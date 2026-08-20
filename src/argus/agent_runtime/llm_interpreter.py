@@ -2151,14 +2151,25 @@ async def _dca_contribution_role_audited_response(
                 ),
             }
         )
-    snapshot = request.latest_task_snapshot
     return total_budget_audited_response(
         response=response,
         audit=audit,
-        answers_pending_sizing_question=(
-            _selected_requested_field_base(request) == "capital_amount"
-            or (snapshot is not None and "sizing_amount" in snapshot.pending_needs)
-        ),
+        answers_pending_sizing_question=_turn_answers_pending_sizing_question(request),
+    )
+
+
+def _turn_answers_pending_sizing_question(request: InterpretationRequest) -> bool:
+    """Whether THIS turn answers the runtime's own amount question.
+
+    ``requested_field`` alone is carried forward while a pending strategy
+    exists, so it only says a question was asked at some point. When the
+    previous turn's stage outcome is ``await_user_reply`` the field beside it
+    was set by that same clarify, which makes the pair current-turn accurate.
+    """
+    return (
+        _selected_requested_field_base(request) == "capital_amount"
+        and str(request.selected_thread_metadata.get("last_stage_outcome") or "")
+        == "await_user_reply"
     )
 
 

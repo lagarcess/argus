@@ -438,13 +438,16 @@ def total_budget_audited_response(
     capital_provenance = str(
         (draft.field_provenance or {}).get("capital_amount") or ""
     ).casefold()
-    if answers_pending_sizing_question and capital_provenance in {
-        "recurring_contribution",
-        "explicit_recurring_contribution",
-    }:
+    capital_is_typed_contribution = (
+        draft.recurring_contribution is not None
+        or capital_provenance
+        in {"recurring_contribution", "explicit_recurring_contribution"}
+    )
+    if answers_pending_sizing_question and capital_is_typed_contribution:
         # The runtime asked "how much per purchase?" and the primary typed the
-        # answer as the contribution: the question fixed the money role, so a
-        # budget claim cannot re-role it. A fresh message with budget wording
+        # answer as the contribution — the same definition the seeded branch
+        # above uses. The question fixed the money role, so a budget claim
+        # cannot re-role it. A fresh message with budget wording
         # ("$200,000 of capital") still demotes, whatever the provenance says.
         return response.model_copy(
             update={

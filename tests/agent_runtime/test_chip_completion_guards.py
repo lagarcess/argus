@@ -234,6 +234,42 @@ class TestSizingAnswerSurvivesBudgetAudit:
         assert audited_draft.total_capital == 200000.0
         assert audited.requires_clarification
 
+    def test_typed_recurring_contribution_also_survives(self) -> None:
+        # The admission mirrors the seeded branch's definition exactly: a
+        # present recurring_contribution is a typed contribution even without
+        # a provenance entry, so the localized ceiling recovery cannot re-role
+        # it back into a budget.
+        from argus.agent_runtime.interpreter.dca_audits import (
+            total_budget_audited_response,
+        )
+
+        draft = _pending_shaped_draft(
+            capital_amount=200.0,
+            recurring_contribution=200.0,
+        )
+        audited = total_budget_audited_response(
+            response=_response(draft),
+            audit=self._audit(),
+            answers_pending_sizing_question=True,
+        )
+        assert audited.candidate_strategy_draft.capital_amount == 200.0
+        assert audited.candidate_strategy_draft.total_capital is None
+        assert not audited.requires_clarification
+
+    def test_sizing_question_signal_is_current_turn_only(self) -> None:
+        # requested_field is carried forward while a pending strategy exists,
+        # so alone it only says a question was once asked; paired with the
+        # previous turn's await_user_reply outcome it is current-turn exact.
+        from argus.agent_runtime.llm_interpreter import (
+            _turn_answers_pending_sizing_question,
+        )
+
+        answering = _request("200$")
+        assert _turn_answers_pending_sizing_question(answering)
+        stale = _request("$200,000 of capital")
+        stale.selected_thread_metadata["last_stage_outcome"] = "ready_to_respond"
+        assert not _turn_answers_pending_sizing_question(stale)
+
     def test_role_ambiguous_sizing_answer_still_becomes_the_budget(self) -> None:
         # Without a provenance claim, the audit's verdict applies even to a
         # sizing answer; the plan then asks for the amount by name.
@@ -256,7 +292,7 @@ class TestSizingAnswerSurvivesBudgetAudit:
 class TestLastResortRepairReservation:
     """Audits can spend the whole allowance; the final rescue still runs."""
 
-    def test_repair_scope_reserves_one_call_after_exhaustion(self) -> None:
+    def test_repair_scope_grants_the_ladder_after_exhaustion(self) -> None:
         state = RunState.new(current_user_message="200$", recent_thread_history=[])
         with turn_execution.turn_execution_scope(entry_state=state) as execution:
             for _ in range(execution.call_allowance):
@@ -264,10 +300,22 @@ class TestLastResortRepairReservation:
             # The corridor is spent: an ordinary call is refused.
             assert turn_execution.reserve_provider_call("interpretation") is None
             with turn_execution.last_resort_repair_scope():
-                first = turn_execution.reserve_provider_call("interpretation_repair")
-                second = turn_execution.reserve_provider_call("interpretation_repair")
-            assert first is not None
-            assert second is None
+                permits = [
+                    turn_execution.reserve_provider_call("interpretation_repair")
+                    for _ in range(turn_execution.LAST_RESORT_REPAIR_CALL_GRANT + 1)
+                ]
+            # The grant covers the repair's model ladder, then stops.
+            granted = permits[: turn_execution.LAST_RESORT_REPAIR_CALL_GRANT]
+            assert all(permit is not None for permit in granted)
+            assert permits[turn_execution.LAST_RESORT_REPAIR_CALL_GRANT] is None
+            # Every granted call is counted in the turn record.
+            assert execution.calls_reserved == (
+                execution.call_allowance + turn_execution.LAST_RESORT_REPAIR_CALL_GRANT
+            )
+            assert (
+                execution.last_resort_repair_grant_used
+                == turn_execution.LAST_RESORT_REPAIR_CALL_GRANT
+            )
 
     def test_within_budget_repair_calls_spend_ordinary_slots(self) -> None:
         state = RunState.new(current_user_message="200$", recent_thread_history=[])
@@ -278,4 +326,4 @@ class TestLastResortRepairReservation:
                     is not None
                 )
             assert execution.calls_reserved == 1
-            assert not execution.last_resort_repair_reserved
+            assert execution.last_resort_repair_calls_granted == 0
