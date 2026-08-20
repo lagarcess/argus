@@ -1522,16 +1522,34 @@ export default function ChatInterface() {
           // app dying silently. Card-state settles (a cancelled confirmation,
           // a persisted terminal outcome) own their artifact and render
           // through their own paths, so the fallback never fires on them.
+          // The frame's sidecars still render here, and open confirmations
+          // settle exactly as they do on a prose-bearing final.
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
-              replaceOrAppendFinalAssistantMessage(prev, assistantId, {
-                id: finalMessageId ?? assistantId,
-                role: "ai",
-                kind: "text",
-                content: t("chat.error_backtest"),
-                actions:
-                  finalTextActions.length > 0 ? finalTextActions : undefined,
-              }),
+              settleOpenConfirmationsFromFinalPayload(
+                replaceOrAppendFinalAssistantMessage(prev, assistantId, {
+                  id: finalMessageId ?? assistantId,
+                  role: "ai",
+                  kind: "text",
+                  content: t("chat.error_backtest"),
+                  actions:
+                    finalTextActions.length > 0 ? finalTextActions : undefined,
+                  recoveryDisplay: finalRecoveryDisplay,
+                  strategyPathContext: finalStrategyPathContext,
+                  assistantRecoveryCode: finalAssistantRecoveryCode,
+                  discovery: finalDiscovery,
+                  memoryRecalls: finalMemoryRecalls,
+                  researchSources: researchSourcesForFinalPayload(finalPayload),
+                  nextExperiments:
+                    nextExperimentRowsFromMetadata(finalPayload) ?? undefined,
+                }),
+                finalPayload,
+                {
+                  action,
+                  finalActions: finalTextActions,
+                  hasFailedAction: finalHasFailedAction,
+                },
+              ),
             ),
           );
         }
