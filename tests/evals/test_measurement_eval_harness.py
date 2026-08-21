@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -83,7 +84,9 @@ def test_measurement_fixtures_do_not_assert_expected_prose() -> None:
                 offending_keys.append(f"{case.id}:{key}")
 
     assert offending_keys == []
-    assert PROSE_JUDGE_RUBRIC_VERSION == "argus-prose-quality-v1"
+    # v2 hands the judge the surface rendered beside the reply (issue #516);
+    # the discrimination evidence lives in docs/reports/evidence/issue-516/.
+    assert PROSE_JUDGE_RUBRIC_VERSION == "argus-prose-quality-v2"
 
 
 def test_expected_fail_baselines_are_issue_tagged() -> None:
@@ -1097,6 +1100,93 @@ def test_prose_judge_cases_fail_when_assistant_text_is_missing(monkeypatch: Any)
     assert result["status"] == "failed"
     assert result["failed_checks"] == ["prose_judge:missing_assistant_text"]
     assert result["prose_judge"]["failed_criteria"] == ["missing_assistant_text"]
+
+
+def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
+    monkeypatch: Any,
+) -> None:
+    """Issue #516: an honest one-sentence framing is only judgeable next to
+    the rows and sources the interface renders below it."""
+    case = harness.EvalCase(
+        id="judge-sees-the-screen",
+        category="asset_discovery_routing",
+        prompt="find me stocks that have recently IPO'ed",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="conversation_followup",
+            capability_verdict="answer_only",
+        ),
+        prose_judge_criteria=("honesty",),
+    )
+    discovery = {
+        "kind": "asset_discovery",
+        "retrieved_at": "2026-08-16T14:02:11+00:00",
+        "sources": [
+            {
+                "title": "Recent IPO listings",
+                "domain": "nasdaq.com",
+                "url": "https://nasdaq.com/recent-ipos",
+                "source_date": "2026-08-14",
+            }
+        ],
+        "candidates": [
+            {
+                "symbol": "MDLN",
+                "name": "Medline Industries",
+                "reason_text": "Listed in early August 2026.",
+            }
+        ],
+        "unverified_names": [],
+    }
+    monkeypatch.setattr(
+        harness,
+        "interpret_stage",
+        lambda **_kwargs: SimpleNamespace(
+            outcome="ready_to_respond",
+            patch={
+                "intent": "conversation_followup",
+                "assistant_response": (
+                    "Here are the stocks that recently completed their IPOs."
+                ),
+                "discovery": discovery,
+            },
+        ),
+    )
+    captured_payloads: list[dict[str, Any]] = []
+
+    async def capture_judge_call(**kwargs: Any) -> harness.ProseJudgeResponse:
+        assert kwargs["messages"][0]["content"] == harness.PROSE_JUDGE_RUBRIC
+        captured_payloads.append(json.loads(kwargs["messages"][1]["content"]))
+        return harness.ProseJudgeResponse.model_validate(
+            {"pass": True, "failed_criteria": [], "notes": ""}
+        )
+
+    monkeypatch.setattr(harness, "invoke_openrouter_json_schema", capture_judge_call)
+
+    result = harness.run_eval_case(case)
+
+    assert len(captured_payloads) == 1
+    surface = captured_payloads[0]["rendered_beside_reply"]
+    assert surface["discovery_rows"] == [
+        {
+            "symbol": "MDLN",
+            "name": "Medline Industries",
+            "reason_text": "Listed in early August 2026.",
+        }
+    ]
+    assert surface["discovery_sources"] == [
+        {
+            "title": "Recent IPO listings",
+            "domain": "nasdaq.com",
+            "source_date": "2026-08-14",
+        }
+    ]
+    # The retained record equals the exact surface the judge received.
+    assert result["prose_judge"]["judged_rendered_context"]["text"] == json.dumps(
+        surface, sort_keys=True
+    )
+    assert result["prose_judge"]["rubric_version"] == "argus-prose-quality-v2"
 
 
 def test_prose_judge_route_receipt_is_included_in_case_cost_evidence(

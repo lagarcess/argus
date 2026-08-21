@@ -67,9 +67,16 @@ def test_failed_prose_criterion_serializes_the_text_that_produced_it(
     tmp_path: Any,
 ) -> None:
     judged_inputs: list[str] = []
+    judged_surfaces: list[dict[str, Any]] = []
 
-    def failing_judge(*, case: harness.EvalCase, assistant_text: str) -> dict[str, Any]:
+    def failing_judge(
+        *,
+        case: harness.EvalCase,
+        assistant_text: str,
+        rendered_beside_reply: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         judged_inputs.append(assistant_text)
+        judged_surfaces.append(rendered_beside_reply or {})
         return {
             "pass": False,
             "failed_criteria": ["honesty"],
@@ -90,6 +97,10 @@ def test_failed_prose_criterion_serializes_the_text_that_produced_it(
     assert evidence["truncated"] is False
     assert evidence["redactions"] == []
     assert result["prose_judge"]["requested_criteria"] == ["honesty"]
+    # The rendered-surface record binds to the same value the judge received,
+    # so a verdict cannot be attributed to a screen the judge never saw.
+    context_evidence = result["prose_judge"]["judged_rendered_context"]
+    assert context_evidence["text"] == json.dumps(judged_surfaces[0], sort_keys=True)
 
     # The evidence must survive serialization, not just live in memory.
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")

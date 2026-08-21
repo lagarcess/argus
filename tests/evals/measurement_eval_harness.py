@@ -32,7 +32,11 @@ from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
     measurement_fixture_documents,
 )
-from tests.evals.measurement_outcome import compare_offered, offered_to_user
+from tests.evals.measurement_outcome import (
+    compare_offered,
+    offered_to_user,
+    rendered_beside_reply,
+)
 from tests.evals.prose_evidence import judged_prose_evidence
 
 LOCKED_EVAL_CATEGORIES = {
@@ -46,13 +50,25 @@ LOCKED_EVAL_CATEGORIES = {
     "asset_discovery_routing",
     "dca_capital_semantics",
 }
-PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v1"
+PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v2"
 PROSE_JUDGE_RUBRIC = """
-Version: argus-prose-quality-v1
+Version: argus-prose-quality-v2
 
 Judge only the prose qualities listed in the case. Do not grade asset symbols,
 dates, strategy type, benchmark, stage outcome, or executable capability truth;
 those are checked by typed assertions outside this judge.
+
+The reply is not the whole screen. rendered_beside_reply is the complete list
+of what the interface renders next to the assistant text on the same turn:
+discovery rows with their source list, pressable recovery options, and
+follow-up experiment rows. Voiced prose often only frames that surface, so
+judge each claim against the prose and the rendered surface together: a
+sentence that introduces or summarizes rows, sources, or options rendered
+beside it is supported by them, and a claim that neither the prose nor the
+rendered surface supports is still unsupported. An empty rendered_beside_reply
+is not missing data; it means the interface rendered nothing beside the prose,
+so a reply that presents results or options as delivered when neither the
+prose nor the rendered surface contains them is unsupported.
 
 Allowed prose criteria:
 - recovery_tone: the user is not blamed, and the response keeps the idea usable.
@@ -248,12 +264,15 @@ def run_eval_case(
     failed_checks = typed_expectation_failures(case=case, outcome=typed_outcome)
     judge_result = None
     if run_prose_judge and case.prose_judge_criteria:
-        assistant_text = _assistant_text(
-            _final_patch(
-                interpret_result=interpret_result,
-                confirm_result=confirm_result,
-                clarify_result=clarify_result,
-            )
+        judged_final_patch = _final_patch(
+            interpret_result=interpret_result,
+            confirm_result=confirm_result,
+            clarify_result=clarify_result,
+        )
+        assistant_text = _assistant_text(judged_final_patch)
+        rendered_surface = rendered_beside_reply(
+            final_patch=judged_final_patch,
+            interpret_patch=interpret_result.patch,
         )
         if not assistant_text.strip():
             judge_result = _missing_prose_judge_result()
@@ -264,6 +283,7 @@ def run_eval_case(
                 judge_result = judge_prose_quality(
                     case=case,
                     assistant_text=assistant_text,
+                    rendered_beside_reply=rendered_surface,
                 )
             finally:
                 route_receipts.extend(
@@ -275,10 +295,13 @@ def run_eval_case(
                     f"prose_judge:{criterion}"
                     for criterion in judge_result["failed_criteria"]
                 )
-        # Bound to the same local the judge received, so the artifact cannot
-        # attribute a verdict to prose the judge never saw.
+        # Bound to the same locals the judge received, so the artifact cannot
+        # attribute a verdict to prose or a rendered surface the judge never saw.
         judge_result["requested_criteria"] = list(case.prose_judge_criteria)
         judge_result["judged_assistant_text"] = judged_prose_evidence(assistant_text)
+        judge_result["judged_rendered_context"] = judged_prose_evidence(
+            json.dumps(rendered_surface, sort_keys=True)
+        )
 
     status = _result_status(failed_checks, expected_fail=case.expected_fail)
     return {
@@ -476,9 +499,18 @@ def expected_fail_issue_for_result(result: dict[str, Any]) -> str | None:
     return issue if isinstance(issue, str) and issue else None
 
 
-def judge_prose_quality(*, case: EvalCase, assistant_text: str) -> dict[str, Any]:
+def judge_prose_quality(
+    *,
+    case: EvalCase,
+    assistant_text: str,
+    rendered_beside_reply: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     response = asyncio.run(
-        _judge_prose_quality_async(case=case, assistant_text=assistant_text)
+        _judge_prose_quality_async(
+            case=case,
+            assistant_text=assistant_text,
+            rendered_beside_reply=rendered_beside_reply or {},
+        )
     )
     if response is None:
         return {
@@ -625,6 +657,7 @@ async def _judge_prose_quality_async(
     *,
     case: EvalCase,
     assistant_text: str,
+    rendered_beside_reply: dict[str, Any],
 ) -> ProseJudgeResponse | None:
     payload = {
         "case_id": case.id,
@@ -634,6 +667,7 @@ async def _judge_prose_quality_async(
         "prompt": case.prompt,
         "criteria": list(case.prose_judge_criteria),
         "assistant_text": assistant_text,
+        "rendered_beside_reply": rendered_beside_reply,
     }
     result = await invoke_openrouter_json_schema(
         task="chat_composer",
