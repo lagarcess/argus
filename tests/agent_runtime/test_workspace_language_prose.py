@@ -258,3 +258,51 @@ def test_every_reachable_reason_code_is_localized(
             f"{label} emits reason_code {contract['reason_code']!r} with no "
             f"{language} copy under {namespace}"
         )
+
+
+# ── The confirm stage: strategy.assumptions is interpreter-owned (#508) ──────
+
+
+def test_confirm_stage_does_not_fabricate_english_assumption_prose() -> None:
+    """The confirmation payload carries the interpreter's assumptions verbatim.
+
+    The confirm stage used to overwrite `strategy.assumptions` with its own
+    English strip ("$10,000 starting capital", "1D bars", "No fees", ...),
+    which reached Spanish turns through the stream payload, the interpreter's
+    prior-strategy context, and the deterministic assumptions answer. The card
+    builds its localizable strip from typed facts, so the runtime dict must
+    hold only what interpretation produced.
+    """
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.confirm import confirm_stage
+    from argus.agent_runtime.state.models import RunState, StrategySummary
+
+    interpreter_assumptions = ["interpreter-owned assumption"]
+    state = RunState.new(
+        current_user_message="Prueba comprar y mantener AAPL desde 2023.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10000,
+        date_range={"start": "2023-01-01", "end": "2024-12-31"},
+        assumptions=list(interpreter_assumptions),
+    )
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        language="es-419",
+    )
+
+    assert result.outcome == "await_approval"
+    for strategy in (
+        result.patch["candidate_strategy_draft"],
+        result.patch["confirmation_payload"]["strategy"],
+    ):
+        assert strategy["assumptions"] == interpreter_assumptions
