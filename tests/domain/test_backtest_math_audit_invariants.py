@@ -13,10 +13,7 @@ from argus.domain.backtesting.coverage import (
     build_metric_time_basis,
     prepare_market_data,
 )
-from argus.domain.backtesting.metrics import (
-    _compute_metrics,
-    _compute_metrics_from_equity,
-)
+from argus.domain.backtesting.metrics import _compute_metrics_from_equity
 from argus.domain.backtesting.runner import compute_alpha_metrics
 from argus.domain.market_data.capabilities import EquityMarketSession
 
@@ -618,36 +615,24 @@ def test_unrepresentable_short_window_annualization_does_not_abort_either_path(
     assert performance["annualized_return_pct"] is None
 
 
-@pytest.mark.parametrize("metric_path", ["returns", "equity"])
-def test_total_loss_annualizes_to_negative_one_hundred_in_both_metric_paths(
-    metric_path: str,
-) -> None:
+def test_total_loss_annualizes_to_negative_one_hundred() -> None:
     index = pd.DatetimeIndex(["2025-01-01", "2025-01-02"], tz="UTC")
     time_basis = build_metric_time_basis(
         asset_class="crypto",
         timeframe="1D",
         effective_index=index,
     )
-    if metric_path == "returns":
-        metrics = _compute_metrics(
-            strategy_returns=pd.Series([0.0, -1.0], index=index),
-            benchmark_returns=pd.Series([0.0, 0.0], index=index),
-            allocation_capital=1_000.0,
-            time_basis=time_basis,
-            trade_count=2,
-            closed_trade_pnls=[-1_000.0],
-        )
-    else:
-        metrics = _compute_metrics_from_equity(
-            strategy_equity=pd.Series([1_000.0, 0.0], index=index),
-            benchmark_equity=pd.Series([1_000.0, 1_000.0], index=index),
-            invested_capital=1_000.0,
-            time_basis=time_basis,
-            trade_count=2,
-            closed_trade_pnls=[-1_000.0],
-        )
+    metrics = _compute_metrics_from_equity(
+        strategy_equity=pd.Series([1_000.0, 0.0], index=index),
+        benchmark_equity=pd.Series([1_000.0, 1_000.0], index=index),
+        invested_capital=1_000.0,
+        time_basis=time_basis,
+        trade_count=2,
+        closed_trade_pnls=[-1_000.0],
+    )
 
     assert metrics["performance"]["annualized_return_pct"] == -100.0
+    assert metrics["risk"]["max_drawdown_pct"] == -100.0
 
 
 def test_continuous_daily_dispersion_uses_a_calendar_year() -> None:
@@ -671,9 +656,10 @@ def test_continuous_daily_dispersion_uses_a_calendar_year() -> None:
         index=index,
     )
 
-    # Returns are [0, 0, 0.10], whose sample standard deviation is 0.10/sqrt(3).
-    expected_volatility = (0.10 / sqrt(3.0)) * sqrt(365.2425) * 100.0
-    expected_sharpe = sqrt(365.2425 / 3.0)
+    # The two real return intervals are [0, 0.10]; no fabricated first zero
+    # joins them, so their sample standard deviation is 0.10/sqrt(2).
+    expected_volatility = (0.10 / sqrt(2.0)) * sqrt(365.2425) * 100.0
+    expected_sharpe = sqrt(365.2425 / 2.0)
 
     assert metrics["aggregate"]["risk"]["volatility_pct"] == pytest.approx(
         expected_volatility,
@@ -709,8 +695,8 @@ def test_currency_pair_daily_dispersion_uses_provider_continuous_calendar() -> N
     )
 
     provider_days_per_year = 365.2425
-    expected_volatility = (0.10 / sqrt(3.0)) * sqrt(provider_days_per_year) * 100.0
-    expected_sharpe = sqrt(provider_days_per_year / 3.0)
+    expected_volatility = (0.10 / sqrt(2.0)) * sqrt(provider_days_per_year) * 100.0
+    expected_sharpe = sqrt(provider_days_per_year / 2.0)
 
     assert metrics["aggregate"]["risk"]["volatility_pct"] == pytest.approx(
         expected_volatility,
@@ -883,10 +869,11 @@ def test_equity_intraday_dispersion_uses_real_sessions_and_early_closes(
     )
 
     # Providers emit seven hourly bars for 390 minutes and four for 210 minutes.
-    # The shared calendar basis is 252 * ((7 + 4) / 2) = 1,386 periods.
+    # The shared calendar basis is 252 * ((7 + 4) / 2) = 1,386 periods, over
+    # the ten real return intervals between the eleven bars.
     expected_periods_per_year = 1_386.0
-    expected_volatility = (0.10 / sqrt(11.0)) * sqrt(expected_periods_per_year) * 100.0
-    expected_sharpe = sqrt(expected_periods_per_year / 11.0)
+    expected_volatility = (0.10 / sqrt(10.0)) * sqrt(expected_periods_per_year) * 100.0
+    expected_sharpe = sqrt(expected_periods_per_year / 10.0)
 
     assert metrics["aggregate"]["risk"]["volatility_pct"] == pytest.approx(
         expected_volatility,

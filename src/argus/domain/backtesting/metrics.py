@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from math import expm1, isfinite, log1p, sqrt
 from typing import Any
 
@@ -90,13 +91,85 @@ def _flow_adjusted_returns(
     """Investment performance per interval, with deposits subtracted.
 
     ``r[t] = (E[t] - F[t]) / E[t-1] - 1``. Intervals that begin with no
-    invested value are 0.0, as is the first interval (the pre-trade
-    baseline belongs to #468 for every template).
+    invested value are 0.0, except the first funded bar: its value is the
+    execution jump from the pre-trade cash baseline to the post-fill mark,
+    ``E[fs] / cumulative_flows[fs] - 1``, which is the modeled entry cost
+    and 0.0 without costs (#468).
     """
     flows = external_flows.reindex(strategy_equity.index).fillna(0.0).astype(float)
     previous = strategy_equity.shift(1)
     adjusted = (strategy_equity - flows) / previous - 1.0
-    return adjusted.where(previous > 0.0, 0.0).fillna(0.0)
+    adjusted = adjusted.where(previous > 0.0, 0.0).fillna(0.0)
+    cumulative_flows = flows.cumsum()
+    funded = (cumulative_flows > 0.0).to_numpy()
+    if funded.any():
+        first_funded = int(funded.argmax())
+        if not bool(previous.iloc[first_funded] > 0.0):
+            adjusted.iloc[first_funded] = float(
+                strategy_equity.iloc[first_funded] / cumulative_flows.iloc[first_funded]
+                - 1.0
+            )
+    return adjusted
+
+
+@dataclass(frozen=True)
+class BaselineAnchoredSeries:
+    """The one metric series shape both capital templates share (#468).
+
+    ``period_returns`` carries one flow-adjusted return per bar interval
+    from the first funded bar, with the funding bar's execution jump
+    compounded into the first interval, so entry costs count exactly once
+    at bar-interval duration. ``drawdown_path`` is the wealth path anchored
+    at the 1.0 pre-trade baseline and keeps the funded bar's post-fill mark.
+    """
+
+    period_returns: pd.Series
+    drawdown_path: pd.Series
+
+
+def _baseline_anchored_series(
+    strategy_equity: pd.Series,
+    external_flows: pd.Series,
+) -> BaselineAnchoredSeries:
+    adjusted = _flow_adjusted_returns(strategy_equity, external_flows)
+    flows = external_flows.reindex(strategy_equity.index).fillna(0.0).astype(float)
+    funded = (flows.cumsum() > 0.0).to_numpy()
+    if not funded.any():
+        return BaselineAnchoredSeries(
+            period_returns=pd.Series(dtype=float),
+            drawdown_path=pd.Series([1.0], dtype=float),
+        )
+    first_funded = int(funded.argmax())
+    jump = float(adjusted.iloc[first_funded])
+    period_returns = adjusted.iloc[first_funded + 1 :].copy()
+    if len(period_returns) > 0:
+        period_returns.iloc[0] = (1.0 + jump) * (
+            1.0 + float(period_returns.iloc[0])
+        ) - 1.0
+    wealth = (1.0 + adjusted.iloc[first_funded:]).cumprod()
+    drawdown_path = pd.Series(
+        np.concatenate([[1.0], wealth.to_numpy(dtype=float)]),
+        dtype=float,
+    )
+    return BaselineAnchoredSeries(
+        period_returns=period_returns,
+        drawdown_path=drawdown_path,
+    )
+
+
+def _dispersion_metrics(
+    period_returns: pd.Series,
+    periods_per_year: float,
+) -> tuple[float | None, float | None]:
+    """Volatility percent and Sharpe from real return intervals only.
+
+    Sample dispersion needs at least two intervals; with fewer, both values
+    are null rather than a fabricated zero.
+    """
+    if len(period_returns) < 2:
+        return None, None
+    volatility_pct = float(period_returns.std() * sqrt(periods_per_year) * 100.0)
+    return abs(volatility_pct), _compute_sharpe(period_returns, periods_per_year)
 
 
 def _money_weighted_annual_return_pct(
@@ -153,58 +226,6 @@ def _money_weighted_annual_return_pct(
     return float(rate_pct) if isfinite(rate_pct) else None
 
 
-def _compute_metrics(
-    *,
-    strategy_returns: pd.Series,
-    benchmark_returns: pd.Series,
-    allocation_capital: float,
-    time_basis: MetricTimeBasis,
-    trade_count: int,
-    closed_trade_pnls: Sequence[float],
-) -> dict[str, Any]:
-    strategy_equity = (1.0 + strategy_returns).cumprod()
-    benchmark_equity = (1.0 + benchmark_returns).cumprod()
-
-    total_return = float(strategy_equity.iloc[-1] - 1.0)
-    benchmark_return = float(benchmark_equity.iloc[-1] - 1.0)
-    total_return_pct = total_return * 100.0
-    benchmark_return_pct = benchmark_return * 100.0
-    volatility_pct = float(
-        strategy_returns.std() * sqrt(time_basis.periods_per_year) * 100.0
-    )
-    win_rate = _closed_trade_win_rate(closed_trade_pnls)
-    profit_factor = _compute_profit_factor(closed_trade_pnls)
-
-    return {
-        "performance": {
-            "return_basis": "fixed_capital",
-            "total_return_pct": round(total_return_pct, 2),
-            "benchmark_return_pct": round(benchmark_return_pct, 2),
-            "delta_vs_benchmark_pct": round(total_return_pct - benchmark_return_pct, 2),
-            "profit": round(allocation_capital * total_return, 2),
-            "annualized_return_pct": _rounded_annualized_return_pct(
-                total_return,
-                time_basis,
-            ),
-        },
-        "risk": {
-            "max_drawdown_pct": round(_max_drawdown_pct(strategy_equity), 2),
-            "volatility_pct": round(abs(volatility_pct), 2),
-        },
-        "efficiency": {
-            "win_rate": round(win_rate, 2) if win_rate is not None else None,
-            "total_trades": trade_count,
-            "profit_factor": (
-                round(profit_factor, 2) if profit_factor is not None else None
-            ),
-            "sharpe_ratio": round(
-                _compute_sharpe(strategy_returns, time_basis.periods_per_year),
-                2,
-            ),
-        },
-    }
-
-
 def _compute_dca_metrics(
     *,
     strategy_equity: pd.Series,
@@ -217,20 +238,21 @@ def _compute_dca_metrics(
     """Metrics for a run funded by dated deposits rather than one bankroll.
 
     Deposits are cash arriving, not performance: risk and efficiency read
-    flow-adjusted returns, the headline return is a simple ratio on
-    contributed cash, and the annual rate is money-weighted over the dated
-    flows. Nominal equity still owns ending value, profit, and the chart.
+    the baseline-anchored flow-adjusted series, the headline return is a
+    simple ratio on contributed cash, and the annual rate is money-weighted
+    over the dated flows. Nominal equity still owns ending value, profit,
+    and the chart.
     """
-    adjusted_returns = _flow_adjusted_returns(strategy_equity, external_flows)
-    wealth_index = (1.0 + adjusted_returns).cumprod()
+    anchored = _baseline_anchored_series(strategy_equity, external_flows)
     contribution_return_pct = (
         float(strategy_equity.iloc[-1] / invested_capital - 1.0) * 100.0
     )
     benchmark_return_pct = (
         float(benchmark_equity.iloc[-1] / invested_capital - 1.0) * 100.0
     )
-    volatility_pct = float(
-        adjusted_returns.std() * sqrt(time_basis.periods_per_year) * 100.0
+    volatility_pct, sharpe_ratio = _dispersion_metrics(
+        anchored.period_returns,
+        time_basis.periods_per_year,
     )
     annualized = _money_weighted_annual_return_pct(
         external_flows=external_flows,
@@ -251,8 +273,10 @@ def _compute_dca_metrics(
             ),
         },
         "risk": {
-            "max_drawdown_pct": round(_max_drawdown_pct(wealth_index), 2),
-            "volatility_pct": round(abs(volatility_pct), 2),
+            "max_drawdown_pct": round(_max_drawdown_pct(anchored.drawdown_path), 2),
+            "volatility_pct": (
+                round(volatility_pct, 2) if volatility_pct is not None else None
+            ),
         },
         "efficiency": {
             # An accumulation plan never closes a position, so closed-trade
@@ -260,9 +284,8 @@ def _compute_dca_metrics(
             "win_rate": None,
             "total_trades": trade_count,
             "profit_factor": None,
-            "sharpe_ratio": round(
-                _compute_sharpe(adjusted_returns, time_basis.periods_per_year),
-                2,
+            "sharpe_ratio": (
+                round(sharpe_ratio, 2) if sharpe_ratio is not None else None
             ),
         },
     }
@@ -277,13 +300,24 @@ def _compute_metrics_from_equity(
     trade_count: int,
     closed_trade_pnls: Sequence[float],
 ) -> dict[str, Any]:
-    strategy_returns = strategy_equity.pct_change().fillna(0.0)
+    """Metrics for a run funded by one bankroll on the first bar.
+
+    The bankroll is a single external flow at bar 0, so the risk series is
+    the same baseline-anchored shape the contributions path uses: drawdown
+    starts at the pre-trade capital, a first-bar execution cost is the
+    first period's loss, and no fabricated zero return exists.
+    """
+    external_flows = pd.Series(0.0, index=strategy_equity.index, dtype=float)
+    if len(external_flows) > 0:
+        external_flows.iloc[0] = invested_capital
+    anchored = _baseline_anchored_series(strategy_equity, external_flows)
     total_return = float(strategy_equity.iloc[-1] / invested_capital - 1.0)
     benchmark_return = float(benchmark_equity.iloc[-1] / invested_capital - 1.0)
     total_return_pct = total_return * 100.0
     benchmark_return_pct = benchmark_return * 100.0
-    volatility_pct = float(
-        strategy_returns.std() * sqrt(time_basis.periods_per_year) * 100.0
+    volatility_pct, sharpe_ratio = _dispersion_metrics(
+        anchored.period_returns,
+        time_basis.periods_per_year,
     )
     win_rate = _closed_trade_win_rate(closed_trade_pnls)
     profit_factor = _compute_profit_factor(closed_trade_pnls)
@@ -301,8 +335,10 @@ def _compute_metrics_from_equity(
             ),
         },
         "risk": {
-            "max_drawdown_pct": round(_max_drawdown_pct(strategy_equity), 2),
-            "volatility_pct": round(abs(volatility_pct), 2),
+            "max_drawdown_pct": round(_max_drawdown_pct(anchored.drawdown_path), 2),
+            "volatility_pct": (
+                round(volatility_pct, 2) if volatility_pct is not None else None
+            ),
         },
         "efficiency": {
             "win_rate": round(win_rate, 2) if win_rate is not None else None,
@@ -310,9 +346,8 @@ def _compute_metrics_from_equity(
             "profit_factor": (
                 round(profit_factor, 2) if profit_factor is not None else None
             ),
-            "sharpe_ratio": round(
-                _compute_sharpe(strategy_returns, time_basis.periods_per_year),
-                2,
+            "sharpe_ratio": (
+                round(sharpe_ratio, 2) if sharpe_ratio is not None else None
             ),
         },
     }

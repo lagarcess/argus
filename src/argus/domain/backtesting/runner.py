@@ -25,7 +25,6 @@ from argus.domain.backtesting.execution import (
 )
 from argus.domain.backtesting.metrics import (
     _compute_dca_metrics,
-    _compute_metrics,
     _compute_metrics_from_equity,
     portfolio_value_summary,
 )
@@ -306,28 +305,16 @@ def compute_alpha_metrics(
                 slippage=float(realism["slippage"]),
                 timeframe=config["timeframe"],
             )
-            if has_modeled_costs:
-                # Equity-based math captures the entry-cost hit at t0 that a
-                # pct_change return series cannot see.
-                by_symbol[symbol] = _compute_metrics_from_equity(
-                    strategy_equity=symbol_equity,
-                    benchmark_equity=benchmark_equity,
-                    invested_capital=allocation_capital,
-                    time_basis=symbol_time_basis,
-                    trade_count=_execution_fill_count(execution_events),
-                    closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
-                )
-            else:
-                # Idealized execution still uses the returns-based metric path;
-                # its equity and closed trades come from the same fill ledger.
-                by_symbol[symbol] = _compute_metrics(
-                    strategy_returns=symbol_equity.pct_change().fillna(0.0),
-                    benchmark_returns=benchmark_equity.pct_change().fillna(0.0),
-                    allocation_capital=allocation_capital,
-                    time_basis=symbol_time_basis,
-                    trade_count=_execution_fill_count(execution_events),
-                    closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
-                )
+            # One equity-based metric path with or without modeled costs: the
+            # baseline-anchored series owns the entry-cost hit at t0 (#468).
+            by_symbol[symbol] = _compute_metrics_from_equity(
+                strategy_equity=symbol_equity,
+                benchmark_equity=benchmark_equity,
+                invested_capital=allocation_capital,
+                time_basis=symbol_time_basis,
+                trade_count=_execution_fill_count(execution_events),
+                closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
+            )
 
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
@@ -363,24 +350,14 @@ def compute_alpha_metrics(
         )
     else:
         aggregate_invested = float(config["starting_capital"])
-        if has_modeled_costs:
-            aggregate_metrics = _compute_metrics_from_equity(
-                strategy_equity=aggregate_strategy_equity,
-                benchmark_equity=aggregate_benchmark_equity,
-                invested_capital=aggregate_invested,
-                time_basis=aggregate_time_basis,
-                trade_count=trade_count,
-                closed_trade_pnls=aggregate_closed_trade_pnls,
-            )
-        else:
-            aggregate_metrics = _compute_metrics(
-                strategy_returns=aggregate_strategy_equity.pct_change().fillna(0.0),
-                benchmark_returns=aggregate_benchmark_equity.pct_change().fillna(0.0),
-                allocation_capital=aggregate_invested,
-                time_basis=aggregate_time_basis,
-                trade_count=trade_count,
-                closed_trade_pnls=aggregate_closed_trade_pnls,
-            )
+        aggregate_metrics = _compute_metrics_from_equity(
+            strategy_equity=aggregate_strategy_equity,
+            benchmark_equity=aggregate_benchmark_equity,
+            invested_capital=aggregate_invested,
+            time_basis=aggregate_time_basis,
+            trade_count=trade_count,
+            closed_trade_pnls=aggregate_closed_trade_pnls,
+        )
     if has_modeled_costs and gross_symbol_equity_curves:
         gross_aggregate_equity = _sum_without_edge_backfill(gross_symbol_equity_curves)
         if is_dca:
