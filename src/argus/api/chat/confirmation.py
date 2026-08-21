@@ -70,8 +70,8 @@ def runtime_confirmation_card(
         if str(symbol).strip()
     ]
     assets = ", ".join(symbols) if symbols else "Selected asset"
-    strategy_type = _localized_strategy_slug(strategy, language=language)
-    strategy_label = _localized_strategy_label(strategy, language=language)
+    strategy_type = display_strategy_slug(strategy)
+    strategy_label = display_strategy_type(strategy)
     if format_confirmation_period_func is not None:
         date_range = format_confirmation_period_func(strategy.get("date_range"))
     else:
@@ -83,11 +83,7 @@ def runtime_confirmation_card(
         strategy.get("date_range"),
         display=date_range,
     )
-    title = _confirmation_title(
-        assets=assets,
-        strategy_type=strategy_type,
-        language=language,
-    )
+    title = _confirmation_title(assets=assets, strategy_type=strategy_type)
     launch_payload = payload.get("launch_payload")
     if not isinstance(launch_payload, dict):
         launch_payload = {}
@@ -188,7 +184,6 @@ def runtime_confirmation_card(
         strategy=strategy,
         strategy_label=strategy_label,
         period=summary_period,
-        language=language,
     )
     active_confirmation_id = confirmation_id_from_payload(
         payload,
@@ -253,10 +248,7 @@ def runtime_confirmation_card(
         ),
         "title": title,
         "status": "ready_to_run" if is_ready_to_run else "needs_change",
-        "statusLabel": _confirmation_status_label(
-            is_ready_to_run=is_ready_to_run,
-            language=language,
-        ),
+        "statusLabel": _confirmation_status_label(is_ready_to_run=is_ready_to_run),
         "strategy_type": canonical_strategy_type,
         "summary": summary,
         "rows": rows,
@@ -1373,7 +1365,6 @@ def _confirmation_assumptions(
             _money_assumption(
                 _confirmation_dca_starting_capital(optional_parameters),
                 role="starting_capital",
-                language=language,
             )
         )
         if isinstance(strategy_capital, int | float):
@@ -1381,7 +1372,6 @@ def _confirmation_assumptions(
                 _contribution_assumption(
                     float(strategy_capital),
                     strategy=strategy,
-                    language=language,
                 )
             )
     elif isinstance(strategy_capital, int | float):
@@ -1389,7 +1379,6 @@ def _confirmation_assumptions(
             _money_assumption(
                 float(strategy_capital),
                 role="starting_capital",
-                language=language,
             )
         )
     else:
@@ -1401,7 +1390,6 @@ def _confirmation_assumptions(
                 _money_assumption(
                     float(initial_capital),
                     role="starting_capital",
-                    language=language,
                 )
             )
     timeframe = _optional_parameter_value(optional_parameters, "timeframe")
@@ -1416,7 +1404,7 @@ def _confirmation_assumptions(
         launch_payload=launch_payload or {},
     )
     if execution_costs is not None:
-        assumptions.append(_execution_cost_assumption(execution_costs, language=language))
+        assumptions.append(_execution_cost_assumption(execution_costs))
     # No prose for the zero-cost case: `display_facts` already carries `fees`
     # and `slippage` whenever they are zero, and the card localizes them from
     # there. A second English copy of the same fact is what put "No fees" on a
@@ -1425,7 +1413,6 @@ def _confirmation_assumptions(
         strategy=strategy,
         optional_parameters=optional_parameters,
         launch_payload=launch_payload or {},
-        language=language,
     )
     if benchmark_assumption:
         assumptions.append(benchmark_assumption)
@@ -1518,14 +1505,13 @@ def _confirmation_benchmark_assumption(
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
     launch_payload: dict[str, Any],
-    language: str = "en",
 ) -> str | None:
     symbol = _confirmation_benchmark_symbol(
         strategy=strategy,
         optional_parameters=optional_parameters,
         launch_payload=launch_payload,
     )
-    return _benchmark_assumption(symbol, language=language) if symbol else None
+    return _benchmark_assumption(symbol) if symbol else None
 
 
 def _confirmation_benchmark_symbol(
@@ -1599,7 +1585,7 @@ def _confirmation_execution_costs(
     return None
 
 
-def _execution_cost_assumption(costs: dict[str, float], *, language: str) -> str:
+def _execution_cost_assumption(costs: dict[str, float]) -> str:
     fee_bps = _format_bps(float(costs["fees"]) * 10000.0)
     slippage_bps = _format_bps(float(costs["slippage"]) * 10000.0)
     return f"Modeled costs: {fee_bps} bps fee + {slippage_bps} bps slippage"
@@ -1621,13 +1607,19 @@ def _format_bps(value: float) -> str:
     return f"{rounded:g}"
 
 
+# The card's prose fields are English by design: the frontend localizes from
+# the typed fields beside them (`status`, `strategy_type`,
+# `rows[].key`/`labelKey`, `display_facts`), and these strings stay as
+# persisted-card and old-client compatibility
+# (`docs/CONVERSATIONAL_RUNTIME.md` forbids per-language copy in the runtime).
+# `summary` embeds the language-formatted period and becomes the card
+# message's persisted content, which feeds `last_message_preview`.
 def _confirmation_summary(
     *,
     assets: str,
     strategy: dict[str, Any],
     strategy_label: str,
     period: str,
-    language: str = "en",
 ) -> str:
     strategy_type = executable_strategy_type(strategy)
     if strategy_type == "buy_and_hold":
@@ -1636,11 +1628,11 @@ def _confirmation_summary(
         return f"Ready to test recurring buys for {assets} over {period}."
     return (
         f"Ready to test {assets} with "
-        f"{_summary_strategy_phrase(strategy_label, language=language)} over {period}."
+        f"{_summary_strategy_phrase(strategy_label)} over {period}."
     )
 
 
-def _summary_strategy_phrase(strategy_label: str, *, language: str = "en") -> str:
+def _summary_strategy_phrase(strategy_label: str) -> str:
     phrases = {
         "RSI Threshold": "an RSI threshold",
         "Dip Buying": "a dip-buying rule",
@@ -1712,31 +1704,15 @@ def _article_for(value: str) -> str:
     return "an" if value[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
 
 
-def _localized_strategy_label(
-    strategy: dict[str, Any],
-    *,
-    language: str,
-) -> str:
-    return display_strategy_type(strategy)
-
-
-def _localized_strategy_slug(
-    strategy: dict[str, Any],
-    *,
-    language: str,
-) -> str:
-    return display_strategy_slug(strategy)
-
-
-def _confirmation_title(*, assets: str, strategy_type: str, language: str) -> str:
+def _confirmation_title(*, assets: str, strategy_type: str) -> str:
     return f"{assets} {strategy_type}".strip()
 
 
-def _confirmation_status_label(*, is_ready_to_run: bool, language: str) -> str:
+def _confirmation_status_label(*, is_ready_to_run: bool) -> str:
     return "Ready to run" if is_ready_to_run else "Needs change"
 
 
-def _money_assumption(value: float, *, role: str, language: str) -> str:
+def _money_assumption(value: float, *, role: str) -> str:
     label = (
         "recurring contribution"
         if role == "recurring_contribution"
@@ -1745,16 +1721,11 @@ def _money_assumption(value: float, *, role: str, language: str) -> str:
     return f"${value:,.0f} {label}"
 
 
-def _contribution_assumption(
-    amount: float,
-    *,
-    strategy: dict[str, Any],
-    language: str,
-) -> str:
+def _contribution_assumption(amount: float, *, strategy: dict[str, Any]) -> str:
     return f"{_contribution_row_value(amount, strategy=strategy)} contribution"
 
 
-def _benchmark_assumption(symbol: str, *, language: str) -> str:
+def _benchmark_assumption(symbol: str) -> str:
     return f"Benchmark: {symbol}"
 
 

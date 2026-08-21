@@ -3949,11 +3949,10 @@ def test_search_retest_localizes_the_spanish_confirmation_card(
         assert row.get("labelKey"), "clients localize labels from labelKey"
     rendered = _stable_test_json(spanish).casefold()
     assert "muestra la confirmación" not in rendered
-    # NOTE: the card summary/title remain English because
-    # confirmation.py::_confirmation_summary ignores `language` for every
-    # confirmation in the product. That pre-existing gap is recorded on this
-    # PR and deliberately not fixed here, so `strategy_copy` is not asserted
-    # against the summary.
+    # NOTE: the card summary/title are English by design (#523): clients
+    # localize from the typed fields, and these strings are persisted-card
+    # compatibility. `strategy_copy` is therefore not asserted against the
+    # summary.
     assert strategy_copy
 
 
