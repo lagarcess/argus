@@ -768,6 +768,13 @@ it. Expectations drift as decisions land, so a failing check may be a
 regression, a superseded expectation, or model variance, and the three are
 indistinguishable from one run.
 
+**Founder-locked 2026-08-21.** This eval gate is weak evidence regardless of
+whether an aggregate count rule exists. It measures structured internals, and
+it read green for weeks while all three seeded front-page chips were broken for
+real users. Founder-overseen production browser acceptance is the stronger gate.
+The release manifest's post-deploy checklist decides whether the promotion
+succeeded.
+
 So a red candidate run requires a **baseline run at the deployed production
 SHA**, with identical provider modes, and the two are compared:
 

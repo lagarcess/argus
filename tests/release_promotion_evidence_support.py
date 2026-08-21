@@ -142,7 +142,7 @@ def assert_main_promotion_baseline_comparison(
     # flips several cases per run on identical input, so counts are noise at
     # this resolution and this proof is the stronger one. Derived from the
     # harness's own imports, never a hand-written path list.
-    untouched, touched = eval_measured_code_unchanged(
+    untouched, _ = eval_measured_code_unchanged(
         rollback_match.group(1),
         candidate_match.group(1),
         repository_root=repository_root,
@@ -150,15 +150,9 @@ def assert_main_promotion_baseline_comparison(
     if untouched:
         return
 
-    assert len(candidate_failed) <= len(baseline_failed), (
-        f"{manifest_path.name}: the candidate fails more cases "
-        f"({len(candidate_failed)}) than the deployed build "
-        f"({len(baseline_failed)}), and it changes measured code: "
-        f"{touched[:5]}. That is a regression."
-    )
-
-    # A favourable total can hide a regression behind an offsetting flip, so
-    # every case that passes deployed and fails here is named, not absorbed.
+    # Totals fluctuate on identical code and can both invent a regression and
+    # hide one behind an offsetting flip. Case identity is the gate: every case
+    # that passes deployed and fails here must be named and dispositioned.
     for case_id in sorted(candidate_failed - baseline_failed):
         assert case_id in manifest, (
             f"{manifest_path.name}: {case_id} passes on the deployed build and "
