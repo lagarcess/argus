@@ -1498,7 +1498,9 @@ and `sharpe_ratio` as `null` because sample dispersion is undefined there;
 consumers must hide a `null`, never substitute zero. A flat multi-interval
 series still reports `0.0` volatility and the `0.0` Sharpe sentinel. Bars
 before a contributions run holds any capital carry no return observations.
-Both capital shapes share this one series contract.
+Both capital shapes share this one series contract. `sharpe_ratio` uses a
+zero risk-free rate; the simulator's idle cash also earns zero, so the
+excess-return convention matches the cash model.
 
 ### Return basis
 
