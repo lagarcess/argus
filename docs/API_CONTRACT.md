@@ -1502,7 +1502,14 @@ placing values side by side. `benchmark_return_pct` and
 `delta_vs_benchmark_pct` always use the run's own basis; a contributions-basis
 benchmark receives the identical dated deposit stream, amounts, and modeled
 cost rates as the strategy, which is what keeps the delta valid within one
-run. Stored runs persisted before this field exists carry no `return_basis`;
+run. Benchmark alignment accepts interior data gaps at 80% observation
+coverage and forward-fills them for marking only: a forward-filled price is
+never an executable fill price. A contributions-basis benchmark deposit
+landing on a gap bar keeps its cash-flow date, idles as cash inside benchmark
+equity, and buys at the next observed benchmark close; a deposit with no
+later observed close remains cash in the benchmark's ending value. Missing
+first or last benchmark bars are still rejected as
+`benchmark_data_unavailable`. Stored runs persisted before this field exists carry no `return_basis`;
 readers must treat a missing value on a `dca_accumulation` run as
 `"contributions"` and as `"fixed_capital"` otherwise.
 
