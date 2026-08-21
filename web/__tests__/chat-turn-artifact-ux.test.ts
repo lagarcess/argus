@@ -166,6 +166,12 @@ describe("chat turn artifact UX", () => {
       join(root, "components/chat/StrategyConfirmationCard.tsx"),
       "utf-8",
     );
+    // The card's view model is shared with Copy, so its composition is
+    // asserted where it now lives (#509).
+    const viewModel = readFileSync(
+      join(root, "lib/confirmation-card-view-model.ts"),
+      "utf-8",
+    );
 
     expect(card).toContain("artifactStatusToneClassName");
     expect(card).not.toContain("const confirmationToneClasses");
@@ -176,9 +182,9 @@ describe("chat turn artifact UX", () => {
     expect(card).toContain("activeActions.length > 0");
     expect(card).toContain("confirmation.confirmation_state === \"active\"");
     expect(card).toContain("confirmationCardViewModel");
-    expect(card).toContain("confirmationAssetTitle");
-    expect(card).toContain("confirmationAssumptionDisplay({");
-    expect(card).toContain("assetClass: confirmation.asset_class");
+    expect(viewModel).toContain("confirmationAssetTitle");
+    expect(viewModel).toContain("confirmationAssumptionDisplay({");
+    expect(viewModel).toContain("assetClass: confirmation.asset_class");
     expect(card).not.toContain("confirmation.rows.slice(0, 3)");
     expect(card).not.toContain("sm:grid-cols-3");
     expect(card).not.toContain("opacity-70");

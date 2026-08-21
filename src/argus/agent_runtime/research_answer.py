@@ -193,6 +193,16 @@ async def _dispatch(
     discovery_request: AssetDiscoveryRequest | None,
     decision: InterpretDecision | None,
 ) -> StageResult | None:
+    # One gate above every rail shape. The rail has eight question kinds and
+    # three of them reach a statistics readout by different routes, so
+    # deciding this per kind guarantees the next kind added forgets it. A
+    # typed refusal that already names an asset and the user's window keeps
+    # its recovery route whatever the classifier decided this turn is.
+    from argus.agent_runtime import knowledge_answer as ka
+
+    if ka.refusal_route_survives_classification(interpretation):
+        ka.note_refusal_route_kept(interpretation)
+        return None
     if query.question_kind in ("market_stats", "current_external"):
         return await _legacy_kind_result(
             query=query,

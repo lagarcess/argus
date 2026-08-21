@@ -79,7 +79,8 @@ def test_usage_cost_uses_served_model_tokens_and_every_tool_count() -> None:
     assert packet.usage.web_search_invocations == 3
     assert packet.usage.fetch_url_invocations == 4
     assert packet.usage.invocations == 2
-    assert packet.usage.cost_usd == pytest.approx(0.2185)
+    # 0.2 model tokens + 2*0.005 + 3*0.0025 + 4*0.0005 tool invocations.
+    assert packet.usage.cost_usd == pytest.approx(0.2195)
 
 
 def test_usage_cost_matches_the_committed_live_cached_response() -> None:

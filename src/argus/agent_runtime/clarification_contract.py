@@ -4,7 +4,10 @@ from math import isfinite
 from typing import Any, Literal
 
 from argus.agent_runtime.recovery_messages import recovery_message
-from argus.agent_runtime.simplification_option_contract import simplification_option_kind
+from argus.agent_runtime.simplification_option_contract import (
+    simplification_option_identity,
+    simplification_option_kind,
+)
 from argus.agent_runtime.state.models import StrategySummary
 
 OFFLINE_CLARIFICATION_FALLBACK = recovery_message(
@@ -276,7 +279,7 @@ def _typed_options(response_intent: dict[str, Any]) -> list[dict[str, Any]]:
         replacement_values = option.get("replacement_values")
         explicit_id = option.get("id")
         option_id = (
-            simplification_option_kind(replacement_values)
+            simplification_option_identity(replacement_values)
             or (
                 explicit_id.strip()
                 if isinstance(explicit_id, str) and explicit_id.strip()

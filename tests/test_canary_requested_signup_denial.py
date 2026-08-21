@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
+from argus.api.ops_contract import REQUESTED_SIGNUP_DENIAL_PATH
+from argus.api.routers import ops
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBE = ROOT / ".github" / "canary-requested-signup-denial.py"
@@ -93,7 +95,7 @@ def test_probe_passes_when_policy_denies_the_disabled_email(stub_api: Any) -> No
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "result=passed" in result.stdout
-    assert stub.paths == ["/api/v1/internal/canary/requested-signup-denial"]
+    assert stub.paths == [REQUESTED_SIGNUP_DENIAL_PATH]
     assert stub.authorization_headers == ["Bearer test-ops-token"]
     assert len(stub.requests) == 1
     assert stub.requests[0] == {"email": SIGNUP_EMAIL}
@@ -145,3 +147,7 @@ def test_probe_keeps_the_signup_address_out_of_its_own_output(stub_api: Any) -> 
 
     assert SIGNUP_EMAIL not in result.stdout
     assert SIGNUP_EMAIL not in result.stderr
+
+
+def test_probe_path_is_the_registered_ops_route() -> None:
+    assert REQUESTED_SIGNUP_DENIAL_PATH in {route.path for route in ops.router.routes}

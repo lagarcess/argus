@@ -426,7 +426,10 @@
       "buy_and_hold": "Compare with buy and hold",
       "moving_average_crossover": "Use a supported moving-average crossover",
       "historical_period": "Test it over a historical period",
-      "supported_symbol": "Use a supported stock or crypto symbol"
+      "supported_symbol": "Use a supported stock or crypto symbol",
+      "recurring_only": "Run recurring buys only",
+      "use_as_starting_capital": "Use it as starting capital",
+      "buy_and_hold_with_starting_capital": "Use buy and hold with starting capital"
     },
     "retest": {
       "strategy_family": {
@@ -909,7 +912,13 @@
       "proposal_error": "Could not update memory. Try again.",
       "proposal_saved": "Saved to memory. Manage it in Data Controls under Personalization."
     },
-    "send_busy": "Argus is still finishing the last message. Try again in a moment."
+    "send_busy": "Argus is still finishing the last message. Try again in a moment.",
+    "copy_card": {
+      "assets": "Assets",
+      "period": "Period",
+      "assumptions": "Assumptions",
+      "assistant_explanation": "Assistant explanation"
+    }
   },
   "settings": {
     "title": "Settings",

@@ -22,7 +22,7 @@ from argus.agent_runtime.semantic_integrity import (
     UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
 )
 from argus.agent_runtime.simplification_option_contract import (
-    simplification_option_kind,
+    simplification_option_identity,
 )
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
@@ -750,7 +750,7 @@ def _simplification_options(
                 replacement_values = option.get("replacement_values")
                 raw_option_id = option.get("id")
                 option_id = (
-                    simplification_option_kind(replacement_values)
+                    simplification_option_identity(replacement_values)
                     or (
                         raw_option_id.strip()
                         if isinstance(raw_option_id, str) and raw_option_id.strip()

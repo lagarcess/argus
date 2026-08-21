@@ -29,7 +29,7 @@ import { useArchiveActiveConversation } from "@/components/chat/useArchiveActive
 import { toggleConversationUnread } from "@/components/chat/toggleConversationUnread";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { conversationActivityMutationNoticeDescriptor, useConversationActivity } from "@/components/chat/useConversationActivity";
-import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
+import { chatFinalPayloadOwnsVisibleTerminalArtifact, clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
 import ExpiredGuestSession from "@/components/guest/ExpiredGuestSession";
@@ -174,6 +174,7 @@ import {
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
   chatActionRequestFromAction, chatHttpErrorDisplay,
+  applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
   hasActiveArtifactActionSet,
@@ -374,8 +375,19 @@ export default function ChatInterface() {
   );
   const isStreamingResponse = conversationActivity.isConversationLocked(conversationId);
   const visibleStreamStatus = visibleRequestStatus(streamStatus, isStreamingResponse);
+  const reloadActiveTranscriptRef = useRef<(conversationId: string) => void>(() => {});
   const handleDurableJobCompletion = useCallback((response: BacktestJobResponse) => {
       const targetConversationId = response.job.conversation_id;
+      // A research answer is a new message, so the active view must refetch
+      // it — with the cache entry intact, so navigation takes the refreshing
+      // path instead of a cold retrieval that blanks the view.
+      if (response.job.operation_scope === "chat.research") {
+        const promoted = promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+        if (promoted) {
+          reloadActiveTranscriptRef.current(targetConversationId);
+          return;
+        }
+      }
       invalidateTranscriptForMutation(targetConversationId, "durable_job_completion");
       promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
     }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
@@ -753,6 +765,13 @@ export default function ChatInterface() {
     });
     await handle.completion;
   }
+  useEffect(() => {
+    reloadActiveTranscriptRef.current = (targetConversationId) => {
+      // A locked conversation reconciles through its own terminal path.
+      if (conversationActivity.isConversationLocked(targetConversationId)) return;
+      void navigateConversationTranscript(targetConversationId);
+    };
+  });
   function beginConversationActivityTerminalReadiness(getRequest: () => ChatRequestSession) { const terminalReadiness = createConversationActivityTerminalReadinessSession({ getRequest: () => ({ conversationId: getRequest().identity.conversationId, kind: getRequest().kind }), activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness, reconcileCanonical: (id) => void navigateConversationTranscript(id) }); terminalReadiness.stage(); return terminalReadiness; }
   // ── Init conversation ──────────────────────────────────────────────────────
 
@@ -1492,6 +1511,26 @@ export default function ChatInterface() {
             }
             return normalizeDurableRetryActionHistory(nextMessages);
           });
+        } else if (!chatFinalPayloadOwnsVisibleTerminalArtifact(finalPayload)) {
+          // A final that owns no visible artifact must still yield a visible
+          // turn; card-state settles (a cancelled confirmation, a persisted
+          // outcome) own theirs and never reach this fallback.
+          setMessages((prev) =>
+            applyEmptyFinalFallback(prev, {
+              assistantId,
+              finalMessageId,
+              content: t("chat.error_backtest"),
+              finalActions: finalTextActions,
+              recoveryDisplay: finalRecoveryDisplay,
+              strategyPathContext: finalStrategyPathContext,
+              assistantRecoveryCode: finalAssistantRecoveryCode,
+              discovery: finalDiscovery,
+              memoryRecalls: finalMemoryRecalls,
+              finalPayload,
+              action,
+              hasFailedAction: finalHasFailedAction,
+            }),
+          );
         }
         terminalReadiness.accept(event.data, identityAuthorized);
       }

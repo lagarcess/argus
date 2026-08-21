@@ -17,7 +17,10 @@ API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"
 EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
 # Kept only as a defense-in-depth redaction value for older operator env files.
 PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
-SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"
+SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"
+SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"
+SIGNUP_LOCAL_NONCE="${ARGUS_CANARY_LOCAL_RUN_NONCE:-}"
+SIGNUP_EMAIL=""
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
 OPS_TOKEN="${ARGUS_OPS_TOKEN:-}"
@@ -30,6 +33,7 @@ CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 HARNESS_SHA="${ARGUS_CANARY_HARNESS_SHA:-$CHECKED_OUT_SHA}"
 ALLOW_HARNESS_MISMATCH="${ARGUS_CANARY_ALLOW_HARNESS_MISMATCH:-false}"
 SURFACE="${ARGUS_CANARY_SURFACE:-}"
+CANARY_RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 ARTIFACT_PROBE="${ARGUS_CANARY_BROWSER_ARTIFACT_PROBE:-none}"
 REDACTION_PROBE_VALUE="${ARGUS_CANARY_BROWSER_REDACTION_PROBE_VALUE:-}"
 SIMULATE_REDACTION_FAILURE="${ARGUS_CANARY_REDACT_SIMULATE_FAILURE:-false}"
@@ -53,9 +57,11 @@ BROWSER_SESSION_HANDOFF="$(mktemp)"
 BROWSER_PHASE_OUTPUT="$(mktemp)"
 BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
 SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
+OPS_CURL_CONFIG="$(mktemp)"
 SIGNUP_AUTH_USERS_RESPONSE="$(mktemp)"
 SIGNUP_AUTH_USER_IDS="$(mktemp)"
 SIGNUP_ALLOWLIST_RESPONSE="$(mktemp)"
+SIGNUP_APPROVAL_REQUEST="$(mktemp)"
 API_JOB_RESPONSE="$(mktemp)"
 API_MESSAGES_RESPONSE="$(mktemp)"
 API_SEARCH_RESPONSE="$(mktemp)"
@@ -70,12 +76,16 @@ RECEIPT_ROWS="$(mktemp)"
 chmod 600 "$BROWSER_IDENTITY_HANDOFF" "$BROWSER_PHASE_OUTPUT"
 chmod 600 "$BROWSER_STORAGE_STATE" "$BROWSER_SESSION_HANDOFF"
 chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
+chmod 600 "$OPS_CURL_CONFIG"
 chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
 chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
+chmod 600 "$SIGNUP_APPROVAL_REQUEST"
 printf 'header = "apikey: %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   > "$SERVICE_ROLE_CURL_CONFIG"
 printf 'header = "Authorization: Bearer %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   >> "$SERVICE_ROLE_CURL_CONFIG"
+printf 'header = "Authorization: Bearer %s"\n' "$OPS_TOKEN" \
+  > "$OPS_CURL_CONFIG"
 
 SIGNUP_IDENTITY_SETUP_ATTEMPTED="false"
 BROWSER_SESSION_MINTED="false"
@@ -96,6 +106,8 @@ cleanup() {
   rm -f "$BROWSER_STORAGE_STATE" "$BROWSER_SESSION_HANDOFF"
   rm -f "$BROWSER_PHASE_OUTPUT"
   rm -f "$BROWSER_AUTH_CURL_CONFIG"
+  rm -f "$OPS_CURL_CONFIG"
+  rm -f "$SIGNUP_APPROVAL_REQUEST"
   rm -f \
     "$SERVICE_ROLE_CURL_CONFIG" \
     "$SIGNUP_AUTH_USERS_RESPONSE" \
@@ -1304,13 +1316,71 @@ service_role_curl() {
   curl -fsS --config "$SERVICE_ROLE_CURL_CONFIG" "$@"
 }
 
-signup_identity_is_safe() {
-  CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - <<'PY'
+resolve_signup_identity() {
+  CANARY_SIGNUP_RUN_ID="$SIGNUP_RUN_ID" \
+    CANARY_SIGNUP_RUN_ATTEMPT="$SIGNUP_RUN_ATTEMPT" \
+    CANARY_SIGNUP_LOCAL_NONCE="$SIGNUP_LOCAL_NONCE" \
+    python3 - <<'PY'
 import os
+import re
 
-signup_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
-pinned_signup_email = "delivered@resend.dev"
-raise SystemExit(0 if signup_email == pinned_signup_email else 1)
+run_id = os.environ["CANARY_SIGNUP_RUN_ID"]
+run_attempt = os.environ["CANARY_SIGNUP_RUN_ATTEMPT"]
+local_nonce = os.environ["CANARY_SIGNUP_LOCAL_NONCE"]
+safe_local_nonce = re.fullmatch(
+    r"[a-z0-9](?:[a-z0-9-]{6,40}[a-z0-9])",
+    local_nonce,
+)
+safe_run_id = re.fullmatch(r"[1-9][0-9]*", run_id)
+safe_run_attempt = re.fullmatch(r"[1-9][0-9]*", run_attempt)
+if run_id and run_attempt and not local_nonce:
+    if not (safe_run_id and safe_run_attempt):
+        raise SystemExit(1)
+    print(f"delivered+argus-{run_id}-{run_attempt}@resend.dev")
+elif not run_id and not run_attempt and safe_local_nonce:
+    print(f"delivered+argus-local-{local_nonce}@resend.dev")
+else:
+    raise SystemExit(1)
+PY
+}
+
+signup_identity_is_safe() {
+  CANARY_LOGIN_EMAIL="$EMAIL" \
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
+    CANARY_SIGNUP_RUN_ID="$SIGNUP_RUN_ID" \
+    CANARY_SIGNUP_RUN_ATTEMPT="$SIGNUP_RUN_ATTEMPT" \
+    CANARY_SIGNUP_LOCAL_NONCE="$SIGNUP_LOCAL_NONCE" \
+    python3 - <<'PY'
+import os
+import re
+
+login_email = os.environ["CANARY_LOGIN_EMAIL"].strip().casefold()
+signup_email = os.environ["CANARY_SIGNUP_EMAIL"]
+run_id = os.environ["CANARY_SIGNUP_RUN_ID"]
+run_attempt = os.environ["CANARY_SIGNUP_RUN_ATTEMPT"]
+local_nonce = os.environ["CANARY_SIGNUP_LOCAL_NONCE"]
+safe_local_nonce = re.fullmatch(
+    r"[a-z0-9](?:[a-z0-9-]{6,40}[a-z0-9])",
+    local_nonce,
+)
+safe_run_id = re.fullmatch(r"[1-9][0-9]*", run_id)
+safe_run_attempt = re.fullmatch(r"[1-9][0-9]*", run_attempt)
+if run_id and run_attempt and not local_nonce:
+    expected_signup_email = f"delivered+argus-{run_id}-{run_attempt}@resend.dev"
+    mode_is_safe = bool(safe_run_id and safe_run_attempt)
+elif not run_id and not run_attempt and safe_local_nonce:
+    expected_signup_email = f"delivered+argus-local-{local_nonce}@resend.dev"
+    mode_is_safe = True
+else:
+    expected_signup_email = ""
+    mode_is_safe = False
+raise SystemExit(
+    0
+    if mode_is_safe
+    and signup_email == expected_signup_email
+    and login_email != signup_email.casefold()
+    else 1
+)
 PY
 }
 
@@ -1466,10 +1536,167 @@ verify_no_signup_auth_identity() {
   collect_signup_auth_user_ids && [ ! -s "$SIGNUP_AUTH_USER_IDS" ]
 }
 
+stage_requested_signup_allowlist() {
+  local encoded_email
+  if ! encoded_email="$(encoded_signup_email)"; then
+    return 1
+  fi
+  service_role_curl \
+    -X PATCH \
+    -H "Content-Type: application/json" \
+    -H "Prefer: return=representation" \
+    -d '{"role":"requested","disabled_at":null}' \
+    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.user&disabled_at=not.is.null" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+if (
+    not isinstance(rows, list)
+    or len(rows) != 1
+    or rows[0].get("email") != target
+    or rows[0].get("role") != "requested"
+    or rows[0].get("disabled_at") is not None
+):
+    raise SystemExit("disabled signup identity was not staged for approval")
+PY
+}
+
+resolve_approve_path() {
+  python3 - <<'PY'
+import sys
+
+sys.path.insert(0, "src")
+from argus.api.ops_contract import ACCESS_REQUEST_APPROVE_PATH
+
+print(ACCESS_REQUEST_APPROVE_PATH)
+PY
+}
+
+approve_requested_signup_allowlist() {
+  local approve_path
+  if ! approve_path="$(resolve_approve_path)" || [ -z "$approve_path" ]; then
+    return 1
+  fi
+  if ! CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_APPROVAL_REQUEST" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+normalized_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+pathlib.Path(sys.argv[1]).write_text(
+    json.dumps({"email": normalized_email}, separators=(",", ":")),
+    encoding="utf-8",
+)
+PY
+  then
+    return 1
+  fi
+  curl -q -fsS \
+    --config "$OPS_CURL_CONFIG" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    --data-binary "@$SIGNUP_APPROVAL_REQUEST" \
+    "${API_URL}${approve_path}" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import pathlib
+import sys
+
+try:
+    payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    raise SystemExit("requested signup promotion returned an invalid response") from exc
+if (
+    not isinstance(payload, dict)
+    or set(payload) != {"approved"}
+    or payload["approved"] is not True
+):
+    raise SystemExit("requested signup promotion was not approved")
+PY
+}
+
+verify_welcome_delivery_recorded() {
+  local encoded_email
+  if ! encoded_email="$(encoded_signup_email)"; then
+    return 1
+  fi
+  service_role_curl \
+    "${SUPABASE_URL}/rest/v1/private_alpha_access_welcome_deliveries?recipient_email=eq.${encoded_email}&select=recipient_email,provider_receipt,sent_at" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
+      CANARY_RUN_STARTED_AT="$CANARY_RUN_STARTED_AT" \
+      python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import datetime
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+started = datetime.datetime.fromisoformat(
+    os.environ["CANARY_RUN_STARTED_AT"].replace("Z", "+00:00")
+)
+if not isinstance(rows, list) or len(rows) != 1:
+    raise SystemExit("welcome delivery read-back did not find exactly one row")
+row = rows[0]
+if row.get("recipient_email") != target:
+    raise SystemExit("welcome delivery read-back returned a different recipient")
+receipt = row.get("provider_receipt")
+if not isinstance(receipt, str) or not receipt.strip():
+    raise SystemExit("welcome delivery read-back has no provider receipt")
+sent_raw = row.get("sent_at")
+if not isinstance(sent_raw, str):
+    raise SystemExit("welcome delivery read-back has no sent_at")
+sent = datetime.datetime.fromisoformat(sent_raw.replace("Z", "+00:00"))
+if sent < started:
+    raise SystemExit("welcome delivery read-back predates this canary run")
+PY
+}
+
+cleanup_welcome_artifacts() {
+  CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_APPROVAL_REQUEST" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+normalized_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+pathlib.Path(sys.argv[1]).write_text(
+    json.dumps({"p_email": normalized_email}, separators=(",", ":")),
+    encoding="utf-8",
+)
+PY
+  service_role_curl \
+    -X POST \
+    -H "Content-Type: application/json" \
+    --data-binary "@$SIGNUP_APPROVAL_REQUEST" \
+    "${SUPABASE_URL}/rest/v1/rpc/delete_private_alpha_access_welcome_artifacts" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+if payload is not True:
+    raise SystemExit("welcome artifact cleanup was refused")
+PY
+}
+
 prepare_signup_identity() {
   SIGNUP_IDENTITY_SETUP_ATTEMPTED="true"
   delete_signup_auth_identity &&
     delete_signup_allowlist &&
+    cleanup_welcome_artifacts &&
     insert_disabled_signup_allowlist
 }
 
@@ -1477,6 +1704,7 @@ cleanup_signup_identity() {
   local cleanup_failed=0
   delete_signup_auth_identity || cleanup_failed=1
   delete_signup_allowlist || cleanup_failed=1
+  cleanup_welcome_artifacts || cleanup_failed=1
   return "$cleanup_failed"
 }
 
@@ -1670,6 +1898,9 @@ run_release_coherence_surface() {
   if [ -z "$OPS_TOKEN" ]; then
     fail_canary "auth" "missing_ops_token"
   fi
+  if ! SIGNUP_EMAIL="$(resolve_signup_identity)"; then
+    fail_canary "auth" "canary_signup_identity_not_safe"
+  fi
   if [ -z "$SIGNUP_EMAIL" ]; then
     fail_canary "auth" "missing_canary_signup_email"
   fi
@@ -1686,6 +1917,15 @@ run_release_coherence_surface() {
   fi
   if ! verify_no_signup_auth_identity; then
     fail_canary "auth" "disabled_signup_has_auth_identity"
+  fi
+  if ! stage_requested_signup_allowlist; then
+    fail_canary "auth" "disabled_signup_approval_staging_failed"
+  fi
+  if ! approve_requested_signup_allowlist; then
+    fail_canary "auth" "requested_signup_approval_failed"
+  fi
+  if ! verify_welcome_delivery_recorded; then
+    fail_canary "auth" "welcome_delivery_not_recorded"
   fi
   CANARY_STATUS="passed"
   CANARY_CAPTURE_WRITE_STATUS="not_written_success"

@@ -7,8 +7,10 @@ import {
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import {
   discoverySidecarFromMetadata,
+  researchSourcesForFinalPayload,
   researchSourcesFromMetadata,
 } from "@/lib/chat-discovery-sidecar";
+import { replaceOrAppendFinalAssistantMessage } from "@/lib/chat-send-state";
 import { memoryRecallsFromMetadata } from "@/lib/memory-recalls";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
@@ -467,4 +469,55 @@ export function chatHttpErrorDisplay(
     content: "",
     recoveryDisplay: { kind: "coverage_recovery", code: problemCode },
   };
+}
+
+
+export function applyEmptyFinalFallback(
+  messages: Message[],
+  options: Readonly<{
+    assistantId: string;
+    finalMessageId?: string;
+    content: string;
+    finalActions: NonNullable<Message["actions"]>;
+    recoveryDisplay?: Message["recoveryDisplay"];
+    strategyPathContext?: Message["strategyPathContext"];
+    assistantRecoveryCode?: Message["assistantRecoveryCode"];
+    discovery?: Message["discovery"];
+    memoryRecalls?: Message["memoryRecalls"];
+    finalPayload: Record<string, unknown>;
+    action: Parameters<
+      typeof settleOpenConfirmationsFromFinalPayload
+    >[2]["action"];
+    hasFailedAction: boolean;
+  }>,
+): Message[] {
+  // A final frame that owns no visible terminal artifact still yields a
+  // visible assistant turn: the localized turn-failure copy, the frame's
+  // sidecars, and the same confirmation settle a prose-bearing final runs.
+  return normalizeDurableRetryActionHistory(
+    settleOpenConfirmationsFromFinalPayload(
+      replaceOrAppendFinalAssistantMessage(messages, options.assistantId, {
+        id: options.finalMessageId ?? options.assistantId,
+        role: "ai",
+        kind: "text",
+        content: options.content,
+        actions:
+          options.finalActions.length > 0 ? options.finalActions : undefined,
+        recoveryDisplay: options.recoveryDisplay,
+        strategyPathContext: options.strategyPathContext,
+        assistantRecoveryCode: options.assistantRecoveryCode,
+        discovery: options.discovery,
+        memoryRecalls: options.memoryRecalls,
+        researchSources: researchSourcesForFinalPayload(options.finalPayload),
+        nextExperiments:
+          nextExperimentRowsFromMetadata(options.finalPayload) ?? undefined,
+      }),
+      options.finalPayload,
+      {
+        action: options.action,
+        finalActions: options.finalActions,
+        hasFailedAction: options.hasFailedAction,
+      },
+    ),
+  );
 }

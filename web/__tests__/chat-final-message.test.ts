@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { mergeFinalTextMessage } from "../lib/chat-final-message";
 
 describe("chat final message merge", () => {
@@ -104,5 +107,41 @@ describe("chat final message merge", () => {
         finalActions: [],
       }),
     ).toBe(message);
+  });
+});
+
+describe("chat final frame visibility", () => {
+  test("a final frame with no prose and no artifact still yields a visible turn", () => {
+    // Production 2026-08-11..13: a Spanish chip click got no assistant reply
+    // at all. The backend cannot end a turn silently by construction, so the
+    // last silent shape was a final frame owning no visible terminal
+    // artifact; the handler must render the localized turn-failure copy for
+    // that shape only. A confirmation-cancel success frame (empty text,
+    // confirmation_cancelled set) owns its artifact and must NOT trip it.
+    const chat = readFileSync(
+      join(__dirname, "..", "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const finalHandler = chat.slice(
+      chat.indexOf("} else if (finalText) {"),
+      chat.indexOf("terminalReadiness.accept(event.data, identityAuthorized)"),
+    );
+    expect(finalHandler).toContain(
+      "} else if (!chatFinalPayloadOwnsVisibleTerminalArtifact(finalPayload)) {",
+    );
+    expect(finalHandler).toContain('content: t("chat.error_backtest")');
+    expect(finalHandler).toContain("applyEmptyFinalFallback");
+    const projection = readFileSync(
+      join(__dirname, "..", "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
+    const fallback = projection.slice(
+      projection.indexOf("export function applyEmptyFinalFallback"),
+    );
+    // The fallback renders the frame's sidecars and settles confirmations
+    // exactly as a prose-bearing final does.
+    expect(fallback).toContain("settleOpenConfirmationsFromFinalPayload");
+    expect(fallback).toContain("recoveryDisplay: options.recoveryDisplay");
+    expect(fallback).toContain("researchSourcesForFinalPayload");
   });
 });

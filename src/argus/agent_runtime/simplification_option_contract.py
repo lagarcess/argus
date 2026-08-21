@@ -9,7 +9,10 @@ from argus.agent_runtime.strategy_contract import canonical_strategy_type
 SimplificationOptionKind = Literal[
     "rsi_threshold",
     "buy_and_hold",
+    "buy_and_hold_with_starting_capital",
     "moving_average_crossover",
+    "recurring_only",
+    "use_as_starting_capital",
 ]
 
 
@@ -27,11 +30,41 @@ def simplification_option_kind(
     if replacement_values.get("rule_family") == "moving_average_crossover":
         return "moving_average_crossover"
     strategy_type = canonical_strategy_type(replacement_values.get("strategy_type"))
+    if (
+        strategy_type == "buy_and_hold"
+        and replacement_values.get("initial_capital") is not None
+    ):
+        # The DCA ceiling recovery's strategy-switch option: the money funds
+        # the switched plan, which is a different offer than comparing.
+        return "buy_and_hold_with_starting_capital"
     if strategy_type == "buy_and_hold":
         return "buy_and_hold"
     if strategy_type == "moving_average_crossover":
         return "moving_average_crossover"
+    # The DCA ceiling recovery's money-role options: both must localize, so
+    # each carries a typed kind rather than only its compatibility label.
+    if replacement_values.get("ignore_initial_capital") is True:
+        return "recurring_only"
+    if replacement_values.get("initial_capital") is not None:
+        return "use_as_starting_capital"
     return None
+
+
+# Kinds that carry no value of their own. Only these may serve as an option
+# identity: a value-bearing kind (the starting-capital pair) names WHAT the
+# option does but not WHICH one it is — the amount is the point — so it must
+# never become an option id, a dedup key, or a selection short-circuit.
+_VALUE_FREE_KINDS: frozenset[str] = frozenset(
+    {"rsi_threshold", "buy_and_hold", "moving_average_crossover", "recurring_only"}
+)
+
+
+def simplification_option_identity(
+    replacement_values: Any,
+) -> SimplificationOptionKind | None:
+    """The kind, only where it can stand in for the whole option."""
+    kind = simplification_option_kind(replacement_values)
+    return kind if kind in _VALUE_FREE_KINDS else None
 
 
 def simplification_option_matches_selection(
@@ -44,8 +77,8 @@ def simplification_option_matches_selection(
         dict,
     ):
         return False
-    selected_kind = simplification_option_kind(selected_replacement_values)
-    option_kind = simplification_option_kind(option_replacement_values)
+    selected_kind = simplification_option_identity(selected_replacement_values)
+    option_kind = simplification_option_identity(option_replacement_values)
     if selected_kind is not None or option_kind is not None:
         return selected_kind == option_kind
     if not selected_replacement_values:

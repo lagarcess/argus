@@ -56,10 +56,12 @@ MODEL_RATE_TABLE_USD_PER_MILLION: dict[str, tuple[ModelTokenRate, ...]] = {
     ),
 }
 
+# Tool rates verified 2026-08-19 against docs.perplexity.ai and a live
+# response; fetch_url bills $0.0005 per invocation.
 TOOL_RATE_TABLE_USD_PER_INVOCATION: dict[str, Decimal] = {
     "finance_search": Decimal("0.005"),
     "web_search": Decimal("0.0025"),
-    "fetch_url": Decimal("0.00025"),
+    "fetch_url": Decimal("0.0005"),
 }
 
 

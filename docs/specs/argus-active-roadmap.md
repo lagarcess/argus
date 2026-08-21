@@ -588,6 +588,102 @@ profile and fall back to the nameless pool.
 
 ## Landed this cycle
 
+- **Never dead-end, never invent** (PR #522, closes the discovery half of #499).
+  A search that finds assets it cannot price now names them and says why,
+  instead of answering "I could not confirm any of the names I found" and
+  stopping. Provider outages no longer read as facts about the asset: the
+  tradability probe returns three values, so `market_data_empty` is about the
+  symbol, `market_data_unavailable` is about us, and an unknown takes the
+  retryable route rather than telling a user Bitcoin is unconfirmable.
+
+  The xhigh review found ten defects and every one reproduced. Its thesis is
+  worth keeping: **each fix had been placed where the symptom was seen rather
+  than where the fact is owned**, so the guard covered the path driven in a
+  browser and missed the paths production uses. Three findings showed the very
+  dead end this PR fixes still reachable through an unguarded route. The round
+  closed by moving four facts to four owners instead of patching ten sites.
+
+  Two measurement lessons came out of it:
+
+  - **A dead assertion is worse than no assertion.** `named_unavailable` read
+    the sidecar's ungated list while the prose named only what survived a
+    different gate, so the case shipped green on the exact reply it was written
+    to catch. The "draw dependence" explanation given for it was wrong, and was
+    retracted on the evidence.
+  - **Founder decision 2026-08-19:** naming discards is owed only when the turn
+    offered nothing. Beside runnable rows it is noise, and the pipeline's
+    deliberate silent-filtering contract stands.
+
+- **Front-page chips now complete** (PR #524, merged `713b79d4`). Production data for
+  2026-08-11 to 08-13 (37 real users, 42 sessions, **2 returning**) showed all
+  three seeded chips failing: Netflix 0/3 in English, the Costco comparison
+  complete server-side but invisible until reload, and Coca-Cola dying on
+  "200$", "13,000 pesos", and "un millón de pesos". Root causes were a stale
+  Perplexity `fetch_url` rate rejecting every URL-fetching grounded read, a
+  three-seam stack under bare money answers, a research answer that never
+  rendered in the open view, and a silent empty final frame.
+
+  The lesson is where the constraint actually sits: **every lane run that week
+  was invisible to those 37 people.** The product's front door was broken and
+  the queue was full of work behind it.
+
+  Verified by the captain in a browser on the merged tree **before** merging,
+  after the lane's own report proved insufficient twice: Netflix returns a
+  grounded answer with sources and a backtest bridge, the Costco comparison
+  renders in the open view with no reload, and the chip plus "200$" reaches a
+  KO recurring-buys card. The live DOM was grepped for the exact production
+  death strings; zero hits.
+
+  One review finding was called critical and could not be reproduced on either
+  tree. The fix is harmless and stayed in, but the severity was repeated from a
+  code trace rather than tested, which is the same error as calling a feature
+  working because its eval case is green.
+
+- **Production promotion** (PR #518, merged 2026-08-16 at `31343882`) — 100
+  commits, one theme: **Argus stops discarding what the user said**. Editing a
+  confirmation card applies every operation in all three shapes, category
+  discovery routes on its typed payload and reaches the search path that was
+  already built, DCA metrics measure performance instead of counting deposits,
+  and confirmation prose renders in the workspace language. Recorded in
+  [`2026-08-16-main-production-promotion.md`](../release-manifests/2026-08-16-main-production-promotion.md).
+
+  Measured against the deployed build rather than asserted: production failed
+  14 of 46 cases, the candidate failed 2 of 60, **zero candidate-only
+  failures**, and the compound-edit tier moved from 1 of 9 to 7 of 9.
+
+  Three lessons, each of which changed an outcome:
+
+  - **Lane reports did not survive independent re-measurement.** #514 claimed
+    ten fixes and two held after merge. #510 claimed an edit fix that a later
+    interleaved A/B measured at 2 of 10 on the very baseline containing it. The
+    working method is: re-derive every number from committed scorecards against
+    a baseline you ran yourself, and settle any changed case with an
+    interleaved A/B at frozen commits in one session.
+  - **The model was right and the code threw it away.** On "remove AAPL" three
+    independent model reads were correct and five deterministic layers
+    destroyed them. The case only ever passed when the model *disobeyed* the
+    schema. Two days were spent blaming the LLM for a defect that was never
+    there.
+  - **A green eval is necessary and never sufficient.** Discovery shipped with
+    its case passing, and a user typing "find me trending cryptos" got a dead
+    end, because the case asserted a routing tag and nothing the user receives.
+    Nothing is called working until it has been used as a user, in the app, in
+    both languages.
+
+- **Model-facing text is a measured surface** (PR #513). The interpreter's
+  system prompt and the response schema's field descriptions are fingerprinted
+  against a committed scorecard; changing either requires evidence and one lane
+  holds the surface at a time. This exists because #491 rewrote the shared
+  prompt for a DCA change, passed its own tests and CI, and silently regressed
+  asset extraction, date preservation, and discovery routing.
+
+- **Copy matches the card** (PR #521, closes #509). Clipboard text derives from
+  the same view model both card kinds render, so a Spanish user copying a
+  Spanish card no longer gets English. The English clipboard was broken too,
+  hiding behind a Spanish bug report. `confirmation.summary` is deliberately
+  dropped from copy, founder-approved 2026-08-16: the card never paints it and
+  it was unconditional backend English. The remaining backend half is #523.
+
 - **Production promotion** (PR #441, merged 2026-08-11 at `d67cef92`) — 451
   commits, the first promotion in a month, recorded in
   [`2026-08-11-main-production-promotion.md`](../release-manifests/2026-08-11-main-production-promotion.md).
