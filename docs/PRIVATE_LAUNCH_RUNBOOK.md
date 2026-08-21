@@ -85,18 +85,37 @@ connection.
    session-pooler URL from the operator secret store under the gate-only name
    below. The URL must not contain query parameters or a fragment because libpq
    can use them to override the validated host or user. Do not put it on the
-   command line or rely on a dotenv file. Download the current production
-   project's root CA from Supabase Database Settings and provide its absolute
-   path. The gate forces `sslmode=verify-full`; it cannot fall back to a
-   plaintext connection.
+   command line, and the gate deliberately does not discover dotenv files, so
+   the values must be exported into the running process. The gate forces
+   `sslmode=verify-full`; it cannot fall back to a plaintext connection, which
+   is why it needs the production root CA by absolute path.
 
 ```bash
-export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
-export ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT="<absolute path to production Supabase CA>"
+export ARGUS_PRODUCTION_DATABASE_URL="$SUPABASE_POSTGRES_SESSION_POOLER_URL"
+export ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT="$HOME/.argus/prod-ca-2021.crt"
 ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
 poetry run python scripts/ops/production_migration_gate.py \
   --candidate-sha "$ARGUS_CANDIDATE_SHA" \
   --output temp/release-evidence/production-migration-gate.json
+```
+
+Both are aliases to things that already exist, so neither is a new secret to
+mint. `SUPABASE_POSTGRES_SESSION_POOLER_URL` is in the root `.env`; source it
+read-only and alias it rather than adding a second name for the same value.
+Use the session pooler, not the direct URL, which fails on IPv6 here.
+
+**Keep the CA at `~/.argus/prod-ca-2021.crt`, not in `~/Downloads`.** The
+certificate is public, the same file Supabase serves at a public URL, so it is
+a path and not a credential. But `~/Downloads` is TCC-protected on macOS and a
+freshly downloaded copy carries `com.apple.quarantine`, so an agent process is
+denied even though the file is world-readable and a normal shell reads it
+fine. The gate then reports `must be an absolute readable file`, which reads
+like a missing file and is not. One-time setup:
+
+```bash
+mkdir -p ~/.argus
+cp ~/Downloads/prod-ca-2021.crt ~/.argus/prod-ca-2021.crt
+xattr -c ~/.argus/prod-ca-2021.crt
 ```
 
 The gate reads every migration from the exact candidate Git tree, verifies the
