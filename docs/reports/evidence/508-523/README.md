@@ -40,3 +40,25 @@ asset symbols; `statusLabel` is the i18n default value behind
 cards, so neither paints on current cards. The preview leak is filed as
 its own issue; this lane's #523 fix removes the ignored `language`
 parameters and documents the seam without changing what the card emits.
+
+## Head revalidation
+
+The captures were taken against the source tree at `acf553b7`, the last
+commit that touched runtime, frontend, or test code for the two fixes. Every
+commit on the PR after it is evidence, test-guard, or comment-only:
+`87d43bf0` added this directory, and the review round that followed added
+an AST tripwire to `tests/agent_runtime/test_workspace_language_prose.py`
+and reworded a test comment. None of them can change what the captures
+show, which is verifiable at any head of this PR without a recapture:
+
+```
+git diff acf553b7 <head> --stat -- src web
+```
+
+is empty. The review round also proved the card emission mechanically
+rather than by screenshot: every `runtime_confirmation_card` call across
+the card, API, stage, cost, and DCA suites (56 calls) produced byte-identical
+output on the base and head `confirmation.py`, and injecting the base
+confirm-stage strip into `strategy.assumptions` changes nothing on the card
+in either language. The thread that asked for this note is resolved on
+the PR with the commit that records it.

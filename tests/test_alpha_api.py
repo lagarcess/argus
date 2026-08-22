@@ -3949,10 +3949,10 @@ def test_search_retest_localizes_the_spanish_confirmation_card(
         assert row.get("labelKey"), "clients localize labels from labelKey"
     rendered = _stable_test_json(spanish).casefold()
     assert "muestra la confirmación" not in rendered
-    # NOTE: the card summary/title are English by design (#523): clients
-    # localize from the typed fields, and these strings are persisted-card
-    # compatibility. `strategy_copy` is therefore not asserted against the
-    # summary.
+    # NOTE: the card summary/title are persisted-compat English (#523):
+    # clients localize the card from the typed fields beside them, so the
+    # summary is not asserted against `strategy_copy`. The summary does still
+    # reach readers through `last_message_preview`; that leak is #528.
     assert strategy_copy
 
 
