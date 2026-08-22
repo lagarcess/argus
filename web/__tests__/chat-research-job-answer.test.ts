@@ -2,15 +2,23 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { applyResearchJobAnswer } from "../components/chat/chat-message-projection";
 import type { Message } from "../components/chat/types";
 import type { ApiMessage, BacktestJob } from "../lib/argus-api";
 import {
   applyBacktestJobUpdate,
-  backtestJobAwaitsPolling,
   backtestJobMessageFromApi,
   pendingBacktestJobIds,
 } from "../lib/chat-backtest-jobs";
+
+// Loaded lazily so the pending-set test below fails on behavior, not on a
+// missing export, against a tree that predates the in-place projection.
+async function projection() {
+  const [{ applyResearchJobAnswer }, { backtestJobAwaitsPolling }] = await Promise.all([
+    import("../components/chat/chat-message-projection"),
+    import("../lib/chat-backtest-jobs"),
+  ]);
+  return { applyResearchJobAnswer, backtestJobAwaitsPolling };
+}
 
 const root = join(import.meta.dir, "..");
 
@@ -85,7 +93,8 @@ function answer(): ApiMessage {
 }
 
 describe("research job answer", () => {
-  test("the answer rides the job response and paints in place after its card", () => {
+  test("the answer rides the job response and paints in place after its card", async () => {
+    const { applyResearchJobAnswer } = await projection();
     const succeeded = job({ status: "succeeded", finished_at: "2026-08-22T01:25:58Z" });
     const response = { job: succeeded, run: null, result_message: answer() };
     const later: Message = { id: "later-user", role: "user", kind: "text", content: "thanks" };
@@ -110,7 +119,8 @@ describe("research job answer", () => {
     );
   });
 
-  test("re-polling a settled job never duplicates the answer", () => {
+  test("re-polling a settled job never duplicates the answer", async () => {
+    const { applyResearchJobAnswer } = await projection();
     // A reload re-arms the hydrated card at its persisted "queued" status and
     // polls again; the answer is already in the transcript by then.
     const response = { job: job({ status: "succeeded" }), run: null, result_message: answer() };
@@ -120,7 +130,8 @@ describe("research job answer", () => {
     expect(applyResearchJobAnswer(painted, response)).toBe(painted);
   });
 
-  test("only a succeeded research job's response inserts a message", () => {
+  test("only a succeeded research job's response inserts a message", async () => {
+    const { applyResearchJobAnswer } = await projection();
     const backtest = {
       job: job({ status: "succeeded", operation_scope: "chat.run_backtest" }),
       run: null,
@@ -134,7 +145,7 @@ describe("research job answer", () => {
     expect(applyResearchJobAnswer([card()], withoutAnswer)).toHaveLength(1);
   });
 
-  test("a succeeded research job is terminal for polling; a succeeded backtest keeps polling for its run", () => {
+  test("a succeeded research job is terminal for polling; a succeeded backtest keeps polling for its run", async () => {
     // Keeping a settled research card in the pending set re-fires the durable
     // completion on every effect re-run.
     const research = card(job({ status: "succeeded" }));
@@ -142,11 +153,14 @@ describe("research job answer", () => {
       ...card(job({ id: "job-2", status: "succeeded", operation_scope: "chat.run_backtest" })),
       id: "assistant-job-2",
     };
+    const running = card(job({ id: "job-3", status: "running" }));
 
+    expect(pendingBacktestJobIds([research, backtest, running])).toEqual(["job-2", "job-3"]);
+
+    const { backtestJobAwaitsPolling } = await projection();
     expect(backtestJobAwaitsPolling(research.backtestJob!)).toBe(false);
     expect(backtestJobAwaitsPolling(backtest.backtestJob!)).toBe(true);
-    expect(backtestJobAwaitsPolling(job({ status: "running" }))).toBe(true);
-    expect(pendingBacktestJobIds([research, backtest])).toEqual(["job-2"]);
+    expect(backtestJobAwaitsPolling(running.backtestJob!)).toBe(true);
   });
 
   test("the poller projects the answer and the completion handler never reloads", () => {
