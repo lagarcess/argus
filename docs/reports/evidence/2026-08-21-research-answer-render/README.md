@@ -107,10 +107,11 @@ real Perplexity background runs, one distinct finance-sector comparison per
 cell (an identical question answers from the shared research cache inline,
 with no job; several non-finance ticker sets routed to an inline backtest
 instead, which is interpreter routing, not this lane). Runtime files are
-byte-identical between `2679dd83` and the merge head `dfc06382` (the
-intervening integration commits touch `tests/evals/` and issue-516 evidence
-only), so the cells captured on either side of the merge vouch for the same
-code.
+byte-identical from `2679dd83` through the merge head `dfc06382` to the PR
+head (the intervening integration commits touch `tests/evals/` and issue-516
+evidence only; later lane commits are evidence and the regenerated OpenAPI
+artifact), so the cells captured on either side of the merge vouch for the
+same code.
 
 Per cell, the driver records the transcript `GET …/messages` count before
 and after the card flips (1 = only the pre-send snapshot, so no reload and
