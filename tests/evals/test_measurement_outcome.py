@@ -8,7 +8,11 @@ so the two grow independently.
 
 from __future__ import annotations
 
-from tests.evals.measurement_outcome import compare_offered, offered_to_user
+from tests.evals.measurement_outcome import (
+    compare_offered,
+    offered_to_user,
+    rendered_beside_reply,
+)
 
 
 class TestOfferedReadsWhatTheUserSaw:
@@ -84,3 +88,126 @@ class TestOfferedReadsWhatTheUserSaw:
         compare_offered({"names_unavailable": True}, dead_end, failures)
         assert len(failures) == 1
         assert "did not name what it found" in failures[0]
+
+
+class TestRenderedBesideReply:
+    """Issue #516: the prose judge must see what the reader had on screen."""
+
+    def test_discovery_rows_sources_and_escalation_are_projected(self) -> None:
+        discovery = {
+            "schema_version": 1,
+            "kind": "asset_discovery",
+            "relationship": "category",
+            "query_summary": "stocks that have recently IPO'ed",
+            "retrieved_at": "2026-08-16T14:02:11+00:00",
+            "can_request_search": True,
+            "sources": [
+                {
+                    "title": "Recent IPO listings",
+                    "domain": "nasdaq.com",
+                    "url": "https://nasdaq.com/recent-ipos",
+                    "source_date": "2026-08-14",
+                },
+            ],
+            "candidates": [
+                {
+                    "symbol": "MDLN",
+                    "name": "Medline Industries",
+                    "asset_class": "equity",
+                    "reason_text": "Listed in early August 2026.",
+                    "source_indices": [0],
+                },
+            ],
+            "unverified_names": ["Private Holdings LLC"],
+        }
+        surface = rendered_beside_reply(
+            final_patch={"discovery": discovery},
+            interpret_patch={},
+        )
+        assert surface["discovery_rows"] == [
+            {
+                "symbol": "MDLN",
+                "name": "Medline Industries",
+                "reason_text": "Listed in early August 2026.",
+            }
+        ]
+        # The reader sees titles and domains, not raw URLs or row indices.
+        assert surface["discovery_sources"] == [
+            {
+                "title": "Recent IPO listings",
+                "domain": "nasdaq.com",
+                "source_date": "2026-08-14",
+            }
+        ]
+        assert surface["retrieved_at"] == "2026-08-16T14:02:11+00:00"
+        assert surface["can_request_search_action"] is True
+        # The sidecar's ungated drop list is parsed but never rendered, so
+        # showing it to the judge would misstate what the reader had.
+        assert "Private Holdings LLC" not in str(surface)
+
+    def test_recovery_options_experiments_and_retry_are_projected(self) -> None:
+        surface = rendered_beside_reply(
+            final_patch={
+                "clarification": {
+                    "kind": "unsupported_recovery",
+                    "payload": {"raw_value": "golden cross forecast"},
+                    "options": [
+                        {
+                            "id": "option_0",
+                            "compatibility_label": (
+                                "Test this idea over a historical period"
+                            ),
+                            "replacement_values": {"requested_field": "date_range"},
+                        },
+                        {"id": "buy_and_hold"},
+                    ],
+                },
+                "next_experiments": {
+                    "rows": [{"kind": "benchmark_compare", "label": "Compare vs SPY"}]
+                },
+                "recovery": {"code": "discovery_search_failed", "retryable": True},
+            },
+            interpret_patch={},
+        )
+        assert surface["recovery_options"] == [
+            {"id": "option_0", "label": "Test this idea over a historical period"},
+            {"id": "buy_and_hold"},
+        ]
+        assert surface["next_experiment_rows"] == [
+            {"kind": "benchmark_compare", "label": "Compare vs SPY"}
+        ]
+        assert surface["recovery"] == {
+            "code": "discovery_search_failed",
+            "retryable": True,
+        }
+
+    def test_a_turn_that_rendered_nothing_projects_to_an_empty_surface(self) -> None:
+        assert (
+            rendered_beside_reply(
+                final_patch={"assistant_response": "Plain prose only."},
+                interpret_patch={},
+            )
+            == {}
+        )
+
+    def test_final_patch_wins_over_interpret_patch(self) -> None:
+        surface = rendered_beside_reply(
+            final_patch={"discovery": {"candidates": [{"symbol": "SOL"}]}},
+            interpret_patch={"discovery": {"candidates": [{"symbol": "BTC"}]}},
+        )
+        assert surface["discovery_rows"] == [{"symbol": "SOL"}]
+
+    def test_malformed_payload_shapes_are_ignored(self) -> None:
+        surface = rendered_beside_reply(
+            final_patch={
+                "discovery": {
+                    "candidates": ["not-a-dict", {"symbol": ""}],
+                    "sources": [None, {"title": ""}],
+                },
+                "clarification": {"options": ["not-a-dict", {}]},
+                "next_experiments": {"rows": [{"reason": "no kind or label"}]},
+                "recovery": "not-a-dict",
+            },
+            interpret_patch={},
+        )
+        assert surface == {}
