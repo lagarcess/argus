@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Literal
 
+import numpy as np
 import pandas as pd
 
 from argus.domain.backtesting.config import (
@@ -44,11 +45,14 @@ class DcaSimulationResult:
 
     ``external_flows`` holds the deposit landing on each bar, so metric code
     can subtract exactly the cash this curve invested and nothing else.
+    ``deferred_fill_count`` counts deposits whose buy waited for a later
+    observed price instead of executing on their own bar.
     """
 
     equity_curve: pd.Series
     invested_capital: float
     external_flows: pd.Series
+    deferred_fill_count: int = 0
 
 
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
@@ -327,6 +331,7 @@ def _dca_equity_curve(
     starting_capital: float = 0.0,
     fees: float = 0.0,
     slippage: float = 0.0,
+    observed: pd.Series | None = None,
 ) -> DcaSimulationResult:
     """Value a recurring plan. The seed buys once on the first bar.
 
@@ -334,21 +339,45 @@ def _dca_equity_curve(
     costs, in fractional shares, so no cash waits for a whole share and the
     invested total is the seed plus one contribution per entry. The flow
     series records the same deposits the curve invests, bar by bar.
+
+    ``observed`` marks bars whose price is a real market observation. A
+    deposit keeps its date, but its buy executes at the next observed price
+    and the cash idles in equity until then; a forward-filled price is never
+    a fill price (#469). ``None`` means every bar is observed.
     """
     entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
     fill_price = close * (1.0 + slippage)
     cash_per_share = fill_price * (1.0 + fees)
-    shares_bought = (contribution / cash_per_share).where(entry_mask, 0.0)
     external_flows = pd.Series(contribution, index=close.index, dtype=float).where(
         entry_mask, 0.0
     )
     if starting_capital > 0.0 and not close.empty:
-        seed_shares = starting_capital / float(cash_per_share.iloc[0])
-        shares_bought = shares_bought.copy()
-        shares_bought.iloc[0] = float(shares_bought.iloc[0]) + seed_shares
         external_flows.iloc[0] = float(external_flows.iloc[0]) + starting_capital
+    if observed is None:
+        observed_values = np.ones(len(close), dtype=bool)
+    else:
+        observed_values = (
+            observed.reindex(close.index).fillna(False).astype(bool).to_numpy()
+        )
+    flow_values = external_flows.to_numpy(dtype=float)
+    observed_positions = np.flatnonzero(observed_values)
+    next_observed = np.searchsorted(
+        observed_positions, np.arange(len(close)), side="left"
+    )
+    fillable = next_observed < observed_positions.size
+    invested_cash = np.zeros(len(close), dtype=float)
+    np.add.at(
+        invested_cash,
+        observed_positions[next_observed[fillable]],
+        flow_values[fillable],
+    )
+    deferred_fill_count = int(np.count_nonzero((flow_values > 0.0) & ~observed_values))
+    shares_bought = pd.Series(invested_cash, index=close.index) / cash_per_share
     cumulative_shares = shares_bought.cumsum()
-    equity = cumulative_shares * close
+    pending_cash = pd.Series(
+        flow_values.cumsum() - invested_cash.cumsum(), index=close.index
+    )
+    equity = cumulative_shares * close + pending_cash
     invested_capital = starting_capital + float(entry_mask.sum()) * contribution
     if invested_capital <= 0:
         invested_capital = contribution
@@ -356,4 +385,5 @@ def _dca_equity_curve(
         equity_curve=equity.astype(float),
         invested_capital=invested_capital,
         external_flows=external_flows,
+        deferred_fill_count=deferred_fill_count,
     )

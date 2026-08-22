@@ -60,7 +60,10 @@ def _build_signals(
         entries = pd.Series(False, index=index, dtype=bool)
 
         if cadence == "daily":
-            entries[:] = True
+            # Entry on the first bar of each calendar day present in data,
+            # never once per bar: intraday bars are many bars per day.
+            days = _index_period_series(index, freq="D")
+            entries = days != days.shift(1)
         elif cadence == "weekly":
             # Entry on the first day of each week present in data
             weeks = _index_period_series(index, freq="W")

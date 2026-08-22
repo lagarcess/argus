@@ -84,7 +84,9 @@ def _contribution_dates(period: str) -> list[date]:
     return [pd.Timestamp(value).date() for value in index[entries.to_numpy()]]
 
 
-@pytest.mark.parametrize("period", ["daily", "weekly", "biweekly", "monthly", "quarterly"])
+@pytest.mark.parametrize(
+    "period", ["daily", "weekly", "biweekly", "monthly", "quarterly"]
+)
 def test_no_contribution_ever_lands_on_a_day_the_exchange_was_closed(
     period: str,
 ) -> None:
@@ -122,9 +124,7 @@ def test_a_contribution_dated_the_31st_falls_on_the_next_session() -> None:
     day that month actually has.
     """
     for month in range(1, 13):
-        first_of_next = (
-            date(2024, month + 1, 1) if month < 12 else date(2025, 1, 1)
-        )
+        first_of_next = date(2024, month + 1, 1) if month < 12 else date(2025, 1, 1)
         last_day_of_month = first_of_next - timedelta(days=1)
         requested = min(31, last_day_of_month.day)
         resolved = next_nyse_session(date(2024, month, requested))
@@ -167,3 +167,35 @@ def test_coverage_reads_the_same_calendar_the_contributions_land_on() -> None:
     assert session_dates
     assert not session_dates & NYSE_2024_HOLIDAYS
     assert set(_contribution_dates("monthly")) <= session_dates
+
+
+def test_daily_cadence_contributes_once_per_day_on_intraday_bars() -> None:
+    """A daily plan on hourly bars deposits once per session day, not per bar."""
+    sessions = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    index = pd.DatetimeIndex(
+        [
+            pd.Timestamp(f"{session}T14:30:00Z") + pd.Timedelta(hours=hour)
+            for session in sessions
+            for hour in range(7)
+        ]
+    )
+    config = _dca_config(period="daily", start=sessions[0], end=sessions[-1])
+    config["timeframe"] = "1h"
+
+    entries, _ = _build_signals(config, _session_bars(index))
+
+    contribution_days = [pd.Timestamp(v).date() for v in index[entries.to_numpy()]]
+    assert int(entries.sum()) == len(sessions)
+    assert contribution_days == sessions
+    # Each contribution is its day's first bar.
+    assert all(pd.Timestamp(v).hour == 14 for v in index[entries.to_numpy()])
+
+
+def test_daily_cadence_on_daily_bars_still_contributes_every_session() -> None:
+    index = nyse_session_index(date(2024, 3, 1), date(2024, 3, 29))
+    entries, _ = _build_signals(
+        _dca_config(period="daily", start=date(2024, 3, 1), end=date(2024, 3, 29)),
+        _session_bars(index),
+    )
+
+    assert entries.all()

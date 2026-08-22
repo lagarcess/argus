@@ -106,7 +106,12 @@ def _expected_ledger(
     fee: float = 0.0,
     slippage: float = 0.0,
 ) -> tuple[list[float], list[float], list[float]]:
-    """Equity, deposits, and flow-adjusted returns from first principles."""
+    """Equity, deposits, and flow-adjusted returns from first principles.
+
+    The first funded bar carries the execution jump from deposited cash to
+    the post-fill mark (0 without costs); later intervals subtract the
+    bar's deposit before the ratio.
+    """
     shares = 0.0
     equity: list[float] = []
     flows: list[float] = []
@@ -117,7 +122,7 @@ def _expected_ledger(
         shares += deposit / (price * (1.0 + slippage) * (1.0 + fee))
         equity.append(shares * price)
         flows.append(deposit)
-    adjusted = [0.0]
+    adjusted = [equity[0] / flows[0] - 1.0 if flows[0] > 0.0 else 0.0]
     for position in range(1, len(prices)):
         previous = equity[position - 1]
         if previous > 0.0:
@@ -125,6 +130,14 @@ def _expected_ledger(
         else:
             adjusted.append(0.0)
     return equity, flows, adjusted
+
+
+def _period_returns(adjusted: list[float]) -> list[float]:
+    """The funding jump compounds into the first real bar interval."""
+    if len(adjusted) < 2:
+        return []
+    first = (1.0 + adjusted[0]) * (1.0 + adjusted[1]) - 1.0
+    return [first, *adjusted[2:]]
 
 
 def _sample_std(values: list[float]) -> float:
@@ -147,9 +160,11 @@ def test_audit_example_risk_metrics_come_from_flow_adjusted_returns() -> None:
     aggregate = metrics["aggregate"]
     performance = aggregate["performance"]
 
-    # Independent arithmetic: flow-adjusted returns are [0, -20%, 0, -20%],
-    # wealth compounds to [1.0, 0.8, 0.8, 0.64].
-    adjusted = [0.0, -0.2, 0.0, -0.2]
+    # Independent arithmetic: the three real bar intervals return
+    # [-20%, 0, -20%] (no costs, so the funding jump is zero and no
+    # fabricated first observation exists); wealth compounds through
+    # [1.0, 0.8, 0.8, 0.64] from the 1.0 pre-trade baseline.
+    adjusted = [-0.2, 0.0, -0.2]
     expected_volatility = _sample_std(adjusted) * sqrt(252.0) * 100.0
     expected_sharpe = float(np.mean(adjusted)) / _sample_std(adjusted) * sqrt(252.0)
 
@@ -254,11 +269,13 @@ def test_modeled_cost_ledgers_reconcile_from_prices_and_deposits(
         fee=fee,
         slippage=slippage,
     )
-    wealth = np.cumprod(1.0 + np.array(adjusted))
+    # Drawdown reads the wealth path from the 1.0 pre-trade baseline, so the
+    # first deposit's execution cost is itself a fall from that baseline.
+    wealth = np.cumprod(1.0 + np.array([0.0, *adjusted]))
     expected_drawdown = float(
         (wealth / np.maximum.accumulate(wealth) - 1.0).min() * 100.0
     )
-    expected_volatility = _sample_std(adjusted) * sqrt(252.0) * 100.0
+    expected_volatility = _sample_std(_period_returns(adjusted)) * sqrt(252.0) * 100.0
     expected_return = (equity[-1] / (2.0 * contribution) - 1.0) * 100.0
 
     assert aggregate["performance"]["total_return_pct"] == pytest.approx(
@@ -429,7 +446,9 @@ def test_no_contribution_schedule_enters_the_return_series(
     adjusted = _flow_adjusted_returns(result.equity_curve, result.external_flows)
     price_returns = close.pct_change()
 
-    assert float(adjusted.iloc[0]) == 0.0
+    # Without costs the funding jump is zero to float precision: the deposit
+    # buys shares worth exactly what it paid.
+    assert float(adjusted.iloc[0]) == pytest.approx(0.0, abs=1e-12)
     np.testing.assert_allclose(
         adjusted.to_numpy()[1:],
         price_returns.to_numpy()[1:],

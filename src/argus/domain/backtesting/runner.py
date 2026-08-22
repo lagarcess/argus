@@ -5,6 +5,7 @@ from typing import Any
 
 import pandas as pd
 import vectorbt as vbt
+from loguru import logger
 
 from argus.domain.backtesting.config import _vbt_freq
 from argus.domain.backtesting.coverage import (
@@ -24,7 +25,6 @@ from argus.domain.backtesting.execution import (
 )
 from argus.domain.backtesting.metrics import (
     _compute_dca_metrics,
-    _compute_metrics,
     _compute_metrics_from_equity,
     portfolio_value_summary,
 )
@@ -49,7 +49,7 @@ def build_benchmark_curve(
         end_date=date.fromisoformat(config["end_date"]),
         timeframe=config["timeframe"],
     )
-    aligned, coverage = _align_benchmark_series(
+    aligned, observed, coverage = _align_benchmark_series(
         benchmark_series,
         target_index,
     )
@@ -59,6 +59,7 @@ def build_benchmark_curve(
     return {
         "symbol": benchmark_symbol,
         "equity_curve": normalized.tolist(),
+        "observed_mask": observed.tolist(),
         "total_return_pct": round((float(normalized.iloc[-1]) - 1.0) * 100.0, 2),
         "coverage": coverage,
     }
@@ -67,7 +68,7 @@ def build_benchmark_curve(
 def _align_benchmark_series(
     benchmark_series: pd.Series,
     target_index: pd.DatetimeIndex,
-) -> tuple[pd.Series, dict[str, Any]]:
+) -> tuple[pd.Series, pd.Series, dict[str, Any]]:
     target = pd.DatetimeIndex(target_index)
     if target.empty:
         raise ValueError("market_data_unavailable")
@@ -84,7 +85,8 @@ def _align_benchmark_series(
     if benchmark.index[0] > first_target or benchmark.index[-1] < last_target:
         raise ValueError("benchmark_data_unavailable")
 
-    observed_points = int(benchmark.reindex(target).notna().sum())
+    observed = benchmark.reindex(target).notna()
+    observed_points = int(observed.sum())
     target_points = int(len(target))
     observed_ratio = observed_points / target_points
     min_ratio = 1.0 if target_points <= 2 else _MIN_BENCHMARK_OBSERVATION_COVERAGE
@@ -99,11 +101,33 @@ def _align_benchmark_series(
     )
     if aligned.isna().any():
         raise ValueError("benchmark_data_unavailable")
-    return aligned, {
-        "observed_points": observed_points,
-        "target_points": target_points,
-        "observed_ratio": round(observed_ratio, 4),
-    }
+    return (
+        aligned,
+        observed,
+        {
+            "observed_points": observed_points,
+            "target_points": target_points,
+            "observed_ratio": round(observed_ratio, 4),
+        },
+    )
+
+
+def _benchmark_observed_series(
+    benchmark_curve: dict[str, Any],
+    *,
+    target_index: pd.Index,
+) -> pd.Series | None:
+    """The alignment boundary's record of which benchmark bars are real.
+
+    A curve payload without the mask (injected test curves, stored payloads
+    from before the mask existed) means every bar is an observation.
+    """
+    raw_mask = benchmark_curve.get("observed_mask")
+    if raw_mask is None:
+        return None
+    if len(raw_mask) != len(target_index):
+        raise ValueError("benchmark_data_unavailable")
+    return pd.Series(list(raw_mask), index=target_index, dtype=bool)
 
 
 def _coerce_index_timezone(
@@ -223,6 +247,10 @@ def compute_alpha_metrics(
                 slippage=float(realism["slippage"]),
             )
             symbol_equity = dca_result.equity_curve
+            benchmark_observed = _benchmark_observed_series(
+                benchmark_curve,
+                target_index=close.index,
+            )
             benchmark_result = _dca_equity_curve(
                 close=benchmark_normalized,
                 entries=entries,
@@ -230,7 +258,16 @@ def compute_alpha_metrics(
                 starting_capital=symbol_dca_plan.starting_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
+                observed=benchmark_observed,
             )
+            if benchmark_result.deferred_fill_count:
+                logger.info(
+                    "DCA benchmark deferred {count} contribution fill(s) to the "
+                    "next observed price symbol={symbol} benchmark={benchmark}",
+                    count=benchmark_result.deferred_fill_count,
+                    symbol=symbol,
+                    benchmark=config["benchmark_symbol"],
+                )
             benchmark_equity = benchmark_result.equity_curve
             if has_modeled_costs:
                 gross_result = _dca_equity_curve(
@@ -268,28 +305,16 @@ def compute_alpha_metrics(
                 slippage=float(realism["slippage"]),
                 timeframe=config["timeframe"],
             )
-            if has_modeled_costs:
-                # Equity-based math captures the entry-cost hit at t0 that a
-                # pct_change return series cannot see.
-                by_symbol[symbol] = _compute_metrics_from_equity(
-                    strategy_equity=symbol_equity,
-                    benchmark_equity=benchmark_equity,
-                    invested_capital=allocation_capital,
-                    time_basis=symbol_time_basis,
-                    trade_count=_execution_fill_count(execution_events),
-                    closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
-                )
-            else:
-                # Idealized execution still uses the returns-based metric path;
-                # its equity and closed trades come from the same fill ledger.
-                by_symbol[symbol] = _compute_metrics(
-                    strategy_returns=symbol_equity.pct_change().fillna(0.0),
-                    benchmark_returns=benchmark_equity.pct_change().fillna(0.0),
-                    allocation_capital=allocation_capital,
-                    time_basis=symbol_time_basis,
-                    trade_count=_execution_fill_count(execution_events),
-                    closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
-                )
+            # One equity-based metric path with or without modeled costs: the
+            # baseline-anchored series owns the entry-cost hit at t0 (#468).
+            by_symbol[symbol] = _compute_metrics_from_equity(
+                strategy_equity=symbol_equity,
+                benchmark_equity=benchmark_equity,
+                invested_capital=allocation_capital,
+                time_basis=symbol_time_basis,
+                trade_count=_execution_fill_count(execution_events),
+                closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
+            )
 
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
@@ -325,24 +350,14 @@ def compute_alpha_metrics(
         )
     else:
         aggregate_invested = float(config["starting_capital"])
-        if has_modeled_costs:
-            aggregate_metrics = _compute_metrics_from_equity(
-                strategy_equity=aggregate_strategy_equity,
-                benchmark_equity=aggregate_benchmark_equity,
-                invested_capital=aggregate_invested,
-                time_basis=aggregate_time_basis,
-                trade_count=trade_count,
-                closed_trade_pnls=aggregate_closed_trade_pnls,
-            )
-        else:
-            aggregate_metrics = _compute_metrics(
-                strategy_returns=aggregate_strategy_equity.pct_change().fillna(0.0),
-                benchmark_returns=aggregate_benchmark_equity.pct_change().fillna(0.0),
-                allocation_capital=aggregate_invested,
-                time_basis=aggregate_time_basis,
-                trade_count=trade_count,
-                closed_trade_pnls=aggregate_closed_trade_pnls,
-            )
+        aggregate_metrics = _compute_metrics_from_equity(
+            strategy_equity=aggregate_strategy_equity,
+            benchmark_equity=aggregate_benchmark_equity,
+            invested_capital=aggregate_invested,
+            time_basis=aggregate_time_basis,
+            trade_count=trade_count,
+            closed_trade_pnls=aggregate_closed_trade_pnls,
+        )
     if has_modeled_costs and gross_symbol_equity_curves:
         gross_aggregate_equity = _sum_without_edge_backfill(gross_symbol_equity_curves)
         if is_dca:

@@ -1483,6 +1483,25 @@ equities use 252 sessions plus the real session durations supplied by the same
 market calendar, including early closes and provider-emitted partial final
 candles. Daily equity uses 252 observations per year.
 
+### Pre-trade baseline
+
+Risk statistics anchor at the pre-trade capital baseline: the cash that funds
+the run, meaning the fixed bankroll at the first bar, or the first funded
+bar's deposits on a contributions run. `max_drawdown_pct` reads the wealth
+path from that baseline, so a first-bar execution cost (fees plus slippage)
+is itself a fall from the baseline and can never hide behind a flat
+post-entry price. `volatility_pct` and `sharpe_ratio` use exactly one return
+per real bar interval, with the funding bar's execution jump compounded into
+the first funded interval; no fabricated zero observation joins the sample.
+A window with fewer than two real return intervals reports `volatility_pct`
+and `sharpe_ratio` as `null` because sample dispersion is undefined there;
+consumers must hide a `null`, never substitute zero. A flat multi-interval
+series still reports `0.0` volatility and the `0.0` Sharpe sentinel. Bars
+before a contributions run holds any capital carry no return observations.
+Both capital shapes share this one series contract. `sharpe_ratio` uses a
+zero risk-free rate; the simulator's idle cash also earns zero, so the
+excess-return convention matches the cash model.
+
 ### Return basis
 
 Every performance block declares how its returns relate to capital under
@@ -1502,7 +1521,14 @@ placing values side by side. `benchmark_return_pct` and
 `delta_vs_benchmark_pct` always use the run's own basis; a contributions-basis
 benchmark receives the identical dated deposit stream, amounts, and modeled
 cost rates as the strategy, which is what keeps the delta valid within one
-run. Stored runs persisted before this field exists carry no `return_basis`;
+run. Benchmark alignment accepts interior data gaps at 80% observation
+coverage and forward-fills them for marking only: a forward-filled price is
+never an executable fill price. A contributions-basis benchmark deposit
+landing on a gap bar keeps its cash-flow date, idles as cash inside benchmark
+equity, and buys at the next observed benchmark close; a deposit with no
+later observed close remains cash in the benchmark's ending value. Missing
+first or last benchmark bars are still rejected as
+`benchmark_data_unavailable`. Stored runs persisted before this field exists carry no `return_basis`;
 readers must treat a missing value on a `dca_accumulation` run as
 `"contributions"` and as `"fixed_capital"` otherwise.
 
@@ -1531,9 +1557,12 @@ elapsed-time annualization above.
 Contributions-basis risk and efficiency statistics measure investment
 performance, never deposits. Period returns subtract each bar's external
 deposit before the ratio (`(equity[t] - deposit[t]) / equity[t-1] - 1`), and
-`max_drawdown_pct` reads the wealth index compounded from those
-flow-adjusted returns rather than the nominal equity curve. `volatility_pct`
-and `sharpe_ratio` consume the same flow-adjusted series. Nominal equity
+`max_drawdown_pct` reads the wealth path compounded from those
+flow-adjusted returns rather than the nominal equity curve, anchored at the
+1.0 pre-trade baseline per "Pre-trade baseline" above, so the first
+deposit's execution cost is itself a fall from the baseline.
+`volatility_pct` and `sharpe_ratio` consume the same flow-adjusted series
+under the same baseline contract. Nominal equity
 still owns `profit`, ending value, `portfolio_value_range`, and the chart:
 nominal dollars and performance returns are different series, and a deposit
 step in the chart is correct cash while a deposit-driven return would be a
