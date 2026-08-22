@@ -2189,11 +2189,10 @@ def test_confirm_stage_still_builds_confirmation_card() -> None:
     assert result.patch["confirmation_payload"]["strategy"]["entry_logic"] == (
         "RSI drops below 30"
     )
-    assert (
-        "$1,000 starting capital"
-        in result.patch["candidate_strategy_draft"]["assumptions"]
-    )
-    assert "1D bars" in result.patch["candidate_strategy_draft"]["assumptions"]
+    # #508: the confirm stage passes `assumptions` through untouched; the
+    # confirmation card owns the visible strip via typed display facts.
+    assert result.patch["candidate_strategy_draft"]["assumptions"] == []
+    assert result.patch["confirmation_payload"]["strategy"]["assumptions"] == []
 
 
 def test_confirm_stage_reconciles_effective_window_before_approval(
@@ -2702,7 +2701,7 @@ def test_confirm_stage_revalidates_strategy_viability_after_window_adjustment(
     assert constraint["category"] == "data_window_too_short_for_rule"
 
 
-def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> None:
+def test_confirm_stage_preserves_explicit_benchmark_as_typed_baseline() -> None:
     state = RunState.new(
         current_user_message=(
             "If I bought AAPL at the start of 2024 through the end of 2024, "
@@ -2722,9 +2721,8 @@ def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> Non
     result = confirm_stage(state=state, contract=build_default_capability_contract())
 
     assert result.outcome == "await_approval"
-    assumptions = result.patch["candidate_strategy_draft"]["assumptions"]
-    assert "Benchmark: QQQ" in assumptions
-    assert "Benchmark: SPY" not in assumptions
+    draft = result.patch["candidate_strategy_draft"]
+    assert draft["comparison_baseline"] == "QQQ"
     assert result.patch["confirmation_payload"]["launch_payload"]["benchmark_symbol"] == (
         "QQQ"
     )
@@ -2754,7 +2752,6 @@ def test_confirm_stage_persists_default_benchmark_in_strategy_payload() -> None:
     assert strategy["asset_universe"] == ["AAPL", "MSFT", "TSLA"]
     assert strategy["comparison_baseline"] == "SPY"
     assert confirmation_payload["launch_payload"]["benchmark_symbol"] == "SPY"
-    assert "Benchmark: SPY" in strategy["assumptions"]
 
 
 def test_confirm_stage_persists_runtime_language_in_launch_payload() -> None:
@@ -2886,7 +2883,6 @@ def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
         "start": "2026-01-01",
         "end": "2026-06-02",
     }
-    assert "Through Jun 2" in strategy["assumptions"]
     adjustment = strategy["extra_parameters"]["data_availability_adjustment"]
     assert adjustment == {
         "kind": "latest_complete_daily_data",
@@ -2942,7 +2938,6 @@ def test_confirm_stage_clears_stale_latest_complete_data_adjustment(
     strategy = confirmation_payload["strategy"]
 
     assert strategy["date_range"] == {"start": "2026-01-01", "end": "2026-06-01"}
-    assert "Through Jun 2" not in strategy["assumptions"]
     assert "data_availability_adjustment" not in strategy.get("extra_parameters", {})
     assert confirmation_payload["validation"]["date_adjusted"] is False
 

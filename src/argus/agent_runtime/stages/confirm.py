@@ -32,7 +32,6 @@ from argus.domain.backtesting.confirmation_preflight import (
     materialize_confirmation_strategy,
     prepare_confirmation_launch,
 )
-from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     launch_request_error_code,
@@ -156,15 +155,9 @@ def confirm_stage(
         strategy,
         launch_payload=launch_payload,
     )
-    card_assumptions = _visible_card_assumptions(
-        strategy=canonical_strategy,
-        optional_parameters=optional_parameters,
-    )
-    strategy_with_assumptions = {
-        **canonical_strategy,
-        "assumptions": card_assumptions,
-    }
-    confirmation_payload["strategy"] = strategy_with_assumptions
+    # `assumptions` stays as interpretation produced it: the confirmation card
+    # builds its localizable strip from typed facts, never from this dict (#508).
+    confirmation_payload["strategy"] = canonical_strategy
     confirmation_payload["confirmation_id"] = confirmation_id
     confirmation_payload["artifact_id"] = confirmation_id
     confirmation_payload["launch_payload"] = launch_payload
@@ -172,7 +165,7 @@ def confirm_stage(
         "status": "ready_to_run",
         "executable": True,
         "date_adjusted": (
-            _has_data_availability_adjustment(strategy_with_assumptions)
+            _has_data_availability_adjustment(canonical_strategy)
             or _has_effective_window_adjustment(launch_payload)
         ),
     }
@@ -184,7 +177,7 @@ def confirm_stage(
     return StageResult(
         outcome="await_approval",
         stage_patch={
-            "candidate_strategy_draft": strategy_with_assumptions,
+            "candidate_strategy_draft": canonical_strategy,
             "confirmation_payload": confirmation_payload,
             "artifact_references": [confirmation_reference.model_dump(mode="python")],
             "assistant_prompt": None,
@@ -855,78 +848,6 @@ def _is_zero_assumption(value: Any) -> bool:
         return False
 
 
-def _visible_card_assumptions(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, dict[str, Any]],
-) -> list[str]:
-    assumptions: list[str] = []
-    strategy_type = _resolve_strategy_type(strategy, optional_parameters)
-    strategy_capital = _strategy_capital_amount(strategy)
-    if strategy_capital is not None:
-        if strategy_type == "dca_accumulation":
-            assumptions.append(f"${strategy_capital:,.0f} recurring contribution")
-        else:
-            assumptions.append(f"${strategy_capital:,.0f} starting capital")
-    else:
-        initial_capital = _parameter_value(optional_parameters, "initial_capital")
-        if isinstance(initial_capital, int | float):
-            assumptions.append(f"${float(initial_capital):,.0f} starting capital")
-
-    timeframe = _parameter_value(optional_parameters, "timeframe")
-    if timeframe:
-        assumptions.append(f"{timeframe} bars")
-
-    data_through_assumption = _data_through_assumption(strategy)
-    if data_through_assumption:
-        assumptions.append(data_through_assumption)
-
-    fees = _numeric_cost_value(_parameter_value(optional_parameters, "fees"))
-    slippage = _numeric_cost_value(_parameter_value(optional_parameters, "slippage"))
-    if (fees is not None and fees > 0.0) or (slippage is not None and slippage > 0.0):
-        assumptions.append(
-            "Modeled costs: "
-            f"{_format_basis_points(fees)} bps fee + "
-            f"{_format_basis_points(slippage)} bps slippage"
-        )
-    else:
-        if fees == 0.0:
-            assumptions.append("No fees")
-        if slippage == 0.0:
-            assumptions.append("No slippage")
-
-    benchmark_assumption = _visible_card_benchmark_assumption(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-    )
-    if benchmark_assumption:
-        assumptions.append(benchmark_assumption)
-    return assumptions
-
-
-def _numeric_cost_value(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _format_basis_points(value: float | None) -> str:
-    bps = round(float(value or 0.0) * 10000.0, 2)
-    if bps.is_integer():
-        return str(int(bps))
-    return f"{bps:g}"
-
-
-def _data_through_assumption(strategy: dict[str, Any]) -> str | None:
-    adjustment = _data_availability_adjustment(strategy)
-    if adjustment is None:
-        return None
-    return format_data_through_label(adjustment.get("through")) or None
-
-
 def _has_data_availability_adjustment(strategy: dict[str, Any]) -> bool:
     return _data_availability_adjustment(strategy) is not None
 
@@ -963,26 +884,6 @@ def _data_adjustment_matches_strategy_end(
     return end in (None, "") or str(end) == through
 
 
-def _visible_card_benchmark_assumption(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, dict[str, Any]],
-) -> str | None:
-    for value in (
-        _parameter_value(optional_parameters, "benchmark_symbol"),
-        strategy.get("comparison_baseline"),
-        strategy.get("benchmark_symbol"),
-    ):
-        if isinstance(value, str) and value.strip():
-            return f"Benchmark: {value.strip().upper()}"
-    asset_class = strategy.get("asset_class")
-    if asset_class == "crypto":
-        return "Benchmark: BTC"
-    if asset_class == "equity":
-        return "Benchmark: SPY"
-    return None
-
-
 def _parameter_value(
     optional_parameters: dict[str, dict[str, Any]],
     field_name: str,
@@ -991,71 +892,3 @@ def _parameter_value(
     if not isinstance(parameter, dict):
         return None
     return parameter.get("value")
-
-
-def _strategy_capital_amount(strategy: dict[str, Any]) -> float | None:
-    value = strategy.get("capital_amount")
-    if isinstance(value, int | float):
-        return float(value)
-    extra_parameters = strategy.get("extra_parameters")
-    if isinstance(extra_parameters, dict):
-        for key in ("capital_amount", "recurring_amount", "contribution_amount"):
-            nested_value = extra_parameters.get(key)
-            if isinstance(nested_value, int | float):
-                return float(nested_value)
-    return None
-
-
-def _resolve_strategy_type(
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, dict[str, Any]],
-) -> str:
-    explicit_strategy_type = strategy.get("strategy_type")
-    if isinstance(explicit_strategy_type, str) and explicit_strategy_type:
-        return canonical_strategy_type(
-            explicit_strategy_type,
-            entry_logic=strategy.get("entry_logic"),
-            exit_logic=strategy.get("exit_logic"),
-            cadence=strategy.get("cadence"),
-        )
-
-    extra_parameters = strategy.get("extra_parameters")
-    if isinstance(extra_parameters, dict):
-        nested_strategy_type = extra_parameters.get("strategy_type")
-        if isinstance(nested_strategy_type, str) and nested_strategy_type:
-            return canonical_strategy_type(
-                nested_strategy_type,
-                entry_logic=strategy.get("entry_logic"),
-                exit_logic=strategy.get("exit_logic"),
-                cadence=strategy.get("cadence"),
-            )
-        if extra_parameters.get("cadence"):
-            return "dca_accumulation"
-
-    if strategy.get("cadence") or _resolved_cadence(strategy, optional_parameters):
-        return "dca_accumulation"
-    if strategy.get("entry_logic") or strategy.get("exit_logic"):
-        return "indicator_threshold"
-    return "buy_and_hold"
-
-
-def _resolved_cadence(
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, dict[str, Any]],
-) -> str | None:
-    cadence = strategy.get("cadence")
-    if isinstance(cadence, str) and cadence:
-        return cadence
-
-    extra_parameters = strategy.get("extra_parameters")
-    if isinstance(extra_parameters, dict):
-        nested_cadence = extra_parameters.get("cadence")
-        if isinstance(nested_cadence, str) and nested_cadence:
-            return nested_cadence
-
-    cadence_payload = optional_parameters.get("cadence")
-    if isinstance(cadence_payload, dict):
-        cadence_value = cadence_payload.get("value")
-        if isinstance(cadence_value, str) and cadence_value:
-            return cadence_value
-    return None
