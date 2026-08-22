@@ -3,6 +3,7 @@ import {
   type ApiMessage,
   type AssetClass,
   type ChatActionRequest,
+  type BacktestJobResponse,
 } from "@/lib/argus-api";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import {
@@ -16,6 +17,7 @@ import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
+  RESEARCH_JOB_SCOPE,
 } from "@/lib/chat-backtest-jobs";
 import { retestReceiptFromMetadata } from "@/lib/chat-retest";
 import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
@@ -440,6 +442,37 @@ export function hydrateMessagesFromApi(
     ),
   );
   return { messages: normalized, inputActions: latestInputActions(normalized) };
+}
+
+// A succeeded research job's answer is a new assistant message the job
+// response carries; it renders in place after the job card, the way a run
+// result does, so the open view never has to refetch or blank to show it.
+export function applyResearchJobAnswer(
+  messages: Message[],
+  response: BacktestJobResponse,
+): Message[] {
+  const answer = response.result_message;
+  if (
+    response.job.operation_scope !== RESEARCH_JOB_SCOPE ||
+    response.job.status !== "succeeded" ||
+    !answer ||
+    messages.some((message) => message.id === answer.id)
+  ) {
+    return messages;
+  }
+  const projected = hydrateMessagesFromApi([answer]).messages[0];
+  if (!projected) return messages;
+  const cardIndex = messages.findIndex(
+    (message) =>
+      message.kind === "backtest_job" &&
+      message.backtestJob?.id === response.job.id,
+  );
+  if (cardIndex === -1) return [...messages, projected];
+  return [
+    ...messages.slice(0, cardIndex + 1),
+    projected,
+    ...messages.slice(cardIndex + 1),
+  ];
 }
 
 export function chatStreamErrorText(

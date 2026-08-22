@@ -375,19 +375,10 @@ export default function ChatInterface() {
   );
   const isStreamingResponse = conversationActivity.isConversationLocked(conversationId);
   const visibleStreamStatus = visibleRequestStatus(streamStatus, isStreamingResponse);
-  const reloadActiveTranscriptRef = useRef<(conversationId: string) => void>(() => {});
   const handleDurableJobCompletion = useCallback((response: BacktestJobResponse) => {
+      // A research answer rides the job response and is already projected
+      // in place by the poller, like a run result; nothing here reloads.
       const targetConversationId = response.job.conversation_id;
-      // A research answer is a new message, so the active view must refetch
-      // it — with the cache entry intact, so navigation takes the refreshing
-      // path instead of a cold retrieval that blanks the view.
-      if (response.job.operation_scope === "chat.research") {
-        const promoted = promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
-        if (promoted) {
-          reloadActiveTranscriptRef.current(targetConversationId);
-          return;
-        }
-      }
       invalidateTranscriptForMutation(targetConversationId, "durable_job_completion");
       promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
     }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
@@ -765,13 +756,6 @@ export default function ChatInterface() {
     });
     await handle.completion;
   }
-  useEffect(() => {
-    reloadActiveTranscriptRef.current = (targetConversationId) => {
-      // A locked conversation reconciles through its own terminal path.
-      if (conversationActivity.isConversationLocked(targetConversationId)) return;
-      void navigateConversationTranscript(targetConversationId);
-    };
-  });
   function beginConversationActivityTerminalReadiness(getRequest: () => ChatRequestSession) { const terminalReadiness = createConversationActivityTerminalReadinessSession({ getRequest: () => ({ conversationId: getRequest().identity.conversationId, kind: getRequest().kind }), activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness, reconcileCanonical: (id) => void navigateConversationTranscript(id) }); terminalReadiness.stage(); return terminalReadiness; }
   // ── Init conversation ──────────────────────────────────────────────────────
 

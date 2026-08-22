@@ -2607,7 +2607,14 @@ Both endpoints return:
 Operation precedence is `running > queued > checking > idle`; equal states use
 the newest source timestamp, then prefer a backtest job. Accepted turns and
 queued jobs are `queued`; running turns/jobs are `running`. A succeeded job is
-`checking` until its completed Run and evidence identity can be hydrated.
+`checking` until its result is hydrateable: for a backtest, its completed Run
+and evidence identity; for a `chat.research` job, the answer message named by
+`execution_metadata.research_result_message_id` (one SQL owner,
+`backtest_job_result_hydrateable`, shared by the projection, the read-state
+mutation, and the baseline). A settled research job is therefore `idle` and its
+answer produces `new_activity` with the job as the cursor source; clients treat
+`checking` as a working lock, so a research job that never settled kept its
+conversation locked after the answer landed.
 
 Completed turns and hydrateable succeeded jobs produce `new_activity` beyond
 the read boundary. Existing typed `await_user_reply`, `needs_clarification`,
@@ -3482,10 +3489,11 @@ Contract rules:
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
   a new assistant message referenced by the succeeded job's
   `execution_metadata.research_result_message_id`. A succeeded research job
-  has a null `result_run_id` by design; clients refresh the transcript on
-  terminal research jobs instead of fetching a run. `operation_scope` rides
-  every serialized job surface, including the polling
-  `GET /backtest-jobs/{job_id}` payload; absent means an ordinary backtest.
+  has a null `result_run_id` by design; the polling `GET /backtest-jobs/{job_id}`
+  response carries that message as `result_message`, the way a backtest's
+  carries `run`, and clients render it in place after the job card instead of
+  refetching the transcript. `operation_scope` rides every serialized job
+  surface, including the polling payload; absent means an ordinary backtest.
 - Thorough answers join the shared research cache like every other shape:
   the finalized packet is stored under the requesting turn's key, and an
   identical question within the class TTL answers inline with
@@ -3870,6 +3878,12 @@ Quick take from result-card metrics. `result_readout_source` and
 `result_readout_fallback_used` expose whether the normal LLM/schema-grounded
 path produced the readout or whether Argus intentionally fell back to the
 deterministic safety renderer.
+
+For a succeeded `chat.research` job, `run` is null and `result_message` is the
+persisted answer (the ordinary `Message` shape, including its `research` and
+`next_experiments` metadata); it is null for every other job and status. The
+frontend projects it after the job card through the same hydration a reloaded
+transcript uses, so the open view paints the answer without a refetch.
 
 Completed jobs may also carry `next_experiments`, the same versioned Try next
 sidecar attached to in-stream results (`version: "argus_next_experiments/v1"`,

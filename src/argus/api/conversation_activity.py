@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, cast
 
 from argus.api import state as api_state
+from argus.api.chat.research_jobs import RESEARCH_OPERATION_SCOPE
 from argus.api.schemas import ConversationActivity
 from argus.domain.conversation_activity import (
     ActivityReadState,
@@ -112,8 +113,16 @@ def _memory_result_hydrateable(
     *,
     user_id: str,
     conversation_id: str,
-    result_run_id: Any,
+    job: Mapping[str, Any],
 ) -> bool:
+    if job.get("operation_scope") == RESEARCH_OPERATION_SCOPE:
+        return _memory_research_result_hydrateable(
+            store,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            job=job,
+        )
+    result_run_id = job.get("result_run_id")
     if not isinstance(result_run_id, str):
         return False
     run = store.backtest_runs.get(result_run_id)
@@ -135,6 +144,30 @@ def _memory_result_hydrateable(
         and artifact.source_conversation_id == conversation_id
         and artifact.idea_id == card["idea_id"]
         and artifact.idea_version_id == card["idea_version_id"]
+    )
+
+
+def _memory_research_result_hydrateable(
+    store: AlphaStore,
+    *,
+    user_id: str,
+    conversation_id: str,
+    job: Mapping[str, Any],
+) -> bool:
+    # A research job's result is the assistant message it persisted, not a
+    # run; the job settles once that message is readable in its conversation.
+    metadata = job.get("execution_metadata")
+    message_id = (
+        metadata.get("research_result_message_id")
+        if isinstance(metadata, Mapping)
+        else None
+    )
+    if not isinstance(message_id, str) or not message_id:
+        return False
+    if store.conversation_owners.get(conversation_id) != user_id:
+        return False
+    return any(
+        message.id == message_id for message in store.messages.get(conversation_id, [])
     )
 
 
@@ -206,7 +239,7 @@ def _memory_sources(
             store,
             user_id=user_id,
             conversation_id=conversation_id,
-            result_run_id=row.get("result_run_id"),
+            job=row,
         )
         occurred_at = row.get("updated_at")
         if status in {"failed", "canceled", "expired"} or result_hydrateable:

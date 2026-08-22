@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,6 +12,7 @@ from argus.api.chat.backtest_jobs import (
     fail_job_without_task_run,
     should_fail_stale_job_without_task_run,
 )
+from argus.api.chat.research_jobs import RESEARCH_OPERATION_SCOPE
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context, client_identity
 from argus.api.guest_observability import (
@@ -18,11 +20,13 @@ from argus.api.guest_observability import (
     emit_guest_funnel_event,
 )
 from argus.api.memory_ownership import memory_object_visible
+from argus.api.message_store import owned_conversation_message
 from argus.api.schemas import (
     BacktestJob,
     BacktestJobResponse,
     BacktestRunRequest,
     BacktestRunResponse,
+    Message,
     User,
 )
 from argus.domain import backtest_admission
@@ -916,6 +920,7 @@ def _backtest_job_response(
         return BacktestJobResponse(
             job=BacktestJob.model_validate(job),
             run=run,
+            result_message=_research_result_message(user_id=user_id, job=job),
             result_readout=readout,
             **readout_metadata,
         )
@@ -923,6 +928,33 @@ def _backtest_job_response(
         if require_succeeded_run:
             raise _by_action_internal_error(request) from None
         raise
+
+
+def _research_result_message(
+    *,
+    user_id: str,
+    job: Mapping[str, object],
+) -> Message | None:
+    """The persisted answer of a succeeded research job, or None."""
+    if (
+        job.get("operation_scope") != RESEARCH_OPERATION_SCOPE
+        or job.get("status") != "succeeded"
+    ):
+        return None
+    conversation_id = job.get("conversation_id")
+    metadata = job.get("execution_metadata")
+    message_id = (
+        metadata.get("research_result_message_id")
+        if isinstance(metadata, Mapping)
+        else None
+    )
+    if not isinstance(conversation_id, str) or not isinstance(message_id, str):
+        return None
+    return owned_conversation_message(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+    )
 
 
 def _by_action_internal_error(request: Request) -> HTTPException:

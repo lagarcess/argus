@@ -49,6 +49,22 @@ class _JobGateway:
     def get_backtest_job(self, *, user_id: str, job_id: str):
         return self.rows.get(job_id)
 
+    def get_message(self, *, user_id: str, conversation_id: str, message_id: str):
+        from datetime import datetime, timezone
+
+        from argus.api.schemas import Message
+
+        if message_id != "answer-1":
+            return None
+        return Message(
+            id=message_id,
+            conversation_id=conversation_id,
+            role="assistant",
+            content="HOOD vs. JPM vs. SCHW, quick comparison",
+            created_at=datetime(2026, 8, 22, 1, 25, 58, tzinfo=timezone.utc),
+            metadata={"conversation_mode": "guide", "research": {"sources": []}},
+        )
+
     def mark_backtest_job_running(self, *, user_id: str, job_id: str, **_kw: Any):
         self.rows[job_id]["status"] = "running"
         return self.rows[job_id]
@@ -292,6 +308,47 @@ def test_job_status_endpoint_serializes_the_research_scope(monkeypatch) -> None:
     assert payload["job"]["operation_scope"] == "chat.research"
     assert payload["job"]["status"] == "succeeded"
     assert payload["run"] is None
+
+
+def test_job_status_endpoint_carries_the_research_answer_message(monkeypatch) -> None:
+    """A succeeded research job's result is its persisted answer message, the
+    way a backtest's result is ``run``; the poll response carries it so the
+    open view renders it in place without refetching the transcript
+    (production cb7b326d, 2026-08-21: card flipped, answer never painted)."""
+    from argus.api.main import app
+    from fastapi.testclient import TestClient
+
+    gateway = _JobGateway()
+    gateway.create_backtest_job(
+        conversation_id="c1",
+        request_message_id="m1",
+        operation_scope="chat.research",
+        launch_payload={},
+        execution_metadata={},
+    )
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    client = TestClient(app)
+
+    queued = client.get("/api/v1/backtest-jobs/job-1").json()
+    assert queued["result_message"] is None
+
+    gateway.complete_research_job(
+        user_id="u1",
+        job_id="job-1",
+        execution_metadata={"research_result_message_id": "answer-1"},
+    )
+
+    succeeded = client.get("/api/v1/backtest-jobs/job-1").json()
+    assert succeeded["job"]["status"] == "succeeded"
+    assert succeeded["run"] is None
+    assert succeeded["result_message"]["id"] == "answer-1"
+    assert succeeded["result_message"]["role"] == "assistant"
+    assert succeeded["result_message"]["content"].startswith("HOOD vs. JPM")
+    assert succeeded["result_message"]["metadata"]["research"] == {"sources": []}
+
+    gateway.rows["job-1"]["operation_scope"] = "chat.run_backtest"
+    backtest = client.get("/api/v1/backtest-jobs/job-1").json()
+    assert backtest["result_message"] is None
 
 
 def test_missing_key_yields_no_job_and_no_sync_packet(monkeypatch) -> None:

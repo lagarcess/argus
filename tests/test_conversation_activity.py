@@ -836,6 +836,53 @@ def test_memory_succeeded_job_checks_until_finalized_run_can_hydrate() -> None:
     assert ready.json()["attention"]["status"] == "new_activity"
 
 
+def test_memory_succeeded_research_job_settles_once_its_answer_message_exists() -> None:
+    # A research job never gets a run: its result is the assistant message
+    # named by execution_metadata.research_result_message_id. Without this,
+    # the conversation projected "checking" forever, which the client treats
+    # as locked (production cb7b326d, 2026-08-21).
+    client = _api_client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = datetime.now(timezone.utc)
+    job_id = fake.uuid4()
+    answer_id = fake.uuid4()
+    api_state.store.backtest_jobs[job_id] = {
+        "id": job_id,
+        "user_id": user_id,
+        "conversation_id": conversation["id"],
+        "operation_scope": "chat.research",
+        "status": "succeeded",
+        "result_run_id": None,
+        "execution_metadata": {"research_result_message_id": answer_id},
+        "finished_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+    }
+
+    unsettled = client.get(f"/api/v1/conversations/{conversation['id']}/activity")
+
+    assert unsettled.status_code == 200
+    assert unsettled.json()["operation"]["status"] == "checking"
+
+    answer = memory_message(
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="HOOD vs. JPM vs. SCHW",
+        metadata={"conversation_mode": "guide"},
+    )
+    api_state.store.messages.setdefault(conversation["id"], []).append(
+        answer.model_copy(update={"id": answer_id})
+    )
+
+    settled = client.get(f"/api/v1/conversations/{conversation['id']}/activity")
+
+    assert settled.status_code == 200
+    assert settled.json()["operation"]["status"] == "idle"
+    assert settled.json()["attention"]["status"] == "new_activity"
+    cursor = settled.json()["attention"]["cursor"]
+    assert decode_attention_cursor(cursor).source_id == job_id
+
+
 def test_history_omits_activity_from_non_chat_items() -> None:
     client = _api_client()
     conversation = client.post("/api/v1/conversations", json={}).json()[

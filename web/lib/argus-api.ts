@@ -191,6 +191,8 @@ export type BacktestJob = {
 export type BacktestJobResponse = {
   job: BacktestJob;
   run: BacktestRun | null;
+  // A succeeded research job's answer, the way `run` is a backtest's result.
+  result_message?: ApiMessage | null;
   result_readout?: string | null;
   result_readout_source?: string | null;
   next_experiments?: Record<string, unknown> | null;
