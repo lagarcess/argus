@@ -1,0 +1,12 @@
+{
+  "cell": "guest-en",
+  "secondsToCard": 87,
+  "answerPaintedWithoutReload": true,
+  "messagesGetsBeforeReady": 1,
+  "messagesGetsAfterReady": 1,
+  "jobPolls": 20,
+  "jobPollsStoppedAfterSuccess": true,
+  "composerDisabledAfterSettle": "false",
+  "answerCharsBelowCard": 3330,
+  "consoleErrors": []
+}

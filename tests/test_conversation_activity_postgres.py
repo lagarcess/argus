@@ -508,6 +508,108 @@ def test_cutoff_baseline_reads_existing_terminal_but_not_later_completion() -> N
             _delete_identity(connection, user_id)
 
 
+def _seed_research_job(
+    connection,
+    *,
+    user_id: str,
+    conversation_id: str,
+    finished_at: datetime,
+    answer_id: str,
+) -> str:
+    job_id = _id()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into public.backtest_jobs"
+            " (id, user_id, conversation_id, payload_hash, launch_payload,"
+            "  status, operation_scope, queued_at, started_at, finished_at,"
+            "  execution_metadata, created_at, updated_at)"
+            " values (%s, %s, %s, 'sha256:test', '{}'::jsonb, 'succeeded',"
+            "  'chat.research', %s, %s, %s, %s::jsonb, %s, %s)",
+            (
+                job_id,
+                user_id,
+                conversation_id,
+                finished_at - timedelta(seconds=30),
+                finished_at - timedelta(seconds=20),
+                finished_at,
+                json.dumps({"research_result_message_id": answer_id}),
+                finished_at - timedelta(seconds=30),
+                finished_at,
+            ),
+        )
+    return job_id
+
+
+def test_succeeded_research_job_is_hydrateable_once_its_answer_exists() -> None:
+    # A research job has no run; its result is the assistant message named by
+    # execution_metadata. Without this branch the row read as a succeeded job
+    # whose run is not ready, which projects "checking" forever and keeps the
+    # conversation locked on the client.
+    with _connect() as connection:
+        user_id = _seed_identity(connection)
+        try:
+            conversation_id = _seed_conversation(connection, user_id=user_id)
+            finished_at = datetime.now(timezone.utc)
+            answer_id = _id()
+            job_id = _seed_research_job(
+                connection,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                finished_at=finished_at,
+                answer_id=answer_id,
+            )
+
+            before = _read_sources(
+                connection, user_id=user_id, conversation_ids=[conversation_id]
+            )
+            job_source = next(
+                source
+                for source in before[0][1]
+                if source["source_kind"] == "backtest_job"
+            )
+            assert job_source["source_id"] == job_id
+            assert job_source["status"] == "succeeded"
+            assert job_source["result_hydrateable"] is False
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "insert into public.messages"
+                    " (id, conversation_id, user_id, role, content, created_at)"
+                    " values (%s, %s, %s, 'assistant', 'Research answer', %s)",
+                    (answer_id, conversation_id, user_id, finished_at),
+                )
+
+            after = _read_sources(
+                connection, user_id=user_id, conversation_ids=[conversation_id]
+            )
+            job_source = next(
+                source
+                for source in after[0][1]
+                if source["source_kind"] == "backtest_job"
+            )
+            assert job_source["source_id"] == job_id
+            assert job_source["result_hydrateable"] is True
+            assert job_source["occurred_at"].startswith(
+                finished_at.isoformat(timespec="seconds")[:19]
+            )
+
+            # The read-state mutation revalidates the cursor with the same
+            # owner predicate, so reading through the answer applies instead
+            # of conflicting.
+            outcome = _mutate(
+                connection,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                action="mark_read",
+                source_kind="backtest_job",
+                source_id=job_id,
+            )
+            assert outcome["outcome"] == "applied"
+            assert outcome["read_state"]["read_through_source_id"] == job_id
+        finally:
+            _delete_identity(connection, user_id)
+
+
 def test_batch_read_is_one_call_for_volume_and_rejects_more_than_100_ids() -> None:
     with _connect() as connection:
         user_id = _seed_identity(connection)

@@ -461,6 +461,9 @@ class BacktestJob(BaseModel):
 class BacktestJobResponse(BaseModel):
     job: BacktestJob
     run: BacktestRun | None = None
+    # A succeeded 'chat.research' job's result is this assistant message, the
+    # way a backtest's result is ``run``; clients render it in place.
+    result_message: Message | None = None
     result_readout: str | None = None
     result_readout_source: str | None = None
     result_readout_fallback_used: bool | None = None

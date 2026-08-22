@@ -19,11 +19,7 @@ import {
 import type { StrategyConfirmationStatus } from "@/components/chat/types";
 import { retainCanonicalResultOwnersForJobUpdate } from "./chat-result-projection-ownership";
 
-const ACTIVE_JOB_STATUSES = new Set<BacktestJobStatus>([
-  "queued",
-  "running",
-  "succeeded",
-]);
+export const RESEARCH_JOB_SCOPE = "chat.research";
 
 const TERMINAL_UNSUCCESSFUL_JOB_STATUSES = new Set<BacktestJobStatus>([
   "failed",
@@ -66,6 +62,13 @@ export function backtestJobFromMetadata(
   return backtestJobFromUnknown(metadata.backtest_job);
 }
 
+// A succeeded backtest keeps polling until its run is readable; a succeeded
+// research job is terminal, its answer rides the job response itself.
+export function backtestJobAwaitsPolling(job: BacktestJob): boolean {
+  if (job.status === "queued" || job.status === "running") return true;
+  return job.status === "succeeded" && job.operation_scope !== RESEARCH_JOB_SCOPE;
+}
+
 export function pendingBacktestJobIds(messages: Message[]): string[] {
   const ids = new Set<string>();
   for (const message of messages) {
@@ -73,7 +76,7 @@ export function pendingBacktestJobIds(messages: Message[]): string[] {
     if (message.kind !== "backtest_job" || !job) {
       continue;
     }
-    if (ACTIVE_JOB_STATUSES.has(job.status)) {
+    if (backtestJobAwaitsPolling(job)) {
       ids.add(job.id);
     }
   }
@@ -249,7 +252,7 @@ function operationScopeOrNull(
   if (
     value === "chat.run_backtest" ||
     value === "backtests.run" ||
-    value === "chat.research"
+    value === RESEARCH_JOB_SCOPE
   ) {
     return value;
   }
