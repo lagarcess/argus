@@ -158,25 +158,6 @@ def _execution_fill_count(
     return _execution._execution_fill_count(execution_events, side=side)
 
 
-def _compute_metrics(
-    *,
-    strategy_returns: pd.Series,
-    benchmark_returns: pd.Series,
-    allocation_capital: float,
-    time_basis: MetricTimeBasis,
-    trade_count: int,
-    closed_trade_pnls: Sequence[float],
-) -> dict[str, Any]:
-    return _metrics._compute_metrics(
-        strategy_returns=strategy_returns,
-        benchmark_returns=benchmark_returns,
-        allocation_capital=allocation_capital,
-        time_basis=time_basis,
-        trade_count=trade_count,
-        closed_trade_pnls=closed_trade_pnls,
-    )
-
-
 def _compute_metrics_from_equity(
     *,
     strategy_equity: pd.Series,
@@ -204,6 +185,7 @@ def _dca_equity_curve(
     starting_capital: float = 0.0,
     fees: float = 0.0,
     slippage: float = 0.0,
+    observed: pd.Series | None = None,
 ) -> _execution.DcaSimulationResult:
     return _execution._dca_equity_curve(
         close=close,
@@ -212,6 +194,7 @@ def _dca_equity_curve(
         starting_capital=starting_capital,
         fees=fees,
         slippage=slippage,
+        observed=observed,
     )
 
 
