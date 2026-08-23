@@ -62,22 +62,40 @@ export function backtestJobFromMetadata(
   return backtestJobFromUnknown(metadata.backtest_job);
 }
 
-// A succeeded backtest keeps polling until its run is readable; a succeeded
-// research job is terminal, its answer rides the job response itself.
-export function backtestJobAwaitsPolling(job: BacktestJob): boolean {
+// Whether a job response still owes the view something. A backtest's result
+// is its run; a research job's is the message the response carries, for a
+// success (the answer) and for a failure (the persisted note) alike. One null
+// response must not end the story: the poll continues, bounded, and the
+// card stays pending so reopening the conversation polls again.
+export function backtestJobResponseAwaitsPolling(
+  response: Pick<BacktestJobResponse, "job" | "run" | "result_message">,
+): boolean {
+  const job = response.job;
   if (job.status === "queued" || job.status === "running") return true;
-  return job.status === "succeeded" && job.operation_scope !== RESEARCH_JOB_SCOPE;
+  if (job.operation_scope === RESEARCH_JOB_SCOPE) {
+    return job.status === "succeeded" && !response.result_message;
+  }
+  return job.status === "succeeded" && !response.run;
+}
+
+// The card-side twin: a research card is pending until its message is in
+// the view (recorded on the card by the projection), a backtest card until
+// it became a result card.
+export function backtestJobCardAwaitsPolling(message: Message): boolean {
+  const job = message.backtestJob;
+  if (message.kind !== "backtest_job" || !job) return false;
+  if (job.status === "queued" || job.status === "running") return true;
+  if (job.operation_scope === RESEARCH_JOB_SCOPE) {
+    return job.status === "succeeded" && !message.researchResultMessageId;
+  }
+  return job.status === "succeeded";
 }
 
 export function pendingBacktestJobIds(messages: Message[]): string[] {
   const ids = new Set<string>();
   for (const message of messages) {
-    const job = message.backtestJob;
-    if (message.kind !== "backtest_job" || !job) {
-      continue;
-    }
-    if (backtestJobAwaitsPolling(job)) {
-      ids.add(job.id);
+    if (backtestJobCardAwaitsPolling(message) && message.backtestJob) {
+      ids.add(message.backtestJob.id);
     }
   }
   return [...ids];

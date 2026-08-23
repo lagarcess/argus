@@ -17,7 +17,7 @@ import {
 } from "@/lib/argus-api";
 import {
   applyBacktestJobUpdate,
-  backtestJobAwaitsPolling,
+  backtestJobResponseAwaitsPolling,
   pendingBacktestJobIds,
 } from "@/lib/chat-backtest-jobs";
 import { applyResearchJobAnswer } from "@/components/chat/chat-message-projection";
@@ -225,8 +225,7 @@ export function useBacktestJobPolling(
         const response = await getBacktestJob(jobId);
         if (cancelled) return;
         applyResponse(response);
-        const shouldContinue =
-          backtestJobAwaitsPolling(response.job) && !response.run;
+        const shouldContinue = backtestJobResponseAwaitsPolling(response);
         if (!shouldContinue) {
           onDurableCompletion?.(response);
         }

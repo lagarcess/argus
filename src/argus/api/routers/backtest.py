@@ -12,6 +12,7 @@ from argus.api.chat.backtest_jobs import (
     fail_job_without_task_run,
     should_fail_stale_job_without_task_run,
 )
+from argus.api.chat.confirmation import public_confirmation_projection
 from argus.api.chat.research_jobs import RESEARCH_OPERATION_SCOPE
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context, client_identity
@@ -916,11 +917,14 @@ def _backtest_job_response(
             raise _by_action_internal_error(request)
     readout = _result_readout_from_job(job) if run is not None else None
     readout_metadata = _result_readout_metadata_from_job(job) if run is not None else {}
+    # A decoration on the status report, never a precondition for it: a
+    # transient messages read failure must not turn a finished job into a 500.
+    result_message = _research_result_message(user_id=user_id, job=job)
     try:
         return BacktestJobResponse(
             job=BacktestJob.model_validate(job),
             run=run,
-            result_message=_research_result_message(user_id=user_id, job=job),
+            result_message=result_message,
             result_readout=readout,
             **readout_metadata,
         )
@@ -930,15 +934,22 @@ def _backtest_job_response(
         raise
 
 
+_TERMINAL_RESEARCH_STATUSES = frozenset({"succeeded", "failed", "canceled", "expired"})
+
+
 def _research_result_message(
     *,
     user_id: str,
     job: Mapping[str, object],
 ) -> Message | None:
-    """The persisted answer of a succeeded research job, or None."""
+    """The message a terminal research job produced (answer or failure note).
+
+    Projected like every transcript message, so the in-place paint and the
+    reloaded transcript carry the same shape and the same redactions.
+    """
     if (
         job.get("operation_scope") != RESEARCH_OPERATION_SCOPE
-        or job.get("status") != "succeeded"
+        or job.get("status") not in _TERMINAL_RESEARCH_STATUSES
     ):
         return None
     conversation_id = job.get("conversation_id")
@@ -950,10 +961,23 @@ def _research_result_message(
     )
     if not isinstance(conversation_id, str) or not isinstance(message_id, str):
         return None
-    return owned_conversation_message(
-        user_id=user_id,
-        conversation_id=conversation_id,
-        message_id=message_id,
+    try:
+        message = owned_conversation_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Research result message read failed; job status served without it",
+            job_id=job.get("id"),
+            error=str(exc),
+        )
+        return None
+    if message is None:
+        return None
+    return message.model_copy(
+        update={"metadata": public_confirmation_projection(message.metadata)}
     )
 
 

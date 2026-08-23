@@ -314,6 +314,9 @@ export type Message = {
   result?: StrategyResultPayload;
   confirmation?: StrategyConfirmationPayload;
   backtestJob?: BacktestJob;
+  // The message a terminal research job produced, once it is in the view;
+  // until then the card keeps polling for it.
+  researchResultMessageId?: string;
   isLoadingResult?: boolean;
   actions?: ChatActionOption[];
   artifactId?: string;

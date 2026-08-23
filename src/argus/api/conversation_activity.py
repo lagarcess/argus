@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from typing import Any, Literal, cast
 
 from argus.api import state as api_state
-from argus.api.chat.research_jobs import RESEARCH_OPERATION_SCOPE
 from argus.api.schemas import ConversationActivity
 from argus.domain.conversation_activity import (
     ActivityReadState,
@@ -18,6 +17,11 @@ from argus.domain.conversation_activity import (
     SourceKind,
     project_conversation_activity,
     terminal_attention_status,
+)
+from argus.domain.job_settlement import (
+    JOB_RESULT_HYDRATEABLE,
+    RESEARCH_OPERATION_SCOPE,
+    evaluate,
 )
 from argus.domain.retest_setup import EVIDENCE_IDENTITY_KEYS
 from argus.domain.store import AlphaStore, utcnow
@@ -115,19 +119,41 @@ def _memory_result_hydrateable(
     conversation_id: str,
     job: Mapping[str, Any],
 ) -> bool:
-    # Only a succeeded row can be settled; a research answer is persisted
-    # before its row flips to succeeded, so an early message never reads as
-    # finished work. Twin of SQL backtest_job_result_hydrateable.
-    if job.get("status") != "succeeded":
-        return False
-    if job.get("operation_scope") == RESEARCH_OPERATION_SCOPE:
-        return _memory_research_result_hydrateable(
-            store,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            job=job,
-        )
-    result_run_id = job.get("result_run_id")
+    # Memory twin of argus_private.backtest_job_result_hydrateable: the rule is
+    # argus.domain.job_settlement.JOB_RESULT_HYDRATEABLE for both; this layer
+    # only says how it observes each fact.
+    return evaluate(
+        JOB_RESULT_HYDRATEABLE,
+        {
+            "job_succeeded": lambda: job.get("status") == "succeeded",
+            "run_result_readable": lambda: _memory_run_result_readable(
+                store,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                result_run_id=job.get("result_run_id"),
+            ),
+            "research_scope": lambda: (
+                job.get("operation_scope") == RESEARCH_OPERATION_SCOPE
+            ),
+            "research_result_message_present": lambda: (
+                _memory_research_result_message_present(
+                    store,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    job=job,
+                )
+            ),
+        },
+    )
+
+
+def _memory_run_result_readable(
+    store: AlphaStore,
+    *,
+    user_id: str,
+    conversation_id: str,
+    result_run_id: Any,
+) -> bool:
     if not isinstance(result_run_id, str):
         return False
     run = store.backtest_runs.get(result_run_id)
@@ -152,15 +178,16 @@ def _memory_result_hydrateable(
     )
 
 
-def _memory_research_result_hydrateable(
+def _memory_research_result_message_present(
     store: AlphaStore,
     *,
     user_id: str,
     conversation_id: str,
     job: Mapping[str, Any],
 ) -> bool:
-    # A research job's result is the assistant message it persisted, not a
-    # run; the job settles once that message is readable in its conversation.
+    # The job owner's assistant message, in the job's conversation. Memory
+    # messages carry no owner of their own; the conversation's owner is that
+    # fact here, as messages.user_id is in SQL.
     metadata = job.get("execution_metadata")
     message_id = (
         metadata.get("research_result_message_id")
@@ -172,7 +199,8 @@ def _memory_research_result_hydrateable(
     if store.conversation_owners.get(conversation_id) != user_id:
         return False
     return any(
-        message.id == message_id for message in store.messages.get(conversation_id, [])
+        message.id == message_id and message.role == "assistant"
+        for message in store.messages.get(conversation_id, [])
     )
 
 

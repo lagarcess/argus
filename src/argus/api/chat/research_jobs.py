@@ -25,6 +25,10 @@ from loguru import logger
 from argus.api import state as api_state
 from argus.api.chat.backtest_job_envelopes import public_backtest_job_payload
 from argus.api.chat.research_evidence import record_research_turn_evidence
+
+# Re-exported: the scope literal is owned by the settlement rule the SQL is
+# rendered from.
+from argus.domain.job_settlement import RESEARCH_OPERATION_SCOPE
 from argus.domain.research.config import (
     BACKGROUND_POLL_INTERVAL_SECONDS,
     RESEARCH_CONFIG_SPECS,
@@ -33,8 +37,6 @@ from argus.domain.research.config import (
 from argus.domain.research.contracts import ResearchPacket, ResearchUnavailableError
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
-
-RESEARCH_OPERATION_SCOPE = "chat.research"
 
 # The keyed visitor digest a guest's background run settles against, carried on
 # the persisted job request. A digest, never an address: nothing here retains
@@ -137,6 +139,17 @@ def start_research_job(
             )
             return None, None
         return None, packet
+    replay = _replayed_research_job(
+        user_id=user_id,
+        request_message_id=request_message_id,
+    )
+    if replay is not None:
+        # The same request message already admitted a research job. Its row is
+        # the answer whatever its status: a live row has its own poller, a
+        # terminal row already names its message. Spawning a second poller
+        # would finalize a second answer nobody links to, and submitting
+        # first would spend provider budget on a run that could not land.
+        return public_backtest_job_payload(replay), None
     try:
         background_id = client.submit_background(prompt, spec)
     except ResearchUnavailableError as exc:
@@ -180,6 +193,25 @@ def start_research_job(
         request_id=request_id,
     )
     return public_backtest_job_payload(job), None
+
+
+def _replayed_research_job(
+    *,
+    user_id: str,
+    request_message_id: str | None,
+) -> dict[str, Any] | None:
+    gateway = api_state.supabase_gateway
+    if gateway is None or not request_message_id:
+        return None
+    try:
+        return gateway.find_backtest_job_by_idempotency_key(
+            user_id=user_id,
+            operation_scope=RESEARCH_OPERATION_SCOPE,
+            idempotency_key=request_message_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Research job replay lookup failed", error=str(exc))
+        return None
 
 
 def _spawn_poller(
@@ -248,7 +280,7 @@ async def _poll_and_finalize(
                 _mark_running(job_id=job_id, user_id=user_id)
             if poll.terminal:
                 if poll.status == "completed" and poll.packet is not None:
-                    _finalize_success(
+                    await _finalize_success(
                         job_id=job_id,
                         job_request=job_request,
                         packet=poll.packet,
@@ -291,7 +323,15 @@ def _mark_running(*, job_id: str, user_id: str) -> None:
         logger.debug("Research job running mark skipped", error=str(exc))
 
 
-def _finalize_success(
+# The completion mark is the row's only way out of running once the answer is
+# persisted; no scheduled janitor revisits a research row. Retry it, and if it
+# still fails, fail the row with the answer linked so the conversation settles
+# and the answer still paints.
+COMPLETION_MARK_ATTEMPTS = 3
+COMPLETION_MARK_RETRY_SECONDS = 2.0
+
+
+async def _finalize_success(
     *,
     job_id: str,
     job_request: dict[str, Any],
@@ -331,22 +371,7 @@ def _finalize_success(
         )
         _fail_job(job_id=job_id, user_id=user_id, detail="result persistence failed")
         return
-    gateway = api_state.supabase_gateway
-    if gateway is not None:
-        try:
-            gateway.complete_research_job(
-                user_id=user_id,
-                job_id=job_id,
-                execution_metadata={
-                    "research_result_message_id": message.id,
-                },
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Research job completion mark failed",
-                job_id=job_id,
-                error=str(exc),
-            )
+    await _mark_completed(job_id=job_id, user_id=user_id, message_id=message.id)
     record_research_turn_evidence(
         research=composed["research"],
         user_id=user_id,
@@ -354,6 +379,35 @@ def _finalize_success(
         message_id=message.id,
         request_id=request_id,
         guest_visitor_key=job_request.get(GUEST_VISITOR_KEY_FIELD),
+    )
+
+
+async def _mark_completed(*, job_id: str, user_id: str, message_id: str) -> None:
+    gateway = api_state.supabase_gateway
+    if gateway is None:
+        return
+    for attempt in range(1, COMPLETION_MARK_ATTEMPTS + 1):
+        try:
+            gateway.complete_research_job(
+                user_id=user_id,
+                job_id=job_id,
+                execution_metadata={"research_result_message_id": message_id},
+            )
+            return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Research job completion mark failed",
+                job_id=job_id,
+                attempt=attempt,
+                error=str(exc),
+            )
+            if attempt < COMPLETION_MARK_ATTEMPTS:
+                await asyncio.sleep(COMPLETION_MARK_RETRY_SECONDS)
+    _fail_job(
+        job_id=job_id,
+        user_id=user_id,
+        detail="completion mark failed",
+        result_message_id=message_id,
     )
 
 
@@ -365,28 +419,54 @@ def _fail_job(
     post_note: bool = False,
     job_request: dict[str, Any] | None = None,
     conversation_id: str | None = None,
+    result_message_id: str | None = None,
 ) -> None:
+    # The note is persisted first so the failed row can name it: a terminal
+    # research row's message, answer or note, is served as the job's
+    # result_message and painted in place.
+    message_id = result_message_id
+    if post_note and conversation_id and job_request is not None:
+        message_id = _persist_failure_note(
+            job_id=job_id,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            job_request=job_request,
+        )
     gateway = api_state.supabase_gateway
-    if gateway is not None:
-        try:
-            gateway.mark_backtest_job_failed(
-                user_id=user_id,
-                job_id=job_id,
-                failure_code="research_failed",
-                failure_detail=detail[:500],
-                retryable=False,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Research job failure mark failed", job_id=job_id, error=str(exc)
-            )
-    if not post_note or not conversation_id or job_request is None:
+    if gateway is None:
         return
+    try:
+        gateway.mark_backtest_job_failed(
+            user_id=user_id,
+            job_id=job_id,
+            failure_code="research_failed",
+            failure_detail=detail[:500],
+            retryable=False,
+            execution_metadata=(
+                {"research_result_message_id": message_id} if message_id else None
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Research job failure mark failed; the row stays active until an"
+            " operator settles it",
+            job_id=job_id,
+            error=str(exc),
+        )
+
+
+def _persist_failure_note(
+    *,
+    job_id: str,
+    user_id: str,
+    conversation_id: str,
+    job_request: dict[str, Any],
+) -> str | None:
     from argus.agent_runtime.research_answer import research_failure_note
     from argus.api.message_store import create_message
 
     try:
-        create_message(
+        note = create_message(
             user_id=user_id,
             conversation_id=conversation_id,
             role="assistant",
@@ -400,3 +480,5 @@ def _fail_job(
             job_id=job_id,
             error=str(exc),
         )
+        return None
+    return note.id

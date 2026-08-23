@@ -75,24 +75,36 @@ why the card flipped.
 
 Backend, job-completion path:
 
-- `supabase/migrations/20260822000000_research_job_activity_settles.sql`:
-  one owner, `public.backtest_job_result_hydrateable(j)` = the run/evidence
-  chain **or** (`chat.research` and the message named by
-  `execution_metadata.research_result_message_id` exists in the
-  conversation). The three functions are re-created to call it; identity
-  columns only, never message prose. Memory twin in
-  `src/argus/api/conversation_activity.py`.
-- `GET /backtest-jobs/{id}` carries a succeeded research job's answer as
-  `result_message`, the way a backtest's carries `run`
-  (`src/argus/api/routers/backtest.py`, `BacktestJobResponse`).
+- One owner of the settle rule, `src/argus/domain/job_settlement.py`: an
+  expression over four facts (`job_succeeded`, `run_result_readable`,
+  `research_scope`, `research_result_message_present`). The memory store
+  evaluates it; the SQL function `argus_private.backtest_job_result_hydrateable`
+  in `supabase/migrations/20260822000000_research_job_activity_settles.sql` is
+  rendered from it, and the migration test pins the checked-in text to the
+  rendering. The three activity functions call it (the batch read evaluates
+  it once per job row in one CTE); identity columns only, never message
+  prose; private to `service_role`, so PostgREST never exposes it as a
+  computed column.
+- `GET /backtest-jobs/{id}` carries a terminal research job's message as
+  `result_message` (the answer, or the failure note), projected like a
+  transcript message, read outside the response path so a transient read
+  failure never 500s the poll (`src/argus/api/routers/backtest.py`).
+- The research job lifecycle (`src/argus/api/chat/research_jobs.py`): a
+  re-adopted request message returns the existing job with no second
+  provider run or poller; the failure note is persisted before the row
+  flips so the failed row names it; the completion mark is retried and, if
+  it still fails, the row fails with the answer linked rather than sitting
+  at `running` forever.
 
 Web:
 
 - the poller projects `result_message` after the job card through the same
   hydration a reloaded transcript uses (`applyResearchJobAnswer`), so the open
   view paints the answer with no refetch and nothing can blank;
-- a succeeded research job is terminal for polling (`backtestJobAwaitsPolling`),
-  so the completion does not re-fire on every effect re-run;
+- a succeeded research job keeps polling, bounded, until its message has
+  arrived, and its card stays pending until the message is in the view, so
+  one empty response never strands the card and reopening the conversation
+  polls again (`backtestJobResponseAwaitsPolling`, `backtestJobCardAwaitsPolling`);
 - the lock-gated reload from #524 is deleted; research completions take the
   same invalidate-and-promote path as run completions.
 
@@ -174,6 +186,47 @@ over one scenario table (`tests/conversation_activity_job_scenarios.py`);
 weakening the SQL owner alone failed exactly the Postgres
 `research_running_with_early_answer_stays_running` case while the memory
 side passed.
+
+## Review round (head `099656f0` → this head)
+
+Ten findings plus two unfiled items, all verified at head. What changed:
+
+- **One owner, not two twins.** The rule now lives once in
+  `argus.domain.job_settlement`; the SQL is rendered from it and pinned to
+  the rendering. Before this, the memory twin returned early on research
+  scope (its run branch unreachable for a research job) while the SQL `OR`ed
+  the branches, and the two checked different owners; the scenario table,
+  with `result_run_id=None` in every row, could not see either.
+- **A null `result_message` no longer dead-ends the paint**: the poll
+  continues until the message arrives and the card stays pending.
+- **The idempotency replay is closed** before provider spend: the existing
+  row is returned, no second poller finalizes an unlinked answer.
+- **The failed research note paints in place** through the same projection.
+- `result_message` is projected like a transcript message (no
+  `canonical_launch_payload_hash`), and read outside the response `try`.
+- The completion mark is retried, then fails the row with the answer linked,
+  closing the running-side lock.
+- The SQL owner is `parallel safe`, compares uuid to uuid behind a validity
+  guard, and is evaluated once per job row; it lives in `argus_private`.
+- `docs/DATA_MODEL.md` no longer states the run-only settle rule.
+
+**Negative result, kept on record.** The reviewer diffed all three replaced
+functions against every migration defining them and found no silent revert,
+then noticed `test_replaced_functions_keep_their_original_signatures` split
+on `" as $$"` while the DDL reads `\nas $$`, so the "head" it compared was
+the whole text on both sides and it validated nothing body-level by
+construction. The drift it could not see is absent. The guard is replaced:
+the mutation and baseline bodies must equal the original bodies with the
+inline predicate substituted by the owner call, and the batch read must
+evaluate the owner exactly once in one CTE with both branch filters intact;
+swapping mutate's owner call for `(select true)` fails it.
+
+**Declined as filed, with the reason:** splicing the in-place message at its
+`created_at` position. Live-streamed messages carry no timestamp on the
+client, and the persisted order is "right after the card" by construction:
+the conversation is locked from the card's persistence until the job
+settles, settling requires the message to exist, and the failure note is
+persisted before the row flips. Nothing can land between card and message.
 
 ## Guards (all fail on base, pass at head)
 

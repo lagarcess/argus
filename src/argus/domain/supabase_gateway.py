@@ -1185,6 +1185,26 @@ class SupabaseGateway(
 
         return jobs.finalize_direct_backtest_job(self.client, **kwargs)
 
+    def find_backtest_job_by_idempotency_key(
+        self,
+        *,
+        user_id: str,
+        operation_scope: str,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        """The row an earlier admission created for this key, whatever its status."""
+        result = (
+            self.client.table("backtest_jobs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("operation_scope", operation_scope)
+            .eq("idempotency_key", idempotency_key)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(result)
+        return dict(row) if row is not None else None
+
     def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
         result = (
             self.client.table("backtest_jobs")

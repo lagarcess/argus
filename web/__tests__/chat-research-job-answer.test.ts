@@ -13,11 +13,14 @@ import {
 // Loaded lazily so the pending-set test below fails on behavior, not on a
 // missing export, against a tree that predates the in-place projection.
 async function projection() {
-  const [{ applyResearchJobAnswer }, { backtestJobAwaitsPolling }] = await Promise.all([
+  const [
+    { applyResearchJobAnswer },
+    { backtestJobResponseAwaitsPolling, backtestJobCardAwaitsPolling },
+  ] = await Promise.all([
     import("../components/chat/chat-message-projection"),
     import("../lib/chat-backtest-jobs"),
   ]);
-  return { applyResearchJobAnswer, backtestJobAwaitsPolling };
+  return { applyResearchJobAnswer, backtestJobResponseAwaitsPolling, backtestJobCardAwaitsPolling };
 }
 
 const root = join(import.meta.dir, "..");
@@ -130,37 +133,57 @@ describe("research job answer", () => {
     expect(applyResearchJobAnswer(painted, response)).toBe(painted);
   });
 
-  test("only a succeeded research job's response inserts a message", async () => {
+  test("a terminal research job's message paints for a failure too, and only research responses insert", async () => {
     const { applyResearchJobAnswer } = await projection();
+    const note: ApiMessage = {
+      ...answer(),
+      id: "note-1",
+      content: "I couldn't finish that thorough research run.",
+      metadata: { conversation_mode: "guide" },
+    };
+    const failed = { job: job({ status: "failed" }), run: null, result_message: note };
+    const painted = applyResearchJobAnswer([card(job({ status: "failed" }))], failed);
+    expect(painted.map((message) => message.id)).toEqual(["assistant-job-1", "note-1"]);
+    expect(painted[1]?.content).toContain("couldn't finish");
+    expect(painted[0]?.researchResultMessageId).toBe("note-1");
+
     const backtest = {
       job: job({ status: "succeeded", operation_scope: "chat.run_backtest" }),
       run: null,
       result_message: answer(),
     };
-    const running = { job: job({ status: "running" }), run: null, result_message: answer() };
     const withoutAnswer = { job: job({ status: "succeeded" }), run: null, result_message: null };
-
     expect(applyResearchJobAnswer([card()], backtest)).toHaveLength(1);
-    expect(applyResearchJobAnswer([card()], running)).toHaveLength(1);
     expect(applyResearchJobAnswer([card()], withoutAnswer)).toHaveLength(1);
   });
 
-  test("a succeeded research job is terminal for polling; a succeeded backtest keeps polling for its run", async () => {
-    // Keeping a settled research card in the pending set re-fires the durable
-    // completion on every effect re-run.
-    const research = card(job({ status: "succeeded" }));
-    const backtest = {
-      ...card(job({ id: "job-2", status: "succeeded", operation_scope: "chat.run_backtest" })),
-      id: "assistant-job-2",
-    };
-    const running = card(job({ id: "job-3", status: "running" }));
+  test("one null result_message never ends the story: the poll continues and the card stays pending", async () => {
+    // Review of #532: a succeeded research job was terminal for polling, so a
+    // single response without the message (replica lag, a read that returned
+    // nothing) painted nothing and nothing re-armed, the original symptom
+    // through a new door. Now the response keeps polling (bounded by the
+    // poller's attempt cap) and the card stays in the pending set until its
+    // message is in the view, so reopening the conversation polls again.
+    const { backtestJobResponseAwaitsPolling, backtestJobCardAwaitsPolling, applyResearchJobAnswer } =
+      await projection();
+    const succeeded = job({ status: "succeeded" });
 
-    expect(pendingBacktestJobIds([research, backtest, running])).toEqual(["job-2", "job-3"]);
+    expect(backtestJobResponseAwaitsPolling({ job: succeeded, run: null, result_message: null })).toBe(true);
+    expect(backtestJobResponseAwaitsPolling({ job: succeeded, run: null, result_message: answer() })).toBe(false);
+    expect(backtestJobResponseAwaitsPolling({ job: job({ status: "running" }), run: null, result_message: null })).toBe(true);
+    expect(backtestJobResponseAwaitsPolling({ job: job({ status: "failed" }), run: null, result_message: null })).toBe(false);
+    const backtestJob = job({ status: "succeeded", operation_scope: "chat.run_backtest" });
+    expect(backtestJobResponseAwaitsPolling({ job: backtestJob, run: null, result_message: null })).toBe(true);
 
-    const { backtestJobAwaitsPolling } = await projection();
-    expect(backtestJobAwaitsPolling(research.backtestJob!)).toBe(false);
-    expect(backtestJobAwaitsPolling(backtest.backtestJob!)).toBe(true);
-    expect(backtestJobAwaitsPolling(running.backtestJob!)).toBe(true);
+    const unsettled = card(succeeded);
+    expect(backtestJobCardAwaitsPolling(unsettled)).toBe(true);
+    expect(pendingBacktestJobIds([unsettled])).toEqual(["job-1"]);
+    const painted = applyResearchJobAnswer([unsettled], { job: succeeded, run: null, result_message: answer() });
+    expect(painted[0]?.researchResultMessageId).toBe("answer-1");
+    expect(backtestJobCardAwaitsPolling(painted[0]!)).toBe(false);
+    expect(pendingBacktestJobIds(painted)).toEqual([]);
+    // A backtest card keeps polling until it becomes a result card.
+    expect(pendingBacktestJobIds([{ ...card(backtestJob), id: "assistant-job-2" }])).toEqual(["job-1"]);
   });
 
   test("the poller projects the answer and the completion handler never reloads", () => {
@@ -172,7 +195,7 @@ describe("research job answer", () => {
     );
     expect(applyResponse).toContain("applyResearchJobAnswer(");
     expect(applyResponse).toContain("applyBacktestJobUpdate(current, response)");
-    expect(reconciliation).toContain("backtestJobAwaitsPolling(response.job) && !response.run");
+    expect(reconciliation).toContain("backtestJobResponseAwaitsPolling(response)");
 
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const handler = chat.slice(

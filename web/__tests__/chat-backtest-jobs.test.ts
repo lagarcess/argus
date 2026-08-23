@@ -1126,9 +1126,7 @@ describe("chat backtest jobs", () => {
     expect(chat).toContain('kind: "backtest_job"');
     expect(chat).toContain("applyBacktestJobUpdate(");
     expect(polling).toContain("pendingBacktestJobKey");
-    expect(polling).toContain(
-      "backtestJobAwaitsPolling(response.job) && !response.run",
-    );
+    expect(polling).toContain("backtestJobResponseAwaitsPolling(response)");
     expect(chat).not.toContain('workflow_proof');
   });
 

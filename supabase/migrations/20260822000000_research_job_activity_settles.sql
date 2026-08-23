@@ -10,68 +10,73 @@
 -- read conflicted. Production cb7b326d-f643-464d-b3f2-0fea9ef5b989,
 -- 2026-08-21.
 --
--- One owner now: backtest_job_result_hydrateable(j). Identity columns only,
--- never message prose. The memory twin is argus.api.conversation_activity.
+-- One owner now. The rule lives in argus.domain.job_settlement and the
+-- function below is rendered from it (render_sql_function); the migration
+-- test pins this text to that rendering. It lives in argus_private so
+-- PostgREST never exposes it as a computed column on backtest_jobs; every
+-- caller runs as service_role. If its signature ever changes, DROP restores
+-- default EXECUTE to anon/authenticated: repeat the revoke block.
+--
+-- Identity columns only, never message prose.
 
-create or replace function public.backtest_job_result_hydrateable(
+create schema if not exists argus_private;
+revoke all on schema argus_private from public, anon, authenticated;
+
+create or replace function argus_private.backtest_job_result_hydrateable(
   j public.backtest_jobs
 )
 returns boolean
 language sql
 stable
+parallel safe
 security invoker
 set search_path = public
 as $$
-  -- Only a succeeded row can be settled. A research job's answer message is
-  -- persisted before the row flips to succeeded, so the message existing
-  -- while the row is still running never reads as finished work.
-  select
+  select (
     j.status = 'succeeded'
     and (
-    exists (
-      select 1
-      from public.backtest_runs as r
-      join public.evidence_artifacts as e
-        on e.source_run_id = r.id
-       and e.user_id = r.user_id
-       and e.source_conversation_id = r.conversation_id
-      where r.id = j.result_run_id
-        and r.user_id = j.user_id
-        and r.conversation_id = j.conversation_id
-        and r.status = 'completed'
-        and r.conversation_result_card
-          ->> 'evidence_artifact_id' = e.id::text
-        and r.conversation_result_card
-          ->> 'idea_id' = e.idea_id::text
-        and r.conversation_result_card
-          ->> 'idea_version_id' = e.idea_version_id::text
-    )
-    or (
-      j.operation_scope = 'chat.research'
-      and exists (
+      exists (
         select 1
-        from public.messages as rm
-        where rm.user_id = j.user_id
-          and rm.conversation_id = j.conversation_id
-          and rm.id::text = j.execution_metadata
-            ->> 'research_result_message_id'
+        from public.backtest_runs as r
+        join public.evidence_artifacts as e
+          on e.source_run_id = r.id
+         and e.user_id = r.user_id
+         and e.source_conversation_id = r.conversation_id
+        where r.id = j.result_run_id
+          and r.user_id = j.user_id
+          and r.conversation_id = j.conversation_id
+          and r.status = 'completed'
+          and r.conversation_result_card
+            ->> 'evidence_artifact_id' = e.id::text
+          and r.conversation_result_card
+            ->> 'idea_id' = e.idea_id::text
+          and r.conversation_result_card
+            ->> 'idea_version_id' = e.idea_version_id::text
+      )
+      or (
+        j.operation_scope = 'chat.research'
+        and exists (
+          select 1
+          from public.messages as rm
+          where rm.user_id = j.user_id
+            and rm.conversation_id = j.conversation_id
+            and rm.role = 'assistant'
+            and rm.id = (
+              case
+                when (j.execution_metadata ->> 'research_result_message_id')
+                  ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                then (j.execution_metadata ->> 'research_result_message_id')::uuid
+              end
+            )
+        )
       )
     )
-    )
+  )
 $$;
 
-revoke all on function public.backtest_job_result_hydrateable(
-  public.backtest_jobs
-) from public;
-revoke all on function public.backtest_job_result_hydrateable(
-  public.backtest_jobs
-) from anon;
-revoke all on function public.backtest_job_result_hydrateable(
-  public.backtest_jobs
-) from authenticated;
-grant execute on function public.backtest_job_result_hydrateable(
-  public.backtest_jobs
-) to service_role;
+revoke all on function argus_private.backtest_job_result_hydrateable(public.backtest_jobs) from public, anon, authenticated;
+grant usage on schema argus_private to service_role;
+grant execute on function argus_private.backtest_job_result_hydrateable(public.backtest_jobs) to service_role;
 
 create or replace function public.read_conversation_activity_sources(
   p_user_id uuid,
@@ -127,6 +132,19 @@ begin
       order by source.occurred_at, source.source_kind_rank, source.source_id
     ) as sources
     from (
+      with jobs as (
+        -- One owner-predicate evaluation per job row, shared by the active
+        -- and terminal branches below.
+        select
+          j.*,
+          argus_private.backtest_job_result_hydrateable(j) as result_hydrateable
+        from public.backtest_jobs as j
+        where j.user_id = c.user_id
+          and j.conversation_id = c.id
+          and j.status in (
+            'queued', 'running', 'succeeded', 'failed', 'canceled', 'expired'
+          )
+      )
       (
         select
           jsonb_build_object(
@@ -199,17 +217,12 @@ begin
           ranked.updated_at as occurred_at,
           2 as source_kind_rank,
           ranked.id as source_id
-        from (
-          select
-            j.*,
-            public.backtest_job_result_hydrateable(j) as result_hydrateable
-          from public.backtest_jobs as j
-          where j.user_id = c.user_id
-            and j.conversation_id = c.id
-            and j.status in ('queued', 'running', 'succeeded')
-        ) as ranked
-        where ranked.status <> 'succeeded'
-           or not ranked.result_hydrateable
+        from jobs as ranked
+        where ranked.status in ('queued', 'running', 'succeeded')
+          and (
+            ranked.status <> 'succeeded'
+            or not ranked.result_hydrateable
+          )
         order by
           case ranked.status
             when 'running' then 3
@@ -235,17 +248,12 @@ begin
           coalesce(ranked.finished_at, ranked.updated_at) as occurred_at,
           2 as source_kind_rank,
           ranked.id as source_id
-        from (
-          select
-            j.*,
-            public.backtest_job_result_hydrateable(j) as result_hydrateable
-          from public.backtest_jobs as j
-          where j.user_id = c.user_id
-            and j.conversation_id = c.id
-            and j.status in ('succeeded', 'failed', 'canceled', 'expired')
-        ) as ranked
-        where ranked.status <> 'succeeded'
-           or ranked.result_hydrateable
+        from jobs as ranked
+        where ranked.status in ('succeeded', 'failed', 'canceled', 'expired')
+          and (
+            ranked.status <> 'succeeded'
+            or ranked.result_hydrateable
+          )
         order by coalesce(ranked.finished_at, ranked.updated_at) desc,
           ranked.id desc
         limit 1
@@ -376,7 +384,7 @@ begin
          j.status in ('failed', 'canceled', 'expired')
          or (
            j.status = 'succeeded'
-           and public.backtest_job_result_hydrateable(j)
+           and argus_private.backtest_job_result_hydrateable(j)
          )
        )
      for update;
@@ -541,7 +549,7 @@ begin
           j.status in ('failed', 'canceled', 'expired')
           or (
             j.status = 'succeeded'
-            and public.backtest_job_result_hydrateable(j)
+            and argus_private.backtest_job_result_hydrateable(j)
           )
         )
     ) as candidate
