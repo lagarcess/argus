@@ -80,12 +80,12 @@ def _align_benchmark_series(
     benchmark.index = _coerce_index_timezone(benchmark.index, target)
     benchmark = benchmark[~benchmark.index.duplicated(keep="last")].sort_index()
 
-    first_target = target[0]
-    last_target = target[-1]
-    if benchmark.index[0] > first_target or benchmark.index[-1] < last_target:
-        raise ValueError("benchmark_data_unavailable")
-
     observed = benchmark.reindex(target).notna()
+    # The first target bar anchors the curve and is the buy-and-hold
+    # benchmark's fill; the last is every template's ending value. Neither
+    # may be a forward-filled price, so both must be real observations.
+    if not bool(observed.iloc[0]) or not bool(observed.iloc[-1]):
+        raise ValueError("benchmark_data_unavailable")
     observed_points = int(observed.sum())
     target_points = int(len(target))
     observed_ratio = observed_points / target_points
@@ -112,22 +112,30 @@ def _align_benchmark_series(
     )
 
 
-def _benchmark_observed_series(
+def _benchmark_series_from_curve(
     benchmark_curve: dict[str, Any],
     *,
     target_index: pd.Index,
-) -> pd.Series | None:
-    """The alignment boundary's record of which benchmark bars are real.
+) -> tuple[pd.Series, pd.Series]:
+    """The normalized benchmark path and the alignment boundary's record of
+    which of its bars are real observations, both positional over the target.
 
-    A curve payload without the mask (injected test curves, stored payloads
-    from before the mask existed) means every bar is an observation.
+    A curve without the mask cannot say which prices are executable, so it
+    is refused rather than treated as fully observed.
     """
-    raw_mask = benchmark_curve.get("observed_mask")
-    if raw_mask is None:
-        return None
-    if len(raw_mask) != len(target_index):
+    try:
+        equity_values = list(benchmark_curve["equity_curve"])
+        observed_values = list(benchmark_curve["observed_mask"])
+    except (KeyError, TypeError) as exc:
+        raise ValueError("benchmark_curve_incomplete") from exc
+    if len(equity_values) != len(target_index) or len(observed_values) != len(
+        target_index
+    ):
         raise ValueError("benchmark_data_unavailable")
-    return pd.Series(list(raw_mask), index=target_index, dtype=bool)
+    return (
+        pd.Series(equity_values, index=target_index, dtype=float),
+        pd.Series(observed_values, index=target_index, dtype=bool),
+    )
 
 
 def _coerce_index_timezone(
@@ -157,6 +165,7 @@ def compute_alpha_metrics(
     benchmark_equity_curves: list[pd.Series] = []
     gross_symbol_equity_curves: list[pd.Series] = []
     symbol_external_flows: list[pd.Series] = []
+    symbol_coverages: list[dict[str, Any]] = []
     closed_trades: list[ClosedTrade] = []
     gross_closed_trades: list[ClosedTrade] = []
     start = date.fromisoformat(config["start_date"])
@@ -233,9 +242,11 @@ def compute_alpha_metrics(
                     prepared_market_data.price_series_for(symbol)
                 ),
             )
-        benchmark_normalized = pd.Series(
-            benchmark_curve["equity_curve"], index=close.index, dtype=float
+        benchmark_normalized, benchmark_observed = _benchmark_series_from_curve(
+            benchmark_curve,
+            target_index=close.index,
         )
+        deferred_fill_count = 0
         if is_dca:
             assert symbol_dca_plan is not None
             dca_result = _dca_equity_curve(
@@ -247,10 +258,6 @@ def compute_alpha_metrics(
                 slippage=float(realism["slippage"]),
             )
             symbol_equity = dca_result.equity_curve
-            benchmark_observed = _benchmark_observed_series(
-                benchmark_curve,
-                target_index=close.index,
-            )
             benchmark_result = _dca_equity_curve(
                 close=benchmark_normalized,
                 entries=entries,
@@ -260,7 +267,8 @@ def compute_alpha_metrics(
                 slippage=float(realism["slippage"]),
                 observed=benchmark_observed,
             )
-            if benchmark_result.deferred_fill_count:
+            deferred_fill_count = benchmark_result.deferred_fill_count
+            if deferred_fill_count:
                 logger.info(
                     "DCA benchmark deferred {count} contribution fill(s) to the "
                     "next observed price symbol={symbol} benchmark={benchmark}",
@@ -316,6 +324,12 @@ def compute_alpha_metrics(
                 closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
             )
 
+        symbol_coverage = _benchmark_coverage_block(
+            benchmark_curve,
+            deferred_fill_count=deferred_fill_count,
+        )
+        by_symbol[symbol]["performance"]["benchmark_coverage"] = symbol_coverage
+        symbol_coverages.append(symbol_coverage)
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
 
@@ -390,6 +404,9 @@ def compute_alpha_metrics(
                 net_performance=aggregate_metrics["performance"],
             )
         )
+    aggregate_metrics.setdefault("performance", {})["benchmark_coverage"] = (
+        _aggregate_benchmark_coverage(symbol_coverages)
+    )
     value_summary = portfolio_value_summary(aggregate_strategy_equity)
     if value_summary is not None:
         aggregate_metrics.setdefault("performance", {})["portfolio_value_range"] = (
@@ -449,6 +466,58 @@ def _aggregate_external_flows(
     if len(flows) > 0:
         flows.iloc[0] = float(aligned_cumulative.iloc[0])
     return flows.astype(float)
+
+
+def _benchmark_coverage_block(
+    benchmark_curve: dict[str, Any],
+    *,
+    deferred_fill_count: int,
+) -> dict[str, Any]:
+    """What the stored run says about the benchmark data it compared against.
+
+    The alignment boundary's coverage counts and the number of deposits whose
+    fill waited for an observed price travel with the metrics, so a
+    comparison that rests on forward-filled bars records that it did.
+    """
+    try:
+        coverage = benchmark_curve["coverage"]
+        observed_points = int(coverage["observed_points"])
+        target_points = int(coverage["target_points"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("benchmark_curve_incomplete") from exc
+    return _coverage_block(
+        observed_points=observed_points,
+        target_points=target_points,
+        deferred_fill_count=deferred_fill_count,
+    )
+
+
+def _aggregate_benchmark_coverage(
+    symbol_coverages: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return _coverage_block(
+        observed_points=sum(int(block["observed_points"]) for block in symbol_coverages),
+        target_points=sum(int(block["target_points"]) for block in symbol_coverages),
+        deferred_fill_count=sum(
+            int(block["deferred_fill_count"]) for block in symbol_coverages
+        ),
+    )
+
+
+def _coverage_block(
+    *,
+    observed_points: int,
+    target_points: int,
+    deferred_fill_count: int,
+) -> dict[str, Any]:
+    return {
+        "observed_points": int(observed_points),
+        "target_points": int(target_points),
+        "observed_ratio": (
+            round(observed_points / target_points, 4) if target_points else 0.0
+        ),
+        "deferred_fill_count": int(deferred_fill_count),
+    }
 
 
 def _execution_realism_has_costs(realism: dict[str, float | bool]) -> bool:

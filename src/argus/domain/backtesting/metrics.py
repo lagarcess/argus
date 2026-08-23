@@ -250,10 +250,6 @@ def _compute_dca_metrics(
     benchmark_return_pct = (
         float(benchmark_equity.iloc[-1] / invested_capital - 1.0) * 100.0
     )
-    volatility_pct, sharpe_ratio = _dispersion_metrics(
-        anchored.period_returns,
-        time_basis.periods_per_year,
-    )
     annualized = _money_weighted_annual_return_pct(
         external_flows=external_flows,
         ending_value=float(strategy_equity.iloc[-1]),
@@ -272,22 +268,14 @@ def _compute_dca_metrics(
                 round(annualized, 2) if annualized is not None else None
             ),
         },
-        "risk": {
-            "max_drawdown_pct": round(_max_drawdown_pct(anchored.drawdown_path), 2),
-            "volatility_pct": (
-                round(volatility_pct, 2) if volatility_pct is not None else None
-            ),
-        },
-        "efficiency": {
-            # An accumulation plan never closes a position, so closed-trade
-            # statistics are absent rather than zero.
-            "win_rate": None,
-            "total_trades": trade_count,
-            "profit_factor": None,
-            "sharpe_ratio": (
-                round(sharpe_ratio, 2) if sharpe_ratio is not None else None
-            ),
-        },
+        # An accumulation plan never closes a position, so the closed-trade
+        # statistics derive from an empty ledger and are null, not zero.
+        **_risk_and_efficiency_blocks(
+            anchored,
+            time_basis=time_basis,
+            trade_count=trade_count,
+            closed_trade_pnls=(),
+        ),
     }
 
 
@@ -315,12 +303,6 @@ def _compute_metrics_from_equity(
     benchmark_return = float(benchmark_equity.iloc[-1] / invested_capital - 1.0)
     total_return_pct = total_return * 100.0
     benchmark_return_pct = benchmark_return * 100.0
-    volatility_pct, sharpe_ratio = _dispersion_metrics(
-        anchored.period_returns,
-        time_basis.periods_per_year,
-    )
-    win_rate = _closed_trade_win_rate(closed_trade_pnls)
-    profit_factor = _compute_profit_factor(closed_trade_pnls)
 
     return {
         "performance": {
@@ -334,6 +316,34 @@ def _compute_metrics_from_equity(
                 time_basis,
             ),
         },
+        **_risk_and_efficiency_blocks(
+            anchored,
+            time_basis=time_basis,
+            trade_count=trade_count,
+            closed_trade_pnls=closed_trade_pnls,
+        ),
+    }
+
+
+def _risk_and_efficiency_blocks(
+    anchored: BaselineAnchoredSeries,
+    *,
+    time_basis: MetricTimeBasis,
+    trade_count: int,
+    closed_trade_pnls: Sequence[float],
+) -> dict[str, Any]:
+    """The risk and efficiency blocks every return basis shares.
+
+    Both bases hand over the same baseline-anchored series and a closed-trade
+    ledger, so a new key here exists for both with one rounding rule.
+    """
+    volatility_pct, sharpe_ratio = _dispersion_metrics(
+        anchored.period_returns,
+        time_basis.periods_per_year,
+    )
+    win_rate = _closed_trade_win_rate(closed_trade_pnls)
+    profit_factor = _compute_profit_factor(closed_trade_pnls)
+    return {
         "risk": {
             "max_drawdown_pct": round(_max_drawdown_pct(anchored.drawdown_path), 2),
             "volatility_pct": (

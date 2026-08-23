@@ -20,7 +20,7 @@ from argus.domain.backtesting.metrics import (
     _baseline_anchored_series,
     _compute_dca_metrics,
 )
-from argus.domain.backtesting.runner import compute_alpha_metrics
+from argus.domain.backtesting.runner import build_benchmark_curve, compute_alpha_metrics
 
 FEE = 200.0 / 10_000.0
 SLIPPAGE = 100.0 / 10_000.0
@@ -83,7 +83,9 @@ def _run(
             pd.Series(entries, index=index, dtype=bool),
             pd.Series(False, index=index, dtype=bool),
         ),
-        build_benchmark_curve_func=lambda *_a, **_k: {"equity_curve": [1.0] * len(index)},
+        build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+            cfg, idx, fetch_price_series_func=lambda **_: pd.Series(1.0, index=idx)
+        ),
     )
 
 
@@ -249,7 +251,9 @@ def test_dca_first_deposit_cost_drag_enters_risk_metrics(
             pd.Series([True, False, True, False], index=index, dtype=bool),
             pd.Series(False, index=index, dtype=bool),
         ),
-        build_benchmark_curve_func=lambda *_a, **_k: {"equity_curve": [1.0] * 4},
+        build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+            cfg, idx, fetch_price_series_func=lambda **_: pd.Series(1.0, index=idx)
+        ),
     )
     aggregate = metrics["aggregate"]
 
@@ -326,9 +330,9 @@ def test_flag_states_share_one_metric_path_at_the_rounding_tie_boundary(
                 pd.Series([True] + [False] * (len(prices) - 1), index=index),
                 pd.Series(False, index=index, dtype=bool),
             ),
-            build_benchmark_curve_func=lambda *_a, **_k: {
-                "equity_curve": [1.0] * len(prices)
-            },
+            build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+                cfg, idx, fetch_price_series_func=lambda **_: pd.Series(1.0, index=idx)
+            ),
         )
 
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")

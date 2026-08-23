@@ -21,6 +21,7 @@ from argus.domain.backtesting.metrics import (
 )
 from argus.domain.backtesting.runner import (
     _aggregate_external_flows,
+    build_benchmark_curve,
     compute_alpha_metrics,
 )
 from hypothesis import given, settings
@@ -91,9 +92,9 @@ def _run_dca(
             pd.Series(entries, index=index, dtype=bool),
             pd.Series(False, index=index, dtype=bool),
         ),
-        build_benchmark_curve_func=lambda *_args, **_kwargs: {
-            "equity_curve": (benchmark / benchmark.iloc[0]).tolist(),
-        },
+        build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+            cfg, idx, fetch_price_series_func=lambda **_: benchmark
+        ),
     )
 
 
@@ -568,9 +569,9 @@ def test_fixed_capital_card_keeps_the_total_return_row() -> None:
             pd.Series([True, False, False], index=index, dtype=bool),
             pd.Series(False, index=index, dtype=bool),
         ),
-        build_benchmark_curve_func=lambda *_args, **_kwargs: {
-            "equity_curve": [1.0, 1.0, 1.0],
-        },
+        build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+            cfg, idx, fetch_price_series_func=lambda **_: pd.Series(1.0, index=idx)
+        ),
     )
 
     assert metrics["aggregate"]["performance"]["return_basis"] == "fixed_capital"

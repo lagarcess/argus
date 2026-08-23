@@ -14,7 +14,7 @@ from argus.domain.backtesting.coverage import (
     prepare_market_data,
 )
 from argus.domain.backtesting.metrics import _compute_metrics_from_equity
-from argus.domain.backtesting.runner import compute_alpha_metrics
+from argus.domain.backtesting.runner import build_benchmark_curve, compute_alpha_metrics
 from argus.domain.market_data.capabilities import EquityMarketSession
 
 
@@ -104,9 +104,9 @@ def _run_with_signals(
         config,
         fetch_ohlcv_func=lambda **_: strategy_bars,
         build_signals_func=signal_builder,
-        build_benchmark_curve_func=lambda *_args, **_kwargs: {
-            "equity_curve": (benchmark / benchmark.iloc[0]).tolist(),
-        },
+        build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+            cfg, idx, fetch_price_series_func=lambda **_: benchmark
+        ),
     )
 
 
@@ -439,9 +439,9 @@ def test_multi_symbol_efficiency_combines_closed_trade_pnl() -> None:
         config,
         fetch_ohlcv_func=lambda *, symbol, **_: bars_by_symbol[symbol],
         build_signals_func=lambda *_: (entries, exits),
-        build_benchmark_curve_func=lambda *_args, **_kwargs: {
-            "equity_curve": [1.0, 1.0],
-        },
+        build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+            cfg, idx, fetch_price_series_func=lambda **_: pd.Series(1.0, index=idx)
+        ),
     )
 
     assert metrics["by_symbol"]["AAPL"]["efficiency"]["win_rate"] == 1.0
@@ -473,9 +473,9 @@ def test_open_positions_are_omitted_from_card_and_result_fact_bank() -> None:
         config,
         fetch_ohlcv_func=lambda *, symbol, **_: bars_by_symbol[symbol],
         build_signals_func=lambda *_: (entries, exits),
-        build_benchmark_curve_func=lambda *_args, **_kwargs: {
-            "equity_curve": [1.0, 1.0, 1.0],
-        },
+        build_benchmark_curve_func=lambda cfg, idx: build_benchmark_curve(
+            cfg, idx, fetch_price_series_func=lambda **_: pd.Series(1.0, index=idx)
+        ),
     )
 
     efficiency = metrics["aggregate"]["efficiency"]

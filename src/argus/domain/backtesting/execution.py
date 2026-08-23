@@ -333,17 +333,19 @@ def _dca_equity_curve(
     slippage: float = 0.0,
     observed: pd.Series | None = None,
 ) -> DcaSimulationResult:
-    """Value a recurring plan. The seed buys once on the first bar.
+    """Value a recurring plan funded by dated deposits.
 
-    Every dollar is invested on its own date at the fill price after modeled
+    The seed is a deposit on the first bar and each contribution a deposit on
+    its entry bar. Every deposit is invested at the fill price after modeled
     costs, in fractional shares, so no cash waits for a whole share and the
     invested total is the seed plus one contribution per entry. The flow
     series records the same deposits the curve invests, bar by bar.
 
     ``observed`` marks bars whose price is a real market observation. A
-    deposit keeps its date, but its buy executes at the next observed price
-    and the cash idles in equity until then; a forward-filled price is never
-    a fill price (#469). ``None`` means every bar is observed.
+    deposit, the seed included, keeps its date, but its buy executes at the
+    next observed price and the cash idles in equity until then; a
+    forward-filled price is never a fill price (#469). ``None`` means every
+    bar is observed, which is what the strategy's own bars are.
     """
     entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
     fill_price = close * (1.0 + slippage)
