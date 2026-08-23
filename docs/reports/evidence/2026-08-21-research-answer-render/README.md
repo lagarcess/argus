@@ -210,6 +210,13 @@ Ten findings plus two unfiled items, all verified at head. What changed:
   guard, and is evaluated once per job row; it lives in `argus_private`.
 - `docs/DATA_MODEL.md` no longer states the run-only settle rule.
 
+Re-driven after the round (guest, English, the founder's prompt, fresh
+database through the whole migration chain): card after 72 s, answer of
+3,388 chars beneath it with no reload (`/messages` 1 → 1), 17 polls then
+stopped, composer enabled, console clean. `review-round-guest-en-*`.
+
+![review round, guest EN: Research ready with the answer painted below](review-round-guest-en-2-ready-no-reload.png)
+
 **Negative result, kept on record.** The reviewer diffed all three replaced
 functions against every migration defining them and found no silent revert,
 then noticed `test_replaced_functions_keep_their_original_signatures` split
