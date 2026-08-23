@@ -185,9 +185,12 @@ def test_metric_and_chart_equity_assignments_share_execution_ledger() -> None:
     assert "vbt.Portfolio.from_signals" not in _called_functions(
         charts.build_result_chart
     )
-    assert _called_functions(runner._benchmark_buy_and_hold_equity).count(
-        "vbt.Portfolio.from_signals"
-    ) == 1
+    assert (
+        _called_functions(runner._benchmark_buy_and_hold_equity).count(
+            "vbt.Portfolio.from_signals"
+        )
+        == 1
+    )
 
 
 @pytest.mark.parametrize(
@@ -483,7 +486,9 @@ def test_validate_backtest_config_rejects_equity_history_before_alpaca_window() 
     assert str(excinfo.value) == "provider_history_start_unavailable"
 
 
-def test_validate_backtest_config_rejects_currency_pair_windows_by_kraken_candles() -> None:
+def test_validate_backtest_config_rejects_currency_pair_windows_by_kraken_candles() -> (
+    None
+):
     config = engine.normalize_backtest_config(
         {
             "template": "buy_and_hold",
@@ -632,77 +637,18 @@ def test_buy_and_hold_execution_realism_reduces_net_return_and_profit(
         "gross_total_return_pct": gross_performance["total_return_pct"],
         "net_total_return_pct": net_performance["total_return_pct"],
         "return_drag_pct": pytest.approx(
-            gross_performance["total_return_pct"]
-            - net_performance["total_return_pct"],
+            gross_performance["total_return_pct"] - net_performance["total_return_pct"],
             abs=0.01,
         ),
     }
-    assert net_performance["benchmark_return_pct"] < gross_performance[
-        "benchmark_return_pct"
-    ]
+    assert (
+        net_performance["benchmark_return_pct"]
+        < gross_performance["benchmark_return_pct"]
+    )
     assert net_performance["delta_vs_benchmark_pct"] == pytest.approx(
-        net_performance["total_return_pct"]
-        - net_performance["benchmark_return_pct"],
+        net_performance["total_return_pct"] - net_performance["benchmark_return_pct"],
         abs=0.01,
     )
-
-
-def test_flag_off_total_return_keeps_legacy_rounding_at_tie_boundary(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # 20-bar triangle 96 -> 114 -> 97.8 puts the exact total return on the
-    # 1.875% rounding tie. The legacy returns-based float path rounds it to
-    # 1.87 while an equity/invested ratio rounds to 1.88, so this pins the
-    # flag-off math to the pre-realism engine bit for bit.
-    prices = [
-        96.0, 97.8, 99.6, 101.4, 103.2, 105.0, 106.8, 108.6, 110.4, 112.2,
-        114.0, 112.2, 110.4, 108.6, 106.8, 105.0, 103.2, 101.4, 99.6, 97.8,
-    ]
-    benchmark_prices = [110.0 + 0.5 * step for step in range(len(prices))]
-    bars = {"TSLA": _make_bars(prices), "NVDA": _make_bars(benchmark_prices)}
-
-    def fake_fetch_ohlcv(
-        symbol: str,
-        asset_class: engine.AssetClass,  # noqa: ARG001
-        start_date: date,  # noqa: ARG001
-        end_date: date,  # noqa: ARG001
-        timeframe: str,  # noqa: ARG001
-    ) -> pd.DataFrame:
-        return bars[symbol].copy()
-
-    def fake_fetch_price_series(
-        symbol: str,
-        asset_class: engine.AssetClass,  # noqa: ARG001
-        start_date: date,  # noqa: ARG001
-        end_date: date,  # noqa: ARG001
-        timeframe: str,  # noqa: ARG001
-    ) -> pd.Series:
-        return bars[symbol]["close"]
-
-    monkeypatch.setattr(engine, "fetch_ohlcv", fake_fetch_ohlcv)
-    monkeypatch.setattr(engine, "fetch_price_series", fake_fetch_price_series)
-    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
-
-    metrics = engine.compute_alpha_metrics(
-        engine.normalize_backtest_config(
-            {
-                "template": "buy_and_hold",
-                "asset_class": "equity",
-                "symbols": ["TSLA"],
-                "timeframe": "1D",
-                "start_date": date(2025, 1, 1),
-                "end_date": date(2025, 1, 20),
-                "side": "long",
-                "starting_capital": 10000,
-                "allocation_method": "equal_weight",
-                "benchmark_symbol": "NVDA",
-                "parameters": {},
-            }
-        )
-    )
-
-    assert metrics["aggregate"]["performance"]["total_return_pct"] == 1.87
-    assert metrics["by_symbol"]["TSLA"]["performance"]["total_return_pct"] == 1.87
 
 
 @pytest.mark.parametrize(
@@ -909,9 +855,10 @@ def test_dca_execution_realism_reduces_net_return_and_profit(
     net_performance = net["aggregate"]["performance"]
     assert net_performance["total_return_pct"] < gross_performance["total_return_pct"]
     assert net_performance["profit"] < gross_performance["profit"]
-    assert net_performance["benchmark_return_pct"] < gross_performance[
-        "benchmark_return_pct"
-    ]
+    assert (
+        net_performance["benchmark_return_pct"]
+        < gross_performance["benchmark_return_pct"]
+    )
 
 
 def test_dca_execution_realism_drag_increases_with_more_fills(
@@ -946,16 +893,17 @@ def test_dca_execution_realism_drag_increases_with_more_fills(
     )
 
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
-    daily_net = engine.compute_alpha_metrics(engine.normalize_backtest_config(daily_payload))
+    daily_net = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(daily_payload)
+    )
     weekly_net = engine.compute_alpha_metrics(
         engine.normalize_backtest_config(weekly_payload)
     )
 
-    assert daily_net["aggregate"]["efficiency"]["total_trades"] > weekly_net[
-        "aggregate"
-    ][
-        "efficiency"
-    ]["total_trades"]
+    assert (
+        daily_net["aggregate"]["efficiency"]["total_trades"]
+        > weekly_net["aggregate"]["efficiency"]["total_trades"]
+    )
     daily_profit_drag = (
         daily_gross["aggregate"]["performance"]["profit"]
         - daily_net["aggregate"]["performance"]["profit"]

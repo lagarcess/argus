@@ -143,7 +143,7 @@ def test_result_chart_markers_are_executed_fills(
             "timeframe": "1D",
             "starting_capital": 10000.0,
             "parameters": {},
-            "benchmark": "SPY",
+            "benchmark_symbol": "SPY",
         }
     )
 
@@ -172,7 +172,7 @@ def test_result_chart_includes_strategy_portfolio_value_range(
             "timeframe": "1D",
             "starting_capital": 10000.0,
             "parameters": {},
-            "benchmark": "SPY",
+            "benchmark_symbol": "SPY",
         }
     )
 
@@ -196,8 +196,8 @@ def test_metrics_trade_count_uses_executed_fills(
     monkeypatch.setattr(engine, "_build_signals", lambda *_: (entries, exits))
     monkeypatch.setattr(
         engine,
-        "build_benchmark_curve",
-        lambda *_, **__: {"equity_curve": [1.0, 1.0, 1.0, 1.0, 1.0]},
+        "fetch_price_series",
+        lambda **_: pd.Series(1.0, index=index),
     )
 
     metrics = engine.compute_alpha_metrics(
@@ -210,7 +210,7 @@ def test_metrics_trade_count_uses_executed_fills(
             "timeframe": "1D",
             "starting_capital": 10000.0,
             "parameters": {},
-            "benchmark": "SPY",
+            "benchmark_symbol": "SPY",
         }
     )
 
