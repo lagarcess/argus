@@ -1321,9 +1321,14 @@ evidence, while user commitment is represented by an explicit `DecisionNote`.
   executed by the launch adapter. Readers should prefer this replay payload when
   present and must not reconstruct run inputs from result-card display copy.
 - Benchmark comparisons require sufficient benchmark observations over the
-  selected window. If the benchmark starts late, ends early, or is too sparse to
-  support a trustworthy aligned curve, the backend returns
-  `503 benchmark_data_unavailable` instead of silently backfilling a comparison.
+  selected window. The benchmark must have a real observation on the window's
+  first and last bar for every template: the first bar anchors the normalized
+  curve and is the buy-and-hold benchmark's fill, the last is every
+  template's ending value, and neither may be a forward-filled price. A
+  benchmark that merely spans the window without trading on those bars, one
+  that starts late or ends early, or one too sparse to support a trustworthy
+  aligned curve returns `503 benchmark_data_unavailable` instead of silently
+  backfilling a comparison.
 
 ## Backtest Job
 
@@ -1419,9 +1424,26 @@ Metrics are grouped into categories.
   "delta_vs_benchmark_pct": 6.3,
   "profit": 1840.25,
   "cagr_pct": 9.7,
-  "annualized_return_pct": 9.7
+  "annualized_return_pct": 9.7,
+  "benchmark_coverage": {
+    "observed_points": 122,
+    "target_points": 122,
+    "observed_ratio": 1.0,
+    "deferred_fill_count": 0
+  }
 }
 ```
+
+`benchmark_coverage` is what the benchmark comparison rests on, stored with
+the run. `observed_points` of `target_points` strategy bars had a real
+benchmark observation (`observed_ratio` is their ratio, at least 0.8 or the
+run was rejected); the remainder were forward-filled for marking only.
+`deferred_fill_count` is the number of contributions-basis benchmark deposits
+whose buy waited for the next observed price instead of executing on its own
+bar; it is `0` for fixed-capital runs and for fully observed benchmarks.
+`metrics.by_symbol.<symbol>.performance.benchmark_coverage` carries the same
+block per symbol, and the aggregate block sums points and deferred fills
+across symbols.
 
 ## Risk Metrics
 ```json
@@ -1526,9 +1548,12 @@ coverage and forward-fills them for marking only: a forward-filled price is
 never an executable fill price. A contributions-basis benchmark deposit
 landing on a gap bar keeps its cash-flow date, idles as cash inside benchmark
 equity, and buys at the next observed benchmark close; a deposit with no
-later observed close remains cash in the benchmark's ending value. Missing
-first or last benchmark bars are still rejected as
-`benchmark_data_unavailable`. Stored runs persisted before this field exists carry no `return_basis`;
+later observed close remains cash in the benchmark's ending value. The
+window's first and last bars must be real benchmark observations for every
+template, so the seed always fills on day one and the ending value is never
+a forward-filled price; a benchmark without them is rejected as
+`benchmark_data_unavailable`. Every run records the coverage its comparison
+rests on in `performance.benchmark_coverage` (below). Stored runs persisted before this field exists carry no `return_basis`;
 readers must treat a missing value on a `dca_accumulation` run as
 `"contributions"` and as `"fixed_capital"` otherwise.
 
@@ -1645,13 +1670,20 @@ other's default. Both are declared together in one `DcaCapitalPlan`
 (`argus.domain.dca_capital`), and every layer that shows, edits, validates, or
 executes a plan reads that owner rather than deciding for itself.
 
-- **`starting_capital`** — the seed, invested on day one at the fill price
-  after modeled costs. **Default `0`**, because the common question ("what if I
-  had bought $200 of Coca-Cola every month") has no lump sum in it.
+- **`starting_capital`** — the seed, a deposit on the first bar invested at
+  that bar's fill price after modeled costs. It is routed like every other
+  deposit, and because the first bar is always a real observation (benchmark
+  endpoint rule above) it never waits. **Default `0`**, because the common
+  question ("what if I had bought $200 of Coca-Cola every month") has no lump
+  sum in it.
 - **`recurring_contribution`** — invested every period.
 - **`cadence`** — the contribution period: `daily`, `weekly`, `biweekly`,
-  `monthly`, `quarterly`. Wire and storage keep the name `cadence`; no user-facing
-  surface names the period as a standalone parameter (see the copy rule below).
+  `monthly`, `quarterly`. One contribution lands on the first bar of each
+  period present in the data, never once per bar: on intraday timeframes a
+  `daily` plan deposits once per calendar day, a `weekly` plan once per week,
+  and a period with no bars deposits on the next bar the data has. Wire and
+  storage keep the name `cadence`; no user-facing surface names the period as
+  a standalone parameter (see the copy rule below).
 
 **Neither role may stand in for the other.** A DCA engine config carries the
 plan under `dca_capital` and carries **no** top-level `starting_capital`,
@@ -4764,11 +4796,14 @@ For Alpha, the Settings "Upgrade" button may be shown behind a feature flag as a
 
 Backend runtime flags may also control internal engine behavior. Execution realism
 is active by default behind `ARGUS_ENABLE_EXECUTION_REALISM`, while modeled costs
-remain opt-in per idea. An explicit `false|0|off|no` value is the kill switch and
-restores the pre-realism behavior byte-for-byte. Runs without stated fees or
-slippage stay canonical "no fees/slippage". With the kill switch engaged,
-confirmation cards omit `capabilities.execution_costs_editable` and result cards
-omit `execution_costs`.
+remain opt-in per idea. An explicit `false|0|off|no` value is the kill switch: it
+forces zero modeled costs and hides the cost surfaces, and nothing else. Metric
+math is one path in both flag states, so a kill-switch run is byte-identical to
+a flag-on run with no stated costs; the switch does not restore the
+pre-baseline arithmetic that existed before #468 (see "Pre-trade baseline").
+Runs without stated fees or slippage stay canonical "no fees/slippage". With the
+kill switch engaged, confirmation cards omit
+`capabilities.execution_costs_editable` and result cards omit `execution_costs`.
 
 ---
 

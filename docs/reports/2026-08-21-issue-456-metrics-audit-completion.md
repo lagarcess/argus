@@ -53,8 +53,8 @@ Benchmark alignment still accepts interior gaps at 80% coverage and still forwar
 
 - `_align_benchmark_series` exposes which target bars are real benchmark observations, and `build_benchmark_curve` carries that mask.
 - `_dca_equity_curve` accepts the mask: a deposit landing on a gap bar **keeps its cash-flow date**, idles as cash inside benchmark equity, and buys at the next observed benchmark close. A deposit with no later observed close remains cash in the benchmark's ending value. Deposit schedules and invested capital therefore stay identical on both sides of the comparison, which preserves the prior audit's pinned same-schedule invariant, and the money-weighted rate keeps true deposit dates.
-- The runner logs every deferred fill (`deferred_fill_count` on the simulation result), so the policy is observable when it fires.
-- Missing first or last benchmark bars are still rejected, sub-threshold coverage is still rejected, non-DCA benchmarks are unchanged, and a fully observed benchmark produces the identical simulation.
+- Every run stores what its comparison rests on: `performance.benchmark_coverage` carries the observed and target bar counts, their ratio, and `deferred_fill_count`, per symbol and in aggregate, so a deferred fill is visible in the run record and not only in a server log (added in the review round below).
+- The window's first and last bars must be real benchmark observations for every template; sub-threshold coverage is still rejected; and a fully observed benchmark produces the identical simulation. The first version of this fix left the endpoint rule as a range check and threaded the mask into the DCA branch only; the review round below records what that cost and how it was closed.
 
 The audit's reproduction now reports **39.79%**, the true-price value, because the gap-day deposit fills at the next session's real price. The policy, including the multi-symbol case where each symbol's index exposes a different gap, is pinned in [`tests/domain/test_dca_benchmark_observed_fills.py`](../../tests/domain/test_dca_benchmark_observed_fills.py); six of its seven tests fail on the base SHA (the seventh pins that rejection thresholds did not tighten). The policy is documented in the contract's return-basis section.
 
@@ -125,6 +125,63 @@ Every run also reconciled profit, delta, the annualized rate by substitution, wi
 | Contributions run funded after bar 0 | Unfunded bars carry no observations; baseline anchors at the first deposit | Held | **Pass**, pinned |
 | Daily DCA on intraday bars | One deposit per day, on its day's first bar | Held; unchanged on real NYSE daily sessions | **Pass**, pinned |
 
+## Review round at `8b40e288`
+
+The PR's first review returned ten confirmed findings. Three changed reported numbers or made a contract sentence true; each is recorded here with what a user saw before and sees after. The remaining findings were contract wording, observability, and structure, and are listed at the end.
+
+### R1. `buy_and_hold` reported a fabricated benchmark return
+
+`_align_benchmark_series` checked that the benchmark's date range *spanned* the window, not that it *traded* on the window's first and last bar. A benchmark observed the session before the window and absent on its first bar cleared that check, cleared the 80% coverage gate (4 of 5), and was forward-filled onto bar 0. The #469 router protected DCA deposits from that bar, but the non-DCA benchmark fills its whole position on bar 0 through `_benchmark_buy_and_hold_equity`, and the curve's normalization anchored on the same forward-filled value.
+
+Worked example, five sessions from 2025-01-06, strategy flat at 100, 10 bps fees and 5 bps slippage, benchmark observed at **50 on 2025-01-03** (the session before the window) and **100 on sessions 2 through 5**, nothing on session 1:
+
+| Template | Before (`8b40e288`) | After |
+| --- | --- | --- |
+| `dca_accumulation`, $100 daily | strategy -0.15%, benchmark **-0.15%**, delta 0.00 | rejected, `benchmark_data_unavailable` |
+| `buy_and_hold`, $10,000 | strategy -0.15%, benchmark **+99.70%**, delta **-99.85** | rejected, `benchmark_data_unavailable` |
+
+The 99.70% is a whole-position buy at a forward-filled 50 marked at 100 on a benchmark that never traded below 100 inside the window. The same payload also carried the contradiction the second finding named: `equity_curve[0] == 1.0` beside `observed_mask[0] == False`. With the founder's variant (benchmark 90 the session before, then 100, 101, 102, 103) the curve reported a 14.44% benchmark move for a window whose observed move was 3.0%, and a seeded DCA ($5,000 seed, $200 daily) reported a benchmark return of 2.64% against the 12.7% its own bar-0 value implied.
+
+The fix is at the producer: both endpoints of the target window must be real benchmark observations, for every template, or alignment rejects the run. Interior gaps keep the 80% policy and the deferral router. The contract sentence the PR had added ("missing first or last benchmark bars are still rejected") was false at `8b40e288` in both directions and is true now. Reachability: a launch without `coverage_preflight` runs the engine with `prepared_market_data=None`, fetching the benchmark directly with no common-window trimming, so the case reaches production. Pinned in [`tests/domain/test_benchmark_curve_contract.py`](../../tests/domain/test_benchmark_curve_contract.py); the `buy_and_hold` case reproduces the 99.7 at `8b40e288` and 13 of the file's 15 tests fail there.
+
+### R2. The default costless path changed, and the contract still promised byte identity
+
+Retiring the returns-based `_compute_metrics` path (fix 1) moved the default, costless path onto the baseline-anchored equity path. `docs/API_CONTRACT.md` still said the realism kill switch "restores the pre-realism behavior byte-for-byte", and the test that pinned the legacy 1.87 rounding had been deleted with the path it pinned.
+
+Worked example on the 20-session triangle fixture (96 rising 1.8 per session to 114, then falling to 97.8), `buy_and_hold`, $10,000, no stated costs, `ARGUS_ENABLE_EXECUTION_REALISM=false`:
+
+| Metric | Base `a5f1139b` (legacy path) | Head (one path) | Why |
+| --- | ---: | ---: | --- |
+| `total_return_pct` | 1.87 | 1.88 | the exact return is 1.875%; the legacy compounded `pct_change` product lands a float below the tie, the equity ratio lands on it |
+| `volatility_pct` | 27.16 | 27.90 | the fabricated zero first return left the sample (19 real intervals instead of 20) |
+| `sharpe_ratio` | 0.99 | 1.02 | same sample change |
+| `benchmark_return_pct`, `annualized_return_pct`, `max_drawdown_pct` | 8.64 / 31.18 / -14.21 | unchanged | not touched by the series shape |
+
+This is #468 applied to the default path, which is the lane's purpose; restoring byte identity with the pre-realism engine would reinstate the fabricated zero return on every costless run. The resolution is the second of the two the review allowed: the contract sentence is replaced. The kill switch now promises exactly what holds, zero modeled costs and hidden cost surfaces, with metric math one path in both flag states, so a kill-switch run is byte-identical to a flag-on run with no stated costs. That invariant, and the 1.88 tie, are pinned in [`tests/domain/test_pretrade_baseline_metrics.py`](../../tests/domain/test_pretrade_baseline_metrics.py).
+
+### R3. The #469 machinery was permissive when absent and unrecorded when it fired
+
+An `observed_mask` missing from a benchmark curve meant "fully observed", so a curve arriving without it silently reverted to stale-price fills, and eight test fakes across four files took exactly that path; the fix was guarded by a suite that mostly did not exercise it. The deferred-fill count reached a log line and nothing else.
+
+Now a curve without the mask is refused (`benchmark_curve_incomplete`), one reader builds both the normalized path and the mask from the payload with a typed `benchmark_data_unavailable` on a length mismatch (previously a raw pandas message could reach the 422), every fake routes through the real `build_benchmark_curve`, and the stored metrics carry `performance.benchmark_coverage`. For the D7 reproduction a run now records:
+
+```json
+{"observed_points": 4, "target_points": 5, "observed_ratio": 0.8, "deferred_fill_count": 1}
+```
+
+per symbol and in aggregate (sums across symbols); a fully observed benchmark records `1.0` and `0` for every template.
+
+### The seed through the router
+
+The seed is folded into the first bar's deposit and routed like any other, so at the function level it defers when bar 0 is unobserved: seed $10,000, prices 1.0 / 1.5 / 2.0 / 2.5, `observed=[False, True, True, True]` gives equity `[10000, 10000, 13333.33, 16666.67]`, one deferred fill, +66.7% against +150% fully observed. That is the correct routing and is now pinned, but after R1 it is unreachable through real alignment, because bar 0 is always an observation; the contract and docstring now say the seed is a first-bar deposit that never waits for that reason.
+
+### The rest of the round
+
+- The daily-cadence rule (fix 3) is now in the contract's `cadence` bullet, not only in this report.
+- The engine facade's `_dca_equity_curve` forwards `observed`, so the seam cannot hand out pre-#469 behavior.
+- One `_risk_and_efficiency_blocks` helper owns the risk and efficiency shape for both return bases; the DCA `win_rate` and `profit_factor` nulls derive from an empty closed-trade ledger instead of being asserted.
+- Four review claims were refuted by the reviewer's own work and are not re-litigated here: the aggregate ragged start (unreachable, `prepare_market_data` trims to a common start), trailing-gap deposits (0.000000 pp difference), an FX session boundary (Kraken serves currency pairs 24/7, 721 of 721 contiguous bars), and a "legacy 0.0" story for null dispersion.
+
 ## Correct today, worth watching
 
 These are not defects at the PR head. They are recorded so the next audit does not rediscover them.
@@ -143,8 +200,8 @@ These are not defects at the PR head. They are recorded so the next audit does n
 - Reproductions and the reconciliation matrix ran with `ARGUS_ENABLE_EXECUTION_REALISM=true` and modeled costs, exercising the production equity metric path. The #469 reproduction went through the real `build_benchmark_curve` alignment and coverage rules, not a stubbed curve.
 - Market data was injected deterministic weekday series. Metric formulas are data-independent once fills and equity exist; the asset- and calendar-aware time basis (D4) is separately pinned by the existing suite, including the real-session intraday test and the daily-cadence NYSE-calendar tests, and by the prior audit's live-provider matrix. No live provider calls, paid dispatch, deploys, or production writes were made.
 - Every expected value in the committed tests is derived from prices and cash flows alone; no test calls a production metric helper to compute its own expectation. The reconciliation harness additionally replayed execution independently.
-- Fail-on-base was proven by restoring `src` to `a5f1139b` and running the new tests: the #469 file fails 6 of 7 (the seventh pins unchanged rejection policy), the #468 file cannot import, and the D8 intraday test fails.
-- Full backend suite at the PR head: 5,645 passed, 528 skipped, 0 failed. `tests/test_interpreter_prompt_freeze.py` passes; no model-facing text was touched.
+- Fail-on-base was proven by restoring `src` to `a5f1139b` and running the new tests: the #469 file fails 6 of 7 (the seventh pins unchanged rejection policy), the #468 file cannot import, and the D8 intraday test fails. The review-round file was proven the same way against `8b40e288`: 13 of 15 fail there, and its `buy_and_hold` harness reproduces the 99.7.
+- Full backend suite at the first PR head: 5,645 passed, 528 skipped, 0 failed. The review-round head's suite result is recorded on the PR. `tests/test_interpreter_prompt_freeze.py` passes; no model-facing text was touched.
 
 ## Issue disposition
 
@@ -155,4 +212,4 @@ These are not defects at the PR head. They are recorded so the next audit does n
 
 ## Stop statement
 
-Changes in this lane: `src/argus/domain/backtesting/` (metrics, runner, execution, signals), the `engine.py` facade line that re-exported the retired `_compute_metrics` helper, tests, `docs/API_CONTRACT.md` metric definitions, and this report. Nothing else was touched; no model-facing text changed.
+Changes in this lane: `src/argus/domain/backtesting/` (metrics, runner, execution, signals), the `engine.py` facade (the line that re-exported the retired `_compute_metrics` helper, and the `observed` forward on `_dca_equity_curve`), tests, `docs/API_CONTRACT.md` metric definitions, and this report. Nothing else was touched; no model-facing text changed.
