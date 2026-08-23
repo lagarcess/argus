@@ -1,0 +1,666 @@
+{
+  "captured_at": "2026-08-23",
+  "head": "803f6094",
+  "base": "8bf55aeb (origin/codex/private-alpha-next)",
+  "topology": "local backend from this worktree at 803f6094 (uvicorn, ARGUS_MOCK_AUTH=true, ARGUS_PERSISTENCE_MODE=memory, ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider via Alpaca, real OpenRouter interpretation with the integration env's model tiers, canonical env sourced into the process only, no env file written) + web dev server at 803f6094 (NEXT_PUBLIC_MOCK_AUTH=true, NEXT_PUBLIC_ENABLE_SPANISH=true) + headed Playwright Chromium driving the rendered app; workspace language set through PATCH /me and the i18n storage key",
+  "scenarios": [
+    {
+      "id": "en-approve",
+      "workspace_language": "en",
+      "turns": [
+        {
+          "label": "1-card",
+          "user_message": "Test buying and holding AAPL from 2023 through 2024 with $10,000.",
+          "card_action": null,
+          "on_screen": "AAPL Buy and Hold Test\nTest buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel\nAdd a follow-up\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-approve-1-card.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "en",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "January 3, 2023 - December 31, 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "SPY",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Daily data",
+              "Benchmark: SPY"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over January 3, 2023 - December 31, 2024."
+          }
+        },
+        {
+          "label": "2-approve",
+          "user_message": "yes, run it",
+          "card_action": null,
+          "on_screen": "AAPL Buy and Hold Test\nTest buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel\nyes, run it\n\nThe visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-approve-2-approve.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_to_respond"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "en",
+            "recovery": {
+              "code": "confirmation_action_guidance",
+              "retryable": false
+            },
+            "assistant_response (persisted English compat; the screen renders the typed code)": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it."
+          }
+        }
+      ]
+    },
+    {
+      "id": "en-edit-then-approve",
+      "workspace_language": "en",
+      "turns": [
+        {
+          "label": "1-card",
+          "user_message": "Test buying and holding AAPL from 2023 through 2024 with $10,000.",
+          "card_action": null,
+          "on_screen": "Test buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel\nAdd a follow-up\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-edit-then-approve-1-card.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "en",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "January 3, 2023 - December 31, 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "SPY",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Daily data",
+              "Benchmark: SPY"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over January 3, 2023 - December 31, 2024."
+          }
+        },
+        {
+          "label": "2-edit",
+          "user_message": "Change the benchmark to QQQ",
+          "card_action": null,
+          "on_screen": "AAPL Buy and Hold Test\nTest buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nUpdated\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nChange the benchmark to QQQ\nAAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: QQQ\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-edit-then-approve-2-edit.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "QQQ",
+            "launch_payload.benchmark_symbol": "QQQ",
+            "launch_payload.language": "en",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "January 3, 2023 - December 31, 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "QQQ",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Daily data",
+              "Benchmark: QQQ"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over January 3, 2023 - December 31, 2024."
+          }
+        },
+        {
+          "label": "3-approve",
+          "user_message": "yes, run it",
+          "card_action": null,
+          "on_screen": "AAPL Buy and Hold Test\nTest buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nUpdated\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nChange the benchmark to QQQ\nAAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: QQQ\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel\nyes, run it\n\nThe visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-edit-then-approve-3-approve.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_to_respond"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "QQQ",
+            "launch_payload.benchmark_symbol": "QQQ",
+            "launch_payload.language": "en",
+            "recovery": {
+              "code": "confirmation_action_guidance",
+              "retryable": false
+            },
+            "assistant_response (persisted English compat; the screen renders the typed code)": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it."
+          }
+        }
+      ]
+    },
+    {
+      "id": "es-approve",
+      "workspace_language": "es-419",
+      "turns": [
+        {
+          "label": "1-card",
+          "user_message": "Prueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.",
+          "card_action": null,
+          "on_screen": "Prueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-approve-1-card.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "es-419",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "3 de enero de 2023 al 31 de diciembre de 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "SPY",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Datos diarios",
+              "Benchmark: SPY"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over 3 de enero de 2023 al 31 de diciembre de 2024."
+          }
+        },
+        {
+          "label": "2-approve",
+          "user_message": "sí, ejecútalo",
+          "card_action": null,
+          "on_screen": "Prueba de compra y retención de\nPrueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nsí, ejecútalo\n\nLa confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-approve-2-approve.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_to_respond"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "es-419",
+            "recovery": {
+              "code": "confirmation_action_guidance",
+              "retryable": false
+            },
+            "assistant_response (persisted English compat; the screen renders the typed code)": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it."
+          }
+        }
+      ]
+    },
+    {
+      "id": "es-edit-then-approve",
+      "workspace_language": "es-419",
+      "turns": [
+        {
+          "label": "1-card",
+          "user_message": "Prueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.",
+          "card_action": null,
+          "on_screen": "Prueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-edit-then-approve-1-card.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "es-419",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "3 de enero de 2023 al 31 de diciembre de 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "SPY",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Datos diarios",
+              "Benchmark: SPY"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over 3 de enero de 2023 al 31 de diciembre de 2024."
+          }
+        },
+        {
+          "label": "2-edit",
+          "user_message": "Cambia el benchmark a QQQ",
+          "card_action": null,
+          "on_screen": "Prueba de compra y retención de\nPrueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nActualizado\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nCambia el benchmark a QQQ\n\nCambiando el benchmark a QQQ.\n\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: QQQ\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-edit-then-approve-2-edit.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "QQQ",
+            "launch_payload.benchmark_symbol": "QQQ",
+            "launch_payload.language": "es-419",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "3 de enero de 2023 al 31 de diciembre de 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "QQQ",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Datos diarios",
+              "Benchmark: QQQ"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over 3 de enero de 2023 al 31 de diciembre de 2024."
+          }
+        },
+        {
+          "label": "3-approve",
+          "user_message": "sí, ejecútalo",
+          "card_action": null,
+          "on_screen": "Prueba de compra y retención de\nPrueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nActualizado\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nCambia el benchmark a QQQ\n\nCambiando el benchmark a QQQ.\n\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: QQQ\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nsí, ejecútalo\n\nLa confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-edit-then-approve-3-approve.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_to_respond"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "QQQ",
+            "launch_payload.benchmark_symbol": "QQQ",
+            "launch_payload.language": "es-419",
+            "recovery": {
+              "code": "confirmation_action_guidance",
+              "retryable": false
+            },
+            "assistant_response (persisted English compat; the screen renders the typed code)": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it."
+          }
+        }
+      ]
+    },
+    {
+      "id": "en-text-approval-then-card-run",
+      "workspace_language": "en",
+      "turns": [
+        {
+          "label": "1-card",
+          "user_message": "Test buying and holding AAPL from 2023 through 2024 with $10,000.",
+          "card_action": null,
+          "on_screen": "Test buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel\nAdd a follow-up\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-text-approval-then-card-run-1-card.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "en",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "January 3, 2023 - December 31, 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "SPY",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Daily data",
+              "Benchmark: SPY"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over January 3, 2023 - December 31, 2024."
+          }
+        },
+        {
+          "label": "2-text-approve",
+          "user_message": "yes, run it",
+          "card_action": null,
+          "on_screen": "Test AAPL Buy and Hold 2023-2024\nTest buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel\nyes, run it\n\nThe visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-text-approval-then-card-run-2-text-approve.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_to_respond"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "en",
+            "recovery": {
+              "code": "confirmation_action_guidance",
+              "retryable": false
+            },
+            "assistant_response (persisted English compat; the screen renders the typed code)": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it."
+          }
+        },
+        {
+          "label": "3-card-run",
+          "user_message": null,
+          "card_action": "Run backtest",
+          "on_screen": "Test AAPL Buy and Hold 2023-2024\nTest buying and holding AAPL from 2023 through 2024 with $10,000.\nAAPL\nBuy and Hold\nRun complete\nSTARTING CAPITAL\n$10,000\nPERIOD\nJan 3, 2023 → Dec 31, 2024\nStocks\nDaily data\nNo fees\nNo slippage\nBenchmark: SPY\nyes, run it\n\nThe visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.\n\nRun backtest\nAAPL\nBuy and Hold\n\nJan 3, 2023 → Dec 31, 2024 · Daily data\n\nSimulation Complete\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n1M\n3M\nYTD\n1Y\nAll\nRange details\n\nVisible period: Jan 3, 2023 to Dec 31, 2024.\n\nEnding value\n\n$20,020\n\n+$10,020 gain · +100.2% total return\n\nCompared with SPY\nBeat by 46.4 percentage points\nWorst drop\n-16.8%\n\nStocks · Historical simulation · No fees/slippage · Not advice\n\nView details\nExplain result\nRefine idea\nAdd decision\nQUICK TAKE\n\nOver the two years from January 2023 through December 2024, a simple buy-and-hold of AAPL returned +100.2%. That beat the SPY benchmark, which returned +53.9% over the same period, by 46.3 percentage points. Keep in mind this is a straight return comparison, not a causal attribution, and it uses daily data only\n\nTRY NEXT\n↳\nTest a different date range·Beat the benchmark by 46.3 points\n↳\nTest the same setup on a similar asset·MSFT\n↳\nTry monthly recurring buys\n\nArgus can make mistakes. For education only. Not financial advice.",
+          "screenshot": "en-text-approval-then-card-run-3-card-run.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "approved_for_execution",
+              "execution_succeeded",
+              "ready_to_respond",
+              "end_run"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "en",
+            "assistant_response (persisted English compat; the screen renders the typed code)": "Over the two years from January 2023 through December 2024, a simple buy-and-hold of AAPL returned +100.2%. That beat the SPY benchmark, which returned +53.9% over the same period, by 46.3 percentage points. Keep in mind this is a straight return comparison, not a causal attribution, and it uses daily data only",
+            "final_keys": [
+              "artifact_references",
+              "assistant_response",
+              "confirmation_payload",
+              "final_response_payload",
+              "message_id",
+              "next_actions",
+              "next_experiments",
+              "result_card",
+              "run",
+              "stage_outcome"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "es-text-approval-then-card-run",
+      "workspace_language": "es-419",
+      "turns": [
+        {
+          "label": "1-card",
+          "user_message": "Prueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.",
+          "card_action": null,
+          "on_screen": "Prueba de compra y retención de\nPrueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-text-approval-then-card-run-1-card.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_for_confirmation",
+              "await_approval"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "es-419",
+            "card.status": "ready_to_run",
+            "card.strategy_type": "buy_and_hold",
+            "card.rows": [
+              [
+                "strategy",
+                "Buy and Hold"
+              ],
+              [
+                "assets",
+                "AAPL"
+              ],
+              [
+                "period",
+                "3 de enero de 2023 al 31 de diciembre de 2024"
+              ],
+              [
+                "starting_capital",
+                "$10,000"
+              ]
+            ],
+            "card.display_facts": {
+              "timeframe": "1D",
+              "fees": 0,
+              "slippage": 0,
+              "benchmark_symbol": "SPY",
+              "capital": 10000
+            },
+            "card.assumptions": [
+              "$10,000 starting capital",
+              "Datos diarios",
+              "Benchmark: SPY"
+            ],
+            "card.title": "AAPL buy and hold",
+            "card.statusLabel": "Ready to run",
+            "card.summary": "Ready to test buy-and-hold for AAPL over 3 de enero de 2023 al 31 de diciembre de 2024."
+          }
+        },
+        {
+          "label": "2-text-approve",
+          "user_message": "sí, ejecútalo",
+          "card_action": null,
+          "on_screen": "Prueba de compra y retención de\nPrueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nsí, ejecútalo\n\nLa confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-text-approval-then-card-run-2-text-approve.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "ready_to_respond"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "es-419",
+            "recovery": {
+              "code": "confirmation_action_guidance",
+              "retryable": false
+            },
+            "assistant_response (persisted English compat; the screen renders the typed code)": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it."
+          }
+        },
+        {
+          "label": "3-card-run",
+          "user_message": null,
+          "card_action": "Ejecutar backtest",
+          "on_screen": "Prueba de compra y retención de\nPrueba comprar y mantener AAPL desde 2023 hasta 2024 con $10,000.\nAAPL\nComprar y mantener\nEjecución completa\nCAPITAL INICIAL\n$10,000\nPERIODO\n3 ene 2023 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nsí, ejecútalo\n\nLa confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.\n\nEjecutar backtest\nAAPL\nComprar y mantener\n\n3 ene 2023 → 31 dic 2024 · Datos diarios\n\nSimulación completa\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n1M\n3M\nEste año\n1A\nTodo\nDetalles del rango\n\nPeríodo visible: 3 ene 2023 al 31 dic 2024.\n\nValor final\n\n$20,020\n\n+$10,020 ganancia · +100.2% rendimiento total\n\nComparado con SPY\nSuperó por 46.4 puntos porcentuales\nPeor caída\n-16.8%\n\nAcciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría\n\nVer detalles\nExplicar resultado\nAjustar idea\nAgregar decisión\nLECTURA RÁPIDA\n\nComprar y mantener AAPL de enero de 2023 a diciembre de 2024 rindió un +100.2%, superando al SPY por 46.3 puntos porcentuales. Es un resultado notable, pero recuerda que es una comparación de retornos, no una atribución causal, y solo considera datos diarios\n\nQUÉ PROBAR DESPUÉS\n↳\nProbar otro rango de fechas·Superó la referencia por 46.3 puntos\n↳\nProbar el mismo enfoque en un activo similar·MSFT\n↳\nProbar compras mensuales recurrentes\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
+          "screenshot": "es-text-approval-then-card-run-3-card-run.png",
+          "stream_status": 200,
+          "stream_final_frame_facts": {
+            "stage_outcomes": [
+              "approved_for_execution",
+              "execution_succeeded",
+              "ready_to_respond",
+              "end_run"
+            ],
+            "confirmation_payload.strategy.assumptions": [],
+            "confirmation_payload.strategy.comparison_baseline": "SPY",
+            "launch_payload.benchmark_symbol": "SPY",
+            "launch_payload.language": "es-419",
+            "assistant_response (persisted English compat; the screen renders the typed code)": "Comprar y mantener AAPL de enero de 2023 a diciembre de 2024 rindió un +100.2%, superando al SPY por 46.3 puntos porcentuales. Es un resultado notable, pero recuerda que es una comparación de retornos, no una atribución causal, y solo considera datos diarios",
+            "final_keys": [
+              "artifact_references",
+              "assistant_response",
+              "confirmation_payload",
+              "final_response_payload",
+              "message_id",
+              "next_actions",
+              "next_experiments",
+              "result_card",
+              "run",
+              "stage_outcome"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

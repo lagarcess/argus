@@ -258,3 +258,97 @@ def test_every_reachable_reason_code_is_localized(
             f"{label} emits reason_code {contract['reason_code']!r} with no "
             f"{language} copy under {namespace}"
         )
+
+
+# ── The confirm stage: strategy.assumptions is interpreter-owned (#508) ──────
+
+
+def test_confirm_stage_does_not_fabricate_english_assumption_prose() -> None:
+    """The confirmation payload carries the interpreter's assumptions verbatim.
+
+    The confirm stage used to overwrite `strategy.assumptions` with its own
+    English strip ("$10,000 starting capital", "1D bars", "No fees", ...),
+    which reached Spanish turns through the stream payload, the interpreter's
+    prior-strategy context, and the deterministic assumptions answer. The card
+    builds its localizable strip from typed facts, so the runtime dict must
+    hold only what interpretation produced.
+    """
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.confirm import confirm_stage
+    from argus.agent_runtime.state.models import RunState, StrategySummary
+
+    interpreter_assumptions = ["interpreter-owned assumption"]
+    state = RunState.new(
+        current_user_message="Prueba comprar y mantener AAPL desde 2023.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10000,
+        date_range={"start": "2023-01-01", "end": "2024-12-31"},
+        assumptions=list(interpreter_assumptions),
+    )
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        language="es-419",
+    )
+
+    assert result.outcome == "await_approval"
+    for strategy in (
+        result.patch["candidate_strategy_draft"],
+        result.patch["confirmation_payload"]["strategy"],
+    ):
+        assert strategy["assumptions"] == interpreter_assumptions
+
+
+# ── The confirm surface: a language it accepts is a language it reads (#523) ──
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CONFIRM_SURFACE_MODULES = (
+    REPO_ROOT / "src" / "argus" / "api" / "chat" / "confirmation.py",
+    REPO_ROOT / "src" / "argus" / "agent_runtime" / "stages" / "confirm.py",
+)
+
+
+def _functions_that_ignore_language(module_path: Path) -> list[str]:
+    import ast
+
+    tree = ast.parse(module_path.read_text("utf-8"))
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        parameters = [arg.arg for arg in node.args.args + node.args.kwonlyargs]
+        if "language" not in parameters:
+            continue
+        reads_language = any(
+            isinstance(child, ast.Name)
+            and child.id == "language"
+            and isinstance(child.ctx, ast.Load)
+            for child in ast.walk(node)
+        )
+        if not reads_language:
+            offenders.append(f"{module_path.name}:{node.lineno} {node.name}")
+    return offenders
+
+
+@pytest.mark.parametrize("module_path", CONFIRM_SURFACE_MODULES, ids=lambda p: p.name)
+def test_confirm_surface_never_accepts_a_language_it_ignores(module_path: Path) -> None:
+    """No function on the confirm surface takes `language` and never reads it.
+
+    An accepted-and-ignored language parameter is worse than an absent one:
+    the call site reads as if language were handled, so English reaches a
+    Spanish reader with nothing at the boundary to catch it. Either the value
+    feeds a localized formatter or the parameter does not exist.
+    """
+    offenders = _functions_that_ignore_language(module_path)
+    assert offenders == [], "accepted-and-ignored language parameters: " + ", ".join(
+        offenders
+    )
