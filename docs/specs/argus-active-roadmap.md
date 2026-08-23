@@ -588,6 +588,36 @@ profile and fall back to the nameless pool.
 
 ## Landed this cycle
 
+- **Every number Argus reports, audited** (PR #526, closes #468 and #469,
+  closes the named scope of #456). Benchmark alignment now requires a real
+  observation at the first and last bar for **every** strategy, not just DCA.
+  Before this, `buy_and_hold` on the same data reported a benchmark return of
+  **99.7%** where DCA honestly reported **-0.15%**, and the fix that was
+  supposed to prevent it covered one of two consumers.
+
+  Two lessons, both about the audit rather than the arithmetic:
+
+  - **A documented behaviour that does not happen is worse than an
+    undocumented one.** The first attempt added a contract sentence saying
+    out-of-window bars were rejected. They were not, and the sentence made the
+    fabricated number harder to find.
+  - **An optional correction is not a correction.** The forward-fill mask was
+    permissive when absent and unrecorded when it fired, so the fix was guarded
+    by a suite that mostly skipped it. Requiring the mask immediately exposed a
+    fixture that had never carried a valid `benchmark_symbol`.
+
+  `performance.benchmark_coverage` now records observed and target points per
+  symbol, so a silent revert shows up in the payload rather than in a user's
+  numbers.
+
+- **The prose judge can see what the reader saw** (PR #525, closes #516). It
+  was failing honest answers on `honesty` because it received the voiced
+  sentence without the discovery rows and sources rendered beside it. Verified
+  by replaying recorded verdicts on the exact prose, three attempts per row:
+  honest cases 4/4 matched at 3/3 passes, fabricated cases 3/3 matched at 0/3.
+  It had been costing a false red on nearly every live eval run, including the
+  2026-08-21 promotion gate.
+
 - **Never dead-end, never invent** (PR #522, closes the discovery half of #499).
   A search that finds assets it cannot price now names them and says why,
   instead of answering "I could not confirm any of the names I found" and
