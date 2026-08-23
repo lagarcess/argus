@@ -32,6 +32,9 @@ def test_one_owner_predicate_settles_research_jobs_and_reads_no_prose() -> None:
     owner = _function(sql, "backtest_job_result_hydrateable")
 
     assert "j public.backtest_jobs" in owner
+    # Only a succeeded row may settle: the research answer is persisted before
+    # the row flips, so an early message must never read as finished work.
+    assert "select j.status = 'succeeded' and (" in owner
     assert "j.operation_scope = 'chat.research'" in owner
     assert "->> 'research_result_message_id'" in owner
     assert "from public.messages as rm" in owner

@@ -115,6 +115,11 @@ def _memory_result_hydrateable(
     conversation_id: str,
     job: Mapping[str, Any],
 ) -> bool:
+    # Only a succeeded row can be settled; a research answer is persisted
+    # before its row flips to succeeded, so an early message never reads as
+    # finished work. Twin of SQL backtest_job_result_hydrateable.
+    if job.get("status") != "succeeded":
+        return False
     if job.get("operation_scope") == RESEARCH_OPERATION_SCOPE:
         return _memory_research_result_hydrateable(
             store,
@@ -235,7 +240,7 @@ def _memory_sources(
             "expired",
         }:
             continue
-        result_hydrateable = status == "succeeded" and _memory_result_hydrateable(
+        result_hydrateable = _memory_result_hydrateable(
             store,
             user_id=user_id,
             conversation_id=conversation_id,

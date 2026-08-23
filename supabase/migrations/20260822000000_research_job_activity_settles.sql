@@ -22,7 +22,12 @@ stable
 security invoker
 set search_path = public
 as $$
+  -- Only a succeeded row can be settled. A research job's answer message is
+  -- persisted before the row flips to succeeded, so the message existing
+  -- while the row is still running never reads as finished work.
   select
+    j.status = 'succeeded'
+    and (
     exists (
       select 1
       from public.backtest_runs as r
@@ -51,6 +56,7 @@ as $$
           and rm.id::text = j.execution_metadata
             ->> 'research_result_message_id'
       )
+    )
     )
 $$;
 
