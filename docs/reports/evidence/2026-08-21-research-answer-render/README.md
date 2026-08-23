@@ -149,6 +149,32 @@ a guest in both languages on the fixed tree before the scripted matrix: card
 only the pre-send `/messages` fetch in the backend log, polling stopped at
 success, composer enabled.
 
+## Re-drive at the reconciled head `162b3f61`
+
+Integration moved to `e911704f` (#525 eval judge, #526 backtest math, #527
+confirm surface; only `docs/API_CONTRACT.md` overlapped, in disjoint
+sections). After the one-way merge, one cell was re-driven end to end on a
+freshly reset local database (every migration replayed, including this
+lane's): guest, English, the founder's exact prompt.
+
+| Cell | Prompt | Card after | Answer below card, no reload | `/messages` GETs before → after | Polls stopped | Composer | Console |
+|---|---|---|---|---|---|---|---|
+| guest, EN | Compare HOOD against JPM and SCHW | 112 s | ✅ 2,893 chars | 1 → 1 | ✅ | enabled | clean |
+
+![reconciled head, guest EN: Research ready with the answer painted below](reconciled-guest-en-2-ready-no-reload.png)
+
+Raw numbers in `reconciled-guest-en.json`. The other three cells cover a
+path nothing since has moved.
+
+The same head also tightens the owner predicate: only a `succeeded` row can
+be hydrateable, in SQL and in the memory twin, because `_finalize_success`
+persists the answer before the row flips, so a running job whose message
+already exists projects `running`, never settled. Both twins now parametrize
+over one scenario table (`tests/conversation_activity_job_scenarios.py`);
+weakening the SQL owner alone failed exactly the Postgres
+`research_running_with_early_answer_stays_running` case while the memory
+side passed.
+
 ## Guards (all fail on base, pass at head)
 
 Run with the base versions of `src/`, `web/lib`, `web/components` and the
@@ -156,8 +182,8 @@ migration removed / the base SQL functions restored, tests at head:
 
 | Guard | On base |
 |---|---|
-| `tests/test_conversation_activity.py::test_memory_succeeded_research_job_settles_once_its_answer_message_exists` | `assert 'checking' == 'idle'` |
-| `tests/test_conversation_activity_postgres.py::test_succeeded_research_job_is_hydrateable_once_its_answer_exists` (local `ARGUS_DISPOSABLE_DATABASE_URL`) | `result_hydrateable` stays `False`; would also 409 on mark-read |
+| `tests/test_conversation_activity.py::test_memory_job_settlement_follows_the_shared_scenario_table` | `research_succeeded_with_answer_settles`: `assert 'checking' == 'idle'` |
+| `tests/test_conversation_activity_postgres.py::test_sql_job_settlement_follows_the_shared_scenario_table` (CI's required real-PostgreSQL gate) | `result_hydrateable` stays `False`; mark-read conflicts |
 | `tests/research/test_research_jobs.py::test_job_status_endpoint_carries_the_research_answer_message` | `KeyError: 'result_message'` |
 | `tests/test_research_job_activity_migration.py` (4) | migration absent |
 | `web/__tests__/chat-research-job-answer.test.ts` (5) | pending set includes the settled research job (`+ "job-1"`); projection helpers absent; poller/handler pins |
