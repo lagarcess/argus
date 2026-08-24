@@ -2668,7 +2668,18 @@ Both endpoints return:
 Operation precedence is `running > queued > checking > idle`; equal states use
 the newest source timestamp, then prefer a backtest job. Accepted turns and
 queued jobs are `queued`; running turns/jobs are `running`. A succeeded job is
-`checking` until its completed Run and evidence identity can be hydrated.
+`checking` until its result is hydrateable: for a backtest, its completed Run
+and evidence identity; for a `chat.research` job, the answer message named by
+`execution_metadata.research_result_message_id`. That rule has one owner,
+`argus.domain.job_settlement`: the memory store evaluates it directly and the
+SQL predicate `argus_private.backtest_job_result_hydrateable` (private to
+`service_role`, never a PostgREST computed column) is rendered from it and
+shared by the projection, the read-state mutation, and the baseline. Only a
+succeeded row can hydrate; a research answer is persisted before its row
+flips, so an early message never settles in-flight work. A settled research
+job is therefore `idle` and its answer produces `new_activity` with the job as
+the cursor source; clients treat `checking` as a working lock, so a research
+job that never settled kept its conversation locked after the answer landed.
 
 Completed turns and hydrateable succeeded jobs produce `new_activity` beyond
 the read boundary. Existing typed `await_user_reply`, `needs_clarification`,
@@ -3543,10 +3554,15 @@ Contract rules:
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
   a new assistant message referenced by the succeeded job's
   `execution_metadata.research_result_message_id`. A succeeded research job
-  has a null `result_run_id` by design; clients refresh the transcript on
-  terminal research jobs instead of fetching a run. `operation_scope` rides
-  every serialized job surface, including the polling
-  `GET /backtest-jobs/{job_id}` payload; absent means an ordinary backtest.
+  has a null `result_run_id` by design; the polling `GET /backtest-jobs/{job_id}`
+  response carries that message as `result_message`, the way a backtest's
+  carries `run`, and clients render it in place after the job card instead of
+  refetching the transcript. A failed run names its persisted failure note
+  the same way, so the explanation paints in place too. A request message is
+  the research job's idempotency key: re-adopting it (a response-option
+  retry) returns the existing job whatever its status, with no second
+  provider run. `operation_scope` rides every serialized job surface,
+  including the polling payload; absent means an ordinary backtest.
 - Thorough answers join the shared research cache like every other shape:
   the finalized packet is stored under the requesting turn's key, and an
   identical question within the class TTL answers inline with
@@ -3931,6 +3947,15 @@ Quick take from result-card metrics. `result_readout_source` and
 `result_readout_fallback_used` expose whether the normal LLM/schema-grounded
 path produced the readout or whether Argus intentionally fell back to the
 deterministic safety renderer.
+
+For a terminal `chat.research` job, `run` is null and `result_message` is the
+message the job produced: the persisted answer on success, the persisted
+failure note on failure (the ordinary `Message` shape, projected with the same
+redactions as `GET /conversations/{id}/messages`); it is null for every other
+job and status, and null, never an error, when the message cannot be read at
+that moment. The frontend projects it after the job card through the same
+hydration a reloaded transcript uses, so the open view paints it without a
+refetch, and keeps polling a succeeded research job until the message arrives.
 
 Completed jobs may also carry `next_experiments`, the same versioned Try next
 sidecar attached to in-stream results (`version: "argus_next_experiments/v1"`,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -205,19 +206,23 @@ def test_background_research_peers_reach_the_next_confirmation_card() -> None:
         ),
         latency_ms=900,
     )
-    _finalize_success(
-        job_id="job-research-1",
-        job_request={
-            "capability_class": "thorough_research",
-            "shape": "thorough",
-            "language": "en",
-            "question": "Break down Netflix against its rivals",
-            "subjects": [{"symbol": "NFLX", "name": "Netflix", "asset_class": "equity"}],
-        },
-        packet=packet,
-        user_id=user_id,
-        conversation_id=conversation["id"],
-        request_id=None,
+    asyncio.run(
+        _finalize_success(
+            job_id="job-research-1",
+            job_request={
+                "capability_class": "thorough_research",
+                "shape": "thorough",
+                "language": "en",
+                "question": "Break down Netflix against its rivals",
+                "subjects": [
+                    {"symbol": "NFLX", "name": "Netflix", "asset_class": "equity"}
+                ],
+            },
+            packet=packet,
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            request_id=None,
+        )
     )
 
     runtime_result: dict[str, Any] = {

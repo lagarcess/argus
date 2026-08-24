@@ -1490,8 +1490,16 @@ Job lifecycle status is separate from engine/runtime failure semantics.
 - `execution_metadata` may store private operational evidence such as workflow
   run id, cache hit/miss, provider fetch duration, compute duration, attempt
   count, and source error kind.
-- `succeeded` is valid only after `result_run_id` links to the fully finalized
-  run/evidence tuple. A recoverable persistence-side failure uses
+- `succeeded` is valid only after the job's result is readable in its
+  conversation: for a backtest, `result_run_id` links to the fully finalized
+  run/evidence tuple; for a `chat.research` job, which has no run by design,
+  `execution_metadata.research_result_message_id` names the persisted
+  assistant answer (written before the row flips). That rule has one owner,
+  `argus.domain.job_settlement`, from which the SQL settle predicate
+  `argus_private.backtest_job_result_hydrateable` is rendered; a succeeded row
+  the rule cannot hydrate projects as `checking`, which clients treat as a
+  working lock. A failed research row names its persisted failure note the
+  same way. A recoverable persistence-side failure uses
   `status = failed`, `failure_code = finalization_failed`, and
   `retryable = true`; `result_run_id` remains null until retry finalizes the
   stable run identity. `finalization_failed` is a failure code, not a new job

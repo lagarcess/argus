@@ -13,6 +13,11 @@ from uuid import uuid4
 
 import pytest
 
+from tests.conversation_activity_job_scenarios import (
+    JOB_SETTLEMENT_SCENARIOS,
+    JobSettlementScenario,
+)
+
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 pytestmark = pytest.mark.skipif(
     not DSN,
@@ -504,6 +509,120 @@ def test_cutoff_baseline_reads_existing_terminal_but_not_later_completion() -> N
                 conversation_ids=[conversation_id],
             )
             assert rows[0][1][-1]["source_id"] == newer_id
+        finally:
+            _delete_identity(connection, user_id)
+
+
+def _seed_job(
+    connection,
+    *,
+    user_id: str,
+    conversation_id: str,
+    operation_scope: str,
+    status: str,
+    occurred_at: datetime,
+    answer_id: str,
+) -> str:
+    job_id = _id()
+    finished_at = occurred_at if status == "succeeded" else None
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into public.backtest_jobs"
+            " (id, user_id, conversation_id, payload_hash, launch_payload,"
+            "  status, operation_scope, queued_at, started_at, finished_at,"
+            "  execution_metadata, created_at, updated_at)"
+            " values (%s, %s, %s, 'sha256:test', '{}'::jsonb, %s,"
+            "  %s, %s, %s, %s, %s::jsonb, %s, %s)",
+            (
+                job_id,
+                user_id,
+                conversation_id,
+                status,
+                operation_scope,
+                occurred_at - timedelta(seconds=30),
+                occurred_at - timedelta(seconds=20),
+                finished_at,
+                json.dumps({"research_result_message_id": answer_id}),
+                occurred_at - timedelta(seconds=30),
+                occurred_at,
+            ),
+        )
+    return job_id
+
+
+def _projected(connection, *, user_id: str, conversation_id: str):
+    from argus.api.conversation_activity import _source_from_row
+    from argus.domain.conversation_activity import project_conversation_activity
+
+    rows = _read_sources(connection, user_id=user_id, conversation_ids=[conversation_id])
+    sources = [_source_from_row(raw) for raw in rows[0][1]]
+    return sources, project_conversation_activity(
+        conversation_id=conversation_id,
+        sources=sources,
+        read_state=None,
+    )
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    JOB_SETTLEMENT_SCENARIOS,
+    ids=[scenario.id for scenario in JOB_SETTLEMENT_SCENARIOS],
+)
+def test_sql_job_settlement_follows_the_shared_scenario_table(
+    scenario: JobSettlementScenario,
+) -> None:
+    # SQL owner predicate backtest_job_result_hydrateable; the memory suite
+    # runs the same table. A research job has no run: its result is the
+    # message named by execution_metadata, and only a succeeded row may settle.
+    with _connect() as connection:
+        user_id = _seed_identity(connection)
+        try:
+            conversation_id = _seed_conversation(connection, user_id=user_id)
+            occurred_at = datetime.now(timezone.utc)
+            answer_id = _id()
+            job_id = _seed_job(
+                connection,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                operation_scope=scenario.operation_scope,
+                status=scenario.status,
+                occurred_at=occurred_at,
+                answer_id=answer_id,
+            )
+            if scenario.answer_present:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "insert into public.messages"
+                        " (id, conversation_id, user_id, role, content, created_at)"
+                        " values (%s, %s, %s, 'assistant', 'Research answer', %s)",
+                        (answer_id, conversation_id, user_id, occurred_at),
+                    )
+
+            sources, activity = _projected(
+                connection, user_id=user_id, conversation_id=conversation_id
+            )
+            job_source = next(s for s in sources if s.source_kind == "backtest_job")
+            assert job_source.source_id == job_id
+            assert job_source.status == scenario.status
+            assert job_source.result_hydrateable is scenario.expected_hydrateable
+            assert activity.operation.status == scenario.expected_operation
+            assert activity.attention.status == scenario.expected_attention
+
+            # The read-state mutation revalidates with the same owner, so the
+            # cursor applies exactly when the projection offers it.
+            outcome = _mutate(
+                connection,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                action="mark_read",
+                source_kind="backtest_job",
+                source_id=job_id,
+            )
+            if scenario.expected_attention == "new_activity":
+                assert outcome["outcome"] == "applied"
+                assert outcome["read_state"]["read_through_source_id"] == job_id
+            else:
+                assert outcome["outcome"] == "conflict"
         finally:
             _delete_identity(connection, user_id)
 

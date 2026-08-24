@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,6 +12,8 @@ from argus.api.chat.backtest_jobs import (
     fail_job_without_task_run,
     should_fail_stale_job_without_task_run,
 )
+from argus.api.chat.confirmation import public_confirmation_projection
+from argus.api.chat.research_jobs import RESEARCH_OPERATION_SCOPE
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context, client_identity
 from argus.api.guest_observability import (
@@ -18,11 +21,13 @@ from argus.api.guest_observability import (
     emit_guest_funnel_event,
 )
 from argus.api.memory_ownership import memory_object_visible
+from argus.api.message_store import owned_conversation_message
 from argus.api.schemas import (
     BacktestJob,
     BacktestJobResponse,
     BacktestRunRequest,
     BacktestRunResponse,
+    Message,
     User,
 )
 from argus.domain import backtest_admission
@@ -912,10 +917,14 @@ def _backtest_job_response(
             raise _by_action_internal_error(request)
     readout = _result_readout_from_job(job) if run is not None else None
     readout_metadata = _result_readout_metadata_from_job(job) if run is not None else {}
+    # A decoration on the status report, never a precondition for it: a
+    # transient messages read failure must not turn a finished job into a 500.
+    result_message = _research_result_message(user_id=user_id, job=job)
     try:
         return BacktestJobResponse(
             job=BacktestJob.model_validate(job),
             run=run,
+            result_message=result_message,
             result_readout=readout,
             **readout_metadata,
         )
@@ -923,6 +932,53 @@ def _backtest_job_response(
         if require_succeeded_run:
             raise _by_action_internal_error(request) from None
         raise
+
+
+_TERMINAL_RESEARCH_STATUSES = frozenset({"succeeded", "failed", "canceled", "expired"})
+
+
+def _research_result_message(
+    *,
+    user_id: str,
+    job: Mapping[str, object],
+) -> Message | None:
+    """The message a terminal research job produced (answer or failure note).
+
+    Projected like every transcript message, so the in-place paint and the
+    reloaded transcript carry the same shape and the same redactions.
+    """
+    if (
+        job.get("operation_scope") != RESEARCH_OPERATION_SCOPE
+        or job.get("status") not in _TERMINAL_RESEARCH_STATUSES
+    ):
+        return None
+    conversation_id = job.get("conversation_id")
+    metadata = job.get("execution_metadata")
+    message_id = (
+        metadata.get("research_result_message_id")
+        if isinstance(metadata, Mapping)
+        else None
+    )
+    if not isinstance(conversation_id, str) or not isinstance(message_id, str):
+        return None
+    try:
+        message = owned_conversation_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Research result message read failed; job status served without it",
+            job_id=job.get("id"),
+            error=str(exc),
+        )
+        return None
+    if message is None:
+        return None
+    return message.model_copy(
+        update={"metadata": public_confirmation_projection(message.metadata)}
+    )
 
 
 def _by_action_internal_error(request: Request) -> HTTPException:

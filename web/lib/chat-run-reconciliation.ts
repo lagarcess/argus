@@ -17,8 +17,10 @@ import {
 } from "@/lib/argus-api";
 import {
   applyBacktestJobUpdate,
+  backtestJobResponseAwaitsPolling,
   pendingBacktestJobIds,
 } from "@/lib/chat-backtest-jobs";
+import { applyResearchJobAnswer } from "@/components/chat/chat-message-projection";
 import {
   conversationLoadRetryActionFromConversationId,
   normalizeDurableRetryActionHistory,
@@ -203,7 +205,10 @@ export function useBacktestJobPolling(
       setMessages((current) =>
         normalizeDurableRetryActionHistory(
           normalizeConfirmationHistory(
-            applyBacktestJobUpdate(current, response),
+            applyResearchJobAnswer(
+              applyBacktestJobUpdate(current, response),
+              response,
+            ),
           ),
         ),
       );
@@ -220,16 +225,7 @@ export function useBacktestJobPolling(
         const response = await getBacktestJob(jobId);
         if (cancelled) return;
         applyResponse(response);
-        // A succeeded research job never has a run: its answer arrives as a
-        // message, so success is terminal and triggers a transcript refresh.
-        const awaitingRunFinalization =
-          response.job.status === "succeeded" &&
-          !response.run &&
-          response.job.operation_scope !== "chat.research";
-        const shouldContinue =
-          response.job.status === "queued" ||
-          response.job.status === "running" ||
-          awaitingRunFinalization;
+        const shouldContinue = backtestJobResponseAwaitsPolling(response);
         if (!shouldContinue) {
           onDurableCompletion?.(response);
         }
