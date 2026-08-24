@@ -588,6 +588,35 @@ profile and fall back to the nameless pool.
 
 ## Landed this cycle
 
+- **A finished research answer appears, and its conversation is usable again**
+  (PR #532). The reported symptom was that the answer never painted until a
+  reload. The real defect was worse: **every conversation that finished a
+  research question was permanently locked**, composer disabled before and
+  after reload. Six production conversations were in that state, found by the
+  founder hitting one.
+
+  The database decided "is this job settled" by looking for a completed
+  backtest run with an evidence artifact. A research job has no run, so the
+  answer was always "still working", forever.
+
+  **Why the first attempt failed the split-brain rule.** The fix put one
+  predicate in SQL and a twin in the memory store, held together by a shared
+  scenario table. The review cited AGENTS.md back at it correctly: *a
+  duplicated fact that is tested is still duplicated*. And the twins had
+  already drifted, the memory side returning early on research scope where the
+  SQL branched, invisible to a table that pinned a null run id in every row.
+
+  The landed shape is one owner, `argus.domain.job_settlement`: the rule is
+  stated once as an expression, the SQL function is rendered from it and pinned
+  byte-for-byte, and the memory path evaluates it. Verified by tampering with
+  one leaf of the rule and watching both sides fail.
+
+  The doc sentence at `DATA_MODEL.md:1493` that encoded the old run-only belief
+  is rewritten. That sentence is where the bug came from.
+
+  **The SQL half heals the existing stuck conversations**, so this promotion
+  fixes the six rather than only preventing new ones.
+
 - **Every number Argus reports, audited** (PR #526, closes #468 and #469,
   closes the named scope of #456). Benchmark alignment now requires a real
   observation at the first and last bar for **every** strategy, not just DCA.
