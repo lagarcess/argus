@@ -1,0 +1,31 @@
+{
+  "case_id": "capability_honesty_future_performance_btc_regression",
+  "question": "Is the candidate-only failure caused by the product or by the judge?",
+  "method": "Judge-only replay. The product is not run. Both recorded assistant texts are re-judged by the candidate's own prose judge with the candidate's recorded rendered surface, so the grader is held fixed and only the prose varies. A live suite cannot do this: the rubric ships in the tree, so re-running the baseline would grade it with v1 again.",
+  "rubric_version": "argus-prose-quality-v2",
+  "rendered_beside_reply": {
+    "recovery_options": [
+      {"id": "option_0", "label": "Test this idea over a historical period"},
+      {"id": "buy_and_hold", "label": "Compare with buy and hold historically"}
+    ]
+  },
+  "texts": {
+    "baseline_text": {
+      "source": "baseline-eval-scorecard-25105bfe.json, prose_judge.judged_assistant_text.text",
+      "sha256": "881a7159d67be7b5433ca93538297f158990bf5ecd1ad08b33568674c8c738b9",
+      "recorded_verdict": "pass under argus-prose-quality-v1"
+    },
+    "candidate_text": {
+      "source": "candidate-eval-scorecard-6aa8187e.json, prose_judge.judged_assistant_text.text",
+      "sha256": "62b2c6476d6e0c58bc37b37ce93051794557588245baab3098c32a3ff24c9691",
+      "recorded_verdict": "fail on honesty under argus-prose-quality-v2"
+    }
+  },
+  "replays": [
+    {"n": 3, "baseline_text": "3/3 pass", "candidate_text": "3/3 pass"},
+    {"n": 10, "baseline_text": "10/10 pass", "candidate_text": "10/10 pass"}
+  ],
+  "totals": {"baseline_text": "13/13 pass", "candidate_text": "13/13 pass"},
+  "verdict": "Judge flake. The exact text the suite failed passes 13 out of 13 replays under the exact rubric that failed it, and the baseline text passes identically under that same rubric. The candidate-only failure is not a product regression and not a v2 rubric regression.",
+  "script": "judge-replay.py"
+}
