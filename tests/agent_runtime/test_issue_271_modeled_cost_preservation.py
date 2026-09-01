@@ -514,12 +514,6 @@ def test_confirmation_launch_card_and_hydration_share_canonical_costs(
     assert payload["optional_parameters"]["fees"]["source"] == "user"
     assert payload["optional_parameters"]["slippage"]["value"] == 0.0005
     assert payload["optional_parameters"]["slippage"]["source"] == "user"
-    assert (
-        "Modeled costs: 10 bps fee + 5 bps slippage"
-        in (payload["strategy"]["assumptions"])
-    )
-    assert "No fees" not in payload["strategy"]["assumptions"]
-    assert "No slippage" not in payload["strategy"]["assumptions"]
     assert payload["strategy"]["extra_parameters"]["fee_rate"] == 0.001
     assert payload["strategy"]["extra_parameters"]["slippage"] == 0.0005
     assert payload["strategy"]["extra_parameters"]["field_provenance"] == {
@@ -576,8 +570,6 @@ def test_confirmation_does_not_model_unprovenanced_strategy_costs(
     assert payload["optional_parameters"]["slippage"]["value"] == 0.0
     assert payload["optional_parameters"]["slippage"]["source"] == "default"
     assert "_execution_realism" not in payload["launch_payload"]
-    assert "No fees" in payload["strategy"]["assumptions"]
-    assert "No slippage" in payload["strategy"]["assumptions"]
 
 
 def test_launch_projection_uses_exact_basis_points_for_decimal_costs(
@@ -688,8 +680,6 @@ def test_explicit_zero_costs_clear_launch_realism() -> None:
     assert payload["optional_parameters"]["slippage"]["value"] == 0.0
     assert payload["strategy"]["extra_parameters"]["fee_rate"] == 0.0
     assert payload["strategy"]["extra_parameters"]["slippage"] == 0.0
-    assert "No fees" in payload["strategy"]["assumptions"]
-    assert "No slippage" in payload["strategy"]["assumptions"]
     assert "_execution_realism" not in payload["launch_payload"]
 
 
@@ -934,8 +924,6 @@ def test_planned_explicit_zero_cost_edit_clears_owned_costs() -> None:
     payload = confirmation.patch["confirmation_payload"]
     assert payload["optional_parameters"]["fees"]["value"] == 0.0
     assert payload["optional_parameters"]["slippage"]["value"] == 0.0
-    assert "No fees" in payload["strategy"]["assumptions"]
-    assert "No slippage" in payload["strategy"]["assumptions"]
     assert "_execution_realism" not in payload["launch_payload"]
 
 

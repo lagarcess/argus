@@ -78,6 +78,99 @@ def offered_to_user(
     }
 
 
+def rendered_beside_reply(
+    *,
+    final_patch: dict[str, Any],
+    interpret_patch: dict[str, Any],
+) -> dict[str, Any]:
+    """Project what the interface renders next to the voiced prose.
+
+    Discovery voicing is one framing sentence by contract; the rows, source
+    list, and pressable options beside it carry the evidence that sentence
+    summarizes. A prose judge that sees only the sentence calls an honest
+    framing fabricated, so this is the judge's view of the rest of the
+    screen. Only reader-visible elements belong here: the sidecar's
+    ungated drop list is parsed but never rendered, so it stays out.
+    Empty groups are omitted so a turn that rendered nothing projects to {}.
+    """
+
+    def _patch_value(key: str) -> Any:
+        value = final_patch.get(key)
+        return interpret_patch.get(key) if value is None else value
+
+    surface: dict[str, Any] = {}
+
+    discovery = _patch_value("discovery")
+    discovery = discovery if isinstance(discovery, dict) else {}
+    rows = [
+        {key: row[key] for key in ("symbol", "name", "reason_text") if row.get(key)}
+        for row in (discovery.get("candidates") or [])
+        if isinstance(row, dict)
+    ]
+    rows = [row for row in rows if row]
+    if rows:
+        surface["discovery_rows"] = rows
+    sources = [
+        {
+            key: source[key]
+            for key in ("title", "domain", "source_date")
+            if source.get(key)
+        }
+        for source in (discovery.get("sources") or [])
+        if isinstance(source, dict)
+    ]
+    sources = [source for source in sources if source]
+    if sources:
+        surface["discovery_sources"] = sources
+    if discovery.get("retrieved_at"):
+        surface["retrieved_at"] = str(discovery["retrieved_at"])
+    # Backend-owned flag: the current-search escalation row renders only
+    # while this is true.
+    if discovery.get("can_request_search") is True:
+        surface["can_request_search_action"] = True
+
+    experiments = _patch_value("next_experiments")
+    experiments = experiments if isinstance(experiments, dict) else {}
+    experiment_rows = [
+        {key: row[key] for key in ("kind", "label") if row.get(key)}
+        for row in (experiments.get("rows") or [])
+        if isinstance(row, dict)
+    ]
+    experiment_rows = [row for row in experiment_rows if row]
+    if experiment_rows:
+        surface["next_experiment_rows"] = experiment_rows
+
+    clarification = _patch_value("clarification")
+    clarification = clarification if isinstance(clarification, dict) else {}
+    options = []
+    for option in clarification.get("options") or []:
+        if not isinstance(option, dict):
+            continue
+        projected = {
+            key: value
+            for key, value in (
+                ("id", option.get("id")),
+                ("label", option.get("compatibility_label") or option.get("label")),
+            )
+            if value
+        }
+        if projected:
+            options.append(projected)
+    if options:
+        surface["recovery_options"] = options
+
+    recovery = _patch_value("recovery")
+    recovery = recovery if isinstance(recovery, dict) else {}
+    if recovery.get("code"):
+        # retryable=true is what renders the Retry control.
+        surface["recovery"] = {
+            "code": str(recovery["code"]),
+            "retryable": bool(recovery.get("retryable")),
+        }
+
+    return surface
+
+
 def _alnum(value: str) -> str:
     return "".join(char for char in value.lower() if char.isalnum())
 

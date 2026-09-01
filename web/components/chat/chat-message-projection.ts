@@ -3,6 +3,7 @@ import {
   type ApiMessage,
   type AssetClass,
   type ChatActionRequest,
+  type BacktestJobResponse,
 } from "@/lib/argus-api";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import {
@@ -16,6 +17,7 @@ import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
+  RESEARCH_JOB_SCOPE,
 } from "@/lib/chat-backtest-jobs";
 import { retestReceiptFromMetadata } from "@/lib/chat-retest";
 import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
@@ -440,6 +442,52 @@ export function hydrateMessagesFromApi(
     ),
   );
   return { messages: normalized, inputActions: latestInputActions(normalized) };
+}
+
+// A terminal research job's message (the answer, or the failure note) is a
+// new assistant message the job response carries; it renders in place after
+// the job card, the way a run result does, so the open view never has to
+// refetch or blank to show it. The card records the message id once it is
+// in the view, which is what ends its polling.
+//
+// Position: the conversation is locked from the card's persistence until the
+// job settles, and settling requires the message to exist, so nothing else
+// can be persisted between card and message; "right after the card" is the
+// persisted order.
+export function applyResearchJobAnswer(
+  messages: Message[],
+  response: BacktestJobResponse,
+): Message[] {
+  const answer = response.result_message;
+  if (response.job.operation_scope !== RESEARCH_JOB_SCOPE || !answer) {
+    return messages;
+  }
+  const cardIndex = messages.findIndex(
+    (message) =>
+      message.kind === "backtest_job" &&
+      message.backtestJob?.id === response.job.id,
+  );
+  const present = messages.some((message) => message.id === answer.id);
+  const cardSettled =
+    cardIndex === -1 ||
+    messages[cardIndex]?.researchResultMessageId === answer.id;
+  if (present && cardSettled) return messages;
+  const settled = cardSettled
+    ? messages
+    : messages.map((message, index) =>
+        index === cardIndex
+          ? { ...message, researchResultMessageId: answer.id }
+          : message,
+      );
+  if (present) return settled;
+  const projected = hydrateMessagesFromApi([answer]).messages[0];
+  if (!projected) return settled;
+  if (cardIndex === -1) return [...settled, projected];
+  return [
+    ...settled.slice(0, cardIndex + 1),
+    projected,
+    ...settled.slice(cardIndex + 1),
+  ];
 }
 
 export function chatStreamErrorText(

@@ -466,7 +466,6 @@ def test_runtime_confirmation_card_shows_execution_realism_values(
     assert "No slippage" not in card["assumptions"]
 
 
-
 def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -> None:
     card = runtime_confirmation_card(
         {
@@ -1113,3 +1112,31 @@ def test_confirmation_card_has_no_benchmark_note_without_a_cleared_leg() -> None
 
     assert card is not None
     assert "benchmark_adjustment" not in card
+
+
+def test_card_prose_is_language_invariant_and_typed_fields_localize() -> None:
+    """#523: `title` and `statusLabel` are persisted-compat English.
+
+    They must not vary with the workspace language, because clients localize
+    from the typed fields beside them; a card that ever emits per-language
+    prose here has put copy back into the runtime. The typed fields must be
+    present, or the frontend has nothing to localize from. `summary` is not
+    asserted: its English scaffold embeds the language-formatted period, and
+    the preview surface that reads it is tracked separately.
+    """
+    cards = {
+        language: runtime_confirmation_card(
+            _confirmation_result_with_draft_costs(),
+            confirmation_id="confirmation-language-seam",
+            language=language,
+        )
+        for language in ("en", "es-419")
+    }
+    english, spanish = cards["en"], cards["es-419"]
+    assert english is not None and spanish is not None
+    for field in ("title", "statusLabel"):
+        assert english[field] == spanish[field]
+    for card in cards.values():
+        assert card["status"] in {"ready_to_run", "needs_change"}
+        assert card["strategy_type"]
+        assert all(row.get("key") for row in card["rows"])

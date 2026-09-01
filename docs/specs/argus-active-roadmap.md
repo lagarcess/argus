@@ -588,6 +588,65 @@ profile and fall back to the nameless pool.
 
 ## Landed this cycle
 
+- **A finished research answer appears, and its conversation is usable again**
+  (PR #532). The reported symptom was that the answer never painted until a
+  reload. The real defect was worse: **every conversation that finished a
+  research question was permanently locked**, composer disabled before and
+  after reload. Six production conversations were in that state, found by the
+  founder hitting one.
+
+  The database decided "is this job settled" by looking for a completed
+  backtest run with an evidence artifact. A research job has no run, so the
+  answer was always "still working", forever.
+
+  **Why the first attempt failed the split-brain rule.** The fix put one
+  predicate in SQL and a twin in the memory store, held together by a shared
+  scenario table. The review cited AGENTS.md back at it correctly: *a
+  duplicated fact that is tested is still duplicated*. And the twins had
+  already drifted, the memory side returning early on research scope where the
+  SQL branched, invisible to a table that pinned a null run id in every row.
+
+  The landed shape is one owner, `argus.domain.job_settlement`: the rule is
+  stated once as an expression, the SQL function is rendered from it and pinned
+  byte-for-byte, and the memory path evaluates it. Verified by tampering with
+  one leaf of the rule and watching both sides fail.
+
+  The doc sentence at `DATA_MODEL.md:1493` that encoded the old run-only belief
+  is rewritten. That sentence is where the bug came from.
+
+  **The SQL half heals the existing stuck conversations**, so this promotion
+  fixes the six rather than only preventing new ones.
+
+- **Every number Argus reports, audited** (PR #526, closes #468 and #469,
+  closes the named scope of #456). Benchmark alignment now requires a real
+  observation at the first and last bar for **every** strategy, not just DCA.
+  Before this, `buy_and_hold` on the same data reported a benchmark return of
+  **99.7%** where DCA honestly reported **-0.15%**, and the fix that was
+  supposed to prevent it covered one of two consumers.
+
+  Two lessons, both about the audit rather than the arithmetic:
+
+  - **A documented behaviour that does not happen is worse than an
+    undocumented one.** The first attempt added a contract sentence saying
+    out-of-window bars were rejected. They were not, and the sentence made the
+    fabricated number harder to find.
+  - **An optional correction is not a correction.** The forward-fill mask was
+    permissive when absent and unrecorded when it fired, so the fix was guarded
+    by a suite that mostly skipped it. Requiring the mask immediately exposed a
+    fixture that had never carried a valid `benchmark_symbol`.
+
+  `performance.benchmark_coverage` now records observed and target points per
+  symbol, so a silent revert shows up in the payload rather than in a user's
+  numbers.
+
+- **The prose judge can see what the reader saw** (PR #525, closes #516). It
+  was failing honest answers on `honesty` because it received the voiced
+  sentence without the discovery rows and sources rendered beside it. Verified
+  by replaying recorded verdicts on the exact prose, three attempts per row:
+  honest cases 4/4 matched at 3/3 passes, fabricated cases 3/3 matched at 0/3.
+  It had been costing a false red on nearly every live eval run, including the
+  2026-08-21 promotion gate.
+
 - **Never dead-end, never invent** (PR #522, closes the discovery half of #499).
   A search that finds assets it cannot price now names them and says why,
   instead of answering "I could not confirm any of the names I found" and

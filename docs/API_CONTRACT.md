@@ -1321,9 +1321,14 @@ evidence, while user commitment is represented by an explicit `DecisionNote`.
   executed by the launch adapter. Readers should prefer this replay payload when
   present and must not reconstruct run inputs from result-card display copy.
 - Benchmark comparisons require sufficient benchmark observations over the
-  selected window. If the benchmark starts late, ends early, or is too sparse to
-  support a trustworthy aligned curve, the backend returns
-  `503 benchmark_data_unavailable` instead of silently backfilling a comparison.
+  selected window. The benchmark must have a real observation on the window's
+  first and last bar for every template: the first bar anchors the normalized
+  curve and is the buy-and-hold benchmark's fill, the last is every
+  template's ending value, and neither may be a forward-filled price. A
+  benchmark that merely spans the window without trading on those bars, one
+  that starts late or ends early, or one too sparse to support a trustworthy
+  aligned curve returns `503 benchmark_data_unavailable` instead of silently
+  backfilling a comparison.
 
 ## Backtest Job
 
@@ -1419,9 +1424,26 @@ Metrics are grouped into categories.
   "delta_vs_benchmark_pct": 6.3,
   "profit": 1840.25,
   "cagr_pct": 9.7,
-  "annualized_return_pct": 9.7
+  "annualized_return_pct": 9.7,
+  "benchmark_coverage": {
+    "observed_points": 122,
+    "target_points": 122,
+    "observed_ratio": 1.0,
+    "deferred_fill_count": 0
+  }
 }
 ```
+
+`benchmark_coverage` is what the benchmark comparison rests on, stored with
+the run. `observed_points` of `target_points` strategy bars had a real
+benchmark observation (`observed_ratio` is their ratio, at least 0.8 or the
+run was rejected); the remainder were forward-filled for marking only.
+`deferred_fill_count` is the number of contributions-basis benchmark deposits
+whose buy waited for the next observed price instead of executing on its own
+bar; it is `0` for fixed-capital runs and for fully observed benchmarks.
+`metrics.by_symbol.<symbol>.performance.benchmark_coverage` carries the same
+block per symbol, and the aggregate block sums points and deferred fills
+across symbols.
 
 ## Risk Metrics
 ```json
@@ -1483,6 +1505,25 @@ equities use 252 sessions plus the real session durations supplied by the same
 market calendar, including early closes and provider-emitted partial final
 candles. Daily equity uses 252 observations per year.
 
+### Pre-trade baseline
+
+Risk statistics anchor at the pre-trade capital baseline: the cash that funds
+the run, meaning the fixed bankroll at the first bar, or the first funded
+bar's deposits on a contributions run. `max_drawdown_pct` reads the wealth
+path from that baseline, so a first-bar execution cost (fees plus slippage)
+is itself a fall from the baseline and can never hide behind a flat
+post-entry price. `volatility_pct` and `sharpe_ratio` use exactly one return
+per real bar interval, with the funding bar's execution jump compounded into
+the first funded interval; no fabricated zero observation joins the sample.
+A window with fewer than two real return intervals reports `volatility_pct`
+and `sharpe_ratio` as `null` because sample dispersion is undefined there;
+consumers must hide a `null`, never substitute zero. A flat multi-interval
+series still reports `0.0` volatility and the `0.0` Sharpe sentinel. Bars
+before a contributions run holds any capital carry no return observations.
+Both capital shapes share this one series contract. `sharpe_ratio` uses a
+zero risk-free rate; the simulator's idle cash also earns zero, so the
+excess-return convention matches the cash model.
+
 ### Return basis
 
 Every performance block declares how its returns relate to capital under
@@ -1502,7 +1543,17 @@ placing values side by side. `benchmark_return_pct` and
 `delta_vs_benchmark_pct` always use the run's own basis; a contributions-basis
 benchmark receives the identical dated deposit stream, amounts, and modeled
 cost rates as the strategy, which is what keeps the delta valid within one
-run. Stored runs persisted before this field exists carry no `return_basis`;
+run. Benchmark alignment accepts interior data gaps at 80% observation
+coverage and forward-fills them for marking only: a forward-filled price is
+never an executable fill price. A contributions-basis benchmark deposit
+landing on a gap bar keeps its cash-flow date, idles as cash inside benchmark
+equity, and buys at the next observed benchmark close; a deposit with no
+later observed close remains cash in the benchmark's ending value. The
+window's first and last bars must be real benchmark observations for every
+template, so the seed always fills on day one and the ending value is never
+a forward-filled price; a benchmark without them is rejected as
+`benchmark_data_unavailable`. Every run records the coverage its comparison
+rests on in `performance.benchmark_coverage` (below). Stored runs persisted before this field exists carry no `return_basis`;
 readers must treat a missing value on a `dca_accumulation` run as
 `"contributions"` and as `"fixed_capital"` otherwise.
 
@@ -1531,9 +1582,12 @@ elapsed-time annualization above.
 Contributions-basis risk and efficiency statistics measure investment
 performance, never deposits. Period returns subtract each bar's external
 deposit before the ratio (`(equity[t] - deposit[t]) / equity[t-1] - 1`), and
-`max_drawdown_pct` reads the wealth index compounded from those
-flow-adjusted returns rather than the nominal equity curve. `volatility_pct`
-and `sharpe_ratio` consume the same flow-adjusted series. Nominal equity
+`max_drawdown_pct` reads the wealth path compounded from those
+flow-adjusted returns rather than the nominal equity curve, anchored at the
+1.0 pre-trade baseline per "Pre-trade baseline" above, so the first
+deposit's execution cost is itself a fall from the baseline.
+`volatility_pct` and `sharpe_ratio` consume the same flow-adjusted series
+under the same baseline contract. Nominal equity
 still owns `profit`, ending value, `portfolio_value_range`, and the chart:
 nominal dollars and performance returns are different series, and a deposit
 step in the chart is correct cash while a deposit-driven return would be a
@@ -1616,13 +1670,20 @@ other's default. Both are declared together in one `DcaCapitalPlan`
 (`argus.domain.dca_capital`), and every layer that shows, edits, validates, or
 executes a plan reads that owner rather than deciding for itself.
 
-- **`starting_capital`** — the seed, invested on day one at the fill price
-  after modeled costs. **Default `0`**, because the common question ("what if I
-  had bought $200 of Coca-Cola every month") has no lump sum in it.
+- **`starting_capital`** — the seed, a deposit on the first bar invested at
+  that bar's fill price after modeled costs. It is routed like every other
+  deposit, and because the first bar is always a real observation (benchmark
+  endpoint rule above) it never waits. **Default `0`**, because the common
+  question ("what if I had bought $200 of Coca-Cola every month") has no lump
+  sum in it.
 - **`recurring_contribution`** — invested every period.
 - **`cadence`** — the contribution period: `daily`, `weekly`, `biweekly`,
-  `monthly`, `quarterly`. Wire and storage keep the name `cadence`; no user-facing
-  surface names the period as a standalone parameter (see the copy rule below).
+  `monthly`, `quarterly`. One contribution lands on the first bar of each
+  period present in the data, never once per bar: on intraday timeframes a
+  `daily` plan deposits once per calendar day, a `weekly` plan once per week,
+  and a period with no bars deposits on the next bar the data has. Wire and
+  storage keep the name `cadence`; no user-facing surface names the period as
+  a standalone parameter (see the copy rule below).
 
 **Neither role may stand in for the other.** A DCA engine config carries the
 plan under `dca_capital` and carries **no** top-level `starting_capital`,
@@ -2607,7 +2668,18 @@ Both endpoints return:
 Operation precedence is `running > queued > checking > idle`; equal states use
 the newest source timestamp, then prefer a backtest job. Accepted turns and
 queued jobs are `queued`; running turns/jobs are `running`. A succeeded job is
-`checking` until its completed Run and evidence identity can be hydrated.
+`checking` until its result is hydrateable: for a backtest, its completed Run
+and evidence identity; for a `chat.research` job, the answer message named by
+`execution_metadata.research_result_message_id`. That rule has one owner,
+`argus.domain.job_settlement`: the memory store evaluates it directly and the
+SQL predicate `argus_private.backtest_job_result_hydrateable` (private to
+`service_role`, never a PostgREST computed column) is rendered from it and
+shared by the projection, the read-state mutation, and the baseline. Only a
+succeeded row can hydrate; a research answer is persisted before its row
+flips, so an early message never settles in-flight work. A settled research
+job is therefore `idle` and its answer produces `new_activity` with the job as
+the cursor source; clients treat `checking` as a working lock, so a research
+job that never settled kept its conversation locked after the answer landed.
 
 Completed turns and hydrateable succeeded jobs produce `new_activity` beyond
 the read boundary. Existing typed `await_user_reply`, `needs_clarification`,
@@ -3482,10 +3554,15 @@ Contract rules:
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
   a new assistant message referenced by the succeeded job's
   `execution_metadata.research_result_message_id`. A succeeded research job
-  has a null `result_run_id` by design; clients refresh the transcript on
-  terminal research jobs instead of fetching a run. `operation_scope` rides
-  every serialized job surface, including the polling
-  `GET /backtest-jobs/{job_id}` payload; absent means an ordinary backtest.
+  has a null `result_run_id` by design; the polling `GET /backtest-jobs/{job_id}`
+  response carries that message as `result_message`, the way a backtest's
+  carries `run`, and clients render it in place after the job card instead of
+  refetching the transcript. A failed run names its persisted failure note
+  the same way, so the explanation paints in place too. A request message is
+  the research job's idempotency key: re-adopting it (a response-option
+  retry) returns the existing job whatever its status, with no second
+  provider run. `operation_scope` rides every serialized job surface,
+  including the polling payload; absent means an ordinary backtest.
 - Thorough answers join the shared research cache like every other shape:
   the finalized packet is stored under the requesting turn's key, and an
   identical question within the class TTL answers inline with
@@ -3870,6 +3947,15 @@ Quick take from result-card metrics. `result_readout_source` and
 `result_readout_fallback_used` expose whether the normal LLM/schema-grounded
 path produced the readout or whether Argus intentionally fell back to the
 deterministic safety renderer.
+
+For a terminal `chat.research` job, `run` is null and `result_message` is the
+message the job produced: the persisted answer on success, the persisted
+failure note on failure (the ordinary `Message` shape, projected with the same
+redactions as `GET /conversations/{id}/messages`); it is null for every other
+job and status, and null, never an error, when the message cannot be read at
+that moment. The frontend projects it after the job card through the same
+hydration a reloaded transcript uses, so the open view paints it without a
+refetch, and keeps polling a succeeded research job until the message arrives.
 
 Completed jobs may also carry `next_experiments`, the same versioned Try next
 sidecar attached to in-stream results (`version: "argus_next_experiments/v1"`,
@@ -4735,11 +4821,14 @@ For Alpha, the Settings "Upgrade" button may be shown behind a feature flag as a
 
 Backend runtime flags may also control internal engine behavior. Execution realism
 is active by default behind `ARGUS_ENABLE_EXECUTION_REALISM`, while modeled costs
-remain opt-in per idea. An explicit `false|0|off|no` value is the kill switch and
-restores the pre-realism behavior byte-for-byte. Runs without stated fees or
-slippage stay canonical "no fees/slippage". With the kill switch engaged,
-confirmation cards omit `capabilities.execution_costs_editable` and result cards
-omit `execution_costs`.
+remain opt-in per idea. An explicit `false|0|off|no` value is the kill switch: it
+forces zero modeled costs and hides the cost surfaces, and nothing else. Metric
+math is one path in both flag states, so a kill-switch run is byte-identical to
+a flag-on run with no stated costs; the switch does not restore the
+pre-baseline arithmetic that existed before #468 (see "Pre-trade baseline").
+Runs without stated fees or slippage stay canonical "no fees/slippage". With the
+kill switch engaged, confirmation cards omit
+`capabilities.execution_costs_editable` and result cards omit `execution_costs`.
 
 ---
 
