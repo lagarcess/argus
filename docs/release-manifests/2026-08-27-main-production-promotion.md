@@ -53,13 +53,28 @@ Flags changed in this promotion: **none.**
 
 ## Production Migration Gate
 
-- Status: **pending, and this is the blocking step.**
+- Status: **applied, gate reruns `status=pass`.**
 
-One migration is pending against production.
+One migration was pending against production.
 
 | file | SHA-256 | classification | reason |
 | --- | --- | --- | --- |
-| `20260822000000_research_job_activity_settles.sql` | recorded at application | additive, plus three in-place function replacements | Creates the `argus_private` schema and the `backtest_job_result_hydrateable` owner function, then `create or replace`s three existing `public.` functions at unchanged signatures. No drop, no column removal, no data rewrite. |
+| `20260822000000_research_job_activity_settles.sql` | `a64b1c2e702109d3d5fb0340c43a14d4af4b554a453a3280bb5ab5d079d2b0e7` | additive, plus three in-place function replacements | Creates the `argus_private` schema and the `backtest_job_result_hydrateable` owner function, then `create or replace`s three existing `public.` functions at unchanged signatures. No drop, no column removal, no data rewrite. |
+
+The gate's automated label is `contract-replacing` on
+`classification_basis: conservative_top_level_sql`, which the runbook describes
+as deliberately conservative for ambiguous top-level SQL. The runbook then
+requires an expand/contract compatibility plan for that class. Here the expand
+step is provable rather than argued: the deployed build at `25105bfe` reads
+`result_hydrateable` in exactly two places
+(`src/argus/domain/conversation_activity.py:166` and `:175`), mapping
+`succeeded and not result_hydrateable` to `checking` and
+`succeeded and result_hydrateable` to `new_activity`. The new SQL only ever
+turns that flag from false to true for a research job with a resolvable answer
+message, so the currently deployed code reads the new function correctly and
+the already-locked conversations unlock on the old build. New code plus old
+SQL is never exercised, because the migration lands first. No window is
+required.
 
 The three replaced functions are `read_conversation_activity_sources`,
 `mutate_conversation_activity_read_state`, and
@@ -90,12 +105,43 @@ backfill is required. The count grows while the defect is live: it was six on
 
 Steps, per `docs/PRIVATE_LAUNCH_RUNBOOK.md` step 3:
 
-- [ ] Gate run at the candidate, `status=pass` required before any deploy-capable action
-- [ ] Human classification of the file: additive, contract-replacing, or destructive
-- [ ] Approved file applied out of band
-- [ ] File hash, ledger before and after, and affected-object readback recorded here
-- [ ] `argus_private` grants read back: no execute for `anon` or `authenticated`
-- [ ] Gate re-run reports `status=pass`, JSON attached as durable evidence
+- [x] Gate run at the candidate. Before applying: `status=blocked`,
+      `stop_reasons=["missing_candidate_migrations"]`, which is the expected
+      pre-application state. Evidence:
+      `production-migration-gate-before.json`.
+- [x] Human classification of the file, recorded above with its compatibility
+      proof.
+- [x] Approved file applied out of band, in one transaction, with the ledger
+      row written from the gate's own statement splitter so the row the gate
+      re-reads is the row that was written.
+- [x] File hash and ledger recorded. Ledger before:
+      `latest_applied_version=20260816150000`, 67 applied rows. Ledger after:
+      `latest_applied_version=20260822000000`, matching
+      `latest_candidate_version`. Statement count 9, statements SHA-256
+      `5b555692048424674ba82b3abe677b0593af603a7652f13b299cc2313b0cb78b`,
+      identical to the value the gate computed from the candidate tree, so
+      `content_drift` and `name_drift` are both empty.
+- [x] `argus_private` grants read back: execute is held by `postgres` and
+      `service_role` only. Nothing granted to `anon`, `authenticated`, or
+      `PUBLIC`.
+- [x] Gate re-run reports `status=pass`, `stop_reasons=[]`, `missing=[]`.
+      Evidence: `production-migration-gate-after.json`.
+
+### Affected-object readback
+
+The rule was evaluated against live production rows through the real projection
+function, `public.read_conversation_activity_sources`, rather than by
+re-deriving the predicate.
+
+| | before | after |
+| --- | ---: | ---: |
+| succeeded `chat.research` jobs with no run | 7 | 7 |
+| settled, so the conversation unlocks | 0 | **7** |
+| still projecting `checking` | 7 | **0** |
+
+All seven return `result_hydrateable=[True]`, including `cb7b326d`, the
+conversation in the original bug report. Those conversations are unlocked in
+production now, on the currently deployed build, before any code ships.
 
 ## Release Contract
 
