@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "head": "25ba3f87d7eb4bdd96eb3359fbacd18f271e7396",
+  "python": "3.10.20",
+  "tests": [
+    {
+      "command": "ARGUS_RESEARCH_RAIL_ENABLED=false NUMBA_CACHE_DIR=<writable-temp> PYTHONPATH=<candidate>/src:<candidate> <project-venv>/bin/python -m pytest tests/agent_runtime/ tests/research/ -q --no-cov",
+      "collected": 2250,
+      "passed": 2250,
+      "failed": 0
+    },
+    {
+      "command": "PYTHONPATH=<candidate>/src:<candidate> <project-venv>/bin/python -m pytest tests/test_interpreter_prompt_freeze.py -q --no-cov",
+      "collected": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  ],
+  "prompt_surface": {
+    "recorded_commit": "9fec4bf70c95383f4afa536674ceac4f38104787",
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "fingerprint_changed": false
+  },
+  "environment_notes": [
+    "A first collection attempt failed before tests ran because Numba could not create a VectorBT cache locator inside the shared read-only project virtual environment.",
+    "The completed run used a writable temporary NUMBA_CACHE_DIR without disabling JIT.",
+    "The worktree links a production-style .env with the research rail enabled. The full unit-test run explicitly set ARGUS_RESEARCH_RAIL_ENABLED=false to match CI's clean default; tests that exercise the enabled rail set it themselves."
+  ],
+  "live_eval_rerun": false
+}

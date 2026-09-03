@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "head": "c7802b37f39772a1216514e37fb6ff2b63142181",
+  "side": "production_baseline",
+  "reproduction_kind": "constructed valid typed interpretation; direct knowledge_answer_stage_result call; external provider patched at the dispatch boundary",
+  "input": {
+    "intent": "results_explanation",
+    "task_relation": "continue",
+    "semantic_turn_act": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "artifact_target": null,
+    "candidate_strategy_draft": {}
+  },
+  "observations": {
+    "research_query_field_exists": false,
+    "external_research_dispatched": false,
+    "stage_outcome": null,
+    "stage_patch": null
+  },
+  "limit": "Production predates the primary research_query contract, so the contradictory field cannot be represented on this baseline interpretation."
+}

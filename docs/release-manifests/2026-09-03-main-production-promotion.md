@@ -158,6 +158,66 @@ used as evidence. A no-completion TLS probe returned HTTP 200, then one retry
 with the identical production SHA, provider modes, Python, env file, and
 `PYTHONPATH` produced the durable baseline scorecard above.
 
+## PR #540 Review Findings
+
+Both Codex review threads were opened against PR head
+`9468da687543389796e2d453d3c727b16ff97bc5`.
+
+### P1: results explanation could enter external research
+
+Status: confirmed and fixed before promotion.
+
+A valid typed interpretation was constructed with
+`intent="results_explanation"`, a contradictory `company_lookup`
+`research_query`, and no semantic result act, result focus, result fact key,
+artifact target, or strategy fields.
+
+- Production `c7802b37` predates the primary `research_query` field. The same
+  results-explanation shape did not dispatch external research.
+- Reviewed head `9468da68` returned
+  `research_turn_has_conflicting_owner=false`, accepted the primary research
+  query, and `knowledge_answer_stage_result` dispatched the external research
+  stage.
+- Fix head `25ba3f87d7eb4bdd96eb3359fbacd18f271e7396` gives the intent the
+  canonical typed route owner `result`. The strategy builder still sees
+  `strategy_route_expected=false`, while research sees a conflicting owner,
+  rejects the contradictory query, and does not dispatch external research.
+
+Evidence:
+
+- Production baseline:
+  `docs/reports/evidence/2026-09-03-main-promotion/review-p1-production-baseline-c7802b37.json`
+- Candidate before:
+  `docs/reports/evidence/2026-09-03-main-promotion/review-p1-reproduction-before-9468da68.json`
+- Candidate after:
+  `docs/reports/evidence/2026-09-03-main-promotion/review-p1-reproduction-after-25ba3f87.json`
+- Verification:
+  `docs/reports/evidence/2026-09-03-main-promotion/review-p1-verification-25ba3f87.json`
+
+The focused tests failed twice before the fix and passed after it. The full
+`tests/agent_runtime/` and `tests/research/` directories then passed 2250 of
+2250 tests. The interpreter prompt-freeze suite passed 3 of 3, with no changed,
+added, or removed model-facing prompt surfaces. The live eval suite was not
+rerun under the founder's explicit instruction. The required scorecard and
+`Candidate SHA` remain bound to the measured `db88a5fe` tree; the deterministic
+review fix above is the only post-eval product change in the promotion PR.
+
+### P2: retrieval evidence can be lost with missing usage metadata
+
+Status: accepted known finding, not fixed in this promotion.
+
+When a usable market-survey response contains valid `finance_results` but
+missing or malformed `usage`, invocation counts remain zero. A finance-only
+survey with no public-source rows can therefore look as if retrieval never
+happened, causing a second paid request and possibly replacing the usable
+answer with the survey-unavailable response.
+
+Follow-up issue: [#541](https://github.com/lagarcess/argus/issues/541).
+
+This finding does not block the promotion. Its worst-case user outcome is the
+same unavailable research outcome production currently gives every research
+query. PR #540 does not change this path.
+
 ## Deploy Proof
 
 Not started. Founder landing and landed-ref verification must happen first.
@@ -183,7 +243,8 @@ Not started. If the founder lands the promotion, completion still requires:
 
 ## Release Decision
 
-- Promotion PR ready: pending the evidence commit and required `ci` check
+- Promotion PR ready: pending review evidence commit, thread resolution, and
+  required `ci` at the final head
 - Founder merge approval: pending
 - Production deploy: **not authorized and not attempted**
 - Blueprint sync: **not applicable and not attempted**

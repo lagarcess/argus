@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "head": "9468da687543389796e2d453d3c727b16ff97bc5",
+  "side": "candidate_before_fix",
+  "reproduction_kind": "constructed valid typed interpretation; direct runtime predicate and knowledge_answer_stage_result calls; external provider patched at the dispatch boundary",
+  "input": {
+    "intent": "results_explanation",
+    "task_relation": "continue",
+    "semantic_turn_act": null,
+    "research_query": {
+      "question_kind": "company_lookup",
+      "symbols": [
+        "META"
+      ],
+      "requires_publisher_sources": true
+    },
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "artifact_target": null,
+    "candidate_strategy_draft": {}
+  },
+  "observations": {
+    "strategy_route_expected": false,
+    "research_turn_has_conflicting_owner": false,
+    "primary_research_query_accepted": true,
+    "external_research_dispatched": true,
+    "stage_outcome": "ready_to_respond",
+    "stage_patch": {
+      "assistant_response": "external research dispatched"
+    }
+  },
+  "conclusion": "The P1 is reachable at the reviewed head. A contradictory research query can take a results explanation turn away from the result route."
+}
