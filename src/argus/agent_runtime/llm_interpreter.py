@@ -27,6 +27,8 @@ from argus.agent_runtime.interpreter.discovery_act_guard import (
 from argus.agent_runtime.interpreter.discovery_focused_read import (
     focused_discovery_payload_response,
 )
+from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.domain.research.config import research_rail_enabled
 from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
     BENCHMARK_LANGUAGE_GUIDANCE,
 )
@@ -1131,6 +1133,7 @@ class OpenRouterStructuredInterpreter:
             context_question_focus=response.context_question_focus,
             artifact_target=_artifact_target_from_response(response),
             asset_discovery=response.asset_discovery,
+            research_query=response.research_query,
         )
 
 
@@ -2241,6 +2244,14 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
+    if (
+        research_rail_enabled()
+        and primary_research_query(response) is not None
+        and request.selected_thread_metadata.get("last_stage_outcome") != "await_user_reply"
+    ):
+        # The primary read owns this question. Strategy and discovery intent
+        # repairs must not replace it; provider grounding happens in the rail.
+        return response
     discovery_response = discovery_response_ready_for_runtime(
         response=response,
         request=request,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from argus.agent_runtime.recovery_messages import recovery_state_from_text
+from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     IntentName,
@@ -200,6 +201,7 @@ class StageResult(BaseModel):
 
 
 class StructuredInterpretation(BaseModel):
+    research_query: ResearchQueryExtraction | None = None
     intent: IntentName
     task_relation: TaskRelation
     requires_clarification: bool = False

@@ -3402,9 +3402,11 @@ classifies as a finance question is grounded through the Perplexity Agent
 API's `finance_search` tool, selected by question shape with no user-visible
 mode.
 
-**One rail, not two (spec section 11b).** With the flag on, one classifier
-owns question shape for everything previously split between grounded
-discovery and research: typed `asset_discovery` turns enter the same router,
+**One rail, not two (spec section 11b).** With the flag on, the primary
+structured interpreter owns question shape through `research_query` for
+everything previously split between grounded discovery and research. Both
+rail entries consume that payload without a second raw-message classifier.
+Typed `asset_discovery` turns enter the same router,
 a comparison whose assets the user has all named becomes grounded
 cross-company research, and discovery's asset-finding runs as the rail's
 `find` operation. One Perplexity provider layer (`research.search` for the
@@ -3420,6 +3422,18 @@ sidecar, its typed action rows, and the guest experience are unchanged; find
 turns additionally carry the `research` sidecar below with `shape: "find"`.
 Flag off, the pre-rail act-gated discovery path runs byte-identically,
 including its own allowance and ledger rows.
+
+`research_query` is an internal interpretation contract, not a client request
+or persisted research sidecar. It carries the existing research question
+kinds, subjects, period and source requirements. An absent question payload
+does not authorize a new classification call; typed discovery may still use
+its existing find operation. Populated execution fields keep builder
+ownership unless `field_provenance[field]` explicitly says `default` and no
+user evidence span contradicts it. Missing or unknown provenance is never a
+default, and no execution field is exempt merely because of its name.
+For a find operation, `asset_discovery` owns the search parameters and
+`needs_current_facts`. A missing discovery payload uses missing-target
+recovery; it never implies that stale model knowledge is sufficient.
 
 The assistant message may carry an additive `research` sidecar in its
 final payload and persisted metadata:

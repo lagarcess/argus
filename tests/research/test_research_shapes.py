@@ -25,7 +25,7 @@ from argus.agent_runtime.state.models import (
 from argus.domain.research.cache import data_class_for
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
-from tests.research.conftest import RecordingTransport, agent_response
+from tests.research.conftest import RecordingTransport, agent_response, set_research_query
 
 USER = UserState(user_id="shapes", language_preference="en")
 SPANISH = UserState(user_id="shapes-es", language_preference="es-419")
@@ -48,13 +48,6 @@ def _state(message: str) -> RunState:
     state = RunState.new(current_user_message=message, recent_thread_history=[])
     state.research_allowance_available = True
     return state
-
-
-def _classify(monkeypatch: pytest.MonkeyPatch, **fields: Any) -> None:
-    async def classify(**_kwargs: Any) -> ra.ResearchQueryExtraction:
-        return ra.ResearchQueryExtraction(**fields)
-
-    monkeypatch.setattr(ra, "_classify_research_question", classify)
 
 
 def _wire(monkeypatch: pytest.MonkeyPatch, documents) -> RecordingTransport:
@@ -116,7 +109,7 @@ def _web_sources_without_assets(*, text: str) -> dict[str, Any]:
 
 
 def test_market_pulse_grounds_and_ends_runnable(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     transport = _wire(monkeypatch, [MOVERS])
 
     result = _run("What are the biggest movers today?")
@@ -155,8 +148,9 @@ def test_retrieval_without_a_concrete_mover_has_one_precise_recovery(
     provider_text: str,
     expected: str,
 ) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="market_pulse",
         symbols=[],
         period_start_date="2026-08-12",
@@ -184,8 +178,9 @@ def test_retrieval_without_a_concrete_mover_has_one_precise_recovery(
 def test_screening_carries_every_stated_condition_to_the_provider(
     monkeypatch,
 ) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="screening",
         symbols=[],
         screening_criteria=["yielding over 4 percent", "dividend stocks"],
@@ -213,8 +208,9 @@ def test_screening_carries_every_stated_condition_to_the_provider(
 
 
 def test_sector_radar_asks_for_analysis_not_a_list_of_names(monkeypatch) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="sector_radar",
         symbols=[],
         sector_of_interest="cybersecurity",
@@ -251,7 +247,7 @@ def test_sector_radar_asks_for_analysis_not_a_list_of_names(monkeypatch) -> None
 def test_survey_shapes_degrade_honestly_when_the_provider_is_unavailable(
     monkeypatch,
 ) -> None:
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     monkeypatch.setattr(grounded, "_client", lambda: None)
 
     result = _run("What's moving in the market?")
@@ -312,7 +308,9 @@ def test_survey_synthesis_requires_an_unambiguous_short_ticker_token() -> None:
 
 
 def test_survey_shapes_answer_natively_in_spanish(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="sector_radar", sector_of_interest="banca")
+    set_research_query(
+        monkeypatch, globals(), question_kind="sector_radar", sector_of_interest="banca"
+    )
     transport = _wire(
         monkeypatch,
         [
@@ -337,7 +335,9 @@ def test_a_bare_comparison_is_a_question_not_a_half_built_backtest(
     """The P1: "Compare PLTR to LMT" carries no capital, window, or execution
     verb, yet the builder claimed it and asked for a date window. The same
     rail classifier now sees the turn before the clarification lands."""
-    _classify(monkeypatch, question_kind="cross_company", symbols=["PLTR", "LMT"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="cross_company", symbols=["PLTR", "LMT"]
+    )
     result = asyncio.run(
         ka.knowledge_answer_stage_result(
             interpretation=_interpretation(
@@ -350,6 +350,7 @@ def test_a_bare_comparison_is_a_question_not_a_half_built_backtest(
                 candidate_strategy_draft=StrategySummary(
                     strategy_type="buy_and_hold",
                     asset_universe=["PLTR", "LMT"],
+                    extra_parameters={"field_provenance": {"strategy_type": "default"}},
                 ),
             ),
             state=_state("Compare PLTR to LMT"),
@@ -367,7 +368,7 @@ def test_a_bare_comparison_is_a_question_not_a_half_built_backtest(
 def test_a_real_build_request_still_belongs_to_the_builder(monkeypatch) -> None:
     """The widened entry is the same classifier, not a land grab: a request
     to run something classifies as none and falls through untouched."""
-    _classify(monkeypatch, question_kind="none", symbols=["AAPL"])
+    set_research_query(monkeypatch, globals(), question_kind="none", symbols=["AAPL"])
     result = asyncio.run(
         ka.knowledge_answer_stage_result(
             interpretation=_interpretation(
@@ -395,7 +396,7 @@ def test_flag_off_keeps_the_builder_gate_exactly_as_it_was(monkeypatch) -> None:
     async def explode(**_kwargs: Any):
         raise AssertionError("no classifier may run for a builder turn flag-off")
 
-    monkeypatch.setattr(ra, "_classify_research_question", explode)
+    monkeypatch.setattr(ra, "_dispatch", explode)
     monkeypatch.setattr(ka, "_classify_question", explode)
     result = asyncio.run(
         ka.knowledge_answer_stage_result(
@@ -421,7 +422,7 @@ def test_a_stated_amount_keeps_the_turn_with_the_builder(monkeypatch) -> None:
     async def explode(**_kwargs: Any):
         raise AssertionError("a turn with real execution evidence never routes")
 
-    monkeypatch.setattr(ra, "_classify_research_question", explode)
+    monkeypatch.setattr(ra, "_dispatch", explode)
     result = asyncio.run(
         ka.knowledge_answer_stage_result(
             interpretation=_interpretation(
@@ -446,7 +447,7 @@ def test_a_stated_amount_keeps_the_turn_with_the_builder(monkeypatch) -> None:
 def test_a_survey_that_never_called_the_tool_says_so(monkeypatch) -> None:
     """The one thing a market survey must not do is present model knowledge
     as the current state of the market."""
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     _wire(
         monkeypatch,
         [
@@ -474,7 +475,7 @@ def test_survey_rows_may_come_from_the_results_not_only_a_lookup_table(
 ) -> None:
     """Movers answers name their assets in the results; the resolver still
     gates every one, so nothing untradable becomes tappable."""
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     document = agent_response(text="NVDA leads.", tickers=["NVDA", "NOTAREALTICKER"])
     # No tickers_lookup table at all: the results are the only source of names.
     document["output"][1]["results"] = [
@@ -501,7 +502,7 @@ def test_a_survey_looks_past_untradable_movers_for_a_runnable_row(
 ) -> None:
     """Movers lists lead with micro caps the catalog cannot trade. Ending on
     "nothing to test" while the answer names NVDA is a dead end, not honesty."""
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     untradable = [f"ZZZ{index}" for index in range(14)]
     document = agent_response(text="Small caps led; NVDA rose 2.3%.", tickers=[])
     document["output"][1]["results"] = [
@@ -531,7 +532,7 @@ def test_a_survey_reads_the_symbols_its_own_tables_name(monkeypatch) -> None:
     live in the answer's tables. Reading those cells is the same
     deterministic markdown walk the lookup parser does, and the resolver
     still decides what becomes tappable."""
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     document = agent_response(text="", tickers=[])
     document["output"][1]["results"] = [
         {"category": "market_movers", "content": "movers", "sources": [], "tickers": []}
@@ -558,7 +559,7 @@ def test_an_ungrounded_survey_is_asked_again_concretely(monkeypatch) -> None:
     """A vague survey lets the model answer from memory however firmly the
     prompt asks for the tool, so the rail asks again with the concrete
     question the shape means. One retry, then honesty."""
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     transport = _wire(
         monkeypatch,
         [
@@ -589,7 +590,7 @@ def test_an_ungrounded_survey_is_asked_again_concretely(monkeypatch) -> None:
 
 
 def test_a_survey_that_skips_the_tool_twice_stays_honest(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     transport = _wire(
         monkeypatch,
         [

@@ -206,3 +206,16 @@ class RecordingTransport(httpx.BaseTransport):
 
 def request_body(request: httpx.Request) -> dict[str, Any]:
     return json.loads(request.content.decode())
+
+
+def set_research_query(monkeypatch, namespace, **fields):
+    """Supply the primary interpretation at the router test boundary."""
+    from argus.agent_runtime.research_query import ResearchQueryExtraction
+
+    original = namespace["_interpretation"]
+    query = ResearchQueryExtraction(**fields)
+
+    def interpreted(*args, **kwargs):
+        return original(*args, **kwargs).model_copy(update={"research_query": query})
+
+    monkeypatch.setitem(namespace, "_interpretation", interpreted)

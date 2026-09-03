@@ -14,7 +14,7 @@ from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
-from tests.research.conftest import RecordingTransport, agent_response
+from tests.research.conftest import RecordingTransport, agent_response, set_research_query
 
 USER = UserState(user_id="research-user", language_preference="en")
 SPANISH_USER = UserState(user_id="research-es", language_preference="es")
@@ -38,13 +38,6 @@ def _state(
     state.research_allowance_available = allowance
     state.research_guest_allowance_exhausted = guest_exhausted
     return state
-
-
-def _classify(monkeypatch: pytest.MonkeyPatch, **fields: Any) -> None:
-    async def classify(**_kwargs: Any) -> ra.ResearchQueryExtraction:
-        return ra.ResearchQueryExtraction(**fields)
-
-    monkeypatch.setattr(ra, "_classify_research_question", classify)
 
 
 def _wire_client(monkeypatch: pytest.MonkeyPatch, documents) -> RecordingTransport:
@@ -73,38 +66,19 @@ def test_flag_off_returns_none_before_any_classification(monkeypatch) -> None:
     async def explode(**_kwargs: Any):
         raise AssertionError("classifier must not run with the rail off")
 
-    monkeypatch.setattr(ra, "_classify_research_question", explode)
+    monkeypatch.setattr(ra, "_dispatch", explode)
     assert _run("What is Apple at?") is None
 
 
-def test_classifier_contract_marks_narrative_clauses_in_any_language(
-    monkeypatch,
-) -> None:
-    captured: dict[str, Any] = {}
+def test_primary_schema_marks_narrative_clauses_in_any_language() -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 
-    async def classify(**kwargs: Any) -> ra.ResearchQueryExtraction:
-        captured.update(kwargs)
-        return ra.ResearchQueryExtraction(
-            question_kind="company_lookup",
-            symbols=["AAPL"],
-            requires_publisher_sources=True,
-        )
-
-    monkeypatch.setattr(ra, "invoke_openrouter_json_schema", classify)
-
-    extraction = asyncio.run(
-        ra._classify_research_question(
-            message="¿Qué impulsó el crecimiento de Apple?",
-            language="es-419",
-        )
-    )
-
-    assert extraction is not None
-    prompt = captured["messages"][0]["content"]
-    assert "growth drivers" in prompt
-    assert "not live_quote in any language" in prompt
-    assert "requires_publisher_sources" in prompt
-    assert "period_start_date" in prompt
+    schema = LLMInterpretationResponse.model_json_schema()
+    query = schema["$defs"]["ResearchQueryExtraction"]["properties"]
+    assert "growth drivers" in query["question_kind"]["description"]
+    assert "not live_quote in any language" in query["question_kind"]["description"]
+    assert "publisher page" in query["requires_publisher_sources"]["description"]
+    assert "period_start_date" in query
 
 
 def test_classifier_rejects_a_malformed_period_start_date() -> None:
@@ -116,7 +90,9 @@ def test_classifier_rejects_a_malformed_period_start_date() -> None:
 
 
 def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
     transport = _wire_client(monkeypatch, [agent_response()])
 
     result = _run("What is Apple trading at right now?")
@@ -139,8 +115,9 @@ def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
 def test_narrative_clause_can_never_use_the_fast_configuration(monkeypatch) -> None:
     """The semantic classifier owns language. The typed narrative fact is
     the deterministic guard if it ever returns a quote-shaped kind anyway."""
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="live_quote",
         symbols=["AAPL"],
         requires_publisher_sources=True,
@@ -171,7 +148,9 @@ def test_narrative_clause_can_never_use_the_fast_configuration(monkeypatch) -> N
 
 
 def test_second_identical_question_serves_from_cache(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
     transport = _wire_client(monkeypatch, [agent_response()])
 
     first = _run("What is Apple trading at right now?")
@@ -187,8 +166,9 @@ def test_second_identical_question_serves_from_cache(monkeypatch) -> None:
 
 
 def test_company_lookup_uses_the_balanced_configuration(monkeypatch) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="company_lookup",
         symbols=["NFLX"],
         period_of_interest="last fiscal year",
@@ -214,8 +194,9 @@ def test_company_lookup_uses_the_balanced_configuration(monkeypatch) -> None:
 def test_company_claims_fail_closed_when_no_publisher_source_survives(
     monkeypatch,
 ) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="company_lookup",
         symbols=["NFLX"],
         requires_publisher_sources=True,
@@ -241,8 +222,9 @@ def test_company_claims_fail_closed_when_no_publisher_source_survives(
 def test_company_claim_retries_without_the_provider_only_citation_channel(
     monkeypatch,
 ) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="company_lookup",
         symbols=["AAPL"],
         requires_publisher_sources=True,
@@ -282,8 +264,9 @@ def test_company_claim_retries_without_the_provider_only_citation_channel(
 
 
 def test_cross_company_returns_a_background_job_request(monkeypatch) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="cross_company",
         symbols=["NFLX", "AAPL"],
         period_start_date="2023-08-12",
@@ -311,7 +294,9 @@ def test_cross_company_returns_a_background_job_request(monkeypatch) -> None:
 def test_thorough_cache_hit_answers_inline_without_a_job(monkeypatch) -> None:
     """An identical thorough question after a finalized job answers from the
     shared cache: no job request, no provider call, no wait."""
-    _classify(monkeypatch, question_kind="cross_company", symbols=["NFLX", "AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="cross_company", symbols=["NFLX", "AAPL"]
+    )
     transport = _wire_client(monkeypatch, [])
 
     first = _run("Compare Netflix and Apple over three years")
@@ -354,8 +339,9 @@ def test_thorough_cache_hit_answers_inline_without_a_job(monkeypatch) -> None:
 def test_screening_grounds_instead_of_queueing_a_background_job(monkeypatch) -> None:
     """A screen is a survey of current market data, so it grounds in the turn
     and comes back with names; it is not thorough multi-year research."""
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="screening",
         symbols=[],
         screening_criteria=["under a 20 P/E", "semiconductors"],
@@ -388,8 +374,9 @@ def test_screening_grounds_instead_of_queueing_a_background_job(monkeypatch) -> 
 
 
 def test_crypto_never_reaches_finance_search(monkeypatch) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="live_quote",
         symbols=["BTC"],
         asset_class_hint="crypto",
@@ -416,8 +403,9 @@ def test_crypto_never_reaches_finance_search(monkeypatch) -> None:
 
 
 def test_currency_pairs_degrade_honestly(monkeypatch) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="live_quote",
         symbols=["EURUSD"],
         asset_class_hint="currency_pair",
@@ -439,7 +427,9 @@ def test_currency_pairs_degrade_honestly(monkeypatch) -> None:
 
 
 def test_exhausted_ceiling_is_an_honest_note_not_a_disappearance(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
     transport = _wire_client(monkeypatch, [agent_response()])
 
     async def voice(*, message, language, facts, fallback, user=None):
@@ -460,7 +450,9 @@ def test_exhausted_ceiling_is_an_honest_note_not_a_disappearance(monkeypatch) ->
 
 
 def test_provider_failure_degrades_without_fabricating(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
 
     class FailingClient:
         def run_research(self, prompt, spec):
@@ -480,12 +472,14 @@ def test_provider_failure_degrades_without_fabricating(monkeypatch) -> None:
 
 
 def test_concept_and_none_fall_through(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="concept", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
     assert _run("What is a drawdown?") is None
 
 
 def test_spanish_turn_carries_the_language_into_the_prompt(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
     transport = _wire_client(monkeypatch, [agent_response(text="Apple cerró...")])
 
     result = _run("¿A cuánto está Apple?", user=SPANISH_USER)
@@ -507,7 +501,9 @@ def test_a_guest_who_spent_their_own_allowance_is_told_so(
 ) -> None:
     """A guest's three are their own. Telling them the shared capacity ran out
     would be a more flattering story than the true one."""
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
     _wire_client(monkeypatch, [agent_response()])
 
     async def voice(*, message, language, facts, fallback, user=None):
@@ -532,7 +528,9 @@ def test_a_guest_who_spent_their_own_allowance_is_told_so(
     [(USER, "shared research capacity"), (SPANISH_USER, "capacidad compartida")],
 )
 def test_a_shared_outage_still_says_shared(monkeypatch, user, must_say) -> None:
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
     _wire_client(monkeypatch, [agent_response()])
 
     async def voice(*, message, language, facts, fallback, user=None):

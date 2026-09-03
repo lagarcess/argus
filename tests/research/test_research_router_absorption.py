@@ -41,7 +41,7 @@ from argus.domain.research.search import (
 )
 from argus.domain.research.search import selection as selection_module
 
-from tests.research.conftest import RecordingTransport, agent_response
+from tests.research.conftest import RecordingTransport, agent_response, set_research_query
 
 USER = UserState(user_id="rail-user", language_preference="en")
 
@@ -165,21 +165,15 @@ def _wire_find(monkeypatch: pytest.MonkeyPatch, *, provider: _FakeSearchProvider
     monkeypatch.setattr(composer_module, "resolve_asset", _resolve)
 
 
-def _classify(monkeypatch: pytest.MonkeyPatch, **fields: Any) -> None:
-    async def classify(**_kwargs: Any) -> ra.ResearchQueryExtraction:
-        return ra.ResearchQueryExtraction(**fields)
-
-    monkeypatch.setattr(ra, "_classify_research_question", classify)
-
-
 def test_named_comparison_on_a_discovery_act_reaches_grounded_research(
     monkeypatch,
 ) -> None:
     """The defect section 11b names: 'Compare Costco against Walmart and
     Target' arrives as a typed discovery act, and the rail classifier, not
     the act taxonomy, decides it is grounded cross-company research."""
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="cross_company",
         symbols=["NFLX", "AAPL"],
     )
@@ -201,7 +195,7 @@ def test_named_comparison_on_a_discovery_act_reaches_grounded_research(
 def test_discovery_shaped_turn_runs_the_find_operation_with_the_typed_request(
     monkeypatch,
 ) -> None:
-    _classify(monkeypatch, question_kind="find_assets", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
 
@@ -234,8 +228,9 @@ def test_screening_classification_keeps_a_typed_discovery_turn_on_the_find_op(
     """Issue #344: 'find me stocks that recently IPO'ed' states a condition,
     so the classifier reads screening; the turn is still an ask for candidate
     assets and must keep the discovery surface, not become a narrative."""
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="screening",
         symbols=[],
         screening_criteria=["recently IPO'ed"],
@@ -266,8 +261,9 @@ def test_diverted_discovery_turn_keeps_its_typed_identity(monkeypatch) -> None:
     """A legitimate diversion (named comparison) may serve grounded research,
     but the patch keeps the typed act and payload instead of relabeling the
     turn educational_question (#344 macro class)."""
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="cross_company",
         symbols=["NFLX", "AAPL"],
     )
@@ -292,7 +288,7 @@ def test_diverted_discovery_turn_keeps_its_typed_identity(monkeypatch) -> None:
 def test_filled_payload_enters_the_rail_with_a_non_discovery_act(monkeypatch) -> None:
     """Issue #344: the typed payload is the rail's discovery gate; an
     educational act label on the same turn does not lose it."""
-    _classify(monkeypatch, question_kind="find_assets", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
 
@@ -313,11 +309,9 @@ def test_filled_payload_enters_the_rail_with_a_non_discovery_act(monkeypatch) ->
     assert result.stage_patch["discovery"]["candidates"]
 
 
-def test_classifier_failure_never_loses_a_discovery_turn(monkeypatch) -> None:
-    async def broken(**_kwargs: Any):
-        return None
-
-    monkeypatch.setattr(ra, "_classify_research_question", broken)
+def test_missing_primary_question_shape_never_loses_a_typed_discovery_turn(
+    monkeypatch,
+) -> None:
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
 
@@ -339,7 +333,7 @@ def test_classifier_failure_never_loses_a_discovery_turn(monkeypatch) -> None:
 def test_find_turns_share_the_research_cache_across_users(monkeypatch) -> None:
     """One cache: the second identical find question consumes no provider
     search, whoever asks it."""
-    _classify(monkeypatch, question_kind="find_assets", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
     decision = _decision(
@@ -377,7 +371,7 @@ def test_exhausted_research_ceiling_degrades_find_to_cheap_verified_rows(
 ) -> None:
     """One meter: the shared research ceiling gates the search; exhaustion
     still answers with resolver-verified rows, never a dead end."""
-    _classify(monkeypatch, question_kind="find_assets", symbols=[])
+    set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
 
@@ -400,11 +394,12 @@ def test_exhausted_research_ceiling_degrades_find_to_cheap_verified_rows(
     assert result.stage_patch["discovery"]["candidates"]
 
 
-def test_knowledge_entry_find_shape_builds_a_deterministic_request(
+def test_knowledge_entry_find_shape_uses_primary_discovery_request(
     monkeypatch,
 ) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="find_assets",
         symbols=["AAPL"],
         discovery_category="AI stocks",
@@ -414,7 +409,16 @@ def test_knowledge_entry_find_shape_builds_a_deterministic_request(
 
     result = asyncio.run(
         ra.research_answer_stage_result(
-            interpretation=_interpretation(),
+            interpretation=_interpretation().model_copy(
+                update={
+                    "asset_discovery": AssetDiscoveryRequest(
+                        relationship="peer",
+                        anchor_symbols=["AAPL"],
+                        category_description="AI stocks",
+                        needs_current_facts=False,
+                    ),
+                }
+            ),
             state=_state("What are some AI stocks like Apple?"),
             user=USER,
         )
@@ -436,7 +440,7 @@ def test_flag_off_discovery_turns_take_the_pre_rail_composer_path(
     async def explode(**_kwargs: Any):
         raise AssertionError("the rail classifier must not run with the flag off")
 
-    monkeypatch.setattr(ra, "_classify_research_question", explode)
+    monkeypatch.setattr(ra, "_dispatch", explode)
     seen: dict[str, Any] = {}
 
     async def legacy(**kwargs: Any):
@@ -489,7 +493,9 @@ def test_etf_constituents_shape_grounds_and_offers_holdings(monkeypatch) -> None
     """Section 2's ETF constituents ability: the holdings table becomes
     resolver-verified pairs, so top constituents are offerable and exposure
     vehicles ground through the table instead of being dropped."""
-    _classify(monkeypatch, question_kind="etf_constituents", symbols=["SPY"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="etf_constituents", symbols=["SPY"]
+    )
     holdings_table = (
         "## SPY ETF Holdings\n\n"
         "| etf | symbol | name | shares | weight | market_value |\n"
@@ -532,8 +538,9 @@ def test_etf_constituents_shape_grounds_and_offers_holdings(monkeypatch) -> None
 
 
 def test_follow_up_producer_block_rides_every_research_sidecar(monkeypatch) -> None:
-    _classify(
+    set_research_query(
         monkeypatch,
+        globals(),
         question_kind="cross_company",
         symbols=["NFLX", "AAPL"],
         period_of_interest="last three years",
@@ -578,7 +585,9 @@ def test_grounded_puts_store_under_the_data_class_ttls(monkeypatch) -> None:
 
     monkeypatch.setattr(grounded, "cache_put", spy)
 
-    _classify(monkeypatch, question_kind="etf_constituents", symbols=["SPY"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="etf_constituents", symbols=["SPY"]
+    )
     holdings_document = agent_response(text="SPY top holdings.", tickers=["SPY"])
     holdings_document["output"][1]["results"][0] = {
         "category": "etf_holdings",
@@ -604,7 +613,9 @@ def test_grounded_puts_store_under_the_data_class_ttls(monkeypatch) -> None:
     assert result is not None
     assert recorded[-1] == DATA_CLASS_TTL_SECONDS["peers_constituents"]
 
-    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
     quote_transport = RecordingTransport([agent_response()])
     monkeypatch.setattr(
         grounded,

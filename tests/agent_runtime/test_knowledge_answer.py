@@ -17,6 +17,11 @@ from argus.domain.research.search.contracts import SearchResult, SearchResultPac
 USER = UserState(user_id="ka", language_preference="es")
 
 
+@pytest.fixture(autouse=True)
+def legacy_knowledge_router(monkeypatch):
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
+
+
 def _interpretation(**overrides: Any) -> StructuredInterpretation:
     payload: dict[str, Any] = {
         "intent": "unsupported_or_out_of_scope",
@@ -330,11 +335,16 @@ def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
     described test.
     """
     monkeypatch.setattr(ka, "research_rail_enabled", lambda: True)
-    span = {"evidence_spans": {"date_range": "over the last 3 years"}}
+    span = {
+        "evidence_spans": {"date_range": "over the last 3 years"},
+        "field_provenance": {"strategy_type": "default"},
+    }
+    query = {"question_kind": "cross_company", "symbols": ["PLTR", "LMT"]}
 
     supported_with_window = _interpretation(
         semantic_turn_act="new_idea",
         requires_clarification=True,
+        research_query=query,
         candidate_strategy_draft=StrategySummary(
             asset_universe=["PLTR", "LMT"],
             asset_class="equity",
@@ -343,22 +353,27 @@ def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
             extra_parameters=span,
         ),
     )
-    assert ka._rail_may_claim_clarification(supported_with_window) is True
+    assert ka.primary_research_query(supported_with_window) is not None
+    assert not ka.refusal_route_survives_classification(supported_with_window)
 
     supported_without_window = _interpretation(
         semantic_turn_act="new_idea",
         requires_clarification=True,
+        research_query=query,
         candidate_strategy_draft=StrategySummary(
             asset_universe=["PLTR", "LMT"],
             asset_class="equity",
             strategy_type="buy_and_hold",
+            extra_parameters={"field_provenance": {"strategy_type": "default"}},
         ),
     )
-    assert ka._rail_may_claim_clarification(supported_without_window) is True
+    assert ka.primary_research_query(supported_without_window) is not None
+    assert not ka.refusal_route_survives_classification(supported_without_window)
 
     unsupported_with_window = _interpretation(
         semantic_turn_act="unsupported_request",
         requires_clarification=True,
+        research_query=query,
         candidate_strategy_draft=StrategySummary(
             asset_universe=["AAPL"],
             asset_class="equity",
@@ -367,20 +382,23 @@ def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
             extra_parameters=span,
         ),
     )
-    assert ka._rail_may_claim_clarification(unsupported_with_window) is False
+    assert ka.refusal_route_survives_classification(unsupported_with_window)
 
     # An inherited window is not a stated one: no evidence span, no decline.
     inherited = _interpretation(
         semantic_turn_act="unsupported_request",
         requires_clarification=True,
+        research_query=query,
         candidate_strategy_draft=StrategySummary(
             asset_universe=["AAPL"],
             asset_class="equity",
             strategy_type="buy_and_hold",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            extra_parameters={"field_provenance": {"strategy_type": "default"}},
         ),
     )
-    assert ka._rail_may_claim_clarification(inherited) is True
+    assert ka.primary_research_query(inherited) is not None
+    assert not ka.refusal_route_survives_classification(inherited)
 
 
 def test_typed_draft_window_outranks_classifier_prose(monkeypatch) -> None:
