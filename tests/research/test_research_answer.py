@@ -40,6 +40,11 @@ def _state(
     return state
 
 
+def _classify(monkeypatch: pytest.MonkeyPatch, **fields: Any) -> None:
+    """Inject the primary payload for research tests sharing this helper."""
+    set_research_query(monkeypatch, globals(), **fields)
+
+
 def _wire_client(monkeypatch: pytest.MonkeyPatch, documents) -> RecordingTransport:
     transport = RecordingTransport(documents)
     monkeypatch.setattr(
