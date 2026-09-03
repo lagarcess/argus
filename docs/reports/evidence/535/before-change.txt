@@ -1,0 +1,98 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: <worktree>
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 4 items
+
+tests/research/test_research_pricing_delivery.py FF.F                    [100%]
+
+=================================== FAILURES ===================================
+______ test_recorded_answer_reaches_user_despite_rate_disagreement[input] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b6a0e80>
+component = 'input'
+
+    @pytest.mark.parametrize("component", ["input", "output"])
+    def test_recorded_answer_reaches_user_despite_rate_disagreement(monkeypatch, component):
+        response = recorded_response()
+        model = response["model"]
+        tiers = pricing.MODEL_RATE_TABLE_USD_PER_MILLION[model]
+        monkeypatch.setitem(
+            pricing.MODEL_RATE_TABLE_USD_PER_MILLION,
+            model,
+            tuple(
+                replace(tier, **{f"{component}_usd_per_million": Decimal("100")})
+                for tier in tiers
+            ),
+        )
+        _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+        _wire_client(monkeypatch, [response])
+
+        result = _run("What was Apple's latest close?")
+
+        assert result is not None
+>       assert "312.41" in result.stage_patch["assistant_response"]
+E       assert '312.41' in "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available."
+
+tests/research/test_research_pricing_delivery.py:47: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-02 19:08:48.119 | WARNING  | argus.agent_runtime.research_grounded:grounded_result:172 - Research provider unavailable reason=malformed_response detail=usage.cost.input_cost is outside the served-model rate table shape=fast
+_____ test_recorded_answer_reaches_user_despite_rate_disagreement[output] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x111e03850>
+component = 'output'
+
+    @pytest.mark.parametrize("component", ["input", "output"])
+    def test_recorded_answer_reaches_user_despite_rate_disagreement(monkeypatch, component):
+        response = recorded_response()
+        model = response["model"]
+        tiers = pricing.MODEL_RATE_TABLE_USD_PER_MILLION[model]
+        monkeypatch.setitem(
+            pricing.MODEL_RATE_TABLE_USD_PER_MILLION,
+            model,
+            tuple(
+                replace(tier, **{f"{component}_usd_per_million": Decimal("100")})
+                for tier in tiers
+            ),
+        )
+        _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+        _wire_client(monkeypatch, [response])
+
+        result = _run("What was Apple's latest close?")
+
+        assert result is not None
+>       assert "312.41" in result.stage_patch["assistant_response"]
+E       assert '312.41' in "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available."
+
+tests/research/test_research_pricing_delivery.py:47: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-02 19:08:48.443 | WARNING  | argus.agent_runtime.research_grounded:grounded_result:172 - Research provider unavailable reason=malformed_response detail=usage.cost.output_cost is outside the served-model rate table shape=fast
+_____ test_live_netflix_response_survives_the_production_pricing_mismatch ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x111e026b0>
+
+    def test_live_netflix_response_survives_the_production_pricing_mismatch(monkeypatch):
+        response = json.loads(
+            (Path(__file__).parent / "fixtures/perplexity_netflix_2026-09-03.json").read_text()
+        )["response"]
+        _classify(
+            monkeypatch, question_kind="company_lookup", symbols=["NFLX"],
+            requires_publisher_sources=True,
+        )
+        _wire_client(monkeypatch, [response])
+        result = _run("What changed for Netflix in its most recent quarterly earnings?")
+        assert result is not None
+>       assert "Netflix" in result.stage_patch["assistant_response"]
+E       assert 'Netflix' in "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available."
+
+tests/research/test_research_pricing_delivery.py:71: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-02 19:08:48.449 | WARNING  | argus.agent_runtime.research_grounded:grounded_result:172 - Research provider unavailable reason=malformed_response detail=usage.cost.output_cost is outside the served-model rate table shape=balanced
+=========================== short test summary info ============================
+FAILED tests/research/test_research_pricing_delivery.py::test_recorded_answer_reaches_user_despite_rate_disagreement[input]
+FAILED tests/research/test_research_pricing_delivery.py::test_recorded_answer_reaches_user_despite_rate_disagreement[output]
+FAILED tests/research/test_research_pricing_delivery.py::test_live_netflix_response_survives_the_production_pricing_mismatch
+========================= 3 failed, 1 passed in 1.31s ==========================
