@@ -1,0 +1,139 @@
+{
+  "evidence_kind": "recorded_provider_replay_not_hosted_or_browser_acceptance",
+  "code_head": "91f23365a95123f404efab002e5ce8c351bb211e",
+  "fixture": "tests/research/fixtures/perplexity_netflix_2026-09-03.json",
+  "mocked_boundaries": [
+    "research classifier",
+    "Perplexity HTTP transport",
+    "Supabase table transport"
+  ],
+  "real_boundaries": [
+    "research answer stage",
+    "provider response parsing and grounding",
+    "API lifespan background invoice writer",
+    "SupabaseGateway ledger normalization"
+  ],
+  "assistant_response": "Netflix\u2019s Q2 2026 revenue rose 13% year over year to $12.6 billion, driven by memberships, pricing and advertising.  \nOperating margin was 33%, while Netflix narrowed full-year revenue guidance to $51.0, $51.4 billion and maintained its 31.5% margin forecast.  \nSource: [Netflix Q2 2026 investor-relations materials](https://ir.netflix.net/investor-news-and-events/investor-events/event-details/2026/Netflix-Second-Quarter-2026-Earnings-Interview-2026-YudK6GN8y2/default.aspx).",
+  "public_research_sidecar": {
+    "schema_version": "argus_research/v1",
+    "capability_class": "balanced_lookup",
+    "shape": "balanced",
+    "sources": [
+      {
+        "title": "July 16, 2026 Fellow shareholders, \u25cf Our financial ...",
+        "domain": "static.poder360.com.br",
+        "url": "https://static.poder360.com.br/uploads/2026/07/Netflix-2T2026.pdf",
+        "source_date": "2026-07-29"
+      },
+      {
+        "title": "Netflix Second Quarter 2026 Earnings Interview",
+        "domain": "ir.netflix.net",
+        "url": "https://ir.netflix.net/investor-news-and-events/investor-events/event-details/2026/Netflix-Second-Quarter-2026-Earnings-Interview-2026-YudK6GN8y2/default.aspx",
+        "source_date": "2026-07-16"
+      },
+      {
+        "title": "Netflix Q2 2026 Earnings: Revenue Hits $12.6B, Margin Holds ...",
+        "domain": "factsheets.com",
+        "url": "https://factsheets.com/netflix-q2-2026-earnings-revenue-hits-12-6b-margin-holds-at-33-4-as-buybacks-hit-a-record/",
+        "source_date": "2026-07-16"
+      },
+      {
+        "title": "Netflix Stock Falls 41% From Peak as Record Buyback Signals Management Conviction",
+        "domain": "www.techtimes.com",
+        "url": "https://www.techtimes.com/articles/324745/20260817/netflix-stock-falls-41-peak-record-buyback-signals-management-conviction.htm",
+        "source_date": "2026-08-17"
+      }
+    ],
+    "retrieved_at": "2026-09-03T00:30:20.581343+00:00",
+    "anchor_symbols": [
+      "NFLX"
+    ],
+    "peers": [],
+    "usage": {
+      "invocations": 2,
+      "latency_ms": 0,
+      "cost_usd": null,
+      "cache_status": "miss"
+    },
+    "follow_up": {
+      "schema_version": "argus_research_follow_up/v1",
+      "subjects": [
+        {
+          "symbol": "NFLX",
+          "name": "Netflix Inc.",
+          "asset_class": "equity"
+        }
+      ],
+      "comparison_set": [],
+      "peer_suggestions": [],
+      "open_thread": {
+        "shape": "balanced",
+        "period_of_interest": null
+      }
+    }
+  },
+  "private_ledger_insert": {
+    "source": "research",
+    "service": "perplexity_agent",
+    "provider": "perplexity_agent",
+    "model": "openai/gpt-5.6-sol",
+    "feature_area": "research_rail",
+    "task": "invoice_reconciliation",
+    "user_id": null,
+    "conversation_id": null,
+    "message_id": null,
+    "backtest_run_id": null,
+    "backtest_job_id": null,
+    "route_receipt_id": null,
+    "request_id": null,
+    "correlation_id": "research:invoice:resp_9d572e1a-e30e-4105-abd0-f83314dea4a1",
+    "provider_request_id": "resp_9d572e1a-e30e-4105-abd0-f83314dea4a1",
+    "upstream_id": null,
+    "usage_metadata": {
+      "pricing_status": "unpriced",
+      "provider_response_id": "resp_9d572e1a-e30e-4105-abd0-f83314dea4a1",
+      "usage": {
+        "invocations": 2,
+        "finance_search_invocations": 2,
+        "web_search_invocations": 1,
+        "fetch_url_invocations": 0,
+        "model": "openai/gpt-5.6-sol",
+        "latency_ms": 0,
+        "cost_usd": null,
+        "input_tokens": 21050,
+        "output_tokens": 708,
+        "cache_creation_input_tokens": 11042,
+        "cache_read_input_tokens": 9999
+      },
+      "reported_cost": {
+        "input_cost": 4e-05,
+        "output_cost": 0.01416,
+        "cache_creation_cost": 0.05521,
+        "cache_read_cost": 0.004,
+        "tool_calls_cost": 0.0125,
+        "total_cost": 0.08591,
+        "currency": "USD"
+      },
+      "reason": "rate_mismatch",
+      "detail": "usage.cost.output_cost is outside the served-model rate table",
+      "reported_component_usd": 0.01416,
+      "expected_min_usd": 0.02124,
+      "expected_max_usd": 0.02124
+    },
+    "input_tokens": 21050,
+    "output_tokens": 708,
+    "total_tokens": null,
+    "billable_unit": "request",
+    "billable_quantity": null,
+    "cost_amount": null,
+    "cost_currency": "USD",
+    "cost_source": "unavailable",
+    "latency_ms": 0,
+    "status": "succeeded",
+    "metadata": {},
+    "occurred_at": "2026-09-03T00:30:20.581510+00:00"
+  },
+  "error_alert_messages": [
+    "research_cost_unpriced {\"detail\": \"usage.cost.output_cost is outside the served-model rate table\", \"expected_max_usd\": 0.02124, \"expected_min_usd\": 0.02124, \"provider_response_id\": \"resp_9d572e1a-e30e-4105-abd0-f83314dea4a1\", \"reason\": \"rate_mismatch\", \"reported_component_usd\": 0.01416, \"reported_cost\": {\"cache_creation_cost\": 0.05521, \"cache_read_cost\": 0.004, \"currency\": \"USD\", \"input_cost\": 4e-05, \"output_cost\": 0.01416, \"tool_calls_cost\": 0.0125, \"total_cost\": 0.08591}, \"usage\": {\"cache_creation_input_tokens\": 11042, \"cache_read_input_tokens\": 9999, \"cost_usd\": null, \"fetch_url_invocations\": 0, \"finance_search_invocations\": 2, \"input_tokens\": 21050, \"invocations\": 2, \"latency_ms\": 0, \"model\": \"openai/gpt-5.6-sol\", \"output_tokens\": 708, \"web_search_invocations\": 1}}"
+  ]
+}
