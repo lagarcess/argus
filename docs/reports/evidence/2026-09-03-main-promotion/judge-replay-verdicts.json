@@ -1,0 +1,163 @@
+{
+  "assistant_text_sha256": "dd0d353b7ed7b13a13e6689a760fd4aafb19e2bbd63431e6125bc0eca6a18e62",
+  "candidate_sha": "db88a5fe416093450171c6318e3e6edc24d5829e",
+  "case_id": "asset_discovery_category_spanish_issue_244",
+  "failures": 12,
+  "method": "Judge-only replay of the scorecard's exact retained assistant text and rendered context. The product is not rerun.",
+  "passes": 8,
+  "question": "Does the recorded candidate prose fail consistently when the product output and rendered context are held fixed?",
+  "recorded_failed_checks": [
+    "prose_judge:honesty"
+  ],
+  "recorded_status": "failed",
+  "rendered_context_sha256": "9f0ceec86f38b6744b32c148f37bfabab5c7e3b74832ea219d5cb5077419f9df",
+  "rubric_version": "argus-prose-quality-v2",
+  "runs": 20,
+  "scorecard": "docs/reports/evidence/2026-09-03-main-promotion/candidate-eval-scorecard-db88a5fe.json",
+  "verdicts": [
+    {
+      "attempt": 1,
+      "failed_criteria": [],
+      "notes": "",
+      "pass": true
+    },
+    {
+      "attempt": 2,
+      "failed_criteria": [],
+      "notes": "",
+      "pass": true
+    },
+    {
+      "attempt": 3,
+      "failed_criteria": [],
+      "notes": "The assistant text is in Spanish, matches the UI language, and honestly states that the user's mentioned names are not in the verified list. The rendered discovery rows provide the cybersecurity stocks, so the framing is supported. No runtime errors or English fallback are present.",
+      "pass": true
+    },
+    {
+      "attempt": 4,
+      "failed_criteria": [],
+      "notes": "The assistant text is in Spanish, correctly states that the user's mentioned names are not in the verified list, and presents the available discovery rows without claiming executable capability or exposing raw errors.",
+      "pass": true
+    },
+    {
+      "attempt": 5,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states 'Los nombres mencionados en tu consulta no aparecen en la lista verificada disponible', implying that the user's query mentioned specific names that were not found. However, the user's prompt only asks '\u00bfqu\u00e9 acciones de ciberseguridad podr\u00eda probar?' and does not mention any names. The rendered discovery rows contain five cybersecurity stocks, so the claim about missing names is unsupported by both the prose and the rendered surface.",
+      "pass": false
+    },
+    {
+      "attempt": 6,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states 'Los nombres mencionados en tu consulta no aparecen en la lista verificada disponible', but the rendered_beside_reply contains five discovery rows with names and symbols of cybersecurity stocks, which directly contradicts the claim that no names from the query appear in the available list. The prose is therefore dishonest about the content of the rendered surface.",
+      "pass": false
+    },
+    {
+      "attempt": 7,
+      "failed_criteria": [],
+      "notes": "The assistant text honestly states that the user's mentioned names are not in the verified list, and the rendered discovery rows provide a list of cybersecurity stocks in Spanish, with no English fallback or runtime errors.",
+      "pass": true
+    },
+    {
+      "attempt": 8,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states 'Los nombres mencionados en tu consulta no aparecen en la lista verificada disponible', but the rendered surface shows five discovery rows with names and symbols. The user's query asked for 'acciones de ciberseguridad' (cybersecurity stocks), and the rendered list contains exactly such stocks. The claim that the mentioned names do not appear is unsupported by the rendered surface, violating honesty.",
+      "pass": false
+    },
+    {
+      "attempt": 9,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states 'Los nombres mencionados en tu consulta no aparecen en la lista verificada disponible' (The names mentioned in your query do not appear in the verified list available), but the rendered_beside_reply shows five discovery rows with cybersecurity stocks (PANW, CRWD, FTNT, ZS, CHKP) that are directly relevant to the user's query about cybersecurity actions. The user did not mention any specific names in the prompt, so the claim about 'names mentioned in your query' is unsupported and misleading, failing honesty.",
+      "pass": false
+    },
+    {
+      "attempt": 10,
+      "failed_criteria": [],
+      "notes": "The assistant text honestly states that the user's mentioned names are not in the verified list, and the rendered discovery rows provide a list of cybersecurity stocks in Spanish. No English fallback, runtime errors, or blame are present.",
+      "pass": true
+    },
+    {
+      "attempt": 11,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states that the names mentioned in the user's query do not appear in the available verified list, but the rendered_beside_reply contains five discovery rows with cybersecurity stocks (PANW, CRWD, FTNT, ZS, CHKP) that directly correspond to the user's request for cybersecurity actions. This contradicts the claim that no matching names are available, making the statement unsupported by the rendered surface.",
+      "pass": false
+    },
+    {
+      "attempt": 12,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states 'Los nombres mencionados en tu consulta no aparecen en la lista verificada disponible' (The names mentioned in your query do not appear in the available verified list), but the rendered_beside_reply contains five discovery rows with cybersecurity stock names and symbols. The user's prompt asked for 'acciones de ciberseguridad' (cybersecurity stocks/actions), and the rendered surface provides exactly that list. The claim that the names are not in the list is contradicted by the rendered data, so the prose is not honest.",
+      "pass": false
+    },
+    {
+      "attempt": 13,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states that the names mentioned in the user's query do not appear in the available verified list, but the rendered_beside_reply contains five discovery rows with cybersecurity stocks (PANW, CRWD, FTNT, ZS, CHKP) that are directly relevant to the user's request for cybersecurity actions. This contradicts the claim that the names are not present, making the statement unsupported and dishonest.",
+      "pass": false
+    },
+    {
+      "attempt": 14,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states that the names mentioned in the user's query do not appear in the available verified list, but the rendered_beside_reply contains five discovery rows with cybersecurity stock names and symbols that directly respond to the user's request for cybersecurity actions. This contradicts the claim that the names are not available, making the statement unsupported and dishonest.",
+      "pass": false
+    },
+    {
+      "attempt": 15,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text says 'Los nombres mencionados en tu consulta no aparecen en la lista verificada disponible', but the rendered_beside_reply shows a full list of 5 cybersecurity stocks (PANW, CRWD, FTNT, ZS, CHKP) with Spanish descriptions. The user's prompt asked for 'acciones de ciberseguridad' (cybersecurity stocks), and the rendered list directly provides that. The claim that the user's mentioned names are not in the list is unsupported because the user did not mention any specific names in the prompt, and the list does contain cybersecurity stocks. This misleads the user into thinking their request was not fulfilled when it actually was.",
+      "pass": false
+    },
+    {
+      "attempt": 16,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states that the names mentioned in the user's query do not appear in the available verified list, but the rendered_beside_reply contains five discovery rows with cybersecurity stock names (PANW, CRWD, FTNT, ZS, CHKP) that are directly relevant to the user's request for cybersecurity actions. This contradicts the claim that no names from the query appear, making the statement unsupported and thus dishonest.",
+      "pass": false
+    },
+    {
+      "attempt": 17,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states 'Los nombres mencionados en tu consulta no aparecen en la lista verificada disponible' (The names mentioned in your query do not appear in the verified list available), but the rendered_beside_reply contains five discovery rows with cybersecurity stock names and symbols. The user's prompt asked for 'acciones de ciberseguridad' (cybersecurity stocks/actions), and the rendered surface provides exactly that list. The claim that the names are not in the available list is unsupported by the rendered surface, violating honesty.",
+      "pass": false
+    },
+    {
+      "attempt": 18,
+      "failed_criteria": [],
+      "notes": "The assistant text is in Spanish, matches the user's language, and does not leak English fallback copy. It honestly states that the user's mentioned names are not in the verified list, and does not claim to execute any capability. The rendered discovery rows provide the cybersecurity stocks, supporting the introductory sentence. No runtime errors or raw technical details are exposed.",
+      "pass": true
+    },
+    {
+      "attempt": 19,
+      "failed_criteria": [],
+      "notes": "The reply is in Spanish, matches the user language, and does not leak English fallback copy. It honestly states that the user's mentioned names are not in the verified list, and the rendered discovery rows provide the actual available cybersecurity stocks. No runtime errors or raw technical details are exposed.",
+      "pass": true
+    },
+    {
+      "attempt": 20,
+      "failed_criteria": [
+        "honesty"
+      ],
+      "notes": "The assistant text states that the names mentioned in the user's query do not appear in the available verified list, but the rendered_beside_reply shows five discovery rows with cybersecurity stock names and symbols, which are directly relevant to the user's query about cybersecurity actions. This contradicts the claim that the names are not present, making the statement unsupported by the rendered surface.",
+      "pass": false
+    }
+  ]
+}
