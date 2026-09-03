@@ -1,0 +1,303 @@
+{
+  "evidence_kind": "synthetic_native_filter_probe_not_production_traffic",
+  "candidate_sha": "d9eccbd7f7eab7c165b0f904b1ef4e8395da0560",
+  "query": {
+    "dateRange": {
+      "date_from": "2026-09-03T00:00:00Z",
+      "date_to": "2026-09-04T00:00:00Z"
+    },
+    "interval": "day",
+    "kind": "TrendsQuery",
+    "properties": [
+      {
+        "key": "environment",
+        "operator": "exact",
+        "type": "event",
+        "value": [
+          "validation_issue_408_d9eccbd7f7ea_20260903T001225Z"
+        ]
+      }
+    ],
+    "series": [
+      {
+        "event": "research",
+        "kind": "EventsNode",
+        "math": "total",
+        "properties": [
+          {
+            "key": "capability_class",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "balanced_lookup"
+            ]
+          },
+          {
+            "key": "event_action",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "failed"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "research",
+        "kind": "EventsNode",
+        "math": "total",
+        "properties": [
+          {
+            "key": "capability_class",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "screening"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "research",
+        "kind": "EventsNode",
+        "math": "total",
+        "properties": [
+          {
+            "key": "capability_class",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "thorough_research"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "system",
+        "kind": "EventsNode",
+        "math": "total",
+        "properties": [
+          {
+            "key": "product_capability",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "chat"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "data": [
+        1,
+        0
+      ],
+      "labels": [
+        "3-Sep-2026",
+        "4-Sep-2026"
+      ],
+      "days": [
+        "2026-09-03",
+        "2026-09-04"
+      ],
+      "count": 1,
+      "label": "research",
+      "filter": {
+        "insight": "TRENDS",
+        "properties": [
+          {
+            "key": "environment",
+            "label": null,
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "validation_issue_408_d9eccbd7f7ea_20260903T001225Z"
+            ]
+          }
+        ],
+        "filter_test_accounts": false,
+        "date_to": "2026-09-04T00:00:00Z",
+        "date_from": "2026-09-03T00:00:00Z",
+        "entity_type": "events",
+        "interval": "day"
+      },
+      "action": {
+        "days": [
+          "2026-09-03T00:00:00Z",
+          "2026-09-04T00:00:00Z"
+        ],
+        "id": "research",
+        "type": "events",
+        "order": 0,
+        "name": "research",
+        "custom_name": null,
+        "math": "total",
+        "math_property": null,
+        "math_hogql": null,
+        "math_group_type_index": null,
+        "properties": {}
+      },
+      "order": 0
+    },
+    {
+      "data": [
+        1,
+        0
+      ],
+      "labels": [
+        "3-Sep-2026",
+        "4-Sep-2026"
+      ],
+      "days": [
+        "2026-09-03",
+        "2026-09-04"
+      ],
+      "count": 1,
+      "label": "research",
+      "filter": {
+        "insight": "TRENDS",
+        "properties": [
+          {
+            "key": "environment",
+            "label": null,
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "validation_issue_408_d9eccbd7f7ea_20260903T001225Z"
+            ]
+          }
+        ],
+        "filter_test_accounts": false,
+        "date_to": "2026-09-04T00:00:00Z",
+        "date_from": "2026-09-03T00:00:00Z",
+        "entity_type": "events",
+        "interval": "day"
+      },
+      "action": {
+        "days": [
+          "2026-09-03T00:00:00Z",
+          "2026-09-04T00:00:00Z"
+        ],
+        "id": "research",
+        "type": "events",
+        "order": 1,
+        "name": "research",
+        "custom_name": null,
+        "math": "total",
+        "math_property": null,
+        "math_hogql": null,
+        "math_group_type_index": null,
+        "properties": {}
+      },
+      "order": 1
+    },
+    {
+      "data": [
+        0,
+        0
+      ],
+      "labels": [
+        "3-Sep-2026",
+        "4-Sep-2026"
+      ],
+      "days": [
+        "2026-09-03",
+        "2026-09-04"
+      ],
+      "count": 0,
+      "label": "research",
+      "filter": {
+        "insight": "TRENDS",
+        "properties": [
+          {
+            "key": "environment",
+            "label": null,
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "validation_issue_408_d9eccbd7f7ea_20260903T001225Z"
+            ]
+          }
+        ],
+        "filter_test_accounts": false,
+        "date_to": "2026-09-04T00:00:00Z",
+        "date_from": "2026-09-03T00:00:00Z",
+        "entity_type": "events",
+        "interval": "day"
+      },
+      "action": {
+        "days": [
+          "2026-09-03T00:00:00Z",
+          "2026-09-04T00:00:00Z"
+        ],
+        "id": "research",
+        "type": "events",
+        "order": 2,
+        "name": "research",
+        "custom_name": null,
+        "math": "total",
+        "math_property": null,
+        "math_hogql": null,
+        "math_group_type_index": null,
+        "properties": {}
+      },
+      "order": 2
+    },
+    {
+      "data": [
+        1,
+        0
+      ],
+      "labels": [
+        "3-Sep-2026",
+        "4-Sep-2026"
+      ],
+      "days": [
+        "2026-09-03",
+        "2026-09-04"
+      ],
+      "count": 1,
+      "label": "system",
+      "filter": {
+        "insight": "TRENDS",
+        "properties": [
+          {
+            "key": "environment",
+            "label": null,
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "validation_issue_408_d9eccbd7f7ea_20260903T001225Z"
+            ]
+          }
+        ],
+        "filter_test_accounts": false,
+        "date_to": "2026-09-04T00:00:00Z",
+        "date_from": "2026-09-03T00:00:00Z",
+        "entity_type": "events",
+        "interval": "day"
+      },
+      "action": {
+        "days": [
+          "2026-09-03T00:00:00Z",
+          "2026-09-04T00:00:00Z"
+        ],
+        "id": "system",
+        "type": "events",
+        "order": 3,
+        "name": "system",
+        "custom_name": null,
+        "math": "total",
+        "math_property": null,
+        "math_hogql": null,
+        "math_group_type_index": null,
+        "properties": {}
+      },
+      "order": 3
+    }
+  ],
+  "url": "https://us.posthog.com/project/372988/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-09-03T00%3A00%3A00Z%22%2C%22date_to%22%3A%222026-09-04T00%3A00%3A00Z%22%7D%2C%22interval%22%3A%22day%22%2C%22kind%22%3A%22TrendsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22environment%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22validation_issue_408_d9eccbd7f7ea_20260903T001225Z%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22research%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22total%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22capability_class%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22balanced_lookup%22%5D%7D%2C%7B%22key%22%3A%22event_action%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22failed%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22research%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22total%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22capability_class%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22screening%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22research%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22total%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22capability_class%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22thorough_research%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22system%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22total%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22product_capability%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22chat%22%5D%7D%5D%7D%5D%7D%7D"
+}
