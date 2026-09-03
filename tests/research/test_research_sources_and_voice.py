@@ -44,15 +44,15 @@ def _interpretation() -> StructuredInterpretation:
 
 
 def _run(message: str, monkeypatch: pytest.MonkeyPatch, **fields: Any):
-    async def classify(**_kwargs: Any) -> ra.ResearchQueryExtraction:
-        return ra.ResearchQueryExtraction(**fields)
-
-    monkeypatch.setattr(ra, "_classify_research_question", classify)
     state = RunState.new(current_user_message=message, recent_thread_history=[])
     state.research_allowance_available = True
     return asyncio.run(
         ra.research_answer_stage_result(
-            interpretation=_interpretation(), state=state, user=USER
+            interpretation=_interpretation().model_copy(
+                update={"research_query": ra.ResearchQueryExtraction(**fields)}
+            ),
+            state=state,
+            user=USER,
         )
     )
 

@@ -1,0 +1,41 @@
+argus
+New chat
+Search
+Recents
+Settings
+Microsoft's Revenue Streams and Business
+¿Cómo gana dinero Microsoft y cuáles son sus principales negocios?
+
+Microsoft makes money primarily by charging businesses and consumers for cloud computing, software subscriptions, and enterprise applications. It also earns revenue from software licences, advertising, gaming content and subscriptions, and device sales.
+
+In fiscal 2026, services and other revenue, including cloud services, subscriptions and advertising, was $267.143 billion, or 80.5% of Microsoft’s $331.839 billion total revenue. Product revenue was $64.696 billion. Figures are for the fiscal year ended June 30, 2026, the latest full year available as of September 3, 2026.
+
+Microsoft’s three principal businesses
+REPORTING SEGMENT	FY2026 REVENUE	WHAT IT INCLUDES AND HOW IT EARNS MONEY
+Productivity and Business Processes	$139.996B	Microsoft 365 and Copilot subscriptions; Office licences; Dynamics business software; and LinkedIn’s recruiting, advertising, sales and premium-subscription products
+Intelligent Cloud	$137.791B	Azure computing, storage, databases and AI services, generally charged through usage or contractual commitments, plus server software, GitHub and enterprise support
+More Personal Computing	$54.052B	Windows licences paid largely by PC manufacturers and commercial customers; Xbox games, Game Pass, transactions and hardware; Bing/search advertising; and Surface and other devices
+Total	$331.839B
+The main money engines underneath those segments
+
+Azure and server/cloud services: Microsoft sells computing capacity, data storage, databases, cybersecurity, developer tools and AI infrastructure. Customers pay based on consumption, subscriptions or multiyear contracts. Server products and cloud-services revenue was $129.425 billion in FY2026.
+
+Microsoft 365: Businesses pay recurring per-user fees for applications and services such as Word, Excel, Teams, Exchange, security tools and Copilot. Consumers also buy Microsoft 365 subscriptions. Commercial Microsoft 365 products and cloud-services revenue was $101.997 billion; the consumer equivalent was $9.175 billion.
+
+LinkedIn and Dynamics: LinkedIn monetizes recruiting tools, advertising, premium memberships and sales software. Dynamics sells cloud-based finance, sales, customer-service and operational applications. Their FY2026 revenues were $19.817 billion and $9.006 billion, respectively.
+
+Gaming: Revenue comes from game sales, Game Pass and other subscriptions, in-game content, third-party platform fees, advertising and Xbox hardware. Gaming generated $21.790 billion.
+
+Windows and devices: PC manufacturers pay to install Windows, while organizations purchase commercial Windows licences and related services. Microsoft also sells Surface and other hardware. Windows-and-devices revenue was $17.084 billion.
+
+Search advertising: Advertisers pay to appear across Microsoft’s search and news properties. This generated $15.176 billion.
+
+The clearest takeaway is that Microsoft is no longer mainly a seller of boxed Windows and Office software. Its two large pillars are now enterprise productivity subscriptions and cloud/AI infrastructure. Together, Productivity and Business Processes and Intelligent Cloud supplied 83.7% of FY2026 revenue and 90.7% of segment operating income. Microsoft reported total operating income of $155.237 billion and net income of $133.749 billion for FY2026.
+
+1 source ›
+TRY NEXT
+↳
+Test Microsoft MSFT over the last 3 years
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

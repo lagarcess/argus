@@ -1,0 +1,77 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+META Buy and Hold Strategy
+test META buy and hold
+
+¿Qué periodo quieres usar para META?
+
+January 3, 2023 through December 31, 2024, with $10,000 starting capital
+
+Got it — META buy-and-hold with $10,000 starting capital. You mentioned January 3, 2023 through December 31, 2024. What are the exact start and end dates for the test?
+
+Start date: 2023-01-03. End date: 2024-12-31.
+META
+Comprar y mantener
+Ejecución completa
+CAPITAL INICIAL
+$10,000
+PERIODO
+3 ene 2023 → 31 dic 2024
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Run backtest
+META
+Comprar y mantener
+
+3 ene 2023 → 31 dic 2024 · Datos diarios
+
+Simulación completa
+
+
+
+
+
+TradingView Lightweight Charts
+1M
+3M
+Este año
+1A
+Todo
+Detalles del rango
+
+Período visible: 3 ene 2023 al 31 dic 2024.
+
+Valor final
+
+$46,950
+
++$36,950 ganancia · +369.5% rendimiento total
+
+Comparado con SPY
+Superó por 315.6 puntos porcentuales
+Peor caída
+-18.4%
+
+Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+
+Ver detalles
+Explicar resultado
+Ajustar idea
+Agregar decisión
+LECTURA RÁPIDA
+
+A simple buy-and-hold of META from January 3, 2023 through December 31, 2024 returned +369.5%, beating the SPY benchmark (+53.9%) by 315.6 percentage points. This is a return comparison, not causal attribution. Daily data only
+
+Find companies similar to Nvidia
+
+La búsqueda actual respaldada por fuentes no está disponible para esta solicitud, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.
+
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

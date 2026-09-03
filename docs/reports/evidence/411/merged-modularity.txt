@@ -1,0 +1,17 @@
+Prospective merge tree: ca529cd6a7853ee3045ecff53ba19ac937483566
+All configured watched files materialized from that tree.
+Modularity budget report
+========================
+
+Top scanned files by current line count:
+- tests/agent_runtime/test_interpret_stage.py: 11011 lines (watched)
+- tests/agent_runtime/test_conversational_contract_hardening.py: 7287 lines (watched)
+- tests/test_chat_runtime_reload_guardrails.py: 6280 lines (watched)
+
+Watched-file budget status:
+- tests/agent_runtime/test_interpret_stage.py: 11011 lines (baseline 11010, growth +1, limit 11085)
+- tests/agent_runtime/test_conversational_contract_hardening.py: 7287 lines (baseline 7285, growth +2, limit 7360)
+- tests/test_chat_runtime_reload_guardrails.py: 6280 lines (baseline 6280, growth +0, limit 6355)
+
+Budget violations:
+- none

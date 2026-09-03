@@ -1,0 +1,1 @@
+2026-09-02 21:10:01.111 | WARNING  | argus.agent_runtime.research_grounded:grounded_result:172 - Research provider unavailable reason=malformed_response detail=usage.cost.output_cost is outside the served-model rate table shape=balanced

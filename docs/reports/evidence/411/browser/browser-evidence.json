@@ -1,0 +1,932 @@
+{
+  "worker_head": "fe40da62c6462bc9c8176cc1000bc0f9cbcb971b",
+  "browser_runtime_head": "35e5cea8e6ca3186694fd02696535caa905b118f",
+  "original_integration_base": "c7802b37f39772a1216514e37fb6ff2b63142181",
+  "integration_sha": "4e987de6e74c3d94df8355ac092d4995f7525529",
+  "captured_combined_tree": "66073a69403084688a725dfae9006af6f90a6459",
+  "final_combined_tree": "5fc943f88ea1144c419bcc1767a8a0d1c4784146",
+  "subsequent_change": "Only tests/research/test_research_answer.py gained a primary-query fixture adapter; runtime/frontend bytes unchanged.",
+  "combined_blobs_verified": 1349,
+  "browser_mode": "English card/backtest and initial turns headed; switched to headless on user request. Spanish card/discovery screenshots after reload; research answer captured headless.",
+  "headless_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "scope": "Local mock auth and memory persistence, real OpenRouter/Alpaca/Perplexity. No Turnstile configuration changes. No merge, push, or deployment.",
+  "provider_call_observation": "API persistence-bound OpenRouter receipt copies; no routing/response stubs. Perplexity usage is in research sidecars. Background title naming is outside turn receipts.",
+  "tests": {
+    "standalone": {
+      "passed": 2176,
+      "failed": 2
+    },
+    "combined_with_same_dotenv": {
+      "passed": 2233,
+      "failed": 2
+    },
+    "mocked_harness": {
+      "passed": 100,
+      "failed": 0
+    }
+  },
+  "cases": [
+    {
+      "label": "build_en_initial",
+      "evidence_environment": "standalone_35e5cea8",
+      "conversation_id": "3f650497-a69b-412d-9fa0-78663098f209",
+      "user_message_id": "cfb70594-78ce-4668-b7b7-c9531279794b",
+      "assistant_message_id": "31da9ee1-d458-4340-8846-dba88066fdc8",
+      "user_message": "test META buy and hold",
+      "assistant_response": "What date window should I use for META?",
+      "stage_outcome": "await_user_reply",
+      "recovery": null,
+      "research": null,
+      "confirmation_payload": null,
+      "receipts": {
+        "request_id": "ff9b8a79-2070-4d5d-acf1-86fa3844d112",
+        "receipt_count": 11,
+        "successful_receipts": 7,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 14923,
+        "reported_openrouter_cost_usd": "0.03030665",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedStrategyExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedDateWindowExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedStrategyExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedDateWindowExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedDateWindowExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "skipped"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "failed"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "skipped"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "failed"
+          }
+        ]
+      }
+    },
+    {
+      "label": "build_en_dates",
+      "evidence_environment": "standalone_35e5cea8",
+      "conversation_id": "3f650497-a69b-412d-9fa0-78663098f209",
+      "user_message_id": "1f07382e-05ca-4689-a71e-a6a73bb9610a",
+      "assistant_message_id": "63e3f4ea-5ef3-4f34-b10a-1eff285f1aca",
+      "user_message": "January 3, 2023 through December 31, 2024, with $10,000 starting capital",
+      "assistant_response": "Got it — META buy-and-hold with $10,000 starting capital. You mentioned January 3, 2023 through December 31, 2024. What are the exact start and end dates for the test?",
+      "stage_outcome": "await_user_reply",
+      "recovery": null,
+      "research": null,
+      "confirmation_payload": null,
+      "receipts": {
+        "request_id": "11458d99-2366-46eb-aec8-295008dcc5d1",
+        "receipt_count": 4,
+        "successful_receipts": 4,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 28614,
+        "reported_openrouter_cost_usd": "0.02427035",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "ArtifactAssumptionEditPlan",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "succeeded"
+          }
+        ]
+      }
+    },
+    {
+      "label": "build_en_card",
+      "evidence_environment": "standalone_35e5cea8",
+      "conversation_id": "3f650497-a69b-412d-9fa0-78663098f209",
+      "user_message_id": "623d68d4-ba82-4d99-a9b8-a9c6b0d16eb8",
+      "assistant_message_id": "320d9f23-445b-4516-908d-20808bdb1679",
+      "user_message": "Start date: 2023-01-03. End date: 2024-12-31.",
+      "assistant_response": "Ready to test buy-and-hold for META over January 3, 2023 - December 31, 2024.",
+      "stage_outcome": "await_approval",
+      "recovery": null,
+      "research": null,
+      "confirmation_payload": {
+        "strategy": {
+          "raw_user_phrasing": "Start date: 2023-01-03. End date: 2024-12-31.",
+          "requested_strategy_template": null,
+          "strategy_type": "buy_and_hold",
+          "strategy_thesis": "Test META buy and hold strategy",
+          "asset_universe": [
+            "META"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2023-01-03",
+            "end": "2024-12-31"
+          },
+          "sizing_mode": null,
+          "capital_amount": 10000.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "META",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "META",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "provider_resolved_assets": [
+              {
+                "raw_text": "META",
+                "symbol": "META",
+                "asset_class": "equity",
+                "name": "Meta Platforms, Inc. Class A Common Stock",
+                "raw_symbol": "META",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NASDAQ"
+              }
+            ],
+            "language": "en",
+            "evidence_spans": {
+              "strategy_type": "buy and hold",
+              "asset_universe": "META"
+            },
+            "raw_strategy_type": "buy_and_hold",
+            "initial_capital": 10000.0,
+            "field_provenance": {
+              "initial_capital": "starting_capital",
+              "capital_amount": "starting_capital",
+              "date_range": "explicit_user"
+            },
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2023-01-03",
+              "end": "2024-12-31",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": "today",
+              "year": null,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "Start date: 2023-01-03. End date: 2024-12-31."
+            },
+            "requested_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            },
+            "effective_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            }
+          }
+        },
+        "optional_parameters": {
+          "initial_capital": {
+            "value": 1000.0,
+            "source": "default",
+            "label": "Initial capital",
+            "description": "Starting cash for the simulated backtest."
+          },
+          "timeframe": {
+            "value": "1D",
+            "source": "default",
+            "label": "Timeframe",
+            "description": "Bar interval used for the simulation."
+          },
+          "fees": {
+            "value": 0.0,
+            "source": "default",
+            "label": "Fees",
+            "description": "Per-trade fee assumption applied during execution."
+          },
+          "slippage": {
+            "value": 0.0,
+            "source": "default",
+            "label": "Slippage",
+            "description": "Execution slippage assumption expressed as a fraction."
+          },
+          "engine_options": {
+            "value": {},
+            "source": "default",
+            "label": "Engine options",
+            "description": "Reserved execution knobs exposed by the runtime contract."
+          }
+        },
+        "launch_payload": {
+          "strategy_type": "buy_and_hold",
+          "symbol": "META",
+          "symbols": [
+            "META"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2023-01-03",
+            "end": "2024-12-31"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "position_size": null,
+          "cadence": null,
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "en",
+          "requested_date_range": {
+            "start": "2023-01-03",
+            "end": "2024-12-31"
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "full_coverage",
+            "requested_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            },
+            "effective_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            },
+            "observations_by_symbol": {
+              "META": 502,
+              "SPY": 502
+            },
+            "adjustment_reason": "none",
+            "preflight_id": "sha256:15fc806d3fa3a22460fcfc504b73ae59a01b62b310b74a3dcab74eab7804fcd0"
+          }
+        },
+        "validation": {
+          "status": "ready_to_run",
+          "executable": true,
+          "date_adjusted": false
+        },
+        "edit_disclosure": null
+      },
+      "receipts": {
+        "request_id": "d0546fc7-0fdc-49e3-a2fe-fec944430ebe",
+        "receipt_count": 3,
+        "successful_receipts": 3,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 16269,
+        "reported_openrouter_cost_usd": "0.02262865",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "ArtifactAssumptionEditPlan",
+            "outcome": "succeeded"
+          }
+        ]
+      }
+    },
+    {
+      "label": "backtest_en",
+      "evidence_environment": "standalone_35e5cea8",
+      "conversation_id": "3f650497-a69b-412d-9fa0-78663098f209",
+      "user_message_id": "41216ddb-7a04-5890-be3d-f4e3e00cd984",
+      "assistant_message_id": "b215f293-81d5-427c-ae11-e0cab659f63e",
+      "user_message": "Run backtest",
+      "assistant_response": "A simple buy-and-hold of META from January 3, 2023 through December 31, 2024 returned +369.5%, beating the SPY benchmark (+53.9%) by 315.6 percentage points. This is a return comparison, not causal attribution. Daily data only",
+      "stage_outcome": "end_run",
+      "recovery": null,
+      "research": null,
+      "confirmation_payload": null,
+      "receipts": {
+        "request_id": "6693e48b-89cc-4646-960e-34b572434df3",
+        "receipt_count": 1,
+        "successful_receipts": 1,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 3049,
+        "reported_openrouter_cost_usd": "0.00026894",
+        "tasks_and_schemas": [
+          {
+            "task": "result_summary",
+            "schema": "QuickTakeDraft",
+            "outcome": "succeeded"
+          }
+        ]
+      }
+    },
+    {
+      "label": "discovery_recovery",
+      "evidence_environment": "standalone_35e5cea8",
+      "conversation_id": "3f650497-a69b-412d-9fa0-78663098f209",
+      "user_message_id": "6281a256-b4ac-4cbf-bdae-9bf14295d016",
+      "assistant_message_id": "eceba199-4bc4-492d-94b1-f5e89acf4639",
+      "user_message": "Find companies similar to Nvidia",
+      "assistant_response": "Current source-backed discovery is not available for this request, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
+      "stage_outcome": "ready_to_respond",
+      "recovery": {
+        "code": "discovery_unavailable",
+        "retryable": false
+      },
+      "research": {
+        "schema_version": "argus_research/v1",
+        "capability_class": "peer_expansion",
+        "shape": "find",
+        "sources": [],
+        "retrieved_at": "2026-09-03T02:06:55.665583+00:00",
+        "anchor_symbols": [
+          "NVDA"
+        ],
+        "peers": [],
+        "usage": {
+          "invocations": 0,
+          "latency_ms": null,
+          "cost_usd": null,
+          "cache_status": "bypass"
+        },
+        "follow_up": {
+          "schema_version": "argus_research_follow_up/v1",
+          "subjects": [
+            {
+              "symbol": "NVDA",
+              "name": "NVDA",
+              "asset_class": "equity"
+            }
+          ],
+          "comparison_set": [],
+          "peer_suggestions": [],
+          "open_thread": {
+            "shape": "find",
+            "period_of_interest": null
+          }
+        }
+      },
+      "confirmation_payload": null,
+      "receipts": {
+        "request_id": "2fd41d3c-5963-4aee-826b-c99ed36e2812",
+        "receipt_count": 2,
+        "successful_receipts": 2,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 11185,
+        "reported_openrouter_cost_usd": "0.0521995",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          }
+        ]
+      }
+    },
+    {
+      "label": "build_es_initial",
+      "evidence_environment": "standalone_35e5cea8",
+      "conversation_id": "7cd0bb5b-e0a4-411f-b548-3bf12044a85b",
+      "user_message_id": "504867c4-645c-454c-a3cc-ee46ce7f5976",
+      "assistant_message_id": "8cf00dba-6ac4-4ab6-97bd-dbe4dfd9a6ff",
+      "user_message": "Prueba META con una estrategia de comprar y mantener",
+      "assistant_response": "What date window should I use for META?",
+      "stage_outcome": "await_user_reply",
+      "recovery": null,
+      "research": null,
+      "confirmation_payload": null,
+      "receipts": {
+        "request_id": "9335a0e5-ee37-4ce1-b930-a730d8162d0f",
+        "receipt_count": 11,
+        "successful_receipts": 7,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 17662,
+        "reported_openrouter_cost_usd": "0.02705025",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedStrategyExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedDateWindowExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedStrategyExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedDateWindowExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedDateWindowExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "skipped"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "failed"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "skipped"
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "failed"
+          }
+        ]
+      }
+    },
+    {
+      "label": "build_es_card",
+      "evidence_environment": "standalone_35e5cea8",
+      "conversation_id": "7cd0bb5b-e0a4-411f-b548-3bf12044a85b",
+      "user_message_id": "b345210f-c4c5-4d7b-8f4f-9c5a1cd2178e",
+      "assistant_message_id": "5b8156b7-7836-4236-959e-0617948d1ad2",
+      "user_message": "Del 2023-01-03 al 2024-12-31, con un capital inicial de 10,000 dólares.",
+      "assistant_response": "Ready to test buy-and-hold for META over 3 de enero de 2023 al 31 de diciembre de 2024.",
+      "stage_outcome": "await_approval",
+      "recovery": null,
+      "research": null,
+      "confirmation_payload": {
+        "strategy": {
+          "raw_user_phrasing": "Del 2023-01-03 al 2024-12-31, con un capital inicial de 10,000 dólares.",
+          "requested_strategy_template": "buy_and_hold",
+          "strategy_type": "buy_and_hold",
+          "strategy_thesis": "Prueba META con una estrategia de comprar y mantener",
+          "asset_universe": [
+            "META"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2023-01-03",
+            "end": "2024-12-31"
+          },
+          "sizing_mode": null,
+          "capital_amount": 10000.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "META",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "META",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "provider_resolved_assets": [
+              {
+                "raw_text": "META",
+                "symbol": "META",
+                "asset_class": "equity",
+                "name": "Meta Platforms, Inc. Class A Common Stock",
+                "raw_symbol": "META",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NASDAQ"
+              }
+            ],
+            "language": "es-419",
+            "evidence_spans": {
+              "strategy_type": "comprar y mantener",
+              "asset_universe": "META"
+            },
+            "raw_strategy_type": "buy_and_hold",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2023-01-03",
+              "end": "2024-12-31",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": "today",
+              "year": null,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "Del 2023-01-03 al 2024-12-31"
+            },
+            "field_provenance": {
+              "date_range": "explicit_user",
+              "capital_amount": "starting_capital"
+            },
+            "requested_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            },
+            "effective_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            }
+          }
+        },
+        "optional_parameters": {
+          "initial_capital": {
+            "value": 1000.0,
+            "source": "default",
+            "label": "Initial capital",
+            "description": "Starting cash for the simulated backtest."
+          },
+          "timeframe": {
+            "value": "1D",
+            "source": "default",
+            "label": "Timeframe",
+            "description": "Bar interval used for the simulation."
+          },
+          "fees": {
+            "value": 0.0,
+            "source": "default",
+            "label": "Fees",
+            "description": "Per-trade fee assumption applied during execution."
+          },
+          "slippage": {
+            "value": 0.0,
+            "source": "default",
+            "label": "Slippage",
+            "description": "Execution slippage assumption expressed as a fraction."
+          },
+          "engine_options": {
+            "value": {},
+            "source": "default",
+            "label": "Engine options",
+            "description": "Reserved execution knobs exposed by the runtime contract."
+          }
+        },
+        "launch_payload": {
+          "strategy_type": "buy_and_hold",
+          "symbol": "META",
+          "symbols": [
+            "META"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2023-01-03",
+            "end": "2024-12-31"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "position_size": null,
+          "cadence": null,
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "es-419",
+          "requested_date_range": {
+            "start": "2023-01-03",
+            "end": "2024-12-31"
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "full_coverage",
+            "requested_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            },
+            "effective_date_range": {
+              "start": "2023-01-03",
+              "end": "2024-12-31"
+            },
+            "observations_by_symbol": {
+              "META": 502,
+              "SPY": 502
+            },
+            "adjustment_reason": "none",
+            "preflight_id": "sha256:15fc806d3fa3a22460fcfc504b73ae59a01b62b310b74a3dcab74eab7804fcd0"
+          }
+        },
+        "validation": {
+          "status": "ready_to_run",
+          "executable": true,
+          "date_adjusted": false
+        },
+        "edit_disclosure": null
+      },
+      "receipts": {
+        "request_id": "c352f64a-74f7-4a9b-969d-95bdb1214af8",
+        "receipt_count": 7,
+        "successful_receipts": 7,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 47482,
+        "reported_openrouter_cost_usd": "0.04465230",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "StrategyFamilyContinuityAudit",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedDateWindowExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "field_fidelity",
+            "schema": "StatedRunFieldFidelityAudit",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "ArtifactAssumptionEditPlan",
+            "outcome": "succeeded"
+          }
+        ]
+      }
+    },
+    {
+      "label": "research_standalone_pricing_failure",
+      "evidence_environment": "standalone_35e5cea8",
+      "user_message": "¿Cómo gana dinero Microsoft y cuáles son sus principales negocios?",
+      "assistant_message_id": "14a51489-029b-4ef7-b41b-003b6a7629bb",
+      "stage_outcome": "ready_to_respond",
+      "assistant_response": "No pude completar la búsqueda de datos en este momento, así que no voy a citar cifras en vivo. Probar una idea con datos históricos sigue disponible.",
+      "research": {
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup",
+        "shape": "balanced",
+        "sources": [],
+        "retrieved_at": "2026-09-03T02:10:01.422609+00:00",
+        "anchor_symbols": [
+          "MSFT"
+        ],
+        "peers": [],
+        "usage": {
+          "invocations": 0,
+          "latency_ms": 0,
+          "cost_usd": 0.0,
+          "cache_status": "bypass"
+        },
+        "follow_up": {
+          "schema_version": "argus_research_follow_up/v1",
+          "subjects": [
+            {
+              "symbol": "MSFT",
+              "name": "Microsoft Corporation Common Stock",
+              "asset_class": "equity"
+            }
+          ],
+          "comparison_set": [],
+          "peer_suggestions": [],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          }
+        },
+        "degraded": {
+          "code": "research_unavailable_malformed_response"
+        }
+      },
+      "recovery": null,
+      "receipts": {
+        "request_id": "0cb57dd5-8a8e-4e0c-9a32-ee394d86bfc3",
+        "receipt_count": 2,
+        "successful_receipts": 2,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 12737,
+        "reported_openrouter_cost_usd": "0.0174065",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          }
+        ]
+      }
+    },
+    {
+      "label": "research_combined_answer",
+      "evidence_environment": "prospective_66073a69",
+      "user_message": "¿Cómo gana dinero Microsoft y cuáles son sus principales negocios?",
+      "assistant_message_id": "4a3865f2-cc03-4e41-895a-b01539a0ff5a",
+      "stage_outcome": "ready_to_respond",
+      "assistant_response": "Microsoft makes money primarily by charging businesses and consumers for **cloud computing, software subscriptions, and enterprise applications**. It also earns revenue from software licences, advertising, gaming content and subscriptions, and device sales.\n\nIn fiscal 2026, services and other revenue, including cloud services, subscriptions and advertising, was **$267.143 billion**, or **80.5%** of Microsoft’s **$331.839 billion** total revenue. Product revenue was **$64.696 billion**. Figures are for the fiscal year ended **June 30, 2026**, the latest full year available as of **September 3, 2026**.\n\n### Microsoft’s three principal businesses\n\n| Reporting segment | FY2026 revenue | What it includes and how it earns money |\n|---|---:|---|\n| **Productivity and Business Processes** | **$139.996B** | Microsoft 365 and Copilot subscriptions; Office licences; Dynamics business software; and LinkedIn’s recruiting, advertising, sales and premium-subscription products |\n| **Intelligent Cloud** | **$137.791B** | Azure computing, storage, databases and AI services, generally charged through usage or contractual commitments, plus server software, GitHub and enterprise support |\n| **More Personal Computing** | **$54.052B** | Windows licences paid largely by PC manufacturers and commercial customers; Xbox games, Game Pass, transactions and hardware; Bing/search advertising; and Surface and other devices |\n| **Total** | **$331.839B** |  |\n\n### The main money engines underneath those segments\n\n- **Azure and server/cloud services:** Microsoft sells computing capacity, data storage, databases, cybersecurity, developer tools and AI infrastructure. Customers pay based on consumption, subscriptions or multiyear contracts. Server products and cloud-services revenue was **$129.425 billion** in FY2026.\n\n- **Microsoft 365:** Businesses pay recurring per-user fees for applications and services such as Word, Excel, Teams, Exchange, security tools and Copilot. Consumers also buy Microsoft 365 subscriptions. Commercial Microsoft 365 products and cloud-services revenue was **$101.997 billion**; the consumer equivalent was **$9.175 billion**.\n\n- **LinkedIn and Dynamics:** LinkedIn monetizes recruiting tools, advertising, premium memberships and sales software. Dynamics sells cloud-based finance, sales, customer-service and operational applications. Their FY2026 revenues were **$19.817 billion** and **$9.006 billion**, respectively.\n\n- **Gaming:** Revenue comes from game sales, Game Pass and other subscriptions, in-game content, third-party platform fees, advertising and Xbox hardware. Gaming generated **$21.790 billion**.\n\n- **Windows and devices:** PC manufacturers pay to install Windows, while organizations purchase commercial Windows licences and related services. Microsoft also sells Surface and other hardware. Windows-and-devices revenue was **$17.084 billion**.\n\n- **Search advertising:** Advertisers pay to appear across Microsoft’s search and news properties. This generated **$15.176 billion**.\n\nThe clearest takeaway is that Microsoft is no longer mainly a seller of boxed Windows and Office software. Its two large pillars are now **enterprise productivity subscriptions** and **cloud/AI infrastructure**. Together, Productivity and Business Processes and Intelligent Cloud supplied **83.7% of FY2026 revenue** and **90.7% of segment operating income**. Microsoft reported total operating income of **$155.237 billion** and net income of **$133.749 billion** for FY2026.",
+      "research": {
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup",
+        "shape": "balanced",
+        "sources": [
+          {
+            "title": "FY26 Q4 - Press Releases - Investor Relations - Microsoft",
+            "domain": "www.microsoft.com",
+            "url": "https://www.microsoft.com/en-us/investor/earnings/fy-2026-q4/press-release-webcast",
+            "source_date": "2026-08-26"
+          }
+        ],
+        "retrieved_at": "2026-09-03T02:14:25.837457+00:00",
+        "anchor_symbols": [
+          "MSFT"
+        ],
+        "peers": [],
+        "usage": {
+          "invocations": 2,
+          "latency_ms": 26682,
+          "cost_usd": null,
+          "cache_status": "miss"
+        },
+        "follow_up": {
+          "schema_version": "argus_research_follow_up/v1",
+          "subjects": [
+            {
+              "symbol": "MSFT",
+              "name": "Microsoft Corporation Common Stock",
+              "asset_class": "equity"
+            }
+          ],
+          "comparison_set": [],
+          "peer_suggestions": [],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          }
+        }
+      },
+      "recovery": null,
+      "receipts": {
+        "request_id": "ff3f3afd-50eb-45f9-835c-e2959cac6c8a",
+        "receipt_count": 2,
+        "successful_receipts": 2,
+        "knowledge_route_count": 0,
+        "receipt_latency_sum_ms": 10799,
+        "reported_openrouter_cost_usd": "0.0169540",
+        "tasks_and_schemas": [
+          {
+            "task": "interpretation_repair",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded"
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded"
+          }
+        ]
+      }
+    }
+  ],
+  "artifact_sha256": {
+    "build-en.png": "2f13d5547af445e6936652107d08e49cc60aa51946047b1225a23c2fa5b7b089",
+    "build-en.txt": "5bc6f764c509cc1c86b0459e6ec2ea52b9be40691dcfbe24fef7b027dc26122d",
+    "build-es.png": "15e7d8e0ddc96dca20aedefaf73bf786e3ecd4adf62c29f9776cd0a76fb50353",
+    "build-es.txt": "0710beedd486a46eec238f10c548a9cdf0255f2847e8b52b9d229741f845ac3d",
+    "backtest-result.png": "12f337db22d87a27bbd76b520d7730d1adb70b12d75219d4c894dffe8b5b4503",
+    "discovery-unavailable.png": "7f5571cf5939bcba567feeb154bd8403291dccdf7a778c670148706ab015ea61",
+    "discovery-unavailable.txt": "3cce49d374008ba934625728737831d6b4ff5d1d5981e144259dd54961e4e0c4",
+    "research-pricing-failure.png": "92e28da0111fd5411942744ab9c1e8d6db80670800902f84b89821c154f2af9c",
+    "research-pricing-failure.txt": "e1f254568bef69cdf5e5a18568644599f87a50104bdfb6b5d65481cbdba85753",
+    "01-build-en-initial.sse": "a9df8cf0d9c24956e11d1f4ba8fb2e66106cfce72cafa48a705b1438a14f546f",
+    "02-build-en-dates.sse": "6a3da2d9e562bd7fc8f39bec7b7afa667e2be87de04f019be910be8c428dfcad",
+    "03-build-en-card.sse": "098b7a8081de50230a6ab24f750044cec2eac93affd34b333a2006e986f393fc",
+    "04-build-es-initial.sse": "437a9cf729cf6676225a7964e1341101200099384ac13e36ff42ecdb3979b3f6",
+    "08-research-pricing-failure.sse": "9ed1102fb1e56b42ae19643172614ae02f0806e7431ad379d287808e7c56f5e2",
+    "en-discovery-messages.json": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+    "es-messages.json": "27ee6c710ee35ff741837c2ace0368a5a4387f76b70fd23ea784e20f786db461",
+    "environment.json": "cdf530c2f4d8fd81a973325a7c211c588b47c9703d4a0660013e8c79b303da33",
+    "route-receipts.jsonl": "74cfdb77a705d783ef3cb5652900799d27c04df59120b3247313e66d292e27f4",
+    "combined/environment.json": "3fd78447d05b3c4c981321cc7f69711eed63ffb72f6b84729ae6eccbe8ae8bc3",
+    "combined/route-receipts.jsonl": "91e13bdf11fff5969ba3a1ae4804e6602bacebc16cf8d9933a43fbe1dccf29dd",
+    "combined/research-answer.sse": "71f85ffd7b857af5afd6242625a8ed33ba7eb12c907415b6f3b02d3adb10e3a8",
+    "combined/research-answer-top.png": "c39f7229331e444ee6462c5605fb8967c3d027a31b6cfd8d4851212156500cfd",
+    "combined/research-answer-bottom.png": "d4d03fba63d068c08dbe2c558efde24dd50bea15f9bb95be4caba3e4dba6aeb5",
+    "combined/research-sources.png": "d7ae694f34de5090170b380fb22928d8d964e499d57cf9af9436ac1289e4d33f",
+    "combined/research-answer.txt": "04805a0af92c58dbe8f66717f5fa1ec938a05775211ca124cfb3b2f6059f95de",
+    "combined/modularity.txt": "7817bb61ed38050839458ad1a567445174331bc8a7c1a191ba1528d87fa06697",
+    "combined/research-pricing-evidence.txt": "df35dc472e9c414491eac61dbf380969086917fa5ac00c514d0262161d94ed91",
+    "research-pricing-diagnostic.txt": "b3cab99e6fd0d47fa0e65f71736a38e13af972be4851da1d9938d38202eb8f51"
+  },
+  "text_storage": "SSE frame content unchanged; final blank lines normalized. Transcript/test-output trailing whitespace normalized for readable Git diffs. Screenshots unedited."
+}
