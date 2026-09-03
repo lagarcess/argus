@@ -77,10 +77,13 @@ join. Repeated completed polls on one client record that response once.
 The writer has two dedicated threads and at most 16 pending inserts. A slow
 database cannot block the answer. A missing, failed, closed, or full writer emits
 `research_cost_unrecorded` with the same safe invoice evidence. Shutdown waits up
-to two seconds and reports pending persistence. Database persistence is therefore
-best effort under infrastructure failure; the synchronous ERROR evidence is the
-recovery record. The tests capture the ERROR signal; external alert delivery is
-not claimed by this local run.
+to two seconds and reports pending persistence, then cancels queued inserts.
+The two-second interval is a drain window, not a whole-process exit guarantee:
+at most two already-running operations retain the shared Supabase client's
+120-second HTTP timeout. Queued requests cannot extend that backlog during exit.
+Database persistence is therefore best effort under infrastructure failure; the
+synchronous ERROR evidence is the recovery record. The tests capture the ERROR
+signal; external alert delivery is not claimed by this local run.
 
 ## Verification and review
 
@@ -111,6 +114,16 @@ not claimed by this local run.
 - Final bounded code review returned **clean** after the slow-write defect was
   fixed. No further changes were requested. This report was written after that
   review returned.
+- A subsequent GitHub shutdown review identified queued inserts surviving
+  executor shutdown. The new blocked-worker regression failed before the fix
+  (all four writes ran after close); cancelling queued futures leaves only the
+  two already-running writes. [Before-change evidence](before-shutdown-change.txt).
+  The latest delta review returned **clean**, and the repeated research, mocked
+  harness, ledger, prompt-freeze, receipt and coverage checks passed:
+  **448 passed**. [Output](shutdown-verification.txt).
+  Ruff, research/new-writer mypy and merged-tree modularity passed again. The
+  answer/ledger/ERROR replay is retained and revalidated by these checks; the
+  correction affects only pending work during shutdown.
 - Integration advanced to `7e616a40841e018ef560c12f4367ac1808d9b350` while verifying:
   PR #536 changes message formatting for OpenRouter receipts and backtest
   coverage failures, plus logging tests and operational documentation. It changes

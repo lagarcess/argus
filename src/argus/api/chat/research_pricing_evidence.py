@@ -59,7 +59,7 @@ class ResearchPricingRecorder:
                     "research_cost_persistence_pending_at_shutdown {}",
                     self._pending[task].model_dump_json(),
                 )
-        self._executor.shutdown(wait=False)
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
 
 def record_unpriced_research_spend(spend: UnpricedResearchSpend) -> None:

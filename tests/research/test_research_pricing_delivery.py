@@ -14,7 +14,10 @@ import pytest
 from argus.api import app_setup
 from argus.api import state as api_state
 from argus.api.chat.research_evidence import record_research_turn_evidence
-from argus.api.chat.research_pricing_evidence import record_unpriced_research_spend
+from argus.api.chat.research_pricing_evidence import (
+    ResearchPricingRecorder,
+    record_unpriced_research_spend,
+)
 from argus.domain.research import billing, pricing
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
@@ -352,3 +355,52 @@ def test_slow_ledger_cannot_hold_a_completed_provider_answer(
     assert len(ledger) == (0 if write_fails else 1)
     if write_fails:
         assert any("research_cost_unrecorded" in message for message in alerts)
+
+
+def test_shutdown_cancels_queued_invoices_without_starting_more_writes(
+    monkeypatch, netflix_response, ledger, alerts
+):
+    started = threading.Event()
+    release = threading.Event()
+    lock = threading.Lock()
+    writes_started = 0
+    gateway = api_state.supabase_gateway
+    insert = gateway.create_cost_ledger_entry
+
+    def blocked_insert(*, entry):
+        nonlocal writes_started
+        with lock:
+            writes_started += 1
+            if writes_started == 2:
+                started.set()
+        assert release.wait(5)
+        return insert(entry=entry)
+
+    monkeypatch.setattr(gateway, "create_cost_ledger_entry", blocked_insert)
+
+    async def exercise():
+        recorder = ResearchPricingRecorder()
+        monkeypatch.setattr(billing, "_recorder", recorder)
+        try:
+            # Two running writes and two queued writes; every answer still returns.
+            for index in range(4):
+                response = {**netflix_response, "id": f"resp_shutdown_{index}"}
+                client = PerplexityAgentClient(
+                    "test", transport=RecordingTransport([response])
+                )
+                packet = client.run_research(
+                    "question", RESEARCH_CONFIG_SPECS["balanced"]
+                )
+                assert packet.answer_markdown
+            assert await asyncio.to_thread(started.wait, 1)
+            await recorder.close()
+        finally:
+            release.set()
+        await asyncio.gather(*tuple(recorder._pending), return_exceptions=True)
+
+    asyncio.run(exercise())
+    assert writes_started == len(ledger) == 2
+    assert sum("research_cost_unpriced" in message for message in alerts) == 4
+    assert any(
+        "research_cost_persistence_pending_at_shutdown" in message for message in alerts
+    )
