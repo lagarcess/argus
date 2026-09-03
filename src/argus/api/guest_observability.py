@@ -17,10 +17,10 @@ from argus.domain.usage_limits import (
     read_memory_usage,
 )
 from argus.observability.guest_funnel import (
-    GuestFunnelCapabilityCategory,
     GuestFunnelConversionReason,
     GuestFunnelEventKind,
     GuestFunnelLanguage,
+    GuestFunnelProductCapability,
     GuestFunnelStrategyCategory,
     GuestFunnelSurface,
     GuestFunnelTerminalOutcome,
@@ -42,7 +42,7 @@ def emit_guest_funnel_event(
     language: GuestFunnelLanguage | None = None,
     surface: GuestFunnelSurface | None = None,
     strategy_category: GuestFunnelStrategyCategory | None = None,
-    capability_category: GuestFunnelCapabilityCategory | None = None,
+    product_capability: GuestFunnelProductCapability | None = None,
     conversion_reason: GuestFunnelConversionReason | None = None,
     terminal_outcome: GuestFunnelTerminalOutcome | None = None,
 ) -> None:
@@ -56,7 +56,7 @@ def emit_guest_funnel_event(
         "language": language,
         "surface": surface,
         "strategy_category": strategy_category,
-        "capability_category": capability_category,
+        "product_capability": product_capability,
         "conversion_reason": conversion_reason,
         "terminal_outcome": terminal_outcome,
     }
@@ -223,7 +223,7 @@ def emit_first_guest_message_event(
         message_id=message_id,
         language=language,
         surface="chat",
-        capability_category="chat",
+        product_capability="chat",
         terminal_outcome="completed",
     )
 
@@ -261,7 +261,7 @@ def emit_first_guest_simulation_event(
         backtest_run_id=backtest_run_id,
         language=language,
         surface="backtest",
-        capability_category="simulation",
+        product_capability="simulation",
         terminal_outcome=terminal_outcome,
     )
 
@@ -295,7 +295,7 @@ def emit_guest_turn_funnel_events(
             message_id=assistant_message_id,
             language=language,
             surface="confirmation",
-            capability_category="simulation",
+            product_capability="simulation",
             terminal_outcome="completed",
         )
     if backtest_run_id is not None:

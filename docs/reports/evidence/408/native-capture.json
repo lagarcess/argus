@@ -1,0 +1,112 @@
+{
+  "evidence_kind": "synthetic_native_filter_probe_not_production_traffic",
+  "candidate_sha": "d9eccbd7f7eab7c165b0f904b1ef4e8395da0560",
+  "environment": "validation_issue_408_d9eccbd7f7ea_20260903T001225Z",
+  "source_sha256": {
+    "src/argus/api/chat/allowance.py": "b282b757f331f46e164333db1329e5b998b5b0eeb1163314b1721d6728347c12",
+    "src/argus/api/chat/backtest_admission_flow.py": "58cc06c6038ffe04b0f2db65cca5cb525b3e4405f67f014490128ac622e0bbcb",
+    "src/argus/api/chat/research_evidence.py": "0e31cc8e5d4ce274630ffdbcd6949b4cf3395a127ff9e3bb4578c4ad5632f973",
+    "src/argus/api/guest_observability.py": "98387b6d9ae7cbbb39ade1c57eec7bdf89393084e2ee0ad97d5de0d5b418c581",
+    "src/argus/api/routers/auth.py": "525cf8492b64edf0c70148434dd73103d884fb87179ec90ca52b153dc6994cb9",
+    "src/argus/api/routers/backtest.py": "47dd811c4abafa994477ccfc720f98e0dc578dec972018d083b25b01af95e783",
+    "src/argus/api/routers/feedback.py": "cfbe6a105864eea8a6e0cb30cee0bbace385803126cdb80935154dea5300daae",
+    "src/argus/domain/guest_cleanup.py": "c2593707ff41efe0782489c874498ae94d7c24c4748e23bd38b7d9a030be0378",
+    "src/argus/observability/envelope.py": "f4ea121f64f983e2d518a9d61da623c1c713d8bf4f7590a4f5ee0e14d43946d6",
+    "src/argus/observability/guest_funnel.py": "e23f002cda306f76962c32f139831d1370ffcb959c46e41fb264c1b9faa3e69a",
+    "src/argus/observability/research_events.py": "ba99c8173f2f59bfddb49a54cbd9d96ac6090ef05f33803286a6fb90ffacc074"
+  },
+  "captured_events": [
+    {
+      "event": "research",
+      "distinct_id": "argus_actor_ccc7e01f8e4750764d97aa33e36afea1",
+      "timestamp": "2026-09-03T00:12:26.513990+00:00",
+      "properties": {
+        "$process_person_profile": false,
+        "schema_version": "argus_observability_event/v1",
+        "event_id": "1b6851f4-9fd8-4521-8d61-fe30059a2d6c",
+        "occurred_at": "2026-09-03T00:12:26.513990+00:00",
+        "environment": "validation_issue_408_d9eccbd7f7ea_20260903T001225Z",
+        "privacy_mode": "metadata_only",
+        "event_type": "research",
+        "event_action": "failed",
+        "feature_area": "research_light",
+        "actor_hash": "argus_actor_ccc7e01f8e4750764d97aa33e36afea1",
+        "status": "degraded",
+        "attributes": {
+          "capability_class": "balanced_lookup",
+          "cache_status": "bypass"
+        },
+        "capability_class": "balanced_lookup"
+      }
+    },
+    {
+      "event": "research",
+      "distinct_id": "argus_actor_ccc7e01f8e4750764d97aa33e36afea1",
+      "timestamp": "2026-09-03T00:12:26.711262+00:00",
+      "properties": {
+        "$process_person_profile": false,
+        "schema_version": "argus_observability_event/v1",
+        "event_id": "b71023f4-d317-4083-876b-48c1bd01320c",
+        "occurred_at": "2026-09-03T00:12:26.711262+00:00",
+        "environment": "validation_issue_408_d9eccbd7f7ea_20260903T001225Z",
+        "privacy_mode": "metadata_only",
+        "event_type": "research",
+        "event_action": "completed",
+        "feature_area": "research_light",
+        "actor_hash": "argus_actor_ccc7e01f8e4750764d97aa33e36afea1",
+        "status": "completed",
+        "attributes": {
+          "capability_class": "balanced_lookup",
+          "cache_status": "bypass"
+        },
+        "capability_class": "balanced_lookup"
+      }
+    },
+    {
+      "event": "research",
+      "distinct_id": "argus_actor_486fc383f683bd0e80611b3bb7a01931",
+      "timestamp": "2026-09-03T00:12:26.861422+00:00",
+      "properties": {
+        "$process_person_profile": false,
+        "schema_version": "argus_observability_event/v1",
+        "event_id": "a0bb3667-d60b-4e4e-bfed-2f86d8dfc651",
+        "occurred_at": "2026-09-03T00:12:26.861422+00:00",
+        "environment": "validation_issue_408_d9eccbd7f7ea_20260903T001225Z",
+        "privacy_mode": "metadata_only",
+        "event_type": "research",
+        "event_action": "completed",
+        "feature_area": "research_light",
+        "actor_hash": "argus_actor_486fc383f683bd0e80611b3bb7a01931",
+        "status": "completed",
+        "attributes": {
+          "capability_class": "screening",
+          "cache_status": "bypass"
+        },
+        "capability_class": "screening"
+      }
+    },
+    {
+      "event": "system",
+      "distinct_id": "argus_actor_3a3aa8068161f5255127e174a33f45d2",
+      "timestamp": "2026-09-03T00:12:26.998040+00:00",
+      "properties": {
+        "$process_person_profile": false,
+        "schema_version": "argus_observability_event/v1",
+        "event_id": "5f875af7-0e37-49fb-86da-4489647cbbd6",
+        "occurred_at": "2026-09-03T00:12:26.998040+00:00",
+        "environment": "validation_issue_408_d9eccbd7f7ea_20260903T001225Z",
+        "privacy_mode": "metadata_only",
+        "event_type": "system",
+        "event_action": "suppressed",
+        "feature_area": "guest_acquisition",
+        "actor_hash": "argus_actor_3a3aa8068161f5255127e174a33f45d2",
+        "attributes": {
+          "product_event": "guest_limit_reached",
+          "product_capability": "chat"
+        },
+        "product_capability": "chat",
+        "product_event": "guest_limit_reached"
+      }
+    }
+  ]
+}

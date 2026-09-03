@@ -46,7 +46,8 @@ GuestFunnelStrategyCategory = Literal[
     "moving_average_crossover",
     "rsi_mean_reversion",
 ]
-GuestFunnelCapabilityCategory = Literal[
+# Product activity, not the research work kind carried by capability_class.
+GuestFunnelProductCapability = Literal[
     "chat",
     "simulation",
     "decision",
@@ -119,7 +120,7 @@ def build_guest_funnel_event(
     language: GuestFunnelLanguage | None = None,
     surface: GuestFunnelSurface | None = None,
     strategy_category: GuestFunnelStrategyCategory | None = None,
-    capability_category: GuestFunnelCapabilityCategory | None = None,
+    product_capability: GuestFunnelProductCapability | None = None,
     conversion_reason: GuestFunnelConversionReason | None = None,
     terminal_outcome: GuestFunnelTerminalOutcome | None = None,
 ) -> ArgusEventEnvelope:
@@ -130,7 +131,7 @@ def build_guest_funnel_event(
         "language": language,
         "surface": surface,
         "strategy_category": strategy_category,
-        "capability_category": capability_category,
+        "product_capability": product_capability,
         "conversion_reason": conversion_reason,
         "terminal_outcome": terminal_outcome,
     }

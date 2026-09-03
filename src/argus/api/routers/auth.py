@@ -271,7 +271,7 @@ def guest_bootstrap(
             user_id=profile.id,
             language=profile.language,
             surface="guest_entry",
-            capability_category="account",
+            product_capability="account",
             terminal_outcome="started",
         )
         payload = dict(result)
@@ -456,7 +456,7 @@ def claim_guest_handoff(
         conversation_id=payload.conversation_id,
         language=user.language,
         surface="account_conversion",
-        capability_category="account",
+        product_capability="account",
         terminal_outcome="completed",
     )
     emit_verified_guest_funnel_event(
@@ -466,7 +466,7 @@ def claim_guest_handoff(
         conversation_id=payload.conversation_id,
         language=user.language,
         surface="account_conversion",
-        capability_category="history",
+        product_capability="history",
         terminal_outcome="claimed",
     )
     response = JSONResponse(
@@ -742,7 +742,7 @@ def signup_guest_account(
                     conversation_id=claim_payload.conversation_id,
                     language=profile.language,
                     surface="account_conversion",
-                    capability_category="account",
+                    product_capability="account",
                     terminal_outcome="completed",
                 )
                 emit_verified_guest_funnel_event(
@@ -752,7 +752,7 @@ def signup_guest_account(
                     conversation_id=claim_payload.conversation_id,
                     language=profile.language,
                     surface="account_conversion",
-                    capability_category="history",
+                    product_capability="history",
                     terminal_outcome="claimed",
                 )
             response = auth_response(request, result)
@@ -944,7 +944,7 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             visitor_key=conversion_visitor_key,
             conversation_id=claim_payload.conversation_id,
             surface="account_conversion",
-            capability_category="account",
+            product_capability="account",
             terminal_outcome="completed",
         )
         emit_verified_guest_funnel_event(
@@ -953,7 +953,7 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             visitor_key=conversion_visitor_key,
             conversation_id=claim_payload.conversation_id,
             surface="account_conversion",
-            capability_category="history",
+            product_capability="history",
             terminal_outcome="claimed",
         )
     response = auth_response(request, result)
