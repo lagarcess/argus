@@ -9,7 +9,10 @@ import pytest
 from argus.agent_runtime import knowledge_answer as ka
 from argus.agent_runtime import research_answer as ra
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
-from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.agent_runtime.interpreter.research_routing import (
+    primary_research_query,
+    research_turn_has_conflicting_owner,
+)
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
@@ -207,6 +210,54 @@ def test_default_draft_does_not_claim_a_genuine_research_question():
         }
     )
     assert primary_research_query(interpretation) == interpretation.research_query
+
+
+def test_results_explanation_intent_owns_turn_without_auxiliary_result_fields():
+    interpretation = _interpretation(
+        intent="results_explanation",
+        semantic_turn_act=None,
+        candidate_strategy_draft={},
+        result_followup_focus=None,
+        result_followup_fact_key=None,
+        artifact_target=None,
+    )
+
+    assert research_turn_has_conflicting_owner(interpretation)
+    assert primary_research_query(interpretation) is None
+
+
+def test_results_explanation_never_dispatches_conflicting_external_research(
+    monkeypatch,
+):
+    async def reject_dispatch(**kwargs):
+        raise AssertionError("a result explanation belongs to the result route")
+
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    monkeypatch.setattr(ra, "research_answer_stage_result", reject_dispatch)
+    interpretation = _interpretation(
+        intent="results_explanation",
+        semantic_turn_act=None,
+        candidate_strategy_draft={},
+        result_followup_focus=None,
+        result_followup_fact_key=None,
+        artifact_target=None,
+    )
+
+    assert (
+        asyncio.run(
+            ka.knowledge_answer_stage_result(
+                interpretation=interpretation,
+                state=RunState.new(
+                    current_user_message="Explain why my latest backtest performed this way",
+                    recent_thread_history=[],
+                ),
+                user=UserState(user_id=fake.uuid4()),
+                snapshot=None,
+                selected_thread_metadata={},
+            )
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize("entry", ["knowledge", "discovery"])

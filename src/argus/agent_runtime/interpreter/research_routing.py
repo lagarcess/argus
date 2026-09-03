@@ -5,14 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
-from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
+from argus.agent_runtime.interpreter.strategy_routing import route_owner
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 
 
 def research_turn_has_conflicting_owner(interpretation: Any) -> bool:
     """A question payload cannot take execution, refusal or artifact ownership."""
     return bool(
-        strategy_route_expected(
+        route_owner(
             intent=interpretation.intent,
             semantic_turn_act=interpretation.semantic_turn_act,
         )
