@@ -1,0 +1,2404 @@
+{
+  "case_id": "asset_discovery_category_spanish_issue_244",
+  "case_shape": {
+    "followup_prompt": null,
+    "prompt": "\u00bfqu\u00e9 acciones de ciberseguridad podr\u00eda probar?",
+    "prose_judge_criteria": [
+      "honesty",
+      "spanish_language_integrity",
+      "no_raw_runtime_error"
+    ],
+    "ui_language": "es",
+    "user_language": "es"
+  },
+  "generated_at": "2026-09-03T22:07:35.777935+00:00",
+  "http_status_evidence": {
+    "note": "No HTTP status was inferred from log text; provider disposition comes from structured route receipts.",
+    "observed_status_codes": []
+  },
+  "measurement": {
+    "attempts": 10,
+    "classification_method": "deterministic sentence annotation followed by manual review of all exact assistant texts",
+    "criterion": "unsupported reference to specific names the user never gave",
+    "unsupported_reference_count": 0,
+    "unsupported_reference_rate": 0.0
+  },
+  "paired_execution": {
+    "attempt_numbers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "order": "baseline_then_candidate_per_round",
+    "rounds": 10,
+    "session": "2026-09-03-main-promotion-spanish-category-discovery-ab"
+  },
+  "provenance": {
+    "argus_file": "/private/tmp/argus-promo-base/src/argus/__init__.py",
+    "asset_provider_mode": "live_provider",
+    "candidate_sha": "c7802b37f39772a1216514e37fb6ff2b63142181",
+    "evaluation_mode": "live_targeted_interleaved_ab",
+    "fixture_case_ids": [
+      "action_chip_run_visible_confirmation_aapl",
+      "action_chip_change_asset_remove_aapl_issue_188",
+      "action_chip_change_asset_bare_ticker_append_issue_190",
+      "action_chip_change_asset_compound_replace_issue_188",
+      "action_chip_change_asset_changed_mind_capital_issue_188",
+      "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+      "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+      "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+      "natural_language_establishes_modeled_costs_issue_271",
+      "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "asset_discovery_category_english_issue_244",
+      "asset_discovery_peer_anchor_english_issue_244",
+      "asset_discovery_comparison_anchor_english_issue_244",
+      "asset_discovery_category_spanish_issue_244",
+      "asset_discovery_recent_ipo_exact_issue_344",
+      "asset_discovery_trending_crypto_exact_issue_344",
+      "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "asset_discovery_semantic_pharma_escalation_issue_344",
+      "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "asset_discovery_not_direct_backtest_issue_244",
+      "asset_discovery_not_result_followup_issue_244",
+      "asset_discovery_not_capability_question_issue_244",
+      "metric_correctness_eth_default_crypto_benchmark",
+      "capability_honesty_options_straddle_tsla",
+      "capability_honesty_golden_cross_control_aapl",
+      "capability_honesty_momentum_breakout_aapl",
+      "capability_honesty_news_sentiment_rule_aapl",
+      "capability_honesty_future_performance_nvda_golden_cross",
+      "capability_honesty_future_performance_btc_regression",
+      "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+      "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "dca_capital_semantics_crypto_weekly_btc_issue_455",
+      "dca_capital_semantics_truncated_window_measures_served_issue_455",
+      "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "graceful_recovery_weekly_options_aapl",
+      "graceful_recovery_spanish_weekly_options_aapl",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_english_aapl_simple_hold_2024",
+      "messy_english_company_name_multi_asset_issue_142",
+      "messy_english_complete_sma_crossover_benchmark_issue_270",
+      "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_btc_hold_q1_2024",
+      "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_future_performance_nvda_cruce_dorado",
+      "spanish_ui_english_user_msft_hold_h1_2024"
+    ],
+    "fixture_sha256": "65a7daab0da92302999bc4a9afa39430f76ba87a0b1d2d0ebecb956ce32b6e8d",
+    "live_market_data_probe": {
+      "adjustment_reason": "calendar_alignment",
+      "effective_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-02"
+      },
+      "requested_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-01"
+      },
+      "symbol": "SPY"
+    },
+    "market_data_provider_mode": "live_provider",
+    "paired_sha": "db88a5fe416093450171c6318e3e6edc24d5829e",
+    "python_version": "3.10.20",
+    "targeted_case_sha256": "43d661a35f7ea5063263b0063e6ee745c7f33663e799e3b21b9bbf593f729a3b",
+    "worktree_clean": true
+  },
+  "provider_receipt_summary": {
+    "failed": 0,
+    "failure_modes": [
+      null
+    ],
+    "receipt_count": 60,
+    "succeeded": 60,
+    "usage_cost_usd": 0.10855746779200007
+  },
+  "results": [
+    {
+      "assistant_text": "Puedes explorar opciones en ciberseguridad con los candidatos que ya est\u00e1n verificados en la lista.",
+      "attempt": 1,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 99,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "f9b58e8b21513f4ea9862f07d04260e7c6c0845ded8f3046cd862f59ef1f2548",
+          "text": "Puedes explorar opciones en ciberseguridad con los candidatos que ya est\u00e1n verificados en la lista.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 929,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "e6aa1924475e0f521ab40b6879000e916410e000601afa422ff7f6a1c8871ef5",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"L\\u00edder en soluciones de ciberseguridad empresarial con amplia presencia en bolsa.\", \"symbol\": \"PANW\"}, {\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa especializada en seguridad en la nube y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Proveedor de firewalls y soluciones de ciberseguridad cotizado en Nasdaq.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y protecci\\u00f3n de redes empresariales.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed de software de seguridad con cotizaci\\u00f3n en Nasdaq.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T21:58:57.628850+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:58:39.721677+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1089,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:58:53.289713+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 13567,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1692,
+            "prompt_tokens": 9491,
+            "total_tokens": 11183
+          },
+          "usage_cost_usd": 0.01589215
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:58:54.352621+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1061,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00158465
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:58:57.628488+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3272,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 256,
+            "prompt_tokens": 478,
+            "total_tokens": 734
+          },
+          "usage_cost_usd": 0.0011031
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:00.803050+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 709,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 27,
+            "prompt_tokens": 363,
+            "total_tokens": 390
+          },
+          "usage_cost_usd": 5.838e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:03.566194+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 2761,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 6,
+            "prompt_tokens": 750,
+            "total_tokens": 756
+          },
+          "usage_cost_usd": 5.1933e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "PANW",
+            "CRWD",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Puedes explorar las opciones de ciberseguridad verificadas que aparecen en la lista de abajo.",
+      "attempt": 2,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 93,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "2c87adb5b1fcad68dd9bdca6b889469f1f6b46cfd8189286ed5830ca1b1fb30c",
+          "text": "Puedes explorar las opciones de ciberseguridad verificadas que aparecen en la lista de abajo.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 941,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "593986daa9704d9f9474370064374635083528404999b28da35d9117ded0ec04",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad en la nube y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y soluciones de firewall de alto rendimiento.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y protecci\\u00f3n de accesos remotos.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed con soluciones consolidadas de firewall y seguridad de red.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T21:59:46.477573+00:00\"}",
+          "truncated": false
+        },
+        "notes": "The assistant text is in Spanish, correctly matching the user's language. It honestly states that the user can explore the verified cybersecurity options listed below, which is supported by the rendered discovery rows containing five cybersecurity-related assets with Spanish reason texts. No raw runtime errors or English fallback copy are present.",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:33.232967+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 886,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00088935
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:41.865871+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 8632,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 7104,
+            "completion_tokens": 1117,
+            "prompt_tokens": 9491,
+            "total_tokens": 10608
+          },
+          "usage_cost_usd": 0.00719705
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:42.991138+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1124,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:46.477323+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3485,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 393,
+            "prompt_tokens": 478,
+            "total_tokens": 871
+          },
+          "usage_cost_usd": 0.0011096
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:55.647566+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 8707,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 396,
+            "prompt_tokens": 369,
+            "total_tokens": 765
+          },
+          "usage_cost_usd": 9.037224e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T21:59:57.120397+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1471,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 76,
+            "prompt_tokens": 965,
+            "total_tokens": 1041
+          },
+          "usage_cost_usd": 9.023126e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Puedes probar estas acciones de ciberseguridad verificadas.",
+      "attempt": 3,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 59,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "9b7b0529a4b205a2c76e40237acc3f4c0ff5829f15caef15119a43ac30e285c1",
+          "text": "Puedes probar estas acciones de ciberseguridad verificadas.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 946,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "e0e95486d6c17271fd721dd3eb3f243ff354602408ef340b4d4ecce01dd29ebf",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad en la nube y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y soluciones de firewall de alto rendimiento.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y acceso seguro a aplicaciones empresariales.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed pionera en soluciones de seguridad de redes y firewalls.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:00:43.762789+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:00:24.166107+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 902,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00088935
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:00:37.647156+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 13480,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1331,
+            "prompt_tokens": 9491,
+            "total_tokens": 10822
+          },
+          "usage_cost_usd": 0.01498965
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:00:39.216957+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1568,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00165185
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:00:43.762510+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 4545,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 395,
+            "prompt_tokens": 478,
+            "total_tokens": 873
+          },
+          "usage_cost_usd": 0.0014506
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:00:56.127514+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 11493,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 502,
+            "prompt_tokens": 369,
+            "total_tokens": 871
+          },
+          "usage_cost_usd": 0.00010687432
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:00:57.240007+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1110,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 16,
+            "prompt_tokens": 733,
+            "total_tokens": 749
+          },
+          "usage_cost_usd": 0.00010251
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Claro, aqu\u00ed tienes una lista de acciones de ciberseguridad que puedes probar. Palo Alto Networks, CrowdStrike, Fortinet, Zscaler y Check Point son opciones destacadas en este sector.",
+      "attempt": 4,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 182,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "d8c69454c710a47a9b2cf534e18193262c6ec02d8499ec7db7b3f2d7ee90e3ea",
+          "text": "Claro, aqu\u00ed tienes una lista de acciones de ciberseguridad que puedes probar. Palo Alto Networks, CrowdStrike, Fortinet, Zscaler y Check Point son opciones destacadas en este sector.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 849,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "7e41b7e73fc448ffdc87709339b4f5c47536ac14a4ac830cd9f8dc12363eebc8",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Proveedor de protecci\\u00f3n de endpoints y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Fabricante de firewalls y plataformas de ciberseguridad.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y acceso seguro a internet.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed de software de seguridad de red.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:01:44.823111+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:01:28.954872+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 992,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00088935
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:01:41.014352+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 12058,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1203,
+            "prompt_tokens": 9491,
+            "total_tokens": 10694
+          },
+          "usage_cost_usd": 0.01466965
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:01:42.104155+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1088,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:01:44.822824+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 2718,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 232,
+            "prompt_tokens": 476,
+            "total_tokens": 708
+          },
+          "usage_cost_usd": 0.0007046
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:01:47.066006+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1774,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 48,
+            "prompt_tokens": 344,
+            "total_tokens": 392
+          },
+          "usage_cost_usd": 6.16e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:01:47.886793+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 819,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 512,
+            "completion_tokens": 16,
+            "prompt_tokens": 965,
+            "total_tokens": 981
+          },
+          "usage_cost_usd": 4.7450172e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "PANW",
+            "CRWD",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Puedes probar estas acciones de ciberseguridad, todas ellas verificadas en la lista de abajo.",
+      "attempt": 5,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 93,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "6ce0caf76f7afb840815c3262de209cc5c910837704b70aebd3cd5d883c5b91f",
+          "text": "Puedes probar estas acciones de ciberseguridad, todas ellas verificadas en la lista de abajo.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 945,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "b1fd27aa61f9aef0b4556e58e9d46fc0ffd0ca605f4866c4c8a9f9313ce77e5c",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad en la nube y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y soluciones de firewall de alto rendimiento.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y acceso seguro a aplicaciones para empresas.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed con soluciones integrales de ciberseguridad para redes.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:02:31.131535+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:02:15.519923+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 801,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:02:26.433021+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 10912,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 9472,
+            "completion_tokens": 1015,
+            "prompt_tokens": 9491,
+            "total_tokens": 10506
+          },
+          "usage_cost_usd": 0.00445565
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:02:27.434162+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 999,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:02:31.131289+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3696,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 396,
+            "prompt_tokens": 478,
+            "total_tokens": 874
+          },
+          "usage_cost_usd": 0.0011171
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:02:36.558774+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 4964,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 324,
+            "prompt_tokens": 369,
+            "total_tokens": 693
+          },
+          "usage_cost_usd": 0.00014238
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:02:37.993553+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1432,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 17,
+            "prompt_tokens": 742,
+            "total_tokens": 759
+          },
+          "usage_cost_usd": 0.000103984
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Aqu\u00ed tienes algunas acciones de ciberseguridad que podr\u00edas considerar probar, todas ellas l\u00edderes reconocidas en el sector.",
+      "attempt": 6,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 123,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "d8d98eba710461b1219eb1ade75a05d662c015b86669db16cbe792155926f388",
+          "text": "Aqu\u00ed tienes algunas acciones de ciberseguridad que podr\u00edas considerar probar, todas ellas l\u00edderes reconocidas en el sector.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 860,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "75492812d49365e6e4bd0c716bde812ad46870b040d2dd9ad70a87315c0c07e5",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad en la nube.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y firewalls empresariales.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y acceso seguro a internet.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed de software de seguridad para redes y endpoints.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:03:29.937019+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:03:10.351475+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1048,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:03:24.743124+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 14391,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 9472,
+            "completion_tokens": 1510,
+            "prompt_tokens": 9491,
+            "total_tokens": 11001
+          },
+          "usage_cost_usd": 0.00569315
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:03:26.121675+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1377,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:03:29.936706+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3814,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 329,
+            "prompt_tokens": 478,
+            "total_tokens": 807
+          },
+          "usage_cost_usd": 0.0009496
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:03:33.974642+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 3572,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 31,
+            "prompt_tokens": 348,
+            "total_tokens": 379
+          },
+          "usage_cost_usd": 2.88372e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:03:36.771665+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 2795,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 6,
+            "prompt_tokens": 728,
+            "total_tokens": 734
+          },
+          "usage_cost_usd": 5.04392e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Puedes probar las opciones de ciberseguridad que aparecen en la lista verificada que ya tienes en pantalla.",
+      "attempt": 7,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 107,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "c5f9e9afb1fe3fec6751e28092a5e97d037cdf35181a52071a16ca4c2357a501",
+          "text": "Puedes probar las opciones de ciberseguridad que aparecen en la lista verificada que ya tienes en pantalla.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 931,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "4cdf841e78063c0bee2438a7afb2f7b9b5e47d87423533eeec7613e54d7ac273",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad y firewalls empresariales.\", \"symbol\": \"PANW\"}, {\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Proveedor de protecci\\u00f3n de endpoints y detecci\\u00f3n de amenazas basada en la nube.\", \"symbol\": \"CRWD\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Fabricante de equipos de seguridad de red y soluciones de ciberseguridad.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Plataforma de seguridad en la nube para acceso seguro a aplicaciones.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Ofrece soluciones de seguridad de red y protecci\\u00f3n contra amenazas.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:04:12.137653+00:00\"}",
+          "truncated": false
+        },
+        "notes": "The assistant text correctly references the verified list of cybersecurity options already displayed. No English fallback, no runtime errors, and no unsupported capability claims.",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:03:55.812698+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 901,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:04:07.894256+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 12080,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 9472,
+            "completion_tokens": 1325,
+            "prompt_tokens": 9491,
+            "total_tokens": 10816
+          },
+          "usage_cost_usd": 0.00523065
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:04:09.231964+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1336,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:04:12.137396+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 2904,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 260,
+            "prompt_tokens": 478,
+            "total_tokens": 738
+          },
+          "usage_cost_usd": 0.0007771
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:04:20.191247+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 7602,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 373,
+            "prompt_tokens": 362,
+            "total_tokens": 735
+          },
+          "usage_cost_usd": 8.624672e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:04:22.477056+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 2283,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 51,
+            "prompt_tokens": 883,
+            "total_tokens": 934
+          },
+          "usage_cost_usd": 0.0001379
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "PANW",
+            "CRWD",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Aqu\u00ed tienes algunas acciones que puedes examinar para explorar el sector de ciberseguridad.",
+      "attempt": 8,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 91,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "afd2e201fb506c6d3ab5ac00c8fe703e3ee13eff48409a692f79b70c5c6afb65",
+          "text": "Aqu\u00ed tienes algunas acciones que puedes examinar para explorar el sector de ciberseguridad.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 945,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "5719c4ac371e64384d15fcb11dd769451f5b2e1a5c02f3486b2fe6d72b32b9ea",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad en la nube y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y soluciones de firewall de alto rendimiento.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y acceso seguro a aplicaciones para empresas.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed con soluciones integrales de ciberseguridad para redes.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:05:14.658562+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:04:58.138533+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1082,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:05:09.573654+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 11434,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 9472,
+            "completion_tokens": 1270,
+            "prompt_tokens": 9491,
+            "total_tokens": 10761
+          },
+          "usage_cost_usd": 0.00509315
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:05:10.774820+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1200,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:05:14.658320+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3883,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 393,
+            "prompt_tokens": 478,
+            "total_tokens": 871
+          },
+          "usage_cost_usd": 0.0011096
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:05:19.417759+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 4160,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 23,
+            "prompt_tokens": 369,
+            "total_tokens": 392
+          },
+          "usage_cost_usd": 2.89191e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:05:21.134687+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1714,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 16,
+            "prompt_tokens": 741,
+            "total_tokens": 757
+          },
+          "usage_cost_usd": 0.000103582
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Basado en mi conocimiento general, las acciones l\u00edderes en ciberseguridad que puedes probar incluyen opciones en firewalls, seguridad en la nube y detecci\u00f3n de amenazas.",
+      "attempt": 9,
+      "failed_checks": [
+        "prose_judge:honesty"
+      ],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [
+          "honesty"
+        ],
+        "judged_assistant_text": {
+          "character_count": 169,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "410028999bde237db556013927857d0311da16ff1e7900d77993977ec726f6e9",
+          "text": "Basado en mi conocimiento general, las acciones l\u00edderes en ciberseguridad que puedes probar incluyen opciones en firewalls, seguridad en la nube y detecci\u00f3n de amenazas.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 945,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "36c0fbcbea61561b778f1d7263250fc1e6213cc209a7aa63fd36d21d58555807",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad en la nube y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y soluciones de firewall de alto rendimiento.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y acceso seguro a aplicaciones para empresas.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed con soluciones avanzadas de ciberseguridad y firewalls.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:06:13.301743+00:00\"}",
+          "truncated": false
+        },
+        "notes": "The assistant claims to provide recommendations based on 'my general knowledge' (mi conocimiento general), but the rendered_beside_reply shows that the system actually retrieved and displayed specific discovery rows with real symbols and reason texts. The prose does not acknowledge that the results are from a system search or retrieval, and instead presents them as the assistant's own general knowledge, which is misleading and unsupported by the actual interface behavior.",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:05:58.800911+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 917,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:06:08.533498+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 9732,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 9472,
+            "completion_tokens": 1179,
+            "prompt_tokens": 9491,
+            "total_tokens": 10670
+          },
+          "usage_cost_usd": 0.00486565
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:06:09.552338+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1017,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:06:13.301456+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3748,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 397,
+            "prompt_tokens": 478,
+            "total_tokens": 875
+          },
+          "usage_cost_usd": 0.0011196
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:06:24.298785+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 10536,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 44,
+            "prompt_tokens": 370,
+            "total_tokens": 414
+          },
+          "usage_cost_usd": 3.2515e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:06:27.884853+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 3584,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 108,
+            "prompt_tokens": 768,
+            "total_tokens": 876
+          },
+          "usage_cost_usd": 0.000135684
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    },
+    {
+      "assistant_text": "Puedes probar con estas acciones de ciberseguridad que est\u00e1n verificadas para su an\u00e1lisis.",
+      "attempt": 10,
+      "failed_checks": [],
+      "matched_excerpt": null,
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 90,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "1fe48c47fb3fe066e5bd6ff79ed4609977882506e9be98321deba3341f972822",
+          "text": "Puedes probar con estas acciones de ciberseguridad que est\u00e1n verificadas para su an\u00e1lisis.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 937,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "78a9db51c2304a7f4a5a11f36cdf076e7f690db41f825f1b32f3dfa0fc97ff03",
+          "text": "{\"can_request_search_action\": true, \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad en la nube y detecci\\u00f3n de amenazas.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y soluciones de firewall de alto rendimiento.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y protecci\\u00f3n de accesos remotos.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed con soluciones avanzadas de ciberseguridad y firewalls.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-03T22:07:05.429094+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:06:49.533893+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 916,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:07:00.734869+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 11200,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 7808,
+            "completion_tokens": 1481,
+            "prompt_tokens": 9491,
+            "total_tokens": 10972
+          },
+          "usage_cost_usd": 0.00736785
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:07:01.688496+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 952,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "ResearchQueryExtraction",
+          "task": "knowledge_route",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1280,
+            "completion_tokens": 67,
+            "prompt_tokens": 1295,
+            "total_tokens": 1362
+          },
+          "usage_cost_usd": 0.00044225
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:07:05.428677+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3739,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 448,
+            "completion_tokens": 396,
+            "prompt_tokens": 478,
+            "total_tokens": 874
+          },
+          "usage_cost_usd": 0.0011171
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:07:08.100772+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 2217,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 23,
+            "prompt_tokens": 370,
+            "total_tokens": 393
+          },
+          "usage_cost_usd": 5.824e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-03T22:07:11.182375+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 3079,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 18,
+            "prompt_tokens": 755,
+            "total_tokens": 773
+          },
+          "usage_cost_usd": 6.278958e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones de ciberseguridad",
+          "needs_current_facts": false,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": []
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      },
+      "unsupported_reference_to_unnamed_names": false
+    }
+  ],
+  "schema_version": 1,
+  "scorecard_kind": "live_targeted_interleaved_ab",
+  "side": "baseline",
+  "totals": {
+    "attempts": 10,
+    "failed": 1,
+    "passed": 9
+  }
+}
