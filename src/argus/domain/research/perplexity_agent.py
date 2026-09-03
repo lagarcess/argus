@@ -18,6 +18,12 @@ from urllib.parse import urlparse
 import httpx
 from loguru import logger
 
+from argus.domain.research.billing import (
+    UnpricedResearchSpend,
+    UnpricedSpendRecorder,
+    record_unpriced_spend,
+    unpriced_spend,
+)
 from argus.domain.research.config import ResearchConfigSpec
 from argus.domain.research.contracts import (
     MAX_ANSWER_CHARS,
@@ -29,6 +35,7 @@ from argus.domain.research.contracts import (
     BackgroundPoll,
     ResearchNamePair,
     ResearchPacket,
+    ResearchPricingError,
     ResearchSource,
     ResearchUnavailableError,
     ResearchUsage,
@@ -49,15 +56,16 @@ class PerplexityAgentClient:
     ) -> None:
         self._api_key = api_key.strip()
         self._transport = transport
+        self._reported_unpriced_ids: set[str] = set()
 
     def run_research(self, prompt: str, spec: ResearchConfigSpec) -> ResearchPacket:
         payload = self._request_body(prompt, spec)
         started = time.monotonic()
         response = self._post(payload, timeout_seconds=spec.timeout_seconds)
         latency_ms = int((time.monotonic() - started) * 1000)
-        packet = _packet_from_response(response, latency_ms=latency_ms)
-        if not packet.answer_markdown:
-            raise ResearchUnavailableError("empty_answer")
+        packet = _packet_from_response(
+            response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
+        )
         return packet
 
     def submit_background(self, prompt: str, spec: ResearchConfigSpec) -> str:
@@ -86,8 +94,18 @@ class PerplexityAgentClient:
             detail = json.dumps(error)[:500] if error else None
             return BackgroundPoll(status=status, failure_detail=detail)  # type: ignore[arg-type]
         latency_ms = int((time.monotonic() - started) * 1000)
-        packet = _packet_from_response(response, latency_ms=latency_ms)
+        packet = _packet_from_response(
+            response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
+        )
         return BackgroundPoll(status="completed", packet=packet)
+
+    def _record_unpriced(self, spend: UnpricedResearchSpend) -> None:
+        response_id = spend.provider_response_id
+        if response_id and response_id in self._reported_unpriced_ids:
+            return
+        record_unpriced_spend(spend)
+        if response_id:
+            self._reported_unpriced_ids.add(response_id)
 
     def _request_body(self, prompt: str, spec: ResearchConfigSpec) -> dict[str, Any]:
         body: dict[str, Any] = {
@@ -148,7 +166,12 @@ class PerplexityAgentClient:
         return document
 
 
-def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> ResearchPacket:
+def _packet_from_response(
+    document: dict[str, Any],
+    *,
+    latency_ms: int,
+    on_unpriced: UnpricedSpendRecorder = record_unpriced_spend,
+) -> ResearchPacket:
     output = document.get("output")
     if not isinstance(output, list):
         raise ResearchUnavailableError("malformed_response", "missing output list")
@@ -199,8 +222,10 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
                         _append_public_source(sources, annotation)
-    usage = _usage_from_response(document, latency_ms=latency_ms)
+    usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
     answer = _sanitize_answer("\n\n".join(text_blocks))
+    if not answer:
+        raise ResearchUnavailableError("empty_answer")
     seen: set[str] = set()
     unique_pairs = []
     for pair in pairs:
@@ -220,90 +245,106 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
     )
 
 
-def _usage_from_response(document: dict[str, Any], *, latency_ms: int) -> ResearchUsage:
-    model = document.get("model")
-    if not isinstance(model, str) or not model.strip():
-        raise ResearchUnavailableError("malformed_response", "missing model")
-    usage = document.get("usage")
-    if not isinstance(usage, dict):
-        raise ResearchUnavailableError("malformed_response", "missing usage")
-    input_tokens = _required_nonnegative_int(
-        usage, "input_tokens", path="usage.input_tokens"
-    )
-    output_tokens = _required_nonnegative_int(
-        usage, "output_tokens", path="usage.output_tokens"
-    )
-    input_details = usage.get("input_tokens_details")
-    if not isinstance(input_details, dict):
-        raise ResearchUnavailableError(
-            "malformed_response", "invalid usage.input_tokens_details"
+def _usage_from_response(
+    document: dict[str, Any],
+    *,
+    latency_ms: int,
+    on_unpriced: UnpricedSpendRecorder = record_unpriced_spend,
+) -> ResearchUsage:
+    raw_model = document.get("model")
+    model = raw_model.strip() if isinstance(raw_model, str) else ""
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_creation_input_tokens: int | None = None
+    cache_read_input_tokens: int | None = None
+    finance_search_invocations = web_search_invocations = fetch_url_invocations = 0
+    pricing_error: ResearchPricingError | None = None
+    try:
+        usage = document.get("usage")
+        if not isinstance(usage, dict):
+            raise ResearchPricingError("invalid_usage", "missing usage")
+        details = usage.get("tool_calls_details")
+        if details is None:
+            details = {}
+        if not isinstance(details, dict):
+            raise ResearchPricingError(
+                "invalid_usage", "invalid usage.tool_calls_details"
+            )
+        finance_search_invocations = _tool_invocation_count(details, "finance_search")
+        web_search_invocations = _tool_invocation_count(
+            details, "web_search", "search_web"
         )
-    cache_creation_input_tokens = _required_nonnegative_int(
-        input_details,
-        "cache_creation_input_tokens",
-        path="usage.input_tokens_details.cache_creation_input_tokens",
-    )
-    cache_read_input_tokens = _required_nonnegative_int(
-        input_details,
-        "cache_read_input_tokens",
-        path="usage.input_tokens_details.cache_read_input_tokens",
-    )
-    cached_tokens = input_details.get("cached_tokens")
-    if cached_tokens is not None and (
-        isinstance(cached_tokens, bool)
-        or not isinstance(cached_tokens, int)
-        or cached_tokens != cache_read_input_tokens
-    ):
-        raise ResearchUnavailableError(
-            "malformed_response",
-            "invalid usage.input_tokens_details.cached_tokens",
+        fetch_url_invocations = _tool_invocation_count(details, "fetch_url")
+        if not model:
+            raise ResearchPricingError("invalid_usage", "missing model")
+        input_tokens = _required_nonnegative_int(
+            usage, "input_tokens", path="usage.input_tokens"
         )
-    details = usage.get("tool_calls_details")
-    if details is None:
-        details = {}
-    if not isinstance(details, dict):
-        raise ResearchUnavailableError(
-            "malformed_response", "invalid usage.tool_calls_details"
+        output_tokens = _required_nonnegative_int(
+            usage, "output_tokens", path="usage.output_tokens"
         )
-    finance_search_invocations = _tool_invocation_count(details, "finance_search")
-    web_search_invocations = _tool_invocation_count(details, "web_search", "search_web")
-    fetch_url_invocations = _tool_invocation_count(details, "fetch_url")
-    cost = usage.get("cost")
-    if not isinstance(cost, dict) or cost.get("currency") != "USD":
-        raise ResearchUnavailableError(
-            "malformed_response", "invalid usage.cost currency"
+        input_details = usage.get("input_tokens_details")
+        if not isinstance(input_details, dict):
+            raise ResearchPricingError(
+                "invalid_usage", "invalid usage.input_tokens_details"
+            )
+        cache_creation_input_tokens = _required_nonnegative_int(
+            input_details,
+            "cache_creation_input_tokens",
+            path="usage.input_tokens_details.cache_creation_input_tokens",
         )
-    provider_tool_costs_usd = _tool_cost_details(cost)
-    cost_usd = validated_research_cost_usd(
-        model=model,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cache_creation_input_tokens=cache_creation_input_tokens,
-        cache_read_input_tokens=cache_read_input_tokens,
-        finance_search_invocations=finance_search_invocations,
-        web_search_invocations=web_search_invocations,
-        fetch_url_invocations=fetch_url_invocations,
-        provider_input_cost_usd=_required_nonnegative_decimal(
-            cost, "input_cost", path="usage.cost.input_cost"
-        ),
-        provider_output_cost_usd=_required_nonnegative_decimal(
-            cost, "output_cost", path="usage.cost.output_cost"
-        ),
-        provider_cache_creation_cost_usd=_required_nonnegative_decimal(
-            cost, "cache_creation_cost", path="usage.cost.cache_creation_cost"
-        ),
-        provider_cache_read_cost_usd=_required_nonnegative_decimal(
-            cost, "cache_read_cost", path="usage.cost.cache_read_cost"
-        ),
-        provider_tool_calls_cost_usd=_optional_nonnegative_decimal(
-            cost, "tool_calls_cost", path="usage.cost.tool_calls_cost"
-        ),
-        provider_tool_costs_usd=provider_tool_costs_usd,
-        provider_total_cost_usd=_required_nonnegative_decimal(
-            cost, "total_cost", path="usage.cost.total_cost"
-        ),
-    )
-    return ResearchUsage(
+        cache_read_input_tokens = _required_nonnegative_int(
+            input_details,
+            "cache_read_input_tokens",
+            path="usage.input_tokens_details.cache_read_input_tokens",
+        )
+        cached_tokens = input_details.get("cached_tokens")
+        if cached_tokens is not None and (
+            isinstance(cached_tokens, bool)
+            or not isinstance(cached_tokens, int)
+            or cached_tokens != cache_read_input_tokens
+        ):
+            raise ResearchPricingError(
+                "invalid_usage",
+                "invalid usage.input_tokens_details.cached_tokens",
+            )
+        cost = usage.get("cost")
+        if not isinstance(cost, dict) or cost.get("currency") != "USD":
+            raise ResearchPricingError("invalid_pricing", "invalid usage.cost currency")
+        provider_tool_costs_usd = _tool_cost_details(cost)
+        cost_usd = validated_research_cost_usd(
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_creation_input_tokens=cache_creation_input_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
+            finance_search_invocations=finance_search_invocations,
+            web_search_invocations=web_search_invocations,
+            fetch_url_invocations=fetch_url_invocations,
+            provider_input_cost_usd=_required_nonnegative_decimal(
+                cost, "input_cost", path="usage.cost.input_cost"
+            ),
+            provider_output_cost_usd=_required_nonnegative_decimal(
+                cost, "output_cost", path="usage.cost.output_cost"
+            ),
+            provider_cache_creation_cost_usd=_required_nonnegative_decimal(
+                cost, "cache_creation_cost", path="usage.cost.cache_creation_cost"
+            ),
+            provider_cache_read_cost_usd=_required_nonnegative_decimal(
+                cost, "cache_read_cost", path="usage.cost.cache_read_cost"
+            ),
+            provider_tool_calls_cost_usd=_optional_nonnegative_decimal(
+                cost, "tool_calls_cost", path="usage.cost.tool_calls_cost"
+            ),
+            provider_tool_costs_usd=provider_tool_costs_usd,
+            provider_total_cost_usd=_required_nonnegative_decimal(
+                cost, "total_cost", path="usage.cost.total_cost"
+            ),
+        )
+    except ResearchPricingError as exc:
+        cost_usd = None
+        pricing_error = exc
+    parsed_usage = ResearchUsage(
         invocations=finance_search_invocations,
         finance_search_invocations=finance_search_invocations,
         web_search_invocations=web_search_invocations,
@@ -317,6 +358,12 @@ def _usage_from_response(document: dict[str, Any], *, latency_ms: int) -> Resear
         cache_read_input_tokens=cache_read_input_tokens,
     )
 
+    if pricing_error is not None:
+        on_unpriced(
+            unpriced_spend(document=document, usage=parsed_usage, error=pricing_error)
+        )
+    return parsed_usage
+
 
 def _tool_invocation_count(details: dict[str, Any], *provider_keys: str) -> int:
     counts: list[int] = []
@@ -325,8 +372,8 @@ def _tool_invocation_count(details: dict[str, Any], *provider_keys: str) -> int:
             continue
         entry = details[key]
         if not isinstance(entry, dict):
-            raise ResearchUnavailableError(
-                "malformed_response", f"invalid usage.tool_calls_details.{key}"
+            raise ResearchPricingError(
+                "invalid_usage", f"invalid usage.tool_calls_details.{key}"
             )
         counts.append(
             _required_nonnegative_int(
@@ -339,16 +386,14 @@ def _tool_invocation_count(details: dict[str, Any], *provider_keys: str) -> int:
         return 0
     if any(count != counts[0] for count in counts[1:]):
         joined = ", ".join(provider_keys)
-        raise ResearchUnavailableError(
-            "malformed_response", f"conflicting tool counts: {joined}"
-        )
+        raise ResearchPricingError("invalid_usage", f"conflicting tool counts: {joined}")
     return counts[0]
 
 
 def _required_nonnegative_int(values: dict[str, Any], key: str, *, path: str) -> int:
     value = values.get(key)
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+        raise ResearchPricingError("invalid_usage", f"invalid {path}")
     return value
 
 
@@ -356,7 +401,7 @@ def _required_nonnegative_decimal(
     values: dict[str, Any], key: str, *, path: str
 ) -> Decimal:
     if key not in values:
-        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+        raise ResearchPricingError("invalid_pricing", f"invalid {path}")
     return _nonnegative_decimal(values[key], path=path)
 
 
@@ -370,10 +415,10 @@ def _optional_nonnegative_decimal(
 
 def _nonnegative_decimal(value: Any, *, path: str) -> Decimal:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+        raise ResearchPricingError("invalid_pricing", f"invalid {path}")
     parsed = Decimal(str(value))
     if not parsed.is_finite() or parsed < 0:
-        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+        raise ResearchPricingError("invalid_pricing", f"invalid {path}")
     return parsed
 
 
@@ -382,8 +427,8 @@ def _tool_cost_details(cost: dict[str, Any]) -> dict[str, Decimal]:
     if details is None:
         return {}
     if not isinstance(details, dict):
-        raise ResearchUnavailableError(
-            "malformed_response", "invalid usage.cost.tool_calls_cost_details"
+        raise ResearchPricingError(
+            "invalid_pricing", "invalid usage.cost.tool_calls_cost_details"
         )
     normalized: dict[str, Decimal] = {}
     aliases = {
@@ -395,17 +440,17 @@ def _tool_cost_details(cost: dict[str, Any]) -> dict[str, Decimal]:
     for provider_key, value in details.items():
         tool = aliases.get(provider_key)
         if tool is None:
-            raise ResearchUnavailableError(
-                "malformed_response",
-                f"unknown usage.cost.tool_calls_cost_details.{provider_key}",
+            raise ResearchPricingError(
+                "invalid_pricing",
+                "unknown tool in usage.cost.tool_calls_cost_details",
             )
         parsed = _nonnegative_decimal(
             value, path=f"usage.cost.tool_calls_cost_details.{provider_key}"
         )
         previous = normalized.get(tool)
         if previous is not None and previous != parsed:
-            raise ResearchUnavailableError(
-                "malformed_response", f"conflicting tool costs: {tool}"
+            raise ResearchPricingError(
+                "invalid_pricing", f"conflicting tool costs: {tool}"
             )
         normalized[tool] = parsed
     return normalized

@@ -3468,6 +3468,15 @@ Contract rules:
   describes the work, not the configuration tier it ran on: a market survey
   is `screening` whether it grounded on the balanced tier or the thorough
   one, so retuning a shape never moves its metering.
+- Pricing reconciliation does not gate a usable provider answer. Research
+  `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
+  replaced with zero or an estimated charge. Provider billing evidence stays
+  server-side. Each unreconciled provider response records an anomaly ledger
+  entry, including discarded retries, independently of the public sidecar.
+  The existing turn ledger also receives null cost for an unpriced answer.
+  Unpriced calls carry the reported invoice, expected range and discrepancy
+  in ledger metadata and emit an ERROR alert. Transport, malformed answer,
+  empty answer and missing required source evidence still fail closed.
 - A pure quote or market-data number may use `fast`; its public source list may
   be empty because provider provenance belongs to the route receipt rather
   than a publisher link. A narrative, causal, or explanatory clause is typed
