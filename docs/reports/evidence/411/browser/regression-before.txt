@@ -1,0 +1,44 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/c111/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/agent_runtime/discovery/test_discovery_route.py F                  [100%]
+
+=================================== FAILURES ===================================
+_ TestDiscoveryRouteFlagOff.test_discovery_wins_over_generic_result_followup_composition _
+
+self = <discovery.test_discovery_route.TestDiscoveryRouteFlagOff object at 0x10a4cef50>
+
+    def test_discovery_wins_over_generic_result_followup_composition(self) -> None:
+        result = _run(
+            message="Find companies similar to Nvidia",
+            response=_discovery_interpretation(
+                relationship="peer",
+                category_description=None,
+                anchor_symbols=["NVDA"],
+                result_followup_focus="general",
+            ),
+            snapshot=_result_snapshot(),
+        )
+        assert result.outcome == "ready_to_respond"
+>       assert result.patch["recovery"]["code"] == "discovery_unavailable"
+E       AssertionError: assert 'interpreter_unavailable' == 'discovery_unavailable'
+E
+E         - discovery_unavailable
+E         + interpreter_unavailable
+
+tests/agent_runtime/discovery/test_discovery_route.py:110: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-02 20:52:12.936 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:373 - Interpret stage started
+2026-09-02 20:52:12.937 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:428 - Interpret stage structured interpreter completed
+2026-09-02 20:52:12.937 | DEBUG    | argus.agent_runtime.stages.interpret:_stage_result_from_interpretation:469 - Interpret stage post-LLM repair started
+2026-09-02 20:52:12.948 | WARNING  | argus.llm.openrouter:invoke_openrouter_chat_completion:516 - OpenRouter unavailable; missing API key
+2026-09-02 20:52:12.949 | INFO     | argus.llm.openrouter:record_openrouter_route_receipt:321 - OpenRouter route receipt
+=========================== short test summary info ============================
+FAILED tests/agent_runtime/discovery/test_discovery_route.py::TestDiscoveryRouteFlagOff::test_discovery_wins_over_generic_result_followup_composition
+============================== 1 failed in 1.26s ===============================

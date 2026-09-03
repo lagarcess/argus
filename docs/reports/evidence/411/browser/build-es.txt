@@ -1,0 +1,32 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Estrategia de comprar y mantener para
+Prueba META con una estrategia de comprar y mantener
+
+¿Qué periodo quieres usar para META?
+
+Del 2023-01-03 al 2024-12-31, con un capital inicial de 10,000 dólares.
+META
+Comprar y mantener
+Listo para ejecutar
+CAPITAL INICIAL
+$10,000
+PERIODO
+3 ene 2023 → 31 dic 2024
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Editar capital
+Editar fechas
+Editar costos
+Ejecutar backtest
+Cambiar supuestos
+Cancelar
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

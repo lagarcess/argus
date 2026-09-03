@@ -1,0 +1,15 @@
+data: {"type":"stage_start","stage":"interpret"}
+
+data: {"type":"stage_start","stage":"research_search","detail":"balanced"}
+
+: keepalive
+
+: keepalive
+
+data: {"type":"stage_outcome","outcome":"ready_to_respond"}
+
+data: {"type":"token","content":"No pude completar la b\u00fasqueda de datos en este momento, as\u00ed que no voy a citar cifras en vivo. Probar una idea con datos hist\u00f3ricos sigue disponible."}
+
+data: {"type":"final","payload":{"artifact_references":[],"stage_outcome":"ready_to_respond","assistant_response":"No pude completar la b\u00fasqueda de datos en este momento, as\u00ed que no voy a citar cifras en vivo. Probar una idea con datos hist\u00f3ricos sigue disponible.","next_experiments":{"version":"argus_next_experiments/v1","rows":[{"kind":"research_test_single","label":"Probar Microsoft (MSFT) en los \u00faltimos 3 a\u00f1os","label_parts":[{"type":"text","value":"Probar "},{"type":"text","value":"Microsoft"},{"type":"ticker","value":"MSFT"},{"type":"text","value":" en los \u00faltimos 3 a\u00f1os"}],"label_key":"chat.next_experiments.labels.research_dynamic","send_text":"Prueba comprar y mantener MSFT durante los \u00faltimos tres a\u00f1os"}]},"research":{"schema_version":"argus_research/v1","capability_class":"balanced_lookup","shape":"balanced","sources":[],"retrieved_at":"2026-09-03T02:10:01.422609+00:00","anchor_symbols":["MSFT"],"peers":[],"usage":{"invocations":0,"latency_ms":0,"cost_usd":0.0,"cache_status":"bypass"},"follow_up":{"schema_version":"argus_research_follow_up/v1","subjects":[{"symbol":"MSFT","name":"Microsoft Corporation Common Stock","asset_class":"equity"}],"comparison_set":[],"peer_suggestions":[],"open_thread":{"shape":"balanced","period_of_interest":null}},"degraded":{"code":"research_unavailable_malformed_response"}},"message_id":"14a51489-029b-4ef7-b41b-003b6a7629bb"}}
+
+data: [DONE]
