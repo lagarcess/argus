@@ -1,9 +1,9 @@
-"""Fail-closed Perplexity Agent API research pricing validation.
+"""Fail-closed invoice reconciliation, independent of research availability.
 
 Agent responses report the exact multi-step bill. Argus validates that bill
 against explicit served-model and tool rates before writing it to the cost
-ledger. Unknown served models fail closed so a fallback can never turn
-unpriced spend into a zero.
+ledger. Pricing errors produce unpriced spend evidence without rejecting
+the provider's answer. Unknown spend can never become zero.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
-from argus.domain.research.contracts import ResearchUnavailableError
+from argus.domain.research.contracts import ResearchPricingError
 
 _MILLION = Decimal(1_000_000)
 _COST_PRECISION_USD = Decimal("0.000001")
@@ -28,8 +28,9 @@ class ModelTokenRate:
     max_input_tokens: int | None = None
 
 
-# Perplexity Agent API rates verified 2026-08-10. GPT-5.6 Sol uses its
-# published long-context tier above 272k input tokens.
+# Published rates rechecked 2026-09-03 against
+# https://docs.perplexity.ai/docs/agent-api/models (unchanged).
+# Live invoices can disagree: see tests/research/fixtures/README.md.
 MODEL_RATE_TABLE_USD_PER_MILLION: dict[str, tuple[ModelTokenRate, ...]] = {
     "openai/gpt-5.6-sol": (
         ModelTokenRate(
@@ -56,8 +57,8 @@ MODEL_RATE_TABLE_USD_PER_MILLION: dict[str, tuple[ModelTokenRate, ...]] = {
     ),
 }
 
-# Tool rates verified 2026-08-19 against docs.perplexity.ai and a live
-# response; fetch_url bills $0.0005 per invocation.
+# Tool rates rechecked 2026-09-03 against docs.perplexity.ai; the recorded
+# live response confirms fetch_url bills $0.0005 per invocation.
 TOOL_RATE_TABLE_USD_PER_INVOCATION: dict[str, Decimal] = {
     "finance_search": Decimal("0.005"),
     "web_search": Decimal("0.0025"),
@@ -202,7 +203,7 @@ def validated_research_cost_usd(
 def _token_rates_for(model: str) -> tuple[ModelTokenRate, ...]:
     tiers = MODEL_RATE_TABLE_USD_PER_MILLION.get(model)
     if tiers is None:
-        raise ResearchUnavailableError("unknown_model_rate", model)
+        raise ResearchPricingError("unknown_model_rate", "served model has no rate")
     return tiers
 
 
@@ -227,7 +228,13 @@ def _validate_token_component(
         reported_cost < lower - _PROVIDER_COST_TOLERANCE_USD
         or reported_cost > upper + _PROVIDER_COST_TOLERANCE_USD
     ):
-        _malformed(f"{path} is outside the served-model rate table")
+        raise ResearchPricingError(
+            "rate_mismatch",
+            f"{path} is outside the served-model rate table",
+            reported=reported_cost,
+            expected_min=lower,
+            expected_max=upper,
+        )
 
 
 def _validate_tier_mix(
@@ -335,8 +342,14 @@ def _rounded_token_cost(tokens: int, rate: Decimal) -> Decimal:
 
 def _require_cost_match(*, path: str, reported: Decimal, expected: Decimal) -> None:
     if abs(reported - expected) > _PROVIDER_COST_TOLERANCE_USD:
-        _malformed(f"{path} does not match response usage")
+        raise ResearchPricingError(
+            "cost_mismatch",
+            f"{path} does not match response usage",
+            reported=reported,
+            expected_min=expected,
+            expected_max=expected,
+        )
 
 
 def _malformed(detail: str) -> None:
-    raise ResearchUnavailableError("malformed_response", detail)
+    raise ResearchPricingError("invalid_pricing", detail)

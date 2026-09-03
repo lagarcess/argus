@@ -593,6 +593,40 @@ failed state from Supabase. `api-proof-shadow-on` is only for proof dispatch
 validation. `api-safe-off` is the emergency rollback mode that disables workflow
 dispatch/execution and removes the Render API key from `argus-api`.
 
+### Retrieving workflow task logs
+
+Use the workflow ID as `resource` and the run ID as the separate `taskRun`
+filter. A `trn-...` ID is not a log resource: that call returned HTTP 500 in
+the [issue #484 production probe](reports/evidence/484/README.md). The same
+run returned HTTP 200 with logs using the correct filter. This is a call-pattern
+problem, not a current Render limitation; no duplicate log store is needed.
+
+The read-only query below follows Render's [List logs API](https://api-docs.render.com/reference/list-logs).
+Set the workspace, workflow, and task-run IDs from Render. Choose explicit UTC
+bounds around the run's `startedAt` and `completedAt` from
+`GET /v1/task-runs/{taskRunId}`; for a running task use the current time as the
+end. The default one-hour window can miss an older run entirely.
+
+```bash
+curl --fail-with-body --silent --show-error --get \
+  'https://api.render.com/v1/logs' \
+  --header "Authorization: Bearer ${RENDER_API_KEY}" \
+  --data-urlencode "ownerId=${RENDER_OWNER_ID}" \
+  --data-urlencode "resource=${RENDER_WORKFLOW_ID}" \
+  --data-urlencode "taskRun=${RENDER_TASK_RUN_ID}" \
+  --data-urlencode "startTime=${TASK_LOG_START_UTC}" \
+  --data-urlencode "endTime=${TASK_LOG_END_UTC}" \
+  --data-urlencode 'direction=forward' \
+  --data-urlencode 'limit=100'
+```
+
+Read the `logs` array from the response object. When `hasMore` is true, repeat
+with `nextStartTime` and `nextEndTime` as the next bounds until it is false.
+An HTTP failure or a null response is not an empty log result. For no matching
+lines, check the owner, workflow, run, time window, and retention first.
+The job's `execution_metadata.workflow_backtest` remains durable execution
+evidence when a task crashes or its logs have expired.
+
 ## Render Environment Ownership
 
 `render.yaml` is allowed to sync non-secret launch configuration: mode flags,

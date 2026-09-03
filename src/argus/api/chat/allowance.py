@@ -57,7 +57,7 @@ def check_message_allowance(request: Request, user: User) -> None:
                 kind="guest_limit_reached",
                 user_id=user.id,
                 surface="chat",
-                capability_category="chat",
+                product_capability="chat",
                 conversion_reason="message_limit",
                 terminal_outcome="limit_reached",
             )

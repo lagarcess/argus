@@ -3482,6 +3482,15 @@ Contract rules:
   describes the work, not the configuration tier it ran on: a market survey
   is `screening` whether it grounded on the balanced tier or the thorough
   one, so retuning a shape never moves its metering.
+- Pricing reconciliation does not gate a usable provider answer. Research
+  `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
+  replaced with zero or an estimated charge. Provider billing evidence stays
+  server-side. Each unreconciled provider response records an anomaly ledger
+  entry, including discarded retries, independently of the public sidecar.
+  The existing turn ledger also receives null cost for an unpriced answer.
+  Unpriced calls carry the reported invoice, expected range and discrepancy
+  in ledger metadata and emit an ERROR alert. Transport, malformed answer,
+  empty answer and missing required source evidence still fail closed.
 - A pure quote or market-data number may use `fast`; its public source list may
   be empty because provider provenance belongs to the route receipt rather
   than a publisher link. A narrative, causal, or explanatory clause is typed
@@ -4631,6 +4640,48 @@ Core fields:
 - `sampling_rate`
 - `retention_class`
 - `attributes`
+
+### Native analytics dimensions
+
+The PostHog projection promotes a closed set of scalar attributes to event
+properties: `product_event`, `language`, `surface`, `terminal_outcome`,
+`conversion_reason`, `strategy_category`, `product_capability`, and
+`capability_class`. The sanitized `attributes` bag remains intact.
+
+These two capability dimensions deliberately describe different facts:
+
+| Dimension | Meaning | Owner / values |
+| --- | --- | --- |
+| `product_capability` | The product activity involved in a guest funnel event | `GuestFunnelProductCapability`: `chat`, `simulation`, `decision`, `history`, `account`, `feedback` |
+| `capability_class` | The kind of research work performed | Research `CapabilityClass`: `fast_quote`, `balanced_lookup`, `thorough_research`, `screening`, `peer_expansion` |
+
+They are not interchangeable and must not be merged. `surface` identifies the
+UI location; research `shape` identifies the execution configuration. A
+`screening` task stays `screening` on either balanced or thorough execution.
+The research sidecar owns its work kind; the ledger and analytics read it.
+
+`product_capability` replaces the ambiguous `capability_category` name at all
+guest event producers. New captures emit only the new name, without an alias.
+Existing PostHog events retain `capability_category`; historical queries
+spanning the change must OR the old and new property filters, or coalesce them
+in historical SQL. Do not reinterpret the old value as a research class.
+Research sidecar and cost-ledger keys remain `capability_class`, so persisted
+research messages and ledger readers need no migration.
+
+Research settlement emits `event_type = "research"` from the same sidecar
+used for metering, even without a cost-ledger gateway. `capability_class` is a
+native event property; unknown values become `unknown` rather than leaking
+arbitrary text. A sidecar carrying `degraded.code` emits
+`event_action = "failed"`, `status = "degraded"`; otherwise it emits
+`completed` for both. This describes the research outcome, not billing
+reconciliation or provider health. Cache hits and bypasses are included;
+`cache_status` remains a bounded nested attribute. No sidecar content, error
+detail, provider data, or spend is copied to PostHog. Capture is best effort,
+and network I/O is scheduled off the streaming event loop.
+
+This event covers inline research (including find) and settled background
+answers. Background failures that never produce a research sidecar retain the
+job lifecycle's failure record; they are not research settlement events.
 
 Privacy posture:
 - Default mode is `metadata_only`.

@@ -399,7 +399,7 @@ def test_first_useful_response_emits_only_at_the_first_settled_unit() -> None:
         message_id="message-1",
         language="en",
         surface="chat",
-        capability_category="chat",
+        product_capability="chat",
         terminal_outcome="completed",
     )
 
@@ -443,7 +443,7 @@ def test_registered_context_never_emits_a_guest_event() -> None:
             kind="guest_limit_reached",
             user_id="registered-user",
             surface="chat",
-            capability_category="chat",
+            product_capability="chat",
             terminal_outcome="limit_reached",
         )
 
@@ -498,7 +498,7 @@ def test_guest_message_limit_emits_from_authoritative_precheck() -> None:
         kind="guest_limit_reached",
         user_id=GUEST_USER_ID,
         surface="chat",
-        capability_category="chat",
+        product_capability="chat",
         conversion_reason="message_limit",
         terminal_outcome="limit_reached",
     )

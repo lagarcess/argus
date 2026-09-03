@@ -163,7 +163,8 @@ _POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST = frozenset(
         "terminal_outcome",
         "conversion_reason",
         "strategy_category",
-        "capability_category",
+        "product_capability",
+        "capability_class",
     }
 )
 

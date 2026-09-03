@@ -305,20 +305,14 @@ def record_openrouter_route_receipt(
     capture = _ROUTE_RECEIPT_CAPTURE.get()
     if capture is not None:
         capture.append(receipt)
+    fields = receipt.as_dict()
+    # Render displays the message, not Loguru extras. Both projections derive
+    # from the receipt; never dump the logger's potentially sensitive context.
     logger.bind(
-        llm_task=task,
-        llm_tier=tier,
-        model=resolved_model,
-        fallback_model=fallback_model,
-        schema_name=schema_name,
-        outcome=outcome,
-        failure_mode=failure_mode,
-        latency_ms=receipt.latency_ms,
-        fallback_used=receipt.fallback_used,
-        token_usage=receipt.token_usage,
-        usage_cost_usd=receipt.usage_cost_usd,
-        context_packet_ids=receipt.context_packet_ids,
-    ).info("OpenRouter route receipt")
+        llm_task=fields["task"],
+        llm_tier=fields["tier"],
+        **{key: value for key, value in fields.items() if key not in {"task", "tier"}},
+    ).info("OpenRouter route receipt {}", json.dumps(fields, separators=(",", ":")))
     return receipt
 
 

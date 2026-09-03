@@ -588,6 +588,48 @@ profile and fall back to the nameless pool.
 
 ## Landed this cycle
 
+- **The 2026-09-01 production promotion** (PR #534, `c7802b37`). Thirty-three
+  commits, four merges, all three Render services. The additive settle
+  migration was applied before the deploy per the runbook's ordering rule, and
+  the readback through the real projection function showed **seven** locked
+  research conversations settling, not the six recorded at draft time. The
+  count grows while a defect is live; the manifest now says to re-count at
+  application time rather than trust a written number.
+
+  The candidate-only eval failure read as a rubric regression from PR #525,
+  because the prose judge ships inside the tree and the two sides were graded
+  v1 and v2. **A grader that ships in the tree cannot be held constant by
+  re-running the suite.** Judge-only replay can: both recorded replies, judged
+  by the candidate's own v2 judge with the candidate's recorded surface, passed
+  13 of 13. Judge flake, not a regression, settled for about $0.02 against
+  $1.33 for a suite re-run that could not have answered the question.
+
+  Recorded because it cost a merge decision: PR #525 was merged on the
+  recommendation that a test-only change needs no review. It changed the
+  instrument that grades promotions, which makes it promotion-affecting.
+
+- **Failure records are readable** (PR #536, #484). Route receipts were bound
+  into Loguru extras, which Render does not display, so the log showed that a
+  receipt happened and nothing it said. The fields now render in the message
+  body, derived from the receipt rather than the logger's context so nothing
+  sensitive leaks. Approved-window rejections print both compared ranges even
+  when they match, which is what lets a hash-only failure prove the windows
+  were identical. The `argus-backtests` task-log query was wrong, not the logs
+  unreachable; the corrected query is in the runbook.
+
+- **Research funnel dimensions are natively filterable** (PR #537, #408).
+  `capability_class` was never on the PostHog top-level allowlist, so research
+  work kind stayed nested and unfilterable. The real defect was the naming
+  collision: `capability_category` is renamed to `product_capability` for the
+  product activity, and `capability_class` keeps its meaning as the research
+  work kind. New captures emit only the new name with no alias, and
+  `API_CONTRACT.md` records that historical queries spanning the change must OR
+  the two properties. Research settlement now emits a typed event, so a
+  degraded research turn is a filterable fact rather than a log line.
+
+  **Anything built on `capability_category` goes blank for new data.** The doc
+  says so; nothing enforces it.
+
 - **A finished research answer appears, and its conversation is usable again**
   (PR #532). The reported symptom was that the answer never painted until a
   reload. The real defect was worse: **every conversation that finished a
