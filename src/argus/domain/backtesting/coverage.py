@@ -728,8 +728,14 @@ def _validate_approved_window(
         )
     if mismatches:
         logger.warning(
-            "Approved data window rejected: {mismatches}",
+            "Approved data window rejected: {mismatches}; "
+            "requested_range approved={approved_requested} current={requested}; "
+            "effective_range approved={approved_effective} current={effective}",
             mismatches="; ".join(mismatches),
+            approved_requested=f"{approved_requested.start}..{approved_requested.end}",
+            requested=f"{requested.start}..{requested.end}",
+            approved_effective=f"{approved_effective.start}..{approved_effective.end}",
+            effective=f"{effective.start}..{effective.end}",
         )
         raise MarketDataCoverageError("approved_data_window_unavailable")
 
