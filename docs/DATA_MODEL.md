@@ -1079,6 +1079,10 @@ Current behavior:
 - PostHog is server-side only and personless (`$process_person_profile = false`).
 - US Cloud is the current PostHog region choice for private alpha compliance
   posture.
+- Research settlement projects the sidecar's work kind and outcome into a
+  bounded `research` event. Native dimension meanings and the
+  `capability_category` to `product_capability` rename are defined in
+  `docs/API_CONTRACT.md` section 17.1; analytics is not the spend ledger.
 
 Deferred durable surfaces:
 - Eval run/case result persistence.

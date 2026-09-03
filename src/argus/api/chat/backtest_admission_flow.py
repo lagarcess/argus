@@ -93,7 +93,7 @@ def admit_durable_chat_job(
                     user_id=context.user_id,
                     conversation_id=context.conversation_id,
                     surface="backtest",
-                    capability_category="simulation",
+                    product_capability="simulation",
                     conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )
@@ -151,7 +151,7 @@ def admit_durable_chat_job(
                         else None
                     ),
                     surface="backtest",
-                    capability_category="simulation",
+                    product_capability="simulation",
                     terminal_outcome="admitted",
                 )
             return ChatAdmissionResult(
@@ -183,7 +183,7 @@ def admit_durable_chat_job(
                     user_id=context.user_id,
                     conversation_id=context.conversation_id,
                     surface="backtest",
-                    capability_category="simulation",
+                    product_capability="simulation",
                     conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )

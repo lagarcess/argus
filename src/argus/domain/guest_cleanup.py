@@ -113,7 +113,7 @@ def cleanup_expired_guest_workspaces(
                     "guest_session_expired",
                     user_id=user_id,
                     surface="cleanup",
-                    capability_category="account",
+                    product_capability="account",
                     terminal_outcome="expired",
                 )
             except Exception:

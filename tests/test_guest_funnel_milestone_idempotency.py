@@ -77,7 +77,7 @@ def _emit_first_result(account, *, message_id: str = "message-1") -> None:
         message_id=message_id,
         backtest_run_id="run-1",
         surface="backtest",
-        capability_category="simulation",
+        product_capability="simulation",
         terminal_outcome="completed",
     )
 
@@ -221,7 +221,7 @@ def test_conversion_owner_still_records_both_claim_milestones() -> None:
                 visitor_key=VISITOR_KEY,
                 conversation_id="conversation-1",
                 surface="account_conversion",
-                capability_category=capability,
+                product_capability=capability,
             )
 
     assert [call.args[0] for call in capture.call_args_list] == [
