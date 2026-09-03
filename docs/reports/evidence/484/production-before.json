@@ -1,0 +1,36 @@
+{
+  "source": "Render GET /v1/logs",
+  "query": {
+    "ownerId": "tea-d5rdkfk9c44c73e7a1ig",
+    "resource": "srv-d78tanmuk2gs73e17nn0",
+    "startTime": "2026-09-02T20:37:39Z",
+    "endTime": "2026-09-02T20:37:40Z",
+    "text": "OpenRouter route receipt",
+    "limit": 10
+  },
+  "logs": [
+    {
+      "id": "c2b94351-779f-4933-96b0-0d5025f564da",
+      "labels": [
+        {
+          "name": "resource",
+          "value": "srv-d78tanmuk2gs73e17nn0"
+        },
+        {
+          "name": "instance",
+          "value": "srv-d78tanmuk2gs73e17nn0-6q8qp"
+        },
+        {
+          "name": "level",
+          "value": "info"
+        },
+        {
+          "name": "type",
+          "value": "app"
+        }
+      ],
+      "message": "2026-09-02 20:37:39.408 | INFO     | argus.llm.openrouter:record_openrouter_route_receipt:321 - OpenRouter route receipt",
+      "timestamp": "2026-09-02T20:37:39.408799657Z"
+    }
+  ]
+}
