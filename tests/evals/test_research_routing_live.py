@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -55,7 +56,9 @@ CASES = (
 
 def test_research_routing_live(monkeypatch):
     if os.getenv("ARGUS_RUN_LIVE_RESEARCH_ROUTING_EVALS") != "1":
-        pytest.skip("set ARGUS_RUN_LIVE_RESEARCH_ROUTING_EVALS=1 for paid acceptance")
+        pytest.skip(
+            "set both ARGUS_RUN_LIVE_EVALS=1 and ARGUS_RUN_LIVE_RESEARCH_ROUTING_EVALS=1 for paid acceptance"
+        )
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
     provenance = build_scorecard_provenance(evaluation_mode="live")
     results = []
@@ -134,7 +137,7 @@ def test_research_routing_live(monkeypatch):
         json.dumps(
             {
                 "evidence_kind": "live_interpreter_with_stubbed_research_dispatch",
-                "provenance": provenance,
+                "provenance": asdict(provenance),
                 "acceptance_source_sha256": hashlib.sha256(
                     Path(__file__).read_bytes()
                 ).hexdigest(),
