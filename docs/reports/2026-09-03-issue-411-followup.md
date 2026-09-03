@@ -1,5 +1,9 @@
 # Issue #411 follow-up: discovery regression and browser evidence
 
+Historical handoff at `83a38d15`. See the [reconciled branch report](2026-09-03-issue-411-reconciled.md)
+for the actual integration merge and fresh research capture; its research
+acceptance no longer depends on the temporary tree described below.
+
 The discovery regression is fixed. The correct recovery remains
 `discovery_unavailable`. Both META build requests reached runnable cards with
 zero `knowledge_route` receipts. A genuine research answer reached the browser

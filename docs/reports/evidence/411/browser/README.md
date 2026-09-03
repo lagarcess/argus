@@ -1,5 +1,8 @@
 # Issue #411 browser acceptance
 
+Current research proof: [reconciled branch capture](../../../../reports/2026-09-03-issue-411-reconciled.md).
+The files in this directory preserve the earlier captures and their original provenance.
+
 See the [follow-up report](../../../2026-09-03-issue-411-followup.md) for the
 regression decision, screenshots, environment boundaries, complete-suite
 results, and integration dependency.

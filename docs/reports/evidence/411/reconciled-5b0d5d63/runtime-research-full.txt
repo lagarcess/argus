@@ -1,0 +1,221 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/c111/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 2235 items
+
+tests/agent_runtime/discovery/test_discovery_composer.py ............... [  0%]
+..............................                                           [  2%]
+tests/agent_runtime/discovery/test_discovery_extraction.py .             [  2%]
+tests/agent_runtime/discovery/test_discovery_route.py ....F........      [  2%]
+tests/agent_runtime/discovery/test_discovery_selection_action.py ......  [  2%]
+tests/agent_runtime/discovery/test_discovery_validation.py ............. [  3%]
+...                                                                      [  3%]
+tests/agent_runtime/discovery/test_guest_discovery_allowance.py ........ [  3%]
+............                                                             [  4%]
+tests/agent_runtime/test_artifact_continuity.py ........................ [  5%]
+.........                                                                [  5%]
+tests/agent_runtime/test_artifact_edit_operations.py ................... [  6%]
+........................................................................ [ 10%]
+.........                                                                [ 10%]
+tests/agent_runtime/test_asset_discovery_schema_contract.py .            [ 10%]
+tests/agent_runtime/test_benchmark_coverage.py .............             [ 11%]
+tests/agent_runtime/test_capacity_refusal_copy.py ......                 [ 11%]
+tests/agent_runtime/test_chip_clarify_edit_routing.py .................. [ 12%]
+..                                                                       [ 12%]
+tests/agent_runtime/test_chip_completion_guards.py ..................    [ 13%]
+tests/agent_runtime/test_compound_edit_contract.py ...................   [ 13%]
+tests/agent_runtime/test_confirm_mixed_asset_preflight.py ...........    [ 14%]
+tests/agent_runtime/test_confirmation_artifacts.py .....                 [ 14%]
+tests/agent_runtime/test_confirmation_liveness.py ....................   [ 15%]
+tests/agent_runtime/test_conversation_stages.py ........................ [ 16%]
+.........................................................                [ 19%]
+tests/agent_runtime/test_conversational_contract_hardening.py .......... [ 19%]
+........................................................................ [ 22%]
+....................................................................     [ 25%]
+tests/agent_runtime/test_discovery_focused_read.py ..........            [ 26%]
+tests/agent_runtime/test_discovery_payload_routing.py ....               [ 26%]
+tests/agent_runtime/test_execute_launch_payload.py .......               [ 26%]
+tests/agent_runtime/test_execute_recovery.py ........................... [ 28%]
+..........................................                               [ 29%]
+tests/agent_runtime/test_focused_repair_asset_reconciliation.py ...      [ 30%]
+tests/agent_runtime/test_focused_repair_preservation.py ....             [ 30%]
+tests/agent_runtime/test_future_performance_admission.py ............... [ 30%]
+...........                                                              [ 31%]
+tests/agent_runtime/test_future_temporal_direction.py ..........         [ 31%]
+tests/agent_runtime/test_graded_interpretation_routing.py .F......       [ 32%]
+tests/agent_runtime/test_interpret_stage.py ............................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 39%]
+...........................                                              [ 41%]
+tests/agent_runtime/test_interpretation_contract_rejections.py ......... [ 41%]
+.                                                                        [ 41%]
+tests/agent_runtime/test_issue_154_s1_runtime_prose_boundary.py .        [ 41%]
+tests/agent_runtime/test_issue_154_s3_recovery_i18n_contract.py ....     [ 41%]
+tests/agent_runtime/test_issue_270_strategy_transitions.py ......        [ 42%]
+tests/agent_runtime/test_issue_271_cost_fidelity_audit.py .............. [ 42%]
+.........                                                                [ 43%]
+tests/agent_runtime/test_issue_271_modeled_cost_preservation.py ........ [ 43%]
+............................                                             [ 44%]
+tests/agent_runtime/test_issue_345_recommendation_continuity.py ........ [ 45%]
+.....                                                                    [ 45%]
+tests/agent_runtime/test_issue_453_cause_projection.py .............     [ 45%]
+tests/agent_runtime/test_issue_453_focused_repair.py ....                [ 45%]
+tests/agent_runtime/test_issue_483_resolved_state.py .......             [ 46%]
+tests/agent_runtime/test_knowledge_answer.py .............               [ 46%]
+tests/agent_runtime/test_latest_result_fact_answers.py ................. [ 47%]
+...............                                                          [ 48%]
+tests/agent_runtime/test_latest_result_window_binding.py ......          [ 48%]
+tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py . [ 48%]
+........................................................................ [ 51%]
+.....                                                                    [ 52%]
+tests/agent_runtime/test_llm_interpreter_date_window_repairs.py ........ [ 52%]
+........................................                                 [ 54%]
+tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py . [ 54%]
+........................................................................ [ 57%]
+......                                                                   [ 57%]
+tests/agent_runtime/test_llm_interpreter_semantic_contracts.py ......... [ 58%]
+................................................................         [ 61%]
+tests/agent_runtime/test_next_experiments.py .................           [ 61%]
+tests/agent_runtime/test_options_semantic_admission.py ................. [ 62%]
+..................                                                       [ 63%]
+tests/agent_runtime/test_post_result_edit_routing.py ...............     [ 64%]
+tests/agent_runtime/test_provider_asset_ownership.py ................... [ 64%]
+.........                                                                [ 65%]
+tests/agent_runtime/test_provider_context_asset_catalog.py .......       [ 65%]
+tests/agent_runtime/test_real_backtest_tool.py .....                     [ 65%]
+tests/agent_runtime/test_recognition_contract_guards.py ................ [ 66%]
+.............................                                            [ 67%]
+tests/agent_runtime/test_recovery_composer.py .                          [ 67%]
+tests/agent_runtime/test_refine_action_edit_routing.py ..............    [ 68%]
+tests/agent_runtime/test_research_routing_contract.py .................. [ 69%]
+........                                                                 [ 69%]
+tests/agent_runtime/test_resolution_context.py ...............           [ 70%]
+tests/agent_runtime/test_response_style_contract.py ....                 [ 70%]
+tests/agent_runtime/test_result_followups.py ..........................  [ 71%]
+tests/agent_runtime/test_runtime_semantic_boundaries.py ......           [ 71%]
+tests/agent_runtime/test_runtime_substage_merge.py ...                   [ 72%]
+tests/agent_runtime/test_simplification_option_identity.py .....         [ 72%]
+tests/agent_runtime/test_spanish_runtime_transcripts.py ............     [ 72%]
+tests/agent_runtime/test_state_models.py .......................         [ 73%]
+tests/agent_runtime/test_strategy_contract.py .......................... [ 75%]
+.........                                                                [ 75%]
+tests/agent_runtime/test_turn_execution.py ................              [ 76%]
+tests/agent_runtime/test_turn_progress.py ...................            [ 77%]
+tests/agent_runtime/test_unsupported_fallback_honesty.py .....           [ 77%]
+tests/agent_runtime/test_unsupported_recovery_asset_conservation.py .... [ 77%]
+..                                                                       [ 77%]
+tests/agent_runtime/test_validation_failure_copy.py .......              [ 77%]
+tests/agent_runtime/test_workflow.py ................................... [ 79%]
+...                                                                      [ 79%]
+tests/agent_runtime/test_workspace_language_prose.py ................... [ 80%]
+........................................................................ [ 83%]
+..................................                                       [ 85%]
+tests/research/test_asset_identity.py ...........................        [ 86%]
+tests/research/test_confirmation_peer_assets.py .............            [ 86%]
+tests/research/test_execution_evidence_invariant.py .................... [ 87%]
+........................................                                 [ 89%]
+tests/research/test_research_answer.py ......................            [ 90%]
+tests/research/test_research_cache.py .......                            [ 90%]
+tests/research/test_research_citations.py .........                      [ 91%]
+tests/research/test_research_client.py .......................           [ 92%]
+tests/research/test_research_config.py ...                               [ 92%]
+tests/research/test_research_contract_example.py ...                     [ 92%]
+tests/research/test_research_evidence.py ...............                 [ 93%]
+tests/research/test_research_jobs.py .............                       [ 93%]
+tests/research/test_research_observability.py .......................... [ 94%]
+.......                                                                  [ 95%]
+tests/research/test_research_pricing_delivery.py ....................... [ 96%]
+.                                                                        [ 96%]
+tests/research/test_research_router_absorption.py ..............         [ 97%]
+tests/research/test_research_rows.py ...........                         [ 97%]
+tests/research/test_research_shapes.py ..................                [ 98%]
+tests/research/test_research_sidecar_builder.py .............            [ 98%]
+tests/research/test_research_source_selection.py ......                  [ 99%]
+tests/research/test_research_sources_and_voice.py ..........             [ 99%]
+tests/research/test_research_truth_boundary.py .........                 [100%]
+
+=================================== FAILURES ===================================
+_ TestDiscoveryRouteFlagOff.test_detected_turn_language_reaches_discovery_composer _
+
+self = <discovery.test_discovery_route.TestDiscoveryRouteFlagOff object at 0x10c695450>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1227cf6a0>
+
+    def test_detected_turn_language_reaches_discovery_composer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from argus.agent_runtime.discovery import composer as composer_module
+
+        captured: dict[str, Any] = {}
+        original = composer_module.discovery_stage_result_if_applicable
+
+        async def _spy(**kwargs: Any):
+            captured["language"] = kwargs.get("language")
+            return await original(**kwargs)
+
+        monkeypatch.setattr(composer_module, "discovery_stage_result_if_applicable", _spy)
+        _run(
+            message="¿Qué acciones de ciberseguridad podría probar?",
+            response=_discovery_interpretation(language="es-419"),
+        )
+>       assert captured["language"] == "es-419"
+E       KeyError: 'language'
+
+tests/agent_runtime/discovery/test_discovery_route.py:141: KeyError
+----------------------------- Captured stderr call -----------------------------
+2026-09-02 23:17:21.196 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:373 - Interpret stage started
+2026-09-02 23:17:21.197 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:428 - Interpret stage structured interpreter completed
+2026-09-02 23:17:21.197 | DEBUG    | argus.agent_runtime.stages.interpret:_stage_result_from_interpretation:469 - Interpret stage post-LLM repair started
+_________ test_knowledge_turn_with_resolved_asset_is_not_interrogated __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x124f7c9a0>
+
+    def test_knowledge_turn_with_resolved_asset_is_not_interrogated(monkeypatch) -> None:
+        # The production shape: statistics question, model resolves SPY, and the
+        # knowledge classifier confirms the user wants statistics, not a run.
+        from argus.agent_runtime import knowledge_answer as ka
+
+        async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
+            return ka.KnowledgeQueryExtraction(question_kind="market_stats", symbols=["SPY"])
+
+        monkeypatch.setattr(ka, "_classify_question", classify)
+        interpretation = StructuredInterpretation(
+            intent="unsupported_or_out_of_scope",
+            task_relation="new_task",
+            user_goal_summary="graded",
+            semantic_turn_act="unsupported_request",
+            requires_clarification=False,
+            assistant_response="Puedo mostrarte estadísticas del S&P 500 mediante SPY.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing="Ayúdame con estadísticas sobre el S&P 500",
+                strategy_thesis="Ayúdame con estadísticas sobre el S&P 500",
+                asset_universe=["SPY"],
+                asset_class="equity",
+                comparison_baseline="SPY",
+            ),
+        )
+        result = _run_stage(interpretation, "Ayúdame con estadísticas sobre el S&P 500")
+
+        assert result.decision.missing_required_fields == []
+        assert "entry_logic" not in result.decision.missing_required_fields
+        # The resolved asset routes the turn to the grounded answer instead of an
+        # interrogation or a bare admission.
+>       assert result.decision.reason_codes == ["knowledge_answer_market_stats"]
+E       AssertionError: assert ['llm_interpr...materialized'] == ['knowledge_a...market_stats']
+E
+E         At index 0 diff: 'llm_interpreter_used' != 'knowledge_answer_market_stats'
+E         Left contains one more item: 'unsupported_request_recovery_materialized'
+E         Use -v to get more diff
+
+tests/agent_runtime/test_graded_interpretation_routing.py:134: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-02 23:17:23.280 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:373 - Interpret stage started
+2026-09-02 23:17:23.281 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:428 - Interpret stage structured interpreter completed
+2026-09-02 23:17:23.281 | DEBUG    | argus.agent_runtime.stages.interpret:_stage_result_from_interpretation:469 - Interpret stage post-LLM repair started
+=========================== short test summary info ============================
+FAILED tests/agent_runtime/discovery/test_discovery_route.py::TestDiscoveryRouteFlagOff::test_detected_turn_language_reaches_discovery_composer
+FAILED tests/agent_runtime/test_graded_interpretation_routing.py::test_knowledge_turn_with_resolved_asset_is_not_interrogated
+======================= 2 failed, 2233 passed in 21.29s ========================

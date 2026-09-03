@@ -1,7 +1,7 @@
 # Issue #411: local fix and verification
 
-Follow-up: [discovery regression repair and live browser evidence](2026-09-03-issue-411-followup.md).
-That report supersedes this document's focused-test-only acceptance summary.
+Current handoff: [reconciled branch and fresh research browser evidence](2026-09-03-issue-411-reconciled.md).
+It supersedes this document's original local-only status and focused-test summary.
 
 The fix is committed locally for review. Production still runs the existing
 code. No merge, deployment, flag change, or GitHub issue closure was performed.
