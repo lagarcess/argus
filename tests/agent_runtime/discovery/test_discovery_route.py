@@ -95,7 +95,11 @@ class TestDiscoveryRouteFlagOff:
         assert str(patch["assistant_response"]).strip()
         assert patch["semantic_turn_act"] == "asset_discovery"
 
-    def test_discovery_wins_over_generic_result_followup_composition(self) -> None:
+    @pytest.mark.parametrize("rail_enabled", ["false", "true"])
+    def test_discovery_wins_over_generic_result_followup_composition(
+        self, monkeypatch: pytest.MonkeyPatch, rail_enabled: str
+    ) -> None:
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", rail_enabled)
         result = _run(
             message="Find companies similar to Nvidia",
             response=_discovery_interpretation(
