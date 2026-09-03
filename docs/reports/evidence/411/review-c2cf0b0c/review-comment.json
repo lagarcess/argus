@@ -1,0 +1,10 @@
+{
+  "id": 3921070867,
+  "html_url": "https://github.com/lagarcess/argus/pull/539#discussion_r3921070867",
+  "body": "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Preserve explicit strategy-route ownership over research**\n\nWhen the interpreter returns `intent=\"strategy_drafting\"`/`\"backtest_execution\"` or `semantic_turn_act=\"new_idea\"` together with an erroneous `research_query`, this predicate does not treat those explicit strategy signals as conflicting owners. If the draft only has a default-provenance strategy type plus reference fields, as with \u201cTest META from 2020 through 2024,\u201d `primary_research_query()` accepts the query and the research rail answers statistics instead of producing the requested backtest setup. Derive this check from the canonical strategy-route ownership predicate rather than maintaining a partial act list.\n\nAGENTS.md reference: [AGENTS.md:L30-L36](https://github.com/lagarcess/argus/blob/f6862e8ff50111c3d8a655aa303da4a81c467a74/AGENTS.md#L30-L36)\n\nUseful? React with \ud83d\udc4d\u00a0/ \ud83d\udc4e.",
+  "path": "src/argus/agent_runtime/interpreter/research_routing.py",
+  "line": 20,
+  "original_line": 20,
+  "commit_id": "f6862e8ff50111c3d8a655aa303da4a81c467a74",
+  "original_commit_id": "f6862e8ff50111c3d8a655aa303da4a81c467a74"
+}
