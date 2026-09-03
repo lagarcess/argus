@@ -1,0 +1,146 @@
+{
+  "baseline_scorecard": "docs/reports/evidence/2026-08-15-category-discovery-payload-routing/live-eval-scorecard-run2.json",
+  "candidate_sha": "9fec4bf70c95383f4afa536674ceac4f38104787",
+  "baseline_totals": {
+    "expected_failed": 0,
+    "failed": 11,
+    "passed": 49,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "candidate_totals": {
+    "expected_failed": 0,
+    "failed": 1,
+    "passed": 61,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "matched_cases": 60,
+  "missing_cases": [],
+  "regressed_previously_passing_cases": [],
+  "historical_cases_now_passing": 60,
+  "added_cases": [
+    {
+      "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "status": "passed",
+      "failed_checks": []
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "status": "failed",
+      "failed_checks": [
+        "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+        "capability_verdict: expected 'executable', got 'answer_only'",
+        "assets: expected ['KO'], got []",
+        "asset_class: expected 'equity', got None",
+        "strategy_type: expected 'dca_accumulation', got None",
+        "capital_amount: expected 13000, got None",
+        "contribution_period: expected 'monthly', got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['ready_to_respond']"
+      ]
+    }
+  ],
+  "historical_fixture_changes": [
+    {
+      "id": "asset_discovery_category_english_issue_244",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_peer_anchor_english_issue_244",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_comparison_anchor_english_issue_244",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_category_spanish_issue_244",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_recent_ipo_exact_issue_344",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true,
+            "min_discovery_rows": 1,
+            "names_unavailable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "differences": {
+        "offered": {
+          "before": null,
+          "after": {
+            "actionable": true
+          }
+        }
+      }
+    }
+  ]
+}
