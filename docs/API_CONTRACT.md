@@ -3431,6 +3431,9 @@ its existing find operation. Populated execution fields keep builder
 ownership unless `field_provenance[field]` explicitly says `default` and no
 user evidence span contradicts it. Missing or unknown provenance is never a
 default, and no execution field is exempt merely because of its name.
+Explicit strategy intent or a strategy turn act keeps builder ownership even
+when all execution fields are defaults. Research admission derives that
+decision from the same strategy-route predicate as the interpret stage.
 For a find operation, `asset_discovery` owns the search parameters and
 `needs_current_facts`. A missing discovery payload uses missing-target
 recovery; it never implies that stale model knowledge is sufficient.

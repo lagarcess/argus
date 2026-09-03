@@ -5,24 +5,22 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 
 
 def research_turn_has_conflicting_owner(interpretation: Any) -> bool:
     """A question payload cannot take execution, refusal or artifact ownership."""
     return bool(
-        strategy_has_execution_evidence(
+        strategy_route_expected(
+            intent=interpretation.intent,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
+        or strategy_has_execution_evidence(
             interpretation.candidate_strategy_draft, include_defaults=False
         )
         or interpretation.unsupported_constraints
-        or interpretation.semantic_turn_act
-        in {
-            "approval",
-            "answer_pending_need",
-            "refine_current_idea",
-            "result_followup",
-            "retry_failed_action",
-        }
+        or interpretation.semantic_turn_act in {"result_followup", "retry_failed_action"}
         or interpretation.artifact_target not in (None, "none")
         # An explicit discovery act owns the turn even when the interpreter
         # also supplies a generic result-composition hint. Artifact targets,

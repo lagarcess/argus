@@ -332,21 +332,22 @@ def test_survey_shapes_answer_natively_in_spanish(monkeypatch) -> None:
 def test_a_bare_comparison_is_a_question_not_a_half_built_backtest(
     monkeypatch,
 ) -> None:
-    """The P1: "Compare PLTR to LMT" carries no capital, window, or execution
-    verb, yet the builder claimed it and asked for a date window. The same
-    rail classifier now sees the turn before the clarification lands."""
+    """A primary-interpreted comparison remains research despite draft defaults.
+
+    The rail cannot override explicit strategy intent to repair a contradictory
+    primary interpretation; that would also steal genuine thin build requests.
+    """
     set_research_query(
         monkeypatch, globals(), question_kind="cross_company", symbols=["PLTR", "LMT"]
     )
     result = asyncio.run(
         ka.knowledge_answer_stage_result(
             interpretation=_interpretation(
-                intent="strategy_drafting",
-                semantic_turn_act="new_idea",
+                intent="conversation_followup",
+                semantic_turn_act="educational_question",
                 requires_clarification=True,
                 missing_required_fields=["date_range"],
-                # The interpreter injects this default for any two-asset
-                # mention; it is what shut the rail out in production.
+                # An incidental default cannot turn this question into a build.
                 candidate_strategy_draft=StrategySummary(
                     strategy_type="buy_and_hold",
                     asset_universe=["PLTR", "LMT"],

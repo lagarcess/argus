@@ -10,6 +10,12 @@ from typing import Any
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
 )
+from argus.agent_runtime.interpreter.strategy_routing import (
+    STRATEGY_TURN_ACTS as STRATEGY_TURN_ACTS,
+)
+from argus.agent_runtime.interpreter.strategy_routing import (
+    strategy_route_expected as _strategy_route_expected,
+)
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
@@ -36,13 +42,11 @@ from argus.agent_runtime.stages.interpret_internal.shared import (
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
     InterpretDecision,
-    SemanticTurnAct,
     StageResult,
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
-    IntentName,
     ResolutionProvenance,
     ResolutionSource,
     StrategySummary,
@@ -67,14 +71,6 @@ from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
-
-STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
-    "new_idea",
-    "answer_pending_need",
-    "refine_current_idea",
-    "approval",
-}
-
 
 _USER_GROUNDED_CAPITAL_SOURCES = frozenset(
     {
@@ -1286,16 +1282,6 @@ def _fresh_complete_restatement_started_new_confirmation(
             missing_required_fields=missing_required_fields,
         )
         and not requires_clarification
-    )
-
-
-def _strategy_route_expected(
-    *,
-    intent: IntentName,
-    semantic_turn_act: SemanticTurnAct | None,
-) -> bool:
-    return intent in {"strategy_drafting", "backtest_execution"} or (
-        semantic_turn_act in STRATEGY_TURN_ACTS
     )
 
 

@@ -332,7 +332,8 @@ def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
     "compare PLTR to LMT over the last 3 years" got the builder's capital
     question while the same question without a period got an answer. Only an
     unsupported verdict over a window the user themselves stated is a
-    described test.
+    described test. These are primary-interpreted questions; explicit strategy
+    ownership is separately protected even when its draft fields are defaults.
     """
     monkeypatch.setattr(ka, "research_rail_enabled", lambda: True)
     span = {
@@ -342,7 +343,8 @@ def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
     query = {"question_kind": "cross_company", "symbols": ["PLTR", "LMT"]}
 
     supported_with_window = _interpretation(
-        semantic_turn_act="new_idea",
+        intent="conversation_followup",
+        semantic_turn_act="educational_question",
         requires_clarification=True,
         research_query=query,
         candidate_strategy_draft=StrategySummary(
@@ -357,7 +359,8 @@ def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
     assert not ka.refusal_route_survives_classification(supported_with_window)
 
     supported_without_window = _interpretation(
-        semantic_turn_act="new_idea",
+        intent="conversation_followup",
+        semantic_turn_act="educational_question",
         requires_clarification=True,
         research_query=query,
         candidate_strategy_draft=StrategySummary(

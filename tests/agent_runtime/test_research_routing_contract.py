@@ -9,6 +9,7 @@ import pytest
 from argus.agent_runtime import knowledge_answer as ka
 from argus.agent_runtime import research_answer as ra
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.research_routing import primary_research_query
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
@@ -160,12 +161,63 @@ def test_stated_buy_and_hold_never_reaches_research_even_with_conflicting_query(
     )
 
 
+@pytest.mark.parametrize(
+    "response_type", [StructuredInterpretation, LLMInterpretationResponse]
+)
+@pytest.mark.parametrize(
+    "owner",
+    [
+        {"intent": "strategy_drafting"},
+        {"intent": "backtest_execution"},
+        {"semantic_turn_act": "new_idea"},
+    ],
+)
+def test_thin_strategy_request_owns_default_draft_despite_research_query(
+    response_type, owner
+):
+    payload = _interpretation(
+        **owner,
+        research_query={"question_kind": "market_stats", "symbols": ["META"]},
+    ).model_dump()
+    provenance = {"strategy_type": "default"}
+    payload["candidate_strategy_draft"] = {
+        "strategy_type": "buy_and_hold",
+        "asset_universe": ["META"],
+        "date_range": {"start": "2020-01-01", "end": "2024-12-31"},
+        **(
+            {"field_provenance": provenance}
+            if response_type is LLMInterpretationResponse
+            else {"extra_parameters": {"field_provenance": provenance}}
+        ),
+    }
+    interpretation = response_type.model_validate(payload)
+    # The thin request has no stated strategy type or capital; typed turn
+    # ownership must still outrank the contradictory question payload.
+    assert not strategy_has_execution_evidence(
+        interpretation.candidate_strategy_draft, include_defaults=False
+    )
+    assert primary_research_query(interpretation) is None
+
+
+def test_default_draft_does_not_claim_a_genuine_research_question():
+    interpretation = _interpretation(
+        candidate_strategy_draft={
+            "strategy_type": "buy_and_hold",
+            "extra_parameters": {"field_provenance": {"strategy_type": "default"}},
+        }
+    )
+    assert primary_research_query(interpretation) == interpretation.research_query
+
+
 @pytest.mark.parametrize("entry", ["knowledge", "discovery"])
 @pytest.mark.parametrize(
     "owner",
     [
         {"candidate_strategy_draft": {"strategy_type": "buy_and_hold"}},
         {"candidate_strategy_draft": {"cadence": "weekly", "capital_amount": 100}},
+        {"intent": "strategy_drafting"},
+        {"intent": "backtest_execution"},
+        {"semantic_turn_act": "new_idea"},
         {"semantic_turn_act": "approval"},
         {"semantic_turn_act": "answer_pending_need"},
         {"semantic_turn_act": "refine_current_idea"},
