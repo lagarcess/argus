@@ -1,0 +1,87 @@
+[
+  {
+    "query": {
+      "ownerId": "tea-d5rdkfk9c44c73e7a1ig",
+      "resource": "trn-08d4gdac8fqh1a67c73flu080",
+      "startTime": "2026-09-02T20:32:00Z",
+      "endTime": "2026-09-02T20:34:00Z",
+      "limit": 3
+    },
+    "status_code": 500
+  },
+  {
+    "query": {
+      "ownerId": "tea-d5rdkfk9c44c73e7a1ig",
+      "resource": "wfl-d8hpsmuq1p3s73duv3q0",
+      "startTime": "2026-09-02T20:32:00Z",
+      "endTime": "2026-09-02T20:34:00Z",
+      "limit": 3,
+      "taskRun": "trn-08d4gdac8fqh1a67c73flu080"
+    },
+    "status_code": 200,
+    "response": {
+      "hasMore": true,
+      "logs": [
+        {
+          "id": "2122b3bc-bb7b-43c0-b75b-81af5ba0aff4",
+          "labels": [
+            {
+              "name": "resource",
+              "value": "wfl-d8hpsmuq1p3s73duv3q0"
+            },
+            {
+              "name": "level",
+              "value": "debug"
+            },
+            {
+              "name": "type",
+              "value": "app"
+            }
+          ],
+          "message": "2026-09-02 20:33:19.010 | DEBUG    | argus.domain.market_data.assets:_resolve_live_provider_ticker:588 - Asset provider exact lookup cache hit symbol=SPY",
+          "timestamp": "2026-09-02T20:33:19.010297476Z"
+        },
+        {
+          "id": "95116d9b-4887-4e1d-8abe-761feb3d4272",
+          "labels": [
+            {
+              "name": "resource",
+              "value": "wfl-d8hpsmuq1p3s73duv3q0"
+            },
+            {
+              "name": "level",
+              "value": "info"
+            },
+            {
+              "name": "type",
+              "value": "app"
+            }
+          ],
+          "message": "2026-09-02 20:33:23.861 | INFO     | argus.llm.openrouter:record_openrouter_route_receipt:321 - OpenRouter route receipt",
+          "timestamp": "2026-09-02T20:33:23.86151284Z"
+        },
+        {
+          "id": "d50e48d0-c1d8-4295-ad8d-70d8e88863a7",
+          "labels": [
+            {
+              "name": "resource",
+              "value": "wfl-d8hpsmuq1p3s73duv3q0"
+            },
+            {
+              "name": "level",
+              "value": "debug"
+            },
+            {
+              "name": "type",
+              "value": "app"
+            }
+          ],
+          "message": "2026-09-02 20:33:23.864 | DEBUG    | argus.domain.market_data.assets:_resolve_live_provider_ticker:588 - Asset provider exact lookup cache hit symbol=KO",
+          "timestamp": "2026-09-02T20:33:23.864782419Z"
+        }
+      ],
+      "nextEndTime": "2026-09-02T20:33:19.010297476Z",
+      "nextStartTime": "2026-09-02T20:32:00Z"
+    }
+  }
+]
