@@ -70,7 +70,6 @@ class _Draft:
 
 def _state(message: str) -> RunState:
     state = RunState.new(current_user_message=message, recent_thread_history=[])
-    state.research_allowance_available = True
     return state
 
 

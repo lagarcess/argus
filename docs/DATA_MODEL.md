@@ -1658,13 +1658,13 @@ Tracks resource consumption for quotas and limits.
 
 ## 14.1 visitor_usage_counters
 
-Tracks discovery allowances for callers who do not have a durable account.
-This is intentionally separate from `usage_counters`, whose `user_id` is a
-foreign key to `profiles.id`.
+Tracks visitor-scoped and shared provider allowances without inventing a
+profile owner. This is intentionally separate from `usage_counters`, whose
+`user_id` is a foreign key to `profiles.id`.
 
 ### Fields
 - `visitor_key`: `text` (opaque keyed digest; never a raw address)
-- `resource`: `text` (`discovery_searches`)
+- `resource`: `text` (`discovery_searches`, `research_searches`)
 - `period`: `text` (`day`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`
@@ -1679,7 +1679,8 @@ foreign key to `profiles.id`.
 - **Window lookup index**:
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
-  execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
+  execute `settle_visitor_usage`, `claim_research_usage`, or
+  `purge_expired_visitor_usage`.
 - Expired rows are disposable operational data, but `period_end` is not a timer
   and nothing in the database acts on it. The row has no owner to cascade from,
   so it is deleted only when a successful non-dry-run of the guest cleanup job
@@ -1698,6 +1699,21 @@ foreign key to `profiles.id`.
 - If counter truth cannot be read, admission currently fails closed into the
   existing `discovery_limit_reached` recovery. Issue #244 retains that
   user-facing truth limitation for follow-up.
+
+### Research policy
+- A guest receives three provider-backed research questions per visitor per
+  UTC day. Renewing the temporary workspace does not reset that allowance.
+- Every signed-in or guest provider attempt also draws on the shared
+  `global:research` daily row. Its ceiling is configured by
+  `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` and defaults to `5000` when blank or
+  invalid.
+- `claim_research_usage` locks the shared row and optional guest row in one
+  transaction, checks both limits, and increments both or neither before
+  provider work starts. This is the concurrency boundary: simultaneous turns
+  from one visitor cannot both consume one remaining slot.
+- Cache hits, ordinary chat turns, unconfigured-provider paths, and persisted
+  thorough-job replays never call the claim. Claim failures degrade to the honest
+  research-capacity response and do not enter the provider path.
 
 ---
 

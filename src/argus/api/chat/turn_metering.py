@@ -1,9 +1,8 @@
-"""Post-terminal settlement of a turn's meters, as one step.
+"""Post-terminal settlement and evidence for a turn, as one step.
 
-Discovery and research settle together, from the same turn identity, at the
-same moment. Keeping them in one call is what stops the two from drifting
-apart: a turn that charges one meter against a visitor and the other against a
-user id is the bug this shape exists to prevent.
+Discovery usage settles here. Research capacity is already claimed at its
+provider boundary; its terminal sidecar is recorded here with the same turn
+identity.
 """
 
 from __future__ import annotations
@@ -21,7 +20,6 @@ def settle_metered_turn(
     user_id: str,
     is_guest: bool,
     client_identity: str | None,
-    guest_research_visitor_key: str | None,
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
@@ -38,7 +36,6 @@ def settle_metered_turn(
     settle_research_turn(
         runtime_result,
         user_id=user_id,
-        guest_visitor_key=guest_research_visitor_key,
         conversation_id=conversation_id,
         message_id=message_id,
         request_id=request_id,

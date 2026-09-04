@@ -45,7 +45,6 @@ def _interpretation() -> StructuredInterpretation:
 
 def _run(message: str, monkeypatch: pytest.MonkeyPatch, **fields: Any):
     state = RunState.new(current_user_message=message, recent_thread_history=[])
-    state.research_allowance_available = True
     return asyncio.run(
         ra.research_answer_stage_result(
             interpretation=_interpretation().model_copy(
