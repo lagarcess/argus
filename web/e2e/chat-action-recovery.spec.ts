@@ -3,6 +3,12 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const CONVERSATION_ID = "conv-actions";
 const RUN_ID = "run-actions";
 const CONFIRMATION_ID = "confirm-actions";
+const ISSUE_542_CONFIRMATION_ID = "confirm-issue-542-spent";
+const ISSUE_542_FRESH_CONFIRMATION_ID = "confirm-issue-542-fresh";
+const ISSUE_542_FAILED_ACTION_ID = "failed-action-issue-542";
+const ISSUE_542_FAILURE_MESSAGE =
+  "This confirmation had already been used for a different setup, so I did not start another backtest. Use Retry below to create a fresh confirmation, then run the new card.";
+const ISSUE_542_SYMBOLS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"];
 const CREATED_AT = "2026-06-16T12:00:00Z";
 const COVERAGE_RECOVERY_REQUEST = "Test AAPL coverage recovery";
 const COVERAGE_RECOVERY_PROMPT =
@@ -55,6 +61,7 @@ type MockChatApi = {
 type MockChatApiOptions = {
   language?: "en" | "es-419";
   initialConfirmation?: boolean;
+  rejectRunWithAdmissionConflict?: boolean;
   rejectRunWithWindowViolation?: boolean;
 };
 
@@ -76,6 +83,12 @@ const UPDATED_DATE_RANGE: MockDateRange = {
   start: "2025-02-01",
   end: "2025-05-01",
   display: "February 1, 2025 to May 1, 2025",
+};
+
+const ISSUE_542_DATE_RANGE: MockDateRange = {
+  start: "2025-09-04",
+  end: "2026-09-04",
+  display: "September 4, 2025 to September 4, 2026",
 };
 
 function formatCurrency(amount: number) {
@@ -106,14 +119,18 @@ function mockUser(language = "en") {
   };
 }
 
-function confirmationAction(type: string, label: string) {
+function confirmationAction(
+  type: string,
+  label: string,
+  confirmationId = CONFIRMATION_ID,
+) {
   return {
-    id: `${type}-${CONFIRMATION_ID}`,
+    id: `${type}-${confirmationId}`,
     type,
     label,
     presentation: "confirmation",
     payload: {
-      confirmation_id: CONFIRMATION_ID,
+      confirmation_id: confirmationId,
       conversation_id: CONVERSATION_ID,
       launch_payload_hash: "launch-hash-actions",
     },
@@ -124,11 +141,12 @@ function confirmationCard(
   dateRange: MockDateRange = DEFAULT_DATE_RANGE,
   assetSymbol = "AAPL",
   initialCapital = 10000,
+  confirmationId = CONFIRMATION_ID,
 ) {
   const formattedCapital = formatCurrency(initialCapital);
 
   return {
-    confirmation_id: CONFIRMATION_ID,
+    confirmation_id: confirmationId,
     confirmation_state: "active",
     title: `${assetSymbol} buy and hold`,
     summary: `Buy and hold ${assetSymbol} with SPY as the comparison benchmark.`,
@@ -153,12 +171,31 @@ function confirmationCard(
       "No fees or slippage",
     ],
     actions: [
-      confirmationAction("run_backtest", "Run backtest"),
-      confirmationAction("change_dates", "Change dates"),
-      confirmationAction("change_asset", "Change asset"),
-      confirmationAction("adjust_assumptions", "Adjust assumptions"),
-      confirmationAction("cancel_confirmation", "Cancel"),
+      confirmationAction("run_backtest", "Run backtest", confirmationId),
+      confirmationAction("change_dates", "Change dates", confirmationId),
+      confirmationAction("change_asset", "Change asset", confirmationId),
+      confirmationAction("adjust_assumptions", "Adjust assumptions", confirmationId),
+      confirmationAction("cancel_confirmation", "Cancel", confirmationId),
     ],
+  };
+}
+
+function issue542ConfirmationCard(confirmationId: string) {
+  const card = confirmationCard(
+    ISSUE_542_DATE_RANGE,
+    ISSUE_542_SYMBOLS.join(", "),
+    100000,
+    confirmationId,
+  );
+  return {
+    ...card,
+    title: "Five-stock buy and hold",
+    summary: "Buy and hold five equities with SPY as the comparison benchmark.",
+    rows: card.rows.map((row) =>
+      row.key === "assets"
+        ? { ...row, value: ISSUE_542_SYMBOLS.join(", ") }
+        : row,
+    ),
   };
 }
 
@@ -399,7 +436,19 @@ async function mockChatApi(
     );
   };
 
-  if (options.initialConfirmation) {
+  if (options.rejectRunWithAdmissionConflict) {
+    messages.splice(
+      0,
+      messages.length,
+      persistedUserMessage(
+        "msg-user-issue-542-confirm",
+        "Buy and hold AAPL, MSFT, NVDA, GOOGL, and AMZN with $100,000 through today.",
+      ),
+      persistedAssistantMessage("msg-confirmation-issue-542", "", {
+        confirmation_card: issue542ConfirmationCard(ISSUE_542_CONFIRMATION_ID),
+      }),
+    );
+  } else if (options.initialConfirmation) {
     upsertConfirmationMessages(
       "Buy and hold AAPL with SPY in early 2025.",
       "msg-confirmation-initial",
@@ -473,6 +522,19 @@ async function mockChatApi(
     });
   });
 
+  await page.route(
+    `**/api/v1/conversations/${CONVERSATION_ID}/activity`,
+    async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          operation: { status: "idle", kind: null, updated_at: CREATED_AT },
+          attention: { status: "none", cursor: null },
+        }),
+      }),
+  );
+
   await page.route(`**/api/v1/conversations/${CONVERSATION_ID}/messages**`, async (route) =>
     route.fulfill({
       status: 200,
@@ -481,7 +543,7 @@ async function mockChatApi(
     }),
   );
 
-  await page.route("**/api/v1/conversations", async (route) => {
+  await page.route(/\/api\/v1\/conversations(?:\?.*)?$/, async (route) => {
     if (route.request().method() === "POST") {
       return route.fulfill({
         status: 200,
@@ -525,6 +587,14 @@ async function mockChatApi(
     }),
   );
 
+  await page.route("**/api/v1/memory/availability", async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ available: false, reason: "disabled" }),
+    }),
+  );
+
   await page.route("**/api/v1/feedback", async (route) => {
     feedbackRequests.push(route.request().postDataJSON() as Record<string, unknown>);
     return route.fulfill({
@@ -537,6 +607,120 @@ async function mockChatApi(
   await page.route("**/api/v1/chat/stream", async (route) => {
     const body = route.request().postDataJSON() as StreamRequest;
     streamRequests.push(body);
+
+    if (
+      options.rejectRunWithAdmissionConflict &&
+      body.action?.type === "run_backtest" &&
+      body.action.payload?.confirmation_id === ISSUE_542_CONFIRMATION_ID
+    ) {
+      const failedJob = {
+        id: "job-issue-542-conflict",
+        conversation_id: CONVERSATION_ID,
+        request_message_id: "msg-user-run-issue-542",
+        confirmation_message_id: "msg-confirmation-issue-542",
+        operation_scope: "chat.run_backtest",
+        status: "failed",
+        result_run_id: null,
+        failure_code: "idempotency_conflict",
+        failure_detail: "confirmation_identity_already_spent",
+        retryable: false,
+        queued_at: CREATED_AT,
+        started_at: null,
+        finished_at: CREATED_AT,
+        created_at: CREATED_AT,
+        updated_at: CREATED_AT,
+      };
+      const failedAction = {
+        artifact_kind: "failed_action",
+        artifact_id: ISSUE_542_FAILED_ACTION_ID,
+        artifact_status: "failed",
+        metadata: {
+          retryable: true,
+          recovery_mode: "reopen_confirmation",
+          launch_payload: {
+            strategy_type: "buy_and_hold",
+            symbols: ISSUE_542_SYMBOLS,
+            initial_capital: 100000,
+            date_range: {
+              start: ISSUE_542_DATE_RANGE.start,
+              end: ISSUE_542_DATE_RANGE.end,
+            },
+          },
+        },
+      };
+      messages.splice(
+        0,
+        messages.length,
+        persistedUserMessage(
+          "msg-user-issue-542-confirm",
+          "Buy and hold AAPL, MSFT, NVDA, GOOGL, and AMZN with $100,000 through today.",
+        ),
+        persistedAssistantMessage("msg-confirmation-issue-542", "", {
+          confirmation_card: {
+            ...issue542ConfirmationCard(ISSUE_542_CONFIRMATION_ID),
+            confirmation_state: "superseded",
+            status: "not_completed",
+            statusLabel: "Not completed",
+            actions: [],
+          },
+        }),
+        persistedUserMessage("msg-user-run-issue-542", "Run backtest", {
+          chat_action: body.action,
+        }),
+        persistedAssistantMessage(
+          "msg-assistant-job-issue-542",
+          ISSUE_542_FAILURE_MESSAGE,
+          {
+            backtest_job: failedJob,
+            backtest_job_id: failedJob.id,
+            latest_failed_action_reference: failedAction,
+          },
+        ),
+      );
+      return fulfillSse(route, [
+        { type: "stage_start", stage: "execute" },
+        {
+          type: "final",
+          payload: {
+            stage_outcome: "execution_failed_terminally",
+            assistant_response: ISSUE_542_FAILURE_MESSAGE,
+            backtest_job: failedJob,
+            latest_failed_action_reference: failedAction,
+            message_id: "msg-assistant-job-issue-542",
+          },
+        },
+        "[DONE]",
+      ]);
+    }
+
+    if (
+      options.rejectRunWithAdmissionConflict &&
+      body.action?.type === "retry_failed_action"
+    ) {
+      const freshConfirmation = issue542ConfirmationCard(
+        ISSUE_542_FRESH_CONFIRMATION_ID,
+      );
+      messages.push(
+        persistedUserMessage("msg-user-retry-issue-542", "Retry", {
+          chat_action: body.action,
+        }),
+        persistedAssistantMessage("msg-confirmation-issue-542-fresh", "", {
+          confirmation_card: freshConfirmation,
+        }),
+      );
+      return fulfillSse(route, [
+        { type: "stage_start", stage: "confirm" },
+        {
+          type: "final",
+          payload: {
+            stage_outcome: "ready_for_confirmation",
+            confirmation: freshConfirmation,
+            message_id: "msg-confirmation-issue-542-fresh",
+          },
+        },
+        "[DONE]",
+      ]);
+    }
 
     if (
       options.rejectRunWithWindowViolation &&
@@ -1128,6 +1312,78 @@ test("run result actions hydrate after reload and submit feedback from more menu
   await page.getByRole("button", { name: "Refine idea" }).click();
   await expect(page.getByText("Tell me what you want to refine next.")).toBeVisible();
   expect(api.streamRequests.at(-1)?.action?.type).toBe("refine_strategy");
+});
+
+test("admission conflict stays specific and retryable live and after reload", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  page.on("requestfailed", (request) => {
+    browserErrors.push(
+      `${request.failure()?.errorText ?? "request failed"}: ${request.url()}`,
+    );
+  });
+  const api = await mockChatApi(page, {
+    rejectRunWithAdmissionConflict: true,
+  });
+  await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
+    waitUntil: "networkidle",
+  });
+
+  for (const symbol of ISSUE_542_SYMBOLS) {
+    await expect(page.getByText(symbol, { exact: true })).toBeVisible();
+  }
+  await expect(page.getByText("$100,000", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Sep 4, 2025 → Sep 4, 2026", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Run backtest" }).click();
+
+  await expect(page.getByText(ISSUE_542_FAILURE_MESSAGE)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  const evidenceDir = process.env.ARGUS_EVIDENCE_DIR;
+  if (evidenceDir) {
+    await page.screenshot({
+      path: `${evidenceDir}/admission-conflict-live.png`,
+      fullPage: true,
+    });
+  }
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByText(ISSUE_542_FAILURE_MESSAGE)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  if (evidenceDir) {
+    await page.screenshot({
+      path: `${evidenceDir}/admission-conflict-reload.png`,
+      fullPage: true,
+    });
+  }
+
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect.poll(() => api.streamRequests.length).toBe(2);
+  expect(api.streamRequests[1]?.action).toMatchObject({
+    type: "retry_failed_action",
+    payload: { failed_action_id: ISSUE_542_FAILED_ACTION_ID },
+  });
+  await expect(page.getByText("Ready to run", { exact: true })).toBeVisible();
+  const freshRunButton = page.getByRole("button", {
+    name: "Run backtest",
+  });
+  await expect(freshRunButton).toBeVisible();
+  await expect(freshRunButton).toBeEnabled();
+  await freshRunButton.scrollIntoViewIfNeeded();
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
+  if (evidenceDir) {
+    await page.locator("section.argus-confirmation-reveal").last().screenshot({
+      path: `${evidenceDir}/retry-fresh-confirmation.png`,
+    });
+  }
+  expect(browserErrors).toEqual([]);
 });
 
 test("private-alpha readiness smoke covers starter, Spanish edit, result, reload, retry, and feedback", async ({

@@ -1452,8 +1452,10 @@ canonical immutable `backtest_runs` row and reference it through
   `backtests.run`; references the retained immutable confirmation `messages.id`)
 - `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`, or
   `chat.research`)
-- `idempotency_key`: `text` (Required, 1-128 visible ASCII characters for an
-  accepted reservation; null only for a terminal pre-start failure receipt)
+- `idempotency_key`: `text` (Required for every current writer. Accepted jobs
+  use the caller's 1-128 visible ASCII reservation key; terminal pre-start
+  receipts use a distinct derived `rejection:<hash>` key. Legacy rows may be
+  null.)
 - `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
   operation's canonical identity object)
 - `payload_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
@@ -1546,8 +1548,9 @@ outcome.
 - Jobs are idempotent at
   `UNIQUE(user_id, operation_scope, idempotency_key)`. Exact retries return the
   current row before capacity/usage checks; a different `identity_hash` is a
-  collision and never returns the old row. The partial uniqueness boundary
-  excludes null-key pre-start failure receipts.
+  collision and never returns the old row. All current jobs and pre-start
+  failure receipts participate in this boundary; the SQL partial predicate
+  excludes only legacy rows whose key is null.
 - The reservation lasts for the durable job record's lifetime. A caller does
   not reuse the same key for a new execution after an elapsed retention window.
 - Chat Run actions use `confirmation_id` as `idempotency_key`. Direct jobs may
@@ -2008,7 +2011,8 @@ Generous usage boundaries tracked via the `usage_counters` table.
      `503 backtest_capacity_exceeded` with `Retry-After: 15`.
    - If the same reservation key carries a different identity: return
      `409 idempotency_conflict` without returning the old job, and persist a
-     separate null-key failed receipt for the refused chat attempt.
+     separate failed receipt under a distinct derived `rejection:<hash>` key
+     for the refused chat attempt.
 5. **Execute**: Dispatch workflow execution, or run the admitted direct
    compatibility path synchronously, against the durable job.
 6. **Response**: Return result or job state. Include rate-limit headers only

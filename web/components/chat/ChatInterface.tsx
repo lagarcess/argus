@@ -130,6 +130,7 @@ import {
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
+  backtestJobMessage,
 } from "@/lib/chat-backtest-jobs";
 import {
   applyRecoverableRunReconciliation,
@@ -1410,21 +1411,21 @@ export default function ChatInterface() {
           );
         } else if (finalBacktestJob) {
           const finalAssistantId = finalMessageId ?? assistantId;
+          const finalBacktestJobMessage = backtestJobMessage({
+            id: finalAssistantId,
+            content: finalText || undefined,
+            job: finalBacktestJob,
+            metadata: finalPayload,
+          });
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
                 applyBacktestJobUpdate(
-                  replaceOrAppendFinalAssistantMessage(prev, assistantId, {
-                    id: finalAssistantId,
-                    role: "ai",
-                    kind: "backtest_job",
-                    content: finalText || undefined,
-                    backtestJob: finalBacktestJob,
-                    artifactId: finalBacktestJob.id,
-                    artifactType: "backtest_job",
-                    artifactStatus: finalBacktestJob.status,
-                    actions: undefined,
-                  }),
+                  replaceOrAppendFinalAssistantMessage(
+                    prev,
+                    assistantId,
+                    finalBacktestJobMessage,
+                  ),
                   { job: finalBacktestJob, run: null },
                 ),
               ),

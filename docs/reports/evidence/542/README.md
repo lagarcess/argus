@@ -54,6 +54,31 @@ checked rather than assumed:
    conflict keeps the failed job terminal while exposing the existing Retry
    action, which rebuilds the setup as a fresh confirmation before another run.
 
+## Browser acceptance
+
+The Chromium acceptance flow uses the reproduced five-symbol, `$100,000`,
+end-today setup and drives the stream contract through the admission-conflict
+decision. It proves the failed card renders the recorded reason and a visible
+Retry action, reloads the conversation and proves both survive hydration, then
+clicks Retry and verifies the structured failed-action identity produces a new
+active confirmation.
+
+![Live admission-conflict card with recorded reason and Retry](./admission-conflict-live.png)
+
+![Reloaded admission-conflict card with recorded reason and Retry](./admission-conflict-reload.png)
+
+![Fresh confirmation produced by Retry](./retry-fresh-confirmation.png)
+
+```text
+cd web
+ARGUS_EVIDENCE_DIR=../docs/reports/evidence/542 \
+PLAYWRIGHT_PORT=3142 \
+bunx playwright test e2e/chat-action-recovery.spec.ts \
+  --project=chromium --grep 'admission conflict stays specific'
+
+1 passed
+```
+
 ## Deterministic verification
 
 The regression was exercised without another paid/provider backtest because

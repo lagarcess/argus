@@ -172,6 +172,53 @@ describe("chat backtest jobs", () => {
     expect(pendingBacktestJobIds([message!])).toEqual(["job-1"]);
   });
 
+  test("reload keeps a failed job's recorded reason and structured Retry action", () => {
+    const failureMessage =
+      "This confirmation had already been used for a different setup, so I did not start another backtest. Use Retry below to create a fresh confirmation, then run the new card.";
+    const failedJob = job({
+      status: "failed",
+      failure_code: "idempotency_conflict",
+      failure_detail: "confirmation_identity_already_spent",
+      retryable: false,
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const persisted = apiMessageWithJob(failedJob);
+    persisted.content = failureMessage;
+    persisted.metadata = {
+      ...persisted.metadata,
+      latest_failed_action_reference: {
+        artifact_kind: "failed_action",
+        artifact_id: "failed-action-1",
+        artifact_status: "failed",
+        metadata: {
+          retryable: true,
+          recovery_mode: "reopen_confirmation",
+          launch_payload: {
+            strategy_type: "buy_and_hold",
+            symbols: ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"],
+          },
+        },
+      },
+    };
+
+    const hydrated = backtestJobMessageFromApi(persisted);
+    const reloaded = hydrateMessagesFromApi([persisted]).messages[0];
+
+    for (const message of [hydrated, reloaded]) {
+      expect(message?.kind).toBe("backtest_job");
+      expect(message?.content).toBe(failureMessage);
+      expect(message?.backtestJob?.failure_code).toBe("idempotency_conflict");
+      expect(message?.actions).toEqual([
+        expect.objectContaining({
+          type: "retry_failed_action",
+          labelKey: "common.retry",
+          artifactId: "failed-action-1",
+          payload: { failed_action_id: "failed-action-1" },
+        }),
+      ]);
+    }
+  });
+
   test("the research operation scope survives every parser entry point", () => {
     // The polling reconciliation compares operation_scope against
     // "chat.research": if any serialized surface drops the field, a
@@ -462,6 +509,7 @@ describe("chat backtest jobs", () => {
 
     expect(updated.kind).toBe("backtest_job");
     expect(updated.backtestJob?.status).toBe("failed");
+    expect(updated.content).toBeUndefined();
     expect(pendingBacktestJobIds([updated])).toEqual([]);
   });
 
@@ -1123,7 +1171,7 @@ describe("chat backtest jobs", () => {
     expect(chat).toMatch(
       /const finalBacktestJob = backtestJobFromFinalPayload\(\s*finalPayload,?\s*\)/,
     );
-    expect(chat).toContain('kind: "backtest_job"');
+    expect(chatInterface).toContain("backtestJobMessage({");
     expect(chat).toContain("applyBacktestJobUpdate(");
     expect(polling).toContain("pendingBacktestJobKey");
     expect(polling).toContain("backtestJobResponseAwaitsPolling(response)");

@@ -379,6 +379,11 @@ export default function ChatMessage({
               <BacktestJobCard
                 job={message.backtestJob}
                 canRetry={Boolean(retryAction)}
+                failureMessage={displayContent}
+                onRetry={
+                  retryAction ? () => onAction?.(retryAction) : undefined
+                }
+                retryLabel={retryAction ? actionLabel(retryAction) : undefined}
               />
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
@@ -803,7 +808,9 @@ export default function ChatMessage({
                 </Tooltip>
                 {/* The failure block owns the retry control; the footer only
                     offers it for messages without that block. */}
-                {retryAction && !message.assistantRecoveryCode && (
+                {retryAction &&
+                  !message.assistantRecoveryCode &&
+                  message.kind !== "backtest_job" && (
                   <Tooltip content={actionLabel(retryAction)} side="top" delay={150}>
                     <button
                       type="button"
