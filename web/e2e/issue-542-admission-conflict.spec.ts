@@ -229,7 +229,10 @@ async function mockIssue542Api(page: Page) {
     if (path === "/api/v1/chat/stream") {
       const body = request.postDataJSON() as StreamRequest;
       streamRequests.push(body);
-      if (body.action?.type === "run_backtest") {
+      if (
+        body.action?.type === "run_backtest" &&
+        body.action.payload?.confirmation_id === SPENT_CONFIRMATION_ID
+      ) {
         const job = failedJob();
         const failedAction = failedActionReference();
         messages.splice(
@@ -291,6 +294,22 @@ async function mockIssue542Api(page: Page) {
               stage_outcome: "ready_for_confirmation",
               confirmation,
               message_id: "msg-confirmation-issue-542-fresh",
+            },
+          },
+          "[DONE]",
+        ]);
+      }
+      if (
+        body.action?.type === "run_backtest" &&
+        body.action.payload?.confirmation_id === FRESH_CONFIRMATION_ID
+      ) {
+        return fulfillSse(route, [
+          {
+            type: "final",
+            payload: {
+              stage_outcome: "completed",
+              assistant_response: "Fresh confirmation accepted.",
+              message_id: "msg-fresh-confirmation-accepted",
             },
           },
           "[DONE]",
@@ -372,6 +391,17 @@ test("admission conflict stays specific and retryable live and after reload", as
       fullPage: true,
     });
   }
+
+  await page.getByRole("button", { name: "Run backtest" }).click();
+  await expect.poll(() => api.streamRequests.length).toBe(3);
+  expect(api.streamRequests[2]?.action).toMatchObject({
+    type: "run_backtest",
+    payload: { confirmation_id: FRESH_CONFIRMATION_ID },
+  });
+  expect(api.streamRequests[2]?.action?.payload?.confirmation_id).not.toBe(
+    SPENT_CONFIRMATION_ID,
+  );
+  await expect(page.getByText("Fresh confirmation accepted.")).toBeVisible();
 
   expect(api.unexpectedRequests).toEqual([]);
   expect(browserErrors).toEqual([]);

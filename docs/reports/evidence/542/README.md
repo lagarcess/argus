@@ -61,7 +61,8 @@ end-today setup and drives the stream contract through the admission-conflict
 decision. It proves the failed card renders the recorded reason and a visible
 Retry action, reloads the conversation and proves both survive hydration, then
 clicks Retry and verifies the structured failed-action identity produces a new
-active confirmation.
+active confirmation. It then clicks Run on that replacement card and verifies
+the outgoing confirmation identity is fresh and differs from the spent one.
 
 ![Live admission-conflict card with recorded reason and Retry](./admission-conflict-live.png)
 
