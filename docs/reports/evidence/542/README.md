@@ -159,6 +159,12 @@ archive. The remaining OpenRouter failure-origin assertion also fails on the
 untouched `5d408acf` base. The clean-host GitHub suite remains the terminal
 full-suite gate.
 
-The fetched `origin/codex/private-alpha-next` head was still exactly
-`5d408acf6b1ed9608dfe8b757ff41372f9b9daeb`, so no reconciliation merge or
-evidence invalidation was required.
+The lane started from `5d408acf6b1ed9608dfe8b757ff41372f9b9daeb` and was
+reconciled one way with `origin/codex/private-alpha-next` at
+`4c8e80639adbe1fe7bbe9c384a30e0ad81f17357` in merge
+`43f49aac0c7fc1a6eb1be1630d777802275c7820`. The integration delta also edits
+`DATA_MODEL.md`, but only in the guest research-allowance sections; it does not
+overlap the backtest job, failure-receipt, frontend, or browser surfaces changed
+here. The browser acceptance and deterministic frontend gates were re-run after
+reconciliation, so the earlier captured images remain valid for the reconciled
+tree.
