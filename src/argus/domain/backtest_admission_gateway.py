@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from argus.domain.backtest_admission import admission_limits
+from argus.domain.backtest_admission import admission_limits, canonical_hash
 from argus.domain.usage_limits import SIMULATION_ALLOWANCE_LIMITS
 
 _BACKTEST_JOB_RESERVATION_COLUMNS = (
@@ -26,6 +26,65 @@ def _row_one(result: Any) -> Any:
     if isinstance(data, list):
         return data[0] if data else None
     return data
+
+
+def _rejection_receipt_idempotency_key(
+    *,
+    user_id: str,
+    operation_scope: str,
+    rejected_idempotency_key: str,
+    request_message_id: str | None,
+    identity_hash: str,
+    payload_hash: str,
+    failure_code: str,
+    failure_detail: str,
+) -> str:
+    receipt_identity = {
+        "user_id": user_id,
+        "operation_scope": operation_scope,
+        "rejected_idempotency_key": rejected_idempotency_key,
+        "request_message_id": request_message_id,
+        "identity_hash": identity_hash,
+        "payload_hash": payload_hash,
+        "failure_code": failure_code,
+        "failure_detail": failure_detail,
+    }
+    digest = canonical_hash(receipt_identity).removeprefix("sha256:")
+    return f"rejection:{digest}"
+
+
+def _is_unique_violation(error: Exception) -> bool:
+    if str(getattr(error, "code", "")) == "23505":
+        return True
+    message = " ".join(str(value) for value in error.args)
+    return "duplicate key value violates unique constraint" in message.lower()
+
+
+def _rejection_receipt_matches(
+    row: dict[str, Any],
+    *,
+    conversation_id: str | None,
+    request_message_id: str | None,
+    confirmation_message_id: str | None,
+    rejected_idempotency_key: str,
+    identity_hash: str,
+    payload_hash: str,
+    failure_code: str,
+    failure_detail: str,
+) -> bool:
+    metadata = row.get("execution_metadata")
+    return (
+        row.get("status") == "failed"
+        and row.get("conversation_id") == conversation_id
+        and row.get("request_message_id") == request_message_id
+        and row.get("confirmation_message_id") == confirmation_message_id
+        and row.get("identity_hash") == identity_hash
+        and row.get("payload_hash") == payload_hash
+        and row.get("failure_code") == failure_code
+        and row.get("failure_detail") == failure_detail
+        and isinstance(metadata, dict)
+        and metadata.get("rejected_idempotency_key") == rejected_idempotency_key
+    )
 
 
 def _serialized_allowance_limits(
@@ -142,6 +201,7 @@ def record_backtest_job_rejection(
     *,
     user_id: str,
     operation_scope: str,
+    rejected_idempotency_key: str,
     identity_hash: str,
     payload_hash: str,
     launch_payload: dict[str, Any],
@@ -153,32 +213,71 @@ def record_backtest_job_rejection(
     confirmation_message_id: str | None = None,
     execution_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Persist a terminal receipt without taking over the rejected reservation."""
+    """Persist one terminal receipt without taking over the rejected reservation."""
 
     finished_at = _now_iso()
-    result = (
-        client.table("backtest_jobs")
-        .insert(
-            {
-                "user_id": user_id,
-                "conversation_id": conversation_id,
-                "request_message_id": request_message_id,
-                "confirmation_message_id": confirmation_message_id,
-                "operation_scope": operation_scope,
-                "idempotency_key": None,
-                "identity_hash": identity_hash,
-                "payload_hash": payload_hash,
-                "launch_payload": launch_payload,
-                "status": "failed",
-                "failure_code": failure_code,
-                "failure_detail": failure_detail,
-                "retryable": retryable,
-                "finished_at": finished_at,
-                "execution_metadata": execution_metadata or {},
-            }
-        )
-        .execute()
+    receipt_key = _rejection_receipt_idempotency_key(
+        user_id=user_id,
+        operation_scope=operation_scope,
+        rejected_idempotency_key=rejected_idempotency_key,
+        request_message_id=request_message_id,
+        identity_hash=identity_hash,
+        payload_hash=payload_hash,
+        failure_code=failure_code,
+        failure_detail=failure_detail,
     )
+    receipt_metadata = {
+        **(execution_metadata or {}),
+        "rejected_idempotency_key": rejected_idempotency_key,
+    }
+    try:
+        result = (
+            client.table("backtest_jobs")
+            .insert(
+                {
+                    "user_id": user_id,
+                    "conversation_id": conversation_id,
+                    "request_message_id": request_message_id,
+                    "confirmation_message_id": confirmation_message_id,
+                    "operation_scope": operation_scope,
+                    "idempotency_key": receipt_key,
+                    "identity_hash": identity_hash,
+                    "payload_hash": payload_hash,
+                    "launch_payload": launch_payload,
+                    "status": "failed",
+                    "failure_code": failure_code,
+                    "failure_detail": failure_detail,
+                    "retryable": retryable,
+                    "finished_at": finished_at,
+                    "execution_metadata": receipt_metadata,
+                }
+            )
+            .execute()
+        )
+    except Exception as error:
+        if not _is_unique_violation(error):
+            raise
+        existing = get_backtest_job_reservation(
+            client,
+            user_id=user_id,
+            operation_scope=operation_scope,
+            idempotency_key=receipt_key,
+        )
+        if existing is None or not _rejection_receipt_matches(
+            existing,
+            conversation_id=conversation_id,
+            request_message_id=request_message_id,
+            confirmation_message_id=confirmation_message_id,
+            rejected_idempotency_key=rejected_idempotency_key,
+            identity_hash=identity_hash,
+            payload_hash=payload_hash,
+            failure_code=failure_code,
+            failure_detail=failure_detail,
+        ):
+            raise RuntimeError(
+                "Existing backtest rejection receipt did not match the attempted rejection."
+            ) from error
+        return existing
     row = _row_one(result)
     if row is None:
         raise RuntimeError("Backtest admission rejection was not persisted.")

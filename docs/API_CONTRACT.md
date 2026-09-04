@@ -201,15 +201,16 @@ Alpha supports server-side idempotency for expensive state-changing operations.
 - Reusing the reservation key with a different canonical identity returns
   `409 idempotency_conflict`. The response must not expose the existing job or
   Run, increment usage, reserve capacity, or execute work. Chat execution also
-  persists a separate terminal failure receipt with a null reservation key;
-  that receipt records the attempted identity and does not mutate or disclose
-  the job that already owns the key.
+  persists a separate terminal failure receipt with a derived
+  `rejection:<hash>` key; that receipt records the attempted identity and does
+  not mutate or disclose the job that already owns the confirmation key.
 - Keys are scoped to the authenticated user. The same text used by another user
   is a different reservation and never reveals the first user's state.
 
 Durable `backtest_jobs` rows therefore store `operation_scope`,
 `idempotency_key`, `identity_hash`, and the existing launch `payload_hash` as
-separate fields. `idempotency_key` is non-null for accepted jobs, and the
+separate fields. `idempotency_key` is non-null for accepted jobs and failure
+receipts, and the
 database uniqueness boundary is
 `UNIQUE(user_id, operation_scope, idempotency_key)`.
 
@@ -237,8 +238,9 @@ can disclose or mutate state.
 
 After a non-replay chat refusal, the API inserts one terminal
 `backtest_jobs.status = failed` receipt for the attempted launch. The receipt
-has `idempotency_key = null`, stable `failure_code` and `failure_detail`, and
-`execution_metadata.refused_before_dispatch = true`; it neither consumes an
+has a distinct `rejection:<hash>` idempotency key, stable `failure_code` and
+`failure_detail`, and `execution_metadata.refused_before_dispatch = true`; it
+neither consumes an
 allowance nor occupies queued/running capacity. The assistant message links to
 that receipt and derives its user-safe copy from the receipt's recorded
 `failure_code`. If the receipt cannot be written, production fails closed

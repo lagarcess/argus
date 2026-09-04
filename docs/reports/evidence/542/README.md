@@ -44,12 +44,15 @@ checked rather than assumed:
    is spent. Before appending a new card, the API replaces any already-reserved
    identity across the confirmation payload and artifact reference.
 2. If admission still refuses a chat launch, the API inserts a separate
-   terminal `backtest_jobs` receipt. It has a null reservation key, the attempted
-   identity and launch payload, `status = failed`, and stable `failure_code`,
-   `failure_detail`, and `retryable` values. The earlier reservation is not
-   changed.
+   terminal `backtest_jobs` receipt. It has a stable, derived
+   `rejection:<hash>` identity distinct from the rejected confirmation key, the
+   attempted identity and launch payload, `status = failed`, and stable
+   `failure_code`, `failure_detail`, and `retryable` values. A replay returns
+   that same receipt, and the earlier reservation is not changed.
 3. The runtime links that failed job as the attempt's artifact and chooses the
-   user-safe assistant message from the stored `failure_code`.
+   user-safe assistant message from the stored `failure_code`. An identity
+   conflict keeps the failed job terminal while exposing the existing Retry
+   action, which rebuilds the setup as a fresh confirmation before another run.
 
 ## Deterministic verification
 
@@ -64,7 +67,7 @@ poetry run pytest tests/test_issue_542_durable_backtest_failures.py \
 31 passed
 
 poetry run pytest tests/test_supabase_gateway.py -q -o addopts=''
-57 passed
+58 passed
 
 poetry run pytest \
   tests/domain/test_market_data_coverage.py::test_equity_window_ending_today_mid_session_clamps_to_last_completed_session \
@@ -87,7 +90,12 @@ poetry run pytest tests/test_issue_542_durable_backtest_failures.py \
   tests/agent_runtime/test_execute_recovery.py \
   tests/test_backtest_job_write_invariant.py \
   tests/test_supabase_gateway.py -q -o addopts=''
-167 passed
+168 passed
+
+poetry run pytest tests/agent_runtime/test_interpret_stage.py \
+  tests/test_chat_runtime_reload_guardrails.py -q -o addopts='' \
+  -k retry_failed_action
+1 passed, 274 deselected
 
 poetry run ruff check src tests workflows scripts
 All checks passed
@@ -99,6 +107,19 @@ Budget violations: none
 The two runtime timing variables are blanked only to keep the test module's
 monkeypatched timeout values from being overridden by this worktree's ignored
 `.env`. The production defaults and source are unchanged.
+
+## Review closure
+
+The first exact-head Codex review identified two valid gaps in the initial
+repair. The follow-up delta now proves both:
+
+- An identity-conflict job remains terminal and non-retryable, while its
+  failed-action artifact exposes Retry. That established action rebuilds a
+  fresh confirmation instead of resubmitting the spent confirmation ID.
+- Refusal receipts use a stable derived key over the attempted action. The
+  existing database uniqueness boundary makes a concurrent or transport replay
+  converge on the first receipt; the gateway reads and validates that receipt
+  after a unique violation instead of inserting a duplicate.
 
 Integration reconciliation and exact-head CI are recorded in the pull request
 once the candidate head is published.

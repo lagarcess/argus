@@ -161,10 +161,16 @@ class _ConflictReceiptGateway:
         return {"decision": "conflict"}
 
     def record_backtest_job_rejection(self, **kwargs: Any) -> dict[str, Any]:
+        rejected_key = kwargs.pop("rejected_idempotency_key")
+        execution_metadata = {
+            **kwargs.pop("execution_metadata"),
+            "rejected_idempotency_key": rejected_key,
+        }
         receipt = {
             "id": "job-542-failed-before-start",
             "status": "failed",
-            "idempotency_key": None,
+            "idempotency_key": "rejection:issue-542",
+            "execution_metadata": execution_metadata,
             **kwargs,
         }
         self.failure_receipts.append(receipt)
@@ -210,7 +216,11 @@ def test_conflicting_today_launch_records_reason_and_drives_user_copy(
     }
     assert len(gateway.failure_receipts) == 1
     receipt = gateway.failure_receipts[0]
-    assert receipt["idempotency_key"] is None
+    assert receipt["idempotency_key"].startswith("rejection:")
+    assert receipt["idempotency_key"] != SPENT_CONFIRMATION_ID
+    assert receipt["execution_metadata"]["rejected_idempotency_key"] == (
+        SPENT_CONFIRMATION_ID
+    )
     assert receipt["failure_code"] == "idempotency_conflict"
     assert receipt["failure_detail"] == "confirmation_identity_already_spent"
     assert receipt["launch_payload"]["request"]["symbols"] == SYMBOLS
@@ -224,4 +234,9 @@ def test_conflicting_today_launch_records_reason_and_drives_user_copy(
     assert result.patch["backtest_job"]["failure_code"] == "idempotency_conflict"
     prompt = result.patch["assistant_prompt"]
     assert "already been used for a different setup" in prompt
+    assert "fresh confirmation" in prompt
     assert "could not complete" not in prompt
+    assert result.patch["backtest_job"]["retryable"] is False
+    failed_action = result.patch["latest_failed_action_reference"]
+    assert failed_action["metadata"]["retryable"] is True
+    assert failed_action["metadata"]["recovery_mode"] == "reopen_confirmation"

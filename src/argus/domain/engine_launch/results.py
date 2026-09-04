@@ -69,7 +69,8 @@ USER_SAFE_FAILURE_MESSAGES = {
     ),
     "idempotency_conflict": (
         "This confirmation had already been used for a different setup, so I did "
-        "not start another backtest. Review the latest card and run it again."
+        "not start another backtest. Use Retry below to create a fresh confirmation, "
+        "then run the new card."
     ),
     "confirmation_changed": (
         "The confirmation changed before this backtest could start, so nothing ran. "

@@ -49,11 +49,12 @@ def failed_async_job_result(
         if failure_code == "backtest_capacity_exceeded"
         else "tool_execution_error"
     )
+    failed_action_retryable = retryable or failure_code == "idempotency_conflict"
     failed_action_patch = failed_action_reference_patch(
         payload=payload,
         failure_classification=failure_classification,
         error=assistant_prompt,
-        retryable=retryable,
+        retryable=failed_action_retryable,
     )
     failed_action_reference = failed_action_patch["latest_failed_action_reference"]
     job_reference = ArtifactReference(

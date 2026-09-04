@@ -52,6 +52,7 @@ def _record_rejection(
     job = gateway.record_backtest_job_rejection(
         user_id=context.user_id,
         operation_scope=CHAT_RUN_SCOPE,
+        rejected_idempotency_key=context.idempotency_key,
         identity_hash=identity_hash,
         payload_hash=payload_digest,
         launch_payload=launch_payload,

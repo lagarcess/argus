@@ -56,7 +56,7 @@
 - Test: `tests/test_backtest_jobs_shadow.py`
 
 - [x] Define one canonical mapping from admission decision to failure code, detail, and retryability.
-- [x] Insert an atomic terminal `backtest_jobs` receipt for admission rejections, with a null reservation key so the earlier successful reservation is never mutated.
+- [x] Insert an atomic terminal `backtest_jobs` receipt for admission rejections, with a stable derived receipt key so transport replay cannot duplicate the failure and the earlier successful reservation is never mutated.
 - [x] Return the stored job through the runtime so assistant-message metadata links to the durable failure.
 - [x] Update existing admission-rejection tests to require a failed job rather than no row.
 - [x] Run the focused admission and issue tests.
@@ -94,6 +94,6 @@
 
 - [x] Fetch `origin/codex/private-alpha-next`, record its current SHA, and compare semantic overlap with the original base.
 - [x] If integration advanced, merge it one way into this worker branch and rerun only invalidated evidence plus exact-head deterministic gates. (Not needed: integration remained at the original base.)
-- [ ] Commit with a conventional message, push the branch, and open a Draft PR targeting `codex/private-alpha-next` with `Closes #542` and the required structured sections.
-- [ ] Add existing relevant labels, request review, inspect unresolved threads, and report exact-head CI state.
+- [x] Commit with a conventional message, push the branch, and open a Draft PR targeting `codex/private-alpha-next` with `Closes #542` and the required structured sections.
+- [x] Add existing relevant labels, request review, inspect unresolved threads, and report exact-head CI state.
 - [ ] Stop with the PR open; do not merge or deploy.

@@ -1490,10 +1490,12 @@ canonical immutable `backtest_runs` row and reference it through
   `queued_at` and `confirmation_message_id` null and `started_at` set to the
   admission transaction timestamp.
 - A refused chat attempt is inserted directly as `failed`, with
-  `idempotency_key` null, `started_at` null, and `finished_at` set. Its
+  a distinct `rejection:<hash>` idempotency key, `started_at` null, and
+  `finished_at` set. Its
   `identity_hash`, `payload_hash`, and `launch_payload` describe the attempted
   run; `execution_metadata` records the rejected key and admission decision.
-  It never owns a reservation, consumes allowance, or occupies capacity.
+  It never owns the rejected confirmation's reservation, consumes allowance,
+  or occupies capacity.
 
 ### Failure Semantics
 Job lifecycle status is separate from engine/runtime failure semantics.

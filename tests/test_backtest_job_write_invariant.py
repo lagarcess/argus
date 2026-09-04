@@ -146,7 +146,8 @@ EXPECTED_WRITE_SITES = {
         "postgrest-insert",
     ): _requires(
         '"status": "failed"',
-        '"idempotency_key": None',
+        '"idempotency_key": receipt_key',
+        '"rejected_idempotency_key": rejected_idempotency_key',
         '"finished_at": finished_at',
         absent=('"result_run_id":', '"started_at":'),
     ),
