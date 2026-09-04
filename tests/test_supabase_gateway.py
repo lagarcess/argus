@@ -1396,8 +1396,18 @@ class _BacktestJobTable:
                 ]
             return SimpleNamespace(data=rows)
         if self.operation == "insert" and self.payload is not None:
+            idempotency_key = self.payload.get("idempotency_key")
+            if idempotency_key is not None and any(
+                row.get("user_id") == self.payload.get("user_id")
+                and row.get("operation_scope") == self.payload.get("operation_scope")
+                and row.get("idempotency_key") == idempotency_key
+                for row in self.client.existing_jobs
+            ):
+                raise _UniqueViolationError
             self.client.inserted_jobs.append(self.payload)
-            return SimpleNamespace(data=[{"id": "job-1", **self.payload}])
+            row = {"id": f"job-{len(self.client.inserted_jobs)}", **self.payload}
+            self.client.existing_jobs.append(row)
+            return SimpleNamespace(data=[row])
         if self.operation == "update" and self.payload is not None:
             matches = [
                 row
@@ -1411,6 +1421,10 @@ class _BacktestJobTable:
             self.client.updated_job_filters.append(dict(self.filters))
             return SimpleNamespace(data=[updated])
         return SimpleNamespace(data=[])
+
+
+class _UniqueViolationError(RuntimeError):
+    code = "23505"
 
 
 def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
@@ -1454,6 +1468,70 @@ def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
             "execution_metadata": {"shadow_mode": True, "source": "api_chat"},
         }
     ]
+
+
+def test_record_backtest_job_rejection_replays_one_terminal_receipt() -> None:
+    client = _BacktestJobClient()
+    gateway = SupabaseGateway(client=client)
+
+    payload = {
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "request_message_id": "message-1",
+        "confirmation_message_id": "confirmation-message-1",
+        "operation_scope": "chat.run_backtest",
+        "rejected_idempotency_key": "confirmation-spent",
+        "identity_hash": "sha256:identity",
+        "payload_hash": "sha256:payload",
+        "launch_payload": {"request": {"symbols": ["NVDA", "MSFT"]}},
+        "failure_code": "idempotency_conflict",
+        "failure_detail": "confirmation_identity_already_spent",
+        "retryable": False,
+        "execution_metadata": {"refused_before_dispatch": True},
+    }
+
+    row = gateway.record_backtest_job_rejection(**payload)
+    replay = gateway.record_backtest_job_rejection(**payload)
+
+    assert replay["id"] == row["id"]
+    assert replay["idempotency_key"] == row["idempotency_key"]
+    assert len(client.inserted_jobs) == 1
+    assert row["id"] == "job-1"
+    [receipt] = client.inserted_jobs
+    assert receipt["status"] == "failed"
+    assert receipt["idempotency_key"].startswith("rejection:")
+    assert receipt["idempotency_key"] != "confirmation-spent"
+    assert receipt["identity_hash"] == "sha256:identity"
+    assert receipt["failure_code"] == "idempotency_conflict"
+    assert receipt["failure_detail"] == "confirmation_identity_already_spent"
+    assert receipt["finished_at"]
+
+
+def test_record_backtest_job_rejection_rejects_mismatched_receipt_collision() -> None:
+    client = _BacktestJobClient()
+    gateway = SupabaseGateway(client=client)
+
+    common = {
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "request_message_id": "message-1",
+        "confirmation_message_id": "confirmation-message-1",
+        "operation_scope": "chat.run_backtest",
+        "rejected_idempotency_key": "confirmation-spent",
+        "identity_hash": "sha256:identity",
+        "payload_hash": "sha256:payload",
+        "launch_payload": {"request": {"symbols": ["NVDA", "MSFT"]}},
+        "failure_code": "idempotency_conflict",
+        "failure_detail": "confirmation_identity_already_spent",
+        "retryable": False,
+        "execution_metadata": {"refused_before_dispatch": True},
+    }
+
+    gateway.record_backtest_job_rejection(**common)
+    client.existing_jobs[0]["failure_detail"] = "unexpected_existing_detail"
+
+    with pytest.raises(RuntimeError, match="did not match the attempted rejection"):
+        gateway.record_backtest_job_rejection(**common)
 
 
 def test_backtest_reservation_query_includes_internal_launch_payload() -> None:

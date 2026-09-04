@@ -1452,7 +1452,10 @@ canonical immutable `backtest_runs` row and reference it through
   `backtests.run`; references the retained immutable confirmation `messages.id`)
 - `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`, or
   `chat.research`)
-- `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
+- `idempotency_key`: `text` (Required for every current writer. Accepted jobs
+  use the caller's 1-128 visible ASCII reservation key; terminal pre-start
+  receipts use a distinct derived `rejection:<hash>` key. Legacy rows may be
+  null.)
 - `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
   operation's canonical identity object)
 - `payload_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
@@ -1488,13 +1491,21 @@ canonical immutable `backtest_runs` row and reference it through
   for the job record's lifetime. A new `backtests.run` row starts `running` with
   `queued_at` and `confirmation_message_id` null and `started_at` set to the
   admission transaction timestamp.
+- A refused chat attempt is inserted directly as `failed`, with
+  a distinct `rejection:<hash>` idempotency key, `started_at` null, and
+  `finished_at` set. Its
+  `identity_hash`, `payload_hash`, and `launch_payload` describe the attempted
+  run; `execution_metadata` records the rejected key and admission decision.
+  It never owns the rejected confirmation's reservation, consumes allowance,
+  or occupies capacity.
 
 ### Failure Semantics
 Job lifecycle status is separate from engine/runtime failure semantics.
 
 - `status` answers where the job is in its lifecycle.
 - `failure_code` is a stable machine code such as `market_data_unavailable`,
-  `invalid_date_range`, `unsupported_indicator`, or `workflow_timeout`.
+  `invalid_date_range`, `unsupported_indicator`, `workflow_timeout`, or
+  `idempotency_conflict`.
 - `failure_detail` is a user-safe grouping such as `market_data_issue`,
   `invalid_date_window`, `unsupported_rule`, or `execution_failed`.
 - `retryable` is computed from the failure category, failure code, attempts, and
@@ -1537,12 +1548,19 @@ outcome.
 - Jobs are idempotent at
   `UNIQUE(user_id, operation_scope, idempotency_key)`. Exact retries return the
   current row before capacity/usage checks; a different `identity_hash` is a
-  collision and never returns the old row.
+  collision and never returns the old row. All current jobs and pre-start
+  failure receipts participate in this boundary; the SQL partial predicate
+  excludes only legacy rows whose key is null.
 - The reservation lasts for the durable job record's lifetime. A caller does
   not reuse the same key for a new execution after an elapsed retention window.
 - Chat Run actions use `confirmation_id` as `idempotency_key`. Direct jobs may
   omit `conversation_id` so the existing direct request shape remains
   compatible, but they remain owner-scoped by `user_id`.
+- Before a newly appended confirmation card is published, the server reads
+  this reservation owner. A proposed `confirmation_id` that already owns a job
+  is replaced across the payload, card, and artifact reference. The durable
+  reservation is therefore the single owner of whether a confirmation identity
+  is spent.
 - `confirmation_message_id` is required for `chat.run_backtest` and the linked
   immutable confirmation artifact is retained for the job record's lifetime;
   direct `backtests.run` jobs keep this field null.
@@ -2008,7 +2026,9 @@ Generous usage boundaries tracked via the `usage_counters` table.
    - If global capacity is exhausted: return
      `503 backtest_capacity_exceeded` with `Retry-After: 15`.
    - If the same reservation key carries a different identity: return
-     `409 idempotency_conflict` without returning the old job.
+     `409 idempotency_conflict` without returning the old job, and persist a
+     separate failed receipt under a distinct derived `rejection:<hash>` key
+     for the refused chat attempt.
 5. **Execute**: Dispatch workflow execution, or run the admitted direct
    compatibility path synchronously, against the durable job.
 6. **Response**: Return result or job state. Include rate-limit headers only

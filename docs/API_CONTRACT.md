@@ -200,15 +200,26 @@ Alpha supports server-side idempotency for expensive state-changing operations.
   counts zero additional simulations.
 - Reusing the reservation key with a different canonical identity returns
   `409 idempotency_conflict`. The response must not expose the existing job or
-  Run, increment usage, reserve capacity, or execute work.
+  Run, increment usage, reserve capacity, or execute work. Chat execution also
+  persists a separate terminal failure receipt with a derived
+  `rejection:<hash>` key; that receipt records the attempted identity and does
+  not mutate or disclose the job that already owns the confirmation key.
 - Keys are scoped to the authenticated user. The same text used by another user
   is a different reservation and never reveals the first user's state.
 
 Durable `backtest_jobs` rows therefore store `operation_scope`,
 `idempotency_key`, `identity_hash`, and the existing launch `payload_hash` as
-separate fields. `idempotency_key` is non-null for accepted jobs, and the
+separate fields. `idempotency_key` is non-null for accepted jobs and failure
+receipts, and the
 database uniqueness boundary is
 `UNIQUE(user_id, operation_scope, idempotency_key)`.
+
+Every newly appended confirmation card checks this durable reservation before
+publication. If its proposed `confirmation_id` is already reserved, the server
+mints a fresh confirmation identity and rewrites the card and payload together.
+An accepted job therefore spends its confirmation identity for the lifetime of
+the reservation; checkpoint or fallback state cannot make that identity active
+again on a later card.
 
 #### Atomic admission and backpressure
 
@@ -224,6 +235,16 @@ the job and charge the allowance together. Per-user exhaustion is evaluated
 before global exhaustion when both apply. Exact replay returns before every
 allowance or capacity check, while a collision returns before either boundary
 can disclose or mutate state.
+
+After a non-replay chat refusal, the API inserts one terminal
+`backtest_jobs.status = failed` receipt for the attempted launch. The receipt
+has a distinct `rejection:<hash>` idempotency key, stable `failure_code` and
+`failure_detail`, and `execution_metadata.refused_before_dispatch = true`; it
+neither consumes an
+allowance nor occupies queued/running capacity. The assistant message links to
+that receipt and derives its user-safe copy from the receipt's recorded
+`failure_code`. If the receipt cannot be written, production fails closed
+instead of emitting an unrecorded business failure.
 
 The private-alpha limits remain:
 
@@ -422,6 +443,11 @@ One action identity maps to one durable backtest job. The canonical Run id is
 stable because finalization derives it from that same job identity and retries
 reuse the job. A new intentional experiment requires a new confirmation and
 therefore a new action identity.
+
+The one-row rule applies to accepted reservation owners. A refused attempt may
+have a separate terminal failure receipt with no reservation key; this is
+audit evidence, not an executable job and not a second owner of the action
+identity.
 
 The owner-scoped lookup is
 `GET /api/v1/backtest-jobs/by-action/{confirmation_id}` and returns the existing

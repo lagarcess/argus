@@ -3,9 +3,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from argus.agent_runtime.confirmation_artifacts import confirmation_id_from_payload
+from loguru import logger
+
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_id_from_payload,
+    new_confirmation_id,
+)
 from argus.agent_runtime.state.models import ArtifactReference
 from argus.api.schemas import BacktestRun
+from argus.domain.backtest_admission import CHAT_RUN_SCOPE
 from argus.domain.backtest_message_projection import result_fact_bank
 
 
@@ -58,6 +64,73 @@ def confirmation_id_for_runtime_card(
     if isinstance(payload, dict):
         return confirmation_id_from_payload(payload, fallback=fallback)
     return fallback or new_id()
+
+
+def ensure_unspent_confirmation_identity(
+    runtime_result: dict[str, Any],
+    *,
+    gateway: Any | None,
+    user_id: str,
+    new_id: Callable[[], str] = new_confirmation_id,
+) -> str:
+    """A durable run reservation spends its confirmation identity forever.
+
+    Normal turn retries replay their persisted assistant message before this
+    boundary. Reaching this function means a new confirmation card is about to
+    be appended, so an identity already owned by a job must be replaced.
+    """
+
+    proposed_id = confirmation_id_for_runtime_card(runtime_result, new_id=new_id)
+    payload = runtime_result.get("confirmation_payload")
+    if gateway is None or not isinstance(payload, dict):
+        return proposed_id
+    reservation_reader = getattr(gateway, "get_backtest_job_reservation", None)
+    if not callable(reservation_reader):
+        return proposed_id
+    reservation = reservation_reader(
+        user_id=user_id,
+        operation_scope=CHAT_RUN_SCOPE,
+        idempotency_key=proposed_id,
+    )
+    if not isinstance(reservation, dict):
+        return proposed_id
+
+    replacement_id = new_id()
+    payload["confirmation_id"] = replacement_id
+    payload["artifact_id"] = replacement_id
+    _replace_confirmation_reference_identity(
+        runtime_result,
+        replacement_id=replacement_id,
+        confirmation_payload=payload,
+    )
+    logger.warning(
+        "Spent confirmation identity replaced before card publication",
+        prior_confirmation_id=proposed_id,
+        replacement_confirmation_id=replacement_id,
+        reservation_job_id=reservation.get("id"),
+    )
+    return replacement_id
+
+
+def _replace_confirmation_reference_identity(
+    runtime_result: dict[str, Any],
+    *,
+    replacement_id: str,
+    confirmation_payload: dict[str, Any],
+) -> None:
+    references = runtime_result.get("artifact_references")
+    if not isinstance(references, list):
+        return
+    for reference in references:
+        if not isinstance(reference, dict):
+            continue
+        if reference.get("artifact_kind") != "confirmation":
+            continue
+        reference["artifact_id"] = replacement_id
+        metadata = reference.get("metadata")
+        if isinstance(metadata, dict):
+            metadata["confirmation_id"] = replacement_id
+            metadata["confirmation_payload"] = confirmation_payload
 
 
 def saved_strategy_metadata(run: BacktestRun, strategy_id: str) -> dict[str, Any]:
