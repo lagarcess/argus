@@ -1,0 +1,113 @@
+{
+  "title": "AAPL Buy and Hold · Tested with Argus",
+  "metas": [
+    [
+      "viewport",
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    [
+      "next-size-adjust",
+      ""
+    ],
+    [
+      "theme-color",
+      "#ffffff"
+    ],
+    [
+      "theme-color",
+      "#191c1f"
+    ],
+    [
+      "description",
+      "AAPL · Jan 2, 2024 to Mar 1, 2024 · Total return: +3.3% · A what if, run on past market data. Not a tip."
+    ],
+    [
+      "robots",
+      "noindex, nofollow, nocache"
+    ],
+    [
+      "googlebot",
+      "noindex, nofollow, noimageindex"
+    ],
+    [
+      "mobile-web-app-capable",
+      "yes"
+    ],
+    [
+      "apple-mobile-web-app-title",
+      "Argus"
+    ],
+    [
+      "apple-mobile-web-app-status-bar-style",
+      "default"
+    ],
+    [
+      "og:title",
+      "AAPL Buy and Hold"
+    ],
+    [
+      "og:description",
+      "AAPL · Jan 2, 2024 to Mar 1, 2024 · Total return: +3.3% · A what if, run on past market data. Not a tip."
+    ],
+    [
+      "og:site_name",
+      "Argus"
+    ],
+    [
+      "og:image",
+      "http://localhost:3000/r/lWu-TtABZ4AX41tbEvFD7j7YfmspHZHW/opengraph-image?8299d3dbfcdb669f"
+    ],
+    [
+      "og:image:type",
+      "image/png"
+    ],
+    [
+      "og:image:width",
+      "1200"
+    ],
+    [
+      "og:image:height",
+      "630"
+    ],
+    [
+      "og:image:alt",
+      "Tested with Argus"
+    ],
+    [
+      "og:type",
+      "article"
+    ],
+    [
+      "twitter:card",
+      "summary_large_image"
+    ],
+    [
+      "twitter:title",
+      "AAPL Buy and Hold"
+    ],
+    [
+      "twitter:description",
+      "AAPL · Jan 2, 2024 to Mar 1, 2024 · Total return: +3.3% · A what if, run on past market data. Not a tip."
+    ],
+    [
+      "twitter:image",
+      "http://localhost:3000/r/lWu-TtABZ4AX41tbEvFD7j7YfmspHZHW/opengraph-image?8299d3dbfcdb669f"
+    ],
+    [
+      "twitter:image:alt",
+      "Tested with Argus"
+    ],
+    [
+      "twitter:image:type",
+      "image/png"
+    ],
+    [
+      "twitter:image:width",
+      "1200"
+    ],
+    [
+      "twitter:image:height",
+      "630"
+    ]
+  ]
+}
