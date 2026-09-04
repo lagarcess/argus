@@ -144,9 +144,14 @@ max_catalogs = 2
 # Analytics Buckets is available to Supabase Pro plan.
 # [storage.analytics.buckets.my-warehouse]
 
-# Store vector embeddings in S3 for large and durable datasets
+# Store vector embeddings in S3 for large and durable datasets.
+# Off because nothing here uses it and it is a Pro feature: with it on, every
+# preview branch fails its Configurations task with HTTP 402 and pauses the
+# migration and seed tasks behind it, so the check never reaches the migrations
+# it exists to run. Semantic memory recall uses the pgvector TABLE
+# public.argus_memory_vectors, created by a migration, which is unrelated.
 [storage.vector]
-enabled = true
+enabled = false
 max_buckets = 10
 max_indexes = 5
 
