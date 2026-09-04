@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 from typing import Any
 
@@ -11,6 +12,12 @@ from argus.api.chat.backtest_jobs import (
     ShadowBacktestJobTool,
     backtest_job_shadow_context,
 )
+from argus.api.main import app
+from argus.domain.research.admission import (
+    ResearchAttemptAdmission,
+    claim_current_research_attempt,
+)
+from fastapi.testclient import TestClient
 
 CONVERSATION_ID = "91931579-0cc8-4fa0-bedd-726abb0afa9c"
 SPENT_CONFIRMATION_ID = "confirmation-17470c6c-83e9-4305-bf6d-645ec3a40be9"
@@ -240,3 +247,114 @@ def test_conflicting_today_launch_records_reason_and_drives_user_copy(
     failed_action = result.patch["latest_failed_action_reference"]
     assert failed_action["metadata"]["retryable"] is True
     assert failed_action["metadata"]["recovery_mode"] == "reopen_confirmation"
+
+
+def _final_stream_payload(stream: str) -> dict[str, Any]:
+    for line in stream.splitlines():
+        if not line.startswith("data: {"):
+            continue
+        event = json.loads(line.removeprefix("data: "))
+        if event.get("type") == "final":
+            return dict(event["payload"])
+    raise AssertionError("chat stream did not emit a final event")
+
+
+def test_one_request_can_claim_research_then_record_one_admission_refusal(
+    monkeypatch,
+) -> None:
+    """The #544 allowance claim and #542 refusal share one router scope."""
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "true")
+
+    gateway = _ConflictReceiptGateway()
+    claim_guest_keys: list[str | None] = []
+    runtime_turn = 0
+
+    def claim_research(*, guest_visitor_key: str | None) -> ResearchAttemptAdmission:
+        claim_guest_keys.append(guest_visitor_key)
+        return ResearchAttemptAdmission(available=True)
+
+    async def runtime_events(**kwargs: Any):
+        nonlocal runtime_turn
+        del kwargs
+        runtime_turn += 1
+        if runtime_turn == 1:
+            yield {"type": "final", "payload": _confirmation_result()}
+            return
+
+        first_claim = claim_current_research_attempt()
+        second_claim = claim_current_research_attempt()
+        assert first_claim is second_claim
+
+        state = RunState.new(current_user_message="run it", recent_thread_history=[])
+        state.confirmation_payload = _today_launch_payload()
+        result = execute_stage(
+            state=state,
+            tool=ShadowBacktestJobTool(
+                delegate=None,
+                gateway_getter=lambda: gateway,
+                dev_memory_fallback_getter=lambda: False,
+            ),
+            max_retries=1,
+        )
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": result.outcome,
+                "assistant_response": result.patch["assistant_prompt"],
+                "backtest_job": result.patch["backtest_job"],
+                "latest_failed_action_reference": result.patch[
+                    "latest_failed_action_reference"
+                ],
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "claim_research_provider_attempt", claim_research)
+    monkeypatch.setattr(
+        agent_router,
+        "guest_research_visitor_key",
+        lambda **_: "visitor:issue-542-544-composition",
+    )
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", runtime_events)
+
+    client = TestClient(app)
+    client.post("/api/v1/dev/reset")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    confirmation_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Test five symbols with $100,000 through today.",
+            "language": "en",
+        },
+    )
+    confirmation = _final_stream_payload(confirmation_response.text)["confirmation"]
+    run_action = next(
+        action for action in confirmation["actions"] if action["type"] == "run_backtest"
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": run_action["payload"]["confirmation_id"]},
+        json={
+            "conversation_id": conversation["id"],
+            "action": run_action,
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert claim_guest_keys == ["visitor:issue-542-544-composition"]
+    assert len(gateway.failure_receipts) == 1
+    [receipt] = gateway.failure_receipts
+    assert receipt["failure_code"] == "idempotency_conflict"
+    assert receipt["failure_detail"] == "confirmation_identity_already_spent"
+    assert receipt["execution_metadata"]["refused_before_dispatch"] is True
+    failed_job = _final_stream_payload(response.text)["backtest_job"]
+    assert failed_job["id"] == receipt["id"]
+    assert failed_job["failure_code"] == receipt["failure_code"]
+    assert failed_job["failure_detail"] == receipt["failure_detail"]
