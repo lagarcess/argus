@@ -10,6 +10,10 @@ from argus.agent_runtime import research_answer as ra
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
+from argus.domain.research.admission import (
+    ResearchAttemptAdmission,
+    research_attempt_admission_context,
+)
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
@@ -31,13 +35,8 @@ def _interpretation() -> StructuredInterpretation:
     )
 
 
-def _state(
-    message: str, *, allowance: bool = True, guest_exhausted: bool = False
-) -> RunState:
-    state = RunState.new(current_user_message=message, recent_thread_history=[])
-    state.research_allowance_available = allowance
-    state.research_guest_allowance_exhausted = guest_exhausted
-    return state
+def _state(message: str) -> RunState:
+    return RunState.new(current_user_message=message, recent_thread_history=[])
 
 
 def _classify(monkeypatch: pytest.MonkeyPatch, **fields: Any) -> None:
@@ -53,13 +52,11 @@ def _wire_client(monkeypatch: pytest.MonkeyPatch, documents) -> RecordingTranspo
     return transport
 
 
-def _run(
-    message: str, *, user=USER, allowance: bool = True, guest_exhausted: bool = False
-):
+def _run(message: str, *, user=USER):
     return asyncio.run(
         ra.research_answer_stage_result(
             interpretation=_interpretation(),
-            state=_state(message, allowance=allowance, guest_exhausted=guest_exhausted),
+            state=_state(message),
             user=user,
         )
     )
@@ -444,7 +441,10 @@ def test_exhausted_ceiling_is_an_honest_note_not_a_disappearance(monkeypatch) ->
 
     monkeypatch.setattr(ka, "_voiced_answer", voice)
 
-    result = _run("What is Apple at?", allowance=False)
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(available=False)
+    ):
+        result = _run("What is Apple at?")
 
     assert result is not None
     assert transport.requests == [], "an exhausted ceiling must not spend"
@@ -452,6 +452,52 @@ def test_exhausted_ceiling_is_an_honest_note_not_a_disappearance(monkeypatch) ->
     assert sidecar["degraded"] == {"code": "research_capacity_exhausted"}
     assert "capacity" in result.stage_patch["assistant_response"].lower()
     assert result.stage_patch["next_experiments"]["rows"]
+
+
+def test_atomic_claim_denial_stops_an_inline_provider_call(monkeypatch) -> None:
+    """A turn admitted before a rival spent the last slot must re-check at
+    the billable boundary and degrade without touching the provider."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+
+    async def voice(*, message, language, facts, fallback, user=None):
+        return fallback
+
+    from argus.agent_runtime import knowledge_answer as ka
+
+    monkeypatch.setattr(ka, "_voiced_answer", voice)
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(
+            available=False,
+            guest_exhausted=True,
+        )
+    ):
+        result = _run("What is Apple at?")
+
+    assert result is not None
+    assert transport.requests == []
+    assert "free research" in result.stage_patch["assistant_response"]
+    assert result.stage_patch["research"]["usage"]["cache_status"] == "bypass"
+
+
+def test_cache_hit_never_claims_research_capacity(monkeypatch) -> None:
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+    assert _run("What is Apple trading at right now?") is not None
+
+    def reject_claim() -> ResearchAttemptAdmission:
+        raise AssertionError("a cache hit must not claim capacity")
+
+    with research_attempt_admission_context(reject_claim):
+        result = _run("What is Apple trading at right now?")
+
+    assert result is not None
+    assert len(transport.requests) == 1
+    assert result.stage_patch["research"]["usage"]["cache_status"] == "hit"
 
 
 def test_provider_failure_degrades_without_fabricating(monkeypatch) -> None:
@@ -518,7 +564,10 @@ def test_a_guest_who_spent_their_own_allowance_is_told_so(
 
     monkeypatch.setattr(ka, "_voiced_answer", voice)
 
-    result = _run("What is Apple at?", user=user, allowance=False, guest_exhausted=True)
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(available=False, guest_exhausted=True)
+    ):
+        result = _run("What is Apple at?", user=user)
 
     assert result is not None
     answer = result.stage_patch["assistant_response"].lower()
@@ -545,7 +594,10 @@ def test_a_shared_outage_still_says_shared(monkeypatch, user, must_say) -> None:
 
     monkeypatch.setattr(ka, "_voiced_answer", voice)
 
-    result = _run("What is Apple at?", user=user, allowance=False)
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(available=False)
+    ):
+        result = _run("What is Apple at?", user=user)
 
     assert result is not None
     assert must_say in result.stage_patch["assistant_response"].lower()

@@ -28,6 +28,7 @@ from argus.agent_runtime.interpreter.research_routing import (
 from argus.agent_runtime.research_grounded import (  # noqa: F401
     RESEARCH_SCHEMA_VERSION,
     compose_completed_research,
+    research_capacity_exhausted_for_job,
     research_failure_note,
     research_prompt_for_job,
     store_research_packet_for_job,
@@ -171,15 +172,6 @@ async def _dispatch(
             decision=decision,
         )
     if query.question_kind in _MARKET_SURVEY_KINDS:
-        if not state.research_allowance_available:
-            return await grounded.exhausted_result(
-                query=query,
-                subjects=[],
-                interpretation=interpretation,
-                state=state,
-                user=user,
-                decision=decision,
-            )
         return await grounded.grounded_result(
             query=query,
             subjects=_resolved_subjects(query),
@@ -205,15 +197,6 @@ async def _dispatch(
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
     if off_coverage or query.asset_class_hint in ("crypto", "currency_pair"):
         return await grounded.off_coverage_result(
-            query=query,
-            subjects=subjects,
-            interpretation=interpretation,
-            state=state,
-            user=user,
-            decision=decision,
-        )
-    if not state.research_allowance_available:
-        return await grounded.exhausted_result(
             query=query,
             subjects=subjects,
             interpretation=interpretation,

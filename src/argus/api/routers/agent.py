@@ -81,8 +81,8 @@ from argus.api.chat.request_admission import (
     reject_invalid_non_run_confirmation_action,
 )
 from argus.api.chat.research_evidence import (
+    claim_research_provider_attempt,
     guest_research_visitor_key,
-    research_allowance_for_turn,
 )
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.result_link import apply_result_link_outcome
@@ -127,6 +127,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.backtest_finalization import BacktestFinalizationError
+from argus.domain.research.admission import research_attempt_admission_context
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
     allowance_windows,
@@ -948,7 +949,6 @@ async def chat_stream(
                         conversation_id=conversation.id,
                         request_message_id=lifecycle_hooks.turn_id,
                         request_id=request.state.request_id,
-                        guest_visitor_key=turn_guest_research_key,
                     )
                     if backtest_job is None:
                         assistant_text = runtime_result.get("assistant_response")
@@ -1261,7 +1261,6 @@ async def chat_stream(
                     user_id=user.id,
                     is_guest=turn_is_guest,
                     client_identity=turn_client_identity,
-                    guest_research_visitor_key=turn_guest_research_key,
                     conversation_id=conversation.id,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
@@ -1416,11 +1415,13 @@ async def chat_stream(
         with (
             openrouter_traffic_class(turn_account.kind),
             turn_execution_scope(entry_state=checkpoint_values or {}),
+            research_attempt_admission_context(
+                lambda: claim_research_provider_attempt(
+                    guest_visitor_key=turn_guest_research_key
+                )
+            ),
         ):
             workflow_input_error: Exception | None = None
-            research_allowance = research_allowance_for_turn(
-                user.id, guest_visitor_key=turn_guest_research_key
-            )
             try:
                 workflow_input = build_workflow_input(
                     user=runtime_user,
@@ -1431,8 +1432,6 @@ async def chat_stream(
                         is_guest=turn_is_guest,
                         client_identity=turn_client_identity,
                     ),
-                    research_allowance_available=research_allowance.available,
-                    research_guest_allowance_exhausted=research_allowance.guest_exhausted,
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance
                     ],

@@ -6,10 +6,10 @@ section 9) and the message allowance is the meter. A guest is the exception
 not an allowance anyone sized, so a guest carries a small research allowance of
 their own, keyed to the visitor. What this module owns:
 
-- the shared global daily ceiling, a circuit breaker charged per provider
-  attempt, readable before the turn and settled after it;
-- the guest's own daily research allowance, read beside the ceiling and
-  charged beside it, so both bounds settle from one place;
+- the shared global daily ceiling, atomically claimed immediately before a
+  cache miss enters provider work;
+- the guest's own daily research allowance, claimed in that same transaction,
+  so concurrent turns can never spend one remaining slot twice;
 - capability-class instrumentation per research turn (fast_quote,
   balanced_lookup, thorough_research, screening, peer_expansion), recorded on
   the cost ledger whether or not a provider call happened, because the class
@@ -20,18 +20,18 @@ their own, keyed to the visitor. What this module owns:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import threading
 from datetime import datetime, timezone
 from typing import Any
 
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.domain.research.admission import ResearchAttemptAdmission
 from argus.domain.research.config import research_rail_enabled
 from argus.domain.usage_limits import (
     GLOBAL_RESEARCH_CEILING_SUBJECT,
     GUEST_RESEARCH_VISITOR_LIMITS,
-    QuotaExceededError,
     align_usage_period,
     global_research_daily_ceiling,
     read_memory_usage,
@@ -40,9 +40,7 @@ from argus.domain.usage_limits import (
 from argus.domain.visitor_usage import (
     memory_visitor_within_limits,
     settle_memory_visitor_usage,
-    settle_visitor_usage,
     visitor_key_for,
-    visitor_within_limits,
 )
 from argus.observability.research_events import capture_research_turn_event
 
@@ -51,23 +49,11 @@ RESEARCH_USAGE_RESOURCE = "research_searches"
 # as discovery: usage_counters.user_id FKs to profiles, so a synthetic global
 # subject there would fail to insert and the ceiling would silently never trip.
 GLOBAL_CEILING_KEY = "global:research"
+_MEMORY_CLAIM_LOCK = threading.Lock()
 
 
 def _ceiling_limits() -> list[tuple[str, int]]:
     return [("day", global_research_daily_ceiling())]
-
-
-@dataclass(frozen=True)
-class ResearchAllowance:
-    """Which bound a turn is under, so the honest note can name the real one.
-
-    ``guest_exhausted`` is only ever set with ``available`` false: a guest who
-    spent their own allowance must not be told the shared capacity ran out,
-    and a shared outage must not be blamed on the guest.
-    """
-
-    available: bool
-    guest_exhausted: bool = False
 
 
 def guest_research_visitor_key(
@@ -82,66 +68,96 @@ def guest_research_visitor_key(
     return visitor_key_for(client_identity) if is_guest else None
 
 
-def research_allowance_for_turn(
-    user_id: str,
+def claim_research_provider_attempt(
     *,
     guest_visitor_key: str | None = None,
-) -> ResearchAllowance:
-    """Backend-derived pre-turn allowance truth. A read, not a charge.
+) -> ResearchAttemptAdmission:
+    """Atomically claim capacity immediately before billable provider work.
 
-    Two bounds, both read here: the shared global circuit breaker, and, for a
+    Two bounds are owned here: the shared global circuit breaker, and, for a
     guest, that visitor's own daily research allowance. A signed-in user still
     meters research through their message allowance (spec section 9); a guest
     does not, because ten free messages spent entirely on the most expensive
     shape is not an allowance anyone sized.
 
-    Flag-off short-circuits to available so ordinary turns never pay the read.
-    Fails closed: without readable truth, no research spend is allowed, and
+    Flag-off short-circuits to available. Fails closed: without writable truth,
+    no research spend is allowed, and
     the turn still answers through the honest exhausted path.
     """
-    del user_id
     if not research_rail_enabled():
-        return ResearchAllowance(available=True)
+        return ResearchAttemptAdmission(available=True)
     now = datetime.now(timezone.utc)
     try:
         if api_state.supabase_gateway is not None:
             client = api_state.supabase_gateway.client
-            if not visitor_within_limits(
-                client,
-                visitor_key=GLOBAL_CEILING_KEY,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=_ceiling_limits(),
-                now=now,
-            ):
-                return ResearchAllowance(available=False)
-            if guest_visitor_key is None:
-                return ResearchAllowance(available=True)
-            within = visitor_within_limits(
-                client,
+            result = client.rpc(
+                "claim_research_usage",
+                {
+                    "p_guest_visitor_key": guest_visitor_key,
+                    "p_resource": RESEARCH_USAGE_RESOURCE,
+                    "p_global_visitor_key": GLOBAL_CEILING_KEY,
+                    "p_global_limit": global_research_daily_ceiling(),
+                    "p_guest_limit": GUEST_RESEARCH_VISITOR_LIMITS[0][1],
+                },
+            ).execute()
+            payload = getattr(result, "data", None)
+            if not isinstance(payload, dict):
+                raise TypeError("Research usage claim returned no object")
+            return ResearchAttemptAdmission(
+                available=payload.get("available") is True,
+                guest_exhausted=payload.get("guest_exhausted") is True,
+            )
+        return _claim_memory_research_usage(
+            guest_visitor_key=guest_visitor_key,
+            now=now,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Research allowance claim failed; treating capacity as exhausted",
+            error=str(exc),
+        )
+        return ResearchAttemptAdmission(available=False)
+
+
+def _claim_memory_research_usage(
+    *,
+    guest_visitor_key: str | None,
+    now: datetime,
+) -> ResearchAttemptAdmission:
+    """Process-local twin of the database transaction used in tests/dev."""
+
+    with _MEMORY_CLAIM_LOCK:
+        if guest_visitor_key is not None:
+            guest_within = memory_visitor_within_limits(
+                api_state.store.visitor_usage_counters,
                 visitor_key=guest_visitor_key,
                 resource=RESEARCH_USAGE_RESOURCE,
                 limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
                 now=now,
             )
-            return ResearchAllowance(available=within, guest_exhausted=not within)
+            if not guest_within:
+                return ResearchAttemptAdmission(
+                    available=False,
+                    guest_exhausted=True,
+                )
         if not _memory_ceiling_available(now=now):
-            return ResearchAllowance(available=False)
-        if guest_visitor_key is None:
-            return ResearchAllowance(available=True)
-        within = memory_visitor_within_limits(
-            api_state.store.visitor_usage_counters,
-            visitor_key=guest_visitor_key,
+            return ResearchAttemptAdmission(available=False)
+        settle_memory_usage(
+            api_state.store.usage_counters,
+            user_id=GLOBAL_RESEARCH_CEILING_SUBJECT,
             resource=RESEARCH_USAGE_RESOURCE,
-            limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
-            now=now,
+            limits=_ceiling_limits(),
+            at=now,
         )
-        return ResearchAllowance(available=within, guest_exhausted=not within)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "Research allowance read failed; treating capacity as exhausted",
-            error=str(exc),
-        )
-        return ResearchAllowance(available=False)
+        if guest_visitor_key is not None:
+            settle_memory_visitor_usage(
+                api_state.store.visitor_usage_counters,
+                visitor_key=guest_visitor_key,
+                resource=RESEARCH_USAGE_RESOURCE,
+                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
+                now=now,
+            )
+        return ResearchAttemptAdmission(available=True)
 
 
 def _memory_ceiling_available(*, now: datetime) -> bool:
@@ -162,54 +178,6 @@ def _memory_ceiling_available(*, now: datetime) -> bool:
     return True
 
 
-def charge_research_ceiling(*, guest_visitor_key: str | None = None) -> None:
-    """One unit per provider attempt, usable or not; cache hits never charge.
-
-    A guest's attempt charges their own allowance as well as the shared
-    breaker, through the same settlement the read above checks.
-    """
-    try:
-        if api_state.supabase_gateway is not None:
-            settle_visitor_usage(
-                api_state.supabase_gateway.client,
-                visitor_key=GLOBAL_CEILING_KEY,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=_ceiling_limits(),
-            )
-            if guest_visitor_key is not None:
-                settle_visitor_usage(
-                    api_state.supabase_gateway.client,
-                    visitor_key=guest_visitor_key,
-                    resource=RESEARCH_USAGE_RESOURCE,
-                    limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
-                )
-            return
-        settle_memory_usage(
-            api_state.store.usage_counters,
-            user_id=GLOBAL_RESEARCH_CEILING_SUBJECT,
-            resource=RESEARCH_USAGE_RESOURCE,
-            limits=_ceiling_limits(),
-        )
-        if guest_visitor_key is not None:
-            settle_memory_visitor_usage(
-                api_state.store.visitor_usage_counters,
-                visitor_key=guest_visitor_key,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
-            )
-    except QuotaExceededError:
-        logger.info(
-            "Research attempt settled at the global ceiling",
-            resource=RESEARCH_USAGE_RESOURCE,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "Research ceiling settlement failed",
-            error=str(exc),
-            failure_classification="telemetry_only",
-        )
-
-
 def settle_research_turn(
     runtime_result: dict[str, Any],
     *,
@@ -217,9 +185,8 @@ def settle_research_turn(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
-    guest_visitor_key: str | None = None,
 ) -> None:
-    """Post-terminal settlement for a turn that may carry a research sidecar."""
+    """Post-terminal evidence for a turn that may carry a research sidecar."""
     research = runtime_result.get("research")
     if not isinstance(research, dict):
         return
@@ -229,7 +196,6 @@ def settle_research_turn(
         conversation_id=conversation_id,
         message_id=message_id,
         request_id=request_id,
-        guest_visitor_key=guest_visitor_key,
     )
 
 
@@ -240,17 +206,12 @@ def record_research_turn_evidence(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
-    guest_visitor_key: str | None = None,
 ) -> None:
-    """Post-terminal, best-effort: settle the ceiling for provider attempts
-    and append one capability-classed ledger row for every research turn."""
+    """Append one capability-classed ledger row for every research turn."""
     if not isinstance(research, dict):
         return
     usage = research.get("usage")
     usage = usage if isinstance(usage, dict) else {}
-    cache_status = str(usage.get("cache_status") or "miss")
-    if cache_status == "miss":
-        charge_research_ceiling(guest_visitor_key=guest_visitor_key)
     _append_ledger_row(
         research=research,
         usage=usage,
