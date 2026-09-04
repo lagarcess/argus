@@ -73,7 +73,7 @@ active confirmation.
 cd web
 ARGUS_EVIDENCE_DIR=../docs/reports/evidence/542 \
 PLAYWRIGHT_PORT=3142 \
-bunx playwright test e2e/chat-action-recovery.spec.ts \
+bunx playwright test e2e/issue-542-admission-conflict.spec.ts \
   --project=chromium --grep 'admission conflict stays specific'
 
 1 passed
