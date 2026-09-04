@@ -1180,6 +1180,11 @@ class SupabaseGateway(
 
         return jobs.list_backtest_job_reservations(self.client, **kwargs)
 
+    def record_backtest_job_rejection(self, **kwargs: Any) -> dict[str, Any]:
+        from argus.domain import backtest_admission_gateway as jobs
+
+        return jobs.record_backtest_job_rejection(self.client, **kwargs)
+
     def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
         from argus.domain import backtest_admission_gateway as jobs
 

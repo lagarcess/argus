@@ -1,9 +1,10 @@
 """A capacity refusal is a request to wait, not a failure (#482).
 
 Argus runs five concurrent backtests product-wide. At the ceiling the run is
-refused before a job exists, so nothing broke and nothing was lost. The runtime
-used to say "The run hit a temporary data or service issue", which is the copy
-for something going wrong, in English regardless of the workspace language.
+refused before execution, so nothing broke and nothing was lost. A terminal
+receipt records that refusal. The runtime used to say "The run hit a temporary
+data or service issue", which is the copy for something going wrong, in English
+regardless of the workspace language.
 """
 
 from __future__ import annotations
@@ -14,7 +15,10 @@ import pytest
 from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.state.models import RunState
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
-from argus.api.chat.backtest_job_envelopes import admission_rejection_envelope
+from argus.api.chat.backtest_job_envelopes import (
+    admission_rejection_envelope,
+    async_backtest_job_envelope,
+)
 
 
 def _capacity_state() -> RunState:
@@ -76,6 +80,32 @@ def test_capacity_refusal_offers_a_retry() -> None:
         (reference.get("metadata") or {}).get("retryable") is True
         for reference in references
     )
+
+
+def test_recorded_capacity_receipt_keeps_the_wait_recovery() -> None:
+    result = execute_stage(
+        state=_capacity_state(),
+        tool=StubBacktestTool(
+            responses=[
+                async_backtest_job_envelope(
+                    {
+                        "id": "capacity-receipt-1",
+                        "conversation_id": "conversation-1",
+                        "status": "failed",
+                        "failure_code": "backtest_capacity_exceeded",
+                        "failure_detail": "global_capacity",
+                        "retryable": True,
+                    }
+                )
+            ]
+        ),
+        max_retries=2,
+    )
+
+    assert result.outcome == "execution_failed_recoverably"
+    assert result.patch["backtest_job"]["id"] == "capacity-receipt-1"
+    assert result.patch["recovery"]["code"] == "backtest_capacity_exceeded"
+    assert "nothing was lost" in result.patch["assistant_prompt"].lower()
 
 
 def test_other_admission_rejections_keep_their_own_copy() -> None:

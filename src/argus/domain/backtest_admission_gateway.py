@@ -137,6 +137,54 @@ def list_backtest_job_reservations(
     return [dict(row) for row in result.data or []]
 
 
+def record_backtest_job_rejection(
+    client: Any,
+    *,
+    user_id: str,
+    operation_scope: str,
+    identity_hash: str,
+    payload_hash: str,
+    launch_payload: dict[str, Any],
+    failure_code: str,
+    failure_detail: str,
+    retryable: bool,
+    conversation_id: str | None = None,
+    request_message_id: str | None = None,
+    confirmation_message_id: str | None = None,
+    execution_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist a terminal receipt without taking over the rejected reservation."""
+
+    finished_at = _now_iso()
+    result = (
+        client.table("backtest_jobs")
+        .insert(
+            {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "request_message_id": request_message_id,
+                "confirmation_message_id": confirmation_message_id,
+                "operation_scope": operation_scope,
+                "idempotency_key": None,
+                "identity_hash": identity_hash,
+                "payload_hash": payload_hash,
+                "launch_payload": launch_payload,
+                "status": "failed",
+                "failure_code": failure_code,
+                "failure_detail": failure_detail,
+                "retryable": retryable,
+                "finished_at": finished_at,
+                "execution_metadata": execution_metadata or {},
+            }
+        )
+        .execute()
+    )
+    row = _row_one(result)
+    if row is None:
+        raise RuntimeError("Backtest admission rejection was not persisted.")
+    return dict(row)
+
+
 def finalize_direct_backtest_job(
     client: Any,
     *,

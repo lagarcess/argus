@@ -1,40 +1,73 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
+
+
+@dataclass(frozen=True)
+class AdmissionFailureReason:
+    failure_code: str
+    failure_detail: str
+    retryable: bool = False
+
+
+def admission_failure_reason(decision: str) -> AdmissionFailureReason:
+    """One owner for the durable and public meaning of an admission refusal."""
+
+    if decision == "conversion_required":
+        return AdmissionFailureReason(
+            failure_code="account_conversion_required",
+            failure_detail="guest_simulation_allowance_exhausted",
+        )
+    if decision == "allowance_exhausted":
+        return AdmissionFailureReason(
+            failure_code="simulation_allowance_exhausted",
+            failure_detail="simulation_allowance_exhausted",
+        )
+    if decision in ("per_user_capacity", "global_capacity"):
+        return AdmissionFailureReason(
+            failure_code="backtest_capacity_exceeded",
+            failure_detail=decision,
+            retryable=True,
+        )
+    if decision == "conflict":
+        return AdmissionFailureReason(
+            failure_code="idempotency_conflict",
+            failure_detail="confirmation_identity_already_spent",
+        )
+    if decision == "confirmation_changed":
+        return AdmissionFailureReason(
+            failure_code="confirmation_changed",
+            failure_detail="confirmation_changed_before_start",
+        )
+    return AdmissionFailureReason(
+        failure_code="backtest_admission_unavailable",
+        failure_detail="admission_decision_unavailable",
+    )
 
 
 def admission_rejection_envelope(decision: str) -> dict[str, Any]:
     """Return typed rejection truth for a run that was never admitted."""
 
-    if decision == "conversion_required":
+    reason = admission_failure_reason(decision)
+    if reason.failure_code == "account_conversion_required":
         error_type = "account_required"
-        failure_code = "account_conversion_required"
-    elif decision == "allowance_exhausted":
+    elif reason.failure_code == "simulation_allowance_exhausted":
         error_type = "rate_limited"
-        failure_code = "simulation_allowance_exhausted"
-    elif decision in ("per_user_capacity", "global_capacity"):
+    elif reason.failure_code == "backtest_capacity_exceeded":
         error_type = "service_overloaded"
-        failure_code = "backtest_capacity_exceeded"
-    elif decision == "conflict":
-        error_type = "tool_execution_error"
-        failure_code = "idempotency_conflict"
-    elif decision == "confirmation_changed":
-        # The card changed between the click and admission; the run refuses
-        # rather than executing values the card no longer shows.
-        error_type = "tool_execution_error"
-        failure_code = "confirmation_changed"
     else:
         error_type = "tool_execution_error"
-        failure_code = "backtest_admission_unavailable"
     return {
         "success": False,
         "payload": None,
         "error_type": error_type,
         "error_message": None,
-        "retryable": False,
+        "retryable": reason.retryable,
         "capability_context": {
             "execution_status": "rejected",
-            "failure_code": failure_code,
+            "failure_code": reason.failure_code,
+            "failure_detail": reason.failure_detail,
         },
     }
 

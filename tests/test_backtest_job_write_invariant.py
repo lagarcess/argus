@@ -141,6 +141,16 @@ def _requires(*needles: str, absent: tuple[str, ...] = ()):
 # lifecycle transitions, result links.
 EXPECTED_WRITE_SITES = {
     (
+        "src/argus/domain/backtest_admission_gateway.py",
+        "record_backtest_job_rejection",
+        "postgrest-insert",
+    ): _requires(
+        '"status": "failed"',
+        '"idempotency_key": None',
+        '"finished_at": finished_at',
+        absent=('"result_run_id":', '"started_at":'),
+    ),
+    (
         "src/argus/domain/supabase_gateway.py",
         "SupabaseGateway.create_backtest_job",
         "postgrest-insert",
@@ -262,9 +272,7 @@ def test_link_write_callers_are_enumerated() -> None:
                 and isinstance(node.func, ast.Attribute)
                 and node.func.attr == "link_backtest_job_result"
             ):
-                callers.add(
-                    (str(path.relative_to(REPO)), index.function_at(node.lineno))
-                )
+                callers.add((str(path.relative_to(REPO)), index.function_at(node.lineno)))
     assert callers == {
         ("src/argus/api/chat/result_link.py", "link_shadow_backtest_job_result"),
         ("workflows/backtest_job.py", "run_backtest_job"),

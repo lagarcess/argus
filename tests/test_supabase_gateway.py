@@ -1456,6 +1456,35 @@ def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
     ]
 
 
+def test_record_backtest_job_rejection_inserts_terminal_unreserved_receipt() -> None:
+    client = _BacktestJobClient()
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.record_backtest_job_rejection(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        request_message_id="message-1",
+        confirmation_message_id="confirmation-message-1",
+        operation_scope="chat.run_backtest",
+        identity_hash="sha256:identity",
+        payload_hash="sha256:payload",
+        launch_payload={"request": {"symbols": ["NVDA", "MSFT"]}},
+        failure_code="idempotency_conflict",
+        failure_detail="confirmation_identity_already_spent",
+        retryable=False,
+        execution_metadata={"refused_before_dispatch": True},
+    )
+
+    assert row["id"] == "job-1"
+    [receipt] = client.inserted_jobs
+    assert receipt["status"] == "failed"
+    assert receipt["idempotency_key"] is None
+    assert receipt["identity_hash"] == "sha256:identity"
+    assert receipt["failure_code"] == "idempotency_conflict"
+    assert receipt["failure_detail"] == "confirmation_identity_already_spent"
+    assert receipt["finished_at"]
+
+
 def test_backtest_reservation_query_includes_internal_launch_payload() -> None:
     existing_job = {
         "id": "job-1",

@@ -67,6 +67,30 @@ USER_SAFE_FAILURE_MESSAGES = {
         "That confirmation needs its data window checked again before it can run. "
         "Review the refreshed dates and approve the new card."
     ),
+    "idempotency_conflict": (
+        "This confirmation had already been used for a different setup, so I did "
+        "not start another backtest. Review the latest card and run it again."
+    ),
+    "confirmation_changed": (
+        "The confirmation changed before this backtest could start, so nothing ran. "
+        "Review the latest card and run it again."
+    ),
+    "simulation_allowance_exhausted": (
+        "This workspace has used its current simulation allowance, so the backtest "
+        "did not start. The setup is still saved here."
+    ),
+    "account_conversion_required": (
+        "This guest workspace has used its simulation allowance, so the backtest "
+        "did not start. Create an account to keep this setup and continue."
+    ),
+    "backtest_admission_unavailable": (
+        "The backtest could not be queued, so it did not start. The setup is still "
+        "saved here; try it again in a moment."
+    ),
+    "workflow_dispatch_missing": (
+        "The backtest was saved but could not start. Try it again from the current "
+        "setup."
+    ),
 }
 
 
@@ -85,6 +109,12 @@ USER_SAFE_FAILURE_DETAILS = {
     "invalid_chronological_date_range": "invalid_date_window",
     "future_end_date": "future_date_window",
     "approved_data_window_unavailable": "approved_data_window_unavailable",
+    "idempotency_conflict": "confirmation_identity_already_spent",
+    "confirmation_changed": "confirmation_changed_before_start",
+    "simulation_allowance_exhausted": "simulation_allowance_exhausted",
+    "account_conversion_required": "guest_simulation_allowance_exhausted",
+    "backtest_admission_unavailable": "admission_decision_unavailable",
+    "workflow_dispatch_missing": "workflow_dispatch_missing",
     "capital_amount_required": "invalid_parameter",
     "position_size_required": "invalid_parameter",
     "capital_amount_not_applicable": "invalid_parameter",

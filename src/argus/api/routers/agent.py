@@ -48,7 +48,7 @@ from argus.api.chat.allowance import (
     ordinary_turn_settlement,
 )
 from argus.api.chat.artifacts import (
-    confirmation_id_for_runtime_card,
+    ensure_unspent_confirmation_identity,
     result_fact_bank,
     result_followup_metadata_from_run,
 )
@@ -909,12 +909,14 @@ async def chat_stream(
                     raise RuntimeError("agent_runtime_typed_recovery")
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
+                confirmation_id = ensure_unspent_confirmation_identity(
+                    runtime_result,
+                    gateway=api_state.supabase_gateway,
+                    user_id=user.id,
+                )
                 confirmation_card = chat_confirmation.runtime_confirmation_card(
                     runtime_result,
-                    confirmation_id=confirmation_id_for_runtime_card(
-                        runtime_result,
-                        new_id=api_state.store.new_id,
-                    ),
+                    confirmation_id=confirmation_id,
                     conversation_id=conversation.id,
                     language=runtime_user.language_preference,
                 )

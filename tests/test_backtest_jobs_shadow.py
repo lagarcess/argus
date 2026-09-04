@@ -41,6 +41,7 @@ class _Gateway:
         self.backpressure_counts = backpressure_counts or {}
         self.link_result = link_result
         self.jobs: list[dict[str, object]] = []
+        self.failure_receipts: list[dict[str, object]] = []
         self.metadata_updates: list[dict[str, object]] = []
         self.result_links: list[dict[str, object]] = []
 
@@ -61,6 +62,16 @@ class _Gateway:
             return {"decision": "replay", "job": dict(self.create_result)}
         self.jobs.append(payload)
         return {"decision": "admitted", "job": {"id": "job-1", **payload}}
+
+    def record_backtest_job_rejection(self, **payload: object) -> dict[str, object]:
+        receipt = {
+            "id": f"rejected-job-{len(self.failure_receipts) + 1}",
+            "status": "failed",
+            "idempotency_key": None,
+            **payload,
+        }
+        self.failure_receipts.append(receipt)
+        return receipt
 
     def list_backtest_jobs(
         self,
@@ -417,10 +428,7 @@ def test_guest_flag_off_admits_job_before_in_process_execution(monkeypatch) -> N
     assert events == ["job", "delegate"]
     assert len(gateway.jobs) == 1
     assert gateway.jobs[0]["allowance_limits"] == context.allowance_limits
-    assert (
-        gateway.jobs[0]["execution_metadata"]["openrouter_traffic_class"]
-        == "guest"
-    )
+    assert gateway.jobs[0]["execution_metadata"]["openrouter_traffic_class"] == "guest"
     assert context.created_job_id == "job-1"
     assert dispatcher.calls == []
     assert delegate.calls == [payload]
@@ -461,12 +469,14 @@ def test_guest_flag_off_conversion_required_skips_delegate(monkeypatch) -> None:
     with backtest_job_shadow_context(_guest_context()):
         result = tool.run(_payload())
 
-    assert result["success"] is False
-    assert result["retryable"] is False
-    assert result["capability_context"]["execution_status"] == "rejected"
-    assert result["capability_context"]["failure_code"] == "account_conversion_required"
+    assert result["success"] is True
+    job = result["payload"]["backtest_job"]
+    assert job["status"] == "failed"
+    assert job["failure_code"] == "account_conversion_required"
+    assert job["failure_detail"] == "guest_simulation_allowance_exhausted"
     assert events == []
     assert gateway.jobs == []
+    assert len(gateway.failure_receipts) == 1
     assert delegate.calls == []
 
 
@@ -694,14 +704,16 @@ def test_shadow_backtest_job_tool_rejects_unadmitted_run_without_free_execution(
     with backtest_job_shadow_context(context):
         result = tool.run(payload)
 
-    assert result["success"] is False
-    assert result["retryable"] is False
-    assert result["capability_context"]["execution_status"] == "rejected"
-    assert result["capability_context"]["failure_code"] == expected_failure_code
+    assert result["success"] is True
+    job = result["payload"]["backtest_job"]
+    assert job["status"] == "failed"
+    assert job["failure_code"] == expected_failure_code
+    assert job["failure_detail"]
     assert events == []
     assert gateway.jobs == []
+    assert len(gateway.failure_receipts) == 1
     assert dispatcher.calls == []
-    assert context.created_job_id is None
+    assert context.created_job_id == "rejected-job-1"
     assert delegate.calls == []
 
 
