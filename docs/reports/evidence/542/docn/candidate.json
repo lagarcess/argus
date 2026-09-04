@@ -1,0 +1,18 @@
+{
+  "postgres": "17.6",
+  "definition_md5": {
+    "admit_backtest_job": "4864ae113274ac0b1e21f3a0258f997f",
+    "replace_guest_conversation": "9865b35765c311423acd5ab7f02e4244",
+    "validated_usage_windows": "8f15ae8cadbad35818de3b11fef7328d"
+  },
+  "jobs_before": 0,
+  "used_before": 2,
+  "jobs_after": 1,
+  "workflow_dispatched": false,
+  "outcome": "execution_failed_terminally",
+  "assistant_prompt": "This guest workspace has used its simulation allowance, so the backtest did not start. Create an account to keep this setup and continue.",
+  "public_code": "account_conversion_required",
+  "failure_code": "account_conversion_required",
+  "receipt_replay_verified": true,
+  "allowance_unchanged": true
+}

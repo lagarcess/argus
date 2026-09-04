@@ -18,6 +18,10 @@ from datetime import datetime, timedelta, timezone
 from threading import Barrier
 
 import pytest
+from argus.domain.usage_limits import (
+    GUEST_SIMULATION_ALLOWANCE,
+    SIMULATION_USAGE_RESOURCE,
+)
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 
@@ -389,6 +393,60 @@ def test_guest_cannot_bypass_lifetime_policy_with_registered_windows(guest_owner
             )
             == {}
         )
+
+
+@pytest.mark.parametrize("prior_admissions", range(GUEST_SIMULATION_ALLOWANCE + 1))
+def test_first_run_after_start_over_uses_preserved_workspace_allowance(
+    guest_owner, prior_admissions: int
+) -> None:
+    """Zero remaining jobs is not zero historical admissions (DOCN incident)."""
+    with _connect() as connection:
+        limits = json.dumps(_guest_limits(guest_owner, GUEST_SIMULATION_ALLOWANCE))
+        for _ in range(prior_admissions):
+            admitted = _admit(connection, guest_owner, allowance_limits=limits)
+            assert admitted["decision"] == "admitted"
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "insert into public.backtest_runs"
+                    " (user_id,conversation_id,status,asset_class,symbols,"
+                    "  benchmark_symbol,config_snapshot,conversation_result_card)"
+                    " values (%s,%s,'completed','equity',array['DOCN'],'SPY',"
+                    " '{}'::jsonb,'{}'::jsonb) returning id",
+                    (guest_owner["user_id"], guest_owner["conversation_id"]),
+                )
+                run_id = cursor.fetchone()[0]
+                cursor.execute(
+                    "update public.backtest_jobs set status='succeeded',"
+                    " result_run_id=%s,finished_at=now() where id=%s",
+                    (run_id, admitted["job"]["id"]),
+                )
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select id::text from public.replace_guest_conversation("
+                "%s,'New idea','system_default','en')",
+                (guest_owner["user_id"],),
+            )
+            replacement = {**guest_owner, "conversation_id": cursor.fetchone()[0]}
+            for table in ("backtest_jobs", "backtest_runs"):
+                cursor.execute(
+                    f"select count(*) from public.{table} where user_id=%s",
+                    (guest_owner["user_id"],),
+                )
+                assert cursor.fetchone()[0] == 0
+
+        before = _usage_rows(
+            connection, guest_owner["user_id"], SIMULATION_USAGE_RESOURCE
+        )
+        assert before.get("guest_session", {}).get("used_count", 0) == prior_admissions
+        outcome = _admit(connection, replacement, allowance_limits=limits)
+        after = _usage_rows(connection, guest_owner["user_id"], SIMULATION_USAGE_RESOURCE)
+        if prior_admissions == GUEST_SIMULATION_ALLOWANCE:
+            assert outcome == {"decision": "conversion_required"}
+            assert after == before
+        else:
+            assert outcome["decision"] == "admitted"
+            assert after["guest_session"]["used_count"] == prior_admissions + 1
 
 
 def test_guest_unique_simulation_charges_once_replay_zero_and_third_stops(

@@ -7,6 +7,7 @@ through to free in-process execution.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -48,6 +49,17 @@ def _record_rejection(
     launch_payload: dict[str, Any],
     execution_metadata: dict[str, Any],
 ) -> ChatAdmissionResult:
+    log_fields = {
+        "reason": decision,
+        "user_id": context.user_id,
+        "conversation_id": context.conversation_id,
+        "request_id": context.request_id,
+    }
+    logger.warning(
+        "Chat backtest admission rejected {}",
+        json.dumps(log_fields, sort_keys=True),
+        **log_fields,
+    )
     reason = admission_failure_reason(decision)
     job = gateway.record_backtest_job_rejection(
         user_id=context.user_id,
@@ -210,12 +222,6 @@ def admit_durable_chat_job(
                 limit=BACKPRESSURE_RECONCILE_SCAN_LIMIT,
             ):
                 continue
-            logger.warning(
-                "Chat backtest admission rejected on capacity",
-                reason=decision,
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
-            )
             return _record_rejection(
                 gateway=gateway,
                 context=context,
@@ -238,12 +244,6 @@ def admit_durable_chat_job(
                     conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )
-            logger.warning(
-                "Chat backtest admission rejected",
-                reason=decision,
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
-            )
             return _record_rejection(
                 gateway=gateway,
                 context=context,
