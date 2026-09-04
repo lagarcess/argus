@@ -408,6 +408,7 @@ export default function ChatMessage({
               ) : null}
               <StrategyConfirmationCard
                 confirmation={message.confirmation}
+                disabled={turnInFlight}
                 onAction={onAction}
                 onDirectEdit={
                   onDirectEdit && message.confirmation.confirmation_id

@@ -166,6 +166,10 @@ describe("chat turn artifact UX", () => {
       join(root, "components/chat/StrategyConfirmationCard.tsx"),
       "utf-8",
     );
+    const message = readFileSync(
+      join(root, "components/chat/ChatMessage.tsx"),
+      "utf-8",
+    );
     // The card's view model is shared with Copy, so its composition is
     // asserted where it now lives (#509).
     const viewModel = readFileSync(
@@ -180,6 +184,8 @@ describe("chat turn artifact UX", () => {
     expect(card).not.toContain("{confirmation.summary}");
     expect(card).toContain("text-[#505a63] dark:text-[#8d969e]");
     expect(card).toContain("activeActions.length > 0");
+    expect(message).toContain("disabled={turnInFlight}");
+    expect(card).toContain("disabled={disabled}");
     expect(card).toContain("confirmation.confirmation_state === \"active\"");
     expect(card).toContain("confirmationCardViewModel");
     expect(viewModel).toContain("confirmationAssetTitle");

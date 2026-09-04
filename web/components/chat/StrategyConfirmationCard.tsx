@@ -57,6 +57,7 @@ import {
 
 type StrategyConfirmationCardProps = {
   confirmation: StrategyConfirmationPayload;
+  disabled?: boolean;
   onAction?: (action: ChatActionOption) => void;
   onDirectEdit?: (edit: ConfirmationDirectEditPayload) => Promise<void>;
 };
@@ -80,7 +81,7 @@ const CONFIRMATION_STATUS_ICON_STATE = {
 } satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>;
 
 const actionClassName =
-  "inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 bg-black/[0.03] px-3.5 py-1.5 text-[13px] font-medium tracking-tight tablet:min-h-9 tablet:px-3 tablet:text-[12px] text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
+  "inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 bg-black/[0.03] px-3.5 py-1.5 text-[13px] font-medium tracking-tight tablet:min-h-9 tablet:px-3 tablet:text-[12px] text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-black/10 disabled:hover:bg-black/[0.03] disabled:active:scale-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-white/[0.04]";
 
 const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "could_not_run",
@@ -89,7 +90,12 @@ const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "run_complete",
 ]);
 
-export default function StrategyConfirmationCard({ confirmation, onAction, onDirectEdit }: StrategyConfirmationCardProps) {
+export default function StrategyConfirmationCard({
+  confirmation,
+  disabled = false,
+  onAction,
+  onDirectEdit,
+}: StrategyConfirmationCardProps) {
   const { t, i18n } = useTranslation();
   const displayState = confirmationDisplayState(confirmation, t);
   const viewModel = confirmationCardViewModel(confirmation, t, i18n.language);
@@ -99,6 +105,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
   const activeActions = canShowActions ? confirmation.actions ?? [] : [];
   const canDirectEdit =
     canShowActions &&
+    !disabled &&
     onDirectEdit !== undefined &&
     (confirmation.capabilities?.direct_edits?.length ?? 0) > 0;
   const StatusIcon = displayState.icon;
@@ -227,6 +234,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
             <button
               key={action.id ?? action.type ?? action.label}
               type="button"
+              disabled={disabled}
               onClick={() => onAction?.(action)}
               className={actionClassName}
             >
