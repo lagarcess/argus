@@ -4,14 +4,18 @@
 
 - Candidate SHA: `db88a5fe416093450171c6318e3e6edc24d5829e`, the product tree the
   live eval measured.
-- Shipping SHA: not created. The founder-owned merge commit is recorded after
-  landing.
+- Shipping SHA: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`
+- Measured-tree relationship: the shipping tree is not byte-identical to the
+  measured `db88a5fe416093450171c6318e3e6edc24d5829e` tree. The only product
+  delta is the reviewed route-ownership fix in
+  `src/argus/agent_runtime/interpreter/research_routing.py` and
+  `src/argus/agent_runtime/interpreter/strategy_routing.py`.
 - Source branch: `codex/private-alpha-next`
 - Promotion target: `main`
 - Rollback target: `c7802b37f39772a1216514e37fb6ff2b63142181`
 - Commits ahead of production: 22
 - Landing method: founder-owned GitHub merge commit, never squash or rebase
-- Approver: founder, pending
+- Approver: founder
 
 ## What ships
 
@@ -202,6 +206,29 @@ rerun under the founder's explicit instruction. The required scorecard and
 `Candidate SHA` remain bound to the measured `db88a5fe` tree; the deterministic
 review fix above is the only post-eval product change in the promotion PR.
 
+### Post-eval delta applicability
+
+The shipping tree is not byte-identical to the live-eval candidate. The
+post-eval change gives `intent="results_explanation"` the canonical typed route
+owner `result`. For research ownership, every changed route combination moves
+only from no conflicting owner to a conflicting owner. It can remove an
+external research dispatch and cannot add one. For strategy ownership, the
+only changed combinations remove contradictory result-intent turns from the
+strategy route. No route is added.
+
+The committed measurement fixture contains exactly 62 cases. The only case
+whose allowed intents include `results_explanation` is
+`asset_discovery_not_result_followup_issue_244` in
+`tests/evals/measurement_cases/asset_discovery_routing.yaml`. Its required
+`semantic_turn_act` is `result_followup`, which was already in the research
+conflicting-owner set before the fix. The recorded `db88a5fe` scorecard emitted
+`intent="conversation_followup"` with `semantic_turn_act="result_followup"` for
+that case, and no case in the scorecard emitted `results_explanation`.
+
+The route delta is therefore inert against all 62 measured cases. The live
+eval was not rerun. The verification record is
+`docs/reports/evidence/2026-09-03-main-promotion/post-eval-route-delta-applicability-7d8ace45.json`.
+
 ### P2: retrieval evidence can be lost with missing usage metadata
 
 Status: accepted known finding, not fixed in this promotion.
@@ -220,7 +247,9 @@ query. PR #540 does not change this path.
 
 ## Deploy Proof
 
-Not started. Founder landing and landed-ref verification must happen first.
+Founder landing completed as merge commit
+`7d8ace45e4ac717ffbfaf222cf66544c3355df6f`. Landed-ref verification must
+complete before deployment.
 
 - [ ] `argus-api` deployed at the landed SHA
 - [ ] `argus-app` deployed at the landed SHA
@@ -243,10 +272,9 @@ Not started. If the founder lands the promotion, completion still requires:
 
 ## Release Decision
 
-- Promotion PR ready: pending review evidence commit, thread resolution, and
-  required `ci` at the final head
-- Founder merge approval: pending
-- Production deploy: **not authorized and not attempted**
+- Promotion PR: merged as `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`
+- Founder merge approval: complete
+- Production deploy: founder-authorized, pending landed-ref verification
 - Blueprint sync: **not applicable and not attempted**
 - Autodeploy change: **not authorized and not attempted**
 - Targeted unsupported-name-reference rate: production 0 of 10; candidate 0 of

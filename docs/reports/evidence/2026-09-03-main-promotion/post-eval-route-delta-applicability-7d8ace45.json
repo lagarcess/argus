@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-04T00:19:26Z",
+  "measured_candidate_sha": "db88a5fe416093450171c6318e3e6edc24d5829e",
+  "landed_shipping_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "landed_tree_equals_pr_head": true,
+  "product_delta_files": [
+    "src/argus/agent_runtime/interpreter/research_routing.py",
+    "src/argus/agent_runtime/interpreter/strategy_routing.py"
+  ],
+  "route_delta": {
+    "description": "results_explanation now resolves to the canonical result route owner",
+    "research_owner_change_count": 6,
+    "research_owner_changed_intents": [
+      "results_explanation"
+    ],
+    "research_owner_old_values": [
+      false
+    ],
+    "research_owner_new_values": [
+      true
+    ],
+    "research_dispatch_effect": "can_remove_never_add",
+    "strategy_route_change_count": 4,
+    "strategy_route_effect": "removes_contradictory_result_intent_from_strategy_never_adds"
+  },
+  "measurement_fixture": {
+    "case_count": 62,
+    "results_explanation_permitted_case_count": 1,
+    "results_explanation_permitted_cases": [
+      {
+        "file": "tests/evals/measurement_cases/asset_discovery_routing.yaml",
+        "id": "asset_discovery_not_result_followup_issue_244",
+        "allowed_intents": [
+          "conversation_followup",
+          "results_explanation"
+        ],
+        "required_semantic_turn_act": "result_followup",
+        "already_conflicting_before_fix": true
+      }
+    ]
+  },
+  "measured_candidate_scorecard": {
+    "path": "docs/reports/evidence/2026-09-03-main-promotion/candidate-eval-scorecard-db88a5fe.json",
+    "result_count": 62,
+    "actual_results_explanation_count": 0,
+    "permitted_case_actual_intent": "conversation_followup",
+    "permitted_case_actual_semantic_turn_act": "result_followup",
+    "permitted_case_status": "passed"
+  },
+  "conclusion": {
+    "inert_against_all_measured_cases": true,
+    "live_eval_rerun_required": false,
+    "reason": "The only newly owned intent was absent from measured outcomes, and its sole permitted case already carried a pre-existing conflicting semantic turn act."
+  }
+}
