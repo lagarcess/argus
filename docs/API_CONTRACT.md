@@ -3485,6 +3485,19 @@ Contract rules:
   describes the work, not the configuration tier it ran on: a market survey
   is `screening` whether it grounded on the balanced tier or the thorough
   one, so retuning a shape never moves its metering.
+- Research capacity is claimed only after the shared cache misses and a
+  provider is configured, immediately before provider work starts. The
+  backend calls one atomic `claim_research_usage` transaction that checks the
+  shared daily ceiling and the optional visitor-keyed guest allowance, then
+  increments both or neither. Two concurrent turns from the same visitor can
+  consume at most the slots that remained when they arrived. Guests receive
+  three provider-backed research questions per UTC day; signed-in users have
+  no separate per-user research allowance, but every provider attempt uses the
+  shared ceiling. `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` defaults to `5000`.
+  Ordinary chat turns, cache hits, unconfigured-provider paths, and idempotent
+  persisted thorough-job replays do not claim capacity. An unreadable or
+  unwritable
+  claim fails closed into the existing honest capacity-exhausted response.
 - Pricing reconciliation does not gate a usable provider answer. Research
   `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
   replaced with zero or an estimated charge. Provider billing evidence stays

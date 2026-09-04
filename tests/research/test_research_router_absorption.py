@@ -34,6 +34,10 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     UserState,
 )
+from argus.domain.research.admission import (
+    ResearchAttemptAdmission,
+    research_attempt_admission_context,
+)
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.research.search import (
     SearchResultPacket,
@@ -93,10 +97,8 @@ def _decision(
     )
 
 
-def _state(message: str, *, research_allowance: bool = True) -> RunState:
-    state = RunState.new(current_user_message=message, recent_thread_history=[])
-    state.research_allowance_available = research_allowance
-    return state
+def _state(message: str) -> RunState:
+    return RunState.new(current_user_message=message, recent_thread_history=[])
 
 
 def _search_packet() -> SearchResultPacket:
@@ -128,13 +130,18 @@ class _FakeSearchProvider:
         return self._packet
 
 
-def _wire_find(monkeypatch: pytest.MonkeyPatch, *, provider: _FakeSearchProvider) -> None:
-    monkeypatch.setattr(
-        selection_module,
-        "search_provider_for_config",
-        lambda **kwargs: provider,
-        raising=True,
-    )
+def _wire_find(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    provider: _FakeSearchProvider | None = None,
+) -> None:
+    if provider is not None:
+        monkeypatch.setattr(
+            selection_module,
+            "search_provider_for_config",
+            lambda **kwargs: provider,
+            raising=True,
+        )
 
     async def _fake_extract(**kwargs: Any) -> DiscoveryExtraction:
         return DiscoveryExtraction(
@@ -375,23 +382,97 @@ def test_exhausted_research_ceiling_degrades_find_to_cheap_verified_rows(
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
 
-    result = asyncio.run(
-        ra.discovery_turn_stage_result(
-            interpretation=_interpretation(),
-            decision=_decision(
-                relationship="category",
-                category_description="cybersecurity stocks",
-            ),
-            state=_state("Find me cybersecurity stocks", research_allowance=False),
-            user=USER,
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(available=False)
+    ):
+        result = asyncio.run(
+            ra.discovery_turn_stage_result(
+                interpretation=_interpretation(),
+                decision=_decision(
+                    relationship="category",
+                    category_description="cybersecurity stocks",
+                ),
+                state=_state("Find me cybersecurity stocks"),
+                user=USER,
+            )
         )
-    )
     assert result is not None
     assert provider.calls == [], "an exhausted ceiling must not search"
     research = result.stage_patch["research"]
     assert research["usage"]["cache_status"] == "bypass"
     assert research["usage"]["invocations"] == 0
     assert result.stage_patch["discovery"]["candidates"]
+    answer = result.stage_patch["assistant_response"].lower()
+    assert "shared research capacity" in answer
+    assert "free research" not in answer
+
+
+def test_atomic_claim_denial_stops_a_find_provider_call(monkeypatch) -> None:
+    """A late denial after the cache miss still serves cheap verified rows."""
+    set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
+    provider = _FakeSearchProvider(_search_packet())
+    _wire_find(monkeypatch, provider=provider)
+
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(available=False, guest_exhausted=True)
+    ):
+        result = asyncio.run(
+            ra.discovery_turn_stage_result(
+                interpretation=_interpretation(),
+                decision=_decision(
+                    relationship="category",
+                    category_description="cybersecurity stocks",
+                ),
+                state=_state("Find me cybersecurity stocks"),
+                user=USER,
+            )
+        )
+
+    assert result is not None
+    assert provider.calls == []
+    research = result.stage_patch["research"]
+    assert research["usage"]["cache_status"] == "bypass"
+    assert research["degraded"] == {"code": "research_capacity_exhausted"}
+    assert result.stage_patch["discovery"]["candidates"]
+    answer = result.stage_patch["assistant_response"].lower()
+    assert "free research" in answer
+    assert "shared research capacity" not in answer
+
+
+@pytest.mark.parametrize(
+    "provider_id",
+    ["perplexity_direct", "openrouter_web_search"],
+)
+def test_unconfigured_find_provider_never_claims_capacity(
+    monkeypatch, provider_id
+) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
+    monkeypatch.setenv("ARGUS_DISCOVERY_SEARCH_PROVIDER", provider_id)
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("ARGUS_DISCOVERY_OPENROUTER_SEARCH_MODEL", "")
+    _wire_find(monkeypatch)
+
+    def reject_claim() -> ResearchAttemptAdmission:
+        raise AssertionError("an unconfigured provider must not claim capacity")
+
+    with research_attempt_admission_context(reject_claim):
+        result = asyncio.run(
+            ra.discovery_turn_stage_result(
+                interpretation=_interpretation(),
+                decision=_decision(
+                    relationship="category",
+                    category_description="cybersecurity stocks",
+                ),
+                state=_state("Find me cybersecurity stocks"),
+                user=USER,
+            )
+        )
+
+    assert result is not None
+    assert result.stage_patch["research"]["degraded"] == {
+        "code": "search_not_configured"
+    }
 
 
 def test_knowledge_entry_find_shape_uses_primary_discovery_request(

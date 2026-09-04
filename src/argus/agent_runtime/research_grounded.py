@@ -47,6 +47,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.substage_events import emit_substage
+from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.cache import (
     cache_get,
     cache_put,
@@ -152,7 +153,6 @@ async def grounded_result(
     if packet is not None:
         cache_status = "hit"
     else:
-        emit_substage("research_search", detail=shape)
         client = _client()
         if client is None:
             return unavailable_result(
@@ -164,6 +164,18 @@ async def grounded_result(
                 decision=decision,
                 reason="not_configured",
             )
+        admission = claim_current_research_attempt()
+        if not admission.available:
+            return await exhausted_result(
+                query=query,
+                subjects=subjects,
+                interpretation=interpretation,
+                state=state,
+                user=user,
+                decision=decision,
+                guest_allowance_exhausted=admission.guest_exhausted,
+            )
+        emit_substage("research_search", detail=shape)
         try:
             packet = await asyncio.to_thread(client.run_research, prompt, spec)
         except ResearchUnavailableError as exc:
@@ -548,14 +560,16 @@ async def exhausted_result(
     interpretation: StructuredInterpretation,
     state: RunState,
     user: UserState,
+    guest_allowance_exhausted: bool,
     decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     """Ceiling exhaustion is an honest, localized note, not a silent
     disappearance: the answer still comes from Argus's own data or model
     knowledge, and still ends somewhere runnable."""
     language = language_tag(user.language_preference)
-    note = _exhausted_note(
-        language, guest_allowance=state.research_guest_allowance_exhausted
+    note = research_capacity_exhausted_note(
+        language,
+        guest_allowance=guest_allowance_exhausted,
     )
     from argus.agent_runtime import knowledge_answer as ka
 
@@ -900,7 +914,9 @@ def _coverage_note(language: str) -> str:
     )
 
 
-def _exhausted_note(language: str, *, guest_allowance: bool = False) -> str:
+def research_capacity_exhausted_note(
+    language: str, *, guest_allowance: bool = False
+) -> str:
     """Name the bound that actually closed, never a more flattering one."""
     if guest_allowance:
         if language == "es-419":
@@ -1202,6 +1218,49 @@ def research_failure_note(language: str) -> str:
         "I didn't verify; you can ask again, or test the idea against "
         "historical data right now."
     )
+
+
+def research_capacity_exhausted_for_job(
+    job_request: dict[str, Any],
+    *,
+    guest_allowance_exhausted: bool,
+) -> dict[str, Any]:
+    """Build the honest terminal payload when a thorough claim loses."""
+
+    language = language_tag(str(job_request.get("language") or "en"))
+    subjects = [
+        subject
+        for subject in job_request.get("subjects") or []
+        if isinstance(subject, dict) and subject.get("symbol")
+    ]
+    return {
+        "answer": research_capacity_exhausted_note(
+            language,
+            guest_allowance=guest_allowance_exhausted,
+        ),
+        "research": build_research_sidecar(
+            capability_class=str(
+                job_request.get("capability_class") or "thorough_research"
+            ),
+            shape="thorough",
+            sources=[],
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            subjects=subjects,
+            peers=[],
+            usage={
+                "invocations": 0,
+                "latency_ms": None,
+                "cost_usd": None,
+                "cache_status": "bypass",
+            },
+            period_of_interest=(
+                str(job_request["period_of_interest"])
+                if job_request.get("period_of_interest")
+                else None
+            ),
+            degraded_code="research_capacity_exhausted",
+        ),
+    }
 
 
 def carried_decision(
