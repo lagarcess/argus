@@ -13,6 +13,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ten paired rounds is what settled the 2026-08-21 and 2026-09-03 disputes.
+_PROSE_AB_MINIMUM_ATTEMPTS = 10
+
+# Shipped before this rule existed, and their trees are no longer deployed, so
+# the measurement can never be taken. 2026-08-27 settled its prose failure with
+# a judge-only replay: 13 of 13 passes on the recorded text. That establishes
+# the grader was stable on that input, which is a different question from
+# whether the candidate voiced it more often than production. The replay is why
+# this rule exists, not evidence that satisfies it.
+_MANIFESTS_PREDATING_PROSE_AB_RULE = frozenset(
+    {
+        "2026-08-27-main-production-promotion.md",
+    }
+)
+
 _PRODUCT_PATHS = ("src/", "web/app", "web/components", "web/lib", "web/public",
                   "render.yaml", "supabase/")
 
@@ -153,9 +168,107 @@ def assert_main_promotion_baseline_comparison(
     # Totals fluctuate on identical code and can both invent a regression and
     # hide one behind an offsetting flip. Case identity is the gate: every case
     # that passes deployed and fails here must be named and dispositioned.
+    prose_failures = {
+        result["id"]
+        for result in candidate_results
+        if result.get("status") == "failed"
+        and isinstance(judge := result.get("prose_judge"), dict)
+        and judge.get("pass") is False
+    }
     for case_id in sorted(candidate_failed - baseline_failed):
         assert case_id in manifest, (
             f"{manifest_path.name}: {case_id} passes on the deployed build and "
             "fails on the candidate. Name it in the manifest with its "
             "disposition, or do not promote."
+        )
+        if (
+            case_id in prose_failures
+            and manifest_path.name not in _MANIFESTS_PREDATING_PROSE_AB_RULE
+        ):
+            assert_prose_failure_measured_on_both_sides(
+                manifest,
+                manifest_path,
+                case_id=case_id,
+                deployed_sha=rollback_match.group(1),
+                candidate_sha=candidate_match.group(1),
+                repository_root=repository_root,
+            )
+
+
+def assert_prose_failure_measured_on_both_sides(
+    manifest: str,
+    manifest_path: Path,
+    *,
+    case_id: str,
+    deployed_sha: str,
+    candidate_sha: str,
+    repository_root: Path,
+) -> None:
+    """A prose regression is a rate on two sides, never one run's verdict.
+
+    Voiced prose is stochastic, so a single suite run can hand back a
+    candidate-only prose failure that no user would ever meet twice. Prose
+    cannot be dispositioned by argument here: the manifest must carry a
+    targeted interleaved A/B that measured the same case on the deployed build
+    and on the candidate. Ten paired rounds cost about $0.20 against $1.33 and
+    half an hour for a suite that still could not answer the question.
+
+    Evidence is matched by content, never by filename: a side-labelled document
+    naming this case, whose provenance measured the right tree.
+    """
+
+    sides: dict[str, dict[str, object]] = {}
+    for relative in re.findall(r"`([^`]+\.json)`", manifest):
+        path = (repository_root / relative).resolve()
+        if not path.is_file():
+            continue
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(document, dict) or document.get("case_id") != case_id:
+            continue
+        side = document.get("side")
+        if side in {"baseline", "candidate"}:
+            sides[str(side)] = document
+
+    missing = {"baseline", "candidate"} - sides.keys()
+    assert not missing, (
+        f"{manifest_path.name}: {case_id} is a candidate-only PROSE failure, so "
+        f"naming it is not a disposition. Missing the {', '.join(sorted(missing))} "
+        "side of a targeted interleaved A/B. Measure the same case on both the "
+        "deployed build and the candidate, reference both documents here, and "
+        "record the two rates. Roughly ten minutes and $0.20."
+    )
+
+    expected_sha = {"baseline": deployed_sha, "candidate": candidate_sha}
+    for side, document in sorted(sides.items()):
+        measured_sha = str((document.get("provenance") or {}).get("candidate_sha") or "")
+        assert measured_sha == expected_sha[side] or _same_product_tree(
+            measured_sha, expected_sha[side], repository_root=repository_root
+        ), (
+            f"{manifest_path.name}: the {side} A/B for {case_id} measured "
+            f"{measured_sha or '<unrecorded>'}, which is not the "
+            f"{'deployed build' if side == 'baseline' else 'candidate'}."
+        )
+
+        measurement = document.get("measurement")
+        assert isinstance(measurement, dict), (
+            f"{manifest_path.name}: the {side} A/B for {case_id} records no "
+            "measurement."
+        )
+        attempts = measurement.get("attempts")
+        assert isinstance(attempts, int) and attempts >= _PROSE_AB_MINIMUM_ATTEMPTS, (
+            f"{manifest_path.name}: the {side} A/B for {case_id} ran "
+            f"{attempts!r} attempts. Fewer than {_PROSE_AB_MINIMUM_ATTEMPTS} "
+            "cannot separate a regression from voicing noise."
+        )
+        counts = [
+            value
+            for key, value in measurement.items()
+            if key.endswith("_count") and isinstance(value, int)
+        ]
+        assert counts, (
+            f"{manifest_path.name}: the {side} A/B for {case_id} reports no "
+            "occurrence count, so the two sides cannot be compared."
         )
