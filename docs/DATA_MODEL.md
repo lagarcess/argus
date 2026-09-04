@@ -1079,6 +1079,10 @@ Current behavior:
 - PostHog is server-side only and personless (`$process_person_profile = false`).
 - US Cloud is the current PostHog region choice for private alpha compliance
   posture.
+- Research settlement projects the sidecar's work kind and outcome into a
+  bounded `research` event. Native dimension meanings and the
+  `capability_category` to `product_capability` rename are defined in
+  `docs/API_CONTRACT.md` section 17.1; analytics is not the spend ledger.
 
 Deferred durable surfaces:
 - Eval run/case result persistence.
@@ -1136,6 +1140,14 @@ Append-only rules:
 - Rollback is one reversible step: drop `public.cost_ledger_entries`.
 
 Current write hooks:
+- Unreconciled Perplexity Agent responses append an anomaly row at the response
+  boundary, correlated for invoice reconciliation by provider response id. They have
+  `cost_amount = null`, `cost_source = "unavailable"`, and
+  `usage_metadata.pricing_status = "unpriced"`; reported components and the
+  failed comparison's expected range remain in `usage_metadata`. The answer's
+  success is independent of invoice reconciliation. Anomaly rows have unknown
+  billable quantity and no cost amount; existing capability-class turn metering
+  remains unchanged. Both records retain null cost for an unpriced call.
 - API chat turns append OpenRouter cost rows from persisted route receipts.
 - Grounded-discovery turns append one `source = "research"` row per attempted
   Search call with `feature_area = "discovery"`, provider identity, latency,

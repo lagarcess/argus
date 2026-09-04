@@ -1,0 +1,62 @@
+argus
+New chat
+Search
+Recents
+Settings
+Microsoft's Revenue Streams and Businesses
+How does Microsoft make money and what are its main businesses?
+
+Microsoft makes most of its money by selling cloud-computing capacity and AI services, subscriptions to workplace and business software, and software licenses. It also earns revenue from gaming, advertising, devices, professional-network services, and technical support. Microsoft reports these activities in three main business segments. [1]
+
+For its fiscal year ended June 30, 2026, the latest full year available as of September 3, 2026, Microsoft generated $331.839 billion in revenue and $133.749 billion in net income. [1]
+
+MAIN BUSINESS	FY2026 REVENUE	WHAT CUSTOMERS PAY FOR
+Productivity and Business Processes	$139.996B	Microsoft 365 and Copilot subscriptions, Office licenses, LinkedIn services and advertising, and Dynamics business software
+Intelligent Cloud	$137.791B	Azure computing, storage, databases and AI usage; GitHub; server software; support and consulting
+More Personal Computing	$54.052B	Windows licenses, Xbox games and subscriptions, Surface and accessories, and search advertising
+Total	$331.839B	-
+1. Productivity and Business Processes
+
+This is Microsoft’s largest segment by FY2026 revenue. Its core products are Microsoft 365, LinkedIn and Dynamics. [1]
+
+Microsoft 365: Businesses and consumers pay recurring subscriptions for applications and services such as Word, Excel, PowerPoint, Outlook, Teams, OneDrive, security products and Microsoft 365 Copilot. Microsoft also still sells some on-premises Office and Windows Commercial licenses. [1]
+LinkedIn: Revenue comes from recruiting and talent products, sales tools, premium memberships and advertising through Marketing Solutions. [1]
+Dynamics: Companies pay for cloud and on-premises enterprise-resource-planning and customer-relationship-management software, including Dynamics 365, Power Apps and Power Automate. Revenue is influenced by licensed users, applications consumed and revenue per user. [1]
+2. Intelligent Cloud
+
+This segment contains Azure and Microsoft’s server, developer and enterprise-service businesses. [1]
+
+Azure: Customers generally pay according to how much cloud infrastructure and platform capacity they consume, such as computing, networking, storage, databases, AI and application services. [1]
+Server and developer products: Microsoft licenses SQL Server, Windows Server, Visual Studio, System Center and related access rights. GitHub provides both cloud and on-premises developer tools, including AI-assisted offerings. [1]
+Enterprise services: Microsoft charges for support, consulting, implementation assistance, training and certification. [1]
+
+This was Microsoft’s fastest-growing major segment in FY2026: revenue rose 30%, with Azure and other cloud-services revenue increasing 41%. Microsoft reported $214.4 billion of Microsoft Cloud revenue, a broader measure spanning several segments. [1]
+
+3. More Personal Computing
+
+This segment combines Microsoft’s consumer-facing and PC-related businesses. [1]
+
+Windows: PC manufacturers pay to license and preinstall Windows on computers; organizations also purchase commercial Windows licenses. [1]
+Xbox: Revenue comes from game and in-game-content sales, Xbox Game Pass and other subscriptions, advertising, digital stores, cloud gaming and console hardware. [1]
+Search advertising: Advertisers pay Microsoft to place search, native and display ads across services including Bing, Copilot, Edge and affiliated properties. [1]
+Devices: Microsoft sells Surface computers and PC accessories. [1]
+The simple picture
+
+Microsoft now has a mixed model:
+
+Subscriptions for Microsoft 365, Copilot, Dynamics, LinkedIn and Xbox services.
+Usage-based charges for Azure cloud and AI workloads.
+Software licensing for Windows, Office and server products.
+Advertising through search, LinkedIn and gaming.
+Transaction and content sales through games, digital stores and related services.
+Hardware sales and professional services from Surface, Xbox consoles, accessories, consulting and support. [1]
+
+The economic center of the company is therefore enterprise cloud infrastructure plus recurring business-software subscriptions, although Windows, gaming and advertising remain sizable businesses. In FY2026, Productivity and Business Processes and Intelligent Cloud together generated $277.787 billion, or 83.7% of Microsoft’s total revenue. [1]
+
+5 sources ›
+TRY NEXT
+↳
+Test Microsoft MSFT over the last 3 years
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

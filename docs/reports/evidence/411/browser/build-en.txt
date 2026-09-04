@@ -1,0 +1,35 @@
+argus
+New chat
+Search
+Recents
+Settings
+META Buy and Hold Strategy
+test META buy and hold
+
+What date window should I use for META?
+
+January 3, 2023 through December 31, 2024, with $10,000 starting capital
+
+Got it — META buy-and-hold with $10,000 starting capital. You mentioned January 3, 2023 through December 31, 2024. What are the exact start and end dates for the test?
+
+Start date: 2023-01-03. End date: 2024-12-31.
+META
+Buy and Hold
+Ready to run
+STARTING CAPITAL
+$10,000
+PERIOD
+Jan 3, 2023 → Dec 31, 2024
+Stocks
+Daily data
+No fees
+No slippage
+Benchmark: SPY
+Edit capital
+Edit dates
+Edit costs
+Run backtest
+Change assumptions
+Cancel
+
+Argus can make mistakes. For education only. Not financial advice.

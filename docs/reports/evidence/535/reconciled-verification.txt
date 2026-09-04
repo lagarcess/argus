@@ -1,0 +1,44 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: <worktree>
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 447 items
+
+tests/research/test_asset_identity.py ...........................        [  6%]
+tests/research/test_confirmation_peer_assets.py .............            [  8%]
+tests/research/test_execution_evidence_invariant.py .................... [ 13%]
+.........................                                                [ 19%]
+tests/research/test_research_answer.py ......................            [ 23%]
+tests/research/test_research_cache.py .......                            [ 25%]
+tests/research/test_research_citations.py .........                      [ 27%]
+tests/research/test_research_client.py .......................           [ 32%]
+tests/research/test_research_config.py ...                               [ 33%]
+tests/research/test_research_contract_example.py ...                     [ 34%]
+tests/research/test_research_evidence.py ...............                 [ 37%]
+tests/research/test_research_jobs.py .............                       [ 40%]
+tests/research/test_research_pricing_delivery.py ....................... [ 45%]
+                                                                         [ 45%]
+tests/research/test_research_router_absorption.py ..............         [ 48%]
+tests/research/test_research_rows.py ...........                         [ 51%]
+tests/research/test_research_shapes.py ..................                [ 55%]
+tests/research/test_research_sidecar_builder.py .............            [ 57%]
+tests/research/test_research_source_selection.py ......                  [ 59%]
+tests/research/test_research_sources_and_voice.py ..........             [ 61%]
+tests/research/test_research_truth_boundary.py .........                 [ 63%]
+tests/evals/test_measurement_eval_harness.py .........................   [ 69%]
+tests/evals/test_measurement_eval_dca_semantics.py ...                   [ 69%]
+tests/evals/test_measurement_eval_scorecard.py ..................        [ 73%]
+tests/evals/test_measurement_eval_live_environment.py .......            [ 75%]
+tests/evals/test_chat_runtime_eval_manifest.py ............              [ 78%]
+tests/evals/test_chat_runtime_trajectory_harness.py .................... [ 82%]
+...............                                                          [ 85%]
+tests/test_cost_ledger.py ......                                         [ 87%]
+tests/test_interpreter_prompt_freeze.py ...                              [ 87%]
+tests/test_route_receipt_logs.py ....                                    [ 88%]
+tests/domain/test_market_data_coverage.py .............................. [ 95%]
+....................                                                     [100%]
+
+============================= 447 passed in 11.26s =============================

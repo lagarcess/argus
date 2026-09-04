@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, PrivateAttr
 
+from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
     AssetDiscoveryRequest,
@@ -238,7 +239,17 @@ class LLMStrategyDraft(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
     comparison_baseline: str | None = None
     refinement_of: str | None = None
-    field_provenance: dict[str, str] = Field(default_factory=dict)
+    field_provenance: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Origin of each populated strategy field. Use explicit_user for fields "
+            "stated by the user, inherited for carried context, and default only "
+            "for values injected without a user request. In particular, an explicit "
+            "buy-and-hold request is never a default strategy_type. Evidence spans "
+            "must support user-stated fields; missing provenance is not a default. "
+            "Preserve the existing capital-role provenance for capital fields."
+        ),
+    )
     evidence_spans: dict[str, str] = Field(
         default_factory=dict,
         description=(
@@ -308,6 +319,19 @@ class LLMInterpretationResponse(BaseModel):
         ),
     )
     candidate_strategy_draft: LLMStrategyDraft = Field(default_factory=LLMStrategyDraft)
+    research_query: ResearchQueryExtraction | None = Field(
+        default=None,
+        description=(
+            "Populate the question shape and subjects here for finance questions, "
+            "including named comparisons and asset discovery. This primary "
+            "interpretation owns the research route; no later model reclassifies "
+            "the message. Leave candidate_strategy_draft empty for research. "
+            "Leave research_query null for build/run requests, replies to a pending "
+            "setup question, edits, approvals, and questions about a visible result "
+            "or confirmation. A named comparison is research unless the user asks "
+            "to simulate an investment or strategy."
+        ),
+    )
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
     uses_latest_result_context: bool | None = None

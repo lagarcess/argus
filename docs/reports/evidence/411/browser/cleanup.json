@@ -1,0 +1,14 @@
+{
+  "qa_browser_session": "issue411",
+  "browser_close_confirmed": true,
+  "ports_checked": [
+    3200,
+    8200
+  ],
+  "listeners": [],
+  "frontend_pid_stopped": 52046,
+  "api_pids_stopped": [
+    52054,
+    54023
+  ]
+}

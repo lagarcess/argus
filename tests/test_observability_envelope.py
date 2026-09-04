@@ -12,6 +12,7 @@ from argus.observability import (
     sanitize_observability_attributes,
 )
 from argus.observability import envelope as envelope_module
+from argus.observability.guest_funnel import build_guest_funnel_event
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -23,7 +24,8 @@ _APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS = frozenset(
         "terminal_outcome",
         "conversion_reason",
         "strategy_category",
-        "capability_category",
+        "product_capability",
+        "capability_class",
     }
 )
 _SCALAR_ATTRIBUTE_VALUES = st.one_of(
@@ -51,6 +53,18 @@ def test_posthog_top_level_attribute_allowlist_is_closed() -> None:
     assert envelope_module._POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST == (
         _APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS
     )
+
+
+def test_product_capability_has_an_unambiguous_native_filter_name() -> None:
+    envelope = build_guest_funnel_event(
+        "guest_limit_reached", user_id=None, product_capability="chat"
+    )
+    properties = posthog_event_payload(envelope, api_key="test-project-token")[
+        "properties"
+    ]
+    assert properties["product_capability"] == "chat"
+    assert "capability_category" not in properties["attributes"]
+    assert "capability_class" not in properties
 
 
 def test_private_alpha_event_envelope_is_non_emitting_by_default(monkeypatch) -> None:
@@ -265,7 +279,8 @@ def test_posthog_projection_promotes_only_the_approved_categorical_dimensions() 
         "terminal_outcome": "completed",
         "conversion_reason": "first_result",
         "strategy_category": "dca",
-        "capability_category": "backtest",
+        "product_capability": "simulation",
+        "capability_class": "balanced_lookup",
         "safe_count": 2,
     }
 

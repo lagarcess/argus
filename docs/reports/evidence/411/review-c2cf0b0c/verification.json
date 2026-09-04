@@ -1,0 +1,155 @@
+{
+  "candidate_sha": "c2cf0b0ca53093043a9afeca08bb1e5b61182a13",
+  "reviewed_head": "f6862e8ff50111c3d8a655aa303da4a81c467a74",
+  "integration_sha": "4e987de6e74c3d94df8355ac092d4995f7525529",
+  "reproduction_kind": "constructed valid typed interpretations; direct runtime predicate calls",
+  "browser_evidence_kind": "headless browser; local mock auth and memory persistence; real OpenRouter, Alpaca and Perplexity",
+  "turns": [
+    {
+      "case": "build-en-thin",
+      "user_message": "Test META from 2020 through 2024",
+      "language": "en",
+      "conversation_id": "298755f4-b8a1-446a-a466-ab6c3f25d431",
+      "request_id": "7a3692c5-7c6f-4f41-8a0d-7ce2e65b303e",
+      "message_id": "2bfca71f-cbb3-44cf-96f1-3aa89574592e",
+      "stage_outcome": "await_approval",
+      "receipt_count": 2,
+      "knowledge_route_count": 0,
+      "research": null,
+      "final_payload_keys": [
+        "active_confirmation_reference",
+        "artifact_references",
+        "confirmation",
+        "confirmation_payload",
+        "message_id",
+        "pending_strategy",
+        "resolution_provenance",
+        "stage_outcome"
+      ]
+    },
+    {
+      "case": "build-es-thin",
+      "user_message": "Prueba META desde 2020 hasta 2024",
+      "language": "es",
+      "conversation_id": "c39f90f2-0f4f-4e43-8f2c-05595bf614b0",
+      "request_id": "6a843374-6419-4033-9720-fa0d52c63102",
+      "message_id": "9dab5a6a-35f5-430e-9823-43091fc1fb3c",
+      "stage_outcome": "await_approval",
+      "receipt_count": 2,
+      "knowledge_route_count": 0,
+      "research": null,
+      "final_payload_keys": [
+        "active_confirmation_reference",
+        "artifact_references",
+        "confirmation",
+        "confirmation_payload",
+        "message_id",
+        "pending_strategy",
+        "resolution_provenance",
+        "stage_outcome"
+      ]
+    },
+    {
+      "case": "research-comparison",
+      "user_message": "Compare PLTR to LMT over the last 3 years",
+      "language": "en",
+      "conversation_id": "087b489c-5fa5-4a01-a239-87a35e56a52b",
+      "request_id": "f9afdf3b-d470-4bb8-88ff-92abdad6f648",
+      "message_id": "c31be3b8-76e1-4b31-9bb6-b00ab9920212",
+      "stage_outcome": "ready_to_respond",
+      "receipt_count": 2,
+      "knowledge_route_count": 0,
+      "research": {
+        "schema_version": "argus_research/v1",
+        "capability_class": "thorough_research",
+        "shape": "thorough",
+        "sources": [],
+        "retrieved_at": "2026-09-03T05:35:12.463851+00:00",
+        "anchor_symbols": [
+          "PLTR",
+          "LMT"
+        ],
+        "peers": [],
+        "usage": {
+          "invocations": 3,
+          "latency_ms": 37139,
+          "cost_usd": 0.19487,
+          "cache_status": "miss"
+        },
+        "follow_up": {
+          "schema_version": "argus_research_follow_up/v1",
+          "subjects": [
+            {
+              "symbol": "PLTR",
+              "name": "Palantir Technologies Inc. Class A Common Stock",
+              "asset_class": "equity"
+            },
+            {
+              "symbol": "LMT",
+              "name": "Lockheed Martin Corp.",
+              "asset_class": "equity"
+            }
+          ],
+          "comparison_set": [
+            "PLTR",
+            "LMT"
+          ],
+          "peer_suggestions": [],
+          "open_thread": {
+            "shape": "thorough",
+            "period_of_interest": "last 3 years"
+          }
+        }
+      },
+      "final_payload_keys": [
+        "artifact_references",
+        "assistant_response",
+        "message_id",
+        "next_experiments",
+        "research",
+        "stage_outcome"
+      ]
+    }
+  ],
+  "totals": {
+    "browser_turns": 3,
+    "route_receipts": 6,
+    "knowledge_route_count": 0,
+    "runtime_research_passed": 2246,
+    "runtime_research_failed": 2,
+    "focused_and_prompt_freeze_passed": 42,
+    "mocked_harness_passed": 100
+  },
+  "prompt_surface_changed": false,
+  "limits": [
+    "Constructed contradiction proves reachability, not production frequency.",
+    "Browser comparison proves routing and answer delivery, not independent financial-fact verification.",
+    "Research answer uses native finance-tool data and exposes no publisher sources.",
+    "Backtests were not launched in this review round."
+  ],
+  "artifacts": {
+    "browser-user-agent.txt": "a148f338b082610955e00e22eeadc0f7349082b338501c13754aedf885101a2a",
+    "build-en-thin.png": "f307b59ab5397f4d16f0419d2172036eee9688bd78fbdeb244f792911cfd332f",
+    "build-en-thin.sse": "ed6510a47f2ec879ac23c9a5b275199ea97439c017007f79d40db1333226dab0",
+    "build-en-thin.txt": "e5959fdb0642eb9121d9dadbea726492d6b2c641eebcda755bc1835533fd1223",
+    "build-es-thin.png": "5cf28e67ad3c9bbd573f21e55de33cc608e9d48f31069e33c0d990815b6d10aa",
+    "build-es-thin.sse": "cf6f2cb34cca4b79715e80706ac90aa443cc5227984aa1b06de365bf6b50ca13",
+    "build-es-thin.txt": "d20ccf0e5fb8df3592df4164600a35a5bddaa6c8dd7ee34a3d6c4390e3d64aab",
+    "environment.json": "ed86fae123a7ffcb256786d05783d0524bc95232523be4961ad4f09b4179f08d",
+    "full-runtime-research-first.txt": "ff644cd43f685a50807fd80216ec9cfba35e61d25b75bd7697a7bde458db865d",
+    "full-runtime-research.txt": "fca9e616b41a19b0b0dff0a9f0782c91d9ae3642c090890fd0b03a18276e88fa",
+    "mocked-harness.txt": "f0eaeb5d573582d2e4015eb3366f81f68ae35cc51b1f4411e3e144e602da3a51",
+    "modularity.txt": "7817bb61ed38050839458ad1a567445174331bc8a7c1a191ba1528d87fa06697",
+    "prompt-surface.json": "d62566c78082e3939009033f7a260234c101a88e12f01704cadfeff819d348ec",
+    "regression-and-freeze-after.txt": "fce5e65b0b44bd5313fdbd2367122440fa1e7b5e1f185291c5f684b01f0c3a43",
+    "regression-before.txt": "283aa1880e5b64580cc6ec3e738aea3079815fa80ef8c430a27dad2ab2e9df7a",
+    "reproduction-after.json": "6c64b610986f9c68b803af6de83341575ab0806dd8a6b9cc1e1a713f04ad0ca0",
+    "reproduction-before.json": "9a62186664f3538e2002ac01b89a7c729199c7dab88ff62d67925376f0e67b29",
+    "research-comparison-bottom.png": "f35922505a9ba796539d9c496133b7f30fa0593655fb70fdaec26d777dfb2cef",
+    "research-comparison-top.png": "b168ce30e1963fc2e3441b7c96081bc6f65b0ea6b0d027e084ba3f4e1d77dd9f",
+    "research-comparison.sse": "6129763d9bee153ad9f76b301523900a2f4dddb0eb18023eaf87faa658446c23",
+    "research-comparison.txt": "13761fdb3b8633559f29eef24679b88a4f681d3000354511a6137cbd6ffaeacc",
+    "review-comment.json": "72c3c2c93f5e05737371e509077e8a5644f62817cc7d8b4c123bd1bda279dbea",
+    "route-receipts.jsonl": "1e962a39be2e877f28c06fdffec9a579ef3f81ee0d4fd28e27954bb22a45aa0e"
+  }
+}

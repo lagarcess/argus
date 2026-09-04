@@ -53,7 +53,7 @@ def feedback(
                     kind="guest_limit_reached",
                     user_id=user.id,
                     surface="feedback",
-                    capability_category="feedback",
+                    product_capability="feedback",
                     terminal_outcome="limit_reached",
                 )
                 raise problem(
@@ -100,7 +100,7 @@ def feedback(
         kind="guest_feedback_submitted",
         user_id=user.id,
         surface="feedback",
-        capability_category="feedback",
+        product_capability="feedback",
         terminal_outcome="completed",
     )
     logger.info(

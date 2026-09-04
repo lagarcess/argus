@@ -18,7 +18,6 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 from argus.agent_runtime import research_answer as ra
@@ -62,10 +61,6 @@ def _interpretation() -> StructuredInterpretation:
 
 
 def _run_with_sentinel(monkeypatch: pytest.MonkeyPatch):
-    async def classify(**_kwargs: Any) -> ra.ResearchQueryExtraction:
-        return ra.ResearchQueryExtraction(question_kind="live_quote", symbols=["NFLX"])
-
-    monkeypatch.setattr(ra, "_classify_research_question", classify)
     transport = RecordingTransport(
         [
             agent_response(
@@ -83,7 +78,13 @@ def _run_with_sentinel(monkeypatch: pytest.MonkeyPatch):
     )
     return asyncio.run(
         ra.research_answer_stage_result(
-            interpretation=_interpretation(),
+            interpretation=_interpretation().model_copy(
+                update={
+                    "research_query": ra.ResearchQueryExtraction(
+                        question_kind="live_quote", symbols=["NFLX"]
+                    )
+                }
+            ),
             state=state,
             user=UserState(user_id="tb", language_preference="en"),
         )

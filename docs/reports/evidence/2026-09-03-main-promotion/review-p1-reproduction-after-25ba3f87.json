@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "head": "25ba3f87d7eb4bdd96eb3359fbacd18f271e7396",
+  "side": "candidate_after_fix",
+  "reproduction_kind": "constructed valid typed interpretation; direct runtime predicate and knowledge_answer_stage_result calls; external provider patched at the dispatch boundary",
+  "input": {
+    "intent": "results_explanation",
+    "task_relation": "continue",
+    "semantic_turn_act": null,
+    "research_query": {
+      "question_kind": "company_lookup",
+      "symbols": [
+        "META"
+      ],
+      "requires_publisher_sources": true
+    },
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "artifact_target": null,
+    "candidate_strategy_draft": {}
+  },
+  "observations": {
+    "canonical_route_owner": "result",
+    "strategy_route_expected": false,
+    "research_turn_has_conflicting_owner": true,
+    "primary_research_query_accepted": false,
+    "external_research_dispatched": false,
+    "stage_outcome": null,
+    "stage_patch": null
+  },
+  "conclusion": "One canonical typed route owner now keeps results explanations off the research rail without sending them through the strategy builder."
+}

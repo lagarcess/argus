@@ -1,0 +1,20 @@
+{
+  "source": "Supabase public.route_receipts, read-only lookup on 2026-09-03 UTC",
+  "receipt_id": "a7c9f61d-f96e-4df8-9408-35ce251a5654",
+  "receipt": {
+    "task": "clarification",
+    "tier": "chat",
+    "model": "deepseek/deepseek-v4-flash",
+    "fallback_model": "qwen/qwen3.5-9b",
+    "mode": "json_schema",
+    "schema_name": "ClarificationResponse",
+    "latency_ms": 12028,
+    "outcome": "failed",
+    "failure_mode": "TimeoutError",
+    "fallback_used": false,
+    "token_usage": null,
+    "usage_cost_usd": null,
+    "context_packet_ids": [],
+    "created_at": "2026-09-02T20:37:39.408467+00:00"
+  }
+}

@@ -483,7 +483,9 @@ _EXECUTION_EVIDENCE_FIELDS = (
 )
 
 
-def strategy_has_execution_evidence(strategy: Any) -> bool:
+def strategy_has_execution_evidence(
+    strategy: Any, *, include_defaults: bool = True
+) -> bool:
     """Whether the draft shows intent to RUN something, not just name something.
 
     Reference fields (asset_universe, asset_class, date_range, timeframe, and
@@ -491,7 +493,19 @@ def strategy_has_execution_evidence(strategy: Any) -> bool:
     the user is talking about; only execution fields may pull a turn onto the
     strategy route. Duck-typed over StrategySummary and LLMStrategyDraft.
     """
-    return any(
-        getattr(strategy, field, None) not in (None, "", [], {})
-        for field in _EXECUTION_EVIDENCE_FIELDS
-    )
+    extra = getattr(strategy, "extra_parameters", None) or {}
+    provenance = getattr(strategy, "field_provenance", extra.get("field_provenance", {}))
+    spans = getattr(strategy, "evidence_spans", extra.get("evidence_spans", {}))
+    provenance = provenance if isinstance(provenance, dict) else {}
+    spans = spans if isinstance(spans, dict) else {}
+    for field in _EXECUTION_EVIDENCE_FIELDS:
+        if getattr(strategy, field, None) in (None, "", [], {}):
+            continue
+        if (
+            not include_defaults
+            and provenance.get(field) == "default"
+            and not spans.get(field)
+        ):
+            continue
+        return True
+    return False

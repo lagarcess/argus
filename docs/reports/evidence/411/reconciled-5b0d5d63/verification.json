@@ -1,0 +1,158 @@
+{
+  "candidate_sha": "5b0d5d6320fbd45bcb18dd36b1a65f3a028a4112",
+  "original_integration_base": "c7802b37f39772a1216514e37fb6ff2b63142181",
+  "integration_sha": "4e987de6e74c3d94df8355ac092d4995f7525529",
+  "reconciliation_merge_sha": "5b0d5d6320fbd45bcb18dd36b1a65f3a028a4112",
+  "evidence_kind": "real headless browser on reconciled worker branch; real OpenRouter, Alpaca and Perplexity; local mock auth and memory persistence",
+  "user_message": "How does Microsoft make money and what are its main businesses?",
+  "conversation_id": "43ce0a1c-2f65-42a0-a834-5d00ac306d1e",
+  "request_id": "fb3711de-f3f2-4ea6-a34c-495f8027ef8d",
+  "assistant_message_id": "dd99cdf9-e933-4bac-bfec-65d47f92ddef",
+  "receipt_count": 2,
+  "knowledge_route_count": 0,
+  "final_payload": {
+    "artifact_references": [],
+    "stage_outcome": "ready_to_respond",
+    "assistant_response": "**Microsoft makes most of its money by selling cloud-computing capacity and AI services, subscriptions to workplace and business software, and software licenses.** It also earns revenue from gaming, advertising, devices, professional-network services, and technical support. Microsoft reports these activities in three main business segments. [1]\n\nFor its fiscal year ended **June 30, 2026**, the latest full year available as of **September 3, 2026**, Microsoft generated **$331.839 billion in revenue** and **$133.749 billion in net income**. [1]\n\n| Main business | FY2026 revenue | What customers pay for |\n|---|---:|---|\n| **Productivity and Business Processes** | **$139.996B** | Microsoft 365 and Copilot subscriptions, Office licenses, LinkedIn services and advertising, and Dynamics business software |\n| **Intelligent Cloud** | **$137.791B** | Azure computing, storage, databases and AI usage; GitHub; server software; support and consulting |\n| **More Personal Computing** | **$54.052B** | Windows licenses, Xbox games and subscriptions, Surface and accessories, and search advertising |\n| **Total** | **$331.839B** | - |\n\n### 1. Productivity and Business Processes\n\nThis is Microsoft’s largest segment by FY2026 revenue. Its core products are Microsoft 365, LinkedIn and Dynamics. [1]\n\n- **Microsoft 365:** Businesses and consumers pay recurring subscriptions for applications and services such as Word, Excel, PowerPoint, Outlook, Teams, OneDrive, security products and Microsoft 365 Copilot. Microsoft also still sells some on-premises Office and Windows Commercial licenses. [1]\n- **LinkedIn:** Revenue comes from recruiting and talent products, sales tools, premium memberships and advertising through Marketing Solutions. [1]\n- **Dynamics:** Companies pay for cloud and on-premises enterprise-resource-planning and customer-relationship-management software, including Dynamics 365, Power Apps and Power Automate. Revenue is influenced by licensed users, applications consumed and revenue per user. [1]\n\n### 2. Intelligent Cloud\n\nThis segment contains Azure and Microsoft’s server, developer and enterprise-service businesses. [1]\n\n- **Azure:** Customers generally pay according to how much cloud infrastructure and platform capacity they consume, such as computing, networking, storage, databases, AI and application services. [1]\n- **Server and developer products:** Microsoft licenses SQL Server, Windows Server, Visual Studio, System Center and related access rights. GitHub provides both cloud and on-premises developer tools, including AI-assisted offerings. [1]\n- **Enterprise services:** Microsoft charges for support, consulting, implementation assistance, training and certification. [1]\n\nThis was Microsoft’s fastest-growing major segment in FY2026: revenue rose **30%**, with Azure and other cloud-services revenue increasing **41%**. Microsoft reported **$214.4 billion of Microsoft Cloud revenue**, a broader measure spanning several segments. [1]\n\n### 3. More Personal Computing\n\nThis segment combines Microsoft’s consumer-facing and PC-related businesses. [1]\n\n- **Windows:** PC manufacturers pay to license and preinstall Windows on computers; organizations also purchase commercial Windows licenses. [1]\n- **Xbox:** Revenue comes from game and in-game-content sales, Xbox Game Pass and other subscriptions, advertising, digital stores, cloud gaming and console hardware. [1]\n- **Search advertising:** Advertisers pay Microsoft to place search, native and display ads across services including Bing, Copilot, Edge and affiliated properties. [1]\n- **Devices:** Microsoft sells Surface computers and PC accessories. [1]\n\n### The simple picture\n\nMicrosoft now has a mixed model:\n\n1. **Subscriptions** for Microsoft 365, Copilot, Dynamics, LinkedIn and Xbox services.\n2. **Usage-based charges** for Azure cloud and AI workloads.\n3. **Software licensing** for Windows, Office and server products.\n4. **Advertising** through search, LinkedIn and gaming.\n5. **Transaction and content sales** through games, digital stores and related services.\n6. **Hardware sales and professional services** from Surface, Xbox consoles, accessories, consulting and support. [1]\n\nThe economic center of the company is therefore **enterprise cloud infrastructure plus recurring business-software subscriptions**, although Windows, gaming and advertising remain sizable businesses. In FY2026, Productivity and Business Processes and Intelligent Cloud together generated **$277.787 billion**, or **83.7%** of Microsoft’s total revenue. [1]",
+    "next_experiments": {
+      "version": "argus_next_experiments/v1",
+      "rows": [
+        {
+          "kind": "research_test_single",
+          "label": "Test Microsoft (MSFT) over the last 3 years",
+          "label_parts": [
+            {
+              "type": "text",
+              "value": "Test "
+            },
+            {
+              "type": "text",
+              "value": "Microsoft"
+            },
+            {
+              "type": "ticker",
+              "value": "MSFT"
+            },
+            {
+              "type": "text",
+              "value": " over the last 3 years"
+            }
+          ],
+          "label_key": "chat.next_experiments.labels.research_dynamic",
+          "send_text": "Test buying and holding MSFT over the last three years"
+        }
+      ]
+    },
+    "research": {
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup",
+      "shape": "balanced",
+      "sources": [
+        {
+          "title": "Form 10-K for Microsoft Corp filed 07/29/2026",
+          "domain": "microsoft.gcs-web.com",
+          "url": "https://microsoft.gcs-web.com/static-files/8a9beeed-0e9e-48e6-b4fb-593d558e2693",
+          "source_date": "2026-07-29"
+        },
+        {
+          "title": "Microsoft FY2026 Earnings: The $133B Profit Machine Now ...",
+          "domain": "beancount.io",
+          "url": "https://beancount.io/blog/2026/07/29/microsoft-fy2026-earnings-analysis",
+          "source_date": "2026-07-29"
+        },
+        {
+          "title": "FY26 Q2 - Segment Results - Investor Relations",
+          "domain": "www.microsoft.com",
+          "url": "https://www.microsoft.com/en-us/investor/earnings/fy-2026-q2/segment-revenues",
+          "source_date": "2026-08-26"
+        },
+        {
+          "title": "MICROSOFT CORP annual report, FY2026 (NASDAQ:MSFT) | MetaTrader",
+          "domain": "www.metatrader.com",
+          "url": "https://www.metatrader.com/en/symbols/nasdaq/msft/documents/1354281-annual-report-fy2026",
+          "source_date": "2026-07-29"
+        },
+        {
+          "title": "Annual Report for Fiscal Year Ending June 30, 2026 (Form 10-K)",
+          "domain": "www.marketscreener.com",
+          "url": "https://www.marketscreener.com/news/microsoft-annual-report-for-fiscal-year-ending-june-30-2026-form-10-k-ce7f51d3dc8efe24",
+          "source_date": "2026-07-29"
+        }
+      ],
+      "retrieved_at": "2026-09-03T04:19:31.527540+00:00",
+      "anchor_symbols": [
+        "MSFT"
+      ],
+      "peers": [],
+      "usage": {
+        "invocations": 2,
+        "latency_ms": 27030,
+        "cost_usd": null,
+        "cache_status": "miss"
+      },
+      "follow_up": {
+        "schema_version": "argus_research_follow_up/v1",
+        "subjects": [
+          {
+            "symbol": "MSFT",
+            "name": "Microsoft Corporation Common Stock",
+            "asset_class": "equity"
+          }
+        ],
+        "comparison_set": [],
+        "peer_suggestions": [],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        }
+      }
+    },
+    "message_id": "dd99cdf9-e933-4bac-bfec-65d47f92ddef"
+  },
+  "tests": {
+    "runtime_research_full": {
+      "passed": 2233,
+      "failed": 2
+    },
+    "full_verify": {
+      "passed": 5773,
+      "skipped": 533,
+      "failed": 20,
+      "coverage_percent": 87
+    },
+    "permission_limited_retest": {
+      "passed": 14,
+      "failed": 0
+    },
+    "additional_baseline_reproductions": {
+      "integration_sha": "4e987de6e74c3d94df8355ac092d4995f7525529",
+      "failed": 4
+    }
+  },
+  "retained_evidence": "EN/ES build cards and discovery recovery at 35e5cea8; identical agent-runtime/frontend bytes. Prior paid scorecards retained; fresh research answer supersedes temporary-tree proof.",
+  "reconciliation_checks": {
+    "recorded_invoice_fixture_preserved": true,
+    "removed_production_pricing_helpers_absent": true,
+    "primary_query_helper_independent": true,
+    "sibling_source_matches_integration": true
+  },
+  "artifacts": {
+    "broad-lint.txt": "91a8571b4a70f1761a4cbbf152b6ad5a1889d7ed6ff886f7aaa5cc7f6d1bbac5",
+    "browser-user-agent.json": "99acab4149f399343e8d4ec5780e3d49579617c298444b907aeb83a6ad1219b7",
+    "ci-lint.txt": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "environment.json": "546db40d4a40faec1cc70017e06af5468be0196ed71a593a0b3f66b637250cc9",
+    "full-verify-summary.txt": "d832bcd5be13e3008da5d6d718d1b90cb2b3027f2e3b296f2aa729d3b765e7fc",
+    "integration-baseline.txt": "f0ad1b577cdba0e52ac94aa624030d1291c32097710f11e5f1c45a29881d2e95",
+    "modularity.txt": "7817bb61ed38050839458ad1a567445174331bc8a7c1a191ba1528d87fa06697",
+    "ownership.txt": "8f78ee4265b84fd1b4b61949f4603dab848291ab8fca1c4c86bc78de36fae22b",
+    "pricing-diagnostic.txt": "dc046c0573d632985a8de8e834b753e0bc834c7487307c05aef1a1ada13f3fb6",
+    "research-answer-bottom.png": "1bd6daec00837d7451f93698244e24a77e4ab94a6845aaa5ec9cd695a3b1b7e9",
+    "research-answer-top.png": "8a5a0cc598125680c200de346f395e8ba1fed0df1fb561e114f678a80b8b6ad1",
+    "research-answer.sse": "f58e443e71533b6ba9f86b393244bb5a676b6b4b38931026e95acfd0ca616465",
+    "research-answer.txt": "0e1fe05c59cb537e48f74221ba0f3fd7e5ebbdd5f9f8f76d8ed6a2b406f31346",
+    "research-sources.png": "e15459f45ffc8df8141e396f47e51413a2d86d5eb14e4fdf5dbc2d06ce95e0ac",
+    "route-receipts.jsonl": "7c9d5a53d87c0b54b2122784639cc26a6360337d9674fc3d4610c37e29dd9d61",
+    "runtime-research-full.txt": "e4563380fd8ad99d5eb97a26ea4684556d873bfaab5a10886c55114402e7cac3",
+    "sandbox-retest.txt": "ad9046c13c0b62d568fbb6768f63c5fcb62bccf52acf81e2df6ba20c896a30b4"
+  }
+}

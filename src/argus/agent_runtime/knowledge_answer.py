@@ -17,9 +17,9 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.interpreter.draft_shape import (
-    _EXECUTION_EVIDENCE_FIELDS,
     strategy_has_execution_evidence,
 )
+from argus.agent_runtime.interpreter.research_routing import primary_research_query
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENT_ACTION_LABELS,
     NEXT_EXPERIMENTS_VERSION,
@@ -132,51 +132,6 @@ class KnowledgeQueryExtraction(BaseModel):
     date_range_raw_text: str | None = None
 
 
-# A default the interpreter injects for any two-asset mention is not the
-# user's stated intent to run something. Everything else in the evidence set
-# is: capital, cadence, sizing, rules, an explicit template.
-_DEFAULTED_EXECUTION_FIELDS = frozenset({"strategy_type"})
-
-
-def _rail_may_claim_clarification(
-    interpretation: StructuredInterpretation,
-) -> bool:
-    """Widen the rail's entry to turns the builder is about to question.
-
-    "Compare PLTR to LMT" carries no capital, no window, and no execution
-    verb, yet the interpreter injects a default buy_and_hold, the draft then
-    counts as execution evidence, and the builder asks for a date window. It
-    is a question wearing a strategy's clothes, and which interpreter model
-    won the race decided whether it reached the rail at all.
-
-    This is not a second router and not a phrase list: it only lets the same
-    rail classifier see the turn. The classifier answers "none" for genuine
-    build requests, so those fall through to the builder unchanged. A draft
-    that carries any real execution field never reaches here.
-    """
-    if not research_rail_enabled():
-        return False
-    if not interpretation.requires_clarification:
-        return False
-    if not _execution_evidence_is_only_a_default(interpretation.candidate_strategy_draft):
-        return False
-    if _describes_a_test_it_cannot_run(interpretation):
-        # A window alone must not decline: "compare PLTR to LMT over the last
-        # 3 years" is the same question as without the period, and declining
-        # on specificity gives the more precise user the worse turn. Only an
-        # unsupported verdict over a window the user themselves stated is a
-        # described test, and that keeps its recovery contract.
-        logger.info(
-            "Research rail claim declined: unsupported request over a stated window",
-            date_range=getattr(
-                interpretation.candidate_strategy_draft, "date_range", None
-            ),
-            failure_classification="rail_claim_declined_stated_window",
-        )
-        return False
-    return True
-
-
 def _describes_a_test_it_cannot_run(
     interpretation: StructuredInterpretation,
 ) -> bool:
@@ -220,15 +175,6 @@ def _draft_carries_a_stated_test_window(strategy: Any) -> bool:
     return bool(str(extra.get("date_range_raw_text") or "").strip())
 
 
-def _execution_evidence_is_only_a_default(strategy: Any) -> bool:
-    for field in _EXECUTION_EVIDENCE_FIELDS:
-        if field in _DEFAULTED_EXECUTION_FIELDS:
-            continue
-        if getattr(strategy, field, None) not in (None, "", [], {}):
-            return False
-    return True
-
-
 async def knowledge_answer_stage_result(
     *,
     interpretation: StructuredInterpretation,
@@ -254,7 +200,9 @@ async def knowledge_answer_stage_result(
             categories=[item.category for item in interpretation.unsupported_constraints],
         )
         return None
-    rail_claim = _rail_may_claim_clarification(interpretation)
+    rail_claim = (
+        research_rail_enabled() and primary_research_query(interpretation) is not None
+    )
     if (
         strategy_has_execution_evidence(interpretation.candidate_strategy_draft)
         and not rail_claim
@@ -267,11 +215,8 @@ async def knowledge_answer_stage_result(
     if not knowledge_shaped and not rail_claim:
         return None
     if research_rail_enabled():
-        # The rail's richer classifier subsumes the legacy one, so a flag-on
-        # turn still makes exactly one routing call. The resolved-asset
-        # shortcut below is deliberately skipped: a current-quote ask must be
-        # allowed to reach the fast research shape instead of being pinned to
-        # historical stats.
+        # The primary interpreter already supplied question shape and subjects.
+        # No raw-message classifier may reconsider its intent here.
         from argus.agent_runtime.research_answer import research_answer_stage_result
 
         return await research_answer_stage_result(
@@ -326,20 +271,10 @@ async def knowledge_answer_stage_result(
 def refusal_route_survives_classification(
     interpretation: StructuredInterpretation,
 ) -> bool:
-    """Whether a turn the classifier claimed must keep its refusal route.
+    """A typed refusal over a user-stated window keeps its recovery route.
 
-    Pure: asking this question changes nothing. The caller that acts on the
-    answer records it, because only the caller knows the turn was actually
-    diverted.
-
-    Two independent reads can each misfire, in opposite directions, so
-    neither may decide alone. The act label can be wrong, which is why the
-    classifier is always consulted first and owns whether a turn is a
-    question at all. The classifier can also be wrong, and when it claims a
-    turn whose typed draft already names an asset and a window the user
-    themselves stated, that turn is a refusal decision with recovery options
-    rather than a question. Answering it from the underlying's price history
-    is how a run request became a readout.
+    The caller records the stand-down. This also protects the legacy
+    flag-off knowledge classifier from answering a run request with stats.
     """
     return _describes_a_test_it_cannot_run(interpretation)
 

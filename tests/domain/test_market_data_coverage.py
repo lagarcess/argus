@@ -1298,8 +1298,10 @@ def test_approved_window_hash_guard_still_rejects_changed_final_bars(
     assert excinfo.value.code == "approved_data_window_unavailable"
 
 
+@pytest.mark.parametrize("clause", ["requested_range", "effective_range", "dataset_id"])
 def test_approved_window_rejection_names_the_mismatched_clause(
     monkeypatch: pytest.MonkeyPatch,
+    clause: str,
 ) -> None:
     from loguru import logger as loguru_logger
 
@@ -1315,7 +1317,11 @@ def test_approved_window_rejection_names_the_mismatched_clause(
         now=now,
     )
     tampered = _approved_payload(preflight)
-    tampered["preflight_id"] = "sha256:" + "0" * 64
+    if clause == "dataset_id":
+        tampered["preflight_id"] = "sha256:" + "0" * 64
+    else:
+        key = "requested_date_range" if clause == "requested_range" else "effective_date_range"
+        tampered[key] = {**tampered[key], "start": "2026-08-04"}
 
     captured: list[str] = []
     handler_id = loguru_logger.add(
@@ -1335,9 +1341,18 @@ def test_approved_window_rejection_names_the_mismatched_clause(
 
     mismatch_lines = [line for line in captured if "Approved data window" in line]
     assert mismatch_lines, captured
-    assert "dataset_id" in mismatch_lines[-1]
-    assert "sha256:000000" in mismatch_lines[-1]
-    assert preflight.dataset_id[:14] in mismatch_lines[-1]
+    line = mismatch_lines[-1]
+    assert f"rejected: {clause} approved=" in line
+    if clause == "dataset_id":
+        assert "sha256:000000" in line
+        assert preflight.dataset_id in line
+    else:
+        assert "approved=2026-08-04" in line
+    # A hash-only failure must show whether both windows stayed the same.
+    assert f"requested_range approved={tampered['requested_date_range']['start']}" in line
+    assert f"current={preflight.requested_date_range.start}..{preflight.requested_date_range.end}" in line
+    assert f"effective_range approved={tampered['effective_date_range']['start']}" in line
+    assert f"current={preflight.effective_date_range.start}..{preflight.effective_date_range.end}" in line
 
 
 def test_intraday_timeframes_keep_the_current_days_completed_candles(

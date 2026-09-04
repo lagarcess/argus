@@ -1,0 +1,699 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/c111/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 39 items
+
+tests/agent_runtime/test_research_routing_contract.py .........FFFFFF... [ 46%]
+..FFFFFF.............                                                    [100%]
+
+=================================== FAILURES ===================================
+_ test_thin_strategy_request_owns_default_draft_despite_research_query[owner0-StructuredInterpretation] _
+
+response_type = <class 'argus.agent_runtime.stages.interpret_types.StructuredInterpretation'>
+owner = {'intent': 'strategy_drafting'}
+
+    @pytest.mark.parametrize("response_type", [StructuredInterpretation, LLMInterpretationResponse])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+        ],
+    )
+    def test_thin_strategy_request_owns_default_draft_despite_research_query(
+        response_type, owner
+    ):
+        payload = _interpretation(
+            **owner,
+            research_query={"question_kind": "market_stats", "symbols": ["META"]},
+        ).model_dump()
+        provenance = {"strategy_type": "default"}
+        payload["candidate_strategy_draft"] = {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["META"],
+            "date_range": {"start": "2020-01-01", "end": "2024-12-31"},
+            **(
+                {"field_provenance": provenance}
+                if response_type is LLMInterpretationResponse
+                else {"extra_parameters": {"field_provenance": provenance}}
+            ),
+        }
+        interpretation = response_type.model_validate(payload)
+        # The thin request has no stated strategy type or capital; typed turn
+        # ownership must still outrank the contradictory question payload.
+        assert not strategy_has_execution_evidence(
+            interpretation.candidate_strategy_draft, include_defaults=False
+        )
+>       assert primary_research_query(interpretation) is None
+E       AssertionError: assert ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) is None
+E        +  where ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) = primary_research_query(StructuredInterpretation(research_query=ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_...fact_key=None, capability_question_focus=None, context_question_focus=None, artifact_target=None, asset_discovery=None))
+
+tests/agent_runtime/test_research_routing_contract.py:197: AssertionError
+_ test_thin_strategy_request_owns_default_draft_despite_research_query[owner0-LLMInterpretationResponse] _
+
+response_type = <class 'argus.agent_runtime.llm_interpreter_types.LLMInterpretationResponse'>
+owner = {'intent': 'strategy_drafting'}
+
+    @pytest.mark.parametrize("response_type", [StructuredInterpretation, LLMInterpretationResponse])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+        ],
+    )
+    def test_thin_strategy_request_owns_default_draft_despite_research_query(
+        response_type, owner
+    ):
+        payload = _interpretation(
+            **owner,
+            research_query={"question_kind": "market_stats", "symbols": ["META"]},
+        ).model_dump()
+        provenance = {"strategy_type": "default"}
+        payload["candidate_strategy_draft"] = {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["META"],
+            "date_range": {"start": "2020-01-01", "end": "2024-12-31"},
+            **(
+                {"field_provenance": provenance}
+                if response_type is LLMInterpretationResponse
+                else {"extra_parameters": {"field_provenance": provenance}}
+            ),
+        }
+        interpretation = response_type.model_validate(payload)
+        # The thin request has no stated strategy type or capital; typed turn
+        # ownership must still outrank the contradictory question payload.
+        assert not strategy_has_execution_evidence(
+            interpretation.candidate_strategy_draft, include_defaults=False
+        )
+>       assert primary_research_query(interpretation) is None
+E       AssertionError: assert ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) is None
+E        +  where ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) = primary_research_query(LLMInterpretationResponse(intent='strategy_drafting', task_relation='new_task', requires_clarification=False, user_goa...None, result_followup_fact_key=None, capability_question_focus=None, context_question_focus=None, artifact_target=None))
+
+tests/agent_runtime/test_research_routing_contract.py:197: AssertionError
+_ test_thin_strategy_request_owns_default_draft_despite_research_query[owner1-StructuredInterpretation] _
+
+response_type = <class 'argus.agent_runtime.stages.interpret_types.StructuredInterpretation'>
+owner = {'intent': 'backtest_execution'}
+
+    @pytest.mark.parametrize("response_type", [StructuredInterpretation, LLMInterpretationResponse])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+        ],
+    )
+    def test_thin_strategy_request_owns_default_draft_despite_research_query(
+        response_type, owner
+    ):
+        payload = _interpretation(
+            **owner,
+            research_query={"question_kind": "market_stats", "symbols": ["META"]},
+        ).model_dump()
+        provenance = {"strategy_type": "default"}
+        payload["candidate_strategy_draft"] = {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["META"],
+            "date_range": {"start": "2020-01-01", "end": "2024-12-31"},
+            **(
+                {"field_provenance": provenance}
+                if response_type is LLMInterpretationResponse
+                else {"extra_parameters": {"field_provenance": provenance}}
+            ),
+        }
+        interpretation = response_type.model_validate(payload)
+        # The thin request has no stated strategy type or capital; typed turn
+        # ownership must still outrank the contradictory question payload.
+        assert not strategy_has_execution_evidence(
+            interpretation.candidate_strategy_draft, include_defaults=False
+        )
+>       assert primary_research_query(interpretation) is None
+E       AssertionError: assert ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) is None
+E        +  where ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) = primary_research_query(StructuredInterpretation(research_query=ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_...fact_key=None, capability_question_focus=None, context_question_focus=None, artifact_target=None, asset_discovery=None))
+
+tests/agent_runtime/test_research_routing_contract.py:197: AssertionError
+_ test_thin_strategy_request_owns_default_draft_despite_research_query[owner1-LLMInterpretationResponse] _
+
+response_type = <class 'argus.agent_runtime.llm_interpreter_types.LLMInterpretationResponse'>
+owner = {'intent': 'backtest_execution'}
+
+    @pytest.mark.parametrize("response_type", [StructuredInterpretation, LLMInterpretationResponse])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+        ],
+    )
+    def test_thin_strategy_request_owns_default_draft_despite_research_query(
+        response_type, owner
+    ):
+        payload = _interpretation(
+            **owner,
+            research_query={"question_kind": "market_stats", "symbols": ["META"]},
+        ).model_dump()
+        provenance = {"strategy_type": "default"}
+        payload["candidate_strategy_draft"] = {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["META"],
+            "date_range": {"start": "2020-01-01", "end": "2024-12-31"},
+            **(
+                {"field_provenance": provenance}
+                if response_type is LLMInterpretationResponse
+                else {"extra_parameters": {"field_provenance": provenance}}
+            ),
+        }
+        interpretation = response_type.model_validate(payload)
+        # The thin request has no stated strategy type or capital; typed turn
+        # ownership must still outrank the contradictory question payload.
+        assert not strategy_has_execution_evidence(
+            interpretation.candidate_strategy_draft, include_defaults=False
+        )
+>       assert primary_research_query(interpretation) is None
+E       AssertionError: assert ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) is None
+E        +  where ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) = primary_research_query(LLMInterpretationResponse(intent='backtest_execution', task_relation='new_task', requires_clarification=False, user_go...None, result_followup_fact_key=None, capability_question_focus=None, context_question_focus=None, artifact_target=None))
+
+tests/agent_runtime/test_research_routing_contract.py:197: AssertionError
+_ test_thin_strategy_request_owns_default_draft_despite_research_query[owner2-StructuredInterpretation] _
+
+response_type = <class 'argus.agent_runtime.stages.interpret_types.StructuredInterpretation'>
+owner = {'semantic_turn_act': 'new_idea'}
+
+    @pytest.mark.parametrize("response_type", [StructuredInterpretation, LLMInterpretationResponse])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+        ],
+    )
+    def test_thin_strategy_request_owns_default_draft_despite_research_query(
+        response_type, owner
+    ):
+        payload = _interpretation(
+            **owner,
+            research_query={"question_kind": "market_stats", "symbols": ["META"]},
+        ).model_dump()
+        provenance = {"strategy_type": "default"}
+        payload["candidate_strategy_draft"] = {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["META"],
+            "date_range": {"start": "2020-01-01", "end": "2024-12-31"},
+            **(
+                {"field_provenance": provenance}
+                if response_type is LLMInterpretationResponse
+                else {"extra_parameters": {"field_provenance": provenance}}
+            ),
+        }
+        interpretation = response_type.model_validate(payload)
+        # The thin request has no stated strategy type or capital; typed turn
+        # ownership must still outrank the contradictory question payload.
+        assert not strategy_has_execution_evidence(
+            interpretation.candidate_strategy_draft, include_defaults=False
+        )
+>       assert primary_research_query(interpretation) is None
+E       AssertionError: assert ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) is None
+E        +  where ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) = primary_research_query(StructuredInterpretation(research_query=ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_...fact_key=None, capability_question_focus=None, context_question_focus=None, artifact_target=None, asset_discovery=None))
+
+tests/agent_runtime/test_research_routing_contract.py:197: AssertionError
+_ test_thin_strategy_request_owns_default_draft_despite_research_query[owner2-LLMInterpretationResponse] _
+
+response_type = <class 'argus.agent_runtime.llm_interpreter_types.LLMInterpretationResponse'>
+owner = {'semantic_turn_act': 'new_idea'}
+
+    @pytest.mark.parametrize("response_type", [StructuredInterpretation, LLMInterpretationResponse])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+        ],
+    )
+    def test_thin_strategy_request_owns_default_draft_despite_research_query(
+        response_type, owner
+    ):
+        payload = _interpretation(
+            **owner,
+            research_query={"question_kind": "market_stats", "symbols": ["META"]},
+        ).model_dump()
+        provenance = {"strategy_type": "default"}
+        payload["candidate_strategy_draft"] = {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["META"],
+            "date_range": {"start": "2020-01-01", "end": "2024-12-31"},
+            **(
+                {"field_provenance": provenance}
+                if response_type is LLMInterpretationResponse
+                else {"extra_parameters": {"field_provenance": provenance}}
+            ),
+        }
+        interpretation = response_type.model_validate(payload)
+        # The thin request has no stated strategy type or capital; typed turn
+        # ownership must still outrank the contradictory question payload.
+        assert not strategy_has_execution_evidence(
+            interpretation.candidate_strategy_draft, include_defaults=False
+        )
+>       assert primary_research_query(interpretation) is None
+E       AssertionError: assert ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) is None
+E        +  where ResearchQueryExtraction(question_kind='market_stats', symbols=['META'], asset_class_hint=None, period_of_interest=None...isher_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None) = primary_research_query(LLMInterpretationResponse(intent='conversation_followup', task_relation='new_task', requires_clarification=False, user...None, result_followup_fact_key=None, capability_question_focus=None, context_question_focus=None, artifact_target=None))
+
+tests/agent_runtime/test_research_routing_contract.py:197: AssertionError
+_____ test_both_rail_entries_protect_existing_turn_owner[owner2-knowledge] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110603be0>
+entry = 'knowledge', owner = {'intent': 'strategy_drafting'}
+
+    @pytest.mark.parametrize("entry", ["knowledge", "discovery"])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"candidate_strategy_draft": {"strategy_type": "buy_and_hold"}},
+            {"candidate_strategy_draft": {"cadence": "weekly", "capital_amount": 100}},
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+            {"semantic_turn_act": "approval"},
+            {"semantic_turn_act": "answer_pending_need"},
+            {"semantic_turn_act": "refine_current_idea"},
+            {"semantic_turn_act": "result_followup"},
+            {"semantic_turn_act": "retry_failed_action"},
+            {"artifact_target": "latest_result"},
+        ],
+    )
+    def test_both_rail_entries_protect_existing_turn_owner(monkeypatch, entry, owner):
+        from argus.agent_runtime import research_find
+
+        async def reject(*args, **kwargs):
+            raise AssertionError("another surface owns this turn")
+
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+        monkeypatch.setattr(ra, "_dispatch", reject)
+        monkeypatch.setattr(research_find, "find_assets_stage_result", reject)
+        interpretation = _interpretation(
+            **{
+                "semantic_turn_act": "asset_discovery",
+                "asset_discovery": {"relationship": "peer", "anchor_symbols": ["META"]},
+                **owner,
+            }
+        )
+        kwargs = dict(
+            interpretation=interpretation,
+            state=RunState.new(
+                current_user_message=fake.sentence(), recent_thread_history=[]
+            ),
+            user=UserState(user_id=fake.uuid4()),
+        )
+        if entry == "knowledge":
+>           result = asyncio.run(ra.research_answer_stage_result(**kwargs))
+
+tests/agent_runtime/test_research_routing_contract.py:251:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/argus/agent_runtime/research_answer.py:65: in research_answer_stage_result
+    return await _dispatch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (ResearchQueryExtraction(question_kind='cross_company', symbols=['PLTR', 'LMT'], asset_class_hint=None, period_of_inte...her_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None),)
+kwargs = {'decision': None, 'discovery_request': AssetDiscoveryRequest(relationship='peer', category_description=None, anchor_s...response_intent=None, semantic_turn_act=None, context_hints=[], resolution_provenance=[], structured_action=None), ...}
+
+    async def reject(*args, **kwargs):
+>       raise AssertionError("another surface owns this turn")
+E       AssertionError: another surface owns this turn
+
+tests/agent_runtime/test_research_routing_contract.py:231: AssertionError
+_____ test_both_rail_entries_protect_existing_turn_owner[owner2-discovery] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1105f0fd0>
+entry = 'discovery', owner = {'intent': 'strategy_drafting'}
+
+    @pytest.mark.parametrize("entry", ["knowledge", "discovery"])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"candidate_strategy_draft": {"strategy_type": "buy_and_hold"}},
+            {"candidate_strategy_draft": {"cadence": "weekly", "capital_amount": 100}},
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+            {"semantic_turn_act": "approval"},
+            {"semantic_turn_act": "answer_pending_need"},
+            {"semantic_turn_act": "refine_current_idea"},
+            {"semantic_turn_act": "result_followup"},
+            {"semantic_turn_act": "retry_failed_action"},
+            {"artifact_target": "latest_result"},
+        ],
+    )
+    def test_both_rail_entries_protect_existing_turn_owner(monkeypatch, entry, owner):
+        from argus.agent_runtime import research_find
+
+        async def reject(*args, **kwargs):
+            raise AssertionError("another surface owns this turn")
+
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+        monkeypatch.setattr(ra, "_dispatch", reject)
+        monkeypatch.setattr(research_find, "find_assets_stage_result", reject)
+        interpretation = _interpretation(
+            **{
+                "semantic_turn_act": "asset_discovery",
+                "asset_discovery": {"relationship": "peer", "anchor_symbols": ["META"]},
+                **owner,
+            }
+        )
+        kwargs = dict(
+            interpretation=interpretation,
+            state=RunState.new(
+                current_user_message=fake.sentence(), recent_thread_history=[]
+            ),
+            user=UserState(user_id=fake.uuid4()),
+        )
+        if entry == "knowledge":
+            result = asyncio.run(ra.research_answer_stage_result(**kwargs))
+        else:
+            decision = ra.grounded.research_decision(interpretation, kwargs["user"], "test")
+            decision.asset_discovery = ra.AssetDiscoveryRequest(
+                relationship="peer", anchor_symbols=["META"]
+            )
+>           result = asyncio.run(ra.discovery_turn_stage_result(decision=decision, **kwargs))
+
+tests/agent_runtime/test_research_routing_contract.py:257:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/argus/agent_runtime/research_answer.py:117: in discovery_turn_stage_result
+    return await _dispatch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (ResearchQueryExtraction(question_kind='cross_company', symbols=['PLTR', 'LMT'], asset_class_hint=None, period_of_inte...her_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None),)
+kwargs = {'decision': InterpretDecision(intent='conversation_followup', task_relation='continue', requires_clarification=False,...response_intent=None, semantic_turn_act=None, context_hints=[], resolution_provenance=[], structured_action=None), ...}
+
+    async def reject(*args, **kwargs):
+>       raise AssertionError("another surface owns this turn")
+E       AssertionError: another surface owns this turn
+
+tests/agent_runtime/test_research_routing_contract.py:231: AssertionError
+_____ test_both_rail_entries_protect_existing_turn_owner[owner3-knowledge] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110770f40>
+entry = 'knowledge', owner = {'intent': 'backtest_execution'}
+
+    @pytest.mark.parametrize("entry", ["knowledge", "discovery"])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"candidate_strategy_draft": {"strategy_type": "buy_and_hold"}},
+            {"candidate_strategy_draft": {"cadence": "weekly", "capital_amount": 100}},
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+            {"semantic_turn_act": "approval"},
+            {"semantic_turn_act": "answer_pending_need"},
+            {"semantic_turn_act": "refine_current_idea"},
+            {"semantic_turn_act": "result_followup"},
+            {"semantic_turn_act": "retry_failed_action"},
+            {"artifact_target": "latest_result"},
+        ],
+    )
+    def test_both_rail_entries_protect_existing_turn_owner(monkeypatch, entry, owner):
+        from argus.agent_runtime import research_find
+
+        async def reject(*args, **kwargs):
+            raise AssertionError("another surface owns this turn")
+
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+        monkeypatch.setattr(ra, "_dispatch", reject)
+        monkeypatch.setattr(research_find, "find_assets_stage_result", reject)
+        interpretation = _interpretation(
+            **{
+                "semantic_turn_act": "asset_discovery",
+                "asset_discovery": {"relationship": "peer", "anchor_symbols": ["META"]},
+                **owner,
+            }
+        )
+        kwargs = dict(
+            interpretation=interpretation,
+            state=RunState.new(
+                current_user_message=fake.sentence(), recent_thread_history=[]
+            ),
+            user=UserState(user_id=fake.uuid4()),
+        )
+        if entry == "knowledge":
+>           result = asyncio.run(ra.research_answer_stage_result(**kwargs))
+
+tests/agent_runtime/test_research_routing_contract.py:251:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/argus/agent_runtime/research_answer.py:65: in research_answer_stage_result
+    return await _dispatch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (ResearchQueryExtraction(question_kind='cross_company', symbols=['PLTR', 'LMT'], asset_class_hint=None, period_of_inte...her_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None),)
+kwargs = {'decision': None, 'discovery_request': AssetDiscoveryRequest(relationship='peer', category_description=None, anchor_s...response_intent=None, semantic_turn_act=None, context_hints=[], resolution_provenance=[], structured_action=None), ...}
+
+    async def reject(*args, **kwargs):
+>       raise AssertionError("another surface owns this turn")
+E       AssertionError: another surface owns this turn
+
+tests/agent_runtime/test_research_routing_contract.py:231: AssertionError
+_____ test_both_rail_entries_protect_existing_turn_owner[owner3-discovery] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x11070f430>
+entry = 'discovery', owner = {'intent': 'backtest_execution'}
+
+    @pytest.mark.parametrize("entry", ["knowledge", "discovery"])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"candidate_strategy_draft": {"strategy_type": "buy_and_hold"}},
+            {"candidate_strategy_draft": {"cadence": "weekly", "capital_amount": 100}},
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+            {"semantic_turn_act": "approval"},
+            {"semantic_turn_act": "answer_pending_need"},
+            {"semantic_turn_act": "refine_current_idea"},
+            {"semantic_turn_act": "result_followup"},
+            {"semantic_turn_act": "retry_failed_action"},
+            {"artifact_target": "latest_result"},
+        ],
+    )
+    def test_both_rail_entries_protect_existing_turn_owner(monkeypatch, entry, owner):
+        from argus.agent_runtime import research_find
+
+        async def reject(*args, **kwargs):
+            raise AssertionError("another surface owns this turn")
+
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+        monkeypatch.setattr(ra, "_dispatch", reject)
+        monkeypatch.setattr(research_find, "find_assets_stage_result", reject)
+        interpretation = _interpretation(
+            **{
+                "semantic_turn_act": "asset_discovery",
+                "asset_discovery": {"relationship": "peer", "anchor_symbols": ["META"]},
+                **owner,
+            }
+        )
+        kwargs = dict(
+            interpretation=interpretation,
+            state=RunState.new(
+                current_user_message=fake.sentence(), recent_thread_history=[]
+            ),
+            user=UserState(user_id=fake.uuid4()),
+        )
+        if entry == "knowledge":
+            result = asyncio.run(ra.research_answer_stage_result(**kwargs))
+        else:
+            decision = ra.grounded.research_decision(interpretation, kwargs["user"], "test")
+            decision.asset_discovery = ra.AssetDiscoveryRequest(
+                relationship="peer", anchor_symbols=["META"]
+            )
+>           result = asyncio.run(ra.discovery_turn_stage_result(decision=decision, **kwargs))
+
+tests/agent_runtime/test_research_routing_contract.py:257:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/argus/agent_runtime/research_answer.py:117: in discovery_turn_stage_result
+    return await _dispatch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (ResearchQueryExtraction(question_kind='cross_company', symbols=['PLTR', 'LMT'], asset_class_hint=None, period_of_inte...her_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None),)
+kwargs = {'decision': InterpretDecision(intent='conversation_followup', task_relation='continue', requires_clarification=False,...response_intent=None, semantic_turn_act=None, context_hints=[], resolution_provenance=[], structured_action=None), ...}
+
+    async def reject(*args, **kwargs):
+>       raise AssertionError("another surface owns this turn")
+E       AssertionError: another surface owns this turn
+
+tests/agent_runtime/test_research_routing_contract.py:231: AssertionError
+_____ test_both_rail_entries_protect_existing_turn_owner[owner4-knowledge] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1107af700>
+entry = 'knowledge', owner = {'semantic_turn_act': 'new_idea'}
+
+    @pytest.mark.parametrize("entry", ["knowledge", "discovery"])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"candidate_strategy_draft": {"strategy_type": "buy_and_hold"}},
+            {"candidate_strategy_draft": {"cadence": "weekly", "capital_amount": 100}},
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+            {"semantic_turn_act": "approval"},
+            {"semantic_turn_act": "answer_pending_need"},
+            {"semantic_turn_act": "refine_current_idea"},
+            {"semantic_turn_act": "result_followup"},
+            {"semantic_turn_act": "retry_failed_action"},
+            {"artifact_target": "latest_result"},
+        ],
+    )
+    def test_both_rail_entries_protect_existing_turn_owner(monkeypatch, entry, owner):
+        from argus.agent_runtime import research_find
+
+        async def reject(*args, **kwargs):
+            raise AssertionError("another surface owns this turn")
+
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+        monkeypatch.setattr(ra, "_dispatch", reject)
+        monkeypatch.setattr(research_find, "find_assets_stage_result", reject)
+        interpretation = _interpretation(
+            **{
+                "semantic_turn_act": "asset_discovery",
+                "asset_discovery": {"relationship": "peer", "anchor_symbols": ["META"]},
+                **owner,
+            }
+        )
+        kwargs = dict(
+            interpretation=interpretation,
+            state=RunState.new(
+                current_user_message=fake.sentence(), recent_thread_history=[]
+            ),
+            user=UserState(user_id=fake.uuid4()),
+        )
+        if entry == "knowledge":
+>           result = asyncio.run(ra.research_answer_stage_result(**kwargs))
+
+tests/agent_runtime/test_research_routing_contract.py:251:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/argus/agent_runtime/research_answer.py:65: in research_answer_stage_result
+    return await _dispatch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (ResearchQueryExtraction(question_kind='cross_company', symbols=['PLTR', 'LMT'], asset_class_hint=None, period_of_inte...her_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None),)
+kwargs = {'decision': None, 'discovery_request': AssetDiscoveryRequest(relationship='peer', category_description=None, anchor_s...response_intent=None, semantic_turn_act=None, context_hints=[], resolution_provenance=[], structured_action=None), ...}
+
+    async def reject(*args, **kwargs):
+>       raise AssertionError("another surface owns this turn")
+E       AssertionError: another surface owns this turn
+
+tests/agent_runtime/test_research_routing_contract.py:231: AssertionError
+_____ test_both_rail_entries_protect_existing_turn_owner[owner4-discovery] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1107d0a00>
+entry = 'discovery', owner = {'semantic_turn_act': 'new_idea'}
+
+    @pytest.mark.parametrize("entry", ["knowledge", "discovery"])
+    @pytest.mark.parametrize(
+        "owner",
+        [
+            {"candidate_strategy_draft": {"strategy_type": "buy_and_hold"}},
+            {"candidate_strategy_draft": {"cadence": "weekly", "capital_amount": 100}},
+            {"intent": "strategy_drafting"},
+            {"intent": "backtest_execution"},
+            {"semantic_turn_act": "new_idea"},
+            {"semantic_turn_act": "approval"},
+            {"semantic_turn_act": "answer_pending_need"},
+            {"semantic_turn_act": "refine_current_idea"},
+            {"semantic_turn_act": "result_followup"},
+            {"semantic_turn_act": "retry_failed_action"},
+            {"artifact_target": "latest_result"},
+        ],
+    )
+    def test_both_rail_entries_protect_existing_turn_owner(monkeypatch, entry, owner):
+        from argus.agent_runtime import research_find
+
+        async def reject(*args, **kwargs):
+            raise AssertionError("another surface owns this turn")
+
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+        monkeypatch.setattr(ra, "_dispatch", reject)
+        monkeypatch.setattr(research_find, "find_assets_stage_result", reject)
+        interpretation = _interpretation(
+            **{
+                "semantic_turn_act": "asset_discovery",
+                "asset_discovery": {"relationship": "peer", "anchor_symbols": ["META"]},
+                **owner,
+            }
+        )
+        kwargs = dict(
+            interpretation=interpretation,
+            state=RunState.new(
+                current_user_message=fake.sentence(), recent_thread_history=[]
+            ),
+            user=UserState(user_id=fake.uuid4()),
+        )
+        if entry == "knowledge":
+            result = asyncio.run(ra.research_answer_stage_result(**kwargs))
+        else:
+            decision = ra.grounded.research_decision(interpretation, kwargs["user"], "test")
+            decision.asset_discovery = ra.AssetDiscoveryRequest(
+                relationship="peer", anchor_symbols=["META"]
+            )
+>           result = asyncio.run(ra.discovery_turn_stage_result(decision=decision, **kwargs))
+
+tests/agent_runtime/test_research_routing_contract.py:257:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/argus/agent_runtime/research_answer.py:117: in discovery_turn_stage_result
+    return await _dispatch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (ResearchQueryExtraction(question_kind='cross_company', symbols=['PLTR', 'LMT'], asset_class_hint=None, period_of_inte...her_sources=False, date_range_raw_text=None, discovery_category=None, screening_criteria=[], sector_of_interest=None),)
+kwargs = {'decision': InterpretDecision(intent='conversation_followup', task_relation='continue', requires_clarification=False,...response_intent=None, semantic_turn_act=None, context_hints=[], resolution_provenance=[], structured_action=None), ...}
+
+    async def reject(*args, **kwargs):
+>       raise AssertionError("another surface owns this turn")
+E       AssertionError: another surface owns this turn
+
+tests/agent_runtime/test_research_routing_contract.py:231: AssertionError
+=========================== short test summary info ============================
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_thin_strategy_request_owns_default_draft_despite_research_query[owner0-StructuredInterpretation]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_thin_strategy_request_owns_default_draft_despite_research_query[owner0-LLMInterpretationResponse]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_thin_strategy_request_owns_default_draft_despite_research_query[owner1-StructuredInterpretation]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_thin_strategy_request_owns_default_draft_despite_research_query[owner1-LLMInterpretationResponse]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_thin_strategy_request_owns_default_draft_despite_research_query[owner2-StructuredInterpretation]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_thin_strategy_request_owns_default_draft_despite_research_query[owner2-LLMInterpretationResponse]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_both_rail_entries_protect_existing_turn_owner[owner2-knowledge]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_both_rail_entries_protect_existing_turn_owner[owner2-discovery]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_both_rail_entries_protect_existing_turn_owner[owner3-knowledge]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_both_rail_entries_protect_existing_turn_owner[owner3-discovery]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_both_rail_entries_protect_existing_turn_owner[owner4-knowledge]
+FAILED tests/agent_runtime/test_research_routing_contract.py::test_both_rail_entries_protect_existing_turn_owner[owner4-discovery]
+======================== 12 failed, 27 passed in 1.09s =========================

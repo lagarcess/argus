@@ -7,6 +7,7 @@ at parse time so every downstream consumer sees the same bounded shape.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -46,6 +47,26 @@ class ResearchUnavailableError(Exception):
         self.detail = detail
 
 
+class ResearchPricingError(Exception):
+    """An invoice cannot be reconciled; this says nothing about the answer."""
+
+    def __init__(
+        self,
+        reason: str,
+        detail: str,
+        *,
+        reported: Decimal | None = None,
+        expected_min: Decimal | None = None,
+        expected_max: Decimal | None = None,
+    ) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.detail = detail
+        self.reported = reported
+        self.expected_min = expected_min
+        self.expected_max = expected_max
+
+
 class ResearchUsage(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -58,7 +79,7 @@ class ResearchUsage(BaseModel):
     fetch_url_invocations: int = Field(default=0, ge=0)
     model: str = ""
     latency_ms: int = Field(default=0, ge=0)
-    cost_usd: float = Field(default=0.0, ge=0.0)
+    cost_usd: float | None = Field(default=None, ge=0.0)
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     cache_creation_input_tokens: int | None = Field(default=None, ge=0)

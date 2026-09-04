@@ -1,0 +1,105 @@
+{
+  "evidence_kind": "synthetic_native_filter_probe_not_production_traffic",
+  "candidate_sha": "d9eccbd7f7eab7c165b0f904b1ef4e8395da0560",
+  "query": {
+    "dateRange": {
+      "date_from": "2026-09-03T00:00:00Z",
+      "date_to": "2026-09-04T00:00:00Z"
+    },
+    "funnelsFilter": {
+      "breakdownAttributionType": "first_touch",
+      "exclusions": [],
+      "funnelAggregateByHogQL": null,
+      "funnelOrderType": "ordered",
+      "funnelStepReference": "total",
+      "funnelVizType": "steps",
+      "funnelWindowInterval": 1,
+      "funnelWindowIntervalUnit": "day",
+      "layout": "vertical"
+    },
+    "kind": "FunnelsQuery",
+    "properties": [
+      {
+        "key": "environment",
+        "operator": "exact",
+        "type": "event",
+        "value": [
+          "validation_issue_408_d9eccbd7f7ea_20260903T001225Z"
+        ]
+      }
+    ],
+    "series": [
+      {
+        "event": "research",
+        "kind": "EventsNode",
+        "optionalInFunnel": false,
+        "properties": [
+          {
+            "key": "capability_class",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "balanced_lookup"
+            ]
+          },
+          {
+            "key": "event_action",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "failed"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "research",
+        "kind": "EventsNode",
+        "optionalInFunnel": false,
+        "properties": [
+          {
+            "key": "capability_class",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "balanced_lookup"
+            ]
+          },
+          {
+            "key": "event_action",
+            "operator": "exact",
+            "type": "event",
+            "value": [
+              "completed"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "action_id": "research",
+      "name": "research",
+      "custom_name": null,
+      "order": 0,
+      "people": [],
+      "count": 1,
+      "type": "events",
+      "average_conversion_time": null,
+      "median_conversion_time": null
+    },
+    {
+      "action_id": "research",
+      "name": "research",
+      "custom_name": null,
+      "order": 1,
+      "people": [],
+      "count": 1,
+      "type": "events",
+      "average_conversion_time": 0.1979999542236328,
+      "median_conversion_time": 0.1979999542236328
+    }
+  ],
+  "url": "https://us.posthog.com/project/372988/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-09-03T00%3A00%3A00Z%22%2C%22date_to%22%3A%222026-09-04T00%3A00%3A00Z%22%7D%2C%22funnelsFilter%22%3A%7B%22breakdownAttributionType%22%3A%22first_touch%22%2C%22exclusions%22%3A%5B%5D%2C%22funnelAggregateByHogQL%22%3Anull%2C%22funnelOrderType%22%3A%22ordered%22%2C%22funnelStepReference%22%3A%22total%22%2C%22funnelVizType%22%3A%22steps%22%2C%22funnelWindowInterval%22%3A1%2C%22funnelWindowIntervalUnit%22%3A%22day%22%2C%22layout%22%3A%22vertical%22%7D%2C%22kind%22%3A%22FunnelsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22environment%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22validation_issue_408_d9eccbd7f7ea_20260903T001225Z%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22research%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22capability_class%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22balanced_lookup%22%5D%7D%2C%7B%22key%22%3A%22event_action%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22failed%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22research%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22capability_class%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22balanced_lookup%22%5D%7D%2C%7B%22key%22%3A%22event_action%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22completed%22%5D%7D%5D%7D%5D%7D%7D"
+}

@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import json
-from decimal import ROUND_HALF_UP, Decimal
+from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
-from argus.domain.research.pricing import (
-    MODEL_RATE_TABLE_USD_PER_MILLION,
-    TOOL_RATE_TABLE_USD_PER_INVOCATION,
-)
 
-_MILLION = Decimal(1_000_000)
-_PROVIDER_COST_PRECISION = Decimal("0.00001")
+RECORDED_PROBES = Path(__file__).resolve().parents[2] / "docs/reports/evidence/377/probes"
+
+
+def recorded_agent_response(name: str = "equity_steps2") -> dict[str, Any]:
+    """An actual captured response, including its independent invoice."""
+    return json.loads((RECORDED_PROBES / f"{name}.json").read_text())["response"]
 
 
 @pytest.fixture(autouse=True)
@@ -37,10 +38,10 @@ def agent_response(
     invocations: int = 1,
     web_search_invocations: int = 0,
     fetch_url_invocations: int = 0,
-    input_tokens: int = 1_000,
-    output_tokens: int = 500,
-    cache_creation_input_tokens: int = 0,
-    cache_read_input_tokens: int = 0,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+    cache_creation_input_tokens: int | None = None,
+    cache_read_input_tokens: int | None = None,
     model: str = "openai/gpt-5.6-sol",
     cost_overrides: dict[str, Any] | None = None,
     response_id: str = "resp_test",
@@ -70,16 +71,21 @@ def agent_response(
         tool_calls_details["search_web"] = {"invocation": web_search_invocations}
     if fetch_url_invocations:
         tool_calls_details["fetch_url"] = {"invocation": fetch_url_invocations}
-    cost = _agent_cost(
-        model=model,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cache_creation_input_tokens=cache_creation_input_tokens,
-        cache_read_input_tokens=cache_read_input_tokens,
-        finance_search_invocations=invocations,
-        web_search_invocations=web_search_invocations,
-        fetch_url_invocations=fetch_url_invocations,
+    recorded_usage = recorded_agent_response()["usage"]
+    # Keep captured billing unchanged. Counter overrides are synthetic test
+    # perturbations; tests about reconciled pricing must give an explicit bill.
+    input_tokens = (
+        recorded_usage["input_tokens"] if input_tokens is None else input_tokens
     )
+    output_tokens = (
+        recorded_usage["output_tokens"] if output_tokens is None else output_tokens
+    )
+    input_details = recorded_usage["input_tokens_details"]
+    if cache_creation_input_tokens is None:
+        cache_creation_input_tokens = input_details["cache_creation_input_tokens"]
+    if cache_read_input_tokens is None:
+        cache_read_input_tokens = input_details["cache_read_input_tokens"]
+    cost = deepcopy(recorded_usage["cost"])
     if cost_overrides:
         cost.update(cost_overrides)
     document: dict[str, Any] = {
@@ -118,77 +124,6 @@ def agent_response(
     return document
 
 
-def _agent_cost(
-    *,
-    model: str,
-    input_tokens: int,
-    output_tokens: int,
-    cache_creation_input_tokens: int,
-    cache_read_input_tokens: int,
-    finance_search_invocations: int,
-    web_search_invocations: int,
-    fetch_url_invocations: int,
-) -> dict[str, Any]:
-    tiers = MODEL_RATE_TABLE_USD_PER_MILLION.get(
-        model, MODEL_RATE_TABLE_USD_PER_MILLION["openai/gpt-5.6-sol"]
-    )
-    rate = next(
-        tier
-        for tier in tiers
-        if tier.max_input_tokens is None or input_tokens <= tier.max_input_tokens
-    )
-    uncached_input_tokens = max(
-        0, input_tokens - cache_creation_input_tokens - cache_read_input_tokens
-    )
-    input_cost = _token_cost(uncached_input_tokens, rate.input_usd_per_million)
-    output_cost = _token_cost(output_tokens, rate.output_usd_per_million)
-    cache_creation_cost = _token_cost(
-        cache_creation_input_tokens, rate.cache_creation_input_usd_per_million
-    )
-    cache_read_cost = _token_cost(
-        cache_read_input_tokens, rate.cache_read_input_usd_per_million
-    )
-    tool_cost_details = {
-        "finance_search": Decimal(finance_search_invocations)
-        * TOOL_RATE_TABLE_USD_PER_INVOCATION["finance_search"],
-        "search_web": Decimal(web_search_invocations)
-        * TOOL_RATE_TABLE_USD_PER_INVOCATION["web_search"],
-        "fetch_url": Decimal(fetch_url_invocations)
-        * TOOL_RATE_TABLE_USD_PER_INVOCATION["fetch_url"],
-    }
-    tool_calls_cost = sum(tool_cost_details.values(), start=Decimal(0))
-    total_cost = sum(
-        (
-            input_cost,
-            output_cost,
-            cache_creation_cost,
-            cache_read_cost,
-            tool_calls_cost,
-        ),
-        start=Decimal(0),
-    ).quantize(_PROVIDER_COST_PRECISION, rounding=ROUND_HALF_UP)
-    cost: dict[str, Any] = {
-        "currency": "USD",
-        "input_cost": float(input_cost),
-        "output_cost": float(output_cost),
-        "cache_creation_cost": float(cache_creation_cost),
-        "cache_read_cost": float(cache_read_cost),
-        "total_cost": float(total_cost),
-    }
-    if tool_calls_cost:
-        cost["tool_calls_cost"] = float(tool_calls_cost)
-        cost["tool_calls_cost_details"] = {
-            tool: float(value) for tool, value in tool_cost_details.items() if value
-        }
-    return cost
-
-
-def _token_cost(tokens: int, rate: Decimal) -> Decimal:
-    return (Decimal(tokens) * rate / _MILLION).quantize(
-        _PROVIDER_COST_PRECISION, rounding=ROUND_HALF_UP
-    )
-
-
 class RecordingTransport(httpx.BaseTransport):
     """Serves canned agent documents and records every request."""
 
@@ -206,3 +141,16 @@ class RecordingTransport(httpx.BaseTransport):
 
 def request_body(request: httpx.Request) -> dict[str, Any]:
     return json.loads(request.content.decode())
+
+
+def set_research_query(monkeypatch, namespace, **fields):
+    """Supply the primary interpretation at the router test boundary."""
+    from argus.agent_runtime.research_query import ResearchQueryExtraction
+
+    original = namespace["_interpretation"]
+    query = ResearchQueryExtraction(**fields)
+
+    def interpreted(*args, **kwargs):
+        return original(*args, **kwargs).model_copy(update={"research_query": query})
+
+    monkeypatch.setitem(namespace, "_interpretation", interpreted)

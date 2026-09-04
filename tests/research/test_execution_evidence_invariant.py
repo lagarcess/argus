@@ -1,16 +1,7 @@
-"""No execution-evidence field may become an interpreter default unnoticed.
-
-The P1 behind this file: "Compare PLTR to LMT" carries no capital, no window
-and no execution verb, yet the interpreter injected ``strategy_type`` and the
-builder claimed the turn, answering a question with "what date window should I
-use?". The rail now forgives that one injected default.
-
-Forgiveness is the dangerous part. Every field the rail forgives is a field a
-real request can no longer prove intent with, so the tolerated set has to stay
-a decision rather than an accident. These are invariants over the whole
-``_EXECUTION_EVIDENCE_FIELDS`` tuple, not a list of the cases we happened to
-think of: adding a sixteenth field fails the suite until someone classifies
-it, and widening the tolerated set fails until someone argues for it.
+"""Every execution field protects builder ownership without positive default
+provenance. There is no tolerated field-name set. The cases span the shared
+evidence tuple, including both draft models, so adding a field extends the
+invariant rather than creating a new bypass.
 """
 
 from __future__ import annotations
@@ -35,7 +26,9 @@ SUMMARY_FIELDS = tuple(
     field for field in _EXECUTION_EVIDENCE_FIELDS if field in StrategySummary.model_fields
 )
 DRAFT_ONLY_FIELDS = tuple(
-    field for field in _EXECUTION_EVIDENCE_FIELDS if field not in StrategySummary.model_fields
+    field
+    for field in _EXECUTION_EVIDENCE_FIELDS
+    if field not in StrategySummary.model_fields
 )
 
 # One populated example per field, so "carries evidence" means the same thing
@@ -88,16 +81,6 @@ def test_every_execution_evidence_field_is_classified() -> None:
     assert set(POPULATED_EXAMPLES) == set(_EXECUTION_EVIDENCE_FIELDS)
 
 
-def test_the_tolerated_defaults_are_a_named_subset() -> None:
-    assert ka._DEFAULTED_EXECUTION_FIELDS <= set(_EXECUTION_EVIDENCE_FIELDS)
-    assert ka._DEFAULTED_EXECUTION_FIELDS == {"strategy_type"}, (
-        "Every tolerated field is one a real request can no longer prove "
-        "intent with. Widening this set is a product decision: prove the "
-        "interpreter injects the field with no user having asked for it, and "
-        "say so here."
-    )
-
-
 @pytest.mark.parametrize("field", _EXECUTION_EVIDENCE_FIELDS)
 def test_a_populated_field_is_execution_evidence(field: str) -> None:
     """Whatever the rail decides to do with it, every field in the tuple has
@@ -108,25 +91,29 @@ def test_a_populated_field_is_execution_evidence(field: str) -> None:
 
 @pytest.mark.parametrize(
     "field",
-    sorted(set(_EXECUTION_EVIDENCE_FIELDS) - ka._DEFAULTED_EXECUTION_FIELDS),
+    _EXECUTION_EVIDENCE_FIELDS,
 )
 def test_real_execution_intent_keeps_the_turn_out_of_the_rail(field: str) -> None:
     """One populated field the interpreter does not inject is a user who asked
     to run something. The rail must leave it to the builder."""
-    assert not ka._execution_evidence_is_only_a_default(
-        _Draft(**{field: POPULATED_EXAMPLES[field]})
+    assert strategy_has_execution_evidence(
+        _Draft(**{field: POPULATED_EXAMPLES[field]}),
+        include_defaults=False,
     )
 
 
-@pytest.mark.parametrize("field", sorted(ka._DEFAULTED_EXECUTION_FIELDS))
-def test_a_tolerated_default_alone_still_reads_as_a_question(field: str) -> None:
-    assert ka._execution_evidence_is_only_a_default(
-        _Draft(**{field: POPULATED_EXAMPLES[field]})
+@pytest.mark.parametrize("field", _EXECUTION_EVIDENCE_FIELDS)
+def test_only_positive_default_provenance_may_discard_execution_evidence(
+    field: str,
+) -> None:
+    assert not strategy_has_execution_evidence(
+        _Draft(**{field: POPULATED_EXAMPLES[field]}, field_provenance={field: "default"}),
+        include_defaults=False,
     )
 
 
 def test_an_empty_draft_reads_as_a_question() -> None:
-    assert ka._execution_evidence_is_only_a_default(_Draft())
+    assert not strategy_has_execution_evidence(_Draft(), include_defaults=False)
 
 
 def test_every_field_belongs_to_a_draft_model() -> None:
@@ -140,7 +127,7 @@ def test_every_field_belongs_to_a_draft_model() -> None:
 
 @pytest.mark.parametrize(
     "field",
-    sorted(set(SUMMARY_FIELDS) - ka._DEFAULTED_EXECUTION_FIELDS),
+    SUMMARY_FIELDS,
 )
 def test_the_rail_declines_a_real_build_request_end_to_end(
     field: str, monkeypatch: pytest.MonkeyPatch
@@ -152,7 +139,7 @@ def test_the_rail_declines_a_real_build_request_end_to_end(
     async def explode(**_kwargs: Any) -> None:
         raise AssertionError(f"no classifier may run for a build request ({field})")
 
-    monkeypatch.setattr(ra, "_classify_research_question", explode)
+    monkeypatch.setattr(ra, "research_answer_stage_result", explode)
     monkeypatch.setattr(ka, "_classify_question", explode)
     result = asyncio.run(
         ka.knowledge_answer_stage_result(

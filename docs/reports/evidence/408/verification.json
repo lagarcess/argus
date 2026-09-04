@@ -1,0 +1,55 @@
+{
+  "candidate_sha": "d9eccbd7f7eab7c165b0f904b1ef4e8395da0560",
+  "integration_base": "c7802b37f39772a1216514e37fb6ff2b63142181",
+  "command": "POSTHOG_PROJECT_TOKEN='' poetry run pytest tests/ -q --cov=src/argus --cov-report=term",
+  "result": {
+    "passed": 5692,
+    "failed": 29,
+    "skipped": 532,
+    "coverage_percent": 87
+  },
+  "baseline_comparison": "All 29 failed node IDs reproduced at the integration base using the same interpreter, environment, and sandbox.",
+  "failed_node_ids": [
+    "tests/agent_runtime/discovery/test_discovery_route.py::TestDiscoveryRouteFlagOff::test_detected_turn_language_reaches_discovery_composer",
+    "tests/agent_runtime/test_graded_interpretation_routing.py::test_knowledge_turn_with_resolved_asset_is_not_interrogated",
+    "tests/agent_runtime/test_knowledge_answer.py::test_current_external_question_answers_with_citations",
+    "tests/agent_runtime/test_knowledge_answer.py::test_educational_turn_with_enriched_asset_uses_the_classifier",
+    "tests/agent_runtime/test_knowledge_answer.py::test_market_data_failure_degrades_to_search",
+    "tests/agent_runtime/test_knowledge_answer.py::test_market_stats_question_gets_grounded_numbers",
+    "tests/agent_runtime/test_knowledge_answer.py::test_unsupported_capability_question_still_reaches_the_answerer",
+    "tests/agent_runtime/test_knowledge_answer.py::test_unsupported_run_request_is_never_answered_with_asset_stats",
+    "tests/evals/test_chat_runtime_trajectory_harness.py::test_concrete_discovery_recovery_trajectory_passes_unmasked",
+    "tests/evals/test_chat_runtime_trajectory_harness.py::test_concrete_expected_fail_masks_exactly_match_observed_failures",
+    "tests/evals/test_chat_runtime_trajectory_harness.py::test_concrete_trajectory_adapters_observe_the_integrated_candidate",
+    "tests/memory/test_saved_decision_lifecycle.py::test_registered_default_off_proposal_creates_no_state",
+    "tests/perf/test_backtest_infra_benchmark.py::test_api_import_probe_keeps_heavy_backtest_modules_out_of_startup",
+    "tests/test_canary_requested_signup_denial.py::test_probe_fails_when_policy_allows_the_disabled_email",
+    "tests/test_canary_requested_signup_denial.py::test_probe_fails_when_the_policy_response_is_ambiguous",
+    "tests/test_canary_requested_signup_denial.py::test_probe_keeps_the_signup_address_out_of_its_own_output",
+    "tests/test_canary_requested_signup_denial.py::test_probe_passes_when_policy_denies_the_disabled_email",
+    "tests/test_chat_stream_contract.py::test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn",
+    "tests/test_chat_stream_contract.py::test_chat_stream_visible_failure_path_is_terminal_for_turn",
+    "tests/test_openrouter_policy.py::test_openrouter_failure_log_reports_raising_origin",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_mints_private_storage_state_and_revokes_it",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_provisions_only_a_safe_dedicated_identity",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_refuses_to_overwrite_an_elevated_allowlist_role",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_refuses_to_provision_over_a_stale_admin_profile",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_refuses_to_relabel_an_existing_unknown_identity",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_rejects_a_stale_admin_profile_before_mint",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_revokes_a_minted_session_that_fails_least_privilege",
+    "tests/test_private_alpha_canary_split.py::test_session_tool_revokes_and_rolls_back_a_failed_profile_bootstrap"
+  ],
+  "focused_result": {
+    "passed": 124,
+    "failed": 0
+  },
+  "independent_review": "No actionable findings; 109 focused checks passed in reviewer verification.",
+  "lint": "src/tests/scripts clean; repository-wide ruff reports three pre-existing errors in docs/reports/evidence/2026-08-24-main-promotion/judge-replay.py, reproduced from base.",
+  "modularity_budget": "Passed; original and current integration SHA match, so candidate is the would-be merged tree.",
+  "mocked_harness": {
+    "passed": 97,
+    "failed": 3,
+    "disposition": "The same three trajectory failures are among the 29 reproduced on the integration base."
+  }
+}

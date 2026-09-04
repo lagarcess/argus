@@ -1,0 +1,242 @@
+{
+  "head": "c2cf0b0ca53093043a9afeca08bb1e5b61182a13",
+  "rows": [
+    {
+      "interpretation": {
+        "research_query": {
+          "question_kind": "market_stats",
+          "symbols": [
+            "META"
+          ],
+          "asset_class_hint": null,
+          "period_of_interest": "2020 through 2024",
+          "period_is_closed_window": true,
+          "period_start_date": "2020-01-01",
+          "requires_publisher_sources": false,
+          "date_range_raw_text": null,
+          "discovery_category": null,
+          "screening_criteria": [],
+          "sector_of_interest": null
+        },
+        "intent": "backtest_execution",
+        "task_relation": "new_task",
+        "requires_clarification": false,
+        "user_goal_summary": "Test META from 2020 through 2024",
+        "detected_user_language": null,
+        "candidate_strategy_draft": {
+          "raw_user_phrasing": null,
+          "requested_strategy_template": null,
+          "strategy_type": "buy_and_hold",
+          "strategy_thesis": null,
+          "asset_universe": [
+            "META"
+          ],
+          "asset_class": null,
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2020-01-01",
+            "end": "2024-12-31"
+          },
+          "sizing_mode": null,
+          "capital_amount": null,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": null,
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [],
+          "extra_parameters": {
+            "field_provenance": {
+              "strategy_type": "default"
+            }
+          }
+        },
+        "missing_required_fields": [],
+        "assistant_response": null,
+        "confidence": 0.8,
+        "reason_codes": [],
+        "ambiguous_fields": [],
+        "unsupported_constraints": [],
+        "response_profile_overrides": {
+          "tone": null,
+          "verbosity": null,
+          "expertise_mode": null
+        },
+        "semantic_turn_act": "new_idea",
+        "result_followup_focus": null,
+        "result_followup_fact_key": null,
+        "capability_question_focus": null,
+        "context_question_focus": null,
+        "artifact_target": null,
+        "asset_discovery": null
+      },
+      "canonical_strategy_owner": true,
+      "research_conflicting_owner": true,
+      "primary_research_query_accepted": false
+    },
+    {
+      "interpretation": {
+        "research_query": {
+          "question_kind": "market_stats",
+          "symbols": [
+            "META"
+          ],
+          "asset_class_hint": null,
+          "period_of_interest": "2020 through 2024",
+          "period_is_closed_window": true,
+          "period_start_date": "2020-01-01",
+          "requires_publisher_sources": false,
+          "date_range_raw_text": null,
+          "discovery_category": null,
+          "screening_criteria": [],
+          "sector_of_interest": null
+        },
+        "intent": "strategy_drafting",
+        "task_relation": "new_task",
+        "requires_clarification": false,
+        "user_goal_summary": "Test META from 2020 through 2024",
+        "detected_user_language": null,
+        "candidate_strategy_draft": {
+          "raw_user_phrasing": null,
+          "requested_strategy_template": null,
+          "strategy_type": "buy_and_hold",
+          "strategy_thesis": null,
+          "asset_universe": [
+            "META"
+          ],
+          "asset_class": null,
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2020-01-01",
+            "end": "2024-12-31"
+          },
+          "sizing_mode": null,
+          "capital_amount": null,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": null,
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [],
+          "extra_parameters": {
+            "field_provenance": {
+              "strategy_type": "default"
+            }
+          }
+        },
+        "missing_required_fields": [],
+        "assistant_response": null,
+        "confidence": 0.8,
+        "reason_codes": [],
+        "ambiguous_fields": [],
+        "unsupported_constraints": [],
+        "response_profile_overrides": {
+          "tone": null,
+          "verbosity": null,
+          "expertise_mode": null
+        },
+        "semantic_turn_act": null,
+        "result_followup_focus": null,
+        "result_followup_fact_key": null,
+        "capability_question_focus": null,
+        "context_question_focus": null,
+        "artifact_target": null,
+        "asset_discovery": null
+      },
+      "canonical_strategy_owner": true,
+      "research_conflicting_owner": true,
+      "primary_research_query_accepted": false
+    },
+    {
+      "interpretation": {
+        "research_query": {
+          "question_kind": "market_stats",
+          "symbols": [
+            "META"
+          ],
+          "asset_class_hint": null,
+          "period_of_interest": "2020 through 2024",
+          "period_is_closed_window": true,
+          "period_start_date": "2020-01-01",
+          "requires_publisher_sources": false,
+          "date_range_raw_text": null,
+          "discovery_category": null,
+          "screening_criteria": [],
+          "sector_of_interest": null
+        },
+        "intent": "conversation_followup",
+        "task_relation": "new_task",
+        "requires_clarification": false,
+        "user_goal_summary": "Test META from 2020 through 2024",
+        "detected_user_language": null,
+        "candidate_strategy_draft": {
+          "raw_user_phrasing": null,
+          "requested_strategy_template": null,
+          "strategy_type": "buy_and_hold",
+          "strategy_thesis": null,
+          "asset_universe": [
+            "META"
+          ],
+          "asset_class": null,
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2020-01-01",
+            "end": "2024-12-31"
+          },
+          "sizing_mode": null,
+          "capital_amount": null,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": null,
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [],
+          "extra_parameters": {
+            "field_provenance": {
+              "strategy_type": "default"
+            }
+          }
+        },
+        "missing_required_fields": [],
+        "assistant_response": null,
+        "confidence": 0.8,
+        "reason_codes": [],
+        "ambiguous_fields": [],
+        "unsupported_constraints": [],
+        "response_profile_overrides": {
+          "tone": null,
+          "verbosity": null,
+          "expertise_mode": null
+        },
+        "semantic_turn_act": "new_idea",
+        "result_followup_focus": null,
+        "result_followup_fact_key": null,
+        "capability_question_focus": null,
+        "context_question_focus": null,
+        "artifact_target": null,
+        "asset_discovery": null
+      },
+      "canonical_strategy_owner": true,
+      "research_conflicting_owner": true,
+      "primary_research_query_accepted": false
+    }
+  ]
+}

@@ -1,0 +1,306 @@
+Full gate on issue #535 implementation; provider credentials disabled.
+Original integration: c7802b37f39772a1216514e37fb6ff2b63142181
+
+=================================== FAILURES ===================================
+____________ test_registered_default_off_proposal_creates_no_state _____________
+
+    def test_registered_default_off_proposal_creates_no_state() -> None:
+        """Catches default-off service access that creates a candidate or consent state."""
+        store = InMemoryCanonicalMemoryStore()
+
+        def explode() -> object:
+            raise AssertionError("default-off proposal must not call clock or id factory")
+
+        service = MemoryService(
+            store=store,
+            clock=explode,  # type: ignore[arg-type]
+            id_factory=explode,  # type: ignore[arg-type]
+        )
+        subject = MemorySubject(
+            owner_id=OWNER_ID,
+            kind=MemoryAccountKind.REGISTERED,
+        )
+        owner = require_registered(subject)
+
+        with pytest.raises(PersonalizationMemoryUnavailable):
+>           _propose_saved(service, subject)
+
+tests/memory/test_saved_decision_lifecycle.py:290:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests/memory/test_saved_decision_lifecycle.py:59: in _propose_saved
+    result = service.propose_saved_decision(
+src/argus/memory/service.py:223: in propose_saved_decision
+    return self._propose(
+src/argus/memory/service.py:929: in _propose
+    now = self._clock()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    def explode() -> object:
+>       raise AssertionError("default-off proposal must not call clock or id factory")
+E       AssertionError: default-off proposal must not call clock or id factory
+
+tests/memory/test_saved_decision_lifecycle.py:276: AssertionError
+__________ test_chat_stream_visible_failure_path_is_terminal_for_turn __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x131fd3970>
+
+    def test_chat_stream_visible_failure_path_is_terminal_for_turn(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from argus.api.message_store import create_message
+        from argus.api.routers import agent as agent_router
+
+        late_success_persisted = Event()
+        prompt = "Backtest buy and hold AAPL from January 2025 through June 2026"
+        late_confirmation_payload = {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold AAPL.",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+                "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+            },
+            "optional_parameters": {},
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": ["AAPL"],
+                "timeframe": "1D",
+                "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+                "sizing_mode": "capital_amount",
+                "capital_amount": 10000,
+                "benchmark_symbol": "SPY",
+            },
+            "validation": {"status": "ready_to_run", "executable": True},
+        }
+
+        async def _late_success_stream_agent_turn_events(**kwargs: Any):
+            yield {"type": "stage_start", "stage": "interpret"}
+            time.sleep(0.05)
+            create_message(
+                user_id=kwargs["user"].user_id,
+                conversation_id=kwargs["thread_id"],
+                role="assistant",
+                content="Ready to test AAPL.",
+                metadata={
+                    "conversation_mode": "confirm",
+                    "agent_runtime_stage_outcome": "await_approval",
+                    "confirmation_payload": late_confirmation_payload,
+                    "confirmation_card": {
+                        "confirmation_id": "late-confirmation-aapl",
+                        "confirmation_state": "active",
+                        "title": "AAPL buy and hold",
+                        "summary": "Ready to test AAPL.",
+                        "rows": [],
+                        "actions": [
+                            {
+                                "type": "run_backtest",
+                                "label": "Run backtest",
+                                "presentation": "confirmation",
+                                "payload": {
+                                    "confirmation_id": "late-confirmation-aapl"
+                                },
+                            }
+                        ],
+                    },
+                },
+            )
+            late_success_persisted.set()
+            yield {
+                "type": "final",
+                "payload": {
+                    "stage_outcome": "await_approval",
+                    "assistant_response": "Ready to test AAPL.",
+                    "confirmation_payload": late_confirmation_payload,
+                },
+            }
+
+        @asynccontextmanager
+        async def _isolated_workflow():
+            yield "worker_loop_workflow"
+
+        monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: True)
+        monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
+        monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.005)
+        monkeypatch.setattr(
+            agent_router,
+            "stream_agent_turn_events",
+            _late_success_stream_agent_turn_events,
+        )
+        monkeypatch.setattr(
+            agent_router.api_state,
+            "isolated_agent_runtime_workflow",
+            _isolated_workflow,
+            raising=False,
+        )
+        client = _client()
+        conversation = _conversation(client)
+
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "conversation_id": conversation["id"],
+                "message": prompt,
+                "language": "en",
+            },
+        )
+
+        assert response.status_code == 200
+        assert late_success_persisted.wait(1)
+        events = _data_events(response.text)
+        error_events = [event for event in events if event.get("type") == "error"]
+        final_events = [event for event in events if event.get("type") == "final"]
+        messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+            "items"
+        ]
+>       user_message, terminal_assistant = _assert_durable_retry_on_linked_assistant(
+            messages,
+            persisted_content=prompt,
+        )
+
+tests/test_chat_stream_contract.py:1129:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+messages = [{'content': 'Backtest buy and hold AAPL from January 2025 through June 2026', 'conversation_id': 'a8e84925-1d35-47b3-...b3-a8ea-83d543023f5a', 'created_at': '2026-09-03T00:31:22.157600Z', 'id': '79da7160-3c50-4325-857a-1718aa88139a', ...}]
+
+    def _assert_durable_retry_on_linked_assistant(
+        messages: list[dict[str, Any]],
+        *,
+        persisted_content: str,
+        failure_code: str = "agent_runtime_failure",
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        user_message = next(message for message in messages if message["role"] == "user")
+        user_runtime_turn = user_message["metadata"]["agent_runtime_turn"]
+        assert user_runtime_turn == {
+            "status": "started",
+            "conversation_id": user_message["conversation_id"],
+            "request_id": user_runtime_turn["request_id"],
+            "started_at": user_runtime_turn["started_at"],
+        }
+        assert user_runtime_turn["request_id"]
+        assert user_runtime_turn["started_at"]
+        assert "retry_last_turn" not in user_message["metadata"]
+
+        linked_assistants = [
+            message
+            for message in messages
+            if message["role"] == "assistant"
+            and message["metadata"].get("agent_runtime_turn", {}).get("turn_id")
+            == user_message["id"]
+        ]
+        assert len(linked_assistants) == 1
+        assistant_message = linked_assistants[0]
+>       assert assistant_message["metadata"]["agent_runtime_turn"] == {
+            "turn_id": user_message["id"],
+            "request_id": user_runtime_turn["request_id"],
+            "status": "recoverable_failed",
+            "terminal": True,
+            "reconciled_outcome": None,
+            "failure_code": failure_code,
+            "retryable": True,
+        }
+E       AssertionError: assert {'failure_cod...': False, ...} == {'failure_cod...e': True, ...}
+E
+E         Omitting 4 identical items, use -vv to show
+E         Differing items:
+E         {'failure_code': None} != {'failure_code': 'agent_runtime_failure'}
+E         {'status': 'completed'} != {'status': 'recoverable_failed'}
+E         {'retryable': False} != {'retryable': True}
+E         Use -v to get more diff
+
+tests/test_chat_stream_contract.py:79: AssertionError
+______ test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x136251ba0>
+
+    def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from argus.api.routers import agent as agent_router
+
+        async def _slow_progressing_stream_agent_turn_events(**_: Any):
+            yield {"type": "stage_start", "stage": "interpret"}
+            await asyncio.sleep(0.03)
+            yield {"type": "stage_outcome", "outcome": "ready_for_confirmation"}
+            yield {
+                "type": "final",
+                "payload": {
+                    "stage_outcome": "await_approval",
+                    "assistant_response": "Ready to test AAPL and MSFT.",
+                },
+            }
+
+        monkeypatch.setattr(
+            agent_router,
+            "stream_agent_turn_events",
+            _slow_progressing_stream_agent_turn_events,
+        )
+        monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
+        monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
+        client = _client()
+        conversation = _conversation(client)
+
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "conversation_id": conversation["id"],
+                "message": "Test an equal-weight AAPL and MSFT strategy",
+                "language": "en",
+            },
+        )
+
+        assert response.status_code == 200
+>       assert ": keepalive" in response.text
+E       assert ': keepalive' in 'data: {"type":"stage_start","stage":"interpret"}\n\ndata: {"type":"stage_outcome","outcome":"ready_for_confirmation"}...ant_response":"Ready to test AAPL and MSFT.","message_id":"3c0a9044-f565-49c3-bad7-73e7d8c91e67"}}\n\ndata: [DONE]\n\n'
+E        +  where 'data: {"type":"stage_start","stage":"interpret"}\n\ndata: {"type":"stage_outcome","outcome":"ready_for_confirmation"}...ant_response":"Ready to test AAPL and MSFT.","message_id":"3c0a9044-f565-49c3-bad7-73e7d8c91e67"}}\n\ndata: [DONE]\n\n' = <Response [200 OK]>.text
+
+tests/test_chat_stream_contract.py:1215: AssertionError
+______________ test_openrouter_failure_log_reports_raising_origin ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x138ec0130>
+
+    def test_openrouter_failure_log_reports_raising_origin(monkeypatch) -> None:
+        def _raise_local_rejection() -> None:
+            raise ValueError(
+                "OpenRouter interpretation returned an incomplete strategy draft"
+            )
+
+        try:
+            _raise_local_rejection()
+        except ValueError as exc:
+            message = _captured_failure_log(monkeypatch, exc)
+
+        assert "error_type=ValueError" in message
+        assert "OpenRouter interpretation returned an incomplete strategy draft" in message
+        # Points at the raising line so a deterministic local rejection is
+        # distinguishable from a provider transport failure.
+>       assert "error_origin=test_openrouter_policy.py:" in message
+E       AssertionError: assert 'error_origin=test_openrouter_policy.py:' in 'LLM interpretation failed task=interpretation model=test/model max_tokens=3200 error_type=ValueError error_origin=<unknown> error_detail=OpenRouter interpretation returned an incomplete strategy draft'
+
+tests/test_openrouter_policy.py:3250: AssertionError
+
+TOTAL                                                                                     47026   6120    87%
+FAILED tests/memory/test_saved_decision_lifecycle.py::test_registered_default_off_proposal_creates_no_state
+FAILED tests/test_chat_stream_contract.py::test_chat_stream_visible_failure_path_is_terminal_for_turn
+FAILED tests/test_chat_stream_contract.py::test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn
+FAILED tests/test_openrouter_policy.py::test_openrouter_failure_log_reports_raising_origin
+===== 4 failed, 5706 passed, 532 skipped, 5 warnings in 252.73s (0:04:12) ======
+
+Untouched-base reproduction of memory and stream failures:
+=========================== short test summary info ============================
+FAILED tests/memory/test_saved_decision_lifecycle.py::test_registered_default_off_proposal_creates_no_state
+FAILED tests/test_chat_stream_contract.py::test_chat_stream_visible_failure_path_is_terminal_for_turn
+FAILED tests/test_chat_stream_contract.py::test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn
+======================== 3 failed, 44 passed in 19.68s =========================
+
+Untouched-base OpenRouter raising-origin failure:
+        assert "OpenRouter interpretation returned an incomplete strategy draft" in message
+        # Points at the raising line so a deterministic local rejection is
+        # distinguishable from a provider transport failure.
+>       assert "error_origin=test_openrouter_policy.py:" in message
+E       AssertionError: assert 'error_origin=test_openrouter_policy.py:' in 'LLM interpretation failed task=interpretation model=test/model max_tokens=3200 error_type=ValueError error_origin=<unknown> error_detail=OpenRouter interpretation returned an incomplete strategy draft'
+
+tests/test_openrouter_policy.py:3250: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_openrouter_policy.py::test_openrouter_failure_log_reports_raising_origin
+============================== 1 failed in 1.19s ===============================

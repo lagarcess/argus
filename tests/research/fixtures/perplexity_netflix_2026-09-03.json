@@ -1,0 +1,287 @@
+{
+  "captured_at": "2026-09-03T00:07:15.383106+00:00",
+  "prompt": "What changed for Netflix in its most recent quarterly earnings? Answer in 3 short sentences with a public investor-relations source.",
+  "response": {
+    "background": false,
+    "completed_at": 1788394011,
+    "created_at": 1788394011,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_9d572e1a-e30e-4105-abd0-f83314dea4a1",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 2048,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "transcript"
+        ],
+        "results": [
+          {
+            "category": "transcript",
+            "content": "[{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript \u2014 Summary**\\n\\n**Earnings Metrics:**\\n- Revenue: $12,559,900,000\\n  (est. $12,581,160,000)\\n- EPS: $0.80\\n  (est. $0.79)\\n- Post-Earnings Move: -0.07%\\n\\nThe most relevant sections cover Q3 and full-year revenue guidance, the drivers of subscription and advertising growth, engagement quality versus raw viewing hours, and advertising monetization opportunities. They also explain how live programming supports acquisition, ad revenue, and retention despite generating fewer hours, while emphasizing that strong retention, willingness to pay, advertiser demand, revenue, and operating profit are the key health indicators. The transcript does not provide a specific quarterly operating-margin figure in the selected discussion, so the operating-margin-related takeaway is qualitative: management highlights strong profit and margin growth and disciplined content spending below revenue growth.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=41.64\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 0m 41s\\n\\n[0m 41s] [Spence Neumann]: Yeah, sure. Thanks, Steve. Look, we don't manage the business on a quarter-to-quarter basis. Our goal is to sustain healthy revenue and profit growth. We talk about that in our letter every quarter. We're guiding, as you say, to 12% revenue growth in Q3 reported, 11% FX neutral. The Q3 revenue drivers are very similar to Q2. It's primarily growth in our subscription revenue from increases in memberships and pricing and higher ads revenue. We continue to see healthy acquisition and retention trends on the membership side, and our recent price adjustments are going well on the pricing side. Now recall, there is a little bit of quarter-to-quarter choppiness in growth because last year was more back-half weighted. That may be a little bit of what you see in the deceleration, but honestly, it's not what we manage to. We manage to the full year.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=90.14\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 1m 30s\\n\\n[1m 30s] [Spence Neumann]: Halfway through the year, we're making strong progress against our goals, and we're tracking to our financial plan for 2026. We expect to deliver another strong year with, as you see in the guide, 13%-14% top-line growth for the full year. That's roughly 12% FX neutral, or about $6 billion of incremental revenue year-over-year. By the way, when we finish 2026, it's worth saying also that in many ways, we're still just getting started as a company. We're entertaining an audience approaching a billion people with still lots of room to grow into our addressable market on every measure.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=151.44\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 2m 31s\\n\\n[2m 31s] [Spencer Wang]: Thanks, Spence, for that thorough answer. I'll now move us along to the topic of engagement, where we do have several questions. This first one is from Rob Sanderson of Loop Capital Markets. His question is, \\\"Management has stated that engagement quality is improving even as reported viewing hours per member have softened. Can you help investors understand what internal metrics provide confidence and how these translate into lower churn, pricing power, higher ads monetization, et cetera? At what point would slow growth in total viewing hours become a concern?\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=190.62\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 3m 10s\\n\\n[3m 10s] [Greg Peters]: I'll take this one and unpack it a bit since I know that there's plenty of interest in this topic. Start by saying there is not a linear relationship between view hours and revenue and profit, because all hours are not created equal. All hours don't provide the same kind of value to the business. A really great example of this is live programming. Live events do a lot of lifting for us for acquisition. They're good for monetization. They drive ad revenue, fandom. They're also a promotional platform. They do not yield typically as many raw view hours. Live, we expect, will be 5% of our content budget this year, but we think that'll only be 1% of view hours. Having said that, six out of top 10 new member sign-up days over the past five years have come from live events.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=290.08\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 4m 50s\\n\\n[4m 50s] [Greg Peters]: We're not going to go into the details of that quality metrics because frankly, it's taken years for us to develop it and vet it and assess it and improve it, we think that those details are a competitive advantage. We're also continue to expand the variety of our entertainment offering. You see us launch new types of content like live, like video podcasts, cloud TV, games. Those are all doing different things in our portfolio to support different needs from our members. Then on quantity, view hours grew 2% in the first half of 2026. That's an incremental 1.5 billion hours relative to the same period last year. It's a slight acceleration compared to 1.5% growth in 2025. Just to be very clear, like all those other dimensions, we remain focused on continuing to grow that number.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=371.5\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 6m 11s\\n\\n[6m 11s] [Greg Peters]: We get more and more sophisticated because we know ultimately it's combined quality, variety, and quantity of engagement that translates into satisfaction and value for members. That drives the strong business outcomes we see right now. Industry-leading retention. We see increased willingness to pay, strong advertiser demand, those ultimately drive the top-level metrics of our business, revenue and operating profit, which are really the ultimate signs of our health.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=567.1\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 9m 27s\\n\\n[9m 27s] [Ted Sarandos]: In Latin America, we've got a big season that just came back for \\\"Rosario Tijeras.\\\" This was a show that started its life as a licensed show from TV Azteca in Mexico. After three successful seasons, we picked it up and produced an original Season 4, Season 5, and just greenlit Season 6. You're seeing the slate perform around the world, which is a real differentiated part of our business. With that said, with the core, we're also really pleased with the investment so far in our live programming. It plays a really important role, as Greg mentioned earlier, driving acquisition, accelerating ad revenue, fueling conversation, helping us to launch new shows. It's also helping us to understand what are the benefits of live over the entire catalog. We're ramping up our live event slate.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=619.68\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 10m 19s\\n\\n[10m 19s] [Ted Sarandos]: You saw the Kevin Hart roast in Q2, the Major League Baseball Home Run Derby earlier this week. What was really fun at the Derby, we produced an original and exclusive Hot Ones special, that we shot on a baseball field, to promote Will Ferrell's new series, \\\"The Hawk,\\\" which just launched today, actually. I think it's a cool example of the intersection between our core, that core series, \\\"The Hawk,\\\" our expansion into new exclusive creator content with Hot Ones, with Sean Evans, who's a best-in-class creator. We're thrilled to be in business together. Plus live sports, all coming together on a baseball field and on Netflix around the world. The result there is a highly attractive, scalable return on content investment, and it ladders up to healthy business metrics that Greg just detailed, and our strong growth in revenue, dollar profit, and profit margin.\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=1333.34\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 22m 13s\\n\\n[22m 13s] [Spencer Wang]: Thanks, Ted. I'll shift us now to a new topic, which is monetization, and I'll begin with advertising. The question is from Steve Cahall, also of Wells Fargo. As you look at the ad tier average revenue per membership today, what are the biggest opportunities for increasing that monetization?\"},{\"url\":\"https://www.perplexity.ai/finance/NFLX/earnings?eventId=650439&tab=transcript&t=1353.54\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-16\",\"content\":\"**NFLX Q2 2026 Earnings Transcript**\\nTimestamp: 22m 33s\\n\\n[22m 33s] [Greg Peters]: Maybe worth starting by noting that we manage the ads business for total revenue, total revenue growth. Those are the optimization functions, ARM and fill rates sort of come along for the ride in achieving those goals. Having said that, there's still a gap between ad tier ARM and then ARM for our standard without ads tier. That gap is narrowing, and I think of that gap as essentially near-term under-realized revenue growth. It represents an opportunity for us. As we improve ads capabilities, we can close that gap over the time, and you've seen us do exactly that over the last year. How have we done it? We've expanded demand sources. We continue to execute quickly on our own ad tech stack. We're adding features. We're adding more ads products. We're adding more measurement. We're making it easier for folks to transact with us.\"}]",
+            "sources": [
+              "https://www.perplexity.ai/finance/NFLX/earnings"
+            ],
+            "tickers": [
+              "NFLX"
+            ]
+          }
+        ],
+        "tickers": [
+          "NFLX"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "financials"
+        ],
+        "results": [
+          {
+            "category": "financials",
+            "content": "## NFLX Q1 2026\n| date | period | income_statement_total_revenues | income_statement_operating_profit | income_statement_net_income_attributable_to_common_shareholders | income_statement_diluted_eps | ratio_operating_margin |\n| --- | --- | --- | --- | --- | --- | --- |\n| 2026-06-30 | 2026 Q2 | 12,559,938,000 | 4,192,610,000 | 3,401,414,000 | 0.80 | 0.33 |\n| 2026-03-31 | 2026 Q1 | 12,249,757,000 | 3,956,997,000 | 5,282,791,000 | 1.23 | 0.32 |\n\nData available in: `NFLX_quarter_2026_Q2_income_statement_6125c3.csv` (row key column: date)\n\n## NFLX Q1 2026\n| date | period | balance_sheet_cash_and_cash_equivalents |\n| --- | --- | --- |\n| 2026-06-30 | 2026 Q2 | 9,099,232,000 |\n| 2026-03-31 | 2026 Q1 | 12,259,772,000 |\n\nData available in: `NFLX_quarter_2026_Q2_balance_sheet_4ba1bf.csv` (row key column: date)\n\n## NFLX Q1 2026\n| date | period | cash_flow_statement_cash_from_operating_activities |\n| --- | --- | --- |\n| 2026-06-30 | 2026 Q2 | 1,743,812,000 |\n| 2026-03-31 | 2026 Q1 | 5,290,205,000 |\n\nData available in: `NFLX_quarter_2026_Q2_cash_flow_24dcc6.csv` (row key column: date)",
+            "sources": [
+              "https://www.perplexity.ai/finance/NFLX/financials"
+            ],
+            "tickers": [
+              "NFLX"
+            ]
+          }
+        ],
+        "tickers": [
+          "NFLX"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "queries": [
+          "Netflix investor relations Q2 2026 shareholder letter",
+          "site:ir.netflix.net Q2 2026 earnings"
+        ],
+        "results": [
+          {
+            "id": 1,
+            "last_updated": "2026-07-29",
+            "snippet": "Fellow shareholders, \n\u25cf\u200b Our financial performance remains solid and we\u2019re on track to meet our objectives for the year:   \n\u25cb\u200b Q2 revenue grew 13% year over year (+12% on a FX-neutral basis ) to $12.6B, and \n1\noperating margin was 33%.\nBoth were in-line with our guidance.\n\u25cb\u200b For 2026, we\u2019ve narrowed our forecasted revenue range to $51.0-$51.4B and continue \nto forecast an operating margin of 31.5%, both consistent with our prior guidance.\n\u25cf\u200b We\u2019re delivering increasing value to our members; engagement is healthy, reflecting the quality,\nquantity, and variety of our offering: \n\u25cb\u200b Harlan Coben\u2019s I Will Find You is our most viewed new original series debut in 2026 and \nSwapped is on its way to becoming our second most viewed original animated film ever.\n...\nQ2 revenue of $12.6B was in-line with forecast and grew 13% year over year (+12% on a foreign \nexchange (F/X) neutral basis), driven primarily by membership growth, pricing and increased ad revenue.\nWe delivered double digit revenue growth in all regions, surpassing the quarterly revenue mark of $4.0B\n...\n(FCF)  in Q2\u201926 totaled $1.5B vs. $2.3B in Q2\u201925.\n...\nIR Contact:    \u200b                \u200b\n\u200b                             \nLowell Singer \nVP, Investor Relations                                           \n  818 434-2141     \u200b\n\u200b\nPR Contact: \u200b  \nComms@netflix.com \n415 254-4462                                                         \n...\n2025",
+            "source": "web",
+            "title": "July 16, 2026 Fellow shareholders, \u25cf Our financial ...",
+            "url": "https://static.poder360.com.br/uploads/2026/07/Netflix-2T2026.pdf"
+          },
+          {
+            "date": "2026-07-16",
+            "id": 2,
+            "last_updated": "2026-08-18",
+            "snippet": "Letter to Shareholders\n(opens in new window)\nPDF\n288 KB\nFinancial Statements",
+            "source": "web",
+            "title": "Netflix Second Quarter 2026 Earnings Interview",
+            "url": "https://ir.netflix.net/investor-news-and-events/investor-events/event-details/2026/Netflix-Second-Quarter-2026-Earnings-Interview-2026-YudK6GN8y2/default.aspx"
+          },
+          {
+            "id": 3,
+            "last_updated": "2026-07-21",
+            "snippet": "Top Investor Questions\nContent Accounting Overview\n...\nInvestor Contacts\n...\nQuarterly Earnings",
+            "source": "web",
+            "title": "Financials - Quarterly Earnings",
+            "url": "https://ir.netflix.net/financials/quarterly-earnings/default.aspx"
+          },
+          {
+            "date": "2026-07-16",
+            "id": 4,
+            "last_updated": "2026-08-04",
+            "snippet": "Netflix released its second-quarter 2026 results after the market close on Thursday, July 16, in a shareholder letter that management says shows the business \u201con track to meet our objectives for the year.\u201d\nThe print comes at a sensitive moment for the stock, which had lost roughly 45% of its value since its all-time high last summer heading into the report.\nBelow are the key numbers and takeaways from the letter, which Netflix filed with the SEC and posted to its investor relations site.\n...\nQ2 revenue came in at $12.56 billion, up 13% year-over-year (12% on a foreign-exchange-neutral basis), landing right in line with the company\u2019s own guidance.\nOperating income was $4.19 billion, up 11% year-over-year, with operating margin at 33.4% \u2014 down slightly from 34.1% in the same quarter last year but a touch ahead of Netflix\u2019s own forecast due to the timing of expenses.\n...\nOne of the more consequential lines in the letter has nothing to do with this quarter\u2019s numbers: starting in 2027, Netflix will shift its \u201cWhat We Watched\u201d viewing report from twice a year to once a year, published separately from earnings.\nThe company frames this as keeping the earnings focus on revenue and operating profit, but it also means investors and press will get less frequent visibility into engagement trends going forward \u2014 title-by-title and weekly Top 10 data will continue, just without the twice-yearly comprehensive report tied to earnings.\n...\nNetflix repurchased $4.7 billion of its own stock in Q2 \u2014 the largest buyback quarter in company history \u2014 after its board authorized an additional $25 billion in April on top of the $6.8 billion of capacity remaining at the end of Q1.\n...\nThe full shareholder letter is available via Netflix\u2019s SEC filing, and past and future letters can be found on Netflix\u2019s investor relations site.\nNote: the direct PDF link on Netflix\u2019s investor site was not yet resolving at the time of publication; we\u2019ll swap in that link once it\u2019s live.",
+            "source": "web",
+            "title": "Netflix Q2 2026 Earnings: Revenue Hits $12.6B, Margin Holds ...",
+            "url": "https://factsheets.com/netflix-q2-2026-earnings-revenue-hits-12-6b-margin-holds-at-33-4-as-buybacks-hit-a-record/"
+          },
+          {
+            "date": "2026-07-16",
+            "id": 5,
+            "last_updated": "2026-08-25",
+            "snippet": "Letter to Shareholders\n(opens in new window)\nPDF\n288 KB\nFinancial Statements",
+            "source": "web",
+            "title": "News & Events - Investor Events - Event Details",
+            "url": "https://ir.netflix.net/investor-news-and-events/investor-events/event-details/"
+          },
+          {
+            "date": "2026-06-15",
+            "id": 6,
+            "last_updated": "2026-08-25",
+            "snippet": "Jun 15, 2026\nNetflix to Announce Second Quarter 2026 Financial Results\nDownload",
+            "source": "web",
+            "title": "News & Events - Financial Releases",
+            "url": "https://ir.netflix.net/investor-news-and-events/financial-releases/default.aspx"
+          },
+          {
+            "date": "2025-01-01",
+            "id": 7,
+            "last_updated": "2025-06-16",
+            "snippet": "Quarterly Filings\nCurrent Reports\n...\nFiling Type\nFiling Description",
+            "source": "web",
+            "title": "SEC Filings - Financials",
+            "url": "https://ir.netflix.net/financials/sec-filings/default.aspx"
+          },
+          {
+            "id": 8,
+            "last_updated": "2026-08-26",
+            "snippet": "A presentation of and reconciliation to the most directly comparable GAAP financial measure, where such can be done without unreasonable effort, can be found on our website at\u00a0https://ir.netflix.com.",
+            "source": "web",
+            "title": "News & Events - Investor Events",
+            "url": "https://ir.netflix.net/investor-news-and-events/investor-events/default.aspx"
+          },
+          {
+            "date": "2026-06-15",
+            "id": 9,
+            "last_updated": "2026-08-26",
+            "snippet": "LOS GATOS, Calif., June 15, 2026 /PRNewswire/ -- Netflix, Inc.\n(NASDAQ: NFLX) today announced it will post its second quarter 2026 financial results and business outlook on its investor relations website at http://ir.netflix.net on Thursday July 16th, 2026, at approximately 1:01 p.m.\nPacific Time.",
+            "source": "web",
+            "title": "Netflix to Announce Second Quarter 2026 Financial Results",
+            "url": "https://ir.netflix.net/investor-news-and-events/financial-releases/press-release-details/2026/Netflix-to-Announce-Second-Quarter-2026-Financial-Results/default.aspx"
+          },
+          {
+            "id": 10,
+            "last_updated": "2026-08-26",
+            "snippet": "Financials\nQuarterly Earnings\nFinancial Statements\nAnnual Reports & Proxies",
+            "source": "web",
+            "title": "Financial Statements - Netflix",
+            "url": "https://ir.netflix.net/financials/financial-statements/default.aspx"
+          },
+          {
+            "id": 11,
+            "last_updated": "2026-08-26",
+            "snippet": "2026 Proxy Statement\nPDF Format Download (opens in new window)",
+            "source": "web",
+            "title": "Financials - Annual Reports & Proxies",
+            "url": "https://ir.netflix.net/financials/annual-reports-and-proxies/default.aspx"
+          },
+          {
+            "date": "2026-06-15",
+            "id": 12,
+            "last_updated": "2026-08-31",
+            "snippet": "Jun 15, 2026\nNetflix to Announce Second Quarter 2026 Financial Results\nDownload\nPDF format download (opens in new window)",
+            "source": "web",
+            "title": "Netflix - News & Events - Financial Releases",
+            "url": "https://ir.netflix.net/investor-news-and-events/financial-releases/2026/default.aspx"
+          },
+          {
+            "id": 13,
+            "last_updated": "2026-08-15",
+            "snippet": "Financials\nQuarterly Earnings\nFinancial Statements\nAnnual Reports & Proxies",
+            "source": "web",
+            "title": "Netflix - Home",
+            "url": "https://ir.netflix.net/home/default.aspx"
+          },
+          {
+            "id": 14,
+            "last_updated": "2026-06-16",
+            "snippet": "Quarterly Earnings\n...\nDownload this Press Release\nPDF Format (opens in new window)",
+            "source": "web",
+            "title": "News & Events - Financial Releases - Press Release Details",
+            "url": "https://ir.netflix.net/investor-news-and-events/financial-releases/press-release-details/"
+          },
+          {
+            "date": "2026-08-17",
+            "id": 15,
+            "last_updated": "2026-08-27",
+            "snippet": "The first was Netflix's July 16 Q2 2026 earnings release, which was technically solid \u2014 revenue of $12.56 billion, up 13.4% year-over-year, with earnings per share of $0.80 edging past the consensus estimate of $0.79 \u2014 but whose forward guidance disappointed investors who had expected sustained high-teens growth.\n...\nThe second cause was a concurrent disclosure change: Netflix announced on July 16 that its \"What We Watched\" biannual engagement report \u2014 a deep dive into title-level viewing hours that the company introduced in December 2023 \u2014 would shift to an annual release beginning in the first quarter of 2027.\nNetflix said the change was intended to \"keep the focus on our primary financial metrics \u2014 revenue and operating profit,\" per its Q2 shareholder letter.\n...\nThe most significant financial development from Q2 was one the market absorbed poorly: Netflix repurchased $4.7 billion of its own shares in the quarter, the largest single-quarter buyback in the company's history, leaving $27.1 billion remaining under its current authorization.\n...\nThese figures are documented in Netflix's Q2 2026 shareholder letter.",
+            "source": "web",
+            "title": "Netflix Stock Falls 41% From Peak as Record Buyback Signals Management Conviction",
+            "url": "https://www.techtimes.com/articles/324745/20260817/netflix-stock-falls-41-peak-record-buyback-signals-management-conviction.htm"
+          }
+        ],
+        "type": "search_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "Netflix\u2019s Q2 2026 revenue rose 13% year over year to $12.6 billion, driven by memberships, pricing and advertising.  \nOperating margin was 33%, while Netflix narrowed full-year revenue guidance to $51.0\u2013$51.4 billion and maintained its 31.5% margin forecast.  \nSource: [Netflix Q2 2026 investor-relations materials](https://ir.netflix.net/investor-news-and-events/investor-events/event-details/2026/Netflix-Second-Quarter-2026-Earnings-Interview-2026-YudK6GN8y2/default.aspx).",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_3a0ace0c-9eda-4327-81a6-a8bf76c17da7",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": null
+    },
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "web_search"
+      },
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "fetch_url"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.05521,
+        "cache_read_cost": 0.004,
+        "currency": "USD",
+        "input_cost": 4e-05,
+        "output_cost": 0.01416,
+        "tool_calls_cost": 0.0125,
+        "tool_calls_cost_details": {
+          "finance_search": 0.01,
+          "search_web": 0.0025
+        },
+        "total_cost": 0.08591
+      },
+      "input_tokens": 21050,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 11042,
+        "cache_read_input_tokens": 9999,
+        "cached_tokens": 9999
+      },
+      "output_tokens": 708,
+      "output_tokens_details": {
+        "reasoning_tokens": 286
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "cost_usd": 0.01,
+          "invocation": 2
+        },
+        "search_web": {
+          "cost_usd": 0.0025,
+          "invocation": 1
+        }
+      },
+      "total_tokens": 21758
+    },
+    "user": null
+  }
+}
