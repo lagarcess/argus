@@ -26,14 +26,16 @@ run_python() {
 usage() {
   cat <<'USAGE'
 Usage:
-  .github/workflow-proof.sh seed [--user-id <uuid>] [--conversation-id <uuid>] [--nonce <value>]
+  .github/workflow-proof.sh seed [--user-id <uuid>] [--nonce <value>]
   .github/workflow-proof.sh local --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh remote --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh direct --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh verify --job-id <uuid> [--expect-nonce <value>] [--expect-provider-mode <mode>]
 
-Seed reuses a stable proof auth/profile/conversation by default.
-Use explicit --user-id/--conversation-id only against an isolated local or preview Supabase database.
+Seed reuses a stable proof auth/profile by default. A proof job carries
+operation_scope=workflows.proof and no conversation, so it never reads as
+conversation activity.
+Use an explicit --user-id only against an isolated local or preview Supabase database.
 
 Local Render validation:
   1. poetry install --only main,workflows --no-interaction

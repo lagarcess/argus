@@ -184,7 +184,7 @@ EXPECTED_WRITE_SITES = {
         "SupabaseGateway.complete_research_job",
         "postgrest-update",
     ): _requires(
-        '.eq("operation_scope", "chat.research")',
+        '.eq("operation_scope", RESEARCH_OPERATION_SCOPE)',
         '.in_("status", ["queued", "running"])',
         absent=('"result_run_id":',),
     ),
@@ -314,6 +314,14 @@ EXPECTED_MIGRATION_WRITERS = {
     "20260726185021_harden_guest_lifecycle_ownership.sql": _requires(
         "set user_id = p_destination_user_id",
         absent=("result_run_id =",),
+    ),
+    # Reclassifies the seeder's proof rows out of every conversation; it
+    # touches scope and conversation only, never status or the result link.
+    "20260905000000_workflow_proof_jobs_leave_conversations.sql": _requires(
+        "set operation_scope = 'workflows.proof'",
+        "conversation_id = null",
+        "where launch_payload ->> 'created_by' = 'workflows.proof_cli'",
+        absent=("result_run_id =", "status ="),
     ),
 }
 
