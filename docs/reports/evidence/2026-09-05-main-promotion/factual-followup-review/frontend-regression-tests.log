@@ -1,0 +1,52 @@
+bun test v1.3.14 (0d9b296a)
+
+__tests__/result-readout-language.test.ts:
+(pass) persisted result presentation (#531) > reads execution assumptions from the real persisted en result shape [9.45ms]
+(pass) persisted result presentation (#531) > reads execution assumptions from the real persisted es-419 result shape [2.41ms]
+(pass) persisted result presentation (#531) > keeps typed execution assumptions in the en card [1.95ms]
+(pass) persisted result presentation (#531) > keeps typed execution assumptions in the es-419 card [2.11ms]
+(pass) persisted result presentation (#531) > never guesses side or allocation from retained prose or unknown typed values [1.49ms]
+(pass) persisted result presentation (#531) > incomplete modeled-cost evidence never claims no fees [0.76ms]
+(pass) persisted result presentation (#531) > voices the same typed DCA facts in en [0.65ms]
+(pass) persisted result presentation (#531) > voices the same typed DCA facts in es-419 [0.68ms]
+(pass) persisted result presentation (#531) > missing metrics stay unavailable instead of reviving private prose [0.11ms]
+(pass) persisted result presentation (#531) > typed indicator periods and thresholds remain visible in Spanish [0.45ms]
+(pass) persisted result presentation (#531) > voices the full typed signal rule group in Spanish [0.72ms]
+(pass) persisted result presentation (#531) > legacy breakdown keeps its typed result facts after hydration [0.14ms]
+172 |           kind: "beginner_guidance",
+173 |           facts: { fact_key: "fee_bps", fee_bps: `${bank.result_card.execution_costs.fee_bps} bps`, language },
+174 |         },
+175 |       },
+176 |     }]).messages[0];
+177 |     expect(message.content).toBe(answer);
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "The modeled fees were 10 bps."
+Received: undefined
+
+      at <anonymous> (/Users/garces/.codex/worktrees/a121/private-alpha-next/web/__tests__/result-readout-language.test.ts:177:29)
+(fail) persisted result presentation (#531) > preserves the voiced en factual answer when its fact bank is context [0.23ms]
+172 |           kind: "beginner_guidance",
+173 |           facts: { fact_key: "fee_bps", fee_bps: `${bank.result_card.execution_costs.fee_bps} bps`, language },
+174 |         },
+175 |       },
+176 |     }]).messages[0];
+177 |     expect(message.content).toBe(answer);
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "Las comisiones modeladas fueron de 10 bps."
+Received: undefined
+
+      at <anonymous> (/Users/garces/.codex/worktrees/a121/private-alpha-next/web/__tests__/result-readout-language.test.ts:177:29)
+(fail) persisted result presentation (#531) > preserves the voiced es-419 factual answer when its fact bank is context [0.06ms]
+(pass) persisted result presentation (#531) > a legacy result without card chrome still renders its repaired typed facts () [0.11ms]
+(pass) persisted result presentation (#531) > a legacy result without card chrome still renders its repaired typed facts ({"kind":"result"}) [0.02ms]
+(pass) persisted result presentation (#531) > live run and historical message carry the same language-neutral facts [0.90ms]
+(pass) persisted result presentation (#531) > failed historical repair renders Spanish unavailable, never permanent working [0.14ms]
+
+ 16 pass
+ 2 fail
+ 72 expect() calls
+Ran 18 tests across 1 file. [93.00ms]
