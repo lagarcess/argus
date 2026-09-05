@@ -315,6 +315,14 @@ EXPECTED_MIGRATION_WRITERS = {
         "set user_id = p_destination_user_id",
         absent=("result_run_id =",),
     ),
+    # Reclassifies the seeder's proof rows out of every conversation; it
+    # touches scope and conversation only, never status or the result link.
+    "20260905000000_workflow_proof_jobs_leave_conversations.sql": _requires(
+        "set operation_scope = 'workflows.proof'",
+        "conversation_id = null",
+        "where launch_payload ->> 'created_by' = 'workflows.proof_cli'",
+        absent=("result_run_id =", "status ="),
+    ),
 }
 
 

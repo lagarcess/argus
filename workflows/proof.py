@@ -11,15 +11,20 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 PROOF_KIND = "render_workflow_proof"
+# A proof job is not conversation work: it carries its own operation scope
+# and no conversation, so no activity reader can ever project it. The
+# scope check in supabase/migrations/20260905000000_workflow_proof_jobs_leave_conversations.sql
+# admits exactly this value, and that migration reclassifies rows the seeder
+# wrote under the column default by this created_by signature.
+PROOF_OPERATION_SCOPE = "workflows.proof"
+PROOF_SEED_CREATED_BY = "workflows.proof_cli"
 PROOF_EMAIL_DOMAIN = "example.invalid"
 WORKFLOW_DATABASE_URL_ENV = "ARGUS_WORKFLOW_DATABASE_URL"
 LEGACY_DATABASE_URL_ENV = "DATABASE_URL"
 PROVIDER_MODE_ENV = "ARGUS_MARKET_DATA_PROVIDER_MODE"
 CACHE_ENABLED_ENV = "ENABLE_MARKET_DATA_CACHE"
 DEFAULT_PROOF_USER_ID = "00000000-0000-4000-8000-000000000124"
-DEFAULT_PROOF_CONVERSATION_ID = "00000000-0000-4000-8000-000000000125"
 PROOF_USER_ID_ENV = "ARGUS_WORKFLOW_PROOF_USER_ID"
-PROOF_CONVERSATION_ID_ENV = "ARGUS_WORKFLOW_PROOF_CONVERSATION_ID"
 
 
 class WorkflowProofError(RuntimeError):
@@ -358,72 +363,10 @@ class PostgresProofJobGateway:
                     },
                 )
 
-    def create_proof_conversation(self, *, user_id: str) -> str:
-        conversation_id = str(uuid4())
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    insert into public.conversations (id, user_id, title, title_source)
-                    values (%s, %s, %s, %s)
-                    returning id
-                    """,
-                    (
-                        conversation_id,
-                        user_id,
-                        "Render Workflow Proof",
-                        "system_default",
-                    ),
-                )
-                row = cur.fetchone()
-        return str(row["id"])
-
-    def ensure_proof_conversation(
-        self,
-        *,
-        user_id: str,
-        conversation_id: str,
-    ) -> str:
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    insert into public.conversations (id, user_id, title, title_source)
-                    values (%s, %s, %s, %s)
-                    on conflict (id) do nothing
-                    """,
-                    (
-                        conversation_id,
-                        user_id,
-                        "Render Workflow Proof",
-                        "system_default",
-                    ),
-                )
-                cur.execute(
-                    """
-                    select user_id
-                    from public.conversations
-                    where id = %s
-                    """,
-                    (conversation_id,),
-                )
-                row = cur.fetchone()
-        if row is None:
-            raise WorkflowProofError(
-                f"Workflow proof conversation {conversation_id} was not created."
-            )
-        owner_user_id = str(row["user_id"])
-        if owner_user_id != user_id:
-            raise WorkflowProofError(
-                "Workflow proof conversation belongs to a different user."
-            )
-        return conversation_id
-
     def create_proof_job(
         self,
         *,
         user_id: str,
-        conversation_id: str,
         nonce: str,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
@@ -432,7 +375,7 @@ class PostgresProofJobGateway:
         payload: dict[str, Any] = {
             "kind": PROOF_KIND,
             "nonce": nonce,
-            "created_by": "workflows.proof_cli",
+            "created_by": PROOF_SEED_CREATED_BY,
         }
         with self._connect() as conn:
             with conn.cursor() as cur:
@@ -440,7 +383,7 @@ class PostgresProofJobGateway:
                     """
                     insert into public.backtest_jobs (
                       user_id,
-                      conversation_id,
+                      operation_scope,
                       idempotency_key,
                       payload_hash,
                       launch_payload,
@@ -452,7 +395,7 @@ class PostgresProofJobGateway:
                     """,
                     (
                         user_id,
-                        conversation_id,
+                        PROOF_OPERATION_SCOPE,
                         idempotency_key,
                         stable_payload_hash(payload),
                         Jsonb(payload),
@@ -475,19 +418,8 @@ def _seed(args: argparse.Namespace) -> int:
     )
     email = proof_user_email(user_id)
     gateway.ensure_proof_profile(user_id=user_id, email=email)
-    conversation_id = _proof_uuid(
-        args.conversation_id
-        or os.getenv(PROOF_CONVERSATION_ID_ENV)
-        or DEFAULT_PROOF_CONVERSATION_ID,
-        label="proof conversation id",
-    )
-    conversation_id = gateway.ensure_proof_conversation(
-        user_id=user_id,
-        conversation_id=conversation_id,
-    )
     row = gateway.create_proof_job(
         user_id=user_id,
-        conversation_id=conversation_id,
         nonce=args.nonce,
         idempotency_key=args.idempotency_key,
     )
@@ -496,7 +428,7 @@ def _seed(args: argparse.Namespace) -> int:
             "job_id": row["id"],
             "user_id": user_id,
             "email": email,
-            "conversation_id": row["conversation_id"],
+            "operation_scope": row["operation_scope"],
             "nonce": args.nonce,
             "status": row["status"],
         }
@@ -576,7 +508,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     seed = subcommands.add_parser("seed")
     seed.add_argument("--user-id")
-    seed.add_argument("--conversation-id")
     seed.add_argument("--nonce")
     seed.add_argument("--idempotency-key")
     seed.set_defaults(func=_seed)

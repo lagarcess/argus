@@ -171,7 +171,10 @@ Alpha supports server-side idempotency for expensive state-changing operations.
   length/characters return `422 validation_error`.
 - The unique reservation key is
   `(user_id, operation_scope, Idempotency-Key)`. The two approved operation
-  scopes are `chat.run_backtest` and `backtests.run`.
+  scopes are `chat.run_backtest` and `backtests.run`. (`chat.research` rows are
+  created by the research rail and `workflows.proof` rows by the canary's
+  workflow proof; neither is admitted through this endpoint, and a proof row
+  belongs to no conversation.)
 - Before hashing, the launch request is validated and materialized as the full
   `LaunchBacktestRequest` target shape: declared defaults and explicit nulls are
   present; field aliases such as `_execution_realism` are used; dates are ISO
