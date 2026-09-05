@@ -129,11 +129,11 @@ async def test_asset_preflight_fallback_is_reserved_for_actual_failure(
 ) -> None:
     from argus.agent_runtime.interpreter import asset_resolution_context as context_module
 
-    calls: list[str] = []
+    calls: list[tuple[str, str]] = []
 
     async def invoke_schema(**kwargs: Any) -> LLMAssetMentionExtraction:
         model_name = str(kwargs["model_name"])
-        calls.append(model_name)
+        calls.append((str(kwargs["task"]), model_name))
         if model_name == "primary/model":
             raise TimeoutError("primary extraction timed out")
         return LLMAssetMentionExtraction(
@@ -148,7 +148,7 @@ async def test_asset_preflight_fallback_is_reserved_for_actual_failure(
     )
     monkeypatch.setattr(
         context_module,
-        "_interpretation_repair_model_candidates",
+        "_asset_mention_preflight_model_candidates",
         lambda _preferred_model: ["primary/model", "fallback/model"],
     )
 
@@ -164,7 +164,10 @@ async def test_asset_preflight_fallback_is_reserved_for_actual_failure(
         ),
     )
 
-    assert calls == ["primary/model", "fallback/model"]
+    assert calls == [
+        ("asset_mention_preflight", "primary/model"),
+        ("asset_mention_preflight", "fallback/model"),
+    ]
     assert context is not None
     assert json.loads(context)["all_traded_asset_mentions_accounted_for"] is True
 
@@ -218,7 +221,7 @@ async def test_issue_483_valid_empty_preflight_cannot_reopen_resolved_asset(
     )
     monkeypatch.setattr(
         context_module,
-        "_interpretation_repair_model_candidates",
+        "_asset_mention_preflight_model_candidates",
         lambda _preferred_model: ["primary/model", "fallback/model"],
     )
     monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_ko)
