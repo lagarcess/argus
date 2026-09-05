@@ -8,8 +8,9 @@
 - Landing method: founder-owned GitHub merge commit, never squash or rebase
 - Approver: founder
 - Current production readback: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f` on the API and app; Workflow ready version `7d8ace4`.
-- Rollback target: `c7802b37f39772a1216514e37fb6ff2b63142181`
-- Baseline selection: the founder explicitly requested `c7802b37f39772a1216514e37fb6ff2b63142181`. Live Render and fetched `origin/main` instead show `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`. Clarification was requested before the baseline ran; without a revised instruction, the original named SHA was retained. This is a historical baseline comparison and does not establish non-regression against the currently deployed build.
+- Rollback target: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`
+- Corrected baseline selection: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`, deployed after PR #540 landed on September 3. The founder corrected the stale dispatch SHA on September 5 and authorized one new baseline run. The candidate scorecard remains unchanged.
+- Dispatch error retained in the record: the first baseline at `c7802b37f39772a1216514e37fb6ff2b63142181` measured the wrong tree because the dispatch named a stale production SHA. It is not valid evidence against current production. Its original scorecard remains committed at `docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-c7802b37.json`; it is excluded from the corrected comparison.
 - Commits ahead: 59 from current production, 86 from the dispatch's older baseline.
 - Measured-tree relationship: evidence and manifest additions only are planned after measurement. No product changes are authorized in this promotion.
 
@@ -84,53 +85,56 @@ Evidence: `docs/reports/evidence/2026-09-05-main-promotion/render-manual-mode-be
 - Local readiness reported `degraded` solely for memory-mode `supabase:gateway_unavailable`, the explicit accepted condition in the smoke script. Runtime and asset checks were ready.
 - Local smoke evidence: `docs/reports/evidence/2026-09-05-main-promotion/local-smoke-e3b98690.log`
 - Live eval scorecard: `docs/reports/evidence/2026-09-05-main-promotion/candidate-eval-scorecard-e3b98690.json`
-- Baseline eval scorecard: `docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-c7802b37.json`
+- Baseline eval scorecard: `docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-7d8ace45.json`
 - Candidate result: 59 passed, three failed, 62 total, zero infrastructure errors.
 - Candidate scorecard generated: `2026-09-05T05:28:53.663758Z`.
 - Candidate provider-reported cost: `$1.372790159656`, from 309 priced receipts; eight receipts had no reported cost.
 - Candidate fixture SHA-256: `1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9`.
 - Both provider modes are `live_provider`; the scorecard confirms Python 3.10.20, clean worktree, exact candidate SHA, all 62 fixture IDs, and the live January 1 holiday alignment probe.
-- Baseline result: 61 passed, one failed, 62 total. Generated `2026-09-05T05:43:59.196903Z`.
-- Baseline provider-reported cost: `$1.186088562696`, from 333 priced receipts; seven receipts had no reported cost.
+- Corrected baseline result: 60 passed, two failed, 62 total. Generated `2026-09-05T16:02:12.055492Z`; elapsed 1720.78 seconds. Exactly one new baseline suite ran; the candidate suite was not rerun.
+- Corrected baseline provider-reported cost: `$1.4265041196`, from 318 priced receipts out of 325; seven receipts had no reported cost.
 - Baseline fixture SHA-256: `65a7daab0da92302999bc4a9afa39430f76ba87a0b1d2d0ebecb956ce32b6e8d`.
-- Baseline provenance confirms `c7802b37f39772a1216514e37fb6ff2b63142181`, both providers live, Python 3.10.20, clean worktree, and the same holiday alignment probe. Both runs pin `PYTHONPATH` to their own source tree.
+- Corrected baseline provenance confirms `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`, both providers live, Python 3.10.20, a clean detached worktree, and the same holiday alignment probe. `PYTHONPATH` was pinned to that tree, and the imported Argus module was checked before execution. Import proof: `docs/reports/evidence/2026-09-05-main-promotion/baseline-import-proof-7d8ace45.json`.
 - Both fixtures contain the same ordered 62 case IDs. Their hashes differ because #549 strengthened delivered-outcome assertions. No fixture or expectation was changed during this promotion.
-- Combined provider-reported cost: `$2.558878722352`. This sum does not invent prices for the 15 receipts with no reported cost.
+- Corrected comparison provider-reported cost: `$2.799294279256`, excluding the erroneous baseline. The comparison has 15 unpriced receipts. All three retained suites, including the dispatch-error baseline, reported `$3.985382841952` with 22 unpriced receipts; no missing prices are invented.
 - Candidate failed IDs: `asset_discovery_spanish_generated_pharma_escalation_issue_344`, `asset_discovery_not_result_followup_issue_244`, and `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`.
-- No failed candidate case has a failed prose judge. The targeted prose A/B requirement is not triggered. No additional paid run was made.
+- No failed candidate case has a failed prose judge. The targeted prose A/B requirement is not triggered. No targeted A/B or candidate suite rerun was made.
 - Mocked eval harness: 237 passed in 9.56 seconds. The first sandboxed attempt could not write Numba cache beside the shared virtual environment; the retry used a writable temporary `NUMBA_CACHE_DIR`.
 - Existing candidate CI: required `ci` and all component jobs passed; Supabase Preview was skipped. These are candidate-head checks, not a substitute for fresh promotion-PR CI.
 - Modularity budget: passed. Current `origin/main` is an ancestor of the candidate, so the would-be merged product tree is the candidate tree.
-- Required manifest tests: **23 passed, one failed** in 8.60 seconds. Command: `pytest tests/test_private_alpha_release_docs.py tests/test_release_promotion_evidence_support.py -q --no-cov` under the pinned Python and mocked provider environment.
+- Required tests on the corrected manifest: **23 passed, one failed** in 5.94 seconds. The first attempt returned the same counts in 8.60 seconds. Command: `pytest tests/test_private_alpha_release_docs.py tests/test_release_promotion_evidence_support.py -q --no-cov` under the pinned Python and mocked provider environment.
 - Failing test: `test_main_promotion_manifests_require_live_eval_scorecard_evidence`. The scorecard writer includes the new `infrastructure_error` total, even when zero; `LIVE_EVAL_RESULT_STATUSES` in `tests/test_private_alpha_release_docs.py` still enumerates the older five statuses. Exact total-dictionary equality rejects the valid retained candidate scorecard. The failure is a writer/consumer contract mismatch; the scorecard and validator were left unchanged.
-- Required negative control: the actual comparison function passed with the manifest intact, failed after every occurrence of the candidate-only Spanish DCA case ID was removed, and passed after exact-byte restoration. This directly proves the comparison function reads this manifest. It does not turn the failing outer release-docs test into a pass.
-- Negative-control evidence: `docs/reports/evidence/2026-09-05-main-promotion/manifest-comparison-negative-control.json`.
-- Full test log: `docs/reports/evidence/2026-09-05-main-promotion/manifest-tests.log`.
+- Corrected negative control: the actual comparison function passed with the manifest intact, failed after every occurrence of the candidate-only Spanish equity-hint case ID was removed, and passed after exact-byte restoration. Its retained execution result is referenced below. This proves the comparison reads the corrected manifest; it does not override the outer release-docs test failure.
+- Corrected negative-control evidence: `docs/reports/evidence/2026-09-05-main-promotion/corrected-manifest-comparison-negative-control.json`. The earlier control remains at `docs/reports/evidence/2026-09-05-main-promotion/manifest-comparison-negative-control.json` as part of the dispatch-error record.
+- Corrected manifest test log: `docs/reports/evidence/2026-09-05-main-promotion/corrected-manifest-tests.log`. The first attempt remains at `docs/reports/evidence/2026-09-05-main-promotion/manifest-tests.log`.
 
-### Candidate failed checks
+### Corrected failed-case comparison
 
-All three failed candidate IDs passed the requested historical baseline. The baseline-only failed ID is `dca_capital_semantics_only_have_amount_is_ceiling_issue_455`; the candidate passes it. There are no shared failed IDs. Totals are not used to offset any failed case.
+This comparison uses deployed production `7d8ace45e4ac717ffbfaf222cf66544c3355df6f` against the unchanged candidate `e3b98690b238bb292e161a9a25554cd9cfdbc19d`. The stale `c7802b37` scorecard and its comparison are excluded. Counts do not offset failed cases.
 
-Comparison evidence: `docs/reports/evidence/2026-09-05-main-promotion/failed-case-comparison.json`.
+| Case ID | Correct baseline | Candidate | Disposition and owner |
+| --- | --- | --- | --- |
+| `asset_discovery_spanish_generated_pharma_escalation_issue_344` | passed | failed | Unresolved candidate-only structured failure; asset discovery, #344. |
+| `asset_discovery_not_result_followup_issue_244` | passed under its older fixture | failed | Candidate-only scorecard failure caused by the added delivered-row assertion; the same missing delivery is observed on both builds. Result follow-up, #244 / #520. |
+| `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run` | failed | failed | Shared structured failure; DCA capital semantics, #455. |
+| `messy_spanish_future_performance_nvda_cruce_dorado` | failed | passed | Baseline-only `prose_judge:honesty` failure; capability honesty and Spanish response composition. This sample improvement does not cancel the equity-hint failure. |
 
-| Case ID | Failed check and observed outcome | Owning surface |
-| --- | --- | --- |
-| `asset_discovery_spanish_generated_pharma_escalation_issue_344` | `asset_discovery.asset_class_hint` expected `equity`, received null. Five verified pharmaceutical equity rows were delivered and the prose judge passed. | Asset discovery interpretation, #344 |
-| `asset_discovery_not_result_followup_issue_244` | `offered.min_next_experiment_rows` expected at least one row, received none. The delivered recovery code was `latest_result_followup_unavailable`. | Result follow-up and delivered Try next outcomes, #244 / #520 |
-| `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run` | Expected executable DCA with contribution amount 13000 and a confirmation. Received `unsupported`, null capital, a second clarification, and no launch payload. The recovery reason was `unsupported_dca_contribution_ceiling`. | DCA capital interpretation and clarification, #455 |
+The exact candidate-only failed IDs are `asset_discovery_spanish_generated_pharma_escalation_issue_344` and `asset_discovery_not_result_followup_issue_244`. The sole shared failed ID is `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`. The sole baseline-only failed ID is `messy_spanish_future_performance_nvda_cruce_dorado`.
 
-Dispositions:
+- `asset_discovery_spanish_generated_pharma_escalation_issue_344`: baseline supplied `asset_class_hint=equity`; candidate supplied null. Both delivered LLY, JNJ, ABBV, MRK, and PFE; both prose judges passed. Inputs and the relevant expectation are identical. This structured difference remains an unresolved promotion blocker; no model-variance waiver is claimed.
+- `asset_discovery_not_result_followup_issue_244`: the correct baseline does **not** fail its native fixture. It records `actionable=false`, `next_experiment_kinds=[]`, and `recovery_code=latest_result_followup_unavailable`, exactly as the candidate does. The baseline fixture has no `expected.offered` assertion for this case; #549 adds `min_next_experiment_rows: 1` on the candidate. Applying the candidate's canonical `compare_offered` assertion to each retained live observation fails both with `offered.min_next_experiment_rows: expected at least 1, got []`. This provider-free check confirms pre-existing missing delivery against the correct production build. It neither rewrites the baseline's native pass nor reruns a model. This candidate-only scorecard failure is dispositioned as a stronger assertion exposing shared behavior, not a delivery regression introduced by this promotion.
+- `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`: both builds return unsupported, null capital, and the same second clarification instead of confirmation. The baseline fails the same three original checks as the candidate: capability, contribution amount, and stage outcomes. The candidate also fails #549's new no-launch delivery check. The earlier candidate-only DCA classification was against the wrong baseline and is withdrawn.
+- `messy_spanish_future_performance_nvda_cruce_dorado`: the correct baseline fails only `prose_judge:honesty`; the candidate passes. This is a baseline-only observation, not a candidate-only prose failure. No targeted A/B is required for this case under the promotion gate.
 
-- `asset_discovery_spanish_generated_pharma_escalation_issue_344`: unresolved candidate-only structured failure. Baseline supplied the required equity hint; candidate did not. Both delivered the same five pharmaceutical equity symbols. No model-variance waiver or prose disposition is claimed.
-- `asset_discovery_not_result_followup_issue_244`: pre-existing delivery failure exposed by the stronger assertion. Both retained scorecards show `actionable=false`, no next-experiment kinds, and `recovery_code=latest_result_followup_unavailable`. The baseline passed because its fixture did not yet require a delivered next-experiment row. The candidate's red assertion makes an existing defect visible; it is not evidence that this promotion removed a previously delivered row.
-- `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`: unresolved candidate-only structured failure. Baseline interpreted the follow-up as a monthly contribution of 13000 with zero starting capital and reached confirmation. Candidate kept the amount as a total-budget constraint and returned unsupported recovery. No model-variance waiver is claimed.
-- `dca_capital_semantics_only_have_amount_is_ceiling_issue_455`: baseline-only failure, owned by DCA capital semantics. The baseline asked for capital and cadence using `missing_sizing_amount_schedule`, while the expected ceiling-specific recovery passed on the candidate. This single-run improvement does not cancel either unresolved candidate-only failure.
+No candidate-only failed case has `prose_judge.pass=false`. The targeted interleaved prose A/B requirement is not triggered, and no additional paid measurement was run. The candidate scorecard's SHA-256 remains `50bbedd21df687c59096231761569c48bfe53f69f734842eebeafff845bd6d93`; the new baseline scorecard's SHA-256 is `319c1618f6a40c1ce9af237f43fdd2630c1df1b73d4d0b26582788f1e576983d`.
 
-The pre-merge evaluation decision is **blocked** by the two unresolved candidate-only structured failures. In addition, the requested baseline is older than verified production, so this comparison cannot establish non-regression against the currently deployed build. The promotion remains a Draft handoff, with no merge or deploy authority inferred from documentation-test or CI results.
+Corrected comparison and the identical delivery assertion results: `docs/reports/evidence/2026-09-05-main-promotion/corrected-failed-case-comparison.json`. Fixture inputs and expectations at both measured refs: `docs/reports/evidence/2026-09-05-main-promotion/comparison-fixture-boundaries.json`.
 
-No failing case has a failed prose judge. No targeted A/B was required or run, and neither suite was rerun to replace these results.
+### Superseded dispatch-error comparison
 
-## Known Production Acceptance Gap
+The retained `c7802b37` baseline returned 61 passed and one failed at `2026-09-05T05:43:59.196903Z`, reporting `$1.186088562696`. It measured the wrong production tree because of the founder's dispatch error. Its failed ID was `dca_capital_semantics_only_have_amount_is_ceiling_issue_455`; that case passes both the correct baseline and candidate. The original comparison remains at `docs/reports/evidence/2026-09-05-main-promotion/failed-case-comparison.json` solely as a record of the first attempt. Its candidate-only and baseline-only classifications are superseded by the comparison above. The original scorecard remains byte-identical, SHA-256 `3977d8ca7b683e511c6366b800633d6aff14a9ea4c5bdd43daa305056ae21e68`.
+
+## Corrected Conversation Activity Acceptance
 
 The same canonical readback used `public.read_conversation_activity_sources` and `argus.domain.conversation_activity.project_conversation_activity` over all 566 conversations. It read 135 `checking`, 424 `idle`, and seven `running` before migration. After migration it read 121 `checking`, 438 `idle`, and seven `running`.
 
@@ -138,7 +142,11 @@ The 121 remaining checking states are not workflow-proof seeds. 120 are succeede
 
 Visibility readback further found 91 checking conversations that are neither archived nor deleted, two archived, and 28 deleted. All seven running conversations are unarchived and undeleted. The normal conversation list therefore still has reachable unresolved activity, not only retained deleted records.
 
-The requested zero-spinner acceptance is not met by the migration readback. This gap must remain visible in the promotion decision and in the post-deploy report.
+The original dispatch's zero-spinner requirement was an error. [PR #548, Founder decision 2](https://github.com/lagarcess/argus/pull/548) explicitly states that the backfill will not be run. The founder reaffirmed that decision in the September 5 correction. The accepted requirement is no proof-seeder row in conversation activity, with the historical Cause A remainder unchanged and attributed. The settle predicate remains unchanged, as required by Founder decision 1 in the same PR.
+
+The corrected read-only production check at `2026-09-05T15:36:21.323602Z` passes that requirement: `read_conversation_activity_sources` emits zero jobs with the proof-seeder signature or `workflows.proof` scope. All 148 seeder rows remain detached from conversations. The canonical projection still reads 121 checking, 438 idle, and seven running conversations. The 121 are a known, owned historical remainder, not a promotion failure. At the job grain, the 266 succeeded rows that cannot hydrate comprise 143 proof-seeder rows and 114 developer QA rows, totaling 257, plus nine jobs owned by others. The 123 retained chat jobs include 122 linked but unfinalized historical runs and one legacy proof-shadow job with no run; these project to 121 conversations. Historical proof-shadow chat rows retain their scope under the explicit #548 boundary. No backfill or deletion ran.
+
+Decision snapshot: `docs/reports/evidence/2026-09-05-main-promotion/backfill-decision-reference.json`. Corrected acceptance and ownership readback: `docs/reports/evidence/2026-09-05-main-promotion/corrected-conversation-activity-readback.json`.
 
 Evidence: `docs/reports/evidence/2026-09-05-main-promotion/remaining-conversation-activity.json` and `docs/reports/evidence/2026-09-05-main-promotion/conversation-activity-visibility.json`.
 
@@ -162,7 +170,7 @@ All items are pending deployment and must be reported separately from the eval.
 - [ ] Grounded research answer with sources in Spanish.
 - [ ] A real backtest completes and its result card renders.
 - [ ] Spanish result card, Quick Take, and assumptions contain no English prose.
-- [ ] Canonical conversation activity readback confirms zero permanent spinners; currently unmet, with 121 checking and seven running before deployment.
+- [ ] Repeat canonical activity readback after deployment: no proof-seeder row or `workflows.proof` scope appears; the 121 historical checking conversations remain unchanged and attributed under PR #548's no-backfill decision. This criterion passed before deployment.
 
 ## Release Decision
 
@@ -171,7 +179,7 @@ All items are pending deployment and must be reported separately from the eval.
 - Deploy direction: pending.
 - Production code deployment: not performed.
 - Blueprint sync and autodeploy change: not applicable and not attempted.
-- Pre-merge evaluation: blocked by unresolved structured candidate-only failures and the historical-baseline limitation.
+- Pre-merge evaluation: blocked by the unresolved candidate-only Spanish equity-hint failure against the corrected production baseline. DCA is shared; missing Try next delivery is observed on both builds. The stale-baseline limitation is corrected.
 - Required documentation tests: blocked by the scorecard writer/consumer status-contract mismatch.
-- Production acceptance: zero-spinner requirement remains unmet.
+- Conversation activity acceptance: corrected pre-deploy criterion passed; 121 historical checking conversations remain deliberately under the founder-owned no-backfill decision. Repeat the same criterion after deployment.
 - Promotion verification: incomplete. Do not merge or deploy this Draft as a completed promotion.
