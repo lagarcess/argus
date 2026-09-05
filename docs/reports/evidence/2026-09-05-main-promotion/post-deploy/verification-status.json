@@ -1,0 +1,117 @@
+{
+  "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "local_verification_checkout": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "github_canary_harness_sha": "fc30a73fc5652cf8035b4e49499f9f198bc22219",
+  "github_canary_run": "https://github.com/lagarcess/argus/actions/runs/33990857918",
+  "status": "deployed_not_fully_verified",
+  "checks": [
+    {
+      "number": 1,
+      "name": "Warmup",
+      "status": "failed_expected_manual_audit_stop",
+      "evidence": [
+        "warmup.log",
+        "warmup.exit"
+      ]
+    },
+    {
+      "number": 2,
+      "name": "Release coherence",
+      "status": "failed_expected_manual_audit_stop",
+      "evidence": [
+        "release-coherence/release-coherence.json",
+        "release-coherence/audit-excerpt.txt"
+      ]
+    },
+    {
+      "number": 3,
+      "name": "Authenticated browser journey",
+      "status": "pass",
+      "evidence": [
+        "authenticated-browser/authenticated-browser.json"
+      ]
+    },
+    {
+      "number": 4,
+      "name": "English exhausted guest account offer",
+      "status": "pass",
+      "evidence": [
+        "browser/english-third-attempt-account-offer.png",
+        "browser/english-third-attempt-evidence.txt"
+      ]
+    },
+    {
+      "number": 5,
+      "name": "Spanish exhausted guest account offer",
+      "status": "pass",
+      "evidence": [
+        "browser/spanish-third-attempt-account-offer.png",
+        "browser/spanish-third-attempt-evidence.txt"
+      ]
+    },
+    {
+      "number": 6,
+      "name": "English grounded research",
+      "status": "pass",
+      "evidence": [
+        "browser/english-research-answer.png",
+        "browser/english-research-sources.png",
+        "research-grounding.md"
+      ]
+    },
+    {
+      "number": 7,
+      "name": "Spanish grounded research",
+      "status": "pass",
+      "evidence": [
+        "browser/spanish-research-answer.png",
+        "browser/spanish-research-sources.png",
+        "research-grounding.md"
+      ]
+    },
+    {
+      "number": 8,
+      "name": "Real backtest and rendered card",
+      "status": "pass",
+      "evidence": [
+        "browser/english-backtest-1-card.png",
+        "browser/english-backtest-2-card.png",
+        "authenticated-browser/authenticated-browser.json"
+      ]
+    },
+    {
+      "number": 9,
+      "name": "Spanish card Quick Take and completed-run assumptions",
+      "status": "fail",
+      "evidence": [
+        "browser/spanish-persisted-meta-card.png",
+        "browser/spanish-persisted-meta-quick-take.png",
+        "browser/spanish-assumptions-question-and-answer.png",
+        "browser/spanish-assumptions-failure-readback.txt"
+      ]
+    },
+    {
+      "number": 10,
+      "name": "Canonical conversation activity",
+      "status": "pass",
+      "evidence": [
+        "conversation-activity-readback.json"
+      ]
+    }
+  ],
+  "counts": {
+    "pass": 7,
+    "failed_expected_manual_audit_stop": 2,
+    "fail": 1
+  },
+  "stop_reason": "Completed AAPL run assumptions question received confirmation assumptions and omitted allocation",
+  "baseline_regression_comparison_performed": false,
+  "redeploy_after_founder_saved_key_removal": false,
+  "product_fix_applied": false,
+  "new_issue_opened": false,
+  "live_eval_suite_rerun": false,
+  "production_database_fixtures_written": false,
+  "backfill_applied": false,
+  "qa_browser_sessions_closed": true,
+  "privacy": "Synthetic QA prompts and results only. Canary identifiers use hashed labels. Activity readback contains aggregate counts only. Browser conversation query IDs are hashed. No auth storage state or secret values included."
+}

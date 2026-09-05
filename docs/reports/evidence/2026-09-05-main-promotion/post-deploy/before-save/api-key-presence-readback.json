@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-09-05T20:39:28.557180+00:00",
+  "response_date": "Sat, 05 Sep 2026 20:39:28 GMT",
+  "service_id": "srv-d78tanmuk2gs73e17nn0",
+  "source": "Render services env-vars GET",
+  "checked_key": "ENABLE_MARKET_DATA_CACHE",
+  "key_present": true,
+  "secret_values_printed": false,
+  "mutation_performed": false
+}

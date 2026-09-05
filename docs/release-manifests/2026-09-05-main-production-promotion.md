@@ -170,36 +170,55 @@ Deployment was serial, with each release command waiting for readiness before th
 
 API and app used pinned Render deploys. Workflow used `.github/render-env-sync.sh workflow-release ee9c3491fa6219502f1e94abc5d9e661a06839d9`. Render exposes the Workflow commit through its version-owned seven-character name, which matches the full API/app SHA. The combined readback at `2026-09-05T20:15:40.958863+00:00` passed for all three before warmup started. Command intervals and service readbacks are retained beside `three-service-ready-versions.json`.
 
-All three triggers remain `off`. No Blueprint sync, Render configuration change, branch-protection change, rollback, or product fix was performed. The API's existing real-workflow dispatch/execution flags were read back before deployment rather than rewritten.
+All three triggers remain `off`. No Blueprint sync, operator Render configuration change, branch-protection change, rollback, or product fix was performed. The founder later removed and saved the forbidden API cache key without redeploying, as recorded below. The API's existing real-workflow dispatch/execution flags were read back before deployment rather than rewritten. Final post-verification readbacks in `post-deploy/api-deploy-status-final.txt`, `post-deploy/web-deploy-status-final.txt`, and `post-deploy/workflow-version-status-final.txt` still report the same three ready versions.
 
 ## Post-Deploy Verification
 
-Verification stopped at step 12. `.github/warmup-render.sh --expect-mode real-workflow` exited 1. API health, forced product readiness, and frontend checks responded successfully. The stale-job scan returned `status=ready`, zero scanned/stale/unresolved jobs, and zero reconciliations. The subsequent release-config audit reported this additional, unaccepted failure:
+The first step 12 attempt stopped on `forbidden argus-api:ENABLE_MARKET_DATA_CACHE unexpected_live_env`, in addition to the expected manual-trigger audit stop. That attempt remains unchanged under `landed-deploy/`. The founder removed the key and then clarified that the removal had not initially been saved. A readback at `2026-09-05T20:39:28.557180+00:00` still found the key; the next readback at `2026-09-05T20:40:21.669417+00:00` confirmed it absent. Both observations are retained. The founder saved configuration without redeploying, and the operator did not redeploy or write configuration. Key absence proves saved Render control-plane state, not a restarted API process environment.
 
-```text
-forbidden argus-api:ENABLE_MARKET_DATA_CACHE unexpected_live_env
-```
+The resumed `.github/warmup-render.sh --expect-mode real-workflow` again exited 1, now solely for `autoDeployTrigger expected=checksPass actual=off` on the three services. Health, forced product readiness, frontend, and Workflow environment checks passed. The stale-job scan reported zero scanned, stale, unresolved, or reconciled jobs. The standalone live Workflow proof was not reached because the audit stopped execution. This is the founder-accepted manual-trigger stop, not a passing warmup process.
 
-The same audit also reported the expected `autoDeployTrigger` mismatch (`expected=checksPass actual=off`) on all three services. That founder-locked manual setting was preserved. It does not account for the forbidden API env entry, so the stop is not dispositioned as only the expected manual-trigger exception. No configuration repair or further canary/browser work was attempted after this failure. The warmup did not reach its live Workflow proof.
+Both step 13 surfaces ran in [GitHub Actions run 33990857918](https://github.com/lagarcess/argus/actions/runs/33990857918). Release coherence exited 1 at `failure_stage=warmup`, `failure_reason=warmup_probe_failed`; its retained audit excerpt shows only the same three manual-trigger mismatches. Its Workflow proof, signup-denial, and welcome-delivery phases were not reached. The separate authenticated-browser job passed, including its real Spanish backtest, result rendering, decision, reload, Omnisearch retrieval, three-service version checks, and session revocation. That job recorded zero console errors, zero page errors, and no blocking overlay. The overall workflow is failed because the release-coherence job is red; the browser success does not relabel it.
 
-All ten requested checks are accounted for below. `FAIL (not run)` means the required acceptance proof is absent because execution stopped; it is not a demonstrated product defect. Paths are relative to `docs/reports/evidence/2026-09-05-main-promotion/landed-deploy/`.
+The browser canary used harness SHA `fc30a73fc5652cf8035b4e49499f9f198bc22219`, the evidence-only merge from PR #557, against deployed SHA `ee9c3491fa6219502f1e94abc5d9e661a06839d9`. Local warmup and manual browser verification retained the landed checkout. No product or harness code changed, and no live eval suite was rerun.
+
+All ten checks are accounted for below. Paths are relative to `docs/reports/evidence/2026-09-05-main-promotion/post-deploy/`. There are seven passes, two accepted manual-trigger stops with nonzero process exits, and one failed acceptance check. The structured index is `verification-status.json`. The two required release-documentation test files passed all 24 tests in 6.63 seconds; the log is `documentation-tests.log`.
 
 | # | Required check | Result | Evidence |
 | --- | --- | --- | --- |
-| 1 | Step 12 warmup, `--expect-mode real-workflow` | FAIL: exit 1, release-config audit | `warmup.txt`, `warmup-result.json` |
-| 2 | Step 13 release-coherence canary | FAIL (not run): stopped at step 12; expected manual-trigger discrepancy is recorded in warmup | `verification-status.json`, `warmup.txt` |
-| 3 | Step 13 authenticated-browser journey | FAIL (not run) | `verification-status.json` |
-| 4 | English exhausted guest receives an account offer on the third backtest | FAIL (not run) | `verification-status.json` |
-| 5 | Spanish exhausted guest receives an account offer on the third backtest | FAIL (not run) | `verification-status.json` |
-| 6 | Grounded research answer with sources, English | FAIL (not run) | `verification-status.json` |
-| 7 | Grounded research answer with sources, Spanish | FAIL (not run) | `verification-status.json` |
-| 8 | Real backtest completes and its result card renders | FAIL (not run) | `verification-status.json` |
-| 9 | Spanish result card, Quick Take, and assumptions contain no English prose | FAIL (not run) | `verification-status.json` |
-| 10 | Canonical activity readback excludes proof seeders and `workflows.proof`, with the attributed 121 historical checking conversations unchanged | FAIL (not run after deployment) | `verification-status.json` |
+| 1 | Step 12 warmup, `--expect-mode real-workflow` | FAIL, accepted manual-trigger audit stop; exit 1, other reached probes pass | `warmup.log`, `warmup.exit`, `api-key-presence-readback.json` |
+| 2 | Step 13 release-coherence canary | FAIL, accepted manual-trigger audit stop; exit 1 at warmup | `release-coherence/release-coherence.json`, `release-coherence/audit-excerpt.txt` |
+| 3 | Step 13 authenticated-browser journey | PASS | `authenticated-browser/authenticated-browser.json` |
+| 4 | English exhausted guest receives an account offer on the third backtest | PASS: two completed cards, third KO run opens Create your account, zero generic backtest failure messages | `browser/english-third-attempt-account-offer.png`, `browser/english-third-attempt-evidence.txt` |
+| 5 | Spanish exhausted guest receives an account offer on the third backtest | PASS: same guest with two completed cards, Spanish third-attempt account offer | `browser/spanish-third-attempt-account-offer.png`, `browser/spanish-third-attempt-evidence.txt` |
+| 6 | Grounded research answer with sources, English | PASS: rendered Netflix answer and five sources, primary-source spot-check | `browser/english-research-answer.png`, `browser/english-research-sources.png`, `research-grounding.md` |
+| 7 | Grounded research answer with sources, Spanish | PASS: rendered Netflix answer and five sources, primary-source spot-check | `browser/spanish-research-answer.png`, `browser/spanish-research-sources.png`, `research-grounding.md` |
+| 8 | Real backtest completes and its result card renders | PASS: canary run plus guest META and AAPL runs complete with result cards | `authenticated-browser/authenticated-browser.json`, `browser/english-backtest-1-card.png`, `browser/english-backtest-2-card.png` |
+| 9 | Spanish result card, Quick Take, and assumptions contain no English prose | FAIL: visible card and Quick Take pass, but the completed-run assumptions question receives confirmation assumptions and omits requested allocation | `browser/spanish-persisted-meta-card.png`, `browser/spanish-persisted-meta-quick-take.png`, `browser/spanish-assumptions-question-and-answer.png`, `browser/spanish-assumptions-failure-readback.txt` |
+| 10 | Canonical activity readback excludes proof seeders and `workflows.proof`, with the attributed 121 historical checking conversations unchanged | PASS: zero proof sources, 121 historical checking conversations unchanged and attributed | `conversation-activity-readback.json` |
 
-The pre-deploy activity acceptance remains valid only for its recorded observation time. Its 121 historical checking conversations are an accepted remainder under [PR #548's no-backfill decision](https://github.com/lagarcess/argus/pull/548); their post-deploy count has not been measured. The warmup's stale-job scan is a different check and cannot substitute for `read_conversation_activity_sources`.
+### Observed assumptions failure and stop
 
-Production is deployed at the landed SHA, but the promotion is not fully verified. The founder owns the next action, including any rollback decision.
+After the guest completed META and AAPL runs and the third KO attempt reached the conversion offer, its KO confirmation remained pending. In the Spanish view, the operator asked:
+
+> ¿Qué supuestos se usaron en el último backtest de AAPL? Muéstrame las comisiones, el deslizamiento y la asignación.
+
+The visible answer was:
+
+> Para la confirmación, estos son los supuestos: Acciones; Capital inicial: USD 10,000.00; Datos diarios; Sin comisiones; Sin deslizamiento; Referencia: SPY.
+
+This answer is Spanish, but it addresses confirmation assumptions instead of the expressly requested completed AAPL run and omits allocation. It therefore does not establish the completed-run assumptions acceptance. This is an observed production behavior mismatch, not a claim that comparison against the former production code proved a regression. Product verification stopped at this observation. The operator captured the question and answer, read back unchanged ready versions, closed both QA browser sessions, and made no further product turns, repair, issue, rollback, or deployment.
+
+### Evidence scope and remaining limitations
+
+Manual browser prompts and results are synthetic QA material. The guest checks used normal browser sessions and real product actions, without database fixtures, signup, real user conversation content, or real user email. The English guest completed two runs and the same exhausted guest was switched to Spanish to verify the equivalent account offer. An additional Spanish browser context reached the shared visitor limit with no completed runs of its own; its `spanish-visitor-budget-offer.png` is supplemental and is not the two-completed-runs proof.
+
+Visible persisted META card labels and Quick Take were Spanish after reloading history and selecting Spanish. The guest language picker uses `persistProfile={false}`: reloading after a guest language change restored the original English profile. This is a browser-view localization proof, not Spanish guest profile persistence proof. The authenticated Spanish reload is separately covered by the passing canary. A DOM-wide readback retained hidden English chart status text, `Visible period: Jan 3, 2023 to Dec 31, 2024.`, which was not visible in the inspected screenshot. The evidence does not assert comprehensive accessibility localization. Manual browser snapshot console counters are preserved; only the authenticated canary has a verified zero-error assertion.
+
+The production activity readback at `2026-09-05T20:55:48.375941+00:00` used `public.read_conversation_activity_sources` and the canonical projector in a repeatable-read, read-only transaction. It emitted zero proof-seeder or `workflows.proof` sources. All 148 proof jobs remain detached, with 143 succeeded and five failed. Among 570 conversations, the snapshot projected 441 idle, 121 checking, and eight running. All 121 checking conversations were attributed to succeeded, unfinalized historical jobs dated June 6 through July 12, with one lacking a linked run. The count is unchanged under [PR #548's no-backfill decision](https://github.com/lagarcess/argus/pull/548). The running count is a separate point-in-time observation during QA, not a change to the accepted historical checking remainder. No backfill or cleanup was applied.
+
+Production remains deployed at the landed SHA, but the promotion is not fully verified. The founder owns the next action, including whether to roll back. Evidence publication does not authorize another deploy.
+
 
 ## PR #552 Factual Follow-up Review
 
@@ -222,9 +241,9 @@ The final-head CI and follow-up Codex review subsequently returned clean before 
 - Promotion PR: [#552](https://github.com/lagarcess/argus/pull/552), with the P1 correction and bilingual browser evidence recorded above. The final PR head's GitHub checks and follow-up Codex review are the source for the merge handoff; both must be clean.
 - Founder merge: completed as `ee9c3491fa6219502f1e94abc5d9e661a06839d9`.
 - Deploy direction: explicitly given by the founder after landing.
-- Production code deployment: all three services ready at the landed SHA; verification stopped at the step 12 release-config audit.
+- Production code deployment: all three services remain ready at the landed SHA. Resumed verification recorded seven passes, two accepted manual-trigger audit stops, and one failed completed-run assumptions check.
 - Blueprint sync and autodeploy change: not applicable and not attempted.
 - Pre-merge evaluation comparison: both candidate-only failures have accepted dispositions. The Spanish hint cannot reach the named consumers as null; the pre-existing missing Try next delivery remains a test-coverage observation without demonstrated user reachability. DCA is shared. The retained native candidate score remains 59 passed and three failed, and the corrected baseline remains 60 passed and two failed.
 - Required documentation tests: passed after correcting the #549 status-vocabulary gap; the total-tamper control still rejects incorrect counts.
-- Conversation activity acceptance: corrected pre-deploy criterion passed; 121 historical checking conversations remain deliberately under the founder-owned no-backfill decision. The post-deploy readback was not run because verification stopped at warmup.
-- The earlier eval dispositions and factual follow-up browser proof remain accepted. The promotion is deployed but not fully verified. No rollback or repair was attempted after the warmup failure; the founder decides what happens next.
+- Conversation activity acceptance: post-deploy canonical readback passed: zero proof sources and the same 121 attributed historical checking conversations under the founder-owned no-backfill decision.
+- The earlier eval dispositions and factual follow-up browser proof remain accepted. The promotion is deployed but not fully verified. After the founder saved the API key removal, verification resumed and then stopped on the observed assumptions mismatch. No rollback, product repair, or new issue was attempted; the founder decides what happens next.
