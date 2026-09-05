@@ -171,7 +171,10 @@ Alpha supports server-side idempotency for expensive state-changing operations.
   length/characters return `422 validation_error`.
 - The unique reservation key is
   `(user_id, operation_scope, Idempotency-Key)`. The two approved operation
-  scopes are `chat.run_backtest` and `backtests.run`.
+  scopes are `chat.run_backtest` and `backtests.run`. (`chat.research` rows are
+  created by the research rail and `workflows.proof` rows by the canary's
+  workflow proof; neither is admitted through this endpoint, and a proof row
+  belongs to no conversation.)
 - Before hashing, the launch request is validated and materialized as the full
   `LaunchBacktestRequest` target shape: declared defaults and explicit nulls are
   present; field aliases such as `_execution_realism` are used; dates are ISO
@@ -3279,6 +3282,14 @@ completed in-stream run, the final payload includes `backtest_job` and omits
   }
 }
 ```
+
+The final event may also carry nullable `final_response_payload`, the typed
+graph output. Its optional nullable `code` is the authoritative conversion
+signal for admission refusals (`account_conversion_required`). The frontend
+stream type imports `ChatFinalResponsePayload`, generated from the backend
+`FinalResponsePayload` model by
+`scripts/generate_chat_final_response_type.py`; do not hand-maintain a second
+field list. Clients accept legacy payloads without this object or code.
 
 When a turn reaches a recoverable assistant response without a completed card,
 the final payload and persisted assistant message metadata may include

@@ -322,6 +322,7 @@ class ToolCallRecord(BaseModel):
 
 
 class FinalResponsePayload(BaseModel):
+    code: str | None = None
     result: dict[str, Any] | None = None
     backtest_job: dict[str, Any] | None = None
     error: str | None = None

@@ -1,0 +1,141 @@
+{
+  "label": "integration-run2",
+  "mode": "run",
+  "before": {
+    "owner": {
+      "user_id": "c56b9e16-5561-492a-9d6a-b7847c55a1c0",
+      "conversation_id": "c3acaa51-64b5-430e-b5f2-b5a33cccfc0e",
+      "period_start": "2026-09-05T00:24:45+00:00",
+      "period_end": "2026-09-12T00:24:45+00:00"
+    },
+    "jobs": [
+      [
+        "bea8b266-ff04-4ba7-b630-9aa1aa4fb975",
+        "succeeded",
+        null,
+        "44d56a6f-3ee5-5371-9d0d-f97cd39a8c5c"
+      ]
+    ],
+    "runs": [
+      [
+        "44d56a6f-3ee5-5371-9d0d-f97cd39a8c5c",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        1,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        1
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "c56b9e16-5561-492a-9d6a-b7847c55a1c0",
+      "conversation_id": "c3acaa51-64b5-430e-b5f2-b5a33cccfc0e",
+      "period_start": "2026-09-05T00:24:45+00:00",
+      "period_end": "2026-09-12T00:24:45+00:00"
+    },
+    "jobs": [
+      [
+        "bea8b266-ff04-4ba7-b630-9aa1aa4fb975",
+        "succeeded",
+        null,
+        "44d56a6f-3ee5-5371-9d0d-f97cd39a8c5c"
+      ],
+      [
+        "b15988ea-1925-4e72-85d6-f87590e5c3c9",
+        "succeeded",
+        null,
+        "ccd05dc3-6e1b-586c-937d-a9bf3d1aef4c"
+      ]
+    ],
+    "runs": [
+      [
+        "ccd05dc3-6e1b-586c-937d-a9bf3d1aef4c",
+        "completed"
+      ],
+      [
+        "44d56a6f-3ee5-5371-9d0d-f97cd39a8c5c",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [],
+  "errors": [],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 1,
+            "remaining": 1,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ],
+  "chat_stream_requests": [
+    {
+      "conversation_id": "c3acaa51-64b5-430e-b5f2-b5a33cccfc0e",
+      "action": {
+        "type": "run_backtest",
+        "label": "Run backtest",
+        "labelKey": "chat.confirmation.actions.run_backtest",
+        "payload": {
+          "artifact_id": "confirmation-50d47533-b2a8-4b74-ab66-4d64e1d84b41",
+          "confirmation_id": "confirmation-50d47533-b2a8-4b74-ab66-4d64e1d84b41",
+          "conversation_id": "c3acaa51-64b5-430e-b5f2-b5a33cccfc0e",
+          "launch_payload_hash": "fa83ba9176b6defb"
+        },
+        "presentation": "confirmation"
+      },
+      "language": "en",
+      "viewport": "wide"
+    }
+  ]
+}

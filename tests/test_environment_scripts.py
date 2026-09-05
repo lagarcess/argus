@@ -540,8 +540,9 @@ def test_workflow_proof_seed_usage_reuses_stable_proof_principal() -> None:
     proof_script = _source(".github/workflow-proof.sh")
 
     assert ".github/workflow-proof.sh seed [--user-id <uuid>]" in proof_script
-    assert "Seed reuses a stable proof auth/profile/conversation" in proof_script
-    assert "--conversation-id" in proof_script
+    assert "Seed reuses a stable proof auth/profile by default" in proof_script
+    assert "operation_scope=workflows.proof and no conversation" in proof_script
+    assert "--conversation-id" not in proof_script
     assert "local or preview Supabase database" in proof_script
 
 

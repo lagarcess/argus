@@ -3,6 +3,7 @@ import i18next from "i18next";
 import { localizeArtifactFinalPayload } from "./artifact-response-transport";
 import type { AssetClass } from "./argus-types";
 import type { ConversationPreview } from "./conversation-preview-display";
+import type { ChatFinalResponsePayload } from "./chat-final-response-payload";
 import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
 import type { DecisionState as RunDossierDecisionState } from "./run-dossier-contract";
 import type {
@@ -354,6 +355,7 @@ export type ChatStreamEvent =
 
 export type ChatFinalPayload = {
   code?: string;
+  final_response_payload?: ChatFinalResponsePayload | null;
   stage_outcome?: string;
   assistant_response?: string | null;
   assistant_prompt?: string | null;

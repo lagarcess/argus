@@ -1306,8 +1306,8 @@ export default function ChatInterface() {
         if (!identityAuthorized) return;
         clearNeutralGuestSubmission();
         setStreamStatus(null);
+        if (recoverQuotaRejectedRun(event.data.final_response_payload?.code ?? event.data.code)) return;
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
-        if (recoverQuotaRejectedRun((finalPayload.final_response_payload as { code?: unknown } | undefined)?.code ?? finalPayload.code)) return;
         const finalText =
           event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;

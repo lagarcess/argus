@@ -1,0 +1,245 @@
+{
+  "label": "es-419-same-day",
+  "mode": "same-day",
+  "language": "es-419",
+  "before": {
+    "owner": {
+      "user_id": "12541a13-5ffe-4420-a254-693224560e3d",
+      "conversation_id": "6ae22848-e450-420c-8ea2-c26135adb492",
+      "period_start": "2026-09-05T02:43:46+00:00",
+      "period_end": "2026-09-12T02:43:46+00:00"
+    },
+    "jobs": [
+      [
+        "12ddc2de-99dd-45fa-a3ce-571c43441735",
+        "succeeded",
+        null,
+        "890da913-848a-5f7e-aadf-e2c52c50a78b"
+      ],
+      [
+        "87e3490e-fa60-498d-a0d3-8eda5ec0362c",
+        "succeeded",
+        null,
+        "989c6b5b-3ccb-545e-a426-2796f36cf265"
+      ]
+    ],
+    "runs": [
+      [
+        "989c6b5b-3ccb-545e-a426-2796f36cf265",
+        "completed"
+      ],
+      [
+        "890da913-848a-5f7e-aadf-e2c52c50a78b",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "12541a13-5ffe-4420-a254-693224560e3d",
+      "conversation_id": "6ae22848-e450-420c-8ea2-c26135adb492",
+      "period_start": "2026-09-05T02:43:46+00:00",
+      "period_end": "2026-09-12T02:43:46+00:00"
+    },
+    "jobs": [
+      [
+        "12ddc2de-99dd-45fa-a3ce-571c43441735",
+        "succeeded",
+        null,
+        "890da913-848a-5f7e-aadf-e2c52c50a78b"
+      ],
+      [
+        "87e3490e-fa60-498d-a0d3-8eda5ec0362c",
+        "succeeded",
+        null,
+        "989c6b5b-3ccb-545e-a426-2796f36cf265"
+      ]
+    ],
+    "runs": [
+      [
+        "989c6b5b-3ccb-545e-a426-2796f36cf265",
+        "completed"
+      ],
+      [
+        "890da913-848a-5f7e-aadf-e2c52c50a78b",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [
+    "Sigue con ArgusEste chat temporal alcanzó el límite de simulaciones de hoy. Se restablece el 5 sept 2026, 7:00 p.m. GMT-5. Crea una cuenta para continuar ahora.Crea tu cuentaInicia sesión para ejecutar otra simulación.Mínimo 8 caracteres.Registrarse¿Ya tienes una cuenta? Iniciar sesiónAl registrarte, aceptas nuestros Términos y Política de Privacidad."
+  ],
+  "errors": [],
+  "accountResponses": [
+    {
+      "user": {
+        "id": "12541a13-5ffe-4420-a254-693224560e3d",
+        "email": null,
+        "username": null,
+        "display_name": null,
+        "language": "es-419",
+        "locale": "es-419",
+        "theme": "dark",
+        "is_admin": false,
+        "onboarding": {
+          "completed": false,
+          "stage": "language_selection",
+          "language_confirmed": false,
+          "primary_goal": null
+        },
+        "created_at": "2026-09-05T02:43:46.974589Z",
+        "updated_at": "2026-09-05T02:43:46.974589Z"
+      },
+      "account_kind": "guest",
+      "guest": {
+        "expires_at": "2026-09-12T02:43:46Z",
+        "conversation_id": "6ae22848-e450-420c-8ea2-c26135adb492",
+        "conversation_limit": 1,
+        "message_limit": 10,
+        "simulation_limit": 2,
+        "feedback_limit": 5
+      },
+      "capabilities": {
+        "can_create_additional_conversation": false,
+        "can_manage_conversation": false,
+        "can_save_decision": false,
+        "can_manage_account": false,
+        "can_use_omnisearch": true,
+        "can_search_current_workspace": true,
+        "can_use_grounded_discovery": true,
+        "can_submit_feedback": true
+      },
+      "public_account_access_enabled": true
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://127.0.0.1:55479/api/v1/memory/availability",
+      "status": 403,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/6ae22848-e450-420c-8ea2-c26135adb492/messages?limit=100",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/backtest-jobs/12ddc2de-99dd-45fa-a3ce-571c43441735",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/backtest-jobs/87e3490e-fa60-498d-a0d3-8eda5ec0362c",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/6ae22848-e450-420c-8ea2-c26135adb492/activity",
+      "status": 200,
+      "method": "PATCH",
+      "request": "{\"action\":\"mark_read\",\"through_attention_cursor\":\"eyJpIjoiODdlMzQ5MGUtZmE2MC00OThkLWEwZDMtOGVkYTVlYzAzNjJjIiwiayI6ImJhY2t0ZXN0X2pvYiIsInYiOjF9\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me/usage",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/analytics/guest-events",
+      "status": 200,
+      "method": "POST",
+      "request": "{\"event\":\"conversion_prompt_shown\",\"language\":\"es-419\",\"surface\":\"conversion_modal\",\"conversion_reason\":\"simulation_limit\",\"terminal_outcome\":\"shown\"}"
+    }
+  ],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 2,
+            "remaining": 0,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": false,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ]
+}

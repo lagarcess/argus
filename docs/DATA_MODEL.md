@@ -1474,13 +1474,13 @@ canonical immutable `backtest_runs` row and reference it through
 ### Fields
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
-- `conversation_id`: `uuid` (Nullable only for direct `backtests.run` admission;
-  otherwise references `conversations.id`)
+- `conversation_id`: `uuid` (Null for direct `backtests.run` admission and for
+  every `workflows.proof` row; otherwise references `conversations.id`)
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
 - `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
   `backtests.run`; references the retained immutable confirmation `messages.id`)
-- `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`, or
-  `chat.research`)
+- `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`,
+  `chat.research`, or `workflows.proof`)
 - `idempotency_key`: `text` (Required for every current writer. Accepted jobs
   use the caller's 1-128 visible ASCII reservation key; terminal pre-start
   receipts use a distinct derived `rejection:<hash>` key. Legacy rows may be
@@ -1508,10 +1508,17 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
-- **operation_scope**: `chat.run_backtest`, `backtests.run`, `chat.research`
-  (thorough research runs ride this same lifecycle; a succeeded research job
-  keeps `result_run_id` null and references its answer message through
-  `execution_metadata.research_result_message_id`)
+- **operation_scope**: `chat.run_backtest`, `backtests.run`, `chat.research`,
+  `workflows.proof` (thorough research runs ride this same lifecycle; a
+  succeeded research job keeps `result_run_id` null and references its answer
+  message through `execution_metadata.research_result_message_id`. A
+  `workflows.proof` row is the Render workflow runtime proof seeded by
+  `workflows/proof.py` for the canary: it is not conversation work, carries no
+  conversation, no request or confirmation message, and no run, and is never
+  admitted through the API. Because every conversation activity reader joins
+  jobs to a conversation, a proof row cannot project as activity; before this
+  scope existed the seeder inherited the `chat.run_backtest` column default
+  and each proof projected a conversation as `checking` forever.)
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
 - A new `chat.run_backtest` row starts `queued` with `queued_at` set and
