@@ -1,0 +1,54 @@
+bun test v1.3.14 (0d9b296a)
+
+__tests__/result-readout-language.test.ts:
+(pass) persisted result presentation (#531) > reads execution assumptions from the real persisted en result shape [11.52ms]
+(pass) persisted result presentation (#531) > reads execution assumptions from the real persisted es-419 result shape [3.05ms]
+(pass) persisted result presentation (#531) > keeps typed execution assumptions in the en card [2.83ms]
+(pass) persisted result presentation (#531) > keeps typed execution assumptions in the es-419 card [2.99ms]
+(pass) persisted result presentation (#531) > never guesses side or allocation from retained prose or unknown typed values [2.06ms]
+(pass) persisted result presentation (#531) > incomplete modeled-cost evidence never claims no fees [1.10ms]
+(pass) persisted result presentation (#531) > voices the same typed DCA facts in en [0.89ms]
+(pass) persisted result presentation (#531) > voices the same typed DCA facts in es-419 [0.84ms]
+(pass) persisted result presentation (#531) > missing metrics stay unavailable instead of reviving private prose [0.28ms]
+(pass) persisted result presentation (#531) > typed indicator periods and thresholds remain visible in Spanish [0.85ms]
+(pass) persisted result presentation (#531) > voices the full typed signal rule group in Spanish [1.04ms]
+(pass) persisted result presentation (#531) > legacy breakdown keeps its typed result facts after hydration [0.25ms]
+(pass) persisted result presentation (#531) > preserves the voiced en factual answer when its fact bank is context [0.13ms]
+(pass) persisted result presentation (#531) > preserves the voiced es-419 factual answer when its fact bank is context [0.02ms]
+(pass) persisted result presentation (#531) > a legacy result without card chrome renders the backend-classified typed facts [0.10ms]
+197 |     const message = hydrateMessagesFromApi([{
+198 |       id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), role: "assistant",
+199 |       content: answer, created_at: new Date().toISOString(),
+200 |       metadata: { result_fact_bank: bank, artifact_presentation_kind: kind },
+201 |     }]).messages[0];
+202 |     expect(message.contentPresentation).toBe(kind === "result" ? "result_readout" : undefined);
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: undefined
+Received: "result_readout"
+
+      at <anonymous> (/Users/garces/.codex/worktrees/a121/private-alpha-next/web/__tests__/result-readout-language.test.ts:202:41)
+(fail) persisted result presentation (#531) > uses the public presentation kind (null), not an independent intent classifier [0.15ms]
+197 |     const message = hydrateMessagesFromApi([{
+198 |       id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), role: "assistant",
+199 |       content: answer, created_at: new Date().toISOString(),
+200 |       metadata: { result_fact_bank: bank, artifact_presentation_kind: kind },
+201 |     }]).messages[0];
+202 |     expect(message.contentPresentation).toBe(kind === "result" ? "result_readout" : undefined);
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: undefined
+Received: "result_readout"
+
+      at <anonymous> (/Users/garces/.codex/worktrees/a121/private-alpha-next/web/__tests__/result-readout-language.test.ts:202:41)
+(fail) persisted result presentation (#531) > uses the public presentation kind (), not an independent intent classifier [0.05ms]
+(pass) persisted result presentation (#531) > uses the public presentation kind ("result"), not an independent intent classifier
+(pass) persisted result presentation (#531) > live run and historical message carry the same language-neutral facts [1.00ms]
+(pass) persisted result presentation (#531) > failed historical repair renders Spanish unavailable, never permanent working [0.19ms]
+
+ 18 pass
+ 2 fail
+ 76 expect() calls
+Ran 20 tests across 1 file. [92.00ms]
