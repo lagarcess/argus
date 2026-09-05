@@ -818,9 +818,12 @@ def _publisher_source_retry_prompt(prompt: str, *, language: str) -> str:
 
 
 def _retrieval_happened(packet: ResearchPacket) -> bool:
+    # The provider's output is the retrieval record. Invoice counts are
+    # billing: unknown (None) and zero are both absence of evidence here.
     usage = packet.usage
     return bool(
-        packet.sources
+        packet.tool_results
+        or packet.sources
         or usage.finance_search_invocations
         or usage.web_search_invocations
         or usage.fetch_url_invocations

@@ -45,6 +45,10 @@ from argus.domain.research.pricing import validated_research_cost_usd
 PERPLEXITY_AGENT_URL = "https://api.perplexity.ai/v1/agent"
 
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
+# Output item types that are tool results. Recorded responses carry exactly one
+# finance_results item per finance_search call and one search_results item per
+# web search; a response that ran no tool carries neither.
+_TOOL_RESULT_ITEM_TYPES = frozenset({"finance_results", "search_results"})
 
 
 class PerplexityAgentClient:
@@ -180,10 +184,13 @@ def _packet_from_response(
     tickers: list[str] = []
     sources: list[ResearchSource] = []
     pairs: list[ResearchNamePair] = []
+    tool_results: list[str] = []
     for item in output:
         if not isinstance(item, dict):
             continue
         item_type = item.get("type")
+        if item_type in _TOOL_RESULT_ITEM_TYPES:
+            tool_results.append(str(item_type))
         if item_type == "finance_results":
             for value in item.get("categories") or []:
                 if isinstance(value, str) and value not in categories:
@@ -240,6 +247,7 @@ def _packet_from_response(
         tickers=tuple(tickers[:MAX_PACKET_TICKERS]),
         sources=tuple(sources[:MAX_PACKET_SOURCES]),
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
+        tool_results=tuple(tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
     )
@@ -257,7 +265,11 @@ def _usage_from_response(
     output_tokens: int | None = None
     cache_creation_input_tokens: int | None = None
     cache_read_input_tokens: int | None = None
-    finance_search_invocations = web_search_invocations = fetch_url_invocations = 0
+    # Unknown until the invoice establishes each count; a lost or malformed
+    # invoice leaves them None, never zero.
+    finance_search_invocations: int | None = None
+    web_search_invocations: int | None = None
+    fetch_url_invocations: int | None = None
     pricing_error: ResearchPricingError | None = None
     try:
         usage = document.get("usage")
