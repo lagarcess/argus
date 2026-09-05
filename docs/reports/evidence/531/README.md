@@ -5,12 +5,14 @@
 - PR: https://github.com/lagarcess/argus/pull/551, targeting `codex/private-alpha-next`.
 - Original requested base: `5d408acf`.
 - Founder-authorized rebase base: `5761dd417429895a24037df8231528c759af4179`.
-- Latest refetched integration: `dcbc7af5420d5d5dc41371bc1add9fef57c4582c`.
+- Latest refetched integration: `8315503022972b8d513b75ba126bfd212321eb35`.
 - Implementation: `c62cde0b`.
 - First one-way integration merge / live measurement candidate:
   `79c8d78eee3af878b9cc52247bb1da28e7dc90a5`.
-- Final one-way integration merge / deterministic revalidation candidate:
+- Second one-way integration merge / browser revalidation candidate:
   `5b3f020be8b2a42621c1d8bf0d26f5f3306d2d4f`.
+- Third one-way integration merge / final deterministic revalidation candidate:
+  `d47fe9257161ae8138f2966841a074ca4a79e8fd`.
 - Through `77be94d6`, intervening changes were receipt-sharing documentation/evidence only:
   no shared runtime owner, API/data contract, UI state, migration, environment
   variable, or directly affected test changed. Existing baseline evidence retained.
@@ -21,11 +23,16 @@
   and cost-ledger evidence taxonomy. Browser and fingerprint evidence remain
   applicable; exact reconciled-tree checks are recorded below. The live scorecard
   stays bound to `79c8d78e` and does not prove the new telemetry taxonomy.
+- `dcbc7af5..83155030` lands #549's evaluation-integrity changes, entirely under
+  `tests/evals/`. There is no application, reader, UI, or prompt change. The
+  harness and fixtures now distinguish unavailable prose judgments and require
+  delivered outcomes, so the old live scorecard is historical evidence only,
+  not acceptance under the new harness. No paid rerun was authorized or attempted.
 - #533 remains excluded. No engine/comparison arithmetic was changed.
 - No lane-authored production edits in the prohibited LLM/interpreter directories,
   the three reserved frontend files, or receipt/share surfaces. Incoming #550
   telemetry and receipt-sharing files are integration-owned, not this lane's diff
-  against `dcbc7af5`.
+  against `83155030`.
 - No merge of the PR, deploy, hosted migration, or historical rewrite performed.
 
 ## Settled persistence contract
@@ -63,7 +70,7 @@ read fails. Runtime source aliases must belong to that same scrub registry.
 ## Fingerprint
 
 **Unchanged.** `surface_drift` returned `([], [], [])`: zero changed, added, or
-removed entries, including after the `5b3f020b` reconciliation. All three
+removed entries, including after the `d47fe925` reconciliation. All three
 prompt-freeze tests passed. The explain prompt
 builders and model-facing schema descriptions were not edited; no fingerprint
 reset was made. The separate sanctioned runtime live gate is recorded below.
@@ -113,6 +120,20 @@ Reconciled candidate `5b3f020b`:
   Settings switch and reload. No credentials were loaded and no provider or
   hosted database call occurred. Browser and replay services were cleaned up.
 
+Final reconciled candidate `d47fe925`:
+
+- Full runtime/research, all three fingerprint checks, and #549's complete
+  canonical mocked harness: **2,526 passed** (37.95 seconds). The runtime/research
+  portion is unchanged at 2,286 cases; the expanded mocked command has 237 cases.
+- Merged-tree modularity passes and prompt drift remains `([], [], [])`.
+- Application source and frontend configuration are byte-identical to the
+  browser-tested `5b3f020b` tree. The Spanish reload screenshot and prior frontend
+  evidence are explicitly revalidated and retained without another provider turn.
+- Current fixture hash is
+  `1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9`,
+  distinct from the historical live scorecard's
+  `65a7daab0da92302999bc4a9afa39430f76ba87a0b1d2d0ebecb956ce32b6e8d`.
+
 ## Review and CI
 
 Independent scoped Codex review returned clean at `79c8d78e`, with no P1/P2
@@ -124,9 +145,17 @@ bounded reconciliation review also returned clean: #550 changes operational
 evidence labels, not reader behavior or model inputs. No review remained in flight
 when this report was written.
 
+The final #549 overlap review returned clean at `d47fe925`: browser/prompt
+evidence is retained, while the old scorecard is historical only. Its three
+typed failures remain observed failures with unknown cause, not infrastructure
+errors or defects resolved by the harness change. No new production finding was
+opened and no review remained in flight after this reconciliation.
+
 [Candidate CI](https://github.com/lagarcess/argus/actions/runs/33938116152)
 finished **success**: backend, frontend, ownership, guest-release, and aggregate
 CI jobs all green. The backend CI suite reports **5,879 passed, 537 skipped**.
+[Reconciled evidence-head CI](https://github.com/lagarcess/argus/actions/runs/33940373943)
+also finished **success** at `e5a8c64b`, including the real-Postgres guest gate.
 Final evidence-only-head CI and unresolved review-thread
 readback are reported in the PR handoff.
 
@@ -136,7 +165,7 @@ The same genuine recorded English-authored META result reproduces the defect
 before the fix and renders a Spanish Quick Take after Settings language change
 and full reload. See [browser evidence](browser/README.md).
 
-The [sanctioned live scorecard](live-measurement.json) is schema v2, with
+The [historical sanctioned live scorecard](live-measurement.json) is schema v2, with
 `worktree_clean=true`, both providers explicitly `live_provider`, Python
 3.10.20, all 62 fixture cases exactly once, and a successful January 1 holiday
 calendar-alignment probe. It records **59 passed, 3 failed**. No rerun or new
@@ -157,6 +186,12 @@ relative to that measurement, not proven regressions caused by this lane. They
 occur in structured interpretation/capability outcomes before the new reader
 boundary. No paired live run on `5761dd41` was performed; the unchanged prompt
 fingerprint alone does not establish causation or waive this failed gate.
+
+After this measurement, integration #549 strengthened delivered-outcome
+assertions and changed unavailable-measurement handling. The recorded fixture
+hash and old harness are retained unchanged with the scorecard. Its 59/3 result
+must not be relabeled or treated as a run of the current harness. Current live
+acceptance remains unmeasured; a new paid run needs explicit founder direction.
 
 DCA browser diversity acceptance is **blocked**. The first browser driver's
 shell quoting damaged the dollar amounts, consuming one provider-backed UI turn;

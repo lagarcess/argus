@@ -82,3 +82,9 @@ market-data provider, hosted-database, DCA, or backtest call.
 `after-reconciliation-provenance.json` records the screenshot digest, exact
 commit parents, recorded-source digest, replay-harness adjustment, and hashes
 for the reader-boundary source files used by the archived application.
+
+The subsequent `d47fe9257161ae8138f2966841a074ca4a79e8fd` reconciliation brings
+in #549 only under `tests/evals/`; application source, frontend configuration,
+and reader contracts are byte-identical to the captured `5b3f020b` tree. The
+same browser evidence is explicitly retained. The stronger evaluation harness
+does not turn the prior live scorecard into a current-harness measurement.
