@@ -14,7 +14,7 @@ from argus.llm.openrouter import (
 )
 from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
 
-_INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
+_ASSET_MENTION_PREFLIGHT_TASK: OpenRouterTask = "asset_mention_preflight"
 
 
 async def provider_asset_resolution_context_for_request(
@@ -30,10 +30,10 @@ async def provider_asset_resolution_context_for_request(
     ):
         return None
     messages = _asset_mention_extraction_messages(request)
-    for model_name in _interpretation_repair_model_candidates(preferred_model):
+    for model_name in _asset_mention_preflight_model_candidates(preferred_model):
         try:
             extraction = await invoke_schema(
-                task=_INTERPRETATION_REPAIR_TASK,
+                task=_ASSET_MENTION_PREFLIGHT_TASK,
                 messages=messages,
                 schema_model=LLMAssetMentionExtraction,
                 schema_name="LLMAssetMentionExtraction",
@@ -54,16 +54,16 @@ async def provider_asset_resolution_context_for_request(
     return None
 
 
-def _interpretation_repair_model_candidates(preferred_model: str) -> list[str]:
-    """Ordered repair-model fallback chain for the asset-mention preflight.
+def _asset_mention_preflight_model_candidates(preferred_model: str) -> list[str]:
+    """Ordered model fallback chain for the asset-mention preflight.
 
-    Mirrors ``_unique_repair_models`` for the interpretation_repair task: the
-    configured tier candidates first, then the preferred model, deduped. Reusing
+    Mirrors ``_unique_repair_models``: configured tier candidates first, then
+    the preferred model, deduped. Reusing
     only the preferred model would leave the preflight with no fallback when that
     model times out or rejects the schema.
     """
     candidates = [
-        *openrouter_structured_model_candidates(task=_INTERPRETATION_REPAIR_TASK),
+        *openrouter_structured_model_candidates(task=_ASSET_MENTION_PREFLIGHT_TASK),
         preferred_model,
     ]
     seen: set[str] = set()
