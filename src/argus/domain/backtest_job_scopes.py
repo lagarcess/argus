@@ -6,7 +6,9 @@ They agree because every one of them derives from this tuple. The SQL check
 constraint is rendered from it by :func:`render_scope_check_constraint`, and
 the migration that installs the active constraint is pinned to that rendering;
 a scope added here without a migration fails that test, and a scope added to
-SQL by hand fails it too.
+SQL by hand fails it too. ``tests/test_backtest_job_scopes.py`` walks every
+production Python file and fails on a scope spelled anywhere but here, so a
+consumer cannot quietly hold its own copy.
 
 Which scopes may be *admitted* through the API is a different fact, owned by
 the admission SQL, and is not restated here.

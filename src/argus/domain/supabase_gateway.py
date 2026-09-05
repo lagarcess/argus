@@ -27,6 +27,7 @@ from argus.domain.backtest_finalization import (
     FinalizedBacktest,
     PreparedBacktestFinalization,
 )
+from argus.domain.backtest_job_scopes import RESEARCH_OPERATION_SCOPE
 from argus.domain.chat_turn_lifecycle_gateway import (
     ChatTurnLifecycleGatewayMixin,
 )
@@ -1156,7 +1157,7 @@ class SupabaseGateway(
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .eq("operation_scope", "chat.research")
+            .eq("operation_scope", RESEARCH_OPERATION_SCOPE)
             .in_("status", ["queued", "running"])
             .execute()
         )

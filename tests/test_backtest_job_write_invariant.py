@@ -184,7 +184,7 @@ EXPECTED_WRITE_SITES = {
         "SupabaseGateway.complete_research_job",
         "postgrest-update",
     ): _requires(
-        '.eq("operation_scope", "chat.research")',
+        '.eq("operation_scope", RESEARCH_OPERATION_SCOPE)',
         '.in_("status", ["queued", "running"])',
         absent=('"result_run_id":',),
     ),
