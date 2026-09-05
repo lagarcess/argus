@@ -3,6 +3,7 @@ import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
+import { benchmarkComparisonView, signedPercentFigure } from "@/lib/result-figures";
 
 type MetricLike = {
   key?: string;
@@ -259,7 +260,7 @@ export function heroDeltaEvidenceView(
   const typedFacts = result.readoutFacts;
   const costs = typedFacts?.costs ?? result.executionCosts;
   const totalReturnValue = typedFacts?.totalReturnPct !== undefined
-    ? formatSignedPercent(typedFacts.totalReturnPct)
+    ? signedPercentFigure(typedFacts.totalReturnPct)
     : normalizeSignedPercent(totalReturn?.value);
   const isContributionReturn =
     totalReturn?.key === "contribution_return_pct" || typedFacts?.strategyType === "dca_accumulation";
@@ -267,10 +268,11 @@ export function heroDeltaEvidenceView(
   const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
   const benchmarkSymbol = facts.benchmark;
   const delta = typedFacts?.benchmarkDeltaPct;
-  const benchmarkValue = delta === undefined || !benchmarkSymbol ? copy.benchmarkUnavailable
-    : Math.abs(delta) < 0.05 ? copy.inLineWith(benchmarkSymbol)
-    : delta > 0 ? copy.beatBy(copy.percentagePoints(Math.abs(delta).toFixed(1)))
-    : copy.laggedBy(copy.percentagePoints(Math.abs(delta).toFixed(1)));
+  const comparison = delta === undefined ? undefined : benchmarkComparisonView(delta);
+  const benchmarkValue = comparison === undefined || !benchmarkSymbol ? copy.benchmarkUnavailable
+    : comparison.claim === "matched" ? copy.inLineWith(benchmarkSymbol)
+    : comparison.claim === "beat" ? copy.beatBy(copy.percentagePoints(comparison.magnitude))
+    : copy.laggedBy(copy.percentagePoints(comparison.magnitude));
 
   return {
     hero: {
@@ -294,7 +296,7 @@ export function heroDeltaEvidenceView(
     },
     worstDrop: {
       label: copy.worstDropLabel,
-      value: typedFacts?.maxDrawdownPct !== undefined ? formatSignedPercent(typedFacts.maxDrawdownPct) : normalizeSignedPercent(worstDrop?.value) ?? copy.unavailable,
+      value: typedFacts?.maxDrawdownPct !== undefined ? signedPercentFigure(typedFacts.maxDrawdownPct) : normalizeSignedPercent(worstDrop?.value) ?? copy.unavailable,
       unavailable: typedFacts?.maxDrawdownPct === undefined && !normalizeSignedPercent(worstDrop?.value),
     },
     timeframeDisplay: facts.timeframeDisplay,
@@ -425,8 +427,8 @@ function executionCostDetails(
     return [];
   }
   return [
-    { label: copy.grossReturnLabel, value: formatSignedPercent(gross) },
-    { label: copy.netReturnLabel, value: formatSignedPercent(net) },
+    { label: copy.grossReturnLabel, value: signedPercentFigure(gross) },
+    { label: copy.netReturnLabel, value: signedPercentFigure(net) },
     feeBps === undefined && slippageBps === undefined
       ? undefined
       : {
@@ -441,11 +443,6 @@ function executionCostDetails(
 
 function finiteNumber(value: number | null | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function formatSignedPercent(value: number): string {
-  const rounded = value.toFixed(1);
-  return `${value > 0 ? "+" : ""}${rounded}%`;
 }
 
 function formatBpsValue(value: number): string {
@@ -622,9 +619,7 @@ function parseCurrency(value: string) {
 function normalizeSignedPercent(value?: string) {
   const match = value?.match(PERCENT_VALUE_PATTERN)?.[0];
   if (!match) return undefined;
-  const numeric = Number(match.replace("%", ""));
-  const sign = numeric > 0 ? "+" : "";
-  return `${sign}${numeric.toFixed(1)}%`;
+  return signedPercentFigure(Number(match.replace("%", "")));
 }
 
 function heroDetail(

@@ -11,6 +11,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from argus.domain.benchmark_comparison import (
+    BenchmarkComparison,
+    benchmark_comparison_from_delta,
+)
 from argus.domain.engine_launch.result_facts import structured_next_experiments
 
 NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1"
@@ -187,8 +191,7 @@ def next_experiment_short_label_key(kind: str) -> str:
 def next_experiments_sidecar(
     result_facts: dict[str, Any],
     *,
-    total_return: float | None = None,
-    benchmark_return: float | None = None,
+    benchmark_delta: float | None = None,
     max_drawdown: float | None = None,
     recent_user_messages: list[str] | None = None,
     previously_offered_kinds: list[str] | None = None,
@@ -203,19 +206,21 @@ def next_experiments_sidecar(
     already_asked = _kinds_already_asked(recent_user_messages) | set(
         previously_offered_kinds or []
     )
-    delta = (
-        total_return - benchmark_return
-        if total_return is not None and benchmark_return is not None
-        else None
+    # benchmark_delta is the engine's own comparison (delta_vs_benchmark_pct);
+    # the sidecar never subtracts two rounded returns to rebuild it.
+    comparison = benchmark_comparison_from_delta(benchmark_delta)
+    why = _row_reason(
+        comparison=comparison,
+        benchmark_delta=benchmark_delta,
+        max_drawdown=max_drawdown,
     )
-    why = _row_reason(delta=delta, max_drawdown=max_drawdown)
     ordered = _ordered_kinds(
         [
             str(option["kind"])
             for option in options
             if str(option["kind"]) not in already_asked
         ],
-        delta=delta,
+        lost=comparison.claim == "lagged_benchmark",
         max_drawdown=max_drawdown,
     )
     labels = {str(option["kind"]): str(option["label"]) for option in options}
@@ -272,13 +277,12 @@ def _kinds_already_asked(recent_user_messages: list[str] | None) -> set[str]:
 def _ordered_kinds(
     kinds: list[str],
     *,
-    delta: float | None,
+    lost: bool,
     max_drawdown: float | None,
 ) -> list[str]:
     """Result-aware order: a losing or high-drawdown run leads with
     refinement, a winning run leads with exploration; ties keep the
     family's own order."""
-    lost = delta is not None and delta < 0
     deep_drawdown = (
         max_drawdown is not None and max_drawdown <= _DEEP_DRAWDOWN_THRESHOLD_PCT
     )
@@ -295,16 +299,23 @@ def _ordered_kinds(
 
 def _row_reason(
     *,
-    delta: float | None,
+    comparison: BenchmarkComparison,
+    benchmark_delta: float | None,
     max_drawdown: float | None,
 ) -> dict[str, Any] | None:
+    # Params carry engine figures at persisted precision; the client prints
+    # them through the same formatter as the result card.
     if max_drawdown is not None and max_drawdown <= _DEEP_DRAWDOWN_THRESHOLD_PCT:
-        return {"code": "deep_drawdown", "params": {"drawdown": round(max_drawdown, 1)}}
-    if delta is not None and delta < 0:
-        return {"code": "lost_to_benchmark", "params": {"points": round(-delta, 1)}}
-    if delta is not None and delta > 0:
-        return {"code": "beat_benchmark", "params": {"points": round(delta, 1)}}
-    return None
+        return {"code": "deep_drawdown", "params": {"drawdown": max_drawdown}}
+    if benchmark_delta is None or comparison.claim not in {
+        "beat_benchmark",
+        "lagged_benchmark",
+    }:
+        return None
+    code = (
+        "beat_benchmark" if comparison.claim == "beat_benchmark" else "lost_to_benchmark"
+    )
+    return {"code": code, "params": {"points": abs(benchmark_delta)}}
 
 
 def offered_kinds_from_thread_metadata(metadata: dict[str, Any] | None) -> list[str]:

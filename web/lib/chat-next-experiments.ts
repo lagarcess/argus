@@ -8,7 +8,10 @@
  * Rows render only from typed metadata — never inferred from prose.
  */
 
+import type { TFunction } from "i18next";
+
 import type { ChatActionOption } from "@/components/chat/types";
+import { tenthFigure } from "@/lib/result-figures";
 
 export const NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1";
 const MAX_ROWS = 3;
@@ -89,6 +92,26 @@ function rowOrNull(value: unknown): NextExperimentRow | null {
       ? { code: whyCode, params: recordOrNull(why?.params) ?? {} }
       : null,
   };
+}
+
+/**
+ * A reason's numbers are engine facts at persisted precision. They print
+ * through the result card's own figure formatter, so the row beneath a card
+ * never quotes a different gap or drop than the card above it (#533).
+ */
+export function nextExperimentReasonText(
+  why: NextExperimentReason | null,
+  t: TFunction,
+): string {
+  if (!why) return "";
+  const params: Record<string, unknown> = { ...why.params };
+  if (typeof params.points === "number" && Number.isFinite(params.points)) {
+    params.points = tenthFigure(Math.abs(params.points));
+  }
+  if (typeof params.drawdown === "number" && Number.isFinite(params.drawdown)) {
+    params.drawdown = tenthFigure(params.drawdown);
+  }
+  return t(`chat.next_experiments.why.${why.code}`, { defaultValue: "", ...params });
 }
 
 export function nextExperimentRowsFromMetadata(

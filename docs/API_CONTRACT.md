@@ -1018,8 +1018,14 @@ source of truth. Legacy `saved_strategy_id` metadata remains readable after
 reload, but clients must not use it to expose a new write action.
 
 Result Quick Take, result breakdown, and dossier outcome prose render from the
-same typed run facts in the current workspace language. Original LLM result
-prose remains immutable audit/model context, not a presentation fallback.
+same typed run facts in the current workspace language. The figures those
+surfaces share with the result card (returns, the benchmark gap, worst drop)
+print through one client formatter at one decimal, mirroring the backend's own
+fixed-point formatting, and the benchmark gap is always the engine's
+`delta_vs_benchmark_pct`. No reader subtracts two rounded returns or rounds the
+gap a second time, so the card and the prose beside it cannot show two numbers
+for one fact. Original LLM result prose remains immutable audit/model context,
+not a presentation fallback.
 Public result messages carry empty `content`; live result finals carry empty
 `assistant_response`. Public run/card payloads omit stored `quick_take`,
 `breakdown`, `result_readout`, and `audit_context`, including nested copies.
@@ -4090,7 +4096,12 @@ sidecar attached to in-stream results (`version: "argus_next_experiments/v1"`,
 localized row label, `why` is a typed reason (`code` + `params`, e.g.
 `beat_benchmark` with `points`), and prebaked rows add `detail` (a short
 suffix such as the pre-resolved peer symbol) plus `send_text` (the exact
-localized sentence a tap submits as an ordinary user turn). The frontend
+localized sentence a tap submits as an ordinary user turn). Reason params are
+engine facts at persisted precision: `points` is the magnitude of the run's
+`delta_vs_benchmark_pct` and `drawdown` is its `max_drawdown_pct`; a gap inside
+the in-line cut carries no benchmark reason. The client prints them through
+the result card's own figure formatter, so the reason never quotes a different
+number than the card above it. The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
 

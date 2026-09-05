@@ -18,7 +18,10 @@ import NextMoveRow, {
   NextMoveTicker,
   NextMoveTitle,
 } from "./NextMoveRow";
-import { nextExperimentAction } from "@/lib/chat-next-experiments";
+import {
+  nextExperimentAction,
+  nextExperimentReasonText,
+} from "@/lib/chat-next-experiments";
 import {
   type ChatActionOption,
   type ChatMention,
@@ -728,12 +731,7 @@ export default function ChatMessage({
                         : rowLabel;
                     // One result-level reason; captioning every row repeats it.
                     const whyText =
-                      row.why && rowIndex === 0
-                        ? t(`chat.next_experiments.why.${row.why.code}`, {
-                            defaultValue: "",
-                            ...row.why.params,
-                          })
-                        : "";
+                      rowIndex === 0 ? nextExperimentReasonText(row.why, t) : "";
                     return (
                       <NextMoveRow
                         key={row.kind}
