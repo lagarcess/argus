@@ -7,7 +7,7 @@ assistant phrasing.
 ## Test Tiers
 
 - **Mocked harness - every change (free, no API calls):**
-  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_measurement_eval_dca_semantics.py tests/evals/test_measurement_eval_scorecard.py tests/evals/test_measurement_eval_live_environment.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
+  Run the single [Mocked Run command](#mocked-run) below.
   Validates routing, scorecard provenance, live-environment refusal, state,
   full conversation-step manifests, and the seven session trajectories. This
   is the everyday inner-loop check.
@@ -25,7 +25,7 @@ Run the mocked harness checks with:
 ```bash
 poetry run pytest \
   tests/evals/test_measurement_eval_harness.py \
-    tests/evals/test_measurement_eval_dca_semantics.py \
+  tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
   tests/evals/test_chat_runtime_eval_manifest.py \
