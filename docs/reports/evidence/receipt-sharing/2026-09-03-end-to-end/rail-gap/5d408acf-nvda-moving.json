@@ -1,0 +1,42 @@
+{
+  "sha": "5d408acf",
+  "label": "nvda-moving",
+  "question": "What has been going on with NVDA lately and why is the stock moving?",
+  "route_receipt_tasks_in_log": [
+    "interpretation_repair",
+    "interpretation",
+    "knowledge_voicing",
+    "name_suggestion"
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content_head": "What has been going on with NVDA lately and why is the stock moving?",
+      "content_chars": 68,
+      "urls_in_prose": [],
+      "metadata_keys": [
+        "agent_runtime_turn"
+      ]
+    },
+    {
+      "role": "assistant",
+      "content_head": "NVIDIA shares fell **4.3 %** today after news that the company paused parts of a financing program for smaller cloud firms.\n\n- **$96.2 billion** revenue in the latest quarter, more than double last year’s figure.\n- **$2.22** adjusted earnings per share, up 120 % from a year ago.\n- The stock had alre",
+      "content_chars": 752,
+      "urls_in_prose": [
+        "https://www.investing.com/news/stock-market-news/why-is-nvidia-stock-sliding-today-93CH-4881741",
+        "https://www.cnbc.com/2026/08/17/nvidias-stock-has-started-to-come-alive-heres-3-reasons-why-it-can-continue-.html",
+        "https://www.marketbeat.com/stocks/NASDAQ/NVDA/news/"
+      ],
+      "metadata_keys": [
+        "agent_runtime_stage_outcome",
+        "agent_runtime_turn",
+        "conversation_mode",
+        "next_experiments"
+      ],
+      "next_experiments_kinds": [
+        "compare_buy_and_hold",
+        "recurring_monthly_buys"
+      ]
+    }
+  ]
+}

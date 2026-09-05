@@ -1,0 +1,42 @@
+{
+  "sha": "5761dd41",
+  "label": "aapl-moving",
+  "question": "Why is Apple stock moving this week?",
+  "route_receipt_tasks_in_log": [
+    "interpretation_repair",
+    "interpretation",
+    "knowledge_voicing",
+    "name_suggestion"
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content_head": "Why is Apple stock moving this week?",
+      "content_chars": 36,
+      "urls_in_prose": [],
+      "metadata_keys": [
+        "agent_runtime_turn"
+      ]
+    },
+    {
+      "role": "assistant",
+      "content_head": "Apple stock is moving this week because investors are reacting to a mix of new product plans and regulatory news, with the biggest single-day gain reaching **3.1 percent** on one report.\n\n- Morgan Stanley raised its price target to **$360**, citing Apple’s hardware pricing power and AI plans.\n- Appl",
+      "content_chars": 1065,
+      "urls_in_prose": [
+        "https://www.marketbeat.com/stocks/NASDAQ/AAPL/news/",
+        "https://www.investing.com/news/stock-market-news/why-is-apple-stock-surging-to-an-alltime-high-today-93CH-4793699",
+        "https://finance.yahoo.com/markets/stocks/articles/why-apple-aapl-stock-trading-231624171.html"
+      ],
+      "metadata_keys": [
+        "agent_runtime_stage_outcome",
+        "agent_runtime_turn",
+        "conversation_mode",
+        "next_experiments"
+      ],
+      "next_experiments_kinds": [
+        "compare_buy_and_hold",
+        "recurring_monthly_buys"
+      ]
+    }
+  ]
+}

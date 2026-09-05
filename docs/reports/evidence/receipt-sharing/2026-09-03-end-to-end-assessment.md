@@ -102,19 +102,22 @@ pinned by `tests/test_public_excerpt_api.py` holds on the deployed build.
 
 ## Findings that are not defects of the sharing lane
 
-1. **A grounded answer can persist with untyped sources.** The question "What
-   has been going on with NVDA lately and why is the stock moving?" produced an
-   answer with today's move, quarter figures and three publisher URLs written
-   into the prose, and no `research` sidecar. The log shows the rail fell
-   through to the pre-rail search-packet answerer
+1. **A grounded answer can persist with untyped sources.** At `5d408acf`, the
+   question "What has been going on with NVDA lately and why is the stock
+   moving?" produced an answer with today's move, quarter figures and three
+   publisher URLs written into the prose, and no `research` sidecar. The log
+   shows the rail fell through to the pre-rail search-packet answerer
    (`knowledge_answer._external_facts_answer`, voiced by the `knowledge_voicing`
    task), which appends the packet's URLs to the prose and persists no typed
-   sources. A second question phrased around a specific earnings report took
-   the rail proper and persisted the full sidecar (`sources` with dates,
-   `retrieved_at`, `anchor_symbols`, `follow_up`, `usage`). Frame 14 shows the
-   first shape. Any sharing rule keyed on typed sources will correctly refuse
-   the first shape and will therefore miss the most common research question
-   until that path persists a sidecar. That belongs to the rail lane.
+   sources. A second question at the same head, phrased around a specific
+   earnings report, took the rail proper and persisted the full sidecar
+   (`sources` with dates, `retrieved_at`, `anchor_symbols`, `follow_up`,
+   `usage`). Frame 14 shows the first shape. Both transcripts, labelled with
+   their SHA, and the re-verification on `5761dd41` after #544 touched this
+   path, are in [`rail-gap.md`](./2026-09-03-end-to-end/rail-gap.md). Any
+   sharing rule keyed on typed sources will correctly refuse the first shape
+   and will therefore miss the most common research question until that path
+   persists a sidecar. That belongs to the rail lane.
 2. **The call to action is not labelled "Try Argus".** The spec and the
    funnel stage say Try Argus; the page says "Test your own idea" and
    "Prueba tu propia idea". Copy drift only.
