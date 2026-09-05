@@ -306,7 +306,7 @@ def scorecard_for_results(
 ) -> dict[str, Any]:
     provenance_payload = validated_provenance_payload(provenance)
     _assert_complete_live_result_set(results, provenance=provenance)
-    by_category: dict[str, dict[str, int | float]] = {}
+    by_category: dict[str, dict[str, int | float | None]] = {}
     for result in results:
         category = str(result["category"])
         bucket = by_category.setdefault(
@@ -317,6 +317,7 @@ def scorecard_for_results(
                 "expected_failed": 0,
                 "unexpected_pass": 0,
                 "skipped": 0,
+                "infrastructure_error": 0,
                 "pass_rate": 0.0,
             },
         )
@@ -331,7 +332,7 @@ def scorecard_for_results(
             for status in ("passed", "failed", "expected_failed", "unexpected_pass")
         )
         bucket["pass_rate"] = (
-            0.0 if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
+            None if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
         )
 
     return {
@@ -348,6 +349,7 @@ def scorecard_for_results(
                 "expected_failed",
                 "unexpected_pass",
                 "skipped",
+                "infrastructure_error",
             )
         },
         "results": results,
