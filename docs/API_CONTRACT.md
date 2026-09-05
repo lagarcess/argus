@@ -1030,6 +1030,14 @@ on read. Old incomplete message facts can be repaired from the owner-scoped
 canonical run in a bounded batch, without rewriting history. Unavailable facts
 produce localized unavailable text, not translated or regenerated source prose.
 
+Public assistant message metadata and live chat finals carry
+`artifact_presentation_kind`: `result`, `breakdown`, `assumptions`,
+`confirmation`, or `null` for an ordinary answer. The API reader computes this
+from the canonical artifact classifier on every read, including legacy rows;
+it is not a second persisted fact. History hydration uses this field for the
+result readout fallback. A `result_fact_bank` by itself does not authorize a
+client to replace voiced text: factual follow-ups can carry the bank as context.
+
 ## Legacy Strategy Record
 
 A retired saved-executable-idea record retained for owner-scoped historical

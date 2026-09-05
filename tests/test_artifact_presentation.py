@@ -67,6 +67,7 @@ def test_reader_never_exposes_private_prose_or_changes_storage(kind: str) -> Non
     assert public["result_fact_bank"]["metrics"] == fact_bank["metrics"]
     assert public["content"] == ""
     assert public["assistant_response"] == ""
+    assert public["artifact_presentation_kind"] == kind
     assert payload == original
 
 
@@ -79,7 +80,7 @@ def test_ordinary_text_does_not_become_an_artifact(intent_kind, faker) -> None:
         "response_intent": {"kind": intent_kind},
         "result_fact_bank": {"symbols": ["AAPL"]},
     }
-    assert reader_payload(payload) == payload
+    assert reader_payload(payload) == {**payload, "artifact_presentation_kind": None}
 
 
 def test_bare_legacy_fact_bank_still_hides_saved_result_prose(faker) -> None:
@@ -89,7 +90,23 @@ def test_bare_legacy_fact_bank_still_hides_saved_result_prose(faker) -> None:
     }
     public = reader_payload(payload)
     assert public["content"] == ""
+    assert public["artifact_presentation_kind"] == "result"
     assert public["result_fact_bank"] == payload["result_fact_bank"]
+
+
+def test_reader_recomputes_stale_presentation_metadata_without_mutating_storage(faker):
+    payload = {
+        "content": faker.sentence(),
+        "artifact_presentation_kind": "result",
+        "response_intent": {"kind": "beginner_guidance"},
+        "result_fact_bank": {"symbols": ["AAPL"]},
+    }
+    original = deepcopy(payload)
+    public = reader_payload(payload)
+    assert public["artifact_presentation_kind"] is None
+    assert public["content"] == payload["content"]
+    assert reader_payload(public) == public
+    assert payload == original
 
 
 @pytest.mark.asyncio
@@ -134,6 +151,7 @@ async def test_factual_followup_survives_live_and_persisted_readers(
 
     live = reader_chat_result(result.patch, result.patch)
     assert live["assistant_response"] == answer
+    assert live["artifact_presentation_kind"] is None
 
     message = Message(
         id=faker.uuid4(),
@@ -150,6 +168,7 @@ async def test_factual_followup_survives_live_and_persisted_readers(
     original = message.model_dump()
     hydrated = _public_message_projection([message])[0]
     assert hydrated.content == answer
+    assert hydrated.metadata["artifact_presentation_kind"] is None
     preview = project_conversation_preview(hydrated.model_dump())
     assert preview.kind == "text"
     assert preview.text == answer

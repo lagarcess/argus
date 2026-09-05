@@ -289,7 +289,6 @@ export function hydrateMessagesFromApi(
     .filter((message) => !hiddenMessageIds.has(message.id))
     .map((message) => {
       const metadata = message.metadata ?? {};
-      const responseIntentKind = recordOrNull(metadata.response_intent)?.kind;
       const chatAction = metadata.chat_action as ChatActionOption | undefined;
       const confirmation = metadata.confirmation_card as
         | StrategyConfirmationPayload
@@ -367,10 +366,7 @@ export function hydrateMessagesFromApi(
       }
       if (
         message.role !== "user" &&
-        recordOrNull(metadata.result_fact_bank) &&
-        (responseIntentKind == null || responseIntentKind === "result") &&
-        !isBreakdownActionMetadata(metadata) &&
-        chatAction?.type !== "save_strategy"
+        metadata.artifact_presentation_kind === "result"
       ) {
         return {
           id: message.id,

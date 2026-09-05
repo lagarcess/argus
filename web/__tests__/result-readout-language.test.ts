@@ -167,6 +167,7 @@ describe("persisted result presentation (#531)", () => {
       id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), role: "assistant",
       content: answer, created_at: new Date().toISOString(),
       metadata: {
+        artifact_presentation_kind: null,
         conversation_mode: "guide", result_run_id: crypto.randomUUID(), result_fact_bank: bank,
         response_intent: {
           kind: "beginner_guidance",
@@ -179,16 +180,27 @@ describe("persisted result presentation (#531)", () => {
     expect(message.resultReadoutFacts).toBeUndefined();
   });
 
-  test.each([undefined, { kind: "result" }])("a legacy result without card chrome still renders its repaired typed facts (%j)", (intent) => {
+  test("a legacy result without card chrome renders the backend-classified typed facts", () => {
     const message = hydrateMessagesFromApi([{
       id: "result-no-card", conversation_id: "conversation-language", role: "assistant",
       content: originalProse, created_at: "2025-12-31T17:00:00Z",
-      metadata: { result_fact_bank: bank, response_intent: intent },
+      metadata: { result_fact_bank: bank, artifact_presentation_kind: "result" },
     }]).messages[0];
     expect(message.contentPresentation).toBe("result_readout");
     expect(message.resultReadoutFacts).toEqual(resultReadoutFacts(bank));
     expect(message.content).toBeUndefined();
     expect(messageStreamPresentation([message], message, 0, false, false).isWorkingMessage).toBe(false);
+  });
+
+  test.each([null, undefined, "result"] as const)("uses the public presentation kind (%j), not an independent intent classifier", (kind) => {
+    const answer = "A voiced fact from the run.";
+    const message = hydrateMessagesFromApi([{
+      id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), role: "assistant",
+      content: answer, created_at: new Date().toISOString(),
+      metadata: { result_fact_bank: bank, artifact_presentation_kind: kind },
+    }]).messages[0];
+    expect(message.contentPresentation).toBe(kind === "result" ? "result_readout" : undefined);
+    expect(message.content).toBe(kind === "result" ? undefined : answer);
   });
 
   test("live run and historical message carry the same language-neutral facts", async () => {
@@ -214,7 +226,7 @@ describe("persisted result presentation (#531)", () => {
     const message = hydrateMessagesFromApi([{
       id: "missing-run", conversation_id: "conversation-language", role: "assistant",
       content: "", created_at: "2025-12-31T17:00:00Z",
-      metadata: { conversation_mode: "result_review", result_run_id: "lost-run", result_fact_bank: {} },
+      metadata: { conversation_mode: "result_review", result_run_id: "lost-run", result_fact_bank: {}, artifact_presentation_kind: "result" },
     }]).messages[0];
     const t = await translator("es-419");
     expect(message.contentPresentation).toBe("result_readout");
