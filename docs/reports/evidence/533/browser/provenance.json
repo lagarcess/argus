@@ -1,6 +1,6 @@
 {
   "issue": 533,
-  "captured_at": "2026-09-05",
+  "captured_at": "2026-09-05 (before) and 2026-09-05 review round (after, re-captured)",
   "browser": "headless Playwright Chromium (web/node_modules/@playwright/test), viewport 1200x1500 at 2x",
   "before": {
     "sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
@@ -26,9 +26,9 @@
     }
   },
   "after": {
-    "sha": "4288c5f588cdacc845826afe2c0d84051be0a767",
-    "subject": "fix(result): one owner for the benchmark gap the card and its prose print",
-    "source_tree_kind": "lane worktree at the exact fix commit, served with next dev",
+    "sha": "707f152424ad3603b3d74dc5c53bd3c185b0dbeb",
+    "subject": "fix(result): backend rounds display figures once; clients print them in the workspace locale",
+    "source_tree_kind": "lane worktree at the exact review-round fix commit, served with next dev",
     "screenshots": {
       "after-en.png": {
         "sha256": "67e52310f11420109d7e0e1ae912cae928d08c126228a4cbbeb536c44613fa58",
@@ -46,7 +46,8 @@
         "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.",
         "try_next_reason": "Superó la referencia por 315.6 puntos"
       }
-    }
+    },
+    "note": "Re-captured at 707f1524 after the Codex review round. The screenshots are byte-identical to the earlier capture at 4288c5f5 (same digests) because the visible output did not change; after-*-visible-text.txt and after-summary.json were rewritten by this run. The one-decimal figures now come from the reader boundary, derived from the recorded bank's own metrics: the replay seeds no run, so the read-time derivation is what rendered these numbers."
   },
   "recorded_result_source": "docs/reports/evidence/411/browser/en-discovery-messages.json",
   "recorded_result_source_sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
@@ -68,7 +69,12 @@
     "wait for the Quick take label, then save the main pane's visible text and a full-page screenshot",
     "repeat for the other language in a fresh browser context"
   ],
-  "console_errors": {"before-en": 0, "before-es-419": 0, "after-en": 0, "after-es-419": 0},
+  "console_errors": {
+    "before-en": 0,
+    "before-es-419": 0,
+    "after-en": 0,
+    "after-es-419": 0
+  },
   "provider_calls": 0,
   "credential_files_loaded": false,
   "hosted_database_reads_or_writes": 0,
