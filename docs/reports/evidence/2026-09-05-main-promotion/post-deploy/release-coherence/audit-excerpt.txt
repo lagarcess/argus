@@ -1,0 +1,9 @@
+2026-09-05T20:42:28.5682644Z OK: API health responded
+2026-09-05T20:42:28.5684112Z OK: product readiness responded
+2026-09-05T20:42:28.5686466Z OK: frontend responded
+2026-09-05T20:42:28.5732948Z drift argus-api:autoDeployTrigger expected=checksPass actual=off
+2026-09-05T20:42:28.5733388Z drift argus-app:autoDeployTrigger expected=checksPass actual=off
+2026-09-05T20:42:28.5733854Z drift argus-backtests:autoDeployTrigger expected=checksPass actual=off
+2026-09-05T20:42:28.5756548Z workflow_env_status=ready
+2026-09-05T20:42:28.5756809Z autodeploy_status=drift
+2026-09-05T20:42:28.5757336Z ERROR: canary failed at warmup: warmup_probe_failed

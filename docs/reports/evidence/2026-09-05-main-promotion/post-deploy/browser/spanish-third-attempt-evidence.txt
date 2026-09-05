@@ -1,0 +1,6 @@
+### Result
+{"html_language":"es-419","completed_result_cards":2,"dialog_text":"SIGUE CON ARGUS\n\nEste chat temporal alcanzó el límite de simulaciones de hoy. Se restablece el Sep 5, 2026, 7:00 PM CDT. Crea una cuenta para continuar ahora.\n\nCrea tu cuenta\n\nInicia sesión para ejecutar otra simulación.\n\nMínimo 8 caracteres.\n\nRegistrarse\n\n¿Ya tienes una cuenta? Iniciar sesión\n\nAl registrarte, aceptas nuestros Términos y Política de Privacidad."}
+### Ran Playwright code
+```js
+await (async (page) => ({html_language: await page.locator("html").getAttribute("lang"), completed_result_cards: await page.getByText("Simulación completa", {exact:true}).count(), dialog_text: await page.getByRole("dialog").innerText()}))(page);
+```

@@ -1,0 +1,6 @@
+### Result
+{"completed_result_cards":2,"generic_backtest_failure_visible":0,"dialog_text":"KEEP GOING WITH ARGUS\n\nThis temporary chat has reached today’s simulation limit. It resets on Sep 5, 2026, 7:00 PM CDT. Create an account to continue now.\n\nCreate your account\n\nSign in to run another simulation.\n\nAt least 8 characters.\n\nSign up\n\nAlready have an account? Sign in\n\nBy signing up, you agree to our Terms and Privacy Policy."}
+### Ran Playwright code
+```js
+await (async (page) => ({completed_result_cards: await page.getByText("Simulation Complete", {exact:true}).count(), generic_backtest_failure_visible: await page.getByText("The backtest could not complete", {exact:false}).count(), dialog_text: await page.getByRole("dialog").innerText()}))(page);
+```

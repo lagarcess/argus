@@ -1,0 +1,121 @@
+### Page
+- Page URL: https://arguschat.ai/chat?conversation=qa_conversation_1873c7dbe34c
+- Page Title: META Buy and Hold Backtest vs · Argus
+- Console: 6 errors, 12 warnings
+### Snapshot
+```yaml
+- generic [ref=e766]:
+  - button "Copy Plain Text" [ref=e767] [cursor=pointer]
+  - generic [ref=e772]:
+    - generic [ref=e773]:
+      - heading "Netflix mainly makes money by charging recurring monthly subscription fees." [level=2] [ref=e774]
+      - paragraph [ref=e775]:
+        - text: Members pay for access to its films, series, games and live programming. Netflix also sells advertising on its lower-priced ad-supported plan. Consumer products, live experiences and other activities contribute some revenue, but remain small relative to subscriptions.
+        - emphasis [ref=e776]: (Netflix 2025 Form 10-K; Netflix Plans and Pricing page)
+      - table [ref=e777]:
+        - rowgroup [ref=e778]:
+          - row [ref=e779]:
+            - columnheader "Revenue source" [ref=e780]
+            - columnheader "How it works" [ref=e781]
+            - columnheader "Relative importance" [ref=e782]
+        - rowgroup [ref=e783]:
+          - row [ref=e784]:
+            - cell [ref=e785]:
+              - strong [ref=e786]: Subscriptions
+            - cell "Members choose a monthly plan. Prices vary by country and features such as ads, video quality, simultaneous devices and downloads. Netflix can also charge for “extra member” accounts outside the main household." [ref=e787]
+            - cell [ref=e788]:
+              - strong [ref=e789]: The core business.
+              - text: Netflix says monthly membership fees are its primary revenue source.
+          - row [ref=e790]:
+            - cell [ref=e791]:
+              - strong [ref=e792]: Advertising
+            - cell "Subscribers to the lower-priced ad-supported plan see ads; advertisers pay Netflix to reach those viewers. Netflix sells targeting, programmatic purchasing and campaign-measurement capabilities to brands." [ref=e793]
+            - cell "Growing quickly, but still much smaller than subscriptions." [ref=e794]
+          - row [ref=e795]:
+            - cell [ref=e796]:
+              - strong [ref=e797]: Consumer products, live experiences and other sources
+            - cell "These include activities beyond the streaming membership itself." [ref=e798]
+            - cell [ref=e799]:
+              - text: Collectively
+              - strong [ref=e800]: not material
+              - text: in 2025, according to Netflix.
+          - row [ref=e801]:
+            - cell [ref=e802]:
+              - strong [ref=e803]: Games
+            - cell "Games are included with eligible Netflix plans rather than generally sold as a separate subscription." [ref=e804]
+            - cell "Primarily intended to increase the value and attractiveness of membership, not disclosed as a separate material revenue stream." [ref=e805]
+      - heading "What customers currently pay" [level=3] [ref=e806]
+      - paragraph [ref=e807]:
+        - text: As of
+        - strong [ref=e808]: September 5, 2026
+        - text: ", Netflix’s published U.S. prices are:"
+      - list [ref=e809]:
+        - listitem [ref=e810]:
+          - text: "Standard with ads:"
+          - strong [ref=e811]: $8.99 per month
+        - listitem [ref=e812]:
+          - text: "Standard:"
+          - strong [ref=e813]: $19.99 per month
+        - listitem [ref=e814]:
+          - text: "Premium:"
+          - strong [ref=e815]: $26.99 per month
+        - listitem [ref=e816]:
+          - text: "Extra member:"
+          - strong [ref=e817]: $7.99 per month with ads
+          - text: or
+          - strong [ref=e818]: $9.99 without ads
+      - paragraph [ref=e819]:
+        - text: Prices and plan availability differ by country.
+        - emphasis [ref=e820]: (Netflix Plans and Pricing page)
+      - heading "How that turns into profit" [level=3] [ref=e821]
+      - paragraph [ref=e822]:
+        - text: Netflix uses subscription and advertising revenue to fund content acquisition and production, technology, marketing, personnel and other operating costs. Its economic objective is to attract and retain enough paying members, and earn enough advertising revenue, so that total revenue exceeds these costs. Management said in its Q2 2026 earnings discussion that subscription growth was being driven by memberships and pricing, while higher advertising revenue provided an additional growth source. It also said content expense was expected to grow more slowly than revenue in 2026.
+        - emphasis [ref=e823]: (Netflix Q2 2026 earnings materials and interview)
+      - paragraph [ref=e824]:
+        - text: The latest reported results available as of
+        - strong [ref=e825]: September 5, 2026
+        - text: "were:"
+      - table [ref=e826]:
+        - rowgroup [ref=e827]:
+          - row [ref=e828]:
+            - columnheader "Reported period" [ref=e829]
+            - columnheader "Revenue" [ref=e830]
+            - columnheader "Operating profit" [ref=e831]
+            - columnheader "Net income" [ref=e832]
+        - rowgroup [ref=e833]:
+          - row [ref=e834]:
+            - cell "Q2 2026, ended June 30" [ref=e835]
+            - cell [ref=e836]:
+              - strong [ref=e837]: $12.559938 billion
+            - cell [ref=e838]:
+              - strong [ref=e839]: $4.192610 billion
+            - cell [ref=e840]:
+              - strong [ref=e841]: $3.401414 billion
+          - row [ref=e842]:
+            - cell "Full-year 2025" [ref=e843]
+            - cell [ref=e844]:
+              - strong [ref=e845]: $45.183036 billion
+            - cell [ref=e846]:
+              - strong [ref=e847]: $13.326603 billion
+            - cell [ref=e848]:
+              - strong [ref=e849]: $10.981201 billion
+      - paragraph [ref=e850]:
+        - text: Netflix does not provide a complete current revenue split between subscriptions and advertising. For 2025, it disclosed that advertising revenue exceeded
+        - strong [ref=e851]: $1.5 billion
+        - text: ", while its Form 10-K stated that all non-membership sources combined were not material. Consequently, subscriptions still accounted for the overwhelming majority of the business."
+      - paragraph [ref=e852]:
+        - strong [ref=e853]: "In plain English:"
+        - text: Netflix pays heavily to assemble entertainment people want, then monetizes that audience chiefly through monthly fees and increasingly through ads. More members, higher prices and better advertising monetization can raise revenue; content, marketing and technology spending determine how much is left as profit.
+    - button "5 sources ›" [ref=e855] [cursor=pointer]
+    - region "Try next" [ref=e856]:
+      - button "Test Netflix (NFLX) over the last 3 years" [ref=e859] [cursor=pointer]:
+        - generic [aria-hidden] [ref=e860]: ↳
+        - generic [ref=e862]:
+          - text: Test Netflix
+          - generic [ref=e863]: NFLX
+          - text: over the last 3 years
+    - generic [ref=e866]:
+      - button "Good response" [ref=e867] [cursor=pointer]
+      - button "Poor response" [ref=e870] [cursor=pointer]
+      - button "More Actions" [ref=e873] [cursor=pointer]
+```

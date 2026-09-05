@@ -1,0 +1,7 @@
+service=argus-api
+deploy_id=dep-dae7d8v40ujc73e4cev0
+status=live
+commit=ee9c3491fa6219502f1e94abc5d9e661a06839d9
+commit_short=ee9c349
+created_at=2026-09-05T20:08:03.566687Z
+finished_at=2026-09-05T20:09:40.296661Z
