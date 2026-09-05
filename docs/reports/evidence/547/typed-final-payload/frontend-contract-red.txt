@@ -1,0 +1,2 @@
+web/__tests__/guest-conversion-recovery.test.ts(27,16): error TS2353: Object literal may only specify known properties, and 'final_response_payload' does not exist in type 'ChatFinalPayload'.
+web/__tests__/guest-conversion-recovery.test.ts(32,16): error TS2353: Object literal may only specify known properties, and 'final_response_payload' does not exist in type 'ChatFinalPayload'.

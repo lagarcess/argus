@@ -27,6 +27,7 @@ from argus.domain.backtest_finalization import (
     FinalizedBacktest,
     PreparedBacktestFinalization,
 )
+from argus.domain.backtest_job_scopes import RESEARCH_OPERATION_SCOPE
 from argus.domain.chat_turn_lifecycle_gateway import (
     ChatTurnLifecycleGatewayMixin,
 )
@@ -1156,7 +1157,7 @@ class SupabaseGateway(
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .eq("operation_scope", "chat.research")
+            .eq("operation_scope", RESEARCH_OPERATION_SCOPE)
             .in_("status", ["queued", "running"])
             .execute()
         )
@@ -1179,6 +1180,11 @@ class SupabaseGateway(
         from argus.domain import backtest_admission_gateway as jobs
 
         return jobs.list_backtest_job_reservations(self.client, **kwargs)
+
+    def record_backtest_job_rejection(self, **kwargs: Any) -> dict[str, Any]:
+        from argus.domain import backtest_admission_gateway as jobs
+
+        return jobs.record_backtest_job_rejection(self.client, **kwargs)
 
     def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
         from argus.domain import backtest_admission_gateway as jobs
@@ -1772,6 +1778,15 @@ class SupabaseGateway(
             cursor_id=cursor_id,
             cursor_pinned=cursor_pinned,
             cursor_type_rank=cursor_type_rank,
+        )
+
+    def read_conversation_preview_messages(
+        self, *, user_id: str, conversation_ids: list[str]
+    ) -> list[dict[str, Any]]:
+        if self.keyset_reader is None:
+            raise RuntimeError("Persistent previews require the Postgres reader.")
+        return self.keyset_reader.read_conversation_preview_messages(
+            user_id=user_id, conversation_ids=conversation_ids
         )
 
     def search_rows(

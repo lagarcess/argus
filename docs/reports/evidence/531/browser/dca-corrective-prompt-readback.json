@@ -1,0 +1,12 @@
+{
+  "captured_at": "2026-09-05T02:23:11.915445+00:00",
+  "candidate_sha": "79c8d78eee3af878b9cc52247bb1da28e7dc90a5",
+  "intended_prompt": "Test investing $500 into AAPL every month from 2024-01-02 through 2024-12-31, starting with $0. Use 0.10% fees and 0.05% slippage, benchmark SPY.",
+  "browser_readback": "Test investing $500 into AAPL every month from 2024-01-02 through 2024-12-31, starting with $0. Use 0.10% fees and 0.05% slippage, benchmark SPY.",
+  "byte_for_byte_equal": true,
+  "driver": "subprocess argv; shell=False; browser contenteditable text assertion",
+  "screenshot": "dca-corrective-prompt-unsent.png",
+  "screenshot_sha256": "eb75cfd797322ffb22b533f64224623d1379eb7f9e0f4fc010af235bdf568737",
+  "submitted": false,
+  "run_clicked": false
+}

@@ -1,0 +1,14 @@
+{
+  "gate": "tests.release_promotion_evidence_support.assert_main_promotion_baseline_comparison",
+  "manifest": "docs/release-manifests/2026-09-05-main-production-promotion.md",
+  "candidate_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+  "baseline_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "before": "pass",
+  "full_manifest_suite": "24 passed after the founder-authorized #549 status vocabulary correction; see status-validator-restored-tests.log.",
+  "case_removed": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+  "without_case": "fail",
+  "failure": "2026-09-05-main-production-promotion.md: asset_discovery_spanish_generated_pharma_escalation_issue_344 passes on the deployed build and fails on the candidate. Name it in the manifest with its disposition, or do not promote.",
+  "restored": "pass",
+  "restored_bytes_match": true,
+  "manifest_sha256": "513244f73b60b70ef65df05d0365baa170eb064e9b0a1adf9f9003d33583089f"
+}

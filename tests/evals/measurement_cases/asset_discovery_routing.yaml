@@ -222,6 +222,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["CRWD"]
@@ -268,6 +270,8 @@ cases:
               start: "2024-01-01"
               end: "2024-12-31"
     expected:
+      offered:
+        min_next_experiment_rows: 1
       # Intent label is model-shape; the act boundary keeps the ordinary
       # post-result "what next" turn out of the discovery route.
       intent: ["conversation_followup", "results_explanation"]
@@ -280,6 +284,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
       # Intent label is model-shape; asking what Argus supports stays an
       # educational turn instead of invoking the discovery route.
       intent: ["conversation_followup", "beginner_guidance"]

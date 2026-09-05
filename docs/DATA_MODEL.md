@@ -447,6 +447,14 @@ Represents an isolated chat thread. Each conversation represents a single invest
 - Conversations use **soft delete** behavior.
 - AI-generated titles should be created once sufficient context is established.
 - `language` can be stored at the thread level for continuity, but the user profile remains the primary source.
+- `last_message_preview` remains a private compatibility/search projection of
+  the immutable message. Reader previews derive from the latest owner-scoped
+  message metadata at read time, in a single bounded batch for the returned
+  page. No new column, per-language copy, backfill, or model call is required.
+  This also repairs existing English-authored artifact previews after a
+  workspace language change. Ordinary user/conversation text stays verbatim;
+  artifact previews contain only kind, symbols and strategy keys and render
+  through the frontend language bundle.
 ---
 
 # 8. messages
@@ -523,6 +531,27 @@ Represents individual messages within a conversation.
   immutable `metadata.agent_runtime_turn.turn_id`, `request_id`, `terminal`, and
   terminal `status`. These values match its `chat_turn_lifecycles` row and make
   terminal evidence discoverable if the lifecycle CAS does not complete.
+- Assumptions answers persist `metadata.response_intent.kind =
+  artifact_assumptions`, with `facts.artifact_kind`, `facts.asset_class`, and
+  `facts.display_facts`. The confirmation fact projector owns the values for
+  both the card and its answer; zero costs and the separate starting-capital
+  and recurring-contribution roles remain explicit numbers. These are ordinary
+  completed assistant messages even when `content` is empty. Reader language
+  and copy come from the typed facts, without another model call or a stored
+  per-language variant. Existing original prose stays immutable private
+  audit/model context and is never a fallback for a typed assumptions answer.
+  Old confirmation payloads can supply missing facts on read. Older freeform
+  assumptions messages without a typed assumptions discriminator cannot be
+  safely identified and keep ordinary transcript behavior; no prose classifier
+  or destructive historical rewrite is permitted.
+- Original result `content`, card `quick_take`/`breakdown`, and job
+  `result_readout` remain immutable private audit/model context. Public reader
+  projections omit them and voice only typed facts from the canonical run.
+  Existing `result_fact_bank` is a read projection, not a second metrics owner;
+  missing historical transport facts are repaired on read using owner and
+  conversation scoped run identity. No language-specific rows or backfill are
+  needed. Failed evidence lookup yields localized unavailable text, never
+  saved-prose fallback. Python and TypeScript AST guards pin private readers.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
   `result_card`, result identifiers, `chat_action`, `failed_action`,
@@ -1445,14 +1474,17 @@ canonical immutable `backtest_runs` row and reference it through
 ### Fields
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
-- `conversation_id`: `uuid` (Nullable only for direct `backtests.run` admission;
-  otherwise references `conversations.id`)
+- `conversation_id`: `uuid` (Null for direct `backtests.run` admission and for
+  every `workflows.proof` row; otherwise references `conversations.id`)
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
 - `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
   `backtests.run`; references the retained immutable confirmation `messages.id`)
-- `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`, or
-  `chat.research`)
-- `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
+- `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`,
+  `chat.research`, or `workflows.proof`)
+- `idempotency_key`: `text` (Required for every current writer. Accepted jobs
+  use the caller's 1-128 visible ASCII reservation key; terminal pre-start
+  receipts use a distinct derived `rejection:<hash>` key. Legacy rows may be
+  null.)
 - `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
   operation's canonical identity object)
 - `payload_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
@@ -1476,10 +1508,17 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
-- **operation_scope**: `chat.run_backtest`, `backtests.run`, `chat.research`
-  (thorough research runs ride this same lifecycle; a succeeded research job
-  keeps `result_run_id` null and references its answer message through
-  `execution_metadata.research_result_message_id`)
+- **operation_scope**: `chat.run_backtest`, `backtests.run`, `chat.research`,
+  `workflows.proof` (thorough research runs ride this same lifecycle; a
+  succeeded research job keeps `result_run_id` null and references its answer
+  message through `execution_metadata.research_result_message_id`. A
+  `workflows.proof` row is the Render workflow runtime proof seeded by
+  `workflows/proof.py` for the canary: it is not conversation work, carries no
+  conversation, no request or confirmation message, and no run, and is never
+  admitted through the API. Because every conversation activity reader joins
+  jobs to a conversation, a proof row cannot project as activity; before this
+  scope existed the seeder inherited the `chat.run_backtest` column default
+  and each proof projected a conversation as `checking` forever.)
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
 - A new `chat.run_backtest` row starts `queued` with `queued_at` set and
@@ -1488,13 +1527,21 @@ canonical immutable `backtest_runs` row and reference it through
   for the job record's lifetime. A new `backtests.run` row starts `running` with
   `queued_at` and `confirmation_message_id` null and `started_at` set to the
   admission transaction timestamp.
+- A refused chat attempt is inserted directly as `failed`, with
+  a distinct `rejection:<hash>` idempotency key, `started_at` null, and
+  `finished_at` set. Its
+  `identity_hash`, `payload_hash`, and `launch_payload` describe the attempted
+  run; `execution_metadata` records the rejected key and admission decision.
+  It never owns the rejected confirmation's reservation, consumes allowance,
+  or occupies capacity.
 
 ### Failure Semantics
 Job lifecycle status is separate from engine/runtime failure semantics.
 
 - `status` answers where the job is in its lifecycle.
 - `failure_code` is a stable machine code such as `market_data_unavailable`,
-  `invalid_date_range`, `unsupported_indicator`, or `workflow_timeout`.
+  `invalid_date_range`, `unsupported_indicator`, `workflow_timeout`, or
+  `idempotency_conflict`.
 - `failure_detail` is a user-safe grouping such as `market_data_issue`,
   `invalid_date_window`, `unsupported_rule`, or `execution_failed`.
 - `retryable` is computed from the failure category, failure code, attempts, and
@@ -1537,12 +1584,19 @@ outcome.
 - Jobs are idempotent at
   `UNIQUE(user_id, operation_scope, idempotency_key)`. Exact retries return the
   current row before capacity/usage checks; a different `identity_hash` is a
-  collision and never returns the old row.
+  collision and never returns the old row. All current jobs and pre-start
+  failure receipts participate in this boundary; the SQL partial predicate
+  excludes only legacy rows whose key is null.
 - The reservation lasts for the durable job record's lifetime. A caller does
   not reuse the same key for a new execution after an elapsed retention window.
 - Chat Run actions use `confirmation_id` as `idempotency_key`. Direct jobs may
   omit `conversation_id` so the existing direct request shape remains
   compatible, but they remain owner-scoped by `user_id`.
+- Before a newly appended confirmation card is published, the server reads
+  this reservation owner. A proposed `confirmation_id` that already owns a job
+  is replaced across the payload, card, and artifact reference. The durable
+  reservation is therefore the single owner of whether a confirmation identity
+  is spent.
 - `confirmation_message_id` is required for `chat.run_backtest` and the linked
   immutable confirmation artifact is retained for the job record's lifetime;
   direct `backtests.run` jobs keep this field null.
@@ -1640,13 +1694,13 @@ Tracks resource consumption for quotas and limits.
 
 ## 14.1 visitor_usage_counters
 
-Tracks discovery allowances for callers who do not have a durable account.
-This is intentionally separate from `usage_counters`, whose `user_id` is a
-foreign key to `profiles.id`.
+Tracks visitor-scoped and shared provider allowances without inventing a
+profile owner. This is intentionally separate from `usage_counters`, whose
+`user_id` is a foreign key to `profiles.id`.
 
 ### Fields
 - `visitor_key`: `text` (opaque keyed digest; never a raw address)
-- `resource`: `text` (`discovery_searches`)
+- `resource`: `text` (`discovery_searches`, `research_searches`)
 - `period`: `text` (`day`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`
@@ -1661,7 +1715,8 @@ foreign key to `profiles.id`.
 - **Window lookup index**:
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
-  execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
+  execute `settle_visitor_usage`, `claim_research_usage`, or
+  `purge_expired_visitor_usage`.
 - Expired rows are disposable operational data, but `period_end` is not a timer
   and nothing in the database acts on it. The row has no owner to cascade from,
   so it is deleted only when a successful non-dry-run of the guest cleanup job
@@ -1680,6 +1735,21 @@ foreign key to `profiles.id`.
 - If counter truth cannot be read, admission currently fails closed into the
   existing `discovery_limit_reached` recovery. Issue #244 retains that
   user-facing truth limitation for follow-up.
+
+### Research policy
+- A guest receives three provider-backed research questions per visitor per
+  UTC day. Renewing the temporary workspace does not reset that allowance.
+- Every signed-in or guest provider attempt also draws on the shared
+  `global:research` daily row. Its ceiling is configured by
+  `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` and defaults to `5000` when blank or
+  invalid.
+- `claim_research_usage` locks the shared row and optional guest row in one
+  transaction, checks both limits, and increments both or neither before
+  provider work starts. This is the concurrency boundary: simultaneous turns
+  from one visitor cannot both consume one remaining slot.
+- Cache hits, ordinary chat turns, unconfigured-provider paths, and persisted
+  thorough-job replays never call the claim. Claim failures degrade to the honest
+  research-capacity response and do not enter the provider path.
 
 ---
 
@@ -1992,7 +2062,9 @@ Generous usage boundaries tracked via the `usage_counters` table.
    - If global capacity is exhausted: return
      `503 backtest_capacity_exceeded` with `Retry-After: 15`.
    - If the same reservation key carries a different identity: return
-     `409 idempotency_conflict` without returning the old job.
+     `409 idempotency_conflict` without returning the old job, and persist a
+     separate failed receipt under a distinct derived `rejection:<hash>` key
+     for the refused chat attempt.
 5. **Execute**: Dispatch workflow execution, or run the admitted direct
    compatibility path synchronously, against the durable job.
 6. **Response**: Return result or job state. Include rate-limit headers only

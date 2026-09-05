@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 from copy import deepcopy
 from decimal import Decimal
 from typing import Any
@@ -19,6 +17,11 @@ from argus.agent_runtime.rule_specs import (
     indicator_threshold_rule,
     opposite_moving_average_crossover_rule,
     strategy_rule,
+)
+from argus.agent_runtime.stages.backtest_execution_results import (
+    async_backtest_job_message,
+    failed_action_reference_patch,
+    failed_async_job_result,
 )
 from argus.agent_runtime.stages.execution_failure_transport import (
     failed_final_response_payload,
@@ -76,12 +79,26 @@ def execute_stage(
         if envelope.get("success"):
             async_job = _async_backtest_job_payload(envelope.get("payload"))
             if async_job is not None:
+                if str(async_job.get("status") or "").lower() in {
+                    "failed",
+                    "canceled",
+                    "expired",
+                }:
+                    return failed_async_job_result(
+                        job=async_job,
+                        payload=payload,
+                        records=records,
+                        language=language,
+                    )
                 return StageResult(
                     outcome="ready_to_respond",
                     stage_patch={
                         "tool_call_records": records,
                         "failure_classification": None,
-                        "assistant_response": _async_backtest_job_message(async_job),
+                        "assistant_response": async_backtest_job_message(
+                            async_job,
+                            language=language,
+                        ),
                         "backtest_job": async_job,
                         "final_response_payload": {"backtest_job": async_job},
                         "artifact_references": [
@@ -112,9 +129,9 @@ def execute_stage(
         capability_context = dict(envelope.get("capability_context") or {})
         conversion_failure_code = public_failure_code(capability_context)
         if _is_capacity_refusal(capability_context):
-            # Capacity refuses before a job exists, so nothing ran and nothing
-            # can be retried in-loop. The user is being asked to wait, which is
-            # a different fact from a failure, and carries its own typed code.
+            # A capacity receipt records the refusal, but no executable job was
+            # admitted. The user is being asked to wait, which is a different
+            # fact from an execution failure and carries its own typed code.
             capacity_prompt = recovery_message(
                 "backtest_capacity_exceeded",
                 retryable=True,
@@ -130,7 +147,7 @@ def execute_stage(
                         "backtest_capacity_exceeded",
                         retryable=True,
                     ),
-                    **_failed_action_reference_patch(
+                    **failed_action_reference_patch(
                         payload=payload,
                         failure_classification=failure_classification,
                         error=capacity_prompt,
@@ -167,7 +184,7 @@ def execute_stage(
                         "final_response_payload": failed_final_response_payload(
                             assistant_prompt, conversion_failure_code
                         ),
-                        **_failed_action_reference_patch(
+                        **failed_action_reference_patch(
                             payload=payload,
                             failure_classification=failure_classification,
                             error=assistant_prompt,
@@ -226,7 +243,7 @@ def execute_stage(
                             "error": recovery_prompt,
                         },
                         **({"recovery": recovery} if recovery is not None else {}),
-                        **_failed_action_reference_patch(
+                        **failed_action_reference_patch(
                             payload=payload,
                             failure_classification=failure_classification,
                             error=recovery_prompt,
@@ -248,7 +265,7 @@ def execute_stage(
                     "final_response_payload": failed_final_response_payload(
                         assistant_prompt, conversion_failure_code
                     ),
-                    **_failed_action_reference_patch(
+                    **failed_action_reference_patch(
                         payload=payload,
                         failure_classification=failure_classification,
                         error=assistant_prompt,
@@ -282,7 +299,7 @@ def execute_stage(
                 "assistant_prompt": recovery_prompt,
                 "final_response_payload": {"error": recovery_prompt},
                 **({"recovery": recovery} if recovery is not None else {}),
-                **_failed_action_reference_patch(
+                **failed_action_reference_patch(
                     payload=payload,
                     failure_classification=last_error_type,
                     error=recovery_prompt,
@@ -302,7 +319,7 @@ def execute_stage(
             "failure_classification": last_error_type,
             "assistant_prompt": assistant_prompt,
             "final_response_payload": {"error": assistant_prompt},
-            **_failed_action_reference_patch(
+            **failed_action_reference_patch(
                 payload=payload,
                 failure_classification=last_error_type,
                 error=assistant_prompt,
@@ -470,53 +487,6 @@ def _async_backtest_job_payload(payload: Any) -> dict[str, Any] | None:
     if not job_id or not conversation_id or not status:
         return None
     return dict(job)
-
-
-def _async_backtest_job_message(job: dict[str, Any]) -> str:
-    status = _as_optional_str(job.get("status")) or "queued"
-    if status == "succeeded":
-        return "The backtest finished. I am loading the result card now."
-    if status in {"failed", "canceled", "expired"}:
-        return "The backtest could not finish. I will show the saved status here."
-    return (
-        "I started the backtest. You can leave this chat and come back; "
-        "I will show the result here as soon as it is ready."
-    )
-
-
-def _failed_action_reference_patch(
-    *,
-    payload: dict[str, Any],
-    failure_classification: str | None,
-    error: str | None,
-    retryable: bool,
-) -> dict[str, Any]:
-    reference = ArtifactReference(
-        artifact_kind="failed_action",
-        artifact_id=_failed_action_id(payload=payload, error=error),
-        artifact_status="failed",
-        metadata={
-            "action_type": "run_backtest",
-            "launch_payload": deepcopy(payload),
-            "failure_classification": failure_classification,
-            "error": error,
-            "user_safe_message": error,
-            "retryable": retryable,
-            "recovery_mode": "reopen_confirmation",
-        },
-    )
-    return {
-        "latest_failed_action_reference": reference.model_dump(mode="python"),
-        "artifact_references": [reference.model_dump(mode="python")],
-    }
-
-
-def _failed_action_id(*, payload: dict[str, Any], error: str | None) -> str:
-    stable_payload = {"payload": payload, "error": error}
-    digest = hashlib.sha256(
-        json.dumps(stable_payload, sort_keys=True, default=str).encode("utf-8")
-    ).hexdigest()[:16]
-    return f"failed-action-{digest}"
 
 
 def _as_optional_str(value: Any) -> str | None:
@@ -1050,12 +1020,6 @@ def _resolve_exit_rule(
     return indicator_threshold_rule(strategy, "exit")
 
 
-
-
-
-
-
-
 def _resolve_cadence(
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
@@ -1192,6 +1156,3 @@ def _resolve_benchmark_symbol(
 
 def _compact_benchmark_symbol(symbol: str) -> str:
     return symbol.strip().upper().replace("/", "").replace("-", "").replace(" ", "")
-
-
-

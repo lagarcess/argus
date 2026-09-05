@@ -196,6 +196,7 @@ async def _runtime_success_events(**kwargs: Any):
     result = _runtime_success_for_message(**kwargs)
     assistant_response = str(result.get("assistant_response") or "")
     yield {"type": "stage_start", "stage": "interpret"}
+    yield {"type": "stage_start", "stage": "explain"}
     yield {"type": "stage_outcome", "outcome": str(result["stage_outcome"])}
     if assistant_response:
         yield {"type": "token", "content": assistant_response}
@@ -517,8 +518,9 @@ def test_memory_direct_admission_persists_guest_traffic_class(
         "source": "api_direct",
         "openrouter_traffic_class": "guest",
     }
-    assert api_state.store.backtest_jobs[job["id"]]["execution_metadata"] == (
-        job["execution_metadata"]
+    assert (
+        api_state.store.backtest_jobs[job["id"]]["execution_metadata"]
+        == (job["execution_metadata"])
     )
 
 
@@ -1010,7 +1012,7 @@ def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
     stream = response.text
     assert '"type":"stage_start","stage":"interpret"' in stream
     assert '"type":"stage_outcome","outcome":"ready_to_respond"' in stream
-    assert '"type":"token"' in stream
+    assert '"type":"token"' not in stream
     assert '"type":"final"' in stream
     assert "data: [DONE]" in stream
 
@@ -1045,13 +1047,15 @@ def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
-    assert '"type":"token"' in response.text
+    assert '"type":"token"' not in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
     assistant_message = messages.json()["items"][-1]
     assert assistant_message["role"] == "assistant"
-    assert "Probé la idea con TSLA." in assistant_message["content"]
+    assert assistant_message["content"] == ""
+    assert assistant_message["metadata"]["result_fact_bank"]["symbols"] == ["TSLA"]
+    assert api_state.store.messages[conversation["id"]][-1].content
 
 
 def test_chat_stream_defaults_to_english_assistant_copy() -> None:
@@ -1068,13 +1072,15 @@ def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
-    assert '"type":"token"' in response.text
+    assert '"type":"token"' not in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
     assistant_message = messages.json()["items"][-1]
     assert assistant_message["role"] == "assistant"
-    assert "I tested that idea with TSLA." in assistant_message["content"]
+    assert assistant_message["content"] == ""
+    assert assistant_message["metadata"]["result_fact_bank"]["symbols"] == ["TSLA"]
+    assert api_state.store.messages[conversation["id"]][-1].content
 
 
 def test_chat_stream_sends_profile_language_to_runtime() -> None:
@@ -1096,11 +1102,10 @@ def test_chat_stream_sends_profile_language_to_runtime() -> None:
     assert stream.count("data: [DONE]") == 1
     events = _stream_events(stream)
     token_events = [event for event in events if event.get("type") == "token"]
-    assert len(token_events) == 1
-    assert token_events[0]["content"] == "I tested that idea with TSLA."
+    assert token_events == []
     final_payload = _final_payload(stream)
     assert final_payload["stage_outcome"] == "ready_to_respond"
-    assert final_payload["assistant_response"] == token_events[0]["content"]
+    assert final_payload["assistant_response"] == ""
     assert final_payload["message_id"]
     assert final_payload["run"]["conversation_id"] == conversation["id"]
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
@@ -1713,10 +1718,7 @@ def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
         expected_match_counts[conversation["id"]] = run_count
         for run_index in range(run_count):
             run = BacktestRun(
-                id=(
-                    "asset-rollup-two-character-symbol-"
-                    f"{index}-{run_index}"
-                ),
+                id=("asset-rollup-two-character-symbol-" f"{index}-{run_index}"),
                 conversation_id=conversation["id"],
                 strategy_id=None,
                 status="completed",
@@ -1726,13 +1728,9 @@ def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
                 benchmark_symbol="SPY",
                 metrics={},
                 config_snapshot={"template": "buy_and_hold"},
-                conversation_result_card={
-                    "title": f"BA result {index}-{run_index}"
-                },
+                conversation_result_card={"title": f"BA result {index}-{run_index}"},
                 created_at=(
-                    now
-                    - timedelta(minutes=index)
-                    - timedelta(seconds=run_index)
+                    now - timedelta(minutes=index) - timedelta(seconds=run_index)
                 ),
             )
             api_state.store.backtest_runs[run.id] = run
@@ -1763,9 +1761,7 @@ def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
         "last_touched_at": now.isoformat().replace("+00:00", "Z"),
     }
     first_conversations = [
-        item
-        for item in first_payload["items"]
-        if item["type"] == "conversation"
+        item for item in first_payload["items"] if item["type"] == "conversation"
     ]
     assert len(first_conversations) == 1
     assert first_conversations[0]["match"]["layer"] == "run"
@@ -1783,22 +1779,19 @@ def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
     assert second_page.status_code == 200
     second_payload = second_page.json()
     second_conversations = [
-        item
-        for item in second_payload["items"]
-        if item["type"] == "conversation"
+        item for item in second_payload["items"] if item["type"] == "conversation"
     ]
     assert len(second_conversations) == 1
     assert {
-        item["conversation_id"]
-        for item in first_conversations + second_conversations
+        item["conversation_id"] for item in first_conversations + second_conversations
     } == set(conversation_ids)
     assert distractor["id"] not in {
-        item["conversation_id"]
-        for item in first_conversations + second_conversations
+        item["conversation_id"] for item in first_conversations + second_conversations
     }
-    assert {
-        item["title"] for item in first_conversations + second_conversations
-    } == {"Aircraft research 0", "Aircraft research 1"}
+    assert {item["title"] for item in first_conversations + second_conversations} == {
+        "Aircraft research 0",
+        "Aircraft research 1",
+    }
     assert {
         item["conversation_id"]: item["match"]["count"]
         for item in first_conversations + second_conversations
@@ -2941,13 +2934,21 @@ def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
         and card.get("decision_state") == "promising"
         for card in reloaded_cards
     )
+    api_state.store.evidence_artifacts[artifact_id] = artifact.model_copy(
+        update={"digest": "PRIVATE ENGLISH ARTIFACT DIGEST"}
+    )
     recalled = client.get("/api/v1/search?q=Worth%20revisiting&limit=20")
     assert recalled.status_code == 200
     assert len(recalled.json()["items"]) == 1
     recalled_conversation = recalled.json()["items"][0]
     assert recalled_conversation["type"] == "conversation"
     assert recalled_conversation["id"] == conversation["id"]
-    assert recalled_conversation["matched_text"].startswith("Worth revisiting.")
+    assert recalled_conversation["matched_text"] == ""
+    assert recalled_conversation["match"]["fragment"] == ""
+    assert recalled_conversation["match"]["layer"] == "decision"
+    assert recalled_conversation["match"]["count"] == 1
+    assert "message_id" not in recalled_conversation["match"]
+    assert "PRIVATE ENGLISH ARTIFACT DIGEST" not in recalled.text
     assert recalled_conversation["dossier"]["decision"]["note"] == "Worth revisiting."
 
 
@@ -3063,7 +3064,9 @@ def test_search_projects_one_typed_conversation_dossier() -> None:
     assert item["type"] == "conversation"
     assert item["id"] == conversation["id"]
     assert item["conversation_id"] == conversation["id"]
-    assert "preview" not in item
+    assert item["preview"]["kind"] == "result"
+    assert item["preview"]["symbols"] == ["TSLA"]
+    assert item["preview"]["text"] is None
 
     dossier = item["dossier"]
     assert list(dossier) == [
@@ -3087,7 +3090,8 @@ def test_search_projects_one_typed_conversation_dossier() -> None:
     assert dossier["tested"]["strategy_family"] == "rsi_mean_reversion"
     assert dossier["outcome"]["run_label"]
     assert dossier["outcome"]["benchmark_symbol"] == "SPY"
-    assert dossier["outcome"]["quick_take"] == "I tested that idea with TSLA."
+    assert "quick_take" not in dossier["outcome"]
+    assert dossier["outcome"]["result_fact_bank"]["symbols"] == ["TSLA"]
     assert dossier["outcome"]["metrics"] == [{"name": "total_return_pct", "value": 12.5}]
     assert item["total_runs"] == 1
     assert item["decided_runs"] == 1
@@ -3129,9 +3133,7 @@ def test_run_dossier_history_uses_non_leaking_ownership_and_cursor_errors() -> N
         deleted_at=now,
     )
 
-    owned = client.get(
-        "/api/v1/conversations/owned-dossier-history/run-dossiers"
-    )
+    owned = client.get("/api/v1/conversations/owned-dossier-history/run-dossiers")
     malformed = client.get(
         "/api/v1/conversations/owned-dossier-history/run-dossiers",
         params={"cursor": "not-a-cursor"},
@@ -3171,6 +3173,13 @@ def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> No
     now = utcnow()
     conversation_id = "bounded-metric-priority"
     run_id = "bounded-metric-priority-run"
+    performance = {
+        "total_return_pct": 12.5,
+        "benchmark_return_pct": 8.0,
+        "delta_vs_benchmark_pct": 4.5,
+        "max_drawdown_pct": -6.0,
+        "sharpe_ratio": 1.2,
+    }
     projected = project_conversation_recall(
         conversation={
             "id": conversation_id,
@@ -3185,6 +3194,7 @@ def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> No
                 "symbols": ["GLD"],
                 "benchmark_symbol": "SPY",
                 "conversation_result_card": {"title": "GLD outcome"},
+                "metrics": {"aggregate": {"performance": performance}},
                 "created_at": now,
             }
         ],
@@ -3198,11 +3208,7 @@ def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> No
                     "metrics": {
                         "aggregate": {
                             "performance": {
-                                "total_return_pct": 12.5,
-                                "benchmark_return_pct": 8.0,
-                                "delta_vs_benchmark_pct": 4.5,
-                                "max_drawdown_pct": -6.0,
-                                "sharpe_ratio": 1.2,
+                                name: value + 100 for name, value in performance.items()
                             }
                         }
                     }
@@ -3223,6 +3229,10 @@ def test_search_dossier_preserves_canonical_metric_priority_when_bounded() -> No
         "delta_vs_benchmark_pct",
         "max_drawdown_pct",
     ]
+    assert {metric.name: metric.value for metric in outcome.metrics} == {
+        metric.name: performance[metric.name] for metric in outcome.metrics
+    }
+    assert outcome.result_fact_bank["metrics"]["aggregate"]["performance"] == performance
 
 
 def test_search_dossier_accepts_postgres_trimmed_fractional_activity() -> None:
@@ -3233,9 +3243,7 @@ def test_search_dossier_accepts_postgres_trimmed_fractional_activity() -> None:
             "id": "trimmed-postgres-fraction",
             "title": "Trimmed PostgreSQL timestamp",
             "updated_at": "2026-07-27T15:00:00+00:00",
-            "_recall_summary": {
-                "latest_activity": "2026-07-30T07:38:21.24646+00:00"
-            },
+            "_recall_summary": {"latest_activity": "2026-07-30T07:38:21.24646+00:00"},
         },
         runs=[],
         ideas=[],
@@ -4021,9 +4029,7 @@ def test_search_retest_omits_unfaithful_dca_snapshot(
     assert projected is not None
     _, item = projected
     assert item.dossier is not None
-    assert all(
-        candidate.type != "retest_run" for candidate in item.dossier.actions
-    )
+    assert all(candidate.type != "retest_run" for candidate in item.dossier.actions)
 
 
 def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> None:
@@ -4100,9 +4106,7 @@ def test_search_run_fresh_omits_oversized_action_without_failing_recall() -> Non
     assert item.title == "Large signal strategy"
     assert item.dossier is not None
     assert item.dossier.tested is not None
-    assert all(
-        candidate.type != "run_fresh" for candidate in item.dossier.actions
-    )
+    assert all(candidate.type != "run_fresh" for candidate in item.dossier.actions)
 
 
 def test_invalid_cursor_returns_problem_details() -> None:

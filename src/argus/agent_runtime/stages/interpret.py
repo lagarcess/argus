@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import os
 from dataclasses import dataclass
 from datetime import date
@@ -389,10 +390,13 @@ async def interpret_stage_async(
 
     async def _unavailable(*, retryable: bool = True) -> StageResult:
         return await _interpreter_unavailable_result(
-            state=state, user=user, snapshot=snapshot,
+            state=state,
+            user=user,
+            snapshot=snapshot,
             current_user_message=state.current_user_message,
             capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata, retryable=retryable,
+            selected_thread_metadata=selected_metadata,
+            retryable=retryable,
         )
 
     if structured_interpreter is None:
@@ -403,7 +407,8 @@ async def interpret_stage_async(
             current_user_message=state.current_user_message,
             recent_thread_history=list(state.recent_thread_history),
             latest_task_snapshot=snapshot,
-            selected_thread_metadata=selected_metadata, user=user,
+            selected_thread_metadata=selected_metadata,
+            user=user,
         ),
     )
     if interpretation is None:
@@ -412,7 +417,9 @@ async def interpret_stage_async(
         return await _unavailable(retryable=failure_kind != "contract_rejected")
     pending_response_option_interpretation = (
         _pending_response_option_interpretation_from_typed_selection(
-            state=state, user=user, snapshot=snapshot,
+            state=state,
+            user=user,
+            snapshot=snapshot,
             current_user_message=state.current_user_message,
             selected_thread_metadata=selected_metadata,
         )
@@ -420,7 +427,10 @@ async def interpret_stage_async(
     if pending_response_option_interpretation is not None:
         interpretation = pending_response_option_interpretation
     knowledge_result = await knowledge_answer_stage_result(
-        interpretation=interpretation, state=state, user=user, snapshot=snapshot,
+        interpretation=interpretation,
+        state=state,
+        user=user,
+        snapshot=snapshot,
         selected_thread_metadata=selected_metadata,
     )
     if knowledge_result is not None:
@@ -433,7 +443,9 @@ async def interpret_stage_async(
         missing_required_fields=interpretation.missing_required_fields,
     )
     return await _stage_result_from_interpretation(
-        state=state, user=user, snapshot=snapshot,
+        state=state,
+        user=user,
+        snapshot=snapshot,
         interpretation=interpretation,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_metadata,
@@ -508,9 +520,7 @@ async def _stage_result_from_interpretation(
         # A resolved asset or date alone names what the user is talking about;
         # only execution evidence may pull a non-strategy turn onto this route.
         interpretation.semantic_turn_act != "result_followup"
-        and strategy_has_execution_evidence(
-            interpretation.candidate_strategy_draft
-        )
+        and strategy_has_execution_evidence(interpretation.candidate_strategy_draft)
     )
     (
         expects_strategy_route,
@@ -951,8 +961,7 @@ async def _stage_result_from_interpretation(
     ):
         missing_required_fields = (
             ["asset_universe"]
-            if "provider_context_incomplete_asset_mentions"
-            in interpretation.reason_codes
+            if "provider_context_incomplete_asset_mentions" in interpretation.reason_codes
             else []
         )
     pending_date_edit_reason_codes: list[str] = []
@@ -1085,10 +1094,7 @@ async def _stage_result_from_interpretation(
             selected_thread_metadata.get("response_intent")
         )
     )
-    if (
-        preserved_optional_parameter_status is not None
-        and not is_new_idea_interpretation
-    ):
+    if preserved_optional_parameter_status is not None and not is_new_idea_interpretation:
         current_optional_parameter_status = optional_parameter_stage_patch.get(
             "optional_parameter_status"
         )
@@ -2703,7 +2709,11 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
     response = await compose_active_confirmation_interpreter_recovery(
         current_user_message=current_user_message,
         setup_phrase=setup_phrase,
-        assumptions_response=assumptions_response,
+        assumptions_response=(
+            json.dumps(assumptions_response["facts"], sort_keys=True)
+            if assumptions_response is not None
+            else None
+        ),
         action_guidance=action_guidance,
         language=user.language_preference,
     )
@@ -2992,7 +3002,12 @@ def _canonicalized_strategy(
                 invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.update(provider_context_assets.resolved_asset_classes_from_strategy_context(updated, symbol) or {resolution.asset.asset_class})
+        asset_classes.update(
+            provider_context_assets.resolved_asset_classes_from_strategy_context(
+                updated, symbol
+            )
+            or {resolution.asset.asset_class}
+        )
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))
@@ -3145,9 +3160,7 @@ def _strategy_with_validated_benchmark_symbol(
         # its provenance so the card discloses exactly this reconciliation.
         updated.resolution_provenance = _dedupe_resolution_provenance(
             [
-                *_without_benchmark_disclosure_provenance(
-                    updated.resolution_provenance
-                ),
+                *_without_benchmark_disclosure_provenance(updated.resolution_provenance),
                 resolution.provenance,
             ]
         )

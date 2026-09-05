@@ -67,6 +67,8 @@ class SearchResultPacket(BaseModel):
 
 @runtime_checkable
 class SearchProvider(Protocol):
+    def require_configured(self) -> None: ...
+
     def search(
         self, query: str, *, max_results: int, timeout_seconds: float
     ) -> SearchResultPacket: ...

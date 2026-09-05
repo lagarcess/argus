@@ -1373,9 +1373,9 @@ def test_dca_same_turn_starting_principal_does_not_overwrite_recurring(
     assert strategy.capital_amount == 20000
     assert strategy.cadence == "weekly"
     assert result.patch["optional_parameter_status"]["initial_capital"] == 100000
-    assert result.patch["optional_parameter_status"].get(
-        "unsupported_constraints", []
-    ) == []
+    assert (
+        result.patch["optional_parameter_status"].get("unsupported_constraints", []) == []
+    )
 
 
 def test_dca_period_count_is_not_misclassified_as_recurring_money(monkeypatch) -> None:
@@ -1507,9 +1507,9 @@ def test_dca_total_capital_and_recurring_contribution_keep_separate_roles(
     assert strategy.capital_amount == 20000
     assert result.patch["optional_parameter_status"]["initial_capital"] == 100000
     assert result.decision.missing_required_fields == []
-    assert result.patch["optional_parameter_status"].get(
-        "unsupported_constraints", []
-    ) == []
+    assert (
+        result.patch["optional_parameter_status"].get("unsupported_constraints", []) == []
+    )
 
 
 def test_dca_confirmation_card_uses_recurring_contribution_not_total_capital() -> None:
@@ -1541,9 +1541,10 @@ def test_dca_confirmation_card_uses_recurring_contribution_not_total_capital() -
     # renders under its own label and neither borrows the other's number.
     assert rows["Contribution"] == "$20,000 weekly"
     assert rows["Starting capital"] == "$100,000"
-    assert "$20,000 weekly contribution" in card["assumptions"]
-    assert "$100,000 starting capital" in card["assumptions"]
-    assert not any("recurring contribution" in item for item in card["assumptions"])
+    assert card["display_facts"]["recurring_contribution"] == 20000
+    assert card["display_facts"]["contribution_period"] == "weekly"
+    assert card["display_facts"]["starting_capital"] == 100000
+    assert card["assumptions"] == []
 
 
 def test_dca_total_capital_alone_does_not_satisfy_recurring_contribution(

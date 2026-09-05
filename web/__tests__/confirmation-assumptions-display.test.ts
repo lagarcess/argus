@@ -37,14 +37,7 @@ describe("confirmation assumption display", () => {
       confirmationAssumptionDisplay({
         assetClass: "equity",
         displayFacts: facts,
-        fallbackAssumptions: [
-          "Datos diarios",
-          "Hasta 12 jun",
-          "Sin comisiones",
-          "Referencia: SPY",
-        ],
         locale: "en-US",
-        promotedValues: [],
         t: englishT,
       }),
     ).toEqual([
@@ -69,9 +62,7 @@ describe("confirmation assumption display", () => {
       confirmationAssumptionDisplay({
         assetClass: "equity",
         displayFacts: facts,
-        fallbackAssumptions: ["No fees", "No slippage", "Benchmark: SPY"],
         locale: "en-US",
-        promotedValues: [],
         t: englishT,
       }),
     ).toEqual([
@@ -82,16 +73,14 @@ describe("confirmation assumption display", () => {
     ]);
   });
 
-  test("preserves filtered legacy assumptions when canonical facts are absent", () => {
+  test("never renders persisted prose when canonical facts are absent", () => {
     expect(
       confirmationAssumptionDisplay({
         assetClass: "equity",
         displayFacts: undefined,
-        fallbackAssumptions: ["$100 starting capital", "Daily data"],
         locale: "en-US",
-        promotedValues: ["$100"],
         t: englishT,
       }),
-    ).toEqual(["Stocks", "Daily data"]);
+    ).toEqual(["Stocks"]);
   });
 });

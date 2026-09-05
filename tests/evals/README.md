@@ -7,7 +7,7 @@ assistant phrasing.
 ## Test Tiers
 
 - **Mocked harness - every change (free, no API calls):**
-  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_measurement_eval_dca_semantics.py tests/evals/test_measurement_eval_scorecard.py tests/evals/test_measurement_eval_live_environment.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
+  Run the single [Mocked Run command](#mocked-run) below.
   Validates routing, scorecard provenance, live-environment refusal, state,
   full conversation-step manifests, and the seven session trajectories. This
   is the everyday inner-loop check.
@@ -23,13 +23,16 @@ assistant phrasing.
 Run the mocked harness checks with:
 
 ```bash
-poetry run pytest \
-  tests/evals/test_measurement_eval_harness.py \
+poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
   tests/evals/test_chat_runtime_eval_manifest.py \
   tests/evals/test_chat_runtime_trajectory_harness.py \
+  tests/evals/test_measurement_availability.py \
+  tests/evals/test_measurement_delivery.py \
+  tests/evals/test_measurement_outcome.py \
+  tests/evals/test_prose_evidence.py \
   -q
 ```
 
@@ -144,6 +147,69 @@ set to `live_provider`, and the successful calendar probe.
 
 Expected-fail cases never count as passes. They are reported separately so
 known broken behavior stays visible.
+
+### Availability versus prose quality (#365)
+
+Runtime composer attempts come from the captured route receipts, not from
+matching recovery wording. When its chat attempts all fail or are skipped,
+the requested prose judgment is `unavailable`, with `pass: null` and no failed
+quality criteria. The localized recovery is retained as `observed` text; it
+was not sent to the judge. A successful fallback remains subject to the ordinary
+rubric. Missing text without outage evidence is still a product failure.
+An unavailable structured judge response is also a missing measurement, not
+an honesty zero. Typed assertions always run, including during an outage.
+
+An outage-only case has status `infrastructure_error`. It blocks the sanctioned
+gate, remains in the scorecard with its route receipts and costs, and contributes
+neither a pass nor a zero to the quality denominator. With no quality measurements,
+the category's `pass_rate` is `null`. A simultaneous typed failure remains `failed`
+with the infrastructure evidence beside it. Expected-fail masks cannot hide an
+outage. Historical schema-v2 scorecards are not rewritten; new scorecards add
+the infrastructure count and per-result `infrastructure_errors`.
+
+There is no automatic retry or paid A/B in this policy. Diagnose the recorded
+availability failure and explicitly authorize any later rerun; an unavailable
+measurement cannot establish either a product regression or a quality pass.
+The deterministic transport reproduction in `test_measurement_availability.py`
+costs $0 and does not certify current live-provider quality.
+
+### Delivered outcomes (#520)
+
+Every measurement fixture now has an `expected.offered` assertion. The current
+set is 62 cases: the nine existing discovery assertions plus 53 strengthened
+cases, including the two DCA cases added since the issue's original count.
+
+- `launch_matches_expected` requires the actual delivered launch payload to
+  contain the fixture's assets, strategy/rules, effective dates, benchmark,
+  capital, DCA money roles/cadence, and modeled costs where specified. It reads
+  the existing expected fields; fixtures do not duplicate their numbers.
+- `clarification_matches_expected` requires the delivered clarification
+  contract, its requested field, and its specified reason. A launch refusal's
+  reason derives from `launch_validation_code`. `response` also requires text;
+  `min_recovery_options` requires options for actionable recovery contracts.
+- `min_next_experiment_rows` requires a delivered next experiment for Try next.
+  Educational answers require `response` and retain their prose rubric.
+
+The harness follows confirmation refusals through `clarify_stage`, just as the
+runtime does. Four DCA refusal cases now measure the terminal
+`unsupported`/`await_user_reply` response instead of stopping at the intermediate
+`needs_clarification` result. Routing expectations elsewhere are unchanged.
+
+`test_measurement_delivery.py` keeps all existing routing/draft facts correct
+while removing delivery. Each of the 53 old cases accepted this deterministic
+fault on the base; each strengthened case rejects it. Separate tests remove DCA
+launch facts one at a time, clear earlier proposals, and exercise real offline
+clarification after a confirmation refusal. This proves the assertions detect
+missing delivery. It does not establish current live-provider behavior or fix
+the separate #364 classification question.
+
+Run the new regression checks without API calls:
+
+```bash
+poetry run pytest tests/evals/test_measurement_availability.py \
+  tests/evals/test_measurement_delivery.py tests/evals/test_measurement_outcome.py \
+  tests/evals/test_prose_evidence.py -q --no-cov
+```
 
 ## Expected-Fail Cases
 

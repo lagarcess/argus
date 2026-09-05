@@ -23,6 +23,7 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import RunState, UserState
+from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.cache import (
     cache_get,
     cache_put,
@@ -99,11 +100,8 @@ async def find_assets_stage_result(
         request=request,
         current_user_message=state.current_user_message,
         language=language,
-        # One meter: the shared research ceiling gates source-backed
-        # searches; the composer's cheap verified rows stay the honest
-        # degradation when it is exhausted.
-        discovery_allowance_available=state.research_allowance_available,
         packet_cache=packet_cache,
+        provider_admission=claim_current_research_attempt,
     )
     if result is None:
         return None

@@ -457,6 +457,19 @@ def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:
     assert profile.timeout_seconds == 20
 
 
+def test_asset_mention_preflight_uses_structured_tier_without_reasoning() -> None:
+    profile = openrouter_profile_for_task("asset_mention_preflight")
+
+    assert (
+        openrouter.openrouter_model_tier_for_task("asset_mention_preflight")
+        == "structured"
+    )
+    assert profile.temperature == 0
+    assert profile.max_tokens == 2200
+    assert profile.reasoning_effort == "none"
+    assert profile.timeout_seconds == 20
+
+
 def test_result_summary_timeout_budget_is_safe_for_render_workflows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

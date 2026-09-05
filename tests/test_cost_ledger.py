@@ -134,8 +134,18 @@ def test_persist_route_receipts_also_appends_cost_ledger_entries(monkeypatch) ->
     gateway = _FakeCostLedgerGateway()
     monkeypatch.setattr("argus.api.chat.route_receipts.api_state.supabase_gateway", gateway)
 
+    repair_effect = {
+        "schema_version": "argus_repair_effect/v1",
+        "trigger_reason": "required_strategy_shape_missing",
+        "repair_applied": True,
+        "changed_fields": ["candidate_strategy_draft.asset_universe"],
+        "before_fingerprint": "a" * 64,
+        "after_fingerprint": "b" * 64,
+        "no_op_reason": None,
+    }
+
     persist_route_receipts(
-        receipts=[_receipt()],
+        receipts=[_receipt(repair_effect=repair_effect)],
         user_id="user-1",
         conversation_id="conversation-1",
         message_id="message-1",
@@ -152,6 +162,8 @@ def test_persist_route_receipts_also_appends_cost_ledger_entries(monkeypatch) ->
     assert entry["request_id"] == "req-1"
     assert entry["correlation_id"] == "req-1:conversation-1:message-1"
     assert entry["cost_amount"] == 0.00042
+    assert gateway.route_receipts[0]["metadata"]["repair_effect"] == repair_effect
+    assert entry["metadata"]["repair_effect"] == repair_effect
 
 
 def test_chat_route_receipt_survives_telemetry_only_cost_ledger_failure(

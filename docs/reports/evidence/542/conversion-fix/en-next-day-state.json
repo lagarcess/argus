@@ -1,0 +1,196 @@
+{
+  "label": "en-next-day",
+  "mode": "next-day",
+  "language": "en",
+  "before": {
+    "owner": {
+      "user_id": "a7c4d5ee-cbe6-485b-b8c4-0e12e5623a56",
+      "conversation_id": "e90185c0-de91-4370-ac6d-98e641d0ac54",
+      "period_start": "2026-09-05T01:11:25+00:00",
+      "period_end": "2026-09-12T01:11:25+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "a7c4d5ee-cbe6-485b-b8c4-0e12e5623a56",
+      "conversation_id": "e90185c0-de91-4370-ac6d-98e641d0ac54",
+      "period_start": "2026-09-05T01:11:25+00:00",
+      "period_end": "2026-09-12T01:11:25+00:00"
+    },
+    "jobs": [
+      [
+        "c131bccd-8ed7-42b8-8e24-885559b380b4",
+        "failed",
+        "account_conversion_required",
+        null
+      ]
+    ],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [
+    "Keep going with ArgusThis temporary chat has reached its simulation limit. It expires on Sep 11, 2026, 8:11 PM CDT. Request access or sign in to continue.Request access to ArgusArgus is in early access. Share your email to request access. If approved, we\u2019ll email you when you can create an account.Email addressRequest accessAlready approved? Sign upAlready have an account? Sign in"
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "url": "http://127.0.0.1:55479/api/v1/memory/availability",
+      "status": 403,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/e90185c0-de91-4370-ac6d-98e641d0ac54/messages?limit=100",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=50",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me/usage",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/e90185c0-de91-4370-ac6d-98e641d0ac54/activity",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/chat/stream",
+      "status": 200,
+      "method": "POST",
+      "request": "{\"conversation_id\":\"e90185c0-de91-4370-ac6d-98e641d0ac54\",\"action\":{\"type\":\"run_backtest\",\"label\":\"Run backtest\",\"labelKey\":\"chat.confirmation.actions.run_backtest\",\"payload\":{\"artifact_id\":\"confirmation-f6738945-38d4-47f5-b809-e499f89497b4\",\"confirmation_id\":\"confirmation-f6738945-38d4-47f5-b809-e499f89497b4\",\"conversation_id\":\"e90185c0-de91-4370-ac6d-98e641d0ac54\",\"launch_payload_hash\":\"fa83ba9176b6defb\"},\"presentation\":\"confirmation\"},\"language\":\"en\",\"viewport\":\"wide\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/analytics/guest-events",
+      "status": 200,
+      "method": "POST",
+      "request": "{\"event\":\"conversion_prompt_shown\",\"language\":\"en\",\"surface\":\"conversion_modal\",\"conversion_reason\":\"simulation_limit\",\"terminal_outcome\":\"shown\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=50",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/e90185c0-de91-4370-ac6d-98e641d0ac54/messages?limit=100",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/e90185c0-de91-4370-ac6d-98e641d0ac54/activity",
+      "status": 200,
+      "method": "PATCH",
+      "request": "{\"action\":\"mark_read\",\"through_attention_cursor\":\"eyJpIjoiYzEzMWJjY2QtOGVkNy00MmI4LThlMjQtODg1NTU5YjM4MGI0IiwiayI6ImJhY2t0ZXN0X2pvYiIsInYiOjF9\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    }
+  ],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 0,
+            "remaining": 2,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "id": "933688a4-413e-4039-b17f-1d4b207788d7",
+      "public_id": "vWL8zXfCKy_DRlL05j5mEX8YXwNvsU-c",
+      "path": "/r/vWL8zXfCKy_DRlL05j5mEX8YXwNvsU-c",
+      "title": "AAPL Buy and Hold",
+      "symbols": [
+        "AAPL"
+      ],
+      "date_range": {
+        "start": "2024-01-02",
+        "end": "2024-03-01"
+      },
+      "created_at": "2026-09-04T03:36:19.031671Z",
+      "revoked_at": "2026-09-04T03:36:19.176867Z",
+      "revocation_reason": "source_deleted"
+    },
+    {
+      "id": "292581f4-1fbf-4b26-8d1a-be7e5b01f17b",
+      "public_id": "lWu-TtABZ4AX41tbEvFD7j7YfmspHZHW",
+      "path": "/r/lWu-TtABZ4AX41tbEvFD7j7YfmspHZHW",
+      "title": "AAPL Buy and Hold",
+      "symbols": [
+        "AAPL"
+      ],
+      "date_range": {
+        "start": "2024-01-02",
+        "end": "2024-03-01"
+      },
+      "created_at": "2026-09-04T03:29:19.806172Z",
+      "revoked_at": "2026-09-04T03:36:14.227603Z",
+      "revocation_reason": "owner_revoked"
+    }
+  ],
+  "next_cursor": null
+}

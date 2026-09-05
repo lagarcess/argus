@@ -18,12 +18,15 @@ def search_provider_for_config(*, provider_id: str) -> SearchProvider:
     """Resolve the configured adapter; unknown ids fail closed."""
     normalized = provider_id.strip().lower()
     if normalized == "perplexity_direct":
-        return PerplexityDirectProvider(api_key=perplexity_api_key())
-    if normalized == "openrouter_web_search":
-        return OpenRouterWebSearchProvider(
+        provider: SearchProvider = PerplexityDirectProvider(api_key=perplexity_api_key())
+    elif normalized == "openrouter_web_search":
+        provider = OpenRouterWebSearchProvider(
             api_key=resolve_openrouter_api_key(),
             model=os.getenv("ARGUS_DISCOVERY_OPENROUTER_SEARCH_MODEL", ""),
         )
-    raise SearchUnavailableError(
-        reason="not_configured", detail=f"unknown_provider:{normalized}"
-    )
+    else:
+        raise SearchUnavailableError(
+            reason="not_configured", detail=f"unknown_provider:{normalized}"
+        )
+    provider.require_configured()
+    return provider

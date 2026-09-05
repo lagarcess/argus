@@ -1,0 +1,135 @@
+{
+  "baseline_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "candidate_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+  "source": "git blobs at the measured refs; no fixture changed",
+  "candidate_failed_case_fixture_comparison": [
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "fixture_path": "tests/evals/measurement_cases/asset_discovery_routing.yaml",
+      "inputs_identical": true,
+      "baseline_expected": {
+        "intent": [
+          "conversation_followup",
+          "results_explanation"
+        ],
+        "capability_verdict": "answer_only",
+        "semantic_turn_act": "result_followup",
+        "stage_outcomes": [
+          "ready_to_respond"
+        ]
+      },
+      "candidate_expected": {
+        "offered": {
+          "min_next_experiment_rows": 1
+        },
+        "intent": [
+          "conversation_followup",
+          "results_explanation"
+        ],
+        "capability_verdict": "answer_only",
+        "semantic_turn_act": "result_followup",
+        "stage_outcomes": [
+          "ready_to_respond"
+        ]
+      },
+      "candidate_prose_judge_failed": false
+    },
+    {
+      "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "fixture_path": "tests/evals/measurement_cases/asset_discovery_routing.yaml",
+      "inputs_identical": true,
+      "baseline_expected": {
+        "intent": "conversation_followup",
+        "capability_verdict": "answer_only",
+        "semantic_turn_act": "asset_discovery",
+        "asset_discovery": {
+          "relationship": "category",
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description_includes_any": [
+            "farmac",
+            "pharma"
+          ],
+          "needs_current_facts": true
+        },
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "offered": {
+          "actionable": true
+        }
+      },
+      "candidate_expected": {
+        "intent": "conversation_followup",
+        "capability_verdict": "answer_only",
+        "semantic_turn_act": "asset_discovery",
+        "asset_discovery": {
+          "relationship": "category",
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description_includes_any": [
+            "farmac",
+            "pharma"
+          ],
+          "needs_current_facts": true
+        },
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "offered": {
+          "actionable": true
+        }
+      },
+      "candidate_prose_judge_failed": false
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "fixture_path": "tests/evals/measurement_cases/dca_capital_semantics.yaml",
+      "inputs_identical": true,
+      "baseline_expected": {
+        "intent": [
+          "backtest_execution",
+          "strategy_drafting"
+        ],
+        "capability_verdict": "executable",
+        "assets": [
+          "KO"
+        ],
+        "asset_class": "equity",
+        "strategy_type": "dca_accumulation",
+        "capital_amount": 13000,
+        "contribution_period": "monthly",
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply",
+          "ready_for_confirmation",
+          "await_approval"
+        ]
+      },
+      "candidate_expected": {
+        "offered": {
+          "launch_matches_expected": true
+        },
+        "intent": [
+          "backtest_execution",
+          "strategy_drafting"
+        ],
+        "capability_verdict": "executable",
+        "assets": [
+          "KO"
+        ],
+        "asset_class": "equity",
+        "strategy_type": "dca_accumulation",
+        "capital_amount": 13000,
+        "contribution_period": "monthly",
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply",
+          "ready_for_confirmation",
+          "await_approval"
+        ]
+      },
+      "candidate_prose_judge_failed": false
+    }
+  ]
+}

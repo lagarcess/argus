@@ -43,8 +43,7 @@ class PerplexityDirectProvider:
     def search(
         self, query: str, *, max_results: int, timeout_seconds: float
     ) -> SearchResultPacket:
-        if not self._api_key:
-            raise SearchUnavailableError(reason="not_configured")
+        self.require_configured()
         bounded_results = max(1, min(int(max_results), MAX_RESULTS))
         started = time.monotonic()
         payload = post_json(
@@ -62,6 +61,11 @@ class PerplexityDirectProvider:
             provider_id="perplexity_direct",
             cost_usd=DOCUMENTED_PERPLEXITY_SEARCH_COST_USD,
         )
+
+    def require_configured(self) -> None:
+        """Fail before admission when this adapter cannot make a request."""
+        if not self._api_key:
+            raise SearchUnavailableError(reason="not_configured")
 
 
 def _sanitized_results(payload: Any) -> list[SearchResult]:

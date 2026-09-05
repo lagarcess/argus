@@ -1,0 +1,22 @@
+{
+  "api_deploy_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "api_deploy_status": "live",
+  "artifact_kind": "evidence",
+  "browser_status": "not_run",
+  "candidate_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "checked_out_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "expected_mode": "real-workflow",
+  "failure_reason": "warmup_probe_failed",
+  "failure_stage": "warmup",
+  "harness_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "language": "es-419",
+  "privacy": "no_raw_ids; labels are sha256 prefixes",
+  "release_profile_hash": "535a9b2f2f1026db945decd7bc2005043d3b09843776a2cd38a73506a52db9ba",
+  "status": "failed",
+  "surface": "release-coherence",
+  "web_deploy_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "web_deploy_status": "live",
+  "workflow_version_commit": "7d8ace4",
+  "workflow_version_status": "ready",
+  "failure_only": "warmup audit reports all three deliberate manual off triggers as drift from repository checksPass"
+}

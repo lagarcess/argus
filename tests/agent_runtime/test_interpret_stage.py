@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -169,9 +170,7 @@ def test_stage_canonicalization_preserves_provider_context_asset_class(
 
     canonical = interpret_module._canonicalized_strategy(
         strategy,
-        current_user_message=(
-            "backtest holding ethereum from 2024-01-01 to 2024-03-31"
-        ),
+        current_user_message=("backtest holding ethereum from 2024-01-01 to 2024-03-31"),
         selected_thread_metadata={},
     )
 
@@ -1416,17 +1415,19 @@ def test_standalone_event_context_uses_context_fact_bank_not_limits(
     assert result.decision.context_question_focus == focus
     assert captured["task"] == "chat_composer"
     assert "Do not open with what Argus cannot do" in captured["messages"][0]["content"]
-    assert "Do not reject standalone context questions" in captured["messages"][0][
-        "content"
-    ]
+    assert (
+        "Do not reject standalone context questions" in captured["messages"][0]["content"]
+    )
     assert "Do not suggest live" in captured["messages"][0]["content"]
-    assert "Do not propose a concrete executable rule unless" in captured["messages"][
-        0
-    ]["content"]
+    assert (
+        "Do not propose a concrete executable rule unless"
+        in captured["messages"][0]["content"]
+    )
     assert "price-jump" in captured["messages"][0]["content"]
-    assert "opening sentence must give useful investing context" in captured[
-        "messages"
-    ][0]["content"]
+    assert (
+        "opening sentence must give useful investing context"
+        in captured["messages"][0]["content"]
+    )
     fact_packet = captured["messages"][1]["content"]
     assert expected_fact in fact_packet.lower()
     live_packet = captured["messages"][2]["content"]
@@ -2051,7 +2052,9 @@ def test_structured_signal_rule_from_llm_reaches_confirmation_without_text_scann
     assert strategy.entry_rule["fast_period"] == 5
     assert strategy.exit_rule["direction"] == "bearish"
     assert result.decision.missing_required_fields == []
-    assert "semantic_unsubstantiated_signal_rule_removed" not in result.decision.reason_codes
+    assert (
+        "semantic_unsubstantiated_signal_rule_removed" not in result.decision.reason_codes
+    )
 
 
 def test_interpret_approval_uses_semantic_turn_act() -> None:
@@ -2331,10 +2334,7 @@ def test_active_confirmation_cost_refinement_uses_artifact_planner(
     assert strategy.capital_amount == 10000
     assert strategy.extra_parameters["fee_rate"] == 0.001
     assert strategy.extra_parameters["slippage"] == 0.0005
-    assert (
-        strategy.extra_parameters["field_provenance"]["fee_rate"]
-        == "explicit_user"
-    )
+    assert strategy.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
     assert "artifact_assumption_edit_planned" in result.decision.reason_codes
 
     confirm_state = RunState.new(
@@ -2854,7 +2854,9 @@ def test_structured_confirmation_action_rejects_stale_artifact_identity() -> Non
     assert "confirmation_payload" not in result.patch
 
 
-def test_structured_confirmation_action_without_validated_payload_refreshes_card() -> None:
+def test_structured_confirmation_action_without_validated_payload_refreshes_card() -> (
+    None
+):
     pending = StrategySummary(
         strategy_type="buy_and_hold",
         strategy_thesis="Buy and hold Tesla.",
@@ -2952,7 +2954,9 @@ def test_failed_action_retry_recovery_uses_explicit_recovery_message() -> None:
     assert "latest retry action" in prompt
 
 
-def test_failed_action_retry_rebuilt_confirmation_uses_explicit_recovery_message() -> None:
+def test_failed_action_retry_rebuilt_confirmation_uses_explicit_recovery_message() -> (
+    None
+):
     state = RunState.new(current_user_message="", recent_thread_history=[])
     state.response_intent = ResponseIntent(
         kind="artifact_action_recovery",
@@ -3013,8 +3017,9 @@ def test_interpret_answers_pending_draft_assumption_followup_without_approval() 
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "For the current idea" in result.patch["assistant_response"]
-    assert "Long-only" in result.patch["assistant_response"]
+    assert result.patch["assistant_response"] == ""
+    assert result.patch["response_intent"]["kind"] == "artifact_assumptions"
+    assert result.patch["response_intent"]["facts"]["artifact_kind"] == "current_idea"
     assert result.decision.semantic_turn_act == "result_followup"
 
 
@@ -3134,9 +3139,10 @@ def test_result_followup_uses_latest_result_when_interpreter_unavailable(
         "kind": "result_followup_chrome",
         "facts": {"focus": "general", "heading_key": "general"},
     }
-    assert "Grounded answer from the latest result facts." in result.patch[
-        "assistant_response"
-    ]
+    assert (
+        "Grounded answer from the latest result facts."
+        in result.patch["assistant_response"]
+    )
     assert result.decision is not None
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "general"
@@ -3205,7 +3211,9 @@ def test_result_followup_heading_uses_typed_chrome_when_interpreter_unavailable(
     assert "Respuesta fundamentada" in result.patch["assistant_response"]
 
 
-def test_result_followup_uses_llm_composer_before_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_result_followup_uses_llm_composer_before_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
@@ -4087,8 +4095,11 @@ def test_pending_confirmation_assumption_question_uses_visible_draft() -> None:
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "Long-only" in result.patch["assistant_response"]
-    assert "Benchmark: SPY" in result.patch["assistant_response"]
+    assert result.patch["assistant_response"] == ""
+    assert (
+        result.patch["response_intent"]["facts"]["display_facts"]["benchmark_symbol"]
+        == "SPY"
+    )
     assert "confirmation_card" not in result.patch
 
 
@@ -4108,13 +4119,20 @@ def test_pending_confirmation_assumption_question_uses_structured_focus() -> Non
             artifact_status="active",
             metadata={
                 "confirmation_card": {
+                    "display_facts": {
+                        "capital": 1000,
+                        "timeframe": "1D",
+                        "fees": 0,
+                        "slippage": 0,
+                        "benchmark_symbol": "SPY",
+                    },
                     "assumptions": [
                         "$1,000 starting capital",
                         "1D bars",
                         "No fees",
                         "No slippage",
                         "Benchmark: SPY",
-                    ]
+                    ],
                 }
             },
         ),
@@ -4136,11 +4154,14 @@ def test_pending_confirmation_assumption_question_uses_structured_focus() -> Non
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "$1,000 starting capital" in result.patch["assistant_response"]
-    assert "$10,000" not in result.patch["assistant_response"]
+    assert result.patch["assistant_response"] == ""
+    assert result.patch["response_intent"]["facts"]["display_facts"]["capital"] == 1000
+    assert "$10,000" not in str(result.patch)
 
 
-def test_llm_extracted_company_name_resolves_through_provider_catalog(monkeypatch) -> None:
+def test_llm_extracted_company_name_resolves_through_provider_catalog(
+    monkeypatch,
+) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
@@ -4173,10 +4194,7 @@ def test_llm_extracted_company_name_resolves_through_provider_catalog(monkeypatc
     )
 
     assert result.outcome == "ready_for_confirmation"
-    assert (
-        result.decision.candidate_strategy_draft.asset_universe
-        == ["AAPL"]
-    )
+    assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL"]
     assert "assistant_response" not in result.patch
 
 
@@ -4461,8 +4479,6 @@ def test_company_name_asset_basket_canonicalizes_interpreter_identified_assets(
     assert "invalid_symbols" not in strategy.extra_parameters
     assert result.decision.ambiguous_fields == []
     assert result.decision.unsupported_constraints == []
-
-
 
 
 def test_ambiguous_interpreter_identified_company_name_clarifies_instead_of_dropping(
@@ -4938,9 +4954,7 @@ def test_unanchored_investing_thesis_routes_to_supported_simplification(
         user_goal_summary="User wants to test a non-executable signal source.",
         candidate_strategy_draft=StrategySummary(
             raw_user_phrasing="trade based on Reddit sentiment",
-            strategy_thesis=(
-                "Use social discussion sentiment as the signal for trades."
-            ),
+            strategy_thesis=("Use social discussion sentiment as the signal for trades."),
         ),
         missing_required_fields=["asset_universe", "entry_logic", "date_range"],
         semantic_turn_act="new_idea",
@@ -5307,9 +5321,7 @@ def test_pending_spanish_date_answer_repairs_stale_llm_noop_date_range(
 
     result = interpret_stage(
         state=RunState.new(
-            current_user_message=(
-                "Usa del 1 de febrero de 2025 al 1 de mayo de 2025"
-            ),
+            current_user_message=("Usa del 1 de febrero de 2025 al 1 de mayo de 2025"),
             recent_thread_history=[],
         ),
         user=UserState(user_id="u1", language_preference="es-419"),
@@ -5368,9 +5380,7 @@ def test_pending_spanish_date_answer_repairs_missing_llm_date_range(
 
     result = interpret_stage(
         state=RunState.new(
-            current_user_message=(
-                "Usa del 1 de febrero de 2025 al 1 de mayo de 2025"
-            ),
+            current_user_message=("Usa del 1 de febrero de 2025 al 1 de mayo de 2025"),
             recent_thread_history=[],
         ),
         user=UserState(user_id="u1", language_preference="es-419"),
@@ -5587,9 +5597,7 @@ def test_pending_date_answer_rejects_unowned_window(
     assert result.decision.candidate_strategy_draft.capital_amount == 25_000
     assert result.decision.candidate_strategy_draft.comparison_baseline == "SPY"
     assert result.decision.candidate_strategy_draft.timeframe == "1D"
-    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
-        "no_progress"
-    )
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == ("no_progress")
     assert "date_range" in result.patch["response_intent"]["requested_fields"]
 
 
@@ -5745,9 +5753,7 @@ def test_interpreter_unavailable_pending_date_stops_with_no_progress(
 
     assert result.outcome == "ready_to_respond"
     assert result.decision.candidate_strategy_draft == pending
-    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
-        "no_progress"
-    )
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == ("no_progress")
     assert result.patch["response_intent"]["requested_fields"] == ["date_range"]
     assert result.patch["requested_field"] == "date_range"
     assert "recovery" not in result.patch
@@ -5821,12 +5827,8 @@ def test_answered_fields_survive_no_progress_stop(
     assert preserved.capital_amount == 25_000
     assert preserved.comparison_baseline == "SPY"
     assert preserved.timeframe == "1D"
-    assert result.patch["candidate_strategy_draft"] == preserved.model_dump(
-        mode="python"
-    )
-    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
-        "no_progress"
-    )
+    assert result.patch["candidate_strategy_draft"] == preserved.model_dump(mode="python")
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == ("no_progress")
     assert result.patch["assistant_response"].startswith(
         "Todavía necesito el período histórico."
     )
@@ -5871,9 +5873,7 @@ def test_pending_spanish_date_answer_repairs_reload_thinned_metadata(
 
     result = interpret_stage(
         state=RunState.new(
-            current_user_message=(
-                "Usa del 1 de febrero de 2025 al 1 de mayo de 2025"
-            ),
+            current_user_message=("Usa del 1 de febrero de 2025 al 1 de mayo de 2025"),
             recent_thread_history=[],
         ),
         user=UserState(user_id="u1", language_preference="es-419"),
@@ -6162,8 +6162,7 @@ def test_canonical_dca_interpreter_output_reaches_confirmation_without_phrase_re
     assert result.decision.missing_required_fields == []
     assert result.decision.unsupported_constraints == []
     assert not any(
-        "dca_contract_repair" in reason
-        for reason in result.decision.reason_codes
+        "dca_contract_repair" in reason for reason in result.decision.reason_codes
     )
 
 
@@ -6378,9 +6377,7 @@ def test_ready_pending_signal_ignores_resolved_optional_ambiguity(
                 reason_code="optional_exit_rule_suggestion",
             )
         ],
-        assistant_response=(
-            "Would you like to run it as-is, or add a simple exit rule?"
-        ),
+        assistant_response=("Would you like to run it as-is, or add a simple exit rule?"),
         semantic_turn_act="answer_pending_need",
     )
 
@@ -6993,7 +6990,9 @@ def test_contextual_asset_edit_preserves_existing_signal_rule_without_restatemen
     assert strategy.date_range == "past year"
     assert strategy.entry_rule == entry_rule
     assert strategy.exit_rule == exit_rule
-    assert "semantic_unsubstantiated_signal_rule_removed" not in result.decision.reason_codes
+    assert (
+        "semantic_unsubstantiated_signal_rule_removed" not in result.decision.reason_codes
+    )
 
 
 def test_initial_multi_symbol_equity_defaults_to_spy_benchmark(
@@ -7024,9 +7023,7 @@ def test_initial_multi_symbol_equity_defaults_to_spy_benchmark(
     )
 
     result, _ = run_interpret_with_llm(
-        message=(
-            "let's test holding AAPL MSFT and TSLA from 2023 to date with 100k"
-        ),
+        message=("let's test holding AAPL MSFT and TSLA from 2023 to date with 100k"),
         response=response,
     )
 
@@ -7278,9 +7275,10 @@ def test_contextual_asset_append_preserves_benchmark_and_setup(
     assert strategy.comparison_baseline == "QQQ"
     assert strategy.date_range == {"start": "2023-01-01", "end": "today"}
     assert strategy.capital_amount == 100000
-    assert strategy.extra_parameters["artifact_patch"][
-        "asset_universe_operation"
-    ] == "append"
+    assert (
+        strategy.extra_parameters["artifact_patch"]["asset_universe_operation"]
+        == "append"
+    )
     assert "asset_universe_operation" not in strategy.extra_parameters
 
 
@@ -7329,9 +7327,10 @@ def test_contextual_asset_replace_preserves_explicit_benchmark_and_setup(
     assert strategy.comparison_baseline == "QQQ"
     assert strategy.date_range == {"start": "2023-01-01", "end": "today"}
     assert strategy.capital_amount == 100000
-    assert strategy.extra_parameters["artifact_patch"][
-        "asset_universe_operation"
-    ] == "replace"
+    assert (
+        strategy.extra_parameters["artifact_patch"]["asset_universe_operation"]
+        == "replace"
+    )
     assert "asset_universe_operation" not in strategy.extra_parameters
 
 
@@ -7499,8 +7498,7 @@ def test_contextual_asset_append_over_five_symbols_requires_correction(
     assert strategy.asset_universe == ["AAPL", "MSFT", "TSLA", "GOOGL", "NVDA", "AMD"]
     assert strategy.comparison_baseline == "QQQ"
     assert any(
-        "5 symbols" in constraint.explanation
-        or "5 symbols" in constraint.raw_value
+        "5 symbols" in constraint.explanation or "5 symbols" in constraint.raw_value
         for constraint in result.decision.unsupported_constraints
     )
 
@@ -7679,6 +7677,7 @@ def test_interpreter_unavailable_mixed_confirmation_edit_preserves_all_operation
             "equity",
         ),
     )
+
     async def planned_edit(**kwargs: Any) -> ArtifactAssumptionEditPlan:
         del kwargs
         return ArtifactAssumptionEditPlan(
@@ -7778,9 +7777,9 @@ def test_interpreter_unavailable_does_not_parse_pending_date_from_text(
     assert result.outcome == "ready_to_respond"
     assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
     assert result.decision.candidate_strategy_draft.asset_universe == []
-    assert "could not safely apply that change" in result.patch[
-        "assistant_response"
-    ].lower()
+    assert (
+        "could not safely apply that change" in result.patch["assistant_response"].lower()
+    )
     assert "interpreter" not in result.patch["assistant_response"].lower()
 
 
@@ -7885,7 +7884,6 @@ def test_interpreter_unavailable_spanish_pending_strategy_applies_calendar_year_
     assert "pending_date_answer_interpreter_unavailable_repaired" in (
         result.decision.reason_codes
     )
-
 
 
 @pytest.mark.parametrize(
@@ -8317,7 +8315,6 @@ def test_coverage_recovery_does_not_leak_optional_parameters_into_new_idea(
     assert "fees" not in optional_status
     assert "slippage" not in optional_status
     assert "timeframe" not in optional_status
-
 
 
 def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choice(
@@ -9106,9 +9103,9 @@ def test_interpreter_unavailable_does_not_infer_missing_signal_rule_from_text(
     assert result.outcome == "ready_to_respond"
     assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
     assert result.decision.candidate_strategy_draft.entry_rule is None
-    assert "could not safely apply that change" in result.patch[
-        "assistant_response"
-    ].lower()
+    assert (
+        "could not safely apply that change" in result.patch["assistant_response"].lower()
+    )
     assert "interpreter" not in result.patch["assistant_response"].lower()
 
 
@@ -9747,9 +9744,7 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
             intent="strategy_drafting",
             task_relation="refine",
             requires_clarification=False,
-            user_goal_summary=(
-                "Refine the latest AAPL result into recurring $500 buys."
-            ),
+            user_goal_summary=("Refine the latest AAPL result into recurring $500 buys."),
             candidate_strategy_draft=LLMStrategyDraft(
                 raw_user_phrasing=(
                     "i want to do recurrent biweekly buys of 500 bucks instead"
@@ -9851,14 +9846,14 @@ def test_indicator_simplification_does_not_regex_parse_when_interpreter_unavaila
     assert result.outcome == "ready_to_respond"
     assert result.decision.candidate_strategy_draft.asset_universe == []
     assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
-    assert "could not safely apply that change" in result.patch[
-        "assistant_response"
-    ].lower()
+    assert (
+        "could not safely apply that change" in result.patch["assistant_response"].lower()
+    )
     assert "interpreter" not in result.patch["assistant_response"].lower()
     assert "draft" not in result.patch["assistant_response"].lower()
 
 
-def test_interpreter_unavailable_reads_visible_confirmation_assumptions(
+def test_interpreter_unavailable_does_not_render_untyped_confirmation_assumptions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def unavailable_active_confirmation_recovery(**kwargs: Any) -> None:
@@ -9907,8 +9902,8 @@ def test_interpreter_unavailable_reads_visible_confirmation_assumptions(
 
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
-    assert "$1,000 starting capital" in answer
-    assert "Benchmark: SPY" in answer
+    assert "$1,000 starting capital" not in answer
+    assert "Benchmark: SPY" not in answer
     assert "visible confirmation" in answer
     assert "start the simulation" in answer
     assert "card controls" in answer
@@ -9955,9 +9950,7 @@ def test_interpreter_unavailable_active_confirmation_plans_benchmark_edit(
 
     result = interpret_stage(
         state=RunState.new(
-            current_user_message=(
-                "compare it to QQQ, keep the same assets and dates"
-            ),
+            current_user_message=("compare it to QQQ, keep the same assets and dates"),
             recent_thread_history=[],
         ),
         user=UserState(user_id="u1"),
@@ -10036,9 +10029,7 @@ def test_interpreter_unavailable_active_rsi_confirmation_plans_threshold_edit(
 
     result = interpret_stage(
         state=RunState.new(
-            current_user_message=(
-                "baja la entrada RSI a 20 y la salida a 60, porfa"
-            ),
+            current_user_message=("baja la entrada RSI a 20 y la salida a 60, porfa"),
             recent_thread_history=[],
         ),
         user=UserState(user_id="u1", language_preference="es-419"),
@@ -10179,7 +10170,10 @@ def test_interpreter_unavailable_active_confirmation_can_answer_side_question(
     assert "$125 recurring contribution" not in answer
     assert "Benchmark: BTC" not in answer
     assert captured["current_user_message"] == "explain what dollar cost averaging means"
-    assert "Benchmark: BTC" in captured["assumptions_response"]
+    assert (
+        json.loads(captured["assumptions_response"])["display_facts"]["benchmark_symbol"]
+        == "BTC"
+    )
 
 
 def test_interpreter_unavailable_active_confirmation_passes_user_language(
@@ -10229,7 +10223,9 @@ def test_interpreter_unavailable_active_confirmation_passes_user_language(
     assert captured["language"] == "es-419"
 
 
-def test_interpreter_unavailable_during_assumption_edit_does_not_answer_stale_assumptions() -> None:
+def test_interpreter_unavailable_during_assumption_edit_does_not_answer_stale_assumptions() -> (
+    None
+):
     snapshot = TaskSnapshot(
         pending_strategy_summary=StrategySummary(
             strategy_type="buy_and_hold",
@@ -10613,8 +10609,8 @@ def test_failed_benchmark_leg_keeps_unsupported_provenance(monkeypatch) -> None:
         asset_class="equity",
         comparison_baseline="SAMSUNG",
     )
-    updated, reason_codes = (
-        interpret_module._strategy_with_validated_benchmark_symbol(strategy)
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
     )
 
     assert updated.comparison_baseline is None
@@ -10677,8 +10673,8 @@ def test_ambiguous_benchmark_leg_is_disclosed_not_silently_cleared(
         asset_class="equity",
         comparison_baseline="SAMSUNG",
     )
-    updated, reason_codes = (
-        interpret_module._strategy_with_validated_benchmark_symbol(strategy)
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
     )
 
     assert updated.comparison_baseline is None
@@ -10755,8 +10751,8 @@ def test_resolved_benchmark_without_price_coverage_reconciles_on_the_card(
         date_range={"start": "2023-01-03", "end": "2023-12-29"},
         comparison_baseline="NINTENDO",
     )
-    strategy, validated_codes = interpret_module._strategy_with_validated_benchmark_symbol(
-        strategy
+    strategy, validated_codes = (
+        interpret_module._strategy_with_validated_benchmark_symbol(strategy)
     )
     assert strategy.comparison_baseline == "NTDOY"
     assert "benchmark_symbol_provider_validated" in validated_codes
@@ -10903,9 +10899,7 @@ def test_explicit_benchmark_change_retires_the_stale_disclosure(
                 validated_by="price_coverage_probe",
             )
         ],
-        extra_parameters={
-            "field_provenance": {"comparison_baseline": "explicit_user"}
-        },
+        extra_parameters={"field_provenance": {"comparison_baseline": "explicit_user"}},
     )
     updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
         strategy

@@ -1,5 +1,7 @@
 "use client";
 
+import { conversationPreviewText } from "@/lib/conversation-preview-display";
+
 import {
   useCallback,
   useEffect,
@@ -575,12 +577,13 @@ export default function ChatCommandPalette({
         );
     return items
       .filter((item): item is CommandPaletteDisplayItem => Boolean(item))
+      .map((item) => ({ ...item, snippet: item.snippet || conversationPreviewText(item.preview, t) }))
       .map((item) =>
         canManageConversation
           ? item
           : { ...item, canManageConversation: false },
       );
-  }, [canManageConversation, isResultMode, recentItems, searchResults]);
+  }, [canManageConversation, isResultMode, recentItems, searchResults, t]);
   const dateGroupedItems = useMemo(
     () => groupItems(displayItems, t),
     [displayItems, t],

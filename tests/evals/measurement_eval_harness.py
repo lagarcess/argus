@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +27,11 @@ from argus.llm.openrouter import (
 )
 from pydantic import BaseModel, Field
 
+from tests.evals.measurement_assertions import (
+    _compare,
+    _compare_date_range,
+    _compare_subset,
+)
 from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
     measurement_fixture_documents,
@@ -37,7 +41,13 @@ from tests.evals.measurement_outcome import (
     offered_to_user,
     rendered_beside_reply,
 )
-from tests.evals.prose_evidence import judged_prose_evidence
+from tests.evals.measurement_prose import (
+    PROSE_JUDGE_RUBRIC,
+    PROSE_JUDGE_RUBRIC_VERSION,
+    composer_unavailability,
+    retain_prose_context,
+    unavailable_prose_result,
+)
 
 LOCKED_EVAL_CATEGORIES = {
     "messy_english",
@@ -50,35 +60,6 @@ LOCKED_EVAL_CATEGORIES = {
     "asset_discovery_routing",
     "dca_capital_semantics",
 }
-PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v2"
-PROSE_JUDGE_RUBRIC = """
-Version: argus-prose-quality-v2
-
-Judge only the prose qualities listed in the case. Do not grade asset symbols,
-dates, strategy type, benchmark, stage outcome, or executable capability truth;
-those are checked by typed assertions outside this judge.
-
-The reply is not the whole screen. rendered_beside_reply is the complete list
-of what the interface renders next to the assistant text on the same turn:
-discovery rows with their source list, pressable recovery options, and
-follow-up experiment rows. Voiced prose often only frames that surface, so
-judge each claim against the prose and the rendered surface together: a
-sentence that introduces or summarizes rows, sources, or options rendered
-beside it is supported by them, and a claim that neither the prose nor the
-rendered surface supports is still unsupported. An empty rendered_beside_reply
-is not missing data; it means the interface rendered nothing beside the prose,
-so a reply that presents results or options as delivered when neither the
-prose nor the rendered surface contains them is unsupported.
-
-Allowed prose criteria:
-- recovery_tone: the user is not blamed, and the response keeps the idea usable.
-- honesty: unsupported or uncertain capability is not presented as executable.
-- spanish_language_integrity: Spanish sessions do not leak English fallback copy.
-- no_raw_runtime_error: provider, Python, traceback, enum, or schema details are
-  not exposed as user-facing recovery text.
-
-Return JSON only. Use failed_criteria for any failed requested criterion.
-"""
 
 
 @dataclass(frozen=True)
@@ -225,6 +206,19 @@ def run_eval_case(
                 contract=contract,
                 language=case.user_language,
             )
+            if confirm_result.outcome == "needs_clarification":
+                clarify_result = clarify_stage(
+                    state=_state_from_interpret_patch(
+                        case=case,
+                        interpret_patch={
+                            **interpret_result.patch,
+                            **confirm_result.patch,
+                        },
+                    ),
+                    contract=contract,
+                    clarification_generator=clarifier,
+                    language=case.user_language,
+                )
         elif interpret_result.outcome == "needs_clarification":
             clarify_state = _state_from_interpret_patch(
                 case=case,
@@ -262,6 +256,7 @@ def run_eval_case(
         followup_result=followup_result,
     )
     failed_checks = typed_expectation_failures(case=case, outcome=typed_outcome)
+    infrastructure_errors = composer_unavailability(route_receipts)
     judge_result = None
     if run_prose_judge and case.prose_judge_criteria:
         judged_final_patch = _final_patch(
@@ -274,7 +269,11 @@ def run_eval_case(
             final_patch=judged_final_patch,
             interpret_patch=interpret_result.patch,
         )
-        if not assistant_text.strip():
+        if infrastructure_errors:
+            judge_result = unavailable_prose_result(
+                "runtime composer did not return prose"
+            )
+        elif not assistant_text.strip():
             judge_result = _missing_prose_judge_result()
             failed_checks.append("prose_judge:missing_assistant_text")
         else:
@@ -290,20 +289,25 @@ def run_eval_case(
                     receipt.as_dict()
                     for receipt in end_openrouter_route_receipt_capture(judge_route_token)
                 )
-            if not judge_result["pass"]:
+            if judge_result.get("status") == "unavailable":
+                infrastructure_errors.append(
+                    {"component": "prose_judge", "code": "no_structured_result"}
+                )
+            elif not judge_result["pass"]:
                 failed_checks.extend(
                     f"prose_judge:{criterion}"
                     for criterion in judge_result["failed_criteria"]
                 )
-        # Bound to the same locals the judge received, so the artifact cannot
-        # attribute a verdict to prose or a rendered surface the judge never saw.
-        judge_result["requested_criteria"] = list(case.prose_judge_criteria)
-        judge_result["judged_assistant_text"] = judged_prose_evidence(assistant_text)
-        judge_result["judged_rendered_context"] = judged_prose_evidence(
-            json.dumps(rendered_surface, sort_keys=True)
+        retain_prose_context(
+            judge_result,
+            criteria=case.prose_judge_criteria,
+            text=assistant_text,
+            rendered_surface=rendered_surface,
         )
 
     status = _result_status(failed_checks, expected_fail=case.expected_fail)
+    if infrastructure_errors:
+        status = "failed" if failed_checks else "infrastructure_error"
     return {
         "id": case.id,
         "category": case.category,
@@ -320,6 +324,7 @@ def run_eval_case(
         ),
         "typed_outcome": typed_outcome,
         "prose_judge": judge_result,
+        "infrastructure_errors": infrastructure_errors,
         "route_receipts": route_receipts,
     }
 
@@ -475,7 +480,12 @@ def typed_expectation_failures(
             failures,
         )
     if expected.offered is not None:
-        compare_offered(expected.offered, outcome.get("offered"), failures)
+        compare_offered(
+            expected.offered,
+            outcome.get("offered"),
+            failures,
+            expected_fields=vars(expected),
+        )
     return failures
 
 
@@ -486,7 +496,8 @@ def blocking_eval_results(
     return [
         result
         for result in results
-        if result.get("status") in {"failed", "unexpected_pass"}
+        if result.get("status") in {"failed", "unexpected_pass", "infrastructure_error"}
+        or result.get("infrastructure_errors")
     ]
 
 
@@ -505,20 +516,20 @@ def judge_prose_quality(
     assistant_text: str,
     rendered_beside_reply: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    response = asyncio.run(
-        _judge_prose_quality_async(
-            case=case,
-            assistant_text=assistant_text,
-            rendered_beside_reply=rendered_beside_reply or {},
+    try:
+        response = asyncio.run(
+            _judge_prose_quality_async(
+                case=case,
+                assistant_text=assistant_text,
+                rendered_beside_reply=rendered_beside_reply or {},
+            )
         )
-    )
+    except Exception as exc:
+        # Judge transport/schema failures make this measurement unavailable;
+        # retain the receipts in run_eval_case and fail the gate, not the prose.
+        return unavailable_prose_result(f"prose judge error: {type(exc).__name__}")
     if response is None:
-        return {
-            "pass": False,
-            "failed_criteria": list(case.prose_judge_criteria),
-            "notes": "prose judge did not return a structured result",
-            "rubric_version": PROSE_JUDGE_RUBRIC_VERSION,
-        }
+        return unavailable_prose_result("prose judge did not return a structured result")
     return {
         "pass": response.passed,
         "failed_criteria": response.failed_criteria,
@@ -579,6 +590,19 @@ def _run_followup_turn_if_needed(
             contract=contract,
             language=case.user_language,
         )
+        if followup_confirm.outcome == "needs_clarification":
+            followup_clarify = clarify_stage(
+                state=_state_for_followup_clarification(
+                    prompt=case.followup_prompt,
+                    interpret_patch={
+                        **followup_interpret.patch,
+                        **followup_confirm.patch,
+                    },
+                ),
+                contract=contract,
+                clarification_generator=clarification_generator,
+                language=case.user_language,
+            )
     elif followup_interpret.outcome == "needs_clarification":
         followup_clarify = clarify_stage(
             state=_state_for_followup_clarification(
@@ -931,8 +955,8 @@ def _typed_outcome(
             *([] if confirm_result is None else [str(confirm_result.outcome)]),
             *([] if clarify_result is None else [str(clarify_result.outcome)]),
             *([] if followup_interpret is None else [str(followup_interpret.outcome)]),
-            *([] if followup_clarify is None else [str(followup_clarify.outcome)]),
             *([] if followup_confirm is None else [str(followup_confirm.outcome)]),
+            *([] if followup_clarify is None else [str(followup_clarify.outcome)]),
         ],
         "assets": _symbols(launch_payload=launch_payload, strategy=strategy),
         "asset_class": launch_payload.get("asset_class") or strategy.get("asset_class"),
@@ -997,10 +1021,14 @@ def _final_patch(
     confirm_result: Any | None,
     clarify_result: Any | None,
 ) -> dict[str, Any]:
+    if clarify_result is not None:
+        return {
+            **interpret_result.patch,
+            **(confirm_result.patch if confirm_result is not None else {}),
+            **clarify_result.patch,
+        }
     if confirm_result is not None:
         return confirm_result.patch
-    if clarify_result is not None:
-        return {**interpret_result.patch, **clarify_result.patch}
     return interpret_result.patch
 
 
@@ -1064,13 +1092,6 @@ def _compare_intent(
     _compare("intent", expected, actual, failures)
 
 
-def _compare(name: str, expected: Any, actual: Any, failures: list[str]) -> None:
-    if expected is None:
-        return
-    if actual != expected:
-        failures.append(f"{name}: expected {expected!r}, got {actual!r}")
-
-
 def _compare_asset_discovery(
     expected: dict[str, Any],
     actual: Any,
@@ -1117,70 +1138,6 @@ def _compare_asset_discovery(
                 "asset_discovery.category_description: expected any of "
                 f"{list(include_terms)!r} in {description!r}"
             )
-
-
-def _compare_subset(
-    name: str,
-    expected: Any,
-    actual: Any,
-    failures: list[str],
-) -> None:
-    if isinstance(expected, dict):
-        if not isinstance(actual, dict):
-            failures.append(
-                f"{name}: expected mapping subset {expected!r}, got {actual!r}"
-            )
-            return
-        for key, expected_value in expected.items():
-            _compare_subset(f"{name}.{key}", expected_value, actual.get(key), failures)
-        return
-    _compare(name, expected, actual, failures)
-
-
-def _compare_date_range(
-    name: str,
-    expected: Any,
-    actual: Any,
-    failures: list[str],
-) -> None:
-    expected_window = _date_range_window(expected)
-    actual_window = _date_range_window(actual)
-    if expected_window is not None and actual_window is not None:
-        if actual_window != expected_window:
-            failures.append(f"{name}: expected {expected!r}, got {actual!r}")
-        return
-    _compare(name, expected, actual, failures)
-
-
-def _date_range_window(value: Any) -> tuple[date, date] | None:
-    if isinstance(value, dict):
-        start = _date_boundary(value.get("start"))
-        end = _date_boundary(value.get("end"))
-        if start is None or end is None:
-            return None
-        return (start, end)
-    if isinstance(value, str):
-        parts = value.split("/")
-        if len(parts) != 2:
-            return None
-        start = _date_boundary(parts[0])
-        end = _date_boundary(parts[1])
-        if start is None or end is None:
-            return None
-        return (start, end)
-    return None
-
-
-def _date_boundary(value: Any) -> date | None:
-    if not isinstance(value, str):
-        return None
-    text = value.strip()
-    if len(text) < 10:
-        return None
-    try:
-        return date.fromisoformat(text[:10])
-    except ValueError:
-        return None
 
 
 def _last_stage_outcome(

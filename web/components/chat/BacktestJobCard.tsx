@@ -16,6 +16,9 @@ import {
 type BacktestJobCardProps = {
   job: BacktestJob;
   canRetry?: boolean;
+  failureMessage?: string;
+  onRetry?: () => void;
+  retryLabel?: string;
 };
 
 const statusIcons = {
@@ -29,12 +32,18 @@ const statusIcons = {
 export default function BacktestJobCard({
   job,
   canRetry = false,
+  failureMessage,
+  onRetry,
+  retryLabel,
 }: BacktestJobCardProps) {
   const { t } = useTranslation();
   const copy = backtestJobCardCopy(job, { canRetry });
   const StatusIcon = statusIcons[copy.icon];
   const title = t(copy.titleKey, copy.titleFallback);
-  const body = t(copy.bodyKey, copy.bodyFallback);
+  const body =
+    job.status === "failed" && failureMessage?.trim()
+      ? failureMessage.trim()
+      : t(copy.bodyKey, copy.bodyFallback);
   const detail = t(copy.detailKey, copy.detailFallback);
   const statusLabel = t(copy.statusLabelKey, copy.statusLabelFallback);
 
@@ -59,8 +68,18 @@ export default function BacktestJobCard({
         </span>
       </div>
 
-      <div className="border-t border-black/8 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/8 sm:px-5">
-        {detail}
+      <div className="flex min-h-11 items-center justify-between gap-3 border-t border-black/8 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/8 sm:px-5">
+        <span>{detail}</span>
+        {canRetry && onRetry && retryLabel ? (
+          <button
+            type="button"
+            data-testid="backtest-job-retry"
+            onClick={onRetry}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#b3593f]/30 px-4 text-[13px] font-medium text-[#9c4a33] transition-colors hover:bg-[#b3593f]/[0.08] dark:border-[#e08d70]/30 dark:text-[#e5a48b] dark:hover:bg-[#e08d70]/10"
+          >
+            {retryLabel}
+          </button>
+        ) : null}
       </div>
     </section>
   );

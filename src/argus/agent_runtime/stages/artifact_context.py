@@ -12,6 +12,7 @@ from argus.agent_runtime.artifacts.drafts import (
 from argus.agent_runtime.confirmation_artifacts import (
     validate_confirmation_execution_payload,
 )
+from argus.agent_runtime.confirmation_facts import confirmation_display_facts
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.agent_runtime.stages.interpret_types import InterpretDecision
 from argus.agent_runtime.state.models import (
@@ -216,39 +217,43 @@ def has_pending_confirmation_context(snapshot: TaskSnapshot | None) -> bool:
     )
 
 
-def draft_assumptions_response(snapshot: TaskSnapshot | None) -> str | None:
-    if snapshot is None:
+def draft_assumptions_response(snapshot: TaskSnapshot | None) -> dict[str, Any] | None:
+    """Project the same typed facts as the card; never read saved assumption prose."""
+    if snapshot is None or not has_pending_confirmation_context(snapshot):
         return None
-    assumptions = active_confirmation_assumptions(snapshot)
-    if not assumptions and snapshot.pending_strategy_summary is not None:
-        assumptions = list(snapshot.pending_strategy_summary.assumptions)
-    if not assumptions and snapshot.pending_strategy_summary is not None:
-        assumptions = inferred_strategy_assumptions(snapshot.pending_strategy_summary)
-    if not assumptions:
-        return None
-    artifact_label = (
-        "visible confirmation"
-        if snapshot.active_confirmation_reference is not None
-        else "current idea"
-    )
-    return f"For the {artifact_label}, I am using: " + "; ".join(assumptions) + "."
-
-
-def active_confirmation_assumptions(snapshot: TaskSnapshot) -> list[str]:
     reference = snapshot.active_confirmation_reference
-    if reference is None:
-        return []
-    metadata = dict(reference.metadata)
+    metadata = reference.metadata if reference is not None else {}
+    strategy = snapshot.pending_strategy_summary or StrategySummary()
+    payload = confirmation_payload_dict(metadata.get("confirmation_payload"))
+    strategy_values = payload.get("strategy")
+    if not isinstance(strategy_values, dict):
+        strategy_values = strategy.model_dump(mode="json")
+    display_facts = None
+    card_asset_class = None
     for key in ("confirmation_card", "card", "presentation"):
         card = metadata.get(key)
-        if isinstance(card, dict):
-            assumptions = card.get("assumptions")
-            if isinstance(assumptions, list):
-                return [str(item) for item in assumptions if str(item).strip()]
-    assumptions = metadata.get("assumptions")
-    if isinstance(assumptions, list):
-        return [str(item) for item in assumptions if str(item).strip()]
-    return []
+        if isinstance(card, dict) and isinstance(card.get("display_facts"), dict):
+            display_facts = dict(card["display_facts"])
+            card_asset_class = card.get("asset_class")
+            break
+    if display_facts is None:
+        optional_parameters = payload.get("optional_parameters")
+        launch_payload = payload.get("launch_payload")
+        display_facts = confirmation_display_facts(
+            strategy=strategy_values,
+            optional_parameters=optional_parameters
+            if isinstance(optional_parameters, dict)
+            else {},
+            launch_payload=launch_payload if isinstance(launch_payload, dict) else {},
+        )
+    return {
+        "kind": "artifact_assumptions",
+        "facts": {
+            "artifact_kind": "confirmation" if reference is not None else "current_idea",
+            "asset_class": card_asset_class or strategy_values.get("asset_class"),
+            "display_facts": display_facts,
+        },
+    }
 
 
 def active_confirmation_effective_strategy(
@@ -312,19 +317,6 @@ def _strategy_with_launch_defaults(
     if benchmark_symbol and not updated.comparison_baseline:
         updated.comparison_baseline = str(benchmark_symbol).strip().upper()
     return updated
-
-
-def inferred_strategy_assumptions(strategy: StrategySummary) -> list[str]:
-    assumptions = ["Long-only", "Equal weight"]
-    if strategy.comparison_baseline:
-        assumptions.append(f"Benchmark: {strategy.comparison_baseline}")
-    elif strategy.asset_class == "crypto":
-        assumptions.append("Benchmark: BTC")
-    elif strategy.asset_class == "equity":
-        assumptions.append("Benchmark: SPY")
-    if strategy.timeframe:
-        assumptions.append(f"Timeframe: {strategy.timeframe}")
-    return assumptions
 
 
 def validated_approval_confirmation_payload_from_state(

@@ -1,0 +1,11 @@
+Candidate: 79c8d78eee3af878b9cc52247bb1da28e7dc90a5
+Scenario: recorded real English-authored META result, Spanish workspace after reload
+
+RECENTS
+Resultado de simulación · META · Comprar y mantener
+
+SEARCH
+Query: A simple buy-and-hold
+Vista previa: Resultado de simulación · META · Comprar y mantener
+
+The retained English result sentence did not render in Recents or Search. The saved conversation title remains English by the reviewed artifact-identity contract.

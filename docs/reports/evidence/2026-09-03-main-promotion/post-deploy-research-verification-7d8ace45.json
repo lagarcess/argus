@@ -1,0 +1,61 @@
+{
+  "schema_version": "argus_post_deploy_research_verification/v1",
+  "landed_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "browser": {
+    "surface": "https://arguschat.ai/chat",
+    "english": {
+      "question_kind": "latest reported quarter revenue drivers",
+      "grounded_answer_rendered": true,
+      "visible_source_count": 5
+    },
+    "spanish": {
+      "question_kind": "razones del crecimiento de ingresos del trimestre mas reciente",
+      "grounded_answer_rendered": true,
+      "visible_source_count": 5
+    },
+    "spanish_category_discovery": {
+      "question": "que acciones de ciberseguridad podria probar",
+      "rows_rendered": 5,
+      "symbols": ["CRWD", "PANW", "FTNT", "ZS", "CHKP"],
+      "status": "passed"
+    }
+  },
+  "posthog": {
+    "project": "Default project",
+    "timezone": "UTC",
+    "event": "research",
+    "environment_filter": "production",
+    "predeploy_window": {
+      "from": "2026-08-31T17:01:00Z",
+      "to": "2026-09-04T00:25:00Z",
+      "settlement_events": 0
+    },
+    "postdeploy_window": {
+      "from": "2026-09-04T00:25:00Z",
+      "to": "2026-09-04T00:55:00Z",
+      "completed_settlement_events": 4,
+      "failed_settlement_events": 0
+    },
+    "status": "recovered"
+  },
+  "api_logs": {
+    "resource": "argus-api",
+    "window": {
+      "from": "2026-09-04T00:25:00Z",
+      "to": "2026-09-04T01:00:00Z"
+    },
+    "pages_read": 10,
+    "log_records_scanned": 991,
+    "first_record_at": "2026-09-04T00:25:02.930040048Z",
+    "last_record_at": "2026-09-04T00:51:25.914192824Z",
+    "grounded_result_records": 0,
+    "successful_grounded_result_records": 0,
+    "research_cost_unpriced_rate_mismatch_records": 3,
+    "status": "required_success_record_not_observed",
+    "code_observation": "grounded_result logs provider-unavailable failures but emits no success log record on the successful return path"
+  },
+  "research_user_path_recovered": true,
+  "research_settlement_telemetry_recovered": true,
+  "required_success_log_proof_satisfied": false,
+  "overall_verification": "incomplete"
+}

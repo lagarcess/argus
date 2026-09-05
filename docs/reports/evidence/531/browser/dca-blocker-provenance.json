@@ -1,0 +1,36 @@
+{
+  "candidate_sha": "79c8d78eee3af878b9cc52247bb1da28e7dc90a5",
+  "scenario": "English-authored AAPL monthly DCA with explicit typed facts, then Spanish hydration",
+  "provider_backed_ui_turns_submitted": 1,
+  "backtests_started": 0,
+  "run_actions_clicked": 0,
+  "invalid_driver_attempt": {
+    "classification": "QA harness error, not a product finding",
+    "cause": "shell expansion removed the two literal dollar amounts before Playwright received the prompt",
+    "terminal_product_state": "the product correctly requested the missing amount",
+    "run_clicked": false
+  },
+  "corrective_attempt": {
+    "intended_prompt": "Test investing $500 into AAPL every month from 2024-01-02 through 2024-12-31, starting with $0. Use 0.10% fees and 0.05% slippage, benchmark SPY.",
+    "browser_readback_byte_for_byte_equal": true,
+    "driver": "shell-free subprocess argv plus browser contenteditable text assertion",
+    "submitted": false,
+    "run_clicked": false,
+    "readback_evidence": "dca-corrective-prompt-readback.json",
+    "readback_evidence_sha256": "c88342fe25b31855b971f3cd4acb1d17f0395c165d3cc4ce2ae9f09e052ed912",
+    "screenshot": "dca-corrective-prompt-unsent.png",
+    "screenshot_sha256": "eb75cfd797322ffb22b533f64224623d1379eb7f9e0f4fc010af235bdf568737"
+  },
+  "approval_rejection": {
+    "summary": "The execution gate rejected a second paid provider-backed submission after the malformed first attempt and required direct user approval. No workaround or indirect submission was attempted.",
+    "blocked_action": "Send corrective DCA prompt"
+  },
+  "private_receipts": {
+    "location": "temporary QA storage only",
+    "promotion_policy": "private audit only; not committed"
+  },
+  "contains_provider_tokens": false,
+  "contains_credential_names_or_values": false,
+  "contains_auth_or_session_identifiers": false,
+  "acceptance_status": "blocked before valid confirmation and Run"
+}

@@ -27,7 +27,10 @@ function confirmation(
   };
 }
 
-async function renderConfirmation(payload: StrategyConfirmationPayload) {
+async function renderConfirmationMarkup(
+  payload: StrategyConfirmationPayload,
+  disabled = false,
+) {
   const i18n = i18next.createInstance();
   await i18n.init({
     lng: "en",
@@ -39,9 +42,14 @@ async function renderConfirmation(payload: StrategyConfirmationPayload) {
     createElement(
       I18nextProvider,
       { i18n },
-      createElement(StrategyConfirmationCard, { confirmation: payload }),
+      createElement(StrategyConfirmationCard, { confirmation: payload, disabled }),
     ),
   );
+  return html;
+}
+
+async function renderConfirmation(payload: StrategyConfirmationPayload) {
+  const html = await renderConfirmationMarkup(payload);
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
 }
 
@@ -50,6 +58,17 @@ function wordCount(text: string, value: string) {
 }
 
 describe("StrategyConfirmationCard asset heading", () => {
+  test("keeps confirmation actions disabled while another turn is in flight", async () => {
+    const payload = confirmation(["AAPL"], "buy_and_hold");
+    payload.actions = [
+      { id: "run-fresh", type: "run_backtest", label: "Run backtest" },
+    ];
+
+    const markup = await renderConfirmationMarkup(payload, true);
+
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>.*Run backtest/);
+  });
+
   test("renders a single entity symbol once when no strategy label exists", async () => {
     const text = await renderConfirmation(confirmation(["AAPL"]));
 

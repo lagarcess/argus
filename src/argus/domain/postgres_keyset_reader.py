@@ -12,6 +12,7 @@ from argus.api.chat.legacy_onboarding_markers import (
     _LEGACY_GOAL_PREFIX,
     _LEGACY_SKIP_MARKER,
 )
+from argus.domain.conversation_previews import MAX_CONVERSATION_PREVIEWS
 
 _KEYSET_ACQUIRE_TIMEOUT_SECONDS = 2.0
 _LEGACY_GOAL_LIKE = _LEGACY_GOAL_PREFIX.replace("_", r"\_").replace("%", r"\%") + "%"
@@ -117,6 +118,43 @@ def _stringify_uuid_fields(
 @dataclass(frozen=True)
 class PostgresKeysetReader:
     pool: Any
+
+    def read_conversation_preview_messages(
+        self, *, user_id: str, conversation_ids: list[str]
+    ) -> list[dict[str, Any]]:
+        ids = list(dict.fromkeys(conversation_ids))
+        if len(ids) > MAX_CONVERSATION_PREVIEWS:
+            raise ValueError("At most 100 conversation previews may be read at once.")
+        if not ids:
+            return []
+        with self.pool.connection(timeout=_KEYSET_ACQUIRE_TIMEOUT_SECONDS) as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    select c.id as conversation_id, latest.role, latest.content, latest.metadata
+                    from public.conversations c
+                    left join lateral (
+                        select m.role, m.content, m.metadata
+                        from public.messages m
+                        where m.user_id = c.user_id and m.conversation_id = c.id
+                          and (m.role <> 'user' or (
+                              m.content <> %s and m.content not like %s escape '\\'
+                          ))
+                        order by m.created_at desc, m.id desc
+                        limit 1
+                    ) latest on true
+                    where c.user_id = %s and c.id = any(%s)
+                    """,
+                    (
+                        _LEGACY_SKIP_MARKER,
+                        _LEGACY_GOAL_LIKE,
+                        _uuid(user_id, label="user_id"),
+                        [_uuid(value, label="conversation_id") for value in ids],
+                    ),
+                )
+                return _stringify_uuid_fields(
+                    cursor.fetchall(), fields=("conversation_id",)
+                )
 
     def list_conversation_rows(
         self,

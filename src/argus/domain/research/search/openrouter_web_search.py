@@ -58,8 +58,7 @@ class OpenRouterWebSearchProvider:
     def search(
         self, query: str, *, max_results: int, timeout_seconds: float
     ) -> SearchResultPacket:
-        if not self._api_key or not self._model:
-            raise SearchUnavailableError(reason="not_configured")
+        self.require_configured()
         bounded_results = max(1, min(int(max_results), MAX_RESULTS))
         started = time.monotonic()
         payload = post_json(
@@ -81,6 +80,11 @@ class OpenRouterWebSearchProvider:
             provider_id="openrouter_web_search",
             cost_usd=_reported_cost(payload),
         )
+
+    def require_configured(self) -> None:
+        """Fail before admission when this adapter cannot make a request."""
+        if not self._api_key or not self._model:
+            raise SearchUnavailableError(reason="not_configured")
 
 
 def _message(payload: Any) -> dict[str, Any]:

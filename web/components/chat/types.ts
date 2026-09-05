@@ -7,6 +7,7 @@ import type {
 import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
 import type { MemoryRecallItem } from "@/lib/memory-recalls";
+import type { ResultReadoutFacts } from "@/lib/result-readout-facts";
 
 export type StrategyResultMetric = {
   /** The card row's stable key, e.g. total_return_pct or contribution_return_pct. */
@@ -120,6 +121,7 @@ export type ChatMention = {
 };
 
 export type StrategyResultPayload = {
+  readoutFacts?: ResultReadoutFacts | null;
   strategyName: string;
   strategyLabel?: string;
   symbols?: string[];
@@ -305,6 +307,7 @@ export type Message = {
     | "backtest_job"
     | "action";
   contentPresentation?:
+    | "result_readout"
     | "result_breakdown"
     | "conversation_load_failure"
     | "superseded_runtime_failure";
@@ -312,6 +315,7 @@ export type Message = {
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
+  resultReadoutFacts?: ResultReadoutFacts | null;
   confirmation?: StrategyConfirmationPayload;
   backtestJob?: BacktestJob;
   // The message a terminal research job produced, once it is in the view;

@@ -12,6 +12,7 @@ from typing import Literal
 OpenRouterTask = Literal[
     "interpretation",
     "interpretation_repair",
+    "asset_mention_preflight",
     "field_fidelity",
     "capability_conflict",
     "clarification",
@@ -52,6 +53,12 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     ),
     "interpretation_repair": OpenRouterProfile(
         "interpretation_repair",
+        temperature=0,
+        max_tokens=2200,
+        timeout_seconds=20,
+    ),
+    "asset_mention_preflight": OpenRouterProfile(
+        "asset_mention_preflight",
         temperature=0,
         max_tokens=2200,
         timeout_seconds=20,
@@ -109,6 +116,7 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "interpretation": "structured",
     "interpretation_repair": "structured",
+    "asset_mention_preflight": "structured",
     "field_fidelity": "structured",
     "capability_conflict": "context",
     "clarification": "chat",

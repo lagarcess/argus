@@ -1,0 +1,86 @@
+{
+  "sha": "5d408acf",
+  "label": "aapl-earnings",
+  "question": "What did Apple say in its most recent quarterly earnings report, and how did AAPL react this week?",
+  "route_receipt_tasks_in_log": [
+    "interpretation",
+    "finance_search x2 (research rail)",
+    "research_pricing_evidence",
+    "name_suggestion"
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content_head": "What did Apple say in its most recent quarterly earnings report, and how did AAPL react this week?",
+      "content_chars": 98,
+      "urls_in_prose": [],
+      "metadata_keys": [
+        "agent_runtime_turn"
+      ]
+    },
+    {
+      "role": "assistant",
+      "content_head": "**Apple’s latest quarter was strong, but its outlook pointed to slower growth. AAPL has risen 2.66% this week through Thursday’s close, with much of the gain occurring as Apple completed its CEO transition.**\n\n### Latest earnings: fiscal Q3 2026\n\nApple reported on July 30 for the quarter ended June ",
+      "content_chars": 2361,
+      "urls_in_prose": [],
+      "metadata_keys": [
+        "agent_runtime_stage_outcome",
+        "agent_runtime_turn",
+        "conversation_mode",
+        "next_experiments",
+        "research"
+      ],
+      "research": {
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup",
+        "shape": "balanced",
+        "retrieved_at": "2026-09-04T03:40:26.809146+00:00",
+        "anchor_symbols": [
+          "AAPL"
+        ],
+        "degraded": null,
+        "sources": [
+          {
+            "title": "Apple reports third quarter results",
+            "domain": "www.apple.com",
+            "url": "https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/",
+            "source_date": "2026-07-30"
+          },
+          {
+            "title": "Apple (AAPL) Investor Relations, Earnings Summary & Outlook",
+            "domain": "quartr.com",
+            "url": "https://quartr.com/companies/apple-inc_4742",
+            "source_date": "2026-05-20"
+          },
+          {
+            "title": "Apple (AAPL) Q3 2026 earnings report: Live updates",
+            "domain": "www.cnbc.com",
+            "url": "https://www.cnbc.com/2026/07/30/apple-earnings-live-updates.html",
+            "source_date": "2026-07-30"
+          },
+          {
+            "title": "Apple Inc. (AAPL) Q3 2026 Earnings Call Transcript | Seeking ...",
+            "domain": "seekingalpha.com",
+            "url": "https://seekingalpha.com/article/4928290-apple-inc-aapl-q3-2026-earnings-call-transcript",
+            "source_date": "2026-07-31"
+          },
+          {
+            "title": "AAPL Performance Report for Apple Stock - Barchart.com",
+            "domain": "www.barchart.com",
+            "url": "https://www.barchart.com/stocks/quotes/aapl/performance",
+            "source_date": "2026-09-03"
+          }
+        ],
+        "usage_keys": [
+          "cache_status",
+          "cost_usd",
+          "invocations",
+          "latency_ms"
+        ]
+      },
+      "next_experiments_kinds": [
+        "research_test_single"
+      ]
+    }
+  ]
+}

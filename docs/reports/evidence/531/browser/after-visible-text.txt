@@ -1,0 +1,10 @@
+Candidate: 79c8d78eee3af878b9cc52247bb1da28e7dc90a5
+Scenario: recorded real English-authored META result, viewed after switching the workspace to Spanish and reloading
+
+LECTURA RÁPIDA
+Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de 369.5%. Terminó 315.64 puntos porcentuales por encima de SPY. La peor caída fue de -18.35%.
+
+PERÍODO DEL GRÁFICO
+Período visible: 3 ene 2023 al 31 dic 2024.
+
+The stored English result prose was absent from the result card after reload.

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 from argus.api.chat.confirmation import runtime_confirmation_card
-from argus.domain.engine_launch.display import format_timeframe_data_label
 
 
 @pytest.fixture(autouse=True)
@@ -138,11 +137,10 @@ def test_retest_confirmation_projects_typed_period_and_normal_run_label() -> Non
     ]
     # The zero-cost truth is a typed fact, never backend prose: the card
     # localizes `fees`/`slippage` at the presentation boundary (#434).
-    assert card["assumptions"] == [
-        "$1,000 starting capital",
-        "Daily data",
-        "Benchmark: SPY",
-    ]
+    assert card["assumptions"] == []
+    assert card["display_facts"]["capital"] == 1000
+    assert card["display_facts"]["timeframe"] == "1D"
+    assert card["display_facts"]["benchmark_symbol"] == "SPY"
     assert card["display_facts"]["fees"] == 0
     assert card["display_facts"]["slippage"] == 0
 
@@ -202,7 +200,7 @@ def test_runtime_confirmation_card_flag_on_shows_draft_costs_without_launch_payl
     assert card is not None
     assert card["display_facts"]["fees"] == 0.001
     assert card["display_facts"]["slippage"] == 0.0005
-    assert "Modeled costs: 10 bps fee + 5 bps slippage" in card["assumptions"]
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None:
@@ -267,11 +265,7 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
         and row["value"] == "$500 monthly"
         for row in card["rows"]
     )
-    assert "$0 starting capital" in card["assumptions"]
-    assert "$500 monthly contribution" in card["assumptions"]
-    assert "Daily data" in card["assumptions"]
-    assert "1D bars" not in card["assumptions"]
-    assert "$10,000 starting capital" not in card["assumptions"]
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_uses_shared_timeframe_display() -> None:
@@ -299,8 +293,8 @@ def test_runtime_confirmation_card_uses_shared_timeframe_display() -> None:
     )
 
     assert card is not None
-    assert format_timeframe_data_label("2h") in card["assumptions"]
-    assert all("bars" not in assumption.lower() for assumption in card["assumptions"])
+    assert card["display_facts"]["timeframe"] == "2h"
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> None:
@@ -339,8 +333,8 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
         and row["value"] == "$100,000"
         for row in card["rows"]
     )
-    assert "$100,000 starting capital" in card["assumptions"]
-    assert "$10,000 starting capital" not in card["assumptions"]
+    assert card["display_facts"]["capital"] == 100000
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_promotes_default_starting_capital() -> None:
@@ -393,8 +387,8 @@ def test_runtime_confirmation_card_promotes_default_starting_capital() -> None:
         and row["value"] == "$1,000"
         for row in card["rows"]
     )
-    assert "$1,000 starting capital" not in card["assumptions"]
-    assert "Benchmark: SPY" in card["assumptions"]
+    assert card["display_facts"]["benchmark_symbol"] == "SPY"
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_shows_execution_realism_values(
@@ -461,9 +455,9 @@ def test_runtime_confirmation_card_shows_execution_realism_values(
         "slippage": 0.0005,
         "timeframe": "1D",
     }
-    assert "Modeled costs: 10 bps fee + 5 bps slippage" in card["assumptions"]
-    assert "No fees" not in card["assumptions"]
-    assert "No slippage" not in card["assumptions"]
+    assert card["display_facts"]["fees"] == 0.001
+    assert card["display_facts"]["slippage"] == 0.0005
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -> None:
@@ -545,9 +539,10 @@ def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -
         "chat.confirmation.actions.cancel",
         "chat.confirmation.actions.run_backtest",
     }
-    assert "$100,000 starting capital" in card["assumptions"]
-    assert "Datos diarios" in card["assumptions"]
-    assert "Benchmark: BTC" in card["assumptions"]
+    assert card["display_facts"]["capital"] == 100000
+    assert card["display_facts"]["timeframe"] == "1D"
+    assert card["display_facts"]["benchmark_symbol"] == "BTC"
+    assert card["assumptions"] == []
     # #434: the strip used to carry "No fees" and "No slippage" in English on a
     # Spanish turn. The zero-cost truth now travels only as a typed fact, which
     # the card localizes.
@@ -745,8 +740,8 @@ def test_runtime_confirmation_card_uses_explicit_benchmark_assumption() -> None:
     )
 
     assert card is not None
-    assert "Benchmark: QQQ" in card["assumptions"]
-    assert "Benchmark: SPY" not in card["assumptions"]
+    assert card["display_facts"]["benchmark_symbol"] == "QQQ"
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_displays_latest_complete_data_assumption() -> None:
@@ -809,7 +804,8 @@ def test_runtime_confirmation_card_displays_latest_complete_data_assumption() ->
         and row["value"] == "January 1, 2026 - June 2, 2026"
         for row in card["rows"]
     )
-    assert "Through Jun 2" in card["assumptions"]
+    assert card["display_facts"]["data_through"] == "2026-06-02"
+    assert card["assumptions"] == []
 
 
 def test_runtime_confirmation_card_ignores_stale_latest_complete_data_assumption() -> (
@@ -872,7 +868,7 @@ def test_runtime_confirmation_card_ignores_stale_latest_complete_data_assumption
         and row["value"] == "January 1, 2026 - June 1, 2026"
         for row in card["rows"]
     )
-    assert "Through Jun 2" not in card["assumptions"]
+    assert "data_through" not in card["display_facts"]
 
 
 def test_runtime_confirmation_card_uses_visible_benchmark_when_payload_is_stale() -> None:
@@ -922,8 +918,8 @@ def test_runtime_confirmation_card_uses_visible_benchmark_when_payload_is_stale(
     assert card is not None
     assert card["status"] == "needs_change"
     assert card["statusLabel"] == "Needs change"
-    assert "Benchmark: QQQ" in card["assumptions"]
-    assert "Benchmark: SPY" not in card["assumptions"]
+    assert card["display_facts"]["benchmark_symbol"] == "QQQ"
+    assert card["assumptions"] == []
     assert all(action["type"] != "run_backtest" for action in card["actions"])
 
 

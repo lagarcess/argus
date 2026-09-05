@@ -1,0 +1,11 @@
+# Single-owner presentation revalidation
+
+The follow-up review at `5bc469b24a90110bd1b6a5dae0c980be0a3c27ac` identified a duplicated classification rule. Commit `3fd260154db898dba3dbd55a2256248de73d9f42` projects `artifact_presentation_kind` from the existing backend classifier on every public read. The frontend's result fallback consumes that field; it no longer examines response intent, bank presence, or action type to reclassify the answer. Stored annotations cannot override the reader's current decision.
+
+The same approved synthetic QA history and two recorded live-provider factual answers were loaded into the local memory API, restarted at this source. Fresh browser reloads in [English](en-reload.png) and [Spanish](es-reload.png) preserve the requested date and value. The [public readback](proof.json) proves both answers carry a root fact bank, `beginner_guidance`, and a null presentation kind, with content exactly equal to the original live responses. These are reload revalidations; no new model calls or production database access occurred. The original live proof remains applicable because model-facing text and answer generation did not change.
+
+Validation: 144 backend/transport/release checks, 1,558 frontend tests, and 237 mocked eval checks pass. The new assertions first failed: 14 backend and two frontend failures. Private result, breakdown, assumptions, legacy repair, and storage immutability controls remain green. The 17-file prompt fingerprint is unchanged. Modularity, Ruff, and focused ESLint pass.
+
+The initial broader test attempt used an unwritable Numba cache and failed before useful transport assertions; the verified run pins a writable temporary cache and disables dotenv loading. A frontend source-shape assertion was updated for the typed public metadata field. An initial Spanish screenshot still showed English chrome because the saved local profile overrode browser storage; the committed screenshot follows the local profile language change and verifies the translated composer. The recorded prose and recovery wording observations from the prior round remain unchanged and are visible in the screenshots.
+
+Any later evidence-only commit is revalidated by source hashes and a fresh browser reload before the final PR handoff. Final CI and Codex review are recorded on the PR after they finish.

@@ -1,0 +1,65 @@
+{
+  "checked_at": "2026-09-05T15:36:21.323602+00:00",
+  "database_access": "repeatable_read_read_only",
+  "reader": "public.read_conversation_activity_sources",
+  "projection": "argus.domain.conversation_activity.project_conversation_activity",
+  "aggregate_only": true,
+  "backfill_decision": "https://github.com/lagarcess/argus/pull/548",
+  "proof_seed_rows": [
+    {
+      "operation_scope": "workflows.proof",
+      "status": "failed",
+      "jobs": 5,
+      "conversation_links": 0
+    },
+    {
+      "operation_scope": "workflows.proof",
+      "status": "succeeded",
+      "jobs": 143,
+      "conversation_links": 0
+    }
+  ],
+  "proof_sources_emitted": 0,
+  "unsettleable_job_attribution": [
+    {
+      "ownership_group": "developer_qa",
+      "operation_scope": "chat.run_backtest",
+      "jobs": 114,
+      "conversations": 113,
+      "linked_runs": 113,
+      "oldest_job": "2026-06-06 06:25:42.694667+00:00",
+      "newest_job": "2026-07-12 15:44:47.144749+00:00"
+    },
+    {
+      "ownership_group": "other_owner",
+      "operation_scope": "chat.run_backtest",
+      "jobs": 9,
+      "conversations": 8,
+      "linked_runs": 9,
+      "oldest_job": "2026-06-08 22:28:19.122384+00:00",
+      "newest_job": "2026-07-12 19:50:50.526094+00:00"
+    },
+    {
+      "ownership_group": "proof_seeder",
+      "operation_scope": "workflows.proof",
+      "jobs": 143,
+      "conversations": 0,
+      "linked_runs": 0,
+      "oldest_job": "2026-06-06 04:45:52.769764+00:00",
+      "newest_job": "2026-09-04 00:34:07.642983+00:00"
+    }
+  ],
+  "conversation_operation_counts": {
+    "idle": 438,
+    "checking": 121,
+    "running": 7
+  },
+  "conversations_read": 566,
+  "acceptance": {
+    "no_proof_seed_or_scope_source_in_activity": true,
+    "known_historical_checking_count": 121,
+    "historical_checking_count_unchanged": true,
+    "backfill_applied": false,
+    "proof_shadow_note": "Historical chat jobs dispatched through proof-shadow retain chat scope per PR #548; they are not proof-seeder rows."
+  }
+}

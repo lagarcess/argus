@@ -775,6 +775,22 @@ def test_issue_271_establishment_accepts_truthful_strategy_drafting_route() -> N
         "stage_outcomes": ["ready_for_confirmation", "await_approval"],
     }
 
+    truthful["offered"] = {
+        "launch_payload": {
+            **{
+                key: truthful[key]
+                for key in (
+                    "asset_class",
+                    "strategy_type",
+                    "date_range",
+                    "benchmark_symbol",
+                    "capital_amount",
+                )
+            },
+            "symbols": truthful["assets"],
+            "_execution_realism": truthful["launch_execution_realism"],
+        }
+    }
     assert harness.typed_expectation_failures(case=case, outcome=truthful) == []
 
 

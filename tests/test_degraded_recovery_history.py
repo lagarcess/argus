@@ -25,6 +25,7 @@ from argus.api.message_store import (
 )
 from argus.api.routers.history import history as list_history
 from argus.api.search_assembly import scored_memory_search_items
+from argus.domain.conversation_previews import project_conversation_preview
 from argus.domain.supabase_gateway import SupabaseGateway
 from langchain_core.messages import AIMessage
 
@@ -129,7 +130,10 @@ def test_degraded_compatibility_text_stays_durable_but_not_in_history_or_preview
         deleted=False,
         user=user,
     )
-    assert history_items.items[0].subtitle == "Prueba AAPL con velas de cinco minutos."
+    assert RAW_ENGLISH_FALLBACK not in history_items.model_dump_json()
+    assert history_items.items[0].subtitle == ""
+    assert history_items.items[0].preview.kind == "unavailable"
+    assert history_items.items[0].preview.text is None
     assert scored_memory_search_items(user=user, query="compatibility") == []
     search_items = scored_memory_search_items(user=user, query="prueba")
     assert search_items[0][1].matched_text == ("Prueba AAPL con velas de cinco minutos.")
@@ -175,6 +179,11 @@ def test_llm_generated_recovery_voice_remains_in_history_preview_and_model_messa
         api_state.store.conversations[conversation.id].last_message_preview
         == EXACT_LLM_VOICE
     )
+    preview = project_conversation_preview(
+        api_state.store.messages[conversation.id][-1].model_dump()
+    )
+    assert preview.kind == "text"
+    assert preview.text == EXACT_LLM_VOICE
 
     user = UserState(user_id=user_id, language_preference="en")
     interpreter_messages = OpenRouterStructuredInterpreter(

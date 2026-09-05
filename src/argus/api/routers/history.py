@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.conversation_activity import conversation_activity_service
+from argus.api.conversation_previews import conversation_previews
 from argus.api.dependencies import current_user
 from argus.api.guest_access import account_context
 from argus.api.memory_ownership import memory_object_visible
@@ -101,7 +102,10 @@ def history(
                     id=conversation.id,
                     title=conversation.title,
                     title_source=conversation.title_source,
-                    subtitle=conversation.last_message_preview or "No messages yet",
+                    subtitle="",
+                    preview=conversation_previews(
+                        user_id=user.id, conversation_ids=[conversation.id]
+                    )[conversation.id],
                     pinned=False,
                     created_at=conversation.updated_at,
                     conversation_id=conversation.id,
@@ -162,8 +166,7 @@ def history(
                     id=conversation_row["id"],
                     title=conversation_row["title"],
                     title_source=conversation_row["title_source"],
-                    subtitle=conversation_row["last_message_preview"]
-                    or "No messages yet",
+                    subtitle="",
                     pinned=conversation_row["pinned"],
                     created_at=conversation_row["updated_at"],
                 )
@@ -233,8 +236,7 @@ def history(
                         id=stored_conversation.id,
                         title=stored_conversation.title,
                         title_source=stored_conversation.title_source,
-                        subtitle=stored_conversation.last_message_preview
-                        or "No messages yet",
+                        subtitle="",
                         pinned=stored_conversation.pinned,
                         created_at=stored_conversation.updated_at,
                     )
@@ -333,8 +335,15 @@ def history(
         conversation_ids=chat_ids,
         reconcile=True,
     )
+    previews = conversation_previews(user_id=user.id, conversation_ids=chat_ids)
     page_items = [
-        item.model_copy(update={"activity": activities[item.id]})
+        item.model_copy(
+            update={
+                "activity": activities[item.id],
+                "preview": previews[item.id],
+                "subtitle": previews[item.id].text or "",
+            }
+        )
         if item.type == "chat"
         else item
         for item in page_items

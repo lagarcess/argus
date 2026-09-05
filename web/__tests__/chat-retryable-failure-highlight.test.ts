@@ -8,6 +8,7 @@ import { I18nextProvider } from "react-i18next";
 
 import ChatMessage from "../components/chat/ChatMessage";
 import type { ChatActionOption, Message } from "../components/chat/types";
+import type { BacktestJob } from "../lib/argus-api";
 
 const root = join(import.meta.dir, "..");
 const catalogs = {
@@ -108,6 +109,54 @@ function expectAmberRetry(markup: string, localizedLabel: string): void {
 }
 
 describe("retryable failure highlight consistency (issue #313)", () => {
+  test("a failed job renders its recorded reason with a visible Retry control", () => {
+    const reason =
+      "This confirmation had already been used for a different setup, so I did not start another backtest. Use Retry below to create a fresh confirmation, then run the new card.";
+    const job: BacktestJob = {
+      id: "job-conflict",
+      conversation_id: "conversation-1",
+      request_message_id: "request-1",
+      confirmation_message_id: "confirmation-1",
+      status: "failed",
+      result_run_id: null,
+      failure_code: "idempotency_conflict",
+      failure_detail: "confirmation_identity_already_spent",
+      retryable: false,
+      queued_at: "2026-09-04T12:00:00Z",
+      started_at: null,
+      finished_at: "2026-09-04T12:00:00Z",
+      created_at: "2026-09-04T12:00:00Z",
+      updated_at: "2026-09-04T12:00:00Z",
+    };
+    const retry: ChatActionOption = {
+      id: "retry-failed-action-1",
+      label: "Retry",
+      labelKey: "common.retry",
+      type: "retry_failed_action",
+      artifactId: "failed-action-1",
+      artifactType: "failed_action",
+      artifactStatus: "failed",
+      payload: { failed_action_id: "failed-action-1" },
+    };
+
+    const html = renderMessage({
+      id: "assistant-job-conflict",
+      role: "ai",
+      kind: "backtest_job",
+      content: reason,
+      backtestJob: job,
+      actions: [retry],
+    });
+
+    expect(html).toContain(reason);
+    expect(html).toMatch(
+      /<button[^>]*data-testid="backtest-job-retry"[^>]*>Retry<\/button>/,
+    );
+    expect(html).not.toContain(
+      "The run stopped before Argus could save a result.",
+    );
+  });
+
   test("hydrated Argus failures stay assistant-side and amber for every producer", () => {
     const producers = [
       hydratedFailure({

@@ -289,11 +289,11 @@ def result_breakdown_fact_bank(
     if date_range:
         fact_bank["date_range"] = date_range
 
-    rule_summary = _localized_rule_summary(context, language=resolved_language)
+    rule_summary = _stored_rule_summary(context)
     if rule_summary:
         fact_bank["rule_summary"] = rule_summary
 
-    run_note = _localized_execution_note(context, language=resolved_language)
+    run_note = _stored_execution_note(context)
     if run_note:
         fact_bank["execution_note"] = run_note
 
@@ -360,7 +360,7 @@ def result_breakdown_fact_bank(
             symbols=_context_symbols(context),
         )
     )
-    fact_bank["caveat"] = _breakdown_caveat(language=resolved_language)
+    fact_bank["caveat"] = _breakdown_caveat()
     return fact_bank
 
 
@@ -400,7 +400,7 @@ def _response_language(language: object) -> str:
     return str(language or "en").strip() or "en"
 
 
-def _breakdown_caveat(*, language: str) -> str:
+def _breakdown_caveat() -> str:
     return (
         "This is historical simulation evidence, not a prediction or trading "
         "recommendation."
@@ -846,8 +846,8 @@ def fallback_result_breakdown_message(
         if max_drawdown is not None
         else "the available risk data"
     )
-    rule_summary = _localized_rule_summary(context, language=resolved_language)
-    execution_summary = _localized_execution_note(context, language=resolved_language)
+    rule_summary = _stored_rule_summary(context)
+    execution_summary = _stored_execution_note(context)
     assumption_text = "; ".join(line.rstrip(".") for line in assumption_lines)
     period_sentence = f" over {date_range}" if date_range else ""
     setup_lines = [
@@ -878,12 +878,12 @@ def fallback_result_breakdown_message(
     )
 
 
-def _localized_rule_summary(context: dict[str, Any], *, language: str) -> str | None:
+def _stored_rule_summary(context: dict[str, Any]) -> str | None:
     raw_summary = str(context.get("rule_summary") or "").strip()
     return raw_summary or None
 
 
-def _localized_execution_note(context: dict[str, Any], *, language: str) -> str | None:
+def _stored_execution_note(context: dict[str, Any]) -> str | None:
     raw_note = str(context.get("execution_note") or "").strip()
     if not raw_note:
         return None
@@ -921,13 +921,6 @@ def _context_cadence(context: dict[str, Any]) -> str | None:
         if isinstance(candidate, str) and candidate.strip():
             return candidate.strip()
     return None
-
-
-def _localized_cadence_label(value: str | None, *, language: str) -> str | None:
-    normalized = str(value or "").strip().lower()
-    if not normalized:
-        return None
-    return normalized
 
 
 def _result_breakdown_metric(

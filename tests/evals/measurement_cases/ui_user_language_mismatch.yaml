@@ -5,6 +5,8 @@ cases:
     user_language: en
     ui_language: es-419
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["MSFT"]

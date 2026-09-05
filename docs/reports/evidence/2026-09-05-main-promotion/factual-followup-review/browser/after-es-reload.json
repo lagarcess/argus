@@ -1,0 +1,24 @@
+[
+  {
+    "role": "user",
+    "content": "\u00bfQu\u00e9 fecha exacta est\u00e1 guardada para el valor m\u00e1ximo de la cartera?"
+  },
+  {
+    "role": "assistant",
+    "content": "El valor m\u00e1ximo de la cartera, **$50,694.08**, se alcanz\u00f3 el **11 de diciembre de 2024**.\n\nFue justo antes de que la acci\u00f3n retrocediera ligeramente hacia el cierre del a\u00f1o. Importante: esto es evidencia de una simulaci\u00f3n hist\u00f3rica, no una predicci\u00f3n ni una recomendaci\u00f3n de inversi\u00f3n.",
+    "response_intent": {
+      "kind": "beginner_guidance",
+      "semantic_needs": [],
+      "requested_fields": [],
+      "facts": {
+        "peak_date": "2024-12-11T05:00:00",
+        "peak_value": "$50,694.08",
+        "fact_key": "peak_date",
+        "source": "result_followup_fact_bank"
+      },
+      "options": []
+    },
+    "conversation_mode": "guide",
+    "result_run_id": "00000000-0000-4000-8000-000000005312"
+  }
+]

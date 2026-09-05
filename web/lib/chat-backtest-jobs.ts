@@ -7,6 +7,7 @@ import {
   type BacktestRun,
 } from "./argus-api";
 import { hydrateResultActionsForRun } from "./chat-result-actions";
+import { failedActionRetryActionFromMetadata } from "./chat-retry-actions";
 import {
   nextExperimentRowsFromMetadata,
   type NextExperimentRow,
@@ -38,15 +39,36 @@ export function backtestJobMessageFromApi(message: ApiMessage): Message | null {
   if (!job) {
     return null;
   }
-  return {
+  return backtestJobMessage({
     id: message.id,
+    content: message.content,
+    job,
+    metadata: message.metadata ?? {},
+  });
+}
+
+export function backtestJobMessage({
+  id,
+  content,
+  job,
+  metadata,
+}: {
+  id: string;
+  content?: string;
+  job: BacktestJob;
+  metadata: Record<string, unknown>;
+}): Message {
+  const retryAction = failedActionRetryActionFromMetadata(metadata);
+  return {
+    id,
     role: "ai",
     kind: "backtest_job",
-    content: message.content,
+    content,
     backtestJob: job,
     artifactId: job.id,
     artifactType: "backtest_job",
     artifactStatus: job.status,
+    actions: retryAction ? [retryAction] : undefined,
   };
 }
 
@@ -128,8 +150,12 @@ export function applyBacktestJobUpdate(
           }),
         );
       }
+      const failedWithoutRecordedMessage =
+        response.job.status === "failed" &&
+        message.backtestJob.status !== "failed";
       return {
         ...message,
+        content: failedWithoutRecordedMessage ? undefined : message.content,
         backtestJob: response.job,
         artifactStatus: response.job.status,
       };

@@ -5,6 +5,10 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: unsupported_or_out_of_scope
       capability_verdict: unsupported
       assets: ["TSLA"]
@@ -22,6 +26,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["AAPL"]
@@ -42,6 +48,10 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent:
         [
           "unsupported_or_out_of_scope",
@@ -64,6 +74,10 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent:
         [
           "unsupported_or_out_of_scope",
@@ -86,6 +100,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
       # Intent label is model-shape; the typed future_window boundary is what
       # keeps the turn non-executable regardless of which label arrives.
       intent:
@@ -110,6 +127,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
       # Intent label is model-shape; the typed future_window boundary is what
       # keeps the turn non-executable regardless of which label arrives.
       intent:

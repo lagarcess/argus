@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal
 
+from argus.domain.backtest_job_scopes import CHAT_RUN_SCOPE, DIRECT_RUN_SCOPE
 from argus.domain.backtesting.config import normalize_timeframe
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
@@ -27,9 +28,6 @@ from argus.domain.usage_limits import (
     read_memory_usage,
     settle_memory_usage,
 )
-
-CHAT_RUN_SCOPE = "chat.run_backtest"
-DIRECT_RUN_SCOPE = "backtests.run"
 
 STALE_DIRECT_JOB_MINUTES = 15
 STALE_DIRECT_JOB_BATCH = 20

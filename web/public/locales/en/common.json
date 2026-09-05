@@ -1,4 +1,12 @@
 {
+  "conversation_preview": {
+    "result": "Backtest result",
+    "confirmation": "Ready to review the backtest",
+    "assumptions": "Backtest assumptions",
+    "breakdown": "Backtest explanation",
+    "empty": "No messages yet",
+    "unavailable": "Open the conversation for details"
+  },
   "common": {
     "and": "and",
     "archive": "Archive",
@@ -221,6 +229,14 @@
     "close": "Close feedback"
   },
   "chat": {
+    "artifact_assumptions": {
+      "confirmation": "For the confirmation, these are the assumptions: {{assumptions}}.",
+      "current_idea": "For this idea, these are the known assumptions: {{assumptions}}.",
+      "unavailable": "The saved artifact does not include the facts needed to show its assumptions.",
+      "starting_capital": "Starting capital: {{amount}}",
+      "contribution": "Contribution: {{amount}} {{period}}",
+      "contribution_without_period": "Contribution: {{amount}}"
+    },
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
     "input_placeholder": "Ask about any company or idea",
     "input_placeholder_prerail": "Describe an investing idea",
@@ -467,7 +483,39 @@
       "updated_duration": "Updated span: {{duration}}"
     },
     "result_readout": {
-      "quick_take": "Quick take"
+      "quick_take": "Quick take",
+      "unavailable": "The saved facts are not sufficient to show this result. Open the result again when its evidence is available.",
+      "strategy": "Historical test",
+      "assets_unavailable": "unavailable assets",
+      "tested": "{{strategy}} for {{symbols}}.",
+      "tested_period": "{{strategy}} for {{symbols}}, {{period}}.",
+      "total_return": "The total return was {{value}}.",
+      "contribution_return": "The return on contributions was {{value}}.",
+      "beat": "It finished {{value}} percentage points ahead of {{symbol}}.",
+      "lagged": "It finished {{value}} percentage points behind {{symbol}}.",
+      "matched": "It finished in line with {{symbol}}.",
+      "comparison_unavailable": "The benchmark comparison is unavailable.",
+      "drawdown": "The worst drop was {{value}}.",
+      "starting_capital": "Starting capital: {{value}}.",
+      "contribution": "Recurring contribution: {{value}}.",
+      "benchmark_return": "{{symbol}} returned {{value}} over the tested period.",
+      "costs": "Modeled costs: {{fee}} bps fee and {{slippage}} bps slippage.",
+      "gross_return": "Return before costs: {{value}}.",
+      "net_return": "Return after costs: {{value}}.",
+      "historical": "This is a historical simulation, not a forecast or investment advice.",
+      "rsi_entry": "RSI({{period}}) at or below {{threshold}}.",
+      "rsi_exit": "RSI({{period}}) at or above {{threshold}}.",
+      "parameter_unavailable": "unavailable",
+      "timeframe_units": { "minute": "minute", "hour": "hour", "day": "day", "week": "week", "period": "period" },
+      "rule_series": { "open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume" },
+      "rule_outputs": { "macd": "line", "signal": "signal line", "histogram": "histogram", "upper": "upper band", "lower": "lower band", "middle": "middle band", "value": "value" },
+      "rule_operators": { "lt": "{{left}} is below {{right}}", "lte": "{{left}} is at or below {{right}}", "gt": "{{left}} is above {{right}}", "gte": "{{left}} is at or above {{right}}", "cross_above": "{{left}} crosses above {{right}}", "cross_below": "{{left}} crosses below {{right}}" },
+      "rule_combinators": { "all": " and ", "any": " or " },
+      "rule_parameters": { "fast": "fast", "slow": "slow", "signal": "signal", "length": "length", "std": "deviations" },
+      "historical_label": "Historical simulation",
+      "not_advice": "Not advice",
+      "trust": "Historical simulation · Not advice",
+      "costs_trust": "Historical simulation · {{fee}} bps fee + {{slippage}} bps slippage · Not advice"
     },
     "discovery_results": {
       "test_candidate": "Backtest {{symbol}}",
@@ -644,7 +692,9 @@
         "date_range": "Date range",
         "timeframe": "Timeframe",
         "side": "Side",
+        "long_only": "Long only",
         "allocation": "Allocation",
+        "equal_weight": "Equal weight",
         "benchmark": "Benchmark",
         "contribution": "Contribution",
         "entry_rule": "Entry rule",

@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from tests.evals.measurement_assertions import (
+    _compare_date_range,
+    _compare_subset,
+)
+
 
 def offered_to_user(
     *,
@@ -26,8 +31,9 @@ def offered_to_user(
     """
 
     def _patch_value(key: str) -> Any:
-        value = final_patch.get(key)
-        return interpret_patch.get(key) if value is None else value
+        # A previous stage's proposals cannot stand in for final delivery.
+        # The harness merges carried patches before calling this projection.
+        return final_patch.get(key)
 
     discovery = _patch_value("discovery")
     discovery = discovery if isinstance(discovery, dict) else {}
@@ -61,11 +67,16 @@ def offered_to_user(
     # what the user was told. Reading the sidecar let a reply that named
     # nothing pass a check written to require naming, so only drops that
     # actually survive into the prose count here.
-    dropped = [str(name) for name in (discovery.get("unverified_names") or []) if str(name)]
+    dropped = [
+        str(name) for name in (discovery.get("unverified_names") or []) if str(name)
+    ]
     haystack = _alnum(assistant_text)
     named_unavailable = [name for name in dropped if _name_appears(name, haystack)]
 
     return {
+        "response": bool(assistant_text.strip()),
+        "launch_payload": dict(launch_payload),
+        "clarification": clarification,
         "discovery_symbols": discovery_symbols,
         "next_experiment_kinds": experiment_kinds,
         "recovery_option_ids": option_ids,
@@ -189,6 +200,8 @@ def compare_offered(
     expected: dict[str, Any],
     actual: Any,
     failures: list[str],
+    *,
+    expected_fields: dict[str, Any] | None = None,
 ) -> None:
     """Assert the turn ended somewhere the user can act on.
 
@@ -199,6 +212,51 @@ def compare_offered(
     if not isinstance(actual, dict):
         failures.append(f"offered: expected payload {expected!r}, got {actual!r}")
         return
+    fields = expected_fields or {}
+    if expected.get("response") is True and not actual.get("response"):
+        failures.append("offered.response: no assistant answer reached the turn")
+    if expected.get("launch_matches_expected") is True:
+        _compare_delivered_launch(fields, actual.get("launch_payload"), failures)
+    if expected.get("clarification_matches_expected") is True:
+        clarification = actual.get("clarification")
+        if not isinstance(clarification, dict) or not clarification.get("kind"):
+            failures.append("offered.clarification: no clarification reached the turn")
+        else:
+            expected_clarification = dict(fields.get("clarification") or {})
+            expected_clarification.setdefault(
+                "kind",
+                "unsupported_recovery"
+                if fields.get("capability_verdict") == "unsupported"
+                else "clarification",
+            )
+            if fields.get("launch_validation_code"):
+                expected_clarification.setdefault(
+                    "reason_code", fields["launch_validation_code"]
+                )
+            _compare_subset(
+                "offered.clarification",
+                expected_clarification,
+                clarification,
+                failures,
+            )
+            # The requested-field tag alone does not render a question. It
+            # must survive into the clarification contract delivered beside it.
+            if fields.get("requested_field") is not None:
+                _compare_subset(
+                    "offered.clarification.requested_field",
+                    fields["requested_field"],
+                    clarification.get("requested_field"),
+                    failures,
+                )
+    for key, actual_key in (
+        ("min_recovery_options", "recovery_option_ids"),
+        ("min_next_experiment_rows", "next_experiment_kinds"),
+    ):
+        minimum = expected.get(key)
+        if isinstance(minimum, int) and len(actual.get(actual_key) or []) < minimum:
+            failures.append(
+                f"offered.{key}: expected at least {minimum}, got {actual.get(actual_key)!r}"
+            )
     if expected.get("actionable") is True and not actual.get("actionable"):
         failures.append(
             "offered.actionable: nothing the user can act on reached the turn "
@@ -235,3 +293,47 @@ def compare_offered(
                 f"offered.recovery_option_ids_include_any: expected any of "
                 f"{list(expected_options)!r}, got {sorted(option_ids)!r}"
             )
+
+
+def _compare_delivered_launch(
+    expected: dict[str, Any],
+    actual: Any,
+    failures: list[str],
+) -> None:
+    """The fixture's facts must reach the launch, without a second YAML copy."""
+    if not isinstance(actual, dict) or not actual:
+        failures.append("offered.launch_payload: no launch reached the turn")
+        return
+    for expected_key, launch_key in (
+        ("assets", "symbols"),
+        ("asset_class", "asset_class"),
+        ("strategy_type", "strategy_type"),
+        ("entry_rule", "entry_rule"),
+        ("exit_rule", "exit_rule"),
+        ("rule_spec", "rule_spec"),
+        ("benchmark_symbol", "benchmark_symbol"),
+        ("capital_amount", "capital_amount"),
+        ("starting_capital", "starting_capital"),
+        ("recurring_contribution", "recurring_contribution"),
+        ("contribution_period", "cadence"),
+        ("launch_execution_realism", "_execution_realism"),
+    ):
+        value = expected.get(expected_key)
+        if value is None or value == ():
+            continue
+        _compare_subset(
+            f"offered.launch_payload.{launch_key}",
+            list(value) if isinstance(value, tuple) else value,
+            actual.get(launch_key),
+            failures,
+        )
+    window = expected.get("effective_date_range")
+    if window is None:
+        window = expected.get("date_range")
+    if window is not None:
+        _compare_date_range(
+            "offered.launch_payload.date_range",
+            window,
+            actual.get("date_range"),
+            failures,
+        )

@@ -1,0 +1,100 @@
+{
+  "schema_version": "argus_render_release_proof/v1",
+  "collected_at": "2026-09-04T00:53:50Z",
+  "landed_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "blueprint_sync": {
+    "applicable": false,
+    "attempted": false,
+    "reason": "release contract unchanged"
+  },
+  "inventory": {
+    "argus-api": 1,
+    "argus-app": 1,
+    "argus-backtests": 1,
+    "duplicate_services_detected": false
+  },
+  "autodeploy": {
+    "argus-api": "off",
+    "argus-app": "off",
+    "argus-backtests": "off",
+    "uniform": true,
+    "changed": false,
+    "disposition": "founder-locked deliberate manual mode"
+  },
+  "runtime_mode": {
+    "expected": "real-workflow",
+    "api_dispatch_enabled": true,
+    "api_workflow_execution_enabled": true,
+    "workflow_environment_status": "ready",
+    "release_profile_status": "ready",
+    "release_profile_hash": "535a9b2f2f1026db945decd7bc2005043d3b09843776a2cd38a73506a52db9ba",
+    "environment_fingerprint": "20bccad6829431999f21c11fd010068ac0c46c39a2bd30f15dcb3345ca981b81",
+    "workflow_environment_fingerprint": "f27047f438bbf0cf8fef87f6af86667c2b6d4aabe0f95211778cf1ff7bb57d1e",
+    "autodeploy_fingerprint": "9423f7276c20d3a3f2a86f1081da71d5936eb00af05d46c290ba2000d2fb5e41"
+  },
+  "deploys": [
+    {
+      "service": "argus-api",
+      "status": "live",
+      "commit": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+      "created_at": "2026-09-04T00:25:53.19375Z",
+      "finished_at": "2026-09-04T00:27:36.506701Z",
+      "started_after_previous_ready": true
+    },
+    {
+      "service": "argus-app",
+      "status": "live",
+      "commit": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+      "created_at": "2026-09-04T00:27:50.079751Z",
+      "finished_at": "2026-09-04T00:29:24.978432Z",
+      "started_after_previous_ready": true
+    },
+    {
+      "service": "argus-backtests",
+      "status": "ready",
+      "release_command_commit": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+      "reported_commit_prefix": "7d8ace4",
+      "created_at": "2026-09-04T00:29:41.214965Z",
+      "started_after_previous_ready": true
+    }
+  ],
+  "versions_aligned": true,
+  "warmup": {
+    "expected_mode": "real-workflow",
+    "api_health": "ready",
+    "product_readiness": "ready",
+    "frontend": "ready",
+    "stale_job_scan": {
+      "status": "ready",
+      "scanned": 0,
+      "stale": 0,
+      "reconciled": 0,
+      "unresolved": 0,
+      "errors": 0
+    },
+    "workflow_runtime_provider_mode": "live_provider",
+    "workflow_runtime_proof": "ready",
+    "wrapper_exit_code": 1,
+    "wrapper_failure_only": "release config audit treats the three deliberate off triggers as drift from repository checksPass"
+  },
+  "canaries": {
+    "authenticated_browser": {
+      "status": "passed",
+      "source": "GitHub Actions run 33822410458",
+      "candidate_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+      "language": "es-419",
+      "browser_console_errors": 0,
+      "browser_page_errors": 0,
+      "blocking_overlay": false,
+      "privacy": "no raw ids"
+    },
+    "release_coherence": {
+      "status": "failed",
+      "source": "GitHub Actions run 33822410458",
+      "failure_stage": "warmup",
+      "failure_reason": "warmup_probe_failed",
+      "substantive_sha_checks": "passed",
+      "failure_only": "the embedded audit rejects the founder-locked manual off triggers"
+    }
+  }
+}

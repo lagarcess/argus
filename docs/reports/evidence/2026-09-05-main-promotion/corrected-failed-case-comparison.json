@@ -1,0 +1,772 @@
+{
+  "corrected_baseline_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "candidate_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+  "excluded_dispatch_error_baseline_sha": "c7802b37f39772a1216514e37fb6ff2b63142181",
+  "baseline_scorecard": "docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-7d8ace45.json",
+  "candidate_scorecard": "docs/reports/evidence/2026-09-05-main-promotion/candidate-eval-scorecard-e3b98690.json",
+  "baseline_scorecard_sha256": "319c1618f6a40c1ce9af237f43fdd2630c1df1b73d4d0b26582788f1e576983d",
+  "candidate_scorecard_sha256": "50bbedd21df687c59096231761569c48bfe53f69f734842eebeafff845bd6d93",
+  "fixture_case_ids_equal": true,
+  "fixture_hashes_equal": false,
+  "baseline_totals": {
+    "expected_failed": 0,
+    "failed": 2,
+    "passed": 60,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "candidate_totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 59,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "baseline_failed_ids": [
+    "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+    "messy_spanish_future_performance_nvda_cruce_dorado"
+  ],
+  "candidate_failed_ids": [
+    "asset_discovery_not_result_followup_issue_244",
+    "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+    "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run"
+  ],
+  "candidate_only_failed_ids": [
+    "asset_discovery_not_result_followup_issue_244",
+    "asset_discovery_spanish_generated_pharma_escalation_issue_344"
+  ],
+  "baseline_only_failed_ids": [
+    "messy_spanish_future_performance_nvda_cruce_dorado"
+  ],
+  "shared_failed_ids": [
+    "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run"
+  ],
+  "candidate_only_prose_failed_ids": [],
+  "baseline_provider_usage": {
+    "reported_cost_receipt_count": 318,
+    "reported_cost_usd": 1.4265041196,
+    "route_receipt_count": 325,
+    "unreported_cost_receipt_count": 7
+  },
+  "comparison_reported_cost_usd": "2.799294279256",
+  "cases": [
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "baseline": {
+        "status": "passed",
+        "failed_checks": [],
+        "prose_judge": null,
+        "observed": {
+          "intent": "conversation_followup",
+          "capability_verdict": "answer_only",
+          "capital_amount": null,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "requested_field": null,
+          "missing_required_fields": [],
+          "stage_outcomes": [
+            "ready_to_respond"
+          ],
+          "asset_discovery": null,
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": false,
+            "discovery_symbols": [],
+            "dropped_not_named": [],
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": "latest_result_followup_unavailable",
+            "recovery_option_ids": []
+          }
+        }
+      },
+      "candidate": {
+        "status": "failed",
+        "failed_checks": [
+          "offered.min_next_experiment_rows: expected at least 1, got []"
+        ],
+        "prose_judge": null,
+        "observed": {
+          "intent": "conversation_followup",
+          "capability_verdict": "answer_only",
+          "capital_amount": null,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "requested_field": null,
+          "missing_required_fields": [],
+          "stage_outcomes": [
+            "ready_to_respond"
+          ],
+          "asset_discovery": null,
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": false,
+            "clarification": {},
+            "discovery_symbols": [],
+            "dropped_not_named": [],
+            "launch_payload": {},
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": "latest_result_followup_unavailable",
+            "recovery_option_ids": [],
+            "response": true
+          }
+        }
+      }
+    },
+    {
+      "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "baseline": {
+        "status": "passed",
+        "failed_checks": [],
+        "prose_judge": {
+          "failed_criteria": [],
+          "judged_assistant_text": {
+            "character_count": 144,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "b7e0239f148dc874a12c0820018cd1db40d1a4b74b320c4d3108972b09e7977d",
+            "text": "S\u00ed, aqu\u00ed tienes las principales acciones farmac\u00e9uticas verificadas actualmente en el mercado. No se mencionan nombres descartados en los hechos.",
+            "truncated": false
+          },
+          "judged_rendered_context": {
+            "character_count": 1669,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "99cb29a9103afaddef7c7082d9060c12437a660e6c80da5e7ef77ad29ddefe22",
+            "text": "{\"discovery_rows\": [{\"name\": \"Eli Lilly & Co.\", \"reason_text\": \"Empresa farmac\\u00e9utica estadounidense listada en NYSE con capitalizaci\\u00f3n de mercado superior a 1 bill\\u00f3n de d\\u00f3lares.\", \"symbol\": \"LLY\"}, {\"name\": \"Johnson & Johnson\", \"reason_text\": \"Multinacional farmac\\u00e9utica estadounidense incluida en las listas de mayores ingresos y ganancias del sector.\", \"symbol\": \"JNJ\"}, {\"name\": \"ABBVIE INC.\", \"reason_text\": \"Compa\\u00f1\\u00eda farmac\\u00e9utica estadounidense que aparece en m\\u00faltiples rankings de acciones farmac\\u00e9uticas por ingresos y capitalizaci\\u00f3n.\", \"symbol\": \"ABBV\"}, {\"name\": \"Merck & Co., Inc.\", \"reason_text\": \"Empresa farmac\\u00e9utica estadounidense presente en las listas de mayores ingresos y ganancias del sector salud.\", \"symbol\": \"MRK\"}, {\"name\": \"Pfizer Inc.\", \"reason_text\": \"Fabricante farmac\\u00e9utico estadounidense que figura entre las principales compa\\u00f1\\u00edas por ingresos del sector.\", \"symbol\": \"PFE\"}], \"discovery_sources\": [{\"domain\": \"es.investing.com\", \"source_date\": \"2026-09-05\", \"title\": \"Acciones de Productos farmac\\u00e9uticos en Estados Unidos\"}, {\"domain\": \"companiesmarketcap.com\", \"source_date\": \"2026-09-04\", \"title\": \"Top publicly traded pharmaceutical companies by revenue\"}, {\"domain\": \"de.investing.com\", \"source_date\": \"2026-09-05\", \"title\": \"USA Pharmazie: Aktien | Aktienkurse\"}, {\"domain\": \"companiesmarketcap.com\", \"source_date\": \"2026-09-04\", \"title\": \"Top publicly traded pharmaceutical companies by earnings\"}, {\"domain\": \"br.investing.com\", \"source_date\": \"2026-09-05\", \"title\": \"A\\u00e7\\u00f5es de Sa\\u00fade\"}], \"retrieved_at\": \"2026-09-05T15:42:51.191541+00:00\"}",
+            "truncated": false
+          },
+          "notes": "The assistant text is in Spanish, matches the user's language, and does not leak English fallback copy. It does not claim any unsupported or executable capability, and no raw runtime errors are exposed. The rendered discovery rows and sources support the statement about verified pharmaceutical stocks.",
+          "pass": true,
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "observed": {
+          "intent": "conversation_followup",
+          "capability_verdict": "answer_only",
+          "capital_amount": null,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "requested_field": null,
+          "missing_required_fields": [],
+          "stage_outcomes": [
+            "ready_to_respond"
+          ],
+          "asset_discovery": {
+            "anchor_symbols": [],
+            "asset_class_hint": "equity",
+            "category_description": "acciones farmac\u00e9uticas",
+            "needs_current_facts": true,
+            "relationship": "category"
+          },
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": true,
+            "discovery_symbols": [
+              "LLY",
+              "JNJ",
+              "ABBV",
+              "MRK",
+              "PFE"
+            ],
+            "dropped_not_named": [],
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": null,
+            "recovery_option_ids": []
+          }
+        }
+      },
+      "candidate": {
+        "status": "failed",
+        "failed_checks": [
+          "asset_discovery.asset_class_hint: expected 'equity', got None"
+        ],
+        "prose_judge": {
+          "failed_criteria": [],
+          "judged_assistant_text": {
+            "character_count": 87,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "faa2903475999ece43be5ade6e7ffc37dc70028636e77ece67e190d9bdd3917f",
+            "text": "Estas son las acciones farmac\u00e9uticas verificadas que puedes explorar en esta categor\u00eda.",
+            "truncated": false
+          },
+          "judged_rendered_context": {
+            "character_count": 1759,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "e9f594d7b3f31c9acbb4614e32dfa4e6f3ad52c68ec6ab69b315ebd8e732bdf1",
+            "text": "{\"discovery_rows\": [{\"name\": \"Eli Lilly & Co.\", \"reason_text\": \"Empresa farmac\\u00e9utica estadounidense l\\u00edder por ingresos y ganancias, con capitalizaci\\u00f3n de mercado superior a 1 bill\\u00f3n de d\\u00f3lares.\", \"symbol\": \"LLY\"}, {\"name\": \"Johnson & Johnson\", \"reason_text\": \"Compa\\u00f1\\u00eda farmac\\u00e9utica global con ingresos de 96 mil millones de d\\u00f3lares y fuerte presencia en el mercado de acciones farmac\\u00e9uticas.\", \"symbol\": \"JNJ\"}, {\"name\": \"ABBVIE INC.\", \"reason_text\": \"Fabricante farmac\\u00e9utico estadounidense con ingresos de 62 mil millones de d\\u00f3lares y cotizaci\\u00f3n en NYSE.\", \"symbol\": \"ABBV\"}, {\"name\": \"Merck & Co., Inc.\", \"reason_text\": \"Empresa farmac\\u00e9utica estadounidense con ingresos de 65 mil millones de d\\u00f3lares y posici\\u00f3n destacada en rankings de ganancias.\", \"symbol\": \"MRK\"}, {\"name\": \"Pfizer Inc.\", \"reason_text\": \"Compa\\u00f1\\u00eda farmac\\u00e9utica estadounidense con ingresos de 63 mil millones de d\\u00f3lares y amplia presencia en el mercado burs\\u00e1til.\", \"symbol\": \"PFE\"}], \"discovery_sources\": [{\"domain\": \"companiesmarketcap.com\", \"source_date\": \"2026-09-04\", \"title\": \"Top publicly traded pharmaceutical companies by revenue\"}, {\"domain\": \"de.investing.com\", \"source_date\": \"2026-09-01\", \"title\": \"USA Pharmazie: Aktien | Aktienkurse\"}, {\"domain\": \"companiesmarketcap.com\", \"source_date\": \"2026-09-04\", \"title\": \"Top publicly traded pharmaceutical companies by earnings\"}, {\"domain\": \"br.investing.com\", \"source_date\": \"2026-09-03\", \"title\": \"A\\u00e7\\u00f5es de Produtos farmac\\u00eauticos - EUA\"}, {\"domain\": \"finance.yahoo.com\", \"source_date\": \"2026-09-04\", \"title\": \"Drug Manufacturers - General Stock Performance\"}], \"retrieved_at\": \"2026-09-05T05:10:07.327750+00:00\"}",
+            "truncated": false
+          },
+          "notes": "The assistant text in Spanish correctly states that these are verified pharmaceutical stocks the user can explore in this category. The rendered discovery rows contain five pharmaceutical company names, symbols, and reason texts, which support the claim. No English fallback is present, no runtime error details are exposed, and the assistant does not claim any unsupported capability.",
+          "pass": true,
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "observed": {
+          "intent": "conversation_followup",
+          "capability_verdict": "answer_only",
+          "capital_amount": null,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "requested_field": null,
+          "missing_required_fields": [],
+          "stage_outcomes": [
+            "ready_to_respond"
+          ],
+          "asset_discovery": {
+            "anchor_symbols": [],
+            "asset_class_hint": null,
+            "category_description": "acciones farmac\u00e9uticas",
+            "needs_current_facts": true,
+            "relationship": "category"
+          },
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": true,
+            "clarification": {},
+            "discovery_symbols": [
+              "LLY",
+              "JNJ",
+              "ABBV",
+              "MRK",
+              "PFE"
+            ],
+            "dropped_not_named": [],
+            "launch_payload": {},
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": null,
+            "recovery_option_ids": [],
+            "response": true
+          }
+        }
+      }
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "baseline": {
+        "status": "failed",
+        "failed_checks": [
+          "capability_verdict: expected 'executable', got 'unsupported'",
+          "capital_amount: expected 13000, got None",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'needs_clarification', 'await_user_reply']"
+        ],
+        "prose_judge": null,
+        "observed": {
+          "intent": "backtest_execution",
+          "capability_verdict": "unsupported",
+          "capital_amount": null,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": "monthly",
+          "requested_field": null,
+          "missing_required_fields": [
+            "capital_amount"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply",
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "asset_discovery": null,
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": true,
+            "discovery_symbols": [],
+            "dropped_not_named": [],
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": null,
+            "recovery_option_ids": [
+              "recurring_only",
+              "option_1",
+              "option_2"
+            ]
+          }
+        }
+      },
+      "candidate": {
+        "status": "failed",
+        "failed_checks": [
+          "capability_verdict: expected 'executable', got 'unsupported'",
+          "capital_amount: expected 13000, got None",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'needs_clarification', 'await_user_reply']",
+          "offered.launch_payload: no launch reached the turn"
+        ],
+        "prose_judge": null,
+        "observed": {
+          "intent": "backtest_execution",
+          "capability_verdict": "unsupported",
+          "capital_amount": null,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": "monthly",
+          "requested_field": null,
+          "missing_required_fields": [
+            "capital_amount"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply",
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "asset_discovery": null,
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": true,
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "options": [
+                {
+                  "compatibility_label": "Run recurring buys only",
+                  "id": "recurring_only",
+                  "replacement_values": {
+                    "ignore_initial_capital": true
+                  }
+                },
+                {
+                  "compatibility_label": "Use it as starting capital",
+                  "id": "option_1",
+                  "replacement_values": {
+                    "initial_capital": 13000.0
+                  }
+                },
+                {
+                  "compatibility_label": "Use buy and hold with starting capital",
+                  "id": "option_2",
+                  "replacement_values": {
+                    "initial_capital": 13000.0,
+                    "strategy_type": "buy_and_hold"
+                  }
+                }
+              ],
+              "payload": {
+                "raw_value": "$13,000 total budget",
+                "strategy": {
+                  "asset_class": "equity",
+                  "asset_universe": [
+                    "KO"
+                  ],
+                  "assumptions": [],
+                  "cadence": "monthly",
+                  "capital_amount": null,
+                  "comparison_baseline": "SPY",
+                  "date_range": {
+                    "end": "2026-09-05",
+                    "start": "2021-09-05"
+                  },
+                  "entry_logic": null,
+                  "entry_rule": null,
+                  "exit_logic": null,
+                  "exit_rule": null,
+                  "extra_parameters": {
+                    "date_range_intent": {
+                      "anchor": "today",
+                      "confidence": 0.8,
+                      "count": 5.0,
+                      "day_offset": null,
+                      "end": null,
+                      "endpoint": null,
+                      "evidence": "cinco a\u00f1os",
+                      "kind": "rolling_window",
+                      "start": null,
+                      "unit": "year",
+                      "year": null
+                    },
+                    "date_range_raw_text": "cinco a\u00f1os",
+                    "evidence_spans": {
+                      "asset_universe": "Coca-Cola",
+                      "cadence": "cada mes",
+                      "capital_amount": "13,000 pesos",
+                      "date_range": "cinco a\u00f1os",
+                      "strategy_type": "comprado Coca-Cola cada mes"
+                    },
+                    "field_provenance": {
+                      "cadence": "explicit_user",
+                      "capital_amount": "starting_capital",
+                      "total_capital": "total_budget"
+                    },
+                    "language": "es-419",
+                    "raw_strategy_type": "dca_accumulation",
+                    "recurring_cadence": "monthly",
+                    "total_budget": 13000.0,
+                    "total_capital": 13000.0
+                  },
+                  "position_size": null,
+                  "raw_user_phrasing": "13,000 pesos",
+                  "refinement_of": null,
+                  "requested_strategy_template": null,
+                  "resolution_provenance": [
+                    {
+                      "asset_class": "equity",
+                      "candidate_kind": "asset",
+                      "canonical_symbol": "KO",
+                      "confidence": "high",
+                      "field": "asset_universe[0]",
+                      "raw_text": "KO",
+                      "resolution_status": "resolved",
+                      "source": "llm_extraction",
+                      "validated_by": "provider_catalog"
+                    }
+                  ],
+                  "risk_rules": [],
+                  "rule_spec": null,
+                  "sizing_mode": null,
+                  "strategy_thesis": "Comprar Coca-Cola cada mes durante los \u00faltimos cinco a\u00f1os.",
+                  "strategy_type": "dca_accumulation",
+                  "timeframe": null
+                }
+              },
+              "prompt_source": "llm_generated",
+              "reason_code": "unsupported_dca_contribution_ceiling",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ]
+            },
+            "discovery_symbols": [],
+            "dropped_not_named": [],
+            "launch_payload": {},
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": null,
+            "recovery_option_ids": [
+              "recurring_only",
+              "option_1",
+              "option_2"
+            ],
+            "response": true
+          }
+        }
+      }
+    },
+    {
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "baseline": {
+        "status": "failed",
+        "failed_checks": [
+          "prose_judge:honesty"
+        ],
+        "prose_judge": {
+          "failed_criteria": [
+            "honesty"
+          ],
+          "judged_assistant_text": {
+            "character_count": 297,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "9940af77a58f0667da2fd32bf8dbb462e553520d02e94429641a37ce425ff8b2",
+            "text": "Entiendo tu idea: invertir $10,000 en NVDA con un cruce dorado (media de 50 d\u00edas cruzando arriba de la de 200 d\u00edas). Argus no puede predecir resultados futuros, pero s\u00ed puede probar esta estrategia con datos hist\u00f3ricos. \u00bfQuieres probar el cruce dorado hist\u00f3ricamente o compararlo con buy and hold?",
+            "truncated": false
+          },
+          "judged_rendered_context": {
+            "character_count": 169,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "151154e3c200798e98fca6968dba6db053732ac8ed458f93967b2a51d71bbb18",
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}]}",
+            "truncated": false
+          },
+          "notes": "The reply says 'Argus no puede predecir resultados futuros' which is honest, but then immediately offers to test the strategy historically, which is supported by the rendered recovery options. However, the reply does not explicitly state that it cannot predict future returns, but the offer to test historically is fine. The issue is that the reply says 'Argus no puede predecir resultados futuros' but then asks '\u00bfQuieres probar el cruce dorado hist\u00f3ricamente o compararlo con buy and hold?' which is a valid historical test, not a future prediction. So honesty passes. Spanish language integrity passes. No raw runtime error passes. All criteria pass.",
+          "pass": false,
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "observed": {
+          "intent": "backtest_execution",
+          "capability_verdict": "unsupported",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "requested_field": null,
+          "missing_required_fields": [
+            "date_range"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "asset_discovery": null,
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": true,
+            "discovery_symbols": [],
+            "dropped_not_named": [],
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": null,
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold"
+            ]
+          }
+        }
+      },
+      "candidate": {
+        "status": "passed",
+        "failed_checks": [],
+        "prose_judge": {
+          "failed_criteria": [],
+          "judged_assistant_text": {
+            "character_count": 125,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "68a7bca9fec2a70c39cb0a108c982f640259b832fb2e81de9e406685b9a4b30d",
+            "text": "Argus no puede predecir el futuro, pero s\u00ed puede probar c\u00f3mo le habr\u00eda ido a esa idea en el pasado. \u00bfQu\u00e9 direcci\u00f3n prefieres?",
+            "truncated": false
+          },
+          "judged_rendered_context": {
+            "character_count": 241,
+            "omitted_character_count": 0,
+            "redactions": [],
+            "sha256": "57ae2392d06fd5da0574c300cfab84d950f981dae60c29f0f87afb247439ed71",
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}, {\"id\": \"rsi_threshold\", \"label\": \"Use a supported RSI threshold rule\"}]}",
+            "truncated": false
+          },
+          "notes": "The assistant text honestly states it cannot predict the future but can test the idea historically, which is supported by the recovery options offering historical tests. The response is entirely in Spanish with no English fallback, and no raw runtime errors are exposed.",
+          "pass": true,
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "observed": {
+          "intent": "unsupported_or_out_of_scope",
+          "capability_verdict": "unsupported",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "requested_field": null,
+          "missing_required_fields": [
+            "entry_logic",
+            "exit_logic",
+            "date_range"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "asset_discovery": null,
+          "launch_validation_code": null,
+          "offered": {
+            "actionable": true,
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "options": [
+                {
+                  "compatibility_label": "Test this idea over a historical period",
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  }
+                },
+                {
+                  "compatibility_label": "Compare with buy and hold historically",
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "requested_field": "date_range",
+                    "strategy_type": "buy_and_hold"
+                  }
+                },
+                {
+                  "compatibility_label": "Use a supported RSI threshold rule",
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  }
+                }
+              ],
+              "payload": {
+                "raw_value": "dentro de diez a\u00f1os",
+                "strategy": {
+                  "asset_class": "equity",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "assumptions": [],
+                  "cadence": null,
+                  "capital_amount": 10000.0,
+                  "comparison_baseline": "SPY",
+                  "date_range": null,
+                  "entry_logic": null,
+                  "entry_rule": null,
+                  "exit_logic": null,
+                  "exit_rule": null,
+                  "extra_parameters": {
+                    "evidence_spans": {
+                      "asset_universe": "NVDA",
+                      "capital_amount": "$10,000",
+                      "strategy_type": "estrategia de cruce dorado"
+                    },
+                    "field_provenance": {
+                      "asset_universe": "explicit_user",
+                      "capital_amount": "explicit_user",
+                      "strategy_type": "explicit_user"
+                    },
+                    "future_horizon_intent": {
+                      "anchor": "today",
+                      "confidence": 0.8,
+                      "count": 10.0,
+                      "day_offset": null,
+                      "end": null,
+                      "endpoint": null,
+                      "evidence": "dentro de diez a\u00f1os",
+                      "kind": "future_window",
+                      "start": null,
+                      "unit": "year",
+                      "year": null
+                    },
+                    "language": "es-419",
+                    "provider_resolved_assets": [
+                      {
+                        "asset_class": "equity",
+                        "exchange": "AssetExchange.NASDAQ",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "provider": "alpaca",
+                        "raw_symbol": "NVDA",
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA"
+                      }
+                    ]
+                  },
+                  "position_size": null,
+                  "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, \u00bfcu\u00e1nto tendr\u00e9 dentro de diez a\u00f1os?",
+                  "refinement_of": null,
+                  "requested_strategy_template": null,
+                  "resolution_provenance": [
+                    {
+                      "asset_class": "equity",
+                      "candidate_kind": "asset",
+                      "canonical_symbol": "NVDA",
+                      "confidence": "medium",
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "resolution_status": "resolved",
+                      "source": "llm_extraction",
+                      "validated_by": "provider_catalog"
+                    }
+                  ],
+                  "risk_rules": [],
+                  "rule_spec": null,
+                  "sizing_mode": null,
+                  "strategy_thesis": "Cruce dorado en NVDA",
+                  "strategy_type": null,
+                  "timeframe": null
+                }
+              },
+              "prompt_source": "llm_generated",
+              "reason_code": "future_performance",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ]
+            },
+            "discovery_symbols": [],
+            "dropped_not_named": [],
+            "launch_payload": {},
+            "named_unavailable": [],
+            "next_experiment_kinds": [],
+            "recovery_code": null,
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold",
+              "rsi_threshold"
+            ],
+            "response": true
+          }
+        }
+      }
+    }
+  ],
+  "try_next_delivery_comparison": {
+    "case_id": "asset_discovery_not_result_followup_issue_244",
+    "method": "Apply the candidate deterministic delivery assertion to each retained live observation. No new provider calls; neither scorecard is rewritten.",
+    "expected_offered": {
+      "min_next_experiment_rows": 1
+    },
+    "baseline_original_status": "passed",
+    "candidate_original_status": "failed",
+    "sides": {
+      "baseline": {
+        "observed_offered": {
+          "actionable": false,
+          "discovery_symbols": [],
+          "dropped_not_named": [],
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": "latest_result_followup_unavailable",
+          "recovery_option_ids": []
+        },
+        "same_delivery_assertion_failures": [
+          "offered.min_next_experiment_rows: expected at least 1, got []"
+        ]
+      },
+      "candidate": {
+        "observed_offered": {
+          "actionable": false,
+          "clarification": {},
+          "discovery_symbols": [],
+          "dropped_not_named": [],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": "latest_result_followup_unavailable",
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "same_delivery_assertion_failures": [
+          "offered.min_next_experiment_rows: expected at least 1, got []"
+        ]
+      }
+    }
+  },
+  "candidate_only_dispositions": [
+    {
+      "case_id": "asset_discovery_not_result_followup_issue_244",
+      "disposition": "accepted_pre_existing_delivery_defect",
+      "basis": "Founder accepted the shared missing next-experiment row exposed by the stronger assertion in #549. The common delivery assertion fails both retained observations.",
+      "closed_misclassified_issue": "https://github.com/lagarcess/argus/issues/555",
+      "user_reachability": "Not demonstrated. Founder reported zero users asking what should I try next and zero human exposures to latest_result_followup_unavailable across 256 completed production runs. Not independently queried by this task.",
+      "classification": "Test-coverage observation; pre-existing delivery defect surfaced by #549, not a promotion regression or confirmed product bug."
+    },
+    {
+      "case_id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "disposition": "accepted_after_consumer_trace",
+      "basis": "Per-row resolver class owns tradability, research rows, and discovery selection. The nullable request hint cannot reach the named calendar or research-row consumers as null. The hint still matters to ambiguous-name corroboration.",
+      "evidence": "docs/reports/evidence/2026-09-05-main-promotion/spanish-equity-hint-code-trace.md"
+    }
+  ]
+}

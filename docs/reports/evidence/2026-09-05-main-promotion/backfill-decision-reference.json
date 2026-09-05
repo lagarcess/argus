@@ -1,0 +1,10 @@
+{
+  "source_url": "https://github.com/lagarcess/argus/pull/548",
+  "source_updated_at": "2026-09-05T03:15:54Z",
+  "retrieved_at": "2026-09-05T15:37:15.575600+00:00",
+  "quoted_decisions": {
+    "Founder decision 1: the settle rule stays as it is": "`JOB_RESULT_HYDRATEABLE` in `argus.domain.job_settlement` is **deliberately untouched**, and that is a decision, not an omission. The rule is right for every row here: a succeeded chat job without a readable run is not settled. Loosening it to \"a completed run exists\" would let every future half-finalized job settle silently, and the rule reading correctly is exactly what surfaced this defect. Do not undo this by widening the rule; fix the writer that lies about its row instead, as this PR does.",
+    "Founder decision 2: the backfill will NOT be run": "Verified by the founder against production: 113 of the 122 Cause A rows belong to the developer QA admin account (`developer@argus.local`); the remaining 9 split between the founder's own account and two real users. Writing 122 evidence tuples to production to clean up development history is not worth it. **Cause A is deliberately left as it is.** The script stays in the tree: it is proven against the real RPC and costs nothing unused. Those conversations keep projecting `checking` until someone deletes them or runs the script.\n\nOne row has no heal in any case: a 2026-06-06 proof-shadow row with no run, in a deleted conversation."
+  },
+  "dispatch_correction": "Founder reaffirmed the no-backfill decision in the September 5 promotion task and replaced zero spinners with no proof-seeder activity plus an unchanged, attributed historical remainder."
+}

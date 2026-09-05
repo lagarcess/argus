@@ -1,0 +1,19 @@
+Command: PYTHONPATH="$PWD/src:$PWD" ARGUS_RUN_LIVE_EVALS=0 ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture ARGUS_ASSET_PROVIDER_MODE=synthetic_unit_fixture NUMBA_CACHE_DIR=/private/tmp/argus-promotion-numba-cache /Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.venv/bin/python -m pytest tests/agent_runtime/discovery/test_discovery_validation.py tests/agent_runtime/discovery/test_discovery_selection_action.py tests/research/test_research_rows.py tests/agent_runtime/test_conversation_stages.py::test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py::test_llm_interpreter_validates_asset_class_with_alpaca_resolver -q --no-cov
+
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/a121/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 35 items
+
+tests/agent_runtime/discovery/test_discovery_validation.py ............. [ 37%]
+...                                                                      [ 45%]
+tests/agent_runtime/discovery/test_discovery_selection_action.py ......  [ 62%]
+tests/research/test_research_rows.py ...........                         [ 94%]
+tests/agent_runtime/test_conversation_stages.py .                        [ 97%]
+tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py . [100%]
+
+============================== 35 passed in 1.70s ==============================

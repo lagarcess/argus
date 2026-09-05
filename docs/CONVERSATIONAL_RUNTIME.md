@@ -93,7 +93,7 @@ Runtime copy is composed, not templated per language. Since the B4 language-gate
 retirement (#154, PRs #174-177), Argus keeps no parallel English/Spanish copy
 tables in the runtime:
 
-- LLM-authored prose (result summaries, clarifications, explanations) is written
+- LLM-authored conversational prose (clarifications and explanations) is written
   in the workspace language from a typed fact bank. The backend supplies typed
   facts; the model supplies the words.
 - Degraded and recovery copy renders from typed codes, not per-language strings.
@@ -102,6 +102,16 @@ tables in the runtime:
   `if locale == "es-419"` branch or an `_english_*` helper.
 - Result-card chrome (labels, headings, chips) renders from typed keys the
   frontend localizes, not from backend-baked language strings.
+
+**Persisted result exception (founder-approved 2026-09-04, #531):** Quick Take,
+result breakdown, dossier outcomes, and their copy output voice typed canonical
+run facts at the frontend boundary, for both live and historical results. A
+workspace-language change must not require a model call or regenerate evidence.
+The original explain-stage prose remains private audit/model context; it is
+stripped from public result transport and is never a reader fallback. Old
+messages derive missing transport facts from an owner-scoped canonical run;
+missing evidence is shown honestly in localized copy. This does not replace
+ordinary conversational composition with a deterministic assistant.
 
 The invariant: prose follows the workspace language everywhere, English and
 Spanish parity is proven by the eval harness (not hardcoded copy), and no runtime
@@ -237,6 +247,21 @@ confirmation is executable. New refinement confirmations supersede older cards,
 and a completed result also makes prior confirmation cards historical. The UI may
 render superseded cards as muted `Updated` cards, but backend execution still
 checks the active confirmation identity before running.
+
+An interpreted question about a pending artifact's assumptions returns the
+typed `artifact_assumptions` response intent. Its `display_facts` come from the
+same confirmation fact owner used by the card, including zero fees/slippage
+and the separate money roles of a recurring plan. The frontend language
+bundles voice those facts in both live and hydrated turns. Empty backend prose
+is a successful terminal answer when this typed intent is present; it must not
+trigger the empty-response recovery or change confirmation liveness.
+
+Existing confirmation artifacts may reconstruct missing facts from their
+typed confirmation payload. Original assumption prose remains non-presentational context,
+and unavailable facts produce localized unavailable copy. Old freeform
+assumptions replies without a stored typed discriminator cannot be recognized
+without guessing from prose, so they retain ordinary transcript behavior.
+The runtime must not add a language-specific phrase matcher to classify them.
 
 Clarification prompts may persist a single pending resolution candidate, such as
 Apple Inc. (`AAPL`) for an ambiguous "Apple" request. If the next user turn is a

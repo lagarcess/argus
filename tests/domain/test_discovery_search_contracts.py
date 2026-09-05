@@ -182,6 +182,9 @@ class TestDiscoverySearchConfig:
 class TestSearchProviderProtocol:
     def test_protocol_accepts_conforming_fake(self) -> None:
         class FakeProvider:
+            def require_configured(self) -> None:
+                return None
+
             def search(
                 self, query: str, *, max_results: int, timeout_seconds: float
             ) -> SearchResultPacket:

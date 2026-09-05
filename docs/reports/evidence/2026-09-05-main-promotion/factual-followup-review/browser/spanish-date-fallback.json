@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "final": [
+    {
+      "assistant_response": "La cartera alcanz\u00f3 su valor m\u00e1ximo el 11 de diciembre de 2024, con un pico de $50,694.08.\n\nEsto fue durante una simulaci\u00f3n hist\u00f3rica de META en compra y retenci\u00f3n, que super\u00f3 ampliamente al SPY en el per\u00edodo.",
+      "response_intent": {
+        "kind": "result_followup_chrome",
+        "semantic_needs": [],
+        "requested_fields": [],
+        "facts": {
+          "focus": "peak_date",
+          "heading_key": "general"
+        },
+        "options": []
+      },
+      "hasBank": false
+    }
+  ]
+}

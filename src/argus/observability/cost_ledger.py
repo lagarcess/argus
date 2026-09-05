@@ -248,4 +248,6 @@ def _ledger_metadata(
             "context_packet_count": len(receipt.context_packet_ids),
         }
     )
+    if receipt.repair_effect:
+        result["repair_effect"] = dict(receipt.repair_effect)
     return result

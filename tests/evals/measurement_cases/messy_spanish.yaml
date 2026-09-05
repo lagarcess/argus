@@ -5,6 +5,8 @@ cases:
     user_language: es-419
     ui_language: es-419
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["BTC"]
@@ -56,6 +58,8 @@ cases:
                 end: "2024-12-31"
               capital_amount: 1000
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["BTC"]
@@ -72,6 +76,9 @@ cases:
     user_language: es-419
     ui_language: es-419
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
       intent:
         [
           "unsupported_or_out_of_scope",

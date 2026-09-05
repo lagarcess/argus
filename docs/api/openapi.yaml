@@ -2191,9 +2191,7 @@ components:
           - $ref: '#/components/schemas/Message'
           - type: 'null'
         result_readout:
-          anyOf:
-          - type: string
-          - type: 'null'
+          type: 'null'
         result_readout_source:
           anyOf:
           - type: string
@@ -2669,6 +2667,10 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        preview:
+          anyOf:
+          - $ref: '#/components/schemas/ConversationPreview'
+          - type: 'null'
         language:
           anyOf:
           - type: string
@@ -2794,6 +2796,36 @@ components:
             format: date-time
           - type: 'null'
       type: object
+    ConversationPreview:
+      properties:
+        kind:
+          type: string
+          enum:
+          - text
+          - result
+          - confirmation
+          - assumptions
+          - breakdown
+          - empty
+          - unavailable
+        text:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        template:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - kind
+      description: Reader facts; retained assistant artifact prose is never a preview.
     ConversationResponse:
       properties:
         conversation:
@@ -3321,6 +3353,8 @@ components:
           - type: 'null'
         activity:
           $ref: '#/components/schemas/ConversationActivity'
+        preview:
+          $ref: '#/components/schemas/ConversationPreview'
       type: object
       required:
       - type
@@ -4610,10 +4644,10 @@ components:
           - type: string
             maxLength: 24
           - type: 'null'
-        quick_take:
+        result_fact_bank:
           anyOf:
-          - type: string
-            maxLength: 500
+          - additionalProperties: true
+            type: object
           - type: 'null'
         metrics:
           items:
@@ -4637,6 +4671,10 @@ components:
           type: boolean
         matched_text:
           type: string
+        preview:
+          anyOf:
+          - $ref: '#/components/schemas/ConversationPreview'
+          - type: 'null'
         updated_at:
           type: string
           format: date-time

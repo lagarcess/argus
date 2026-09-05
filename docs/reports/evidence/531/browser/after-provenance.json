@@ -1,0 +1,33 @@
+{
+  "candidate_sha": "79c8d78eee3af878b9cc52247bb1da28e7dc90a5",
+  "captured_at": "2026-09-05T02:13:24Z",
+  "browser": "headed Playwright CLI",
+  "browser_origin": "http://127.0.0.1:3212",
+  "api_origin": "http://127.0.0.1:8532/api/v1",
+  "source_tree_kind": "git archive of exact candidate SHA",
+  "recorded_result_source": "docs/reports/evidence/411/browser/en-discovery-messages.json",
+  "recorded_result_source_sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+  "committed_replay_harness_sha256": "c04549b9db3e898bf524c4b6c7d0afbb9ead3d7f7944c8bd93366d3c50aaa749",
+  "runtime_replay_harness_sha256": "e459aefde0c2648cf4a78e7658b03b2e1af7491a4ed166519d66fce4a49d469e",
+  "runtime_harness_adjustment": "the isolated git archive has no git metadata, so only candidate-SHA discovery was changed to read the required ISSUE531_QA_TREE environment value; seed and route behavior were unchanged",
+  "render_source_sha256": "055ff1fff029408a58ce5218820b174093e61ee3489bb89316a970c54598bf64",
+  "screenshot": "after-en-authored-es-workspace.png",
+  "screenshot_sha256": "a27d123bf55ff1c84aacd8d60e37f6c4faf81dc2a901ae67edba2210b898c4d5",
+  "browser_steps": [
+    "load the English-authored recorded result through normal conversation hydration",
+    "open Settings, Preferences, and App language",
+    "select Espanol",
+    "reload the browser page",
+    "inspect the post-reload result card and chart status",
+    "invoke the result copy handler and inspect its generated text"
+  ],
+  "copy_verification": {
+    "method": "temporary browser-only navigator.clipboard.writeText spy followed by the real copy button DOM handler",
+    "claim": "proves the text produced by the product copy handler",
+    "does_not_claim": "does not prove persistence into the operating-system clipboard",
+    "reason_for_dom_activation": "the visually hidden copy control was present and enabled, but a normal pointer click was intercepted by the chat section hit target"
+  },
+  "provider_calls": 0,
+  "hosted_database_reads_or_writes": 0,
+  "auth_or_session_identifiers_in_evidence": false
+}

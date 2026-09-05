@@ -1,0 +1,54 @@
+{
+  "status": "passed",
+  "postgres": "17.10",
+  "synthetic_conversations": 7,
+  "synthetic_messages": 24010,
+  "requested_conversations": 6,
+  "returned_owned_conversations": 5,
+  "reader_queries": 1,
+  "reader_pool_acquisitions": 1,
+  "checks": [
+    "latest timestamp and id tie ordering",
+    "owner scoped conversations",
+    "cross-owner message excluded",
+    "unrequested conversation excluded",
+    "empty chat",
+    "legacy skip and goal markers excluded",
+    "system and tool previews unavailable",
+    "one deduplicated batch"
+  ],
+  "plan": [
+    {
+      "Node Type": "Nested Loop",
+      "Actual Rows": 5,
+      "Actual Loops": 1
+    },
+    {
+      "Node Type": "Seq Scan",
+      "Relation Name": "conversations",
+      "Actual Rows": 5,
+      "Actual Loops": 1,
+      "Rows Removed by Filter": 2
+    },
+    {
+      "Node Type": "Limit",
+      "Actual Rows": 1,
+      "Actual Loops": 5
+    },
+    {
+      "Node Type": "Incremental Sort",
+      "Actual Rows": 1,
+      "Actual Loops": 5
+    },
+    {
+      "Node Type": "Index Scan",
+      "Index Name": "idx_messages_conversation_created",
+      "Relation Name": "messages",
+      "Actual Rows": 1,
+      "Actual Loops": 5,
+      "Rows Removed by Filter": 1
+    }
+  ],
+  "execution_ms": 0.08,
+  "shared_hit_blocks": 25
+}

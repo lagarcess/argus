@@ -97,18 +97,14 @@ def shared_adapter_rows() -> list[dict[str, Any]]:
             "artifact_payload": _source_row()["artifact_payload"],
             "decision_payload": {
                 "id": "00000000-0000-0000-0000-000000000501",
-                "evidence_artifact_id": (
-                    "00000000-0000-0000-0000-000000000301"
-                ),
+                "evidence_artifact_id": ("00000000-0000-0000-0000-000000000301"),
                 "source_conversation_id": CONVERSATION_ID,
                 "decision_state": "watching",
                 "note": "Watch this result.",
                 "created_at": COMPLETED_AT,
                 "updated_at": COMPLETED_AT,
             },
-            "result_message_id": (
-                "00000000-0000-0000-0000-000000000201"
-            ),
+            "result_message_id": ("00000000-0000-0000-0000-000000000201"),
         },
         {
             "run_payload": {
@@ -139,7 +135,6 @@ def _serialized_response(page: RunDossierSourcePage) -> dict[str, Any]:
                 decision=row.decision,
                 result_message_id=row.result_message_id,
                 decision_action_availability="available",
-                language="en",
             )
             for row in page.rows
         ],

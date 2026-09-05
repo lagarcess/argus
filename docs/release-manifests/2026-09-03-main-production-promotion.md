@@ -4,14 +4,18 @@
 
 - Candidate SHA: `db88a5fe416093450171c6318e3e6edc24d5829e`, the product tree the
   live eval measured.
-- Shipping SHA: not created. The founder-owned merge commit is recorded after
-  landing.
+- Shipping SHA: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`
+- Measured-tree relationship: the shipping tree is not byte-identical to the
+  measured `db88a5fe416093450171c6318e3e6edc24d5829e` tree. The only product
+  delta is the reviewed route-ownership fix in
+  `src/argus/agent_runtime/interpreter/research_routing.py` and
+  `src/argus/agent_runtime/interpreter/strategy_routing.py`.
 - Source branch: `codex/private-alpha-next`
 - Promotion target: `main`
 - Rollback target: `c7802b37f39772a1216514e37fb6ff2b63142181`
 - Commits ahead of production: 22
 - Landing method: founder-owned GitHub merge commit, never squash or rebase
-- Approver: founder, pending
+- Approver: founder
 
 ## What ships
 
@@ -202,6 +206,29 @@ rerun under the founder's explicit instruction. The required scorecard and
 `Candidate SHA` remain bound to the measured `db88a5fe` tree; the deterministic
 review fix above is the only post-eval product change in the promotion PR.
 
+### Post-eval delta applicability
+
+The shipping tree is not byte-identical to the live-eval candidate. The
+post-eval change gives `intent="results_explanation"` the canonical typed route
+owner `result`. For research ownership, every changed route combination moves
+only from no conflicting owner to a conflicting owner. It can remove an
+external research dispatch and cannot add one. For strategy ownership, the
+only changed combinations remove contradictory result-intent turns from the
+strategy route. No route is added.
+
+The committed measurement fixture contains exactly 62 cases. The only case
+whose allowed intents include `results_explanation` is
+`asset_discovery_not_result_followup_issue_244` in
+`tests/evals/measurement_cases/asset_discovery_routing.yaml`. Its required
+`semantic_turn_act` is `result_followup`, which was already in the research
+conflicting-owner set before the fix. The recorded `db88a5fe` scorecard emitted
+`intent="conversation_followup"` with `semantic_turn_act="result_followup"` for
+that case, and no case in the scorecard emitted `results_explanation`.
+
+The route delta is therefore inert against all 62 measured cases. The live
+eval was not rerun. The verification record is
+`docs/reports/evidence/2026-09-03-main-promotion/post-eval-route-delta-applicability-7d8ace45.json`.
+
 ### P2: retrieval evidence can be lost with missing usage metadata
 
 Status: accepted known finding, not fixed in this promotion.
@@ -220,38 +247,136 @@ query. PR #540 does not change this path.
 
 ## Deploy Proof
 
-Not started. Founder landing and landed-ref verification must happen first.
+Founder landing completed as merge commit
+`7d8ace45e4ac717ffbfaf222cf66544c3355df6f`.
 
-- [ ] `argus-api` deployed at the landed SHA
-- [ ] `argus-app` deployed at the landed SHA
-- [ ] `argus-backtests` released at the landed SHA
-- [ ] all three ready versions proven equal
-- [ ] landed-ref migration gate reports `status=pass` and
+The dedicated promotion checkout was placed at that exact SHA before the
+landed checks ran. `.github/local-smoke.sh --expected-sha
+7d8ace45e4ac717ffbfaf222cf66544c3355df6f` returned
+`verification_status=ready` and `workflow_probe=ready` under Python 3.10.20.
+The product readiness response inside the smoke was `degraded`, while the
+smoke command's documented terminal release result was `ready`.
+
+The landed-ref database gate ran from the same exact checkout and returned:
+
+- Gate report:
+  `docs/reports/evidence/2026-09-03-main-promotion/production-migration-gate-landed-7d8ace45.json`
+- Checked at: `2026-09-04T00:22:23.948782Z`
+- Gate result: `status=pass`
+- Landing verification: `verified`
+- Verified ref: `origin/main`
+- Resolved SHA: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`
+- Missing migrations: none
+- Migration name drift: none
+- Migration content drift: none
+- Stop reasons: none
+
+No Blueprint sync ran. Render inventory returned one existing `argus-api`, one
+existing `argus-app`, and one existing `argus-backtests` workflow, with no
+duplicate service proposed. All three read `autoDeployTrigger=off`. That
+uniform manual state was preserved exactly as founder-locked.
+
+The API configuration was verified in `real-workflow` mode without reapplying
+it. Dispatch and workflow execution were enabled, the workflow environment was
+ready, and the workflow runtime proof returned `ready` with
+`live_provider`.
+
+Deployment proceeded serially and waited for each predecessor:
+
+| Service | Started | Ready | Version |
+| --- | --- | --- | --- |
+| `argus-api` | `2026-09-04T00:25:53.19375Z` | `2026-09-04T00:27:36.506701Z` | `7d8ace45e4ac717ffbfaf222cf66544c3355df6f` |
+| `argus-app` | `2026-09-04T00:27:50.079751Z` | `2026-09-04T00:29:24.978432Z` | `7d8ace45e4ac717ffbfaf222cf66544c3355df6f` |
+| `argus-backtests` | `2026-09-04T00:29:41.214965Z` | `ready` | released with the full landed SHA; Render reports prefix `7d8ace4` |
+
+- [x] `argus-api` deployed at the landed SHA
+- [x] `argus-app` deployed at the landed SHA
+- [x] `argus-backtests` released at the landed SHA
+- [x] all three ready versions proven equal
+- [x] landed-ref migration gate reports `status=pass` and
       `landing_verification=verified`
+
+Durable Render evidence:
+`docs/reports/evidence/2026-09-03-main-promotion/render-release-proof-7d8ace45.json`.
 
 ## Post-Deploy Verification
 
-Not started. If the founder lands the promotion, completion still requires:
+Step 12 ran with `--expect-mode real-workflow`. API health, product readiness,
+frontend reachability, and the stale-job scan passed. The stale-job scan found
+zero stale, unresolved, or errored rows. The exact documented workflow proof
+then returned `workflow_runtime_proof=ready` and
+`workflow_runtime_provider_mode=live_provider`.
 
-- [ ] step 12 warmup with `--expect-mode real-workflow`
-- [ ] release-coherence canary
-- [ ] authenticated-browser canary
-- [ ] grounded production research answer with sources in English
-- [ ] grounded production research answer with sources in Spanish
+The warmup wrapper exited 1 only because its embedded release-config audit
+requires the repository's future target `checksPass` and labels each live
+`off` trigger as drift. The same check made the release-coherence GitHub job
+red at its warmup stage. Exact API, web, workflow, checkout, candidate, and
+harness SHA checks all matched the landed version before that stop. No trigger
+was changed because the live manual state is founder-locked and explicitly not
+drift for this promotion.
+
+The authenticated-browser GitHub canary passed at the exact landed SHA. It ran
+the Spanish real-workflow journey, including a real backtest, decision note,
+reload, and Omnisearch checks. It reported no console error, page error, or
+blocking overlay and retained only hashed labels.
+
+Production browser verification returned:
+
+- an English grounded answer about the latest reported quarter, with five
+  visible sources;
+- a Spanish grounded answer about the latest reported quarter, with five
+  visible sources; and
+- five rendered Spanish cybersecurity discovery rows: `CRWD`, `PANW`, `FTNT`,
+  `ZS`, and `CHKP`.
+
+PostHog was queried with `event=research` and `environment=production`. The
+reported outage window from `2026-08-31T17:01:00Z` through the deploy start had
+zero settlement events. From `2026-09-04T00:25:00Z` through
+`2026-09-04T00:55:00Z`, PostHog contained four completed settlement events and
+zero failed settlement events.
+
+The required log proof did not appear. A read-only, fully paginated Render log
+query scanned 991 `argus-api` records across ten pages from deploy through the
+browser verification. It found zero `grounded_result` records and therefore
+zero successful `grounded_result` records. The successful return path in
+`grounded_result()` currently emits no success log line; only its provider
+failure branch logs. Three separate `research_cost_unpriced` rate-mismatch
+records appeared, while the browser answers and completed PostHog settlements
+showed that those pricing records did not suppress the answers.
+
+- [x] step 12 substantive warmup and real-workflow proof
+- [ ] step 12 wrapper exit is green; blocked only by the manual-trigger audit
+- [ ] release-coherence canary is green; blocked at the same audit
+- [x] authenticated-browser canary
+- [x] grounded production research answer with sources in English
+- [x] grounded production research answer with sources in Spanish
+- [x] disputed Spanish category discovery rows render
 - [ ] production log readback of a successful `grounded_result`
-- [ ] PostHog readback of research settlement events
+- [x] PostHog readback of research settlement events
+
+Durable evidence:
+
+- `docs/reports/evidence/2026-09-03-main-promotion/authenticated-browser-github-run-33822410458.json`
+- `docs/reports/evidence/2026-09-03-main-promotion/release-coherence-github-run-33822410458.json`
+- `docs/reports/evidence/2026-09-03-main-promotion/post-deploy-research-verification-7d8ace45.json`
 
 ## Release Decision
 
-- Promotion PR ready: pending review evidence commit, thread resolution, and
-  required `ci` at the final head
-- Founder merge approval: pending
-- Production deploy: **not authorized and not attempted**
+- Promotion PR: merged as `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`
+- Founder merge approval: complete
+- Production deploy: complete at the landed SHA on all three services
 - Blueprint sync: **not applicable and not attempted**
 - Autodeploy change: **not authorized and not attempted**
 - Targeted unsupported-name-reference rate: production 0 of 10; candidate 0 of
   10
 - Pre-merge blockers under the founder-provided equal-rate rule: none
+- Research user path: recovered in both languages with sources
+- Research settlement telemetry: recovered, 4 completed and 0 failed
+- Promotion verification: **incomplete**. The required successful
+  `grounded_result` log record is absent, and the release-coherence wrapper is
+  red because it contradicts the founder-locked manual trigger posture.
+- Rollback: not performed and not independently authorized. The deployed user
+  path is returning grounded research answers.
 - Rollback target if a later promotion is authorized:
   `c7802b37f39772a1216514e37fb6ff2b63142181`
 

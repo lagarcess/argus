@@ -64,6 +64,7 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "expected_failed": 0,
         "unexpected_pass": 0,
         "skipped": 0,
+        "infrastructure_error": 0,
         "pass_rate": 0.5,
     }
     assert scorecard["category_pass_rates"]["messy_spanish"] == {
@@ -72,6 +73,7 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "expected_failed": 1,
         "unexpected_pass": 1,
         "skipped": 0,
+        "infrastructure_error": 0,
         "pass_rate": 0.0,
     }
     assert scorecard["totals"]["unexpected_pass"] == 1

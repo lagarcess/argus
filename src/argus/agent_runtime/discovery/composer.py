@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 from loguru import logger
@@ -27,6 +27,7 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.substage_events import emit_substage
 from argus.domain.market_data import resolve_asset
+from argus.domain.research.admission import ResearchAttemptAdmission
 from argus.domain.research.search import (
     SearchResultPacket,
     SearchUnavailableError,
@@ -92,6 +93,7 @@ async def discovery_operation_result(
     language: str,
     discovery_allowance_available: bool = True,
     packet_cache: Any | None = None,
+    provider_admission: Callable[[], ResearchAttemptAdmission] | None = None,
 ) -> StageResult | None:
     """The find pipeline behind the act gate, callable as a rail operation.
 
@@ -144,6 +146,32 @@ async def discovery_operation_result(
             provider = selection.search_provider_for_config(
                 provider_id=config.provider_id
             )
+            admission = provider_admission() if provider_admission is not None else None
+            if admission is not None and not admission.available:
+                usage["fallback_code"] = "research_capacity_exhausted"
+                result = await _model_knowledge_result(
+                    decision=decision,
+                    request=request,
+                    max_candidates=config.max_candidates,
+                    current_user_message=current_user_message,
+                    language=language,
+                    can_request_search=False,
+                    usage=usage,
+                )
+                if result is not None:
+                    from argus.agent_runtime.research_grounded import (
+                        research_capacity_exhausted_note,
+                    )
+
+                    note = research_capacity_exhausted_note(
+                        runtime_locale(language),
+                        guest_allowance=admission.guest_exhausted,
+                    )
+                    answer = result.stage_patch.get("assistant_response")
+                    result.stage_patch["assistant_response"] = (
+                        f"{answer}\n\n{note}" if answer else note
+                    )
+                return result
             usage["search_attempted"] = True
             # Never announce a search that will not happen.
             emit_substage("discovery_search", detail=_search_subject(request))

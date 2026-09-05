@@ -33,7 +33,6 @@ export function confirmationCardCopyText(
 export function resultCardCopyText(
   view: ResultCardViewModel,
   t: TFunction,
-  explanation?: string | null,
 ): string {
   const headings = copyHeadings(t);
   const { evidence } = view;
@@ -51,8 +50,8 @@ export function resultCardCopyText(
     labelledLine(evidence.worstDrop.label, evidence.worstDrop.value),
     ...evidence.details.map((detail) => labelledLine(detail.label, detail.value)),
     ...evidence.trustGroups,
-    explanation?.trim()
-      ? `${headings.assistantExplanation}:\n${explanation.trim()}`
+    view.readout.trim()
+      ? `${headings.assistantExplanation}:\n${view.readout.trim()}`
       : null,
   ]);
 }

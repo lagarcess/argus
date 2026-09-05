@@ -1,0 +1,135 @@
+{
+  "label": "production-third-same-day",
+  "mode": "run",
+  "before": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "371f538b-e13c-435e-b90f-f92e20d30ede",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [
+      [
+        "55ba460d-27fd-40be-8c34-9a6e9b5eab9b",
+        "succeeded",
+        null,
+        "2f7d931a-bada-5eac-9897-c985ae27b7d1"
+      ],
+      [
+        "1133eb78-7600-491e-9f67-8142d789c5d9",
+        "succeeded",
+        null,
+        "c9fda0b3-04cc-561d-8f5e-b0bbe8f6485c"
+      ]
+    ],
+    "runs": [
+      [
+        "c9fda0b3-04cc-561d-8f5e-b0bbe8f6485c",
+        "completed"
+      ],
+      [
+        "2f7d931a-bada-5eac-9897-c985ae27b7d1",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "371f538b-e13c-435e-b90f-f92e20d30ede",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [
+      [
+        "55ba460d-27fd-40be-8c34-9a6e9b5eab9b",
+        "succeeded",
+        null,
+        "2f7d931a-bada-5eac-9897-c985ae27b7d1"
+      ],
+      [
+        "1133eb78-7600-491e-9f67-8142d789c5d9",
+        "succeeded",
+        null,
+        "c9fda0b3-04cc-561d-8f5e-b0bbe8f6485c"
+      ]
+    ],
+    "runs": [
+      [
+        "c9fda0b3-04cc-561d-8f5e-b0bbe8f6485c",
+        "completed"
+      ],
+      [
+        "2f7d931a-bada-5eac-9897-c985ae27b7d1",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [
+    "Keep going with ArgusThis temporary chat has reached today\u2019s simulation limit. It resets on Sep 5, 2026, 7:00 PM CDT. Request access or sign in to continue.Request access to ArgusArgus is in early access. Share your email to request access. If approved, we\u2019ll email you when you can create an account.Email addressRequest accessAlready approved? Sign upAlready have an account? Sign in"
+  ],
+  "errors": [],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 2,
+            "remaining": 0,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": false,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ],
+  "chat_stream_requests": []
+}

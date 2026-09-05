@@ -819,8 +819,13 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     assert re.search(r"sha256:[0-9a-f]{64}", public_payload) is None
     conversations = client.get("/api/v1/conversations").json()["items"]
     assert conversations[0]["id"] == conversation["id"]
-    assert conversations[0]["last_message_preview"] == assistant["content"]
-    assert "AAPL" in conversations[0]["last_message_preview"]
+    assert conversations[0]["last_message_preview"] is None
+    assert conversations[0]["preview"]["kind"] == "confirmation"
+    assert conversations[0]["preview"]["symbols"] == ["AAPL"]
+    assert (
+        api_state.store.conversations[conversation["id"]].last_message_preview
+        == raw_assistant.content
+    )
 
 
 def test_chat_stream_persists_pending_strategy_metadata(
@@ -1330,7 +1335,20 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert second.status_code == 200
     assert runtime_calls == 1
     assert "event: result" not in second.text
-    breakdown = _stream_payloads(second.text, "token")[0]["text"]
+    assert _stream_payloads(second.text, "token") == []
+    final = _stream_payloads(second.text, "final")[0]["payload"]
+    assert final["assistant_response"] == ""
+    assert final["response_intent"]["kind"] == "result_breakdown"
+    bank = final["response_intent"]["facts"]["result_fact_bank"]
+    assert bank["run_id"] == run_id
+    assert bank["symbols"] == ["AAPL"]
+    assert "metrics" in bank
+    assert "config_snapshot" in bank
+    assert "next_experiments" not in final
+    # Composition remains private audit context; rendering derives from facts.
+    from argus.api import state as api_state
+
+    breakdown = api_state.store.messages[conversation["id"]][-1].content
     assert "### Quick Breakdown" not in breakdown
     assert "**Setup.**" in breakdown
     assert "**How to read it.**" in breakdown
@@ -1344,6 +1362,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert run_id in messages.text
     assistant = messages.json()["items"][-1]
+    assert assistant["content"] == ""
+    assert breakdown not in messages.text
+    assert assistant["metadata"]["response_intent"] == final["response_intent"]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
     assert assistant["metadata"]["result_breakdown_source"] == "deterministic_fallback"
@@ -1498,12 +1519,20 @@ def test_show_breakdown_action_rejects_mismatched_conversation_context(
     )
 
     assert response.status_code == 200
-    text = _stream_payloads(response.text, "token")[0]["text"]
-    assert "could not find" in text
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["assistant_response"] == ""
+    assert final["response_intent"] == {
+        "kind": "result_breakdown",
+        "facts": {"result_fact_bank": None},
+    }
+    assert final["message_id"]
     assistant = client.get(
         f"/api/v1/conversations/{active_conversation['id']}/messages"
     ).json()["items"][-1]
     assert "result_run_id" not in assistant["metadata"]
+    assert assistant["content"] == ""
+    assert assistant["metadata"]["response_intent"] == final["response_intent"]
 
 
 @pytest.mark.parametrize(
@@ -1518,10 +1547,14 @@ def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
     from argus.api import state as api_state
 
     composed_save_response: dict[str, Any] = {}
+    retirement_text = (
+        "I cannot move this into Strategies here, but the run stays reachable "
+        "from this chat and Recents."
+    )
 
     async def compose_private_alpha_save_response(**kwargs: Any) -> str:
         composed_save_response.update(kwargs)
-        return "I cannot move this into Strategies here, but the run stays reachable from this chat and Recents."
+        return retirement_text
 
     monkeypatch.setattr(
         "argus.api.routers.agent.compose_private_alpha_save_response",
@@ -1590,6 +1623,7 @@ def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
 
     assert response.status_code == 200
     text = _stream_payloads(response.text, "token")[0]["text"]
+    assert text == retirement_text
     assert "Saved" not in text
     assert "Strategy was saved" not in text
     assert composed_save_response["user_message"] == expected_request_message
@@ -1613,6 +1647,12 @@ def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
         "AAPL buy and hold"
     )
     assert api_state.store.strategies == {}
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["assistant_response"] == retirement_text
+    messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert messages[-1]["content"] == retirement_text
 
 
 @pytest.mark.parametrize(

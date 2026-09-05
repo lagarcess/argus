@@ -1,0 +1,54 @@
+[
+  {
+    "kind": "stage_boundary",
+    "data": {
+      "outcome": "execution_failed_terminally",
+      "before": {
+        "error": "This guest workspace has used its simulation allowance, so the backtest did not start. Create an account to keep this setup and continue.",
+        "backtest_job": {
+          "id": "b7d27640-1d93-4daa-80b2-fb73df89c3c7",
+          "conversation_id": "8fe60d7e-73f2-4545-ad60-afc3787d294b",
+          "request_message_id": "b7e210f7-e16d-54f2-8b74-4ef679bfb37d",
+          "confirmation_message_id": "1f8a60ab-00f6-4570-8e7d-507034949239",
+          "operation_scope": "chat.run_backtest",
+          "status": "failed",
+          "result_run_id": null,
+          "failure_code": "account_conversion_required",
+          "failure_detail": "guest_simulation_allowance_exhausted",
+          "retryable": false,
+          "queued_at": "2026-09-05T02:02:32.619505+00:00",
+          "started_at": null,
+          "finished_at": "2026-09-05T02:02:32.619485+00:00",
+          "created_at": "2026-09-05T02:02:32.619505+00:00",
+          "updated_at": "2026-09-05T02:02:32.619505+00:00"
+        },
+        "code": "account_conversion_required"
+      },
+      "after": {
+        "code": "account_conversion_required",
+        "result": null,
+        "backtest_job": {
+          "id": "b7d27640-1d93-4daa-80b2-fb73df89c3c7",
+          "conversation_id": "8fe60d7e-73f2-4545-ad60-afc3787d294b",
+          "request_message_id": "b7e210f7-e16d-54f2-8b74-4ef679bfb37d",
+          "confirmation_message_id": "1f8a60ab-00f6-4570-8e7d-507034949239",
+          "operation_scope": "chat.run_backtest",
+          "status": "failed",
+          "result_run_id": null,
+          "failure_code": "account_conversion_required",
+          "failure_detail": "guest_simulation_allowance_exhausted",
+          "retryable": false,
+          "queued_at": "2026-09-05T02:02:32.619505+00:00",
+          "started_at": null,
+          "finished_at": "2026-09-05T02:02:32.619485+00:00",
+          "created_at": "2026-09-05T02:02:32.619505+00:00",
+          "updated_at": "2026-09-05T02:02:32.619505+00:00"
+        },
+        "error": "This guest workspace has used its simulation allowance, so the backtest did not start. Create an account to keep this setup and continue.",
+        "summary": null,
+        "result_card": null,
+        "explanation_context": null
+      }
+    }
+  }
+]

@@ -202,7 +202,7 @@ def evidence_preview_from_payload(
         "assumptions": _safe_text_list(
             payload.get("assumptions") or result_card.get("assumptions")
         ),
-        "metrics_summary": _metrics_summary(payload.get("metrics")),
+        "metrics_summary": result_metrics_summary(payload.get("metrics")),
     }
     quick_take = _safe_preview_text(
         payload.get("quick_take") or result_card.get("quick_take")
@@ -383,7 +383,7 @@ def _safe_breakdown(value: object) -> object | None:
     return None
 
 
-def _metrics_summary(value: object) -> dict[str, object]:
+def result_metrics_summary(value: object) -> dict[str, object]:
     if not isinstance(value, dict):
         return {}
     performance = value.get("aggregate")

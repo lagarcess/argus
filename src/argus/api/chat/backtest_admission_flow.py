@@ -7,6 +7,7 @@ through to free in-process execution.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from typing import Any
 
 from loguru import logger
 
+from argus.api.chat.backtest_job_envelopes import admission_failure_reason
 from argus.api.guest_observability import (
     emit_verified_guest_funnel_event,
     guest_session_allowance_present,
@@ -35,6 +37,51 @@ BACKPRESSURE_RECONCILE_SCAN_LIMIT = 16
 class ChatAdmissionResult:
     decision: str
     job: dict[str, Any] | None = None
+
+
+def _record_rejection(
+    *,
+    gateway: Any,
+    context: Any,
+    decision: str,
+    identity_hash: str,
+    payload_digest: str,
+    launch_payload: dict[str, Any],
+    execution_metadata: dict[str, Any],
+) -> ChatAdmissionResult:
+    log_fields = {
+        "reason": decision,
+        "user_id": context.user_id,
+        "conversation_id": context.conversation_id,
+        "request_id": context.request_id,
+    }
+    logger.warning(
+        "Chat backtest admission rejected {}",
+        json.dumps(log_fields, sort_keys=True),
+        **log_fields,
+    )
+    reason = admission_failure_reason(decision)
+    job = gateway.record_backtest_job_rejection(
+        user_id=context.user_id,
+        operation_scope=CHAT_RUN_SCOPE,
+        rejected_idempotency_key=context.idempotency_key,
+        identity_hash=identity_hash,
+        payload_hash=payload_digest,
+        launch_payload=launch_payload,
+        conversation_id=context.conversation_id,
+        request_message_id=context.request_message_id,
+        confirmation_message_id=context.confirmation_message_id,
+        failure_code=reason.failure_code,
+        failure_detail=reason.failure_detail,
+        retryable=reason.retryable,
+        execution_metadata={
+            **execution_metadata,
+            "admission_decision": decision,
+            "rejected_idempotency_key": context.idempotency_key,
+            "refused_before_dispatch": True,
+        },
+    )
+    return ChatAdmissionResult(decision=decision, job=job)
 
 
 def admit_durable_chat_job(
@@ -97,7 +144,15 @@ def admit_durable_chat_job(
                     conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )
-                return ChatAdmissionResult(decision="conversion_required")
+                return _record_rejection(
+                    gateway=gateway,
+                    context=context,
+                    decision="conversion_required",
+                    identity_hash=identity_hash,
+                    payload_digest=payload_digest,
+                    launch_payload=launch_payload,
+                    execution_metadata=execution_metadata,
+                )
 
     for attempt in (1, 2):
         outcome = gateway.admit_backtest_job(
@@ -167,13 +222,15 @@ def admit_durable_chat_job(
                 limit=BACKPRESSURE_RECONCILE_SCAN_LIMIT,
             ):
                 continue
-            logger.warning(
-                "Chat backtest admission rejected on capacity",
-                reason=decision,
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
+            return _record_rejection(
+                gateway=gateway,
+                context=context,
+                decision=decision,
+                identity_hash=identity_hash,
+                payload_digest=payload_digest,
+                launch_payload=launch_payload,
+                execution_metadata=execution_metadata,
             )
-            return ChatAdmissionResult(decision=decision)
         if decision in ("conflict", "allowance_exhausted", "conversion_required"):
             if decision == "conversion_required" and guest_session_allowance_present(
                 context.allowance_limits
@@ -187,13 +244,15 @@ def admit_durable_chat_job(
                     conversion_reason="simulation_limit",
                     terminal_outcome="limit_reached",
                 )
-            logger.warning(
-                "Chat backtest admission rejected",
-                reason=decision,
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
+            return _record_rejection(
+                gateway=gateway,
+                context=context,
+                decision=decision,
+                identity_hash=identity_hash,
+                payload_digest=payload_digest,
+                launch_payload=launch_payload,
+                execution_metadata=execution_metadata,
             )
-            return ChatAdmissionResult(decision=decision)
         raise RuntimeError(f"Backtest admission returned unknown decision {decision!r}.")
     return ChatAdmissionResult(decision="per_user_capacity")
 

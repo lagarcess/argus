@@ -786,9 +786,13 @@ def test_legacy_onboarding_marker_process_loss_never_updates_public_previews(
     assert conversations.status_code == 200
     [public_conversation] = conversations.json()["items"]
     assert public_conversation["last_message_preview"] is None
+    assert public_conversation["preview"]["kind"] == "empty"
+    assert public_conversation["preview"]["text"] is None
     assert history.status_code == 200
     [history_item] = history.json()["items"]
-    assert history_item["subtitle"] == "No messages yet"
+    assert history_item["subtitle"] == ""
+    assert history_item["preview"]["kind"] == "empty"
+    assert history_item["preview"]["text"] is None
     assert search.status_code == 200
     assert search.json()["items"] == []
     for response in (public_messages, conversations, history, search):

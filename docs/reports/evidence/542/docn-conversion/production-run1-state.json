@@ -1,0 +1,105 @@
+{
+  "label": "production-run1",
+  "mode": "run",
+  "before": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "371f538b-e13c-435e-b90f-f92e20d30ede",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [],
+    "visitor_usage": []
+  },
+  "after": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "371f538b-e13c-435e-b90f-f92e20d30ede",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [
+      [
+        "55ba460d-27fd-40be-8c34-9a6e9b5eab9b",
+        "succeeded",
+        null,
+        "2f7d931a-bada-5eac-9897-c985ae27b7d1"
+      ]
+    ],
+    "runs": [
+      [
+        "2f7d931a-bada-5eac-9897-c985ae27b7d1",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        1,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        1
+      ]
+    ]
+  },
+  "dialogs": [],
+  "errors": [],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 0,
+            "remaining": 2,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ],
+  "chat_stream_requests": [
+    {
+      "conversation_id": "371f538b-e13c-435e-b90f-f92e20d30ede",
+      "action": {
+        "type": "run_backtest",
+        "label": "Run backtest",
+        "labelKey": "chat.confirmation.actions.run_backtest",
+        "payload": {
+          "artifact_id": "confirmation-dbf2a08b-7cac-433d-a378-6b878046e2a7",
+          "confirmation_id": "confirmation-dbf2a08b-7cac-433d-a378-6b878046e2a7",
+          "conversation_id": "371f538b-e13c-435e-b90f-f92e20d30ede",
+          "launch_payload_hash": "fa83ba9176b6defb"
+        },
+        "presentation": "confirmation"
+      },
+      "language": "en",
+      "viewport": "wide"
+    }
+  ]
+}

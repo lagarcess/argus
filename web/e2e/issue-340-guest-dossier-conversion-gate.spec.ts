@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { withDossierResultFacts } from "../test-fixtures/dossier-result-facts";
 
 const CONVERSATION_ID = "00000000-0000-4000-8000-000000000340";
 const RUN_ID = "00000000-0000-4000-8000-000000000341";
@@ -98,7 +99,7 @@ function searchPayload(accountKind: "guest" | "registered") {
         decision_states: ["watching"],
         total_runs: 2,
         decided_runs: 2,
-        dossier: {
+        dossier: withDossierResultFacts({
           run_id: RUN_ID,
           run_label: "Weekly GLD pullback",
           completed_at: "2026-08-02T15:00:00Z",
@@ -115,7 +116,6 @@ function searchPayload(accountKind: "guest" | "registered") {
             run_label: "Weekly GLD pullback",
             completed_at: "2026-08-02T15:00:00Z",
             benchmark_symbol: "SPY",
-            quick_take: "GLD held up better than SPY.",
             metrics: [
               { name: "total_return_pct", value: 8.4 },
               { name: "benchmark_return_pct", value: 6.1 },
@@ -140,7 +140,7 @@ function searchPayload(accountKind: "guest" | "registered") {
               run_label: "Weekly GLD pullback",
             },
           ],
-        },
+        }),
       },
     ],
     ledger_groups: [{ decision_state: "watching", count: 2 }],
@@ -149,7 +149,7 @@ function searchPayload(accountKind: "guest" | "registered") {
 }
 
 function historicalDossier(accountKind: "guest" | "registered") {
-  return {
+  return withDossierResultFacts({
     run_id: HISTORICAL_RUN_ID,
     run_label: "Historical GLD pullback",
     completed_at: "2026-07-15T15:00:00Z",
@@ -166,7 +166,6 @@ function historicalDossier(accountKind: "guest" | "registered") {
       run_label: "Historical GLD pullback",
       completed_at: "2026-07-15T15:00:00Z",
       benchmark_symbol: "SPY",
-      quick_take: "The earlier GLD run trailed SPY.",
       metrics: [
         { name: "total_return_pct", value: 4.2 },
         { name: "benchmark_return_pct", value: 6.4 },
@@ -191,7 +190,7 @@ function historicalDossier(accountKind: "guest" | "registered") {
         run_label: "Historical GLD pullback",
       },
     ],
-  };
+  });
 }
 
 async function mockJourney(page: Page, language: LocaleFixture["language"]) {

@@ -1,0 +1,4 @@
+PASS en-run1 {"label":"en-run1","mode":"completed","modal":false,"stream_requests":1,"run_count":1,"job_count":1,"counter":[["backtest_runs","guest_session",1,2]]}
+PASS en-run2 {"label":"en-run2","mode":"completed","modal":false,"stream_requests":1,"run_count":2,"job_count":2,"counter":[["backtest_runs","guest_session",2,2]]}
+PASS en-same-day {"label":"en-same-day","mode":"same-day","modal":true,"stream_requests":0,"run_count":2,"job_count":2,"counter":[["backtest_runs","guest_session",2,2]]}
+PASS en-next-day {"label":"en-next-day","mode":"next-day","modal":true,"stream_requests":1,"run_count":0,"job_count":1,"counter":[["backtest_runs","guest_session",2,2]]}

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 
 import type { RunDossier } from "../lib/run-dossier-contract";
+import { withDossierResultFacts } from "../test-fixtures/dossier-result-facts";
 import {
   formatRunDossierMetrics,
   formatRunDossierSetup,
@@ -19,7 +20,7 @@ const translations: Record<string, string> = {
 const t = ((key: string, fallback?: string) =>
   translations[key] ?? fallback ?? key) as TFunction;
 
-const dossier: RunDossier = {
+const dossier: RunDossier = withDossierResultFacts({
   run_id: "run-7",
   run_label: "Weekly GLD pullback",
   completed_at: "2026-07-31T14:30:00.000Z",
@@ -36,7 +37,6 @@ const dossier: RunDossier = {
     run_label: "Weekly GLD pullback",
     completed_at: "2026-07-31T14:30:00.000Z",
     benchmark_symbol: "SPY",
-    quick_take: "GLD held up better than SPY.",
     metrics: [
       { name: "total_return_pct", value: 8.4 },
       { name: "max_drawdown_pct", value: -6.2 },
@@ -49,7 +49,7 @@ const dossier: RunDossier = {
     run_label: "Weekly GLD pullback",
   },
   actions: [],
-};
+});
 
 describe("single-run dossier formatting", () => {
   test("formats only the bounded setup facts supplied by the backend", () => {

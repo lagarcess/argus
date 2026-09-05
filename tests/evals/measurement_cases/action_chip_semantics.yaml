@@ -75,6 +75,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: approved_for_execution
       assets: ["AAPL"]
@@ -146,6 +148,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
@@ -223,6 +227,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA", "TSLA"]
@@ -300,6 +306,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["MSFT", "NVDA", "TSLA", "GOOGL"]
@@ -377,6 +385,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA"]
@@ -417,6 +427,8 @@ cases:
         comparison_baseline: SPY
         capital_amount: 1000
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
@@ -457,6 +469,8 @@ cases:
         comparison_baseline: SPY
         capital_amount: 1000
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
@@ -496,6 +510,8 @@ cases:
         comparison_baseline: SPY
         capital_amount: 1000
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["MSFT", "TSLA", "AMD"]
@@ -536,6 +552,8 @@ cases:
         comparison_baseline: SPY
         capital_amount: 1000
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
@@ -576,6 +594,8 @@ cases:
         comparison_baseline: SPY
         capital_amount: 1000
     expected:
+      offered:
+        launch_matches_expected: true
       intent: [strategy_drafting, backtest_execution]
       capability_verdict: executable
       assets: ["TSLA"]
@@ -598,6 +618,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: [strategy_drafting, backtest_execution]
       capability_verdict: executable
       assets: ["MSFT"]
@@ -706,6 +728,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["MSFT", "AAPL"]
@@ -790,6 +814,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["LOW", "HD"]
@@ -1017,6 +1043,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: [strategy_drafting, backtest_execution]
       capability_verdict: executable
       assets: ["NVDA"]
@@ -1279,6 +1307,8 @@ cases:
         status: ready_to_run
         executable: true
     expected:
+      offered:
+        launch_matches_expected: true
       intent: [strategy_drafting, backtest_execution]
       capability_verdict: executable
       assets: ["NVDA"]

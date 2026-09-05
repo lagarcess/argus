@@ -1,0 +1,245 @@
+{
+  "label": "en-run2",
+  "mode": "completed",
+  "language": "en",
+  "before": {
+    "owner": {
+      "user_id": "bc736619-3630-4df5-ba52-080ca8e25827",
+      "conversation_id": "65fdb98b-9860-400b-9ca1-f3350c917020",
+      "period_start": "2026-09-05T02:01:09+00:00",
+      "period_end": "2026-09-12T02:01:09+00:00"
+    },
+    "jobs": [
+      [
+        "f07edac1-8589-405e-aa2b-8ecc746194fd",
+        "succeeded",
+        null,
+        "bb3d2805-a3c3-5ffb-8587-af645381786a"
+      ]
+    ],
+    "runs": [
+      [
+        "bb3d2805-a3c3-5ffb-8587-af645381786a",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        1,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        1
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "bc736619-3630-4df5-ba52-080ca8e25827",
+      "conversation_id": "65fdb98b-9860-400b-9ca1-f3350c917020",
+      "period_start": "2026-09-05T02:01:09+00:00",
+      "period_end": "2026-09-12T02:01:09+00:00"
+    },
+    "jobs": [
+      [
+        "f07edac1-8589-405e-aa2b-8ecc746194fd",
+        "succeeded",
+        null,
+        "bb3d2805-a3c3-5ffb-8587-af645381786a"
+      ],
+      [
+        "4a2ef27f-3e1f-4fa5-a6aa-73774003c51d",
+        "succeeded",
+        null,
+        "9d4d46d9-43f0-59e8-a011-cda23f023b03"
+      ]
+    ],
+    "runs": [
+      [
+        "9d4d46d9-43f0-59e8-a011-cda23f023b03",
+        "completed"
+      ],
+      [
+        "bb3d2805-a3c3-5ffb-8587-af645381786a",
+        "completed"
+      ]
+    ],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-05 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [],
+  "errors": [],
+  "accountResponses": [
+    {
+      "user": {
+        "id": "bc736619-3630-4df5-ba52-080ca8e25827",
+        "email": null,
+        "username": null,
+        "display_name": null,
+        "language": "en",
+        "locale": "en-US",
+        "theme": "dark",
+        "is_admin": false,
+        "onboarding": {
+          "completed": false,
+          "stage": "language_selection",
+          "language_confirmed": false,
+          "primary_goal": null
+        },
+        "created_at": "2026-09-05T02:01:09.956106Z",
+        "updated_at": "2026-09-05T02:01:09.956106Z"
+      },
+      "account_kind": "guest",
+      "guest": {
+        "expires_at": "2026-09-12T02:01:09Z",
+        "conversation_id": "65fdb98b-9860-400b-9ca1-f3350c917020",
+        "conversation_limit": 1,
+        "message_limit": 10,
+        "simulation_limit": 2,
+        "feedback_limit": 5
+      },
+      "capabilities": {
+        "can_create_additional_conversation": false,
+        "can_manage_conversation": false,
+        "can_save_decision": false,
+        "can_manage_account": false,
+        "can_use_omnisearch": true,
+        "can_search_current_workspace": true,
+        "can_use_grounded_discovery": true,
+        "can_submit_feedback": true
+      },
+      "public_account_access_enabled": true
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://127.0.0.1:55479/api/v1/memory/availability",
+      "status": 403,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/65fdb98b-9860-400b-9ca1-f3350c917020/messages?limit=100",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/backtest-jobs/f07edac1-8589-405e-aa2b-8ecc746194fd",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/65fdb98b-9860-400b-9ca1-f3350c917020/activity",
+      "status": 200,
+      "method": "PATCH",
+      "request": "{\"action\":\"mark_read\",\"through_attention_cursor\":\"eyJpIjoiZjA3ZWRhYzEtODU4OS00MDVlLWFhMmItOGVjYzc0NjE5NGZkIiwiayI6ImJhY2t0ZXN0X2pvYiIsInYiOjF9\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me/usage",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/chat/stream",
+      "status": 200,
+      "method": "POST",
+      "request": "{\"conversation_id\":\"65fdb98b-9860-400b-9ca1-f3350c917020\",\"action\":{\"type\":\"run_backtest\",\"label\":\"Run backtest\",\"labelKey\":\"chat.confirmation.actions.run_backtest\",\"payload\":{\"artifact_id\":\"confirmation-82454af0-a4e1-4cd6-ae44-d45cda6fcfba\",\"confirmation_id\":\"confirmation-82454af0-a4e1-4cd6-ae44-d45cda6fcfba\",\"conversation_id\":\"65fdb98b-9860-400b-9ca1-f3350c917020\",\"launch_payload_hash\":\"fa83ba9176b6defb\"},\"presentation\":\"confirmation\"},\"language\":\"en\",\"viewport\":\"wide\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=50",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    }
+  ],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 1,
+            "remaining": 1,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ]
+}

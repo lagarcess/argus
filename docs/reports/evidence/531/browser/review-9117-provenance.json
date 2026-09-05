@@ -1,0 +1,43 @@
+{
+  "candidate_sha": "7eb10e2f8101d71d60641e1aad3cfbbd18121fa1",
+  "candidate_subject": "chore(integration): reconcile payload and scope contracts",
+  "lane_parent_sha": "93bfbbf801c8a1841fd0d3e55d377bb533e15dc9",
+  "integration_parent_sha": "9117fa7f06c7f5a7326c6341d96c780b66f540db",
+  "integration_parent_context": "includes #548 scope and migration changes plus #547 generated final-payload code",
+  "captured_at": "2026-09-05T03:38:49Z",
+  "browser": "headed Playwright CLI",
+  "source_tree_kind": "git archive of exact candidate SHA",
+  "recorded_result_source": "docs/reports/evidence/411/browser/en-discovery-messages.json",
+  "recorded_result_source_sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+  "committed_replay_harness_sha256": "c04549b9db3e898bf524c4b6c7d0afbb9ead3d7f7944c8bd93366d3c50aaa749",
+  "runtime_replay_harness_sha256": "e459aefde0c2648cf4a78e7658b03b2e1af7491a4ed166519d66fce4a49d469e",
+  "runtime_harness_adjustment": "the isolated git archive has no git metadata, so only candidate-SHA discovery was changed to read the required ISSUE531_QA_TREE environment value; seed and route behavior were unchanged",
+  "source_files_sha256": {
+    "web/components/chat/ChatMessage.tsx": "055ff1fff029408a58ce5218820b174093e61ee3489bb89316a970c54598bf64",
+    "web/components/chat/chat-message-projection.ts": "f2b415f83ff69a0c7d4fa35bc4c8c8d85fb8a62d1e3ec0b0c34d46f829b83ed2",
+    "web/lib/result-readout-display.ts": "9c16845c36d221586a5d68d7764684f1ffe04e80cdd7c4a22655c6daa2d1c150",
+    "src/argus/api/artifact_presentation.py": "556c5166345b31d3a370374009e7ffc3826e1f7e4457977d201a9bd250682f8f",
+    "src/argus/api/artifact_message_reads.py": "94f819a60355f15cc2d5b9ddcc71f6aeae102e366a4de2564a7082933a8a752e",
+    "web/lib/chat-final-response-payload.ts": "ce8acac4760400a055885b5bee3e291a2d4090ea7e7d648df4f42ee67dd7a262",
+    "scripts/generate_chat_final_response_type.py": "b0070b1fec9c9ca96dcd8ae811cd770d9dd2d60b03f82c545882fdae73bfc0a7"
+  },
+  "screenshot": "review-9117-en-authored-es-workspace.png",
+  "screenshot_sha256": "f1d6b62ad91d4c49970c33d6660689b15b205b6d613a4a6a458d0d9aff454b3e",
+  "browser_steps": [
+    "load the recorded English-authored result through normal conversation hydration",
+    "open Settings, Preferences, and App language",
+    "select Spanish",
+    "fully reload the same browser page",
+    "inspect the post-reload result card and Quick Take"
+  ],
+  "observed_quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de 369.5%. Terminó 315.64 puntos porcentuales por encima de SPY. La peor caída fue de -18.35%.",
+  "saved_english_result_body_rendered": false,
+  "console_errors": 0,
+  "console_warnings_count": 2,
+  "console_warnings": "development-only unused font preload warnings",
+  "provider_calls": 0,
+  "credential_files_loaded": false,
+  "hosted_database_reads_or_writes": 0,
+  "dca_or_backtest_actions": 0,
+  "auth_or_session_identifiers_in_evidence": false
+}

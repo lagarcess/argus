@@ -8,6 +8,7 @@ import asyncio
 import json
 import time
 from datetime import date
+from functools import partial
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -28,6 +29,9 @@ from argus.agent_runtime.interpreter.discovery_focused_read import (
     focused_discovery_payload_response,
 )
 from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.agent_runtime.interpreter.repair_observability import (
+    repair_effect_metadata,
+)
 from argus.domain.research.config import research_rail_enabled
 from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
     BENCHMARK_LANGUAGE_GUIDANCE,
@@ -393,6 +397,7 @@ from argus.agent_runtime.turn_execution_evidence import (
 from argus.domain.market_data import is_ticker_like_query, resolve_asset
 from argus.llm.openrouter import (
     OpenRouterTask,
+    annotate_latest_openrouter_route_receipt,
     build_openrouter_model,
     invoke_openrouter_json_schema,
     log_openrouter_failure,
@@ -409,6 +414,28 @@ from argus.nlp.natural_time import (
 _carry_asset_blocker = provider_context_assets.carry_incomplete_asset_blocker
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
+
+
+def _annotate_interpretation_repair(
+    *,
+    schema_name: str,
+    before: LLMInterpretationResponse,
+    after: LLMInterpretationResponse,
+    trigger_reason: str,
+    repair_applied: bool,
+    no_op_reason: str | None = None,
+) -> None:
+    annotate_latest_openrouter_route_receipt(
+        task=_INTERPRETATION_REPAIR_TASK,
+        schema_name=schema_name,
+        repair_effect=repair_effect_metadata(
+            before=before,
+            after=after,
+            trigger_reason=trigger_reason,
+            repair_applied=repair_applied,
+            no_op_reason=no_op_reason,
+        ),
+    )
 
 
 def _selected_thread_metadata_context(metadata: dict[str, Any]) -> str:
@@ -3232,6 +3259,9 @@ async def _repair_incomplete_strategy_extraction(
 ) -> LLMInterpretationResponse | None:
     if not _strategy_extraction_repair_is_allowed(failed_response, request=request):
         return None
+    schema_name = "FocusedStrategyExtraction"
+    trigger_reason = "required_strategy_shape_missing"
+    annotate_repair = partial(_annotate_interpretation_repair, schema_name=schema_name, before=failed_response, trigger_reason=trigger_reason)
     messages = _focused_strategy_extraction_messages(request)
     for model_name in _unique_repair_models(
         preferred_model,
@@ -3242,14 +3272,17 @@ async def _repair_incomplete_strategy_extraction(
                 task=_INTERPRETATION_REPAIR_TASK,
                 messages=_openrouter_wire_messages(messages),
                 schema_model=FocusedStrategyExtraction,
-                schema_name="FocusedStrategyExtraction",
+                schema_name=schema_name,
                 model_name=model_name,
             )
         except Exception:
+            annotate_repair(after=failed_response, repair_applied=False, no_op_reason="provider_call_failed")
             continue
         if not isinstance(extraction, FocusedStrategyExtraction):
+            annotate_repair(after=failed_response, repair_applied=False, no_op_reason="invalid_provider_result")
             continue
         if not _focused_strategy_extraction_has_material_fields(extraction):
+            annotate_repair(after=failed_response, repair_applied=False, no_op_reason="no_material_fields")
             continue
         base_response = failed_response
         if _request_has_active_strategy_context(
@@ -3285,6 +3318,7 @@ async def _repair_incomplete_strategy_extraction(
                 "ready_after_focused_strategy_repair",
                 response=response,
             )
+            annotate_repair(after=response, repair_applied=True)
             return response
         response = await _signal_rule_checked_response(
             response=response,
@@ -3313,7 +3347,9 @@ async def _repair_incomplete_strategy_extraction(
         if audited_response is not None:
             response = audited_response
         if _structured_interpretation_has_required_shape(response, request=request):
+            annotate_repair(after=response, repair_applied=True)
             return response
+        annotate_repair(after=failed_response, repair_applied=False, no_op_reason="required_shape_rejected")
     return None
 
 
@@ -3328,6 +3364,9 @@ async def _focused_date_window_audited_response(
         request=request,
     ):
         return None
+    schema_name = "FocusedDateWindowExtraction"
+    trigger_reason = "date_window_intent_uncertain"
+    annotate_repair = partial(_annotate_interpretation_repair, schema_name=schema_name, before=response, trigger_reason=trigger_reason)
     messages = _focused_date_window_extraction_messages(
         response=response,
         request=request,
@@ -3341,10 +3380,11 @@ async def _focused_date_window_audited_response(
                 task=_INTERPRETATION_REPAIR_TASK,
                 messages=messages,
                 schema_model=FocusedDateWindowExtraction,
-                schema_name="FocusedDateWindowExtraction",
+                schema_name=schema_name,
                 model_name=model_name,
             )
         except Exception as exc:
+            annotate_repair(after=response, repair_applied=False, no_op_reason="provider_call_failed")
             log_openrouter_failure(
                 task=_INTERPRETATION_REPAIR_TASK,
                 model_name=model_name,
@@ -3353,10 +3393,12 @@ async def _focused_date_window_audited_response(
             )
             continue
         if not isinstance(extraction, FocusedDateWindowExtraction):
+            annotate_repair(after=response, repair_applied=False, no_op_reason="invalid_provider_result")
             continue
         if not extraction.has_date_window:
             # A well-formed "no window" is authoritative; remaining repair models
             # are not asked.
+            annotate_repair(after=response, repair_applied=False, no_op_reason="no_date_window")
             return None
         repaired = _response_from_focused_date_window_extraction(
             response=response,
@@ -3366,10 +3408,13 @@ async def _focused_date_window_audited_response(
         if repaired is not None:
             # The focused extraction can name the latest-result reference; the
             # binder runs again because normalization already passed.
-            return _response_with_latest_result_window_bound(
+            repaired = _response_with_latest_result_window_bound(
                 repaired,
                 request=request,
             )
+            annotate_repair(after=repaired, repair_applied=True)
+            return repaired
+        annotate_repair(after=response, repair_applied=False, no_op_reason="invalid_date_window")
     return None
 
 

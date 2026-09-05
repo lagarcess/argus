@@ -6,6 +6,7 @@ import type {
   SearchLedgerGroup,
 } from "./argus-api";
 import type { SearchDossierAction } from "./run-dossier-contract";
+import type { ConversationPreview } from "./conversation-preview-display";
 import {
   commandPaletteRowActionForEvent,
   quickJumpIndexForEvent,
@@ -17,6 +18,7 @@ export type CommandPaletteDisplayItem = {
   conversationId: string | null;
   title: string;
   snippet: string;
+  preview?: ConversationPreview | null;
   matchCount: number;
   matchMessageId: string | null;
   updatedAt: string;
@@ -82,7 +84,8 @@ export function commandPaletteItemFromHistory(
     type: "chat",
     conversationId: item.conversation_id ?? item.id,
     title: item.title,
-    snippet: item.subtitle ?? "",
+    snippet: "",
+    preview: item.preview,
     matchCount: 1,
     matchMessageId: null,
     updatedAt: item.created_at,
@@ -137,7 +140,8 @@ export function commandPaletteItemFromSearch(
     type: "conversation",
     conversationId: item.conversation_id,
     title: item.title,
-    snippet: item.matched_text,
+    snippet: item.match.layer === "message" ? item.match.fragment : "",
+    preview: item.preview,
     matchCount: item.match.count,
     matchMessageId: item.match.message_id ?? null,
     updatedAt: item.updated_at,

@@ -5,6 +5,10 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: unsupported_or_out_of_scope
       capability_verdict: unsupported
       assets: ["AAPL"]
@@ -23,6 +27,10 @@ cases:
     user_language: es-419
     ui_language: es-419
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: unsupported_or_out_of_scope
       capability_verdict: unsupported
       assets: ["AAPL"]
@@ -43,6 +51,9 @@ cases:
     degraded_mode:
       clarifier: offline
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: needs_clarification
       assets: ["AAPL"]

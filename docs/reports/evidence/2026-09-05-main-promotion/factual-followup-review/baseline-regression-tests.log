@@ -1,0 +1,403 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/a121/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 21 items / 11 deselected / 10 selected
+
+tests/test_artifact_presentation.py FFF.FFFFFF                           [100%]
+
+=================================== FAILURES ===================================
+__________ test_ordinary_text_does_not_become_an_artifact[knowledge] ___________
+
+intent_kind = 'knowledge', faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.parametrize(
+        "intent_kind", ["knowledge", "beginner_guidance", "unsupported_recovery"]
+    )
+    def test_ordinary_text_does_not_become_an_artifact(intent_kind, faker) -> None:
+        payload = {
+            "content": faker.sentence(),
+            "response_intent": {"kind": intent_kind},
+            "result_fact_bank": {"symbols": ["AAPL"]},
+        }
+>       assert reader_payload(payload) == payload
+E       AssertionError: assert {'content': '...s': ['AAPL']}} == {'content': '...s': ['AAPL']}}
+E         
+E         Omitting 2 identical items, use -vv to show
+E         Differing items:
+E         {'content': ''} != {'content': 'Serious inside else memory if six.'}
+E         Use -v to get more diff
+
+tests/test_artifact_presentation.py:82: AssertionError
+______ test_ordinary_text_does_not_become_an_artifact[beginner_guidance] _______
+
+intent_kind = 'beginner_guidance'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.parametrize(
+        "intent_kind", ["knowledge", "beginner_guidance", "unsupported_recovery"]
+    )
+    def test_ordinary_text_does_not_become_an_artifact(intent_kind, faker) -> None:
+        payload = {
+            "content": faker.sentence(),
+            "response_intent": {"kind": intent_kind},
+            "result_fact_bank": {"symbols": ["AAPL"]},
+        }
+>       assert reader_payload(payload) == payload
+E       AssertionError: assert {'content': '...s': ['AAPL']}} == {'content': '...s': ['AAPL']}}
+E         
+E         Omitting 2 identical items, use -vv to show
+E         Differing items:
+E         {'content': ''} != {'content': 'Serious inside else memory if six.'}
+E         Use -v to get more diff
+
+tests/test_artifact_presentation.py:82: AssertionError
+_____ test_ordinary_text_does_not_become_an_artifact[unsupported_recovery] _____
+
+intent_kind = 'unsupported_recovery'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.parametrize(
+        "intent_kind", ["knowledge", "beginner_guidance", "unsupported_recovery"]
+    )
+    def test_ordinary_text_does_not_become_an_artifact(intent_kind, faker) -> None:
+        payload = {
+            "content": faker.sentence(),
+            "response_intent": {"kind": intent_kind},
+            "result_fact_bank": {"symbols": ["AAPL"]},
+        }
+>       assert reader_payload(payload) == payload
+E       AssertionError: assert {'content': '...s': ['AAPL']}} == {'content': '...s': ['AAPL']}}
+E         
+E         Omitting 2 identical items, use -vv to show
+E         Differing items:
+E         {'content': ''} != {'content': 'Serious inside else memory if six.'}
+E         Use -v to get more diff
+
+tests/test_artifact_presentation.py:82: AssertionError
+___ test_factual_followup_survives_live_and_persisted_readers[peak_date-en] ____
+
+language = 'en', fact_key = 'peak_date'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("fact_key", ["peak_date", "peak_value", "fee_bps"])
+    async def test_factual_followup_survives_live_and_persisted_readers(
+        language: str, fact_key: str, faker
+    ) -> None:
+        from argus.agent_runtime.result_followups import result_followup_fact_bank
+        from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+            latest_result_answer_stage_result_if_applicable,
+        )
+        from argus.api.artifact_presentation import reader_chat_result
+        from argus.api.routers.conversations import _public_message_projection
+        from argus.domain.conversation_previews import project_conversation_preview
+    
+        from tests.agent_runtime.test_latest_result_fact_answers import (
+            _decision,
+            _latest_result_reference,
+            _RecordingComposer,
+            _snapshot,
+        )
+    
+        reference = _latest_result_reference()
+        fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
+        answer = f"{faker.sentence()} {fact}"
+        composer = _RecordingComposer(response=answer)
+        decision = _decision("result_card_fact").model_copy(
+            update={"result_followup_fact_key": fact_key}
+        )
+        result = await latest_result_answer_stage_result_if_applicable(
+            decision=decision,
+            snapshot=_snapshot(),
+            current_user_message=faker.sentence(),
+            language=language,
+            compose_response_func=composer,
+        )
+        assert result is not None
+        assert composer.calls[0]["language"] == language
+        assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+        assert result.patch["response_intent"]["facts"][fact_key] == fact
+    
+        live = reader_chat_result(result.patch, result.patch)
+>       assert live["assistant_response"] == answer
+E       AssertionError: assert '' == 'Serious insi...x. 2021-11-09'
+E         
+E         - Serious inside else memory if six. 2021-11-09
+
+tests/test_artifact_presentation.py:136: AssertionError
+_ test_factual_followup_survives_live_and_persisted_readers[peak_date-es-419] __
+
+language = 'es-419', fact_key = 'peak_date'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("fact_key", ["peak_date", "peak_value", "fee_bps"])
+    async def test_factual_followup_survives_live_and_persisted_readers(
+        language: str, fact_key: str, faker
+    ) -> None:
+        from argus.agent_runtime.result_followups import result_followup_fact_bank
+        from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+            latest_result_answer_stage_result_if_applicable,
+        )
+        from argus.api.artifact_presentation import reader_chat_result
+        from argus.api.routers.conversations import _public_message_projection
+        from argus.domain.conversation_previews import project_conversation_preview
+    
+        from tests.agent_runtime.test_latest_result_fact_answers import (
+            _decision,
+            _latest_result_reference,
+            _RecordingComposer,
+            _snapshot,
+        )
+    
+        reference = _latest_result_reference()
+        fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
+        answer = f"{faker.sentence()} {fact}"
+        composer = _RecordingComposer(response=answer)
+        decision = _decision("result_card_fact").model_copy(
+            update={"result_followup_fact_key": fact_key}
+        )
+        result = await latest_result_answer_stage_result_if_applicable(
+            decision=decision,
+            snapshot=_snapshot(),
+            current_user_message=faker.sentence(),
+            language=language,
+            compose_response_func=composer,
+        )
+        assert result is not None
+        assert composer.calls[0]["language"] == language
+        assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+        assert result.patch["response_intent"]["facts"][fact_key] == fact
+    
+        live = reader_chat_result(result.patch, result.patch)
+>       assert live["assistant_response"] == answer
+E       AssertionError: assert '' == 'Serious insi...x. 2021-11-09'
+E         
+E         - Serious inside else memory if six. 2021-11-09
+
+tests/test_artifact_presentation.py:136: AssertionError
+___ test_factual_followup_survives_live_and_persisted_readers[peak_value-en] ___
+
+language = 'en', fact_key = 'peak_value'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("fact_key", ["peak_date", "peak_value", "fee_bps"])
+    async def test_factual_followup_survives_live_and_persisted_readers(
+        language: str, fact_key: str, faker
+    ) -> None:
+        from argus.agent_runtime.result_followups import result_followup_fact_bank
+        from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+            latest_result_answer_stage_result_if_applicable,
+        )
+        from argus.api.artifact_presentation import reader_chat_result
+        from argus.api.routers.conversations import _public_message_projection
+        from argus.domain.conversation_previews import project_conversation_preview
+    
+        from tests.agent_runtime.test_latest_result_fact_answers import (
+            _decision,
+            _latest_result_reference,
+            _RecordingComposer,
+            _snapshot,
+        )
+    
+        reference = _latest_result_reference()
+        fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
+        answer = f"{faker.sentence()} {fact}"
+        composer = _RecordingComposer(response=answer)
+        decision = _decision("result_card_fact").model_copy(
+            update={"result_followup_fact_key": fact_key}
+        )
+        result = await latest_result_answer_stage_result_if_applicable(
+            decision=decision,
+            snapshot=_snapshot(),
+            current_user_message=faker.sentence(),
+            language=language,
+            compose_response_func=composer,
+        )
+        assert result is not None
+        assert composer.calls[0]["language"] == language
+        assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+        assert result.patch["response_intent"]["facts"][fact_key] == fact
+    
+        live = reader_chat_result(result.patch, result.patch)
+>       assert live["assistant_response"] == answer
+E       AssertionError: assert '' == 'Serious insi...x. $14,500.25'
+E         
+E         - Serious inside else memory if six. $14,500.25
+
+tests/test_artifact_presentation.py:136: AssertionError
+_ test_factual_followup_survives_live_and_persisted_readers[peak_value-es-419] _
+
+language = 'es-419', fact_key = 'peak_value'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("fact_key", ["peak_date", "peak_value", "fee_bps"])
+    async def test_factual_followup_survives_live_and_persisted_readers(
+        language: str, fact_key: str, faker
+    ) -> None:
+        from argus.agent_runtime.result_followups import result_followup_fact_bank
+        from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+            latest_result_answer_stage_result_if_applicable,
+        )
+        from argus.api.artifact_presentation import reader_chat_result
+        from argus.api.routers.conversations import _public_message_projection
+        from argus.domain.conversation_previews import project_conversation_preview
+    
+        from tests.agent_runtime.test_latest_result_fact_answers import (
+            _decision,
+            _latest_result_reference,
+            _RecordingComposer,
+            _snapshot,
+        )
+    
+        reference = _latest_result_reference()
+        fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
+        answer = f"{faker.sentence()} {fact}"
+        composer = _RecordingComposer(response=answer)
+        decision = _decision("result_card_fact").model_copy(
+            update={"result_followup_fact_key": fact_key}
+        )
+        result = await latest_result_answer_stage_result_if_applicable(
+            decision=decision,
+            snapshot=_snapshot(),
+            current_user_message=faker.sentence(),
+            language=language,
+            compose_response_func=composer,
+        )
+        assert result is not None
+        assert composer.calls[0]["language"] == language
+        assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+        assert result.patch["response_intent"]["facts"][fact_key] == fact
+    
+        live = reader_chat_result(result.patch, result.patch)
+>       assert live["assistant_response"] == answer
+E       AssertionError: assert '' == 'Serious insi...x. $14,500.25'
+E         
+E         - Serious inside else memory if six. $14,500.25
+
+tests/test_artifact_presentation.py:136: AssertionError
+____ test_factual_followup_survives_live_and_persisted_readers[fee_bps-en] _____
+
+language = 'en', fact_key = 'fee_bps'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("fact_key", ["peak_date", "peak_value", "fee_bps"])
+    async def test_factual_followup_survives_live_and_persisted_readers(
+        language: str, fact_key: str, faker
+    ) -> None:
+        from argus.agent_runtime.result_followups import result_followup_fact_bank
+        from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+            latest_result_answer_stage_result_if_applicable,
+        )
+        from argus.api.artifact_presentation import reader_chat_result
+        from argus.api.routers.conversations import _public_message_projection
+        from argus.domain.conversation_previews import project_conversation_preview
+    
+        from tests.agent_runtime.test_latest_result_fact_answers import (
+            _decision,
+            _latest_result_reference,
+            _RecordingComposer,
+            _snapshot,
+        )
+    
+        reference = _latest_result_reference()
+        fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
+        answer = f"{faker.sentence()} {fact}"
+        composer = _RecordingComposer(response=answer)
+        decision = _decision("result_card_fact").model_copy(
+            update={"result_followup_fact_key": fact_key}
+        )
+        result = await latest_result_answer_stage_result_if_applicable(
+            decision=decision,
+            snapshot=_snapshot(),
+            current_user_message=faker.sentence(),
+            language=language,
+            compose_response_func=composer,
+        )
+        assert result is not None
+        assert composer.calls[0]["language"] == language
+        assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+        assert result.patch["response_intent"]["facts"][fact_key] == fact
+    
+        live = reader_chat_result(result.patch, result.patch)
+>       assert live["assistant_response"] == answer
+E       AssertionError: assert '' == 'Serious insi...f six. 10 bps'
+E         
+E         - Serious inside else memory if six. 10 bps
+
+tests/test_artifact_presentation.py:136: AssertionError
+__ test_factual_followup_survives_live_and_persisted_readers[fee_bps-es-419] ___
+
+language = 'es-419', fact_key = 'fee_bps'
+faker = <faker.proxy.Faker object at 0x10aa1e7d0>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("fact_key", ["peak_date", "peak_value", "fee_bps"])
+    async def test_factual_followup_survives_live_and_persisted_readers(
+        language: str, fact_key: str, faker
+    ) -> None:
+        from argus.agent_runtime.result_followups import result_followup_fact_bank
+        from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+            latest_result_answer_stage_result_if_applicable,
+        )
+        from argus.api.artifact_presentation import reader_chat_result
+        from argus.api.routers.conversations import _public_message_projection
+        from argus.domain.conversation_previews import project_conversation_preview
+    
+        from tests.agent_runtime.test_latest_result_fact_answers import (
+            _decision,
+            _latest_result_reference,
+            _RecordingComposer,
+            _snapshot,
+        )
+    
+        reference = _latest_result_reference()
+        fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
+        answer = f"{faker.sentence()} {fact}"
+        composer = _RecordingComposer(response=answer)
+        decision = _decision("result_card_fact").model_copy(
+            update={"result_followup_fact_key": fact_key}
+        )
+        result = await latest_result_answer_stage_result_if_applicable(
+            decision=decision,
+            snapshot=_snapshot(),
+            current_user_message=faker.sentence(),
+            language=language,
+            compose_response_func=composer,
+        )
+        assert result is not None
+        assert composer.calls[0]["language"] == language
+        assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+        assert result.patch["response_intent"]["facts"][fact_key] == fact
+    
+        live = reader_chat_result(result.patch, result.patch)
+>       assert live["assistant_response"] == answer
+E       AssertionError: assert '' == 'Serious insi...f six. 10 bps'
+E         
+E         - Serious inside else memory if six. 10 bps
+
+tests/test_artifact_presentation.py:136: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_artifact_presentation.py::test_ordinary_text_does_not_become_an_artifact[knowledge]
+FAILED tests/test_artifact_presentation.py::test_ordinary_text_does_not_become_an_artifact[beginner_guidance]
+FAILED tests/test_artifact_presentation.py::test_ordinary_text_does_not_become_an_artifact[unsupported_recovery]
+FAILED tests/test_artifact_presentation.py::test_factual_followup_survives_live_and_persisted_readers[peak_date-en]
+FAILED tests/test_artifact_presentation.py::test_factual_followup_survives_live_and_persisted_readers[peak_date-es-419]
+FAILED tests/test_artifact_presentation.py::test_factual_followup_survives_live_and_persisted_readers[peak_value-en]
+FAILED tests/test_artifact_presentation.py::test_factual_followup_survives_live_and_persisted_readers[peak_value-es-419]
+FAILED tests/test_artifact_presentation.py::test_factual_followup_survives_live_and_persisted_readers[fee_bps-en]
+FAILED tests/test_artifact_presentation.py::test_factual_followup_survives_live_and_persisted_readers[fee_bps-es-419]
+================== 9 failed, 1 passed, 11 deselected in 0.77s ==================

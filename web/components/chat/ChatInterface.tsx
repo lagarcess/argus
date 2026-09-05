@@ -130,6 +130,7 @@ import {
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
+  backtestJobMessage,
 } from "@/lib/chat-backtest-jobs";
 import {
   applyRecoverableRunReconciliation,
@@ -1305,8 +1306,8 @@ export default function ChatInterface() {
         if (!identityAuthorized) return;
         clearNeutralGuestSubmission();
         setStreamStatus(null);
+        if (recoverQuotaRejectedRun(event.data.final_response_payload?.code ?? event.data.code)) return;
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
-        if (recoverQuotaRejectedRun((finalPayload.final_response_payload as { code?: unknown } | undefined)?.code ?? finalPayload.code)) return;
         const finalText =
           event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
@@ -1410,21 +1411,21 @@ export default function ChatInterface() {
           );
         } else if (finalBacktestJob) {
           const finalAssistantId = finalMessageId ?? assistantId;
+          const finalBacktestJobMessage = backtestJobMessage({
+            id: finalAssistantId,
+            content: finalText || undefined,
+            job: finalBacktestJob,
+            metadata: finalPayload,
+          });
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
                 applyBacktestJobUpdate(
-                  replaceOrAppendFinalAssistantMessage(prev, assistantId, {
-                    id: finalAssistantId,
-                    role: "ai",
-                    kind: "backtest_job",
-                    content: finalText || undefined,
-                    backtestJob: finalBacktestJob,
-                    artifactId: finalBacktestJob.id,
-                    artifactType: "backtest_job",
-                    artifactStatus: finalBacktestJob.status,
-                    actions: undefined,
-                  }),
+                  replaceOrAppendFinalAssistantMessage(
+                    prev,
+                    assistantId,
+                    finalBacktestJobMessage,
+                  ),
                   { job: finalBacktestJob, run: null },
                 ),
               ),

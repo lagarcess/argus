@@ -837,6 +837,15 @@ class ShadowBacktestJobTool:
                 ),
             )
             if admission.decision not in ("admitted", "replay"):
+                rejected_job = admission.job
+                if (
+                    isinstance(rejected_job, dict)
+                    and str(rejected_job.get("status") or "").lower() == "failed"
+                ):
+                    context.admission_decision = admission.decision
+                    rejected_job_id = str(rejected_job.get("id") or "").strip()
+                    context.created_job_id = rejected_job_id or None
+                    return dict(rejected_job), None
                 return None, admission_rejection_envelope(admission.decision)
             job = admission.job
             if job is None:
@@ -906,6 +915,11 @@ class ShadowBacktestJobTool:
         context = current_backtest_job_shadow_context()
         if context is not None and context.admission_decision == "replay":
             return True
+        status = str(job.get("status") or "").strip().lower()
+        if status in {"failed", "canceled", "expired"}:
+            # A terminal pre-start receipt is the result of this attempt even
+            # when asynchronous execution itself is disabled.
+            return True
         if not (
             backtest_jobs_shadow_enabled()
             and backtest_jobs_dispatch_enabled()
@@ -919,8 +933,7 @@ class ShadowBacktestJobTool:
             return False
         if context is None or context.created_job_id is None:
             return False
-        status = str(job.get("status") or "").strip().lower()
-        if status in {"succeeded", "failed", "canceled", "expired"}:
+        if status == "succeeded":
             return True
         return (
             context.admission_decision == "admitted" or context.workflow_dispatch_started
@@ -1010,5 +1023,3 @@ class ShadowBacktestJobTool:
         task_run_id = str(workflow_dispatch.get("task_run_id") or "").strip()
         context.workflow_task_run_id = task_run_id or None
         return True
-
-

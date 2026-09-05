@@ -31,6 +31,17 @@ def _run(*, run_id: str, created_at: datetime) -> dict[str, Any]:
         "asset_class": "equity",
         "symbols": ["TSLA"],
         "benchmark_symbol": "SPY",
+        "metrics": {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 12.5,
+                    "benchmark_return_pct": 8.0,
+                    "delta_vs_benchmark_pct": 4.5,
+                    "max_drawdown_pct": -6.0,
+                    "ignored_fifth_metric": 99,
+                }
+            }
+        },
         "config_snapshot": {
             "template": "buy_and_hold",
             "start_date": "2024-01-01",
@@ -70,17 +81,6 @@ def _artifact(*, run_id: str, created_at: datetime) -> dict[str, Any]:
         "payload": {
             "quick_take": "TSLA returned 12.5%.",
             "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 12.5,
-                        "benchmark_return_pct": 8.0,
-                        "delta_vs_benchmark_pct": 4.5,
-                        "max_drawdown_pct": -6.0,
-                        "ignored_fifth_metric": 99,
-                    }
-                }
-            },
         },
         "created_at": created_at,
         "updated_at": created_at,
@@ -113,7 +113,6 @@ def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
         },
         result_message_id="message-1",
         decision_action_availability="available",
-        language="en",
     )
 
     assert dossier.run_id == "run-1"
@@ -128,10 +127,7 @@ def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
     assert dossier.actions[0].source_run_id == dossier.run_id
     # The typed envelope carries identity and policy only; the executable
     # setup is reloaded server-side from the owner-scoped source run.
-    assert (
-        dossier.actions[0].window_policy
-        == "preserve_start_ending_latest_available"
-    )
+    assert dossier.actions[0].window_policy == "preserve_start_ending_latest_available"
     assert dossier.actions[0].contract_version == "argus_retest_run/v2"
     assert dossier.actions[0].state == "new_data_available"
     assert dossier.actions[0].reason_code is None
@@ -148,9 +144,7 @@ def test_retest_action_api_and_checked_openapi_expose_only_v2_literals() -> None
 
     generated = app.openapi()["components"]["schemas"]["SearchRetestAction"]
     checked = yaml.safe_load(
-        (Path(__file__).parents[1] / "docs/api/openapi.yaml").read_text(
-            encoding="utf-8"
-        )
+        (Path(__file__).parents[1] / "docs/api/openapi.yaml").read_text(encoding="utf-8")
     )["components"]["schemas"]["SearchRetestAction"]
 
     for schema in (generated, checked):
@@ -182,7 +176,6 @@ def test_unfinalized_evidence_identity_is_not_offered_a_retest() -> None:
         decision=None,
         result_message_id="message-1",
         decision_action_availability="available",
-        language="en",
     )
 
     assert all(action.type != "retest_run" for action in dossier.actions)
@@ -383,9 +376,9 @@ def test_memory_history_is_newest_first_bounded_and_counts_only_eligible_rows() 
         cursor_run_id=pivot["id"],
     )
     assert [row.run["id"] for row in second.rows] == newest_first_ids[4:]
-    assert not {
-        row.run["id"] for row in first.rows
-    }.intersection(row.run["id"] for row in second.rows)
+    assert not {row.run["id"] for row in first.rows}.intersection(
+        row.run["id"] for row in second.rows
+    )
     assert second.total_runs == 7
     assert second.decided_runs == 5
 

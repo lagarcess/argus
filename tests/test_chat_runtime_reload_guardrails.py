@@ -5213,8 +5213,28 @@ def test_show_breakdown_action_without_canonical_run_id_does_not_use_latest(
 
     assert response.status_code == 200
     assert captured["run"] is None
-    text = _stream_payloads(response.text, "token")[0]["content"]
-    assert "could not find" in text
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["assistant_response"] == ""
+    assert final["response_intent"] == {
+        "kind": "result_breakdown",
+        "facts": {"result_fact_bank": None},
+    }
+    assert "result_run_id" not in final
+    assert final["message_id"]
+    messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assistant = next(
+        message for message in messages if message["id"] == final["message_id"]
+    )
+    assert assistant["content"] == ""
+    assert assistant["metadata"]["response_intent"] == final["response_intent"]
+    assert assistant["metadata"]["agent_runtime_turn"]["terminal"] is True
+    assert "result_run_id" not in assistant["metadata"]
+    assert api_state.store.messages[conversation["id"]][-1].content == (
+        "I could not find the completed backtest to explain."
+    )
 
 
 def _seed_completed_run(user_id: str, conversation_id: str) -> str:

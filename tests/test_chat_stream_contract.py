@@ -791,6 +791,7 @@ def test_chat_stream_persists_provider_canonicalized_company_name_asset(
 def test_chat_stream_result_uses_final_payload_run_without_named_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.api import state as api_state
     from argus.api.routers import agent as agent_router
 
     result_card = {
@@ -817,6 +818,7 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
     async def _fake_stream_agent_turn_events(**_: Any):
         yield {"type": "stage_start", "stage": "interpret"}
         yield {"type": "stage_start", "stage": "execute"}
+        yield {"type": "stage_start", "stage": "explain"}
         yield {"type": "token", "content": "Short grounded summary."}
         yield {
             "type": "final",
@@ -863,12 +865,24 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
     payload = _final_payload(response.text)
     assert payload["run"]["conversation_result_card"]["title"] == "AAPL buy and hold"
     assert payload["message_id"]
+    assert payload["assistant_response"] == ""
+    assert "Short grounded summary." not in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
     assert messages[-1]["id"] == payload["message_id"]
-    assert messages[-1]["content"] == "Short grounded summary."
+    assert messages[-1]["content"] == ""
+    assert (
+        messages[-1]["metadata"]["result_fact_bank"]["metrics"]
+        == payload["run"]["metrics"]
+    )
+    stored_message = next(
+        message
+        for message in api_state.store.messages[conversation["id"]]
+        if message.id == payload["message_id"]
+    )
+    assert stored_message.content == "Short grounded summary."
 
 
 @pytest.mark.parametrize("action_type", ["show_breakdown", "save_strategy"])
@@ -876,6 +890,7 @@ def test_result_actions_enter_runtime_before_transport_handling(
     monkeypatch: pytest.MonkeyPatch,
     action_type: str,
 ) -> None:
+    from argus.api import state as api_state
     from argus.api.routers import agent as agent_router
 
     captured_action_contexts: list[dict[str, Any] | None] = []
@@ -916,9 +931,25 @@ def test_result_actions_enter_runtime_before_transport_handling(
     assert response.status_code == 200
     assert captured_action_contexts
     assert captured_action_contexts[0]["type"] == action_type
-    assert _final_payload(response.text)["assistant_response"] == (
-        "Runtime handled the result action."
-    )
+    final_payload = _final_payload(response.text)
+    if action_type == "show_breakdown":
+        assert final_payload["assistant_response"] == ""
+        assert final_payload["chat_action"]["type"] == action_type
+        assert final_payload["response_intent"] == {
+            "kind": "result_breakdown",
+            "facts": {"result_fact_bank": None},
+        }
+        assert "Runtime handled the result action." not in response.text
+        stored_message = next(
+            message
+            for message in api_state.store.messages[conversation["id"]]
+            if message.id == final_payload["message_id"]
+        )
+        assert stored_message.content == "Runtime handled the result action."
+    else:
+        assert final_payload["assistant_response"] == (
+            "Runtime handled the result action."
+        )
 
 
 def test_chat_stream_artifact_naming_scheduler_failure_does_not_block_done(
@@ -1093,6 +1124,9 @@ def test_chat_stream_visible_failure_path_is_terminal_for_turn(
         yield "worker_loop_workflow"
 
     monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: True)
+    # Workspace dotenv values otherwise override these intentionally tiny test clocks.
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS", "")
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS", "")
     monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.005)
     monkeypatch.setattr(
@@ -1199,6 +1233,8 @@ def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(
     )
     monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
     monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS", "")
+    monkeypatch.setenv("ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS", "")
     client = _client()
     conversation = _conversation(client)
 

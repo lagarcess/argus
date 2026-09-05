@@ -58,10 +58,11 @@ class OpenRouterRouteReceipt:
     token_usage: dict[str, int] | None = None
     usage_cost_usd: float | None = None
     context_packet_ids: list[str] = field(default_factory=list)
+    repair_effect: dict[str, object] = field(default_factory=dict)
     created_at: str = ""
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        result: dict[str, object] = {
             "task": self.task,
             "tier": self.tier,
             "model": self.model,
@@ -77,6 +78,9 @@ class OpenRouterRouteReceipt:
             "context_packet_ids": list(self.context_packet_ids),
             "created_at": self.created_at,
         }
+        if self.repair_effect:
+            result["repair_effect"] = dict(self.repair_effect)
+        return result
 
 
 _ROUTE_RECEIPTS: list[OpenRouterRouteReceipt] = []
@@ -316,6 +320,34 @@ def record_openrouter_route_receipt(
     return receipt
 
 
+def annotate_latest_openrouter_route_receipt(
+    *,
+    task: OpenRouterTask,
+    schema_name: str,
+    repair_effect: dict[str, object],
+) -> bool:
+    """Attach value-free repair evidence to this request's latest matching call."""
+
+    capture = _ROUTE_RECEIPT_CAPTURE.get()
+    if capture is None:
+        return False
+    for receipt in reversed(capture):
+        if receipt.task == task and receipt.schema_name == schema_name:
+            receipt.repair_effect.clear()
+            receipt.repair_effect.update(repair_effect)
+            fields = {
+                "task": receipt.task,
+                "schema_name": receipt.schema_name,
+                "receipt_created_at": receipt.created_at,
+                "repair_effect": dict(receipt.repair_effect),
+            }
+            logger.bind(llm_task=receipt.task, llm_schema_name=receipt.schema_name).info(
+                "OpenRouter repair effect {}", json.dumps(fields, separators=(",", ":"))
+            )
+            return True
+    return False
+
+
 def _reserve_openrouter_attempt(task: OpenRouterTask, timeout_seconds: float, model_name: str, mode: Literal["json_schema", "chat_model"], schema_name: str | None, context_packet_ids: list[str] | None) -> turn_execution.ProviderCallPermit | None:
     if (permit := turn_execution.reserve_provider_call(task, timeout_seconds)) is not None:
         return permit
@@ -356,8 +388,9 @@ def summarize_openrouter_route_receipts(
     """
 
     active_receipts = list(receipts) if receipts is not None else get_openrouter_route_receipts()
-    route_waterfall = [
-        {
+    route_waterfall: list[dict[str, object]] = []
+    for receipt in active_receipts:
+        row: dict[str, object] = {
             "task": receipt.task,
             "tier": receipt.tier,
             "model": receipt.model,
@@ -368,8 +401,9 @@ def summarize_openrouter_route_receipts(
             "fallback_used": receipt.fallback_used,
             "context_packet_ids": list(receipt.context_packet_ids),
         }
-        for receipt in active_receipts
-    ]
+        if receipt.repair_effect:
+            row["repair_effect"] = dict(receipt.repair_effect)
+        route_waterfall.append(row)
     slowest = max(active_receipts, key=lambda receipt: receipt.latency_ms, default=None)
     return {
         "receipt_count": len(active_receipts),

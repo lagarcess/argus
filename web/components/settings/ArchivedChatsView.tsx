@@ -8,6 +8,7 @@ import {
   } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
+import { conversationPreviewText } from "@/lib/conversation-preview-display";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { listConversations, patchConversation, type Conversation } from "@/lib/argus-api";
 
@@ -79,7 +80,7 @@ export default function ArchivedChatsView({ onClose, onBack, backLabel, onRestor
                       {chat.title || t("chat.new_chat")}
                     </span>
                     <span className="text-[13px] text-black/40 dark:text-white/40 truncate">
-                      {chat.last_message_preview || t("chat.no_messages")}
+                      {conversationPreviewText(chat.preview, t)}
                     </span>
                   </div>
                   <Tooltip content={t("common.restore") || "Restore"} side="top">

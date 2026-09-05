@@ -12,6 +12,7 @@ import {
 } from "@/components/chat/ConversationActivityIndicator";
 import { conversationDisplayTitle } from "@/lib/chat-title-display";
 import type { HistoryItem } from "@/lib/argus-api";
+import { conversationPreviewText } from "@/lib/conversation-preview-display";
 
 type RecentsQuickPeekProps = {
   historyItems: HistoryItem[];
@@ -164,7 +165,7 @@ export default function RecentsQuickPeek({
                       {displayTitle}
                     </span>
                     <span className="mt-0.5 block truncate text-[11px] text-black/45 dark:text-white/45">
-                      {item.subtitle}
+                      {conversationPreviewText(item.preview, t)}
                     </span>
                   </span>
                   {isQuickJumpActive && number !== null ? (

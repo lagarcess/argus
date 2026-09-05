@@ -1,0 +1,114 @@
+{
+  "label": "integration-third-next-day",
+  "mode": "run",
+  "before": {
+    "owner": {
+      "user_id": "c56b9e16-5561-492a-9d6a-b7847c55a1c0",
+      "conversation_id": "284c3dff-dc73-4420-886f-86d3f6f4de99",
+      "period_start": "2026-09-05T00:24:45+00:00",
+      "period_end": "2026-09-12T00:24:45+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "c56b9e16-5561-492a-9d6a-b7847c55a1c0",
+      "conversation_id": "284c3dff-dc73-4420-886f-86d3f6f4de99",
+      "period_start": "2026-09-05T00:24:45+00:00",
+      "period_end": "2026-09-12T00:24:45+00:00"
+    },
+    "jobs": [
+      [
+        "98945fe6-662f-4b65-a4ba-926cc079ad10",
+        "failed",
+        "account_conversion_required",
+        null
+      ]
+    ],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [],
+  "errors": [],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 0,
+            "remaining": 2,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ],
+  "chat_stream_requests": [
+    {
+      "conversation_id": "284c3dff-dc73-4420-886f-86d3f6f4de99",
+      "action": {
+        "type": "run_backtest",
+        "label": "Run backtest",
+        "labelKey": "chat.confirmation.actions.run_backtest",
+        "payload": {
+          "artifact_id": "confirmation-e36dccfd-6302-43b3-8a9d-47c7db2ca423",
+          "confirmation_id": "confirmation-e36dccfd-6302-43b3-8a9d-47c7db2ca423",
+          "conversation_id": "284c3dff-dc73-4420-886f-86d3f6f4de99",
+          "launch_payload_hash": "fa83ba9176b6defb"
+        },
+        "presentation": "confirmation"
+      },
+      "language": "en",
+      "viewport": "wide"
+    }
+  ]
+}

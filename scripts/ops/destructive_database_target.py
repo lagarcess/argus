@@ -20,6 +20,52 @@ class DestructiveDatabaseTarget:
     supabase_url: str = field(repr=False)
 
 
+@dataclass(frozen=True)
+class DestructivePostgresTarget:
+    """One coordinate for a job that reads and writes through Postgres only."""
+
+    database_host: str
+
+
+def resolve_destructive_postgres_target(
+    environ: Mapping[str, str] | None = None,
+) -> DestructivePostgresTarget:
+    """Resolve only the process-provided ``DATABASE_URL`` and validate its host.
+
+    A job that selects, writes, and verifies through one connection holds one
+    coordinate, so no second URL can name a different project.
+    """
+
+    source = os.environ if environ is None else environ
+    database_url = str(source.get("DATABASE_URL") or "").strip()
+    if not database_url:
+        raise DestructiveDatabaseTargetError(
+            "DATABASE_URL must be set explicitly in the process environment; "
+            "dotenv discovery is disabled for destructive jobs."
+        )
+    return DestructivePostgresTarget(
+        database_host=_validated_host(
+            database_url,
+            name="DATABASE_URL",
+            schemes={"postgres", "postgresql"},
+        )
+    )
+
+
+def announce_destructive_postgres_target(
+    target: DestructivePostgresTarget,
+    *,
+    stream: TextIO | None = None,
+) -> None:
+    """Print the non-secret host before any connection is opened."""
+
+    print(
+        f"destructive database target: database_host={target.database_host}",
+        file=stream or sys.stdout,
+        flush=True,
+    )
+
+
 def resolve_destructive_database_target(
     environ: Mapping[str, str] | None = None,
 ) -> DestructiveDatabaseTarget:

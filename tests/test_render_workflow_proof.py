@@ -415,44 +415,30 @@ def test_seed_cli_reuses_stable_proof_principal_by_default(
     class SeedGateway:
         def __init__(self) -> None:
             self.profile: dict[str, str] | None = None
-            self.conversation: dict[str, str] | None = None
             self.job_args: dict[str, str | None] | None = None
 
         def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
             self.profile = {"user_id": user_id, "email": email}
 
-        def ensure_proof_conversation(
-            self,
-            *,
-            user_id: str,
-            conversation_id: str,
-        ) -> str:
-            assert self.profile is not None
-            assert self.profile["user_id"] == user_id
-            self.conversation = {
-                "user_id": user_id,
-                "conversation_id": conversation_id,
-            }
-            return conversation_id
-
         def create_proof_job(
             self,
             *,
             user_id: str,
-            conversation_id: str,
             nonce: str,
             idempotency_key: str | None = None,
         ) -> dict[str, object]:
+            assert self.profile is not None
+            assert self.profile["user_id"] == user_id
             self.job_args = {
                 "user_id": user_id,
-                "conversation_id": conversation_id,
                 "nonce": nonce,
                 "idempotency_key": idempotency_key,
             }
             return {
                 "id": "00000000-0000-4000-8000-000000000002",
                 "user_id": user_id,
-                "conversation_id": conversation_id,
+                "conversation_id": None,
+                "operation_scope": proof.PROOF_OPERATION_SCOPE,
                 "status": "queued",
             }
 
@@ -466,59 +452,40 @@ def test_seed_cli_reuses_stable_proof_principal_by_default(
     assert output["user_id"] == proof.DEFAULT_PROOF_USER_ID
     assert output["email"] == f"render-workflow-proof+{output['user_id']}@example.invalid"
     assert output["job_id"] == "00000000-0000-4000-8000-000000000002"
-    assert output["conversation_id"] == proof.DEFAULT_PROOF_CONVERSATION_ID
+    assert output["operation_scope"] == "workflows.proof"
+    assert "conversation_id" not in output
     assert output["nonce"] == "internet-proof"
     assert output["status"] == "queued"
     assert gateway.profile == {"user_id": output["user_id"], "email": output["email"]}
-    assert gateway.conversation == {
-        "user_id": output["user_id"],
-        "conversation_id": output["conversation_id"],
-    }
     assert gateway.job_args == {
         "user_id": output["user_id"],
-        "conversation_id": output["conversation_id"],
         "nonce": "internet-proof",
         "idempotency_key": None,
     }
 
 
-def test_seed_cli_respects_explicit_proof_user_and_conversation(
+def test_seed_cli_respects_explicit_proof_user(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     from workflows import proof
 
     class SeedGateway:
-        def __init__(self) -> None:
-            self.conversation: dict[str, str] | None = None
-
         def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
             self.profile = {"user_id": user_id, "email": email}
-
-        def ensure_proof_conversation(
-            self,
-            *,
-            user_id: str,
-            conversation_id: str,
-        ) -> str:
-            self.conversation = {
-                "user_id": user_id,
-                "conversation_id": conversation_id,
-            }
-            return conversation_id
 
         def create_proof_job(
             self,
             *,
             user_id: str,
-            conversation_id: str,
             nonce: str,
             idempotency_key: str | None = None,
         ) -> dict[str, object]:
             return {
                 "id": "00000000-0000-4000-8000-000000000004",
                 "user_id": user_id,
-                "conversation_id": conversation_id,
+                "conversation_id": None,
+                "operation_scope": proof.PROOF_OPERATION_SCOPE,
                 "status": "queued",
             }
 
@@ -530,8 +497,6 @@ def test_seed_cli_respects_explicit_proof_user_and_conversation(
             "seed",
             "--user-id",
             "00000000-0000-4000-8000-000000000003",
-            "--conversation-id",
-            "00000000-0000-4000-8000-000000000005",
             "--nonce",
             "explicit-proof",
         ]
@@ -540,11 +505,19 @@ def test_seed_cli_respects_explicit_proof_user_and_conversation(
 
     assert exit_code == 0
     assert output["user_id"] == "00000000-0000-4000-8000-000000000003"
-    assert output["conversation_id"] == "00000000-0000-4000-8000-000000000005"
-    assert gateway.conversation == {
-        "user_id": "00000000-0000-4000-8000-000000000003",
-        "conversation_id": "00000000-0000-4000-8000-000000000005",
-    }
+    assert output["operation_scope"] == "workflows.proof"
+    assert gateway.profile["user_id"] == "00000000-0000-4000-8000-000000000003"
+
+
+def test_seed_cli_no_longer_accepts_a_conversation() -> None:
+    """A proof job has no conversation to sit in, so the seeder cannot be
+    handed one; the argument would be the one way back into the projection."""
+    from workflows import proof
+
+    with pytest.raises(SystemExit):
+        proof.build_parser().parse_args(
+            ["seed", "--conversation-id", "00000000-0000-4000-8000-000000000005"]
+        )
 
 
 def test_backtest_jobs_migration_defines_durable_workflow_boundary() -> None:

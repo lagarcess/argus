@@ -10,6 +10,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["SPY"]
@@ -36,6 +38,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: needs_clarification
       assets: ["SPY"]
@@ -52,6 +57,10 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: unsupported
       assets: ["VOO"]
@@ -69,6 +78,10 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: unsupported
       assets: ["VOO"]
@@ -87,6 +100,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["SPY"]
@@ -116,6 +131,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["SPY"]
@@ -143,15 +160,19 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: ["backtest_execution", "strategy_drafting"]
-      capability_verdict: needs_clarification
+      capability_verdict: unsupported
       assets: ["AAPL"]
       asset_class: equity
       capital_amount: 500
       contribution_period: quarterly
       requested_field: cadence
       launch_validation_code: contribution_period_exceeds_window
-      stage_outcomes: ["ready_for_confirmation", "needs_clarification"]
+      stage_outcomes: ["ready_for_confirmation", "needs_clarification", "await_user_reply"]
 
   # A contribution of $0 beside a seed is refused as
   # dca_contribution_zero_is_buy_and_hold: the refusal says what the plan
@@ -161,13 +182,17 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: ["backtest_execution", "strategy_drafting"]
-      capability_verdict: needs_clarification
+      capability_verdict: unsupported
       assets: ["SPY"]
       asset_class: equity
       requested_field: capital_amount
       launch_validation_code: dca_contribution_zero_is_buy_and_hold
-      stage_outcomes: ["ready_for_confirmation", "needs_clarification"]
+      stage_outcomes: ["ready_for_confirmation", "needs_clarification", "await_user_reply"]
 
   # Review round 1 finding 2 regression: calendar alignment moves the served
   # start off the January 1 holiday, and the period fit is still measured
@@ -181,6 +206,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["AAPL"]
@@ -208,6 +235,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA"]
@@ -234,6 +263,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["BTC"]
@@ -259,14 +290,18 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: ["backtest_execution", "strategy_drafting"]
-      capability_verdict: needs_clarification
+      capability_verdict: unsupported
       assets: ["RDDT"]
       asset_class: equity
       capital_amount: 500
       contribution_period: quarterly
       requested_field: cadence
-      stage_outcomes: ["ready_for_confirmation", "needs_clarification"]
+      stage_outcomes: ["ready_for_confirmation", "needs_clarification", "await_user_reply"]
 
   # Both money roles survive Spanish phrasing: the seed stays the seed and
   # "cada mes" resolves to the same typed period, so the one-phrase rendering
@@ -276,6 +311,8 @@ cases:
     user_language: es-419
     ui_language: es-419
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["SPY"]
@@ -302,15 +339,19 @@ cases:
     user_language: es-419
     ui_language: es-419
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
+        min_recovery_options: 1
       intent: ["backtest_execution", "strategy_drafting"]
-      capability_verdict: needs_clarification
+      capability_verdict: unsupported
       assets: ["AAPL"]
       asset_class: equity
       capital_amount: 500
       contribution_period: quarterly
       requested_field: cadence
       launch_validation_code: contribution_period_exceeds_window
-      stage_outcomes: ["ready_for_confirmation", "needs_clarification"]
+      stage_outcomes: ["ready_for_confirmation", "needs_clarification", "await_user_reply"]
 
   # The prebaked-chip contract (front-page chip q3): the chip carries the
   # full ask (KO, monthly cadence, a five-year window) and the only follow-up
@@ -338,6 +379,8 @@ cases:
           start: "2021-08-19"
           end: "2026-08-19"
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["KO"]
@@ -369,6 +412,8 @@ cases:
           start: "2021-08-19"
           end: "2026-08-19"
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["KO"]

@@ -29,6 +29,10 @@ from argus.api.chat.research_evidence import record_research_turn_evidence
 # Re-exported: the scope literal is owned by the settlement rule the SQL is
 # rendered from.
 from argus.domain.job_settlement import RESEARCH_OPERATION_SCOPE
+from argus.domain.research.admission import (
+    ResearchCapacityExhausted,
+    claim_current_research_attempt,
+)
 from argus.domain.research.config import (
     BACKGROUND_POLL_INTERVAL_SECONDS,
     RESEARCH_CONFIG_SPECS,
@@ -37,11 +41,6 @@ from argus.domain.research.config import (
 from argus.domain.research.contracts import ResearchPacket, ResearchUnavailableError
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
-
-# The keyed visitor digest a guest's background run settles against, carried on
-# the persisted job request. A digest, never an address: nothing here retains
-# more about a visitor than the counter table already does.
-GUEST_VISITOR_KEY_FIELD = "guest_visitor_key"
 
 # Keep strong references so in-flight pollers never get garbage collected.
 _POLLER_TASKS: set[asyncio.Task[None]] = set()
@@ -61,7 +60,6 @@ def apply_research_job_request(
     conversation_id: str,
     request_message_id: str | None,
     request_id: str | None,
-    guest_visitor_key: str | None = None,
 ) -> dict[str, Any] | None:
     """Consume a typed research job request from the runtime result.
 
@@ -71,6 +69,7 @@ def apply_research_job_request(
     """
     from argus.agent_runtime.research_answer import (
         compose_completed_research,
+        research_capacity_exhausted_for_job,
         research_failure_note,
         store_research_packet_for_job,
     )
@@ -78,17 +77,22 @@ def apply_research_job_request(
     job_request = runtime_result.pop("research_job_request", None)
     if not isinstance(job_request, dict):
         return None
-    if guest_visitor_key is not None:
-        # Rides the persisted job row: the background run settles the guest's
-        # allowance long after the request that authorized it is gone.
-        job_request[GUEST_VISITOR_KEY_FIELD] = guest_visitor_key
-    job, sync_packet = start_research_job(
-        job_request=job_request,
-        user_id=user_id,
-        conversation_id=conversation_id,
-        request_message_id=request_message_id,
-        request_id=request_id,
-    )
+    try:
+        job, sync_packet = start_research_job(
+            job_request=job_request,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            request_message_id=request_message_id,
+            request_id=request_id,
+        )
+    except ResearchCapacityExhausted as exc:
+        composed = research_capacity_exhausted_for_job(
+            job_request,
+            guest_allowance_exhausted=exc.admission.guest_exhausted,
+        )
+        runtime_result["assistant_response"] = composed["answer"]
+        runtime_result["research"] = composed["research"]
+        return None
     if job is not None:
         return job
     if sync_packet is not None:
@@ -129,6 +133,9 @@ def start_research_job(
     if api_state.supabase_gateway is None:
         # Dev memory persistence has no durable job surface; run the same
         # documented configuration synchronously instead of inventing one.
+        admission = claim_current_research_attempt()
+        if not admission.available:
+            raise ResearchCapacityExhausted(admission)
         try:
             sync_spec = spec.model_copy(update={"timeout_seconds": 110.0})
             packet = client.run_research(prompt, sync_spec)
@@ -150,6 +157,9 @@ def start_research_job(
         # would finalize a second answer nobody links to, and submitting
         # first would spend provider budget on a run that could not land.
         return public_backtest_job_payload(replay), None
+    admission = claim_current_research_attempt()
+    if not admission.available:
+        raise ResearchCapacityExhausted(admission)
     try:
         background_id = client.submit_background(prompt, spec)
     except ResearchUnavailableError as exc:
@@ -378,7 +388,6 @@ async def _finalize_success(
         conversation_id=conversation_id,
         message_id=message.id,
         request_id=request_id,
-        guest_visitor_key=job_request.get(GUEST_VISITOR_KEY_FIELD),
     )
 
 

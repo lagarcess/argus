@@ -1,0 +1,24 @@
+[
+  {
+    "role": "user",
+    "content": "\u00bfCu\u00e1l fue el valor m\u00e1ximo de la cartera en esta prueba?"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "response_intent": {
+      "kind": "beginner_guidance",
+      "semantic_needs": [],
+      "requested_fields": [],
+      "facts": {
+        "peak_value": "$50,694.08",
+        "peak_date": "2024-12-11T05:00:00",
+        "fact_key": "peak_value",
+        "source": "result_followup_fact_bank"
+      },
+      "options": []
+    },
+    "conversation_mode": "guide",
+    "result_run_id": "00000000-0000-4000-8000-000000005312"
+  }
+]
