@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.artifact_message_reads import owned_result_message_facts
+from argus.api.artifact_presentation import reader_payload
 from argus.api.chat.confirmation import (
     DeadConfirmationCardError,
     public_confirmation_projection,
@@ -20,6 +22,7 @@ from argus.api.client_capabilities import (
     dossier_decision_action_availability,
 )
 from argus.api.conversation_activity import conversation_activity_service
+from argus.api.conversation_previews import conversation_previews
 from argus.api.dependencies import (
     current_user,
     dev_memory_fallback_enabled,
@@ -84,7 +87,16 @@ def _with_activity(
         conversation_ids=[conversation.id],
         reconcile=reconcile,
     )[conversation.id]
-    return conversation.model_copy(update={"activity": activity})
+    preview = conversation_previews(user_id=user_id, conversation_ids=[conversation.id])[
+        conversation.id
+    ]
+    return conversation.model_copy(
+        update={
+            "activity": activity,
+            "preview": preview,
+            "last_message_preview": preview.text,
+        }
+    )
 
 
 def _memory_conversation_owned_by(
@@ -100,13 +112,20 @@ def _memory_conversation_owned_by(
 
 
 def _public_message_projection(messages: list[Message]) -> list[Message]:
-    return [
-        message.model_copy(
-            update={"metadata": public_confirmation_projection(message.metadata)}
-        )
-        for message in messages
-        if not (message.role == "user" and is_legacy_onboarding_marker(message.content))
-    ]
+    projected: list[Message] = []
+    for message in messages:
+        if message.role == "user" and is_legacy_onboarding_marker(message.content):
+            continue
+        metadata = public_confirmation_projection(message.metadata)
+        if message.role == "assistant":
+            public = reader_payload({**(metadata or {}), "content": message.content})
+            content = public.pop("content")
+            projected.append(
+                message.model_copy(update={"content": content, "metadata": public})
+            )
+        else:
+            projected.append(message.model_copy(update={"metadata": metadata}))
+    return projected
 
 
 def _project_backtest_job_actions(
@@ -339,8 +358,18 @@ def list_conversations(
         conversation_ids=[item.id for item in page_items],
         reconcile=True,
     )
+    previews = conversation_previews(
+        user_id=user.id, conversation_ids=[item.id for item in page_items]
+    )
     page_items = [
-        item.model_copy(update={"activity": activities[item.id]}) for item in page_items
+        item.model_copy(
+            update={
+                "activity": activities[item.id],
+                "preview": previews[item.id],
+                "last_message_preview": previews[item.id].text,
+            }
+        )
+        for item in page_items
     ]
     next_cursor = None
     if has_more and page_items:
@@ -617,7 +646,6 @@ def list_run_dossiers(
             decision=row.decision,
             result_message_id=row.result_message_id,
             decision_action_availability=decision_action_availability,
-            language=user.language,
         )
         for row in selected_rows
     ]
@@ -780,6 +808,9 @@ def list_messages(
     )
     represented_request_ids = represented_backtest_job_request_ids(items)
     represented_request_ids.update(transcript_represented_request_ids)
+    items = owned_result_message_facts(
+        items, user_id=user.id, conversation_id=conversation_id
+    )
     items = _public_message_projection(items)
     if database_page:
         items = [item for item in items if item.id in database_page_ids]

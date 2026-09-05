@@ -165,10 +165,10 @@ describe("result card playground", () => {
       (fixture) => fixture.id === "old-persisted-card-shape",
     );
     expect(legacyFixture?.result.metrics).toEqual([
-      { label: "Ending value", value: "$1,000 -> $2,002" },
-      { label: "Total return", value: "+100.2%" },
-      { label: "Compared with SPY", value: "Beat SPY by 46.4 percentage points" },
-      { label: "Worst drop", value: "-16.8%" },
+      { key: "cash_value", label: "Ending value", value: "$1,000 -> $2,002" },
+      { key: "total_return_pct", label: "Total return", value: "+100.2%" },
+      { key: "benchmark_delta", label: "Compared with SPY", value: "Beat SPY by 46.4 percentage points" },
+      { key: "max_drawdown_pct", label: "Worst drop", value: "-16.8%" },
     ]);
   });
 
@@ -181,7 +181,7 @@ describe("result card playground", () => {
     expect(positive.benchmark.value).toBe("Beat by 27.9 percentage points");
     expect(positive.timeframeDisplay).toBe("Daily data");
     expect(positive.worstDrop.value).toBe("-12.4%");
-    expect(positive.details).toContainEqual({ label: "Timeframe", value: "1D" });
+    expect(positive.details).toContainEqual({ label: "Timeframe", value: "Daily data" });
     expect(positive.details).toContainEqual({ label: "Benchmark", value: "SPY" });
     expect(positive.details.slice(0, 4)).toEqual([
       { label: "Starting capital", value: "$1,000" },
@@ -189,7 +189,7 @@ describe("result card playground", () => {
       { label: "Lowest value", value: "$984" },
       {
         label: "Date range",
-        value: "January 4, 2021 to December 31, 2025",
+        value: "Jan 4, 2021 → Dec 31, 2025",
       },
     ]);
 
@@ -242,11 +242,12 @@ describe("result card playground", () => {
 
     const compactProductionShape = heroDeltaEvidenceView({
       ...resultCardPlaygroundFixtures[0].result,
+      readoutFacts: { symbols: ["AAPL"], benchmarkDeltaPct: 8.4 },
       metrics: [
-        { label: "Ending value", value: "$1K -> $1.37K" },
-        { label: "Total return", value: "+37.1%" },
-        { label: "Compared with SPY", value: "+8.4 percentage points vs SPY" },
-        { label: "Worst drop", value: "-18.9%" },
+        { key: "cash_value", label: "Ending value", value: "$1K -> $1.37K" },
+        { key: "total_return_pct", label: "Total return", value: "+37.1%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "+8.4 percentage points vs SPY" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-18.9%" },
       ],
     });
     expect(compactProductionShape.hero.value).toBe("$1,370");
@@ -305,7 +306,7 @@ describe("result card playground", () => {
     });
 
     expect(structured.timeframeDisplay).toBe("4-hour data");
-    expect(structured.details).toContainEqual({ label: "Timeframe", value: "4h" });
+    expect(structured.details).toContainEqual({ label: "Timeframe", value: "4-hour data" });
     expect(formatTimeframeForDisplay("1h")).toBe("Hourly data");
     expect(formatTimeframeForDisplay("2h")).toBe("2-hour data");
     expect(formatTimeframeForDisplay("12h")).toBe("12-hour data");
@@ -315,11 +316,12 @@ describe("result card playground", () => {
   test("uses structured benchmark facts before stale assumption text", () => {
     const structured = heroDeltaEvidenceView({
       ...resultCardPlaygroundFixtures[0].result,
+      readoutFacts: { symbols: ["AAPL"], benchmarkDeltaPct: 8.1 },
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,350" },
-        { label: "Total return", value: "+35.0%" },
-        { label: "Compared with QQQ", value: "+8.1 percentage points vs QQQ" },
-        { label: "Worst drop", value: "-15.5%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,350" },
+        { key: "total_return_pct", label: "Total return", value: "+35.0%" },
+        { key: "benchmark_delta", label: "Compared with QQQ", value: "+8.1 percentage points vs QQQ" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-15.5%" },
       ],
       assumptions: ["Long-only", "Equal weight", "No fees/slippage", "Benchmark: SPY"],
       configSnapshot: {
@@ -342,10 +344,10 @@ describe("result card playground", () => {
     const structured = heroDeltaEvidenceView({
       ...resultCardPlaygroundFixtures[0].result,
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,350" },
-        { label: "Total return", value: "+35.0%" },
-        { label: "Compared with QQQ", value: "+8.1 percentage points vs QQQ" },
-        { label: "Worst drop", value: "-15.5%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,350" },
+        { key: "total_return_pct", label: "Total return", value: "+35.0%" },
+        { key: "benchmark_delta", label: "Compared with QQQ", value: "+8.1 percentage points vs QQQ" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-15.5%" },
       ],
       assumptions: ["Long-only", "Equal weight", "No fees/slippage", "Benchmark: SPY"],
       configSnapshot: {
@@ -428,7 +430,7 @@ describe("result card playground", () => {
       { label: "Starting capital", value: "$1,000" },
       { label: "Peak value", value: "$20,000" },
       { label: "Lowest value", value: "$5,000" },
-      { label: "Date range", value: "January 4, 2021 to December 31, 2025" },
+      { label: "Date range", value: "Jan 4, 2021 → Dec 31, 2025" },
     ]);
   });
 
@@ -514,7 +516,7 @@ describe("result card playground", () => {
       (fixture) => fixture.id === "old-persisted-card-shape",
     )!.result;
     expect(compactTrustGroups()).toEqual([
-      "Historical simulation · No fees/slippage · Not advice",
+      defaultResultCardDisplayCopy.trustStrip,
     ]);
     expect(compactTrustStrip()).not.toContain("Universe:");
     expect(compactTrustStrip()).not.toContain("Benchmark: SPY");
@@ -524,7 +526,7 @@ describe("result card playground", () => {
     });
     expect(heroDeltaEvidenceView(legacy).details).toContainEqual({
       label: "Timeframe",
-      value: "1D",
+      value: "Daily data",
     });
   });
 
@@ -535,7 +537,7 @@ describe("result card playground", () => {
     const view = heroDeltaEvidenceView(modeledCosts);
 
     expect(view.trustGroups).toEqual([
-      "Stocks · Historical simulation · Net of 10 bps fee + 5 bps slippage · Not advice",
+      "Stocks · Historical simulation · 10 bps fee + 5 bps slippage · Not advice",
     ]);
     expect(view.details).toContainEqual({
       label: "Benchmark",
@@ -580,12 +582,12 @@ describe("result card playground", () => {
     expect(labels).not.toContain("Benchmark costs");
   });
 
-  test("exposes trade parameters in lightweight details when fixture facts exist", () => {
+  test("does not reconstruct trade parameters from retained English assumptions", () => {
     const trade = heroDeltaEvidenceView(
       resultCardPlaygroundFixtures.find((fixture) => fixture.id === "trade-based-strategy")!.result,
     );
-    expect(trade.details).toContainEqual({ label: "Entry rule", value: "RSI below 30" });
-    expect(trade.details).toContainEqual({ label: "Exit rule", value: "RSI above 55" });
+    expect(trade.details).not.toContainEqual({ label: "Entry rule", value: "RSI below 30" });
+    expect(trade.details).not.toContainEqual({ label: "Exit rule", value: "RSI above 55" });
   });
 
   test("hydrates missing run facts and normalizes action labels correctly via resultCardFromConversationCard", () => {
@@ -615,7 +617,7 @@ describe("result card playground", () => {
     expect(mappedWithoutRun.strategyName).toBe("Test Strategy");
     expect(mappedWithoutRun.symbols).toEqual(["AAPL", "MSFT"]);
     expect(mappedWithoutRun.statusLabel).toBe("Completed");
-    expect(mappedWithoutRun.assumptions).toEqual(["Assumption 1", "Assumption 2"]);
+    expect("assumptions" in mappedWithoutRun).toBe(false);
     expect(mappedWithoutRun.assetClass).toBeUndefined();
     expect(mappedWithoutRun.chart).toBeNull();
     expect(mappedWithoutRun.runId).toBeUndefined();

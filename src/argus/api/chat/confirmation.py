@@ -13,6 +13,18 @@ from argus.agent_runtime.confirmation_artifacts import (
     stable_payload_hash,
     validate_confirmation_execution_payload,
 )
+from argus.agent_runtime.confirmation_facts import (
+    confirmation_dca_starting_capital as _confirmation_dca_starting_capital,
+)
+from argus.agent_runtime.confirmation_facts import (
+    confirmation_display_capital as _confirmation_display_capital,
+)
+from argus.agent_runtime.confirmation_facts import (
+    confirmation_display_facts,
+)
+from argus.agent_runtime.confirmation_facts import (
+    strategy_type_uses_cadence as _strategy_type_uses_cadence,
+)
 from argus.agent_runtime.presentation_i18n import confirmation_rule_display_value
 from argus.agent_runtime.strategy_contract import (
     display_strategy_slug,
@@ -22,12 +34,9 @@ from argus.agent_runtime.strategy_contract import (
 )
 from argus.domain.backtesting.config import (
     _execution_realism_feature_enabled,
-    _normalize_execution_realism,
 )
 from argus.domain.engine_launch.display import (
-    format_data_through_label,
     format_date_range_label,
-    format_timeframe_data_label,
 )
 
 
@@ -153,31 +162,11 @@ def runtime_confirmation_card(
             )
         )
 
-    assumptions = _confirmation_assumptions(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-        launch_payload=launch_payload,
-        language=language,
-    )
-    display_facts = _confirmation_display_facts(
+    display_facts = confirmation_display_facts(
         strategy=strategy,
         optional_parameters=optional_parameters,
         launch_payload=launch_payload,
     )
-    # Typed seeds for the direct capital editor; rows carry display strings
-    # only, and the frontend must not parse them back into numbers. A recurring
-    # plan seeds both of its roles under their own names.
-    if _strategy_type_uses_cadence(canonical_strategy_type):
-        display_facts["starting_capital"] = _confirmation_dca_starting_capital(
-            optional_parameters
-        )
-        if display_capital is not None:
-            display_facts["recurring_contribution"] = display_capital
-        contribution_period = _supported_contribution_period(strategy.get("cadence"))
-        if contribution_period is not None:
-            display_facts["contribution_period"] = contribution_period
-    elif display_capital is not None:
-        display_facts["capital"] = display_capital
     summary_period = _confirmation_period_without_parentheses(date_range)
     summary = _confirmation_summary(
         assets=assets,
@@ -252,7 +241,7 @@ def runtime_confirmation_card(
         "strategy_type": canonical_strategy_type,
         "summary": summary,
         "rows": rows,
-        "assumptions": assumptions,
+        "assumptions": [],
         "actions": actions,
     }
     if display_facts:
@@ -1278,37 +1267,6 @@ def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:
     }
 
 
-def _confirmation_display_capital(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, Any],
-    launch_payload: dict[str, Any],
-    strategy_type: str,
-) -> float | None:
-    strategy_capital = _numeric_money_value(strategy.get("capital_amount"))
-    if _strategy_type_uses_cadence(strategy_type):
-        return strategy_capital
-    return (
-        strategy_capital
-        or _numeric_money_value(
-            _optional_parameter_value(optional_parameters, "initial_capital")
-        )
-        or _numeric_money_value(launch_payload.get("capital_amount"))
-        or _numeric_money_value(launch_payload.get("starting_capital"))
-    )
-
-
-def _confirmation_dca_starting_capital(optional_parameters: dict[str, Any]) -> float:
-    """The seed the card shows. Only a stated one counts; the default is $0."""
-    entry = optional_parameters.get("initial_capital")
-    if not isinstance(entry, dict) or str(entry.get("source") or "") != "user":
-        return 0.0
-    value = entry.get("value")
-    if not isinstance(value, int | float) or isinstance(value, bool) or value < 0:
-        return 0.0
-    return float(value)
-
-
 def _supported_contribution_period(value: Any) -> str | None:
     from argus.domain.dca_capital import supported_contribution_period
 
@@ -1323,13 +1281,6 @@ def _contribution_row_value(amount: float, *, strategy: dict[str, Any]) -> str:
     if period is None:
         return f"${amount:,.0f}"
     return format_contribution_phrase(amount=amount, period=period, is_es=False)
-
-
-def _numeric_money_value(value: Any) -> float | None:
-    if not isinstance(value, int | float) or isinstance(value, bool):
-        return None
-    amount = float(value)
-    return amount if amount > 0 else None
 
 
 def _confirmation_date_range_payload(
@@ -1348,272 +1299,6 @@ def _confirmation_date_range_payload(
     }
 
 
-def _confirmation_assumptions(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, Any],
-    launch_payload: dict[str, Any] | None = None,
-    language: str = "en",
-) -> list[str]:
-    assumptions: list[str] = []
-    strategy_type = executable_strategy_type(strategy)
-    strategy_capital = strategy.get("capital_amount")
-    if _strategy_type_uses_cadence(strategy_type):
-        # The strip follows the card's two rows, in the same order and with
-        # the same two roles.
-        assumptions.append(
-            _money_assumption(
-                _confirmation_dca_starting_capital(optional_parameters),
-                role="starting_capital",
-            )
-        )
-        if isinstance(strategy_capital, int | float):
-            assumptions.append(
-                _contribution_assumption(
-                    float(strategy_capital),
-                    strategy=strategy,
-                )
-            )
-    elif isinstance(strategy_capital, int | float):
-        assumptions.append(
-            _money_assumption(
-                float(strategy_capital),
-                role="starting_capital",
-            )
-        )
-    else:
-        initial_capital = _optional_parameter_value(
-            optional_parameters, "initial_capital"
-        )
-        if isinstance(initial_capital, int | float):
-            assumptions.append(
-                _money_assumption(
-                    float(initial_capital),
-                    role="starting_capital",
-                )
-            )
-    timeframe = _optional_parameter_value(optional_parameters, "timeframe")
-    if timeframe:
-        assumptions.append(format_timeframe_data_label(timeframe, language=language))
-    data_through_assumption = _data_through_assumption(strategy, language=language)
-    if data_through_assumption:
-        assumptions.append(data_through_assumption)
-    execution_costs = _confirmation_execution_costs(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-        launch_payload=launch_payload or {},
-    )
-    if execution_costs is not None:
-        assumptions.append(_execution_cost_assumption(execution_costs))
-    # No prose for the zero-cost case: `display_facts` already carries `fees`
-    # and `slippage` whenever they are zero, and the card localizes them from
-    # there. A second English copy of the same fact is what put "No fees" on a
-    # Spanish card (#434).
-    benchmark_assumption = _confirmation_benchmark_assumption(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-        launch_payload=launch_payload or {},
-    )
-    if benchmark_assumption:
-        assumptions.append(benchmark_assumption)
-    return assumptions
-
-
-def _data_through_assumption(
-    strategy: dict[str, Any],
-    *,
-    language: str,
-) -> str | None:
-    adjustment = _data_availability_adjustment(strategy)
-    if adjustment is None:
-        return None
-    return format_data_through_label(adjustment.get("through"), language=language) or None
-
-
-def _confirmation_display_facts(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, Any],
-    launch_payload: dict[str, Any],
-) -> dict[str, Any]:
-    facts: dict[str, Any] = {}
-    timeframe = _optional_parameter_value(optional_parameters, "timeframe")
-    if timeframe:
-        facts["timeframe"] = timeframe
-    data_adjustment = _data_availability_adjustment(strategy)
-    if data_adjustment is not None:
-        facts["data_through"] = data_adjustment.get("through")
-    execution_costs = _confirmation_execution_costs(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-        launch_payload=launch_payload,
-    )
-    if execution_costs is not None:
-        facts["fees"] = execution_costs["fees"]
-        facts["slippage"] = execution_costs["slippage"]
-    else:
-        fees = _optional_parameter_value(optional_parameters, "fees")
-        if fees is not None:
-            facts["fees"] = fees
-        slippage = _optional_parameter_value(optional_parameters, "slippage")
-        if slippage is not None:
-            facts["slippage"] = slippage
-    benchmark_symbol = _confirmation_benchmark_symbol(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-        launch_payload=launch_payload,
-    )
-    if benchmark_symbol:
-        facts["benchmark_symbol"] = benchmark_symbol
-    return facts
-
-
-def _data_availability_adjustment(strategy: dict[str, Any]) -> dict[str, Any] | None:
-    extra_parameters = strategy.get("extra_parameters")
-    if not isinstance(extra_parameters, dict):
-        return None
-    adjustment = extra_parameters.get("data_availability_adjustment")
-    if not isinstance(adjustment, dict):
-        return None
-    if adjustment.get("kind") not in {
-        "latest_complete_daily_data",
-        "latest_complete_market_data",
-    }:
-        return None
-    through = adjustment.get("through")
-    if not isinstance(through, str):
-        return None
-    if not _data_adjustment_matches_strategy_end(strategy, through=through):
-        return None
-    return adjustment
-
-
-def _data_adjustment_matches_strategy_end(
-    strategy: dict[str, Any],
-    *,
-    through: str,
-) -> bool:
-    date_range = strategy.get("date_range")
-    if not isinstance(date_range, dict):
-        return True
-    end = date_range.get("end") or date_range.get("to")
-    return end in (None, "") or str(end) == through
-
-
-def _confirmation_benchmark_assumption(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, Any],
-    launch_payload: dict[str, Any],
-) -> str | None:
-    symbol = _confirmation_benchmark_symbol(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-        launch_payload=launch_payload,
-    )
-    return _benchmark_assumption(symbol) if symbol else None
-
-
-def _confirmation_benchmark_symbol(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, Any],
-    launch_payload: dict[str, Any],
-) -> str | None:
-    for value in (
-        strategy.get("comparison_baseline"),
-        strategy.get("benchmark_symbol"),
-        _optional_parameter_value(optional_parameters, "benchmark_symbol"),
-        launch_payload.get("benchmark_symbol"),
-    ):
-        if isinstance(value, str) and value.strip():
-            return value.strip().upper()
-    asset_class = strategy.get("asset_class")
-    if asset_class == "crypto":
-        return "BTC"
-    if asset_class == "equity":
-        return "SPY"
-    return None
-
-
-def _confirmation_execution_costs(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, Any],
-    launch_payload: dict[str, Any],
-) -> dict[str, float] | None:
-    if not _execution_realism_feature_enabled():
-        # With the engine flag off the run is idealized no matter what values a
-        # draft carries, so never advertise modeled costs.
-        return None
-
-    launch_realism = launch_payload.get("_execution_realism")
-    if isinstance(launch_realism, dict):
-        try:
-            realism = _normalize_execution_realism(launch_realism)
-        except ValueError:
-            realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
-    else:
-        realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
-    if bool(realism["enabled"]):
-        costs = {
-            "fees": float(realism["fee_bps"]) / 10000.0,
-            "slippage": float(realism["slippage_bps"]) / 10000.0,
-        }
-        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
-            return costs
-
-    extra_parameters = strategy.get("extra_parameters")
-    if isinstance(extra_parameters, dict):
-        costs = {
-            "fees": _optional_float(extra_parameters.get("fee_rate")) or 0.0,
-            "slippage": _optional_float(extra_parameters.get("slippage")) or 0.0,
-        }
-        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
-            return costs
-
-    costs = {
-        "fees": _optional_float(_optional_parameter_value(optional_parameters, "fees"))
-        or 0.0,
-        "slippage": _optional_float(
-            _optional_parameter_value(optional_parameters, "slippage")
-        )
-        or 0.0,
-    }
-    if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
-        return costs
-    return None
-
-
-def _execution_cost_assumption(costs: dict[str, float]) -> str:
-    fee_bps = _format_bps(float(costs["fees"]) * 10000.0)
-    slippage_bps = _format_bps(float(costs["slippage"]) * 10000.0)
-    return f"Modeled costs: {fee_bps} bps fee + {slippage_bps} bps slippage"
-
-
-def _optional_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _format_bps(value: float) -> str:
-    rounded = round(value, 2)
-    if rounded.is_integer():
-        return str(int(rounded))
-    return f"{rounded:g}"
-
-
-# The card's prose fields are English by design: the frontend localizes from
-# the typed fields beside them (`status`, `strategy_type`,
-# `rows[].key`/`labelKey`, `display_facts`), and these strings stay as
-# persisted-card and old-client compatibility
-# (`docs/CONVERSATIONAL_RUNTIME.md` forbids per-language copy in the runtime).
-# `summary` embeds the language-formatted period and becomes the card
-# message's persisted content, which feeds `last_message_preview`.
 def _confirmation_summary(
     *,
     assets: str,
@@ -1641,13 +1326,6 @@ def _summary_strategy_phrase(strategy_label: str) -> str:
         "Moving Average Crossover": "a moving-average crossover",
     }
     return phrases.get(strategy_label, strategy_label.strip().lower())
-
-
-def _optional_parameter_value(optional_parameters: dict[str, Any], key: str) -> Any:
-    value = optional_parameters.get(key)
-    if isinstance(value, dict):
-        return value.get("value")
-    return None
 
 
 def _format_confirmation_value(value: Any) -> str:
@@ -1690,16 +1368,6 @@ def _confirmation_period_without_parentheses(value: str) -> str:
     return f"{label.strip()}, {dates[:-1].strip()}"
 
 
-def _strategy_type_uses_cadence(strategy_type: str) -> bool:
-    normalized = strategy_type.strip().lower().replace("-", "_").replace(" ", "_")
-    return normalized in {
-        "dca",
-        "dca_accumulation",
-        "recurring_accumulation",
-        "recurring_buys",
-    }
-
-
 def _article_for(value: str) -> str:
     return "an" if value[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
 
@@ -1710,23 +1378,6 @@ def _confirmation_title(*, assets: str, strategy_type: str) -> str:
 
 def _confirmation_status_label(*, is_ready_to_run: bool) -> str:
     return "Ready to run" if is_ready_to_run else "Needs change"
-
-
-def _money_assumption(value: float, *, role: str) -> str:
-    label = (
-        "recurring contribution"
-        if role == "recurring_contribution"
-        else "starting capital"
-    )
-    return f"${value:,.0f} {label}"
-
-
-def _contribution_assumption(amount: float, *, strategy: dict[str, Any]) -> str:
-    return f"{_contribution_row_value(amount, strategy=strategy)} contribution"
-
-
-def _benchmark_assumption(symbol: str) -> str:
-    return f"Benchmark: {symbol}"
 
 
 def _confirmation_today() -> date:

@@ -159,9 +159,7 @@ def test_unprovenanced_llm_costs_stay_idealized_at_canonical_boundary() -> None:
 
 
 def test_primary_llm_cost_spans_do_not_gain_explicit_provenance() -> None:
-    message = (
-        "Build a daily MSFT test and model a 10 bps fee and 5 bps slippage."
-    )
+    message = "Build a daily MSFT test and model a 10 bps fee and 5 bps slippage."
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
             raw_user_phrasing="Model-normalized strategy summary.",
@@ -535,7 +533,7 @@ def test_confirmation_launch_card_and_hydration_share_canonical_costs(
     assert card is not None
     assert card["display_facts"]["fees"] == 0.001
     assert card["display_facts"]["slippage"] == 0.0005
-    assert "Modeled costs: 10 bps fee + 5 bps slippage" in card["assumptions"]
+    assert card["assumptions"] == []
 
     hydrated = draft_from_confirmation_payload(payload)
     assert hydrated.extra_parameters["fee_rate"] == 0.001

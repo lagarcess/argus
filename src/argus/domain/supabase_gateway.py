@@ -1780,6 +1780,15 @@ class SupabaseGateway(
             cursor_type_rank=cursor_type_rank,
         )
 
+    def read_conversation_preview_messages(
+        self, *, user_id: str, conversation_ids: list[str]
+    ) -> list[dict[str, Any]]:
+        if self.keyset_reader is None:
+            raise RuntimeError("Persistent previews require the Postgres reader.")
+        return self.keyset_reader.read_conversation_preview_messages(
+            user_id=user_id, conversation_ids=conversation_ids
+        )
+
     def search_rows(
         self,
         *,

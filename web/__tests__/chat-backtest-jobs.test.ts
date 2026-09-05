@@ -625,7 +625,7 @@ describe("chat backtest jobs", () => {
         (message) => message.kind === "strategy_result",
       );
       const quickTakeOwners = resultMessages.filter((message) =>
-        message.content?.includes("**Quick take**"),
+        message.result?.readoutFacts,
       );
       const addDecisionEditorOwners = resultMessages.filter(
         (message) => message.result?.evidenceArtifactId === "evidence-1",
@@ -754,7 +754,7 @@ describe("chat backtest jobs", () => {
         message.result?.runId === completedRun.id,
     );
     const quickTakeOwners = resultOwners.filter((message) =>
-      message.content?.includes("**Quick take**"),
+      message.result?.readoutFacts,
     );
     const decisionOwners = resultOwners.filter(
       (message) =>

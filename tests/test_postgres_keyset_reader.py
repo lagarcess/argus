@@ -54,6 +54,28 @@ def _reader_types():
     return ConversationKeysetCursorError, PostgresKeysetReader
 
 
+def test_preview_read_uses_one_owner_scoped_latest_message_query():
+    _, reader_type = _reader_types()
+    owner = "30000000-0000-0000-0000-000000000001"
+    ids = ["20000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000002"]
+    pool = _RecordingPool(
+        [[{"conversation_id": UUID(ids[0]), "metadata": {"result_card": {}}}]]
+    )
+    rows = reader_type(pool).read_conversation_preview_messages(
+        user_id=owner, conversation_ids=ids
+    )
+    assert rows[0]["conversation_id"] == ids[0]
+    assert len(pool.cursor.executions) == 1
+    sql, params = pool.cursor.executions[0]
+    assert "left join lateral" in sql
+    assert "m.user_id = c.user_id and m.conversation_id = c.id" in sql
+    assert "where c.user_id = %s and c.id = any(%s)" in sql
+    assert "order by m.created_at desc, m.id desc" in sql
+    assert "limit 1" in sql
+    assert params[-2:] == (UUID(owner), [UUID(value) for value in ids])
+    assert pool.acquisition_timeouts == [2.0]
+
+
 def _conversation_row(
     value: int,
     *,

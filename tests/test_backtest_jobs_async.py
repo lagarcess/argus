@@ -853,7 +853,8 @@ def test_backtest_job_status_endpoint_returns_job_and_result(
 ) -> None:
     from argus.api import state as api_state
 
-    monkeypatch.setattr(api_state, "supabase_gateway", _HydrationGateway())
+    gateway = _HydrationGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     client = TestClient(app)
 
     response = client.get("/api/v1/backtest-jobs/job-async-1")
@@ -864,8 +865,19 @@ def test_backtest_job_status_endpoint_returns_job_and_result(
     assert payload["job"]["result_run_id"] == "run-workflow-1"
     assert payload["run"]["id"] == "run-workflow-1"
     assert payload["run"]["conversation_result_card"]["title"] == "AAPL buy and hold"
-    assert payload["result_readout"].startswith("**Quick take**")
-    assert "Backend generated readout" in payload["result_readout"]
+    assert payload["result_readout"] is None
+    assert payload["run"]["metrics"] == gateway.run.metrics
+    assert payload["run"]["config_snapshot"] == gateway.run.config_snapshot
+    stored_job = gateway.get_backtest_job(
+        user_id=gateway.user.id, job_id=payload["job"]["id"]
+    )
+    assert stored_job is not None
+    private_readout = stored_job["execution_metadata"]["workflow_backtest"][
+        "result_readout"
+    ]
+    assert private_readout.startswith("**Quick take**")
+    assert "Backend generated readout" in private_readout
+    assert "Backend generated readout" not in response.text
     assert payload["result_readout_source"] == "llm_explain_stage"
     assert payload["result_readout_fallback_used"] is False
 

@@ -1,5 +1,8 @@
 import { getSupabaseClient } from "./supabase-client";
+import i18next from "i18next";
+import { localizeArtifactFinalPayload } from "./artifact-response-transport";
 import type { AssetClass } from "./argus-types";
+import type { ConversationPreview } from "./conversation-preview-display";
 import type { ChatFinalResponsePayload } from "./chat-final-response-payload";
 import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
 import type { DecisionState as RunDossierDecisionState } from "./run-dossier-contract";
@@ -22,11 +25,11 @@ import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
   displayResultActionLabel,
-  displayResultBenchmarkNote,
   displayResultMetricLabel,
   resultMetricDisplayOrder,
 } from "./result-card-display";
 import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
+import { resultReadoutFacts } from "./result-readout-facts";
 import {
   ARGUS_API_BASE_URL,
   apiFetch,
@@ -194,7 +197,8 @@ export type BacktestJobResponse = {
   run: BacktestRun | null;
   // A succeeded research job's answer, the way `run` is a backtest's result.
   result_message?: ApiMessage | null;
-  result_readout?: string | null;
+  /** Private source prose is never transported; retained slot for old clients. */
+  result_readout?: null;
   result_readout_source?: string | null;
   next_experiments?: Record<string, unknown> | null;
   result_readout_fallback_used?: boolean | null;
@@ -210,6 +214,7 @@ export type Conversation = {
   created_at: string;
   updated_at: string;
   last_message_preview?: string | null;
+  preview?: ConversationPreview | null;
   language?: "en" | "es-419" | null;
   activity?: ConversationActivity | null;
 };
@@ -243,6 +248,7 @@ type HistoryItemBase = {
   /** Present on chat items; retained as optional for existing history consumers. */
   title_source?: TitleSource | null;
   subtitle: string;
+  preview?: ConversationPreview | null;
   pinned: boolean;
   created_at: string;
   conversation_id?: string | null;
@@ -353,6 +359,7 @@ export type ChatFinalPayload = {
   stage_outcome?: string;
   assistant_response?: string | null;
   assistant_prompt?: string | null;
+  response_intent?: Record<string, unknown> | null;
   confirmation?: StrategyConfirmationPayload | null;
   confirmation_cancelled?: { confirmation_id?: string | null } | null;
   confirmation_payload?: Record<string, unknown> | null;
@@ -462,7 +469,7 @@ export function resultCardFromConversationCard(
   card: ConversationResultCard,
   run?: Pick<BacktestRun, "id" | "strategy_id"> &
     Partial<
-      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot">
+      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot" | "metrics" | "symbols">
     >,
 ) {
   const rows = [...card.rows].sort(
@@ -477,11 +484,11 @@ export function resultCardFromConversationCard(
     dateRange: card.date_range,
     statusLabel: card.status_label,
     metrics: rows.map((row) => ({
+      key: row.key,
       label: displayResultMetricLabel(row, run?.benchmark_symbol),
       value: row.value,
     })),
-    benchmarkNote: displayResultBenchmarkNote(card.benchmark_note),
-    assumptions: card.assumptions,
+    readoutFacts: resultReadoutFacts({ ...run, symbols: run?.symbols ?? card.symbols, result_card: card }),
     assetClass: run?.asset_class ?? card.asset_class ?? undefined,
     configSnapshot: run?.config_snapshot,
     runId: run?.id,
@@ -1026,7 +1033,10 @@ export async function streamChatMessage(
   const dispatchParsedFrame = (part: string) => {
     const parsed = parseChatStreamFrame(part);
     if (!parsed) return;
-    onEvent(parsed);
+    onEvent(parsed.event === "final" ? {
+      ...parsed,
+      data: localizeArtifactFinalPayload(parsed.data, i18next.t.bind(i18next), i18next.resolvedLanguage ?? language ?? "en-US"),
+    } : parsed);
     if (parsed.event === "done" || parsed.event === "error") {
       receivedDone = true;
     }

@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timezone
 from typing import Any, cast
 
+from argus.api.artifact_presentation import without_private_prose
 from argus.api.schemas import (
     DecisionActionAvailability,
     DecisionState,
@@ -17,7 +18,7 @@ from argus.api.schemas import (
     SearchRetestAction,
     SearchRetestRepair,
 )
-from argus.domain.evidence import evidence_preview_from_payload
+from argus.domain.evidence import result_metrics_summary
 from argus.domain.retest_setup import (
     has_finalized_evidence_identity,
     retest_setup_from_run,
@@ -62,7 +63,6 @@ def project_run_dossier(
     decision: Mapping[str, Any] | None,
     result_message_id: str | None,
     decision_action_availability: DecisionActionAvailability | None,
-    language: str,
 ) -> RunDossier:
     """Project one run and its artifact into the bounded public dossier shape."""
     run_id = text(run.get("id"))
@@ -73,15 +73,8 @@ def project_run_dossier(
         raise ValueError("Run dossier evidence artifact requires an id.")
 
     run_label = run_label_for(run)
-    preview = evidence_preview_from_payload(
-        digest=artifact.get("digest"),
-        title=artifact.get("title"),
-        payload=(
-            artifact.get("payload") if isinstance(artifact.get("payload"), dict) else None
-        ),
-    )
     metric_rows: list[SearchDossierMetric] = []
-    metrics = preview.get("metrics_summary")
+    metrics = result_metrics_summary(run.get("metrics"))
     if isinstance(metrics, dict):
         for name, value in metrics.items():
             if len(metric_rows) >= _MAX_METRICS:
@@ -159,10 +152,21 @@ def project_run_dossier(
             run_label=run_label,
             completed_at=row_activity(run),
             benchmark_symbol=_bounded_text(
-                preview.get("benchmark_symbol") or run.get("benchmark_symbol"),
+                run.get("benchmark_symbol"),
                 24,
             ),
-            quick_take=_bounded_text(preview.get("quick_take"), 500),
+            result_fact_bank=without_private_prose(
+                {
+                    key: run.get(key)
+                    for key in (
+                        "symbols",
+                        "metrics",
+                        "config_snapshot",
+                        "benchmark_symbol",
+                        "conversation_result_card",
+                    )
+                }
+            ),
             metrics=metric_rows,
         ),
         decision=decision_projection,

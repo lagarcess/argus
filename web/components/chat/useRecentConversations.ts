@@ -126,7 +126,7 @@ export function useRecentConversations({
         .then(({ items, next_cursor }) => {
           const projected = items
             .filter(
-              (conversation) => conversation.last_message_preview !== null,
+              (conversation) => conversation.preview?.kind !== "empty",
             )
             .map((conversation) =>
               projectConversationToRecentChat(conversation, {

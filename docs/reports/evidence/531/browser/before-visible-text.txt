@@ -1,0 +1,22 @@
+Integration baseline: 5761dd417429895a24037df8231528c759af4179
+Workspace language selected in the real UI: Spanish (es-419)
+Result source: previously recorded English-authored META result
+
+Visible Spanish result chrome:
+Valor final
+Comparado con SPY
+Superó por 315.6 puntos porcentuales
+Peor caída
+Explicar resultado
+Ajustar idea
+Agregar decisión
+LECTURA RÁPIDA
+
+Visible persisted English Quick Take:
+A simple buy-and-hold of META from January 3, 2023 through December 31,
+2024 returned +369.5%, beating the SPY benchmark (+53.9%) by 315.6
+percentage points. This is a return comparison, not causal attribution. Daily
+data only
+
+Browser console at the decisive snapshot: 0 errors, 6 repeated development-only
+font-preload warnings.

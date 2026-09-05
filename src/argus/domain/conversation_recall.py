@@ -310,7 +310,6 @@ def project_conversation_recall(
             decision=latest_decision,
             result_message_id=result_message_id_for(latest_run, conversation_messages),
             decision_action_availability=decision_action_availability,
-            language=language,
         )
     eligible_decisions = [
         current

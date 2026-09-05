@@ -95,7 +95,10 @@ def _unsupported_intent(category: str, *, with_options: bool) -> dict[str, Any]:
             "strategy": {"asset_universe": ["AAPL"]},
         },
         "options": [
-            {"label": "Compare with buy and hold", "replacement_values": {"strategy_type": "buy_and_hold"}}
+            {
+                "label": "Compare with buy and hold",
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            }
         ]
         if with_options
         else [],
@@ -110,7 +113,10 @@ def _coverage_intent(code: str | None, *, with_options: bool) -> dict[str, Any]:
         "requested_fields": ["date_range"],
         "facts": {"coverage": coverage, "strategy": {"asset_universe": ["AAPL"]}},
         "options": [
-            {"id": "change_dates", "replacement_values": {"requested_field": "date_range"}}
+            {
+                "id": "change_dates",
+                "replacement_values": {"requested_field": "date_range"},
+            }
         ]
         if with_options
         else [],
@@ -197,7 +203,6 @@ def test_deterministic_prose_always_carries_a_typed_contract(
     """
 
     prose = intent_clarification_fallback(
-        language=language,
         response_intent=response_intent,
         strategy=None,
     )
@@ -311,9 +316,13 @@ def test_confirm_stage_does_not_fabricate_english_assumption_prose() -> None:
 # ── The confirm surface: a language it accepts is a language it reads (#523) ──
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIRM_SURFACE_MODULES = (
+WORKSPACE_LANGUAGE_MODULES = (
     REPO_ROOT / "src" / "argus" / "api" / "chat" / "confirmation.py",
     REPO_ROOT / "src" / "argus" / "agent_runtime" / "stages" / "confirm.py",
+    REPO_ROOT / "src" / "argus" / "agent_runtime" / "stages" / "explain.py",
+    REPO_ROOT / "src" / "argus" / "agent_runtime" / "clarification_contract.py",
+    REPO_ROOT / "src" / "argus" / "api" / "chat" / "breakdown.py",
+    REPO_ROOT / "src" / "argus" / "domain" / "run_dossiers.py",
 )
 
 
@@ -339,9 +348,9 @@ def _functions_that_ignore_language(module_path: Path) -> list[str]:
     return offenders
 
 
-@pytest.mark.parametrize("module_path", CONFIRM_SURFACE_MODULES, ids=lambda p: p.name)
-def test_confirm_surface_never_accepts_a_language_it_ignores(module_path: Path) -> None:
-    """No function on the confirm surface takes `language` and never reads it.
+@pytest.mark.parametrize("module_path", WORKSPACE_LANGUAGE_MODULES, ids=lambda p: p.name)
+def test_workspace_surface_never_accepts_a_language_it_ignores(module_path: Path) -> None:
+    """No function on these artifact surfaces accepts a language it ignores.
 
     An accepted-and-ignored language parameter is worse than an absent one:
     the call site reads as if language were handled, so English reaches a
