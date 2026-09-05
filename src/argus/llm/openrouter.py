@@ -335,6 +335,15 @@ def annotate_latest_openrouter_route_receipt(
         if receipt.task == task and receipt.schema_name == schema_name:
             receipt.repair_effect.clear()
             receipt.repair_effect.update(repair_effect)
+            fields = {
+                "task": receipt.task,
+                "schema_name": receipt.schema_name,
+                "receipt_created_at": receipt.created_at,
+                "repair_effect": dict(receipt.repair_effect),
+            }
+            logger.bind(llm_task=receipt.task, llm_schema_name=receipt.schema_name).info(
+                "OpenRouter repair effect {}", json.dumps(fields, separators=(",", ":"))
+            )
             return True
     return False
 

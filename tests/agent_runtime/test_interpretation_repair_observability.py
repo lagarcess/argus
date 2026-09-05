@@ -71,6 +71,29 @@ def test_repair_effect_metadata_exposes_no_typed_values() -> None:
     assert len(str(effect["after_fingerprint"])) == 64
 
 
+def test_repair_effect_metadata_ignores_diagnostic_only_changes() -> None:
+    fake = Faker()
+    before = _response(goal=fake.sentence(), symbol=fake.lexify(text="????").upper())
+    after = before.model_copy(deep=True)
+    after.reason_codes.append("focused_date_window_intent_repair")
+    after.candidate_strategy_draft.date_range_raw_text = fake.sentence()
+    after.candidate_strategy_draft.evidence_spans = {
+        "date_range": fake.sentence(),
+    }
+
+    effect = repair_effect_metadata(
+        before=before,
+        after=after,
+        trigger_reason="date_window_intent_uncertain",
+        repair_applied=True,
+    )
+
+    assert effect["repair_applied"] is False
+    assert effect["changed_fields"] == []
+    assert effect["before_fingerprint"] == effect["after_fingerprint"]
+    assert effect["no_op_reason"] == "no_typed_change"
+
+
 @pytest.mark.asyncio
 async def test_focused_strategy_repair_receipt_records_applied_effect(
     monkeypatch: pytest.MonkeyPatch,

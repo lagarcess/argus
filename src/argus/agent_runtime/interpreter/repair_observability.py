@@ -6,7 +6,9 @@ from typing import Any
 
 from pydantic import BaseModel
 
-_RESPONSE_TEXT_FIELDS = frozenset({"assistant_response", "user_goal_summary"})
+_NON_MATERIAL_RESPONSE_FIELDS = frozenset(
+    {"assistant_response", "reason_codes", "user_goal_summary"}
+)
 _DRAFT_TEXT_FIELDS = frozenset(
     {
         "date_range_raw_text",
@@ -50,7 +52,7 @@ def repair_effect_metadata(
 
 def _fingerprint_projection(response: BaseModel) -> dict[str, Any]:
     projection = response.model_dump(mode="json")
-    for field_name in _RESPONSE_TEXT_FIELDS:
+    for field_name in _NON_MATERIAL_RESPONSE_FIELDS:
         projection.pop(field_name, None)
     draft = projection.get("candidate_strategy_draft")
     if isinstance(draft, dict):
