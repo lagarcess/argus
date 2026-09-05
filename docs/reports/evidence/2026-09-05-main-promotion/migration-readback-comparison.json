@@ -1,0 +1,10 @@
+{
+  "candidate_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+  "checked_objects": {
+    "non_proof_job_aggregate_counts_unchanged": true,
+    "rls_flags_unchanged": true,
+    "activity_reader_definition_unchanged": true
+  },
+  "environment_files_modified": false,
+  "checkout_tracked_changes": ""
+}

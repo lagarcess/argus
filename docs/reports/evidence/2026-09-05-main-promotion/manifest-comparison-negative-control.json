@@ -1,0 +1,13 @@
+{
+  "gate": "tests.release_promotion_evidence_support.assert_main_promotion_baseline_comparison",
+  "manifest": "docs/release-manifests/2026-09-05-main-production-promotion.md",
+  "candidate_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+  "case_removed": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+  "before": "pass",
+  "full_manifest_suite": "separately failed on infrastructure_error totals schema; this control does not override that failure",
+  "without_case": "fail",
+  "failure": "2026-09-05-main-production-promotion.md: dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run passes on the deployed build and fails on the candidate. Name it in the manifest with its disposition, or do not promote.",
+  "restored": "pass",
+  "restored_bytes_match": true,
+  "manifest_sha256": "970cc3ebb3abbf6362345156a0fdb5b0056097a26590c01e0ffbb04f4e653079"
+}
