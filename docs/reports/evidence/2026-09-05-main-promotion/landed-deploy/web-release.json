@@ -1,0 +1,7 @@
+{
+  "service": "argus-app",
+  "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "started_at": "2026-09-05T20:10:25.851228+00:00",
+  "exit_code": 0,
+  "finished_at": "2026-09-05T20:12:15.205537+00:00"
+}

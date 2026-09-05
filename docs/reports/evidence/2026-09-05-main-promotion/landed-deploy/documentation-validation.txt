@@ -1,0 +1,5 @@
+Command: python -m pytest tests/test_private_alpha_release_docs.py tests/test_release_promotion_evidence_support.py -q --tb=short
+Python: 3.10.20
+Result: 24 passed in 13.94s
+Additional checks: git diff --check passed; manifest contains no em dash; durable evidence scanned against locally configured secret values without printing them.
+Scope: documentation evidence validation only; does not waive failed production warmup or unrun acceptance checks.

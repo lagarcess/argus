@@ -1,0 +1,31 @@
+Private Alpha local smoke
+candidate_sha=ee9c3491fa6219502f1e94abc5d9e661a06839d9
+workflow_mode=proof-shadow
+runtime_mode={"ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED":"false","ARGUS_BACKTEST_JOBS_SHADOW_ENABLED":"true","ARGUS_BACKTEST_REAL_WORKFLOW_TASK":"argus-backtests/run_backtest_job","ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED":"false","ARGUS_BACKTEST_WORKFLOW_TASK":"argus-backtests/workflow_proof","ARGUS_CHECKPOINTER_MODE":"memory","ARGUS_DEV_MEMORY_FALLBACK":"true","ARGUS_MARKET_DATA_PROVIDER_MODE":"synthetic_unit_fixture","ARGUS_MOCK_AUTH":"true","ARGUS_PERSISTENCE_MODE":"memory"}
+feature_flags={"NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED":"false","NEXT_PUBLIC_ENABLE_SPANISH":"true","NEXT_PUBLIC_OMNISEARCH_ENABLED":"true"}
+env_fingerprint=1266ea4fd3379ca743c4a018d33390fa59ea37d268c595b23655df287c5c3616
+workflow_probe=ready
+Starting local API on http://127.0.0.1:8100
+Starting local web on http://127.0.0.1:3100
+Checking api_health: http://127.0.0.1:8100/health
+curl: (7) Failed to connect to 127.0.0.1 port 8100 after 0 ms: Couldn't connect to server
+  waiting for api_health... attempt 1
+ERROR: Background process 11523 died unexpectedly.
+--- api.log ---
+INFO:     Started server process [11522]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8100 (Press CTRL+C to quit)
+--- web.log ---
+$ next dev --hostname "127.0.0.1" --port "3100"
+⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use 127.0.0.1:3100
+    at <unknown> (Error: listen EADDRINUSE: address already in use 127.0.0.1:3100) {
+  code: 'EADDRINUSE',
+  errno: -48,
+  syscall: 'listen',
+  address: '127.0.0.1',
+  port: 3100
+}
+[?25h
+error: script "dev" exited with code 1
