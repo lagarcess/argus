@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "final": [
+    {
+      "assistant_response": "El valor m\u00e1ximo de la cartera en esta prueba fue de $50,694.08, alcanzado el 11 de diciembre de 2024.\n\nPartiendo de $10,000, la inversi\u00f3n en META lleg\u00f3 a m\u00e1s de cinco veces su valor inicial durante el per\u00edodo de simulaci\u00f3n.",
+      "response_intent": {
+        "kind": "result_followup_chrome",
+        "semantic_needs": [],
+        "requested_fields": [],
+        "facts": {
+          "focus": "peak_value",
+          "heading_key": "general"
+        },
+        "options": []
+      },
+      "hasBank": false
+    }
+  ]
+}

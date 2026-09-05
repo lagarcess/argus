@@ -1,0 +1,15 @@
+{
+  "baseline_head": "6fd92c6500921d8e0d72f0faa03f54163c946353",
+  "before_surface_sha256": "d31d56eed5b1803af5d4473775924aa880d73f2be2901bbb65d7163d8b6fc939",
+  "after_surface_sha256": "d31d56eed5b1803af5d4473775924aa880d73f2be2901bbb65d7163d8b6fc939",
+  "measured_files": 17,
+  "changed": [],
+  "added": [],
+  "removed": [],
+  "recorded_fingerprint_drift": [
+    [],
+    [],
+    []
+  ],
+  "live_eval_rerun": false
+}

@@ -1,0 +1,59 @@
+{
+  "reviewed_head": "6fd92c6500921d8e0d72f0faa03f54163c946353",
+  "backend_fix": "5ea47355bd2d3849cca0f0ece176fc7744e93c97",
+  "complete_source_head": "bb3bff50902a1dc221745fb4b0b87ab6b42f5b5d",
+  "source_hashes": {
+    "src/argus/domain/artifact_presentation_kind.py": "b8cd75c4ca0f4aca0da124f1498657853eafc312c65b394afa247e81d683e785",
+    "web/components/chat/chat-message-projection.ts": "75f9967a495d4e63cc2b9790ff5728e8637ea171ed1983caf36ebb051a4f7d88"
+  },
+  "fixture": {
+    "source": "docs/reports/evidence/411/browser/en-discovery-messages.json",
+    "sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+    "seeded_messages": 8,
+    "email_matches": 0,
+    "provenance": "committed synthetic local QA; founder-approved",
+    "hosted_database_reads_or_writes": 0,
+    "persistence": "memory",
+    "auth": "mock",
+    "provider": "live OpenRouter"
+  },
+  "before": {
+    "head": "6fd92c6500921d8e0d72f0faa03f54163c946353",
+    "source": "immutable git archive; PYTHONPATH and source root pinned",
+    "languages": [
+      "en",
+      "es-419"
+    ],
+    "observation": "empty live factual reply, generic Quick Take after reload"
+  },
+  "after": {
+    "languages": [
+      "en",
+      "es-419"
+    ],
+    "response_intent": "beginner_guidance",
+    "result_fact_bank_present": true,
+    "requested_fact": "peak_date",
+    "peak_date": "2024-12-11T05:00:00",
+    "peak_value": "$50,694.08",
+    "live_equals_persisted_content": true,
+    "rendered_reload_verified": true,
+    "english_live_capture_head": "5ea47355bd2d3849cca0f0ece176fc7744e93c97",
+    "english_live_revalidation": "The later frontend commit changes only history hydration; no API source differs. Final English reload was recaptured at complete_source_head.",
+    "spanish_live_and_reload_head": "bb3bff50902a1dc221745fb4b0b87ab6b42f5b5d"
+  },
+  "attempt_dispositions": [
+    "The first pre-approval replay omitted its canonical run and was inconclusive; the corrected replay seeds the real QA run record.",
+    "Two English peak-value attempts returned a visible recovery after unsupported_causal_attribution_claim; preserved and excluded from P1 proof.",
+    "One English and two Spanish correct answers used result_followup_chrome without a root fact bank; preserved and excluded from P1 proof.",
+    "The backend-only fix preserved API content but still rendered a generic Quick Take after reload. Browser proof exposed and led to the frontend hydration correction.",
+    "The legacy QA run has no typed fee_bps; the fee probe returned unavailable. Its recovery displays an English option label in the Spanish workspace. This is retained, not presented as a successful fact-answer case.",
+    "The accepted English answer contains an em dash. The raw response and screenshot are retained unchanged; the presentation-only patch does not alter model-facing text."
+  ],
+  "live_eval_suite_rerun": false,
+  "test_results": {
+    "backend_release_and_fingerprint": 104,
+    "frontend_full": 1556,
+    "mocked_eval_harness": 237
+  }
+}
