@@ -23,8 +23,7 @@ assistant phrasing.
 Run the mocked harness checks with:
 
 ```bash
-poetry run pytest \
-  tests/evals/test_measurement_eval_harness.py \
+poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
