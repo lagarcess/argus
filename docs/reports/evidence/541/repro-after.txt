@@ -1,0 +1,17 @@
+{
+  "answer": "NVDA +2.3%, TSLA -1.1% as of 3:15pm ET.",
+  "degraded": null,
+  "paid_requests": 1,
+  "provider_output_types": [
+    "skill_loaded",
+    "finance_results",
+    "message"
+  ],
+  "sidecar_usage": {
+    "cache_status": "miss",
+    "cost_usd": null,
+    "invocations": null,
+    "latency_ms": 0
+  },
+  "usage_block_present": false
+}
