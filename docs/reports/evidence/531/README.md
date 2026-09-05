@@ -1,5 +1,41 @@
 # Persisted artifact language: #531, #530, #528
 
+## Codex review correction
+
+The automatic review of `bd19209f` identified one confirmed P1: removing private
+English assumptions also removed execution disclosures from the result card.
+`02f542d5` restores localized long-only/equal-weight values from the saved
+configuration, and the default no-fees/slippage disclosure. `ac50a671` keeps
+incomplete modeled-cost evidence from falsely claiming that costs were zero.
+The shared card formatter owns this choice; the view-model no longer overrides
+it separately. Unknown side/allocation values are not guessed from stored prose.
+Browser QA caught a missed persisted shape in that first correction: completed
+runs nest execution values under `config_snapshot.engine_config`. `98f6e50b`
+selects that typed config before reading either value, retaining compatibility
+with older flat configs. A bilingual regression loads the actual recorded META
+conversation through normal hydration, not a synthetic flattened fixture.
+
+- Red: the new bilingual execution-disclosure regression failed in both
+  languages before implementation. A separate partial-cost regression failed
+  before its one-line fail-closed guard. The real persisted-shape regression
+  also failed in both languages before the nested-config correction.
+- Green: result-language, result-card, and retained-prose AST suites: **45 passed**.
+- Full frontend suite at `98f6e50b`: **1,553 passed**. The final combined
+  offline-eval and focused-contract rerun passed **299 tests, 2 live-only skips**.
+- The review correction changes only frontend presentation, locale data, and
+  tests. Backend/model inputs, fingerprint, eval assertions, scope registry,
+  migrations, and reserved production files remain untouched.
+- Full offline evals: **260 passed, 2 skipped**. Full runtime/research:
+  **2,289 passed, the same 2 founder-named inherited failures**. Payload,
+  scope/migration, fingerprint, and private-prose checks: **39 passed**.
+- Frontend lint: zero errors, eight existing warnings. Standalone `tsc` still
+  reports the repository's broad `bun:test` declaration/test-file limitations;
+  it is not claimed green. The required CI frontend build remains the production
+  TypeScript gate.
+
+The fresh affected browser capture and terminal CI/review disposition are linked
+in the PR handoff after the requested follow-up review returns.
+
 ## Review reconciliation onto `9117fa7f`
 
 The founder requested a non-draft review round after the earlier handoff below.

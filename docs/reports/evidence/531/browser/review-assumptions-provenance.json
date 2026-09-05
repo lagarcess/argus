@@ -1,0 +1,73 @@
+{
+  "candidate_sha": "98f6e50b31395450068b3739afc0dcf9931f3e02",
+  "candidate_subject": "fix(i18n): read saved engine configuration assumptions",
+  "parent_sha": "ac50a6717f5f1b2dbda26aabb30a032f16910846",
+  "reconciliation_sha": "7eb10e2f8101d71d60641e1aad3cfbbd18121fa1",
+  "captured_at": "2026-09-05T04:10:46Z",
+  "browser": "headed Playwright CLI",
+  "source_tree_kind": "git archive of exact candidate SHA",
+  "recorded_result_source": "docs/reports/evidence/411/browser/en-discovery-messages.json",
+  "recorded_result_source_sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+  "committed_replay_harness_sha256": "c04549b9db3e898bf524c4b6c7d0afbb9ead3d7f7944c8bd93366d3c50aaa749",
+  "runtime_replay_harness_sha256": "e459aefde0c2648cf4a78e7658b03b2e1af7491a4ed166519d66fce4a49d469e",
+  "runtime_harness_adjustment": "the isolated git archive has no git metadata, so only candidate-SHA discovery was changed to read the required ISSUE531_QA_TREE environment value; seed and route behavior were unchanged",
+  "frontend_environment": "Spanish enabled; mock auth enabled; Supabase public values were inert local-only placeholders; no credential file was loaded",
+  "source_files_sha256": {
+    "web/lib/result-card-display.ts": "4777549831b4747cc649e06ad340f3ea9854d84d2ea592597dd4a9d87504e6b3",
+    "web/lib/result-card-view-model.ts": "eff8bb48c80497e0f11d86091851407ab50f4856443077e393801366ae4ff2e1",
+    "web/components/chat/chat-message-projection.ts": "f2b415f83ff69a0c7d4fa35bc4c8c8d85fb8a62d1e3ec0b0c34d46f829b83ed2",
+    "web/lib/result-readout-display.ts": "9c16845c36d221586a5d68d7764684f1ffe04e80cdd7c4a22655c6daa2d1c150",
+    "web/public/locales/en/common.json": "cd6a5a3743147ea57523180d334afa54d5b953a3b35789094d468eb56bef64f9",
+    "web/public/locales/es-419/common.json": "d7010271f442fc122f9cb1da096bc6f32e48a25bf60a935799f27efb578613ac",
+    "web/__tests__/result-readout-language.test.ts": "e20f7d8288cffb85a9dddd27e166283b60f8d930aae0a0827272c76a6a552eb1"
+  },
+  "screenshots": {
+    "review-assumptions-en-workspace.png": {
+      "sha256": "4063b9721839601b81926cd5f8c661a3a82bda769931dffb9051facd72cf6054",
+      "dimensions": "2400x1636",
+      "shows": "English Quick Take with expanded Side Long only and Allocation Equal weight"
+    },
+    "review-assumptions-es-workspace.png": {
+      "sha256": "a1e4d1908d714e35690e3dfae05c854089c57abf603244e19bc7ccdf1c92ebff",
+      "dimensions": "2400x1636",
+      "shows": "Spanish Quick Take with expanded Direccion Solo posiciones largas and Asignacion Pesos iguales"
+    },
+    "review-assumptions-es-trust-strip.png": {
+      "sha256": "4e5664ce255994f4008e1ac71439c73331761e9879ec9b869382ba3e93da81dd",
+      "dimensions": "2400x1636",
+      "shows": "Spanish trust strip with Sin comisiones/deslizamiento and Spanish Quick Take immediately below"
+    }
+  },
+  "browser_steps": [
+    "load the recorded English-authored result through normal conversation hydration",
+    "expand result details and inspect the English execution assumptions",
+    "select Spanish through Settings and fully reload the same conversation",
+    "inspect the Spanish Quick Take and no-fees trust strip",
+    "expand result details and inspect the Spanish execution assumptions"
+  ],
+  "observed_english": {
+    "trust_strip": "Stocks · Historical simulation · No fees/slippage · Not advice",
+    "side": "Side · Long only",
+    "allocation": "Allocation · Equal weight"
+  },
+  "observed_spanish": {
+    "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de 369.5%. Terminó 315.64 puntos porcentuales por encima de SPY. La peor caída fue de -18.35%.",
+    "trust_strip": "Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
+    "side": "Dirección · Solo posiciones largas",
+    "allocation": "Asignación · Pesos iguales"
+  },
+  "saved_english_result_body_rendered_in_spanish": false,
+  "pre_capture_correction": {
+    "sha": "ac50a6717f5f1b2dbda26aabb30a032f16910846",
+    "finding": "the genuine persisted shape stored side and allocation under config_snapshot.engine_config, while the initial formatter read only direct-root fields",
+    "failed_screenshot_committed": false
+  },
+  "console_errors": 0,
+  "console_warnings_count": 2,
+  "console_warnings": "development-only unused font preload warnings",
+  "provider_calls": 0,
+  "credential_files_loaded": false,
+  "hosted_database_reads_or_writes": 0,
+  "chat_model_dca_or_backtest_actions": 0,
+  "auth_or_session_identifiers_in_evidence": false
+}

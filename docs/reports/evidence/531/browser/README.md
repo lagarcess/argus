@@ -108,3 +108,27 @@ backtest call.
 recorded-source digest, replay-harness adjustment, reader-boundary source
 hashes, and the generated final-payload source hashes reviewed in this
 reconciliation.
+
+## Typed execution assumptions
+
+`review-assumptions-es-workspace.png` and
+`review-assumptions-es-trust-strip.png` capture the genuine recorded
+English-authored META result at exact head
+`98f6e50b31395450068b3739afc0dcf9931f3e02`. QA selected Spanish through
+Settings, fully reloaded the same persisted conversation, and expanded result
+details.
+
+The browser shows a Spanish `LECTURA RÁPIDA`, the trust disclosure
+`Sin comisiones/deslizamiento`, and typed execution assumptions
+`Dirección · Solo posiciones largas` and `Asignación · Pesos iguales`.
+The saved English result body did not render. The companion
+`review-assumptions-en-workspace.png` confirms the same saved configuration
+renders `Side · Long only` and `Allocation · Equal weight` in English.
+
+The first candidate checked during this acceptance pass, `ac50a671`, omitted
+the two assumptions because the genuine persisted facts place them under
+`config_snapshot.engine_config`. That mismatch was corrected before these
+screenshots were taken; no failed-candidate image is retained.
+`review-assumptions-provenance.json` records the exact source and screenshot
+hashes. This replay loaded no credentials and made no chat, model,
+market-data-provider, hosted-database, DCA, or backtest call.
