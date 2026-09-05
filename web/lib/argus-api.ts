@@ -171,6 +171,8 @@ export type BacktestRun = {
   chart?: ResultChartPayload | null;
   trades?: Record<string, unknown>[] | null;
   created_at: string;
+  /** One-decimal display figures the backend derives from metrics on read. */
+  figures?: Record<string, unknown> | null;
 };
 
 export type BacktestJob = {
@@ -469,7 +471,7 @@ export function resultCardFromConversationCard(
   card: ConversationResultCard,
   run?: Pick<BacktestRun, "id" | "strategy_id"> &
     Partial<
-      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot" | "metrics" | "symbols">
+      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot" | "figures" | "metrics" | "symbols">
     >,
 ) {
   const rows = [...card.rows].sort(
