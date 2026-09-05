@@ -22,12 +22,15 @@ def persist_route_receipts(
         return
     for receipt in receipts:
         try:
+            receipt_metadata = dict(metadata or {})
+            if receipt.repair_effect:
+                receipt_metadata["repair_effect"] = dict(receipt.repair_effect)
             created = api_state.supabase_gateway.create_route_receipt(
                 user_id=user_id,
                 conversation_id=conversation_id,
                 run_id=run_id,
                 message_id=message_id,
-                metadata=metadata,
+                metadata=receipt_metadata,
                 receipt=receipt.as_dict(),
             )
             request_id = str((metadata or {}).get("request_id") or "").strip() or None
@@ -42,7 +45,7 @@ def persist_route_receipts(
                 backtest_run_id=run_id,
                 route_receipt_rows=[created],
                 request_id=request_id,
-                metadata=metadata,
+                metadata=receipt_metadata,
             )
         except Exception as exc:
             logger.warning(
