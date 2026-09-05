@@ -15,6 +15,11 @@
 -- and every activity reader joins jobs to a conversation, so the row is
 -- unrepresentable as conversation activity rather than filtered out of it.
 --
+-- The constraint block below is rendered from
+-- argus.domain.backtest_job_scopes.render_scope_check_constraint and pinned to
+-- it by tests/test_workflow_proof_jobs_migration.py; the scope tuple there is
+-- the one owner of every scope value.
+--
 -- The seeder's rows are reclassified by its own signature,
 -- launch_payload.created_by. Chat jobs that a proof-shadow deployment once
 -- dispatched to the proof task keep their scope and conversation: they were

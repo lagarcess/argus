@@ -10,13 +10,14 @@ from datetime import date, datetime, timezone
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
+from argus.domain.backtest_job_scopes import PROOF_OPERATION_SCOPE
+
 PROOF_KIND = "render_workflow_proof"
 # A proof job is not conversation work: it carries its own operation scope
 # and no conversation, so no activity reader can ever project it. The
-# scope check in supabase/migrations/20260905000000_workflow_proof_jobs_leave_conversations.sql
-# admits exactly this value, and that migration reclassifies rows the seeder
-# wrote under the column default by this created_by signature.
-PROOF_OPERATION_SCOPE = "workflows.proof"
+# migration 20260905000000_workflow_proof_jobs_leave_conversations.sql
+# reclassifies rows the seeder wrote under the column default by this
+# created_by signature.
 PROOF_SEED_CREATED_BY = "workflows.proof_cli"
 PROOF_EMAIL_DOMAIN = "example.invalid"
 WORKFLOW_DATABASE_URL_ENV = "ARGUS_WORKFLOW_DATABASE_URL"

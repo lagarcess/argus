@@ -1,21 +1,26 @@
 """Guard for the workflow-proof scope migration.
 
-A proof job is not conversation work. The seeder owns the proof's scope and
-its created_by signature (``workflows.proof``); the migration's scope check
-and its reclassification statement are pinned to those values, so the seeder
-and the schema cannot name the proof differently. The settle rule itself is
-untouched: this migration must not restate or replace the owner function.
+Every ``operation_scope`` value has one owner, ``argus.domain.backtest_job_scopes``;
+the migration's check constraint is rendered from it and must be exactly that
+rendering. The seeder owns the proof's created_by signature and the
+reclassification is keyed on it. The settle rule itself is untouched: this
+migration must not restate or replace the owner function.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from argus.domain.backtest_admission import CHAT_RUN_SCOPE, DIRECT_RUN_SCOPE
+from argus.domain.backtest_job_scopes import (
+    OPERATION_SCOPES,
+    PROOF_OPERATION_SCOPE,
+    render_scope_check_constraint,
+)
 from argus.domain.job_settlement import RESEARCH_OPERATION_SCOPE, SQL_FUNCTION_NAME
 
-from workflows.proof import PROOF_OPERATION_SCOPE, PROOF_SEED_CREATED_BY
+from workflows import proof
+from workflows.proof import PROOF_SEED_CREATED_BY
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = (
@@ -37,22 +42,24 @@ def _statements(text: str) -> str:
     )
 
 
-def test_scope_check_admits_every_scope_including_the_proof() -> None:
-    sql = _normalized(MIGRATION.read_text(encoding="utf-8"))
-    check = re.search(
-        r"add constraint backtest_jobs_operation_scope_check check \( "
-        r"operation_scope in \( (.*?) \) \)",
-        sql,
-    )
-    assert check is not None
-    scopes = [scope.strip().strip("'") for scope in check.group(1).split(",")]
-    assert scopes == [
+def test_scope_check_is_exactly_the_rendering_of_the_scope_registry() -> None:
+    migration = MIGRATION.read_text(encoding="utf-8")
+
+    assert render_scope_check_constraint() in migration
+    assert migration.count("add constraint backtest_jobs_operation_scope_check") == 1
+
+
+def test_every_scope_a_writer_stamps_derives_from_the_registry() -> None:
+    # Each module keeps its historical name; the value comes from the one
+    # tuple the constraint is rendered from, so the two cannot drift.
+    assert OPERATION_SCOPES == (
         CHAT_RUN_SCOPE,
         DIRECT_RUN_SCOPE,
         RESEARCH_OPERATION_SCOPE,
         PROOF_OPERATION_SCOPE,
-    ]
-    assert "drop constraint if exists backtest_jobs_operation_scope_check" in sql
+    )
+    assert proof.PROOF_OPERATION_SCOPE is PROOF_OPERATION_SCOPE
+    assert len(set(OPERATION_SCOPES)) == len(OPERATION_SCOPES)
 
 
 def test_reclassification_is_keyed_on_the_seeder_signature() -> None:

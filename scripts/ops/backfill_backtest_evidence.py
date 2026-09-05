@@ -7,13 +7,15 @@ and evidence artifact tuple; the finalizer only arrived with #201 on
 those jobs unsettled: no predicate can honestly read a result that has no
 evidence identity, and loosening it would hide every future half-finalized
 job. So this script gives each such run the tuple it is owed, through the same
-finalizer every live path uses (``public.finalize_backtest_completion`` via
-``argus.domain.backtest_finalization``), and the rule flips true on the facts.
+finalizer every live path uses (``public.finalize_backtest_completion``, called
+the way the worker calls it), and the rule flips true on the facts.
 
-Dry run by default; ``--apply`` writes. Idempotent: a finalized run leaves the
-candidate set, and the finalizer replays an existing tuple instead of
-duplicating it. Candidates are selected with the owner predicate itself,
-never a restatement of it.
+One coordinate. Selection, the run read, the finalization, and the settlement
+re-check all run on the one ``DATABASE_URL`` connection, so no second URL can
+name a different project. Dry run by default; ``--apply`` writes. Idempotent:
+a finalized run leaves the candidate set, and the finalizer replays an
+existing tuple instead of duplicating it. Candidates are selected with the
+owner predicate itself, never a restatement of it.
 """
 
 from __future__ import annotations
@@ -30,19 +32,16 @@ from uuid import uuid4
 if __package__:
     from scripts.ops.destructive_database_target import (
         DestructiveDatabaseTargetError,
-        announce_destructive_database_target,
-        pin_destructive_database_target,
-        resolve_destructive_database_target,
+        announce_destructive_postgres_target,
+        resolve_destructive_postgres_target,
     )
 else:
     from destructive_database_target import (  # type: ignore[no-redef]
         DestructiveDatabaseTargetError,
-        announce_destructive_database_target,
-        pin_destructive_database_target,
-        resolve_destructive_database_target,
+        announce_destructive_postgres_target,
+        resolve_destructive_postgres_target,
     )
 
-CHAT_RUN_SCOPE = "chat.run_backtest"
 EXECUTION_IDENTITY_PREFIX = "evidence_backfill"
 
 # A succeeded chat job the owner predicate cannot hydrate, whose linked run is
@@ -79,6 +78,14 @@ from public.backtest_jobs as j
 where j.id = %(job_id)s
 """
 
+RUN_SQL = """
+select *
+from public.backtest_runs
+where id = %(run_id)s
+  and user_id = %(user_id)s
+limit 1
+"""
+
 
 @dataclass(frozen=True)
 class Candidate:
@@ -99,34 +106,62 @@ def _copy_first_env(target: str, candidates: Sequence[str]) -> None:
             return
 
 
-def _prepare_supabase_env() -> None:
+def _prepare_database_env() -> None:
     _copy_first_env("DATABASE_URL", ("ARGUS_WORKFLOW_DATABASE_URL",))
-    _copy_first_env("SUPABASE_URL", ("SUPABASE_PROJECT_URL",))
 
 
-def select_candidates(connection: Any, *, limit: int) -> list[Candidate]:
-    with connection.cursor() as cursor:
-        cursor.execute(CANDIDATE_SQL, {"scope": CHAT_RUN_SCOPE, "limit": max(1, limit)})
-        rows = cursor.fetchall()
-    return [
-        Candidate(
-            job_id=str(row[0]),
-            user_id=str(row[1]),
-            conversation_id=str(row[2]),
-            result_run_id=str(row[3]),
-            created_at=row[4].isoformat()
-            if hasattr(row[4], "isoformat")
-            else str(row[4]),
-        )
-        for row in rows
-    ]
+def _evidence_backfill_gateway_class() -> type:
+    """The worker's Postgres gateway, extended with the reads this job needs.
+
+    Subclassing keeps the finalization call the worker's own; the one
+    connection the worker opens serves selection and verification too.
+    """
+    from argus.api.schemas import BacktestRun
+    from argus.domain.backtest_job_scopes import CHAT_RUN_SCOPE
+
+    from workflows.backtest_job import PostgresBacktestJobGateway, _json_safe
+
+    class EvidenceBackfillGateway(PostgresBacktestJobGateway):
+        def select_candidates(self, *, limit: int) -> list[Candidate]:
+            with self._connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        CANDIDATE_SQL,
+                        {"scope": CHAT_RUN_SCOPE, "limit": max(1, limit)},
+                    )
+                    rows = cur.fetchall()
+            return [
+                Candidate(
+                    job_id=str(row["job_id"]),
+                    user_id=str(row["user_id"]),
+                    conversation_id=str(row["conversation_id"]),
+                    result_run_id=str(row["result_run_id"]),
+                    created_at=_json_safe(row["created_at"]),
+                )
+                for row in rows
+            ]
+
+        def job_is_settled(self, job_id: str) -> bool:
+            with self._connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(SETTLED_SQL, {"job_id": job_id})
+                    row = cur.fetchone()
+            return bool(row and next(iter(row.values())))
+
+        def get_backtest_run(self, *, user_id: str, run_id: str) -> BacktestRun | None:
+            with self._connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(RUN_SQL, {"run_id": run_id, "user_id": user_id})
+                    row = cur.fetchone()
+            if row is None:
+                return None
+            return BacktestRun.model_validate(_json_safe(dict(row)))
+
+    return EvidenceBackfillGateway
 
 
-def job_is_settled(connection: Any, *, job_id: str) -> bool:
-    with connection.cursor() as cursor:
-        cursor.execute(SETTLED_SQL, {"job_id": job_id})
-        row = cursor.fetchone()
-    return bool(row and row[0])
+def evidence_backfill_gateway(database_url: str) -> Any:
+    return _evidence_backfill_gateway_class()(database_url)
 
 
 def finalize_candidate(
@@ -239,33 +274,23 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
-    _prepare_supabase_env()
+    _prepare_database_env()
     try:
-        target = resolve_destructive_database_target()
+        target = resolve_destructive_postgres_target()
     except DestructiveDatabaseTargetError as exc:
         parser.error(str(exc))
-    pin_destructive_database_target(target)
-    announce_destructive_database_target(
+    announce_destructive_postgres_target(
         target,
         stream=sys.stderr if args.json else sys.stdout,
     )
 
-    import psycopg
-    from argus.domain.supabase_gateway import SupabaseGateway
-
-    # The pooler may be in transaction mode; never rely on server-side
-    # prepared statements.
-    with psycopg.connect(
-        os.environ["DATABASE_URL"], prepare_threshold=None
-    ) as connection:
-        connection.autocommit = True
-        candidates = select_candidates(connection, limit=args.limit)
-        gateway = SupabaseGateway.from_env() if args.apply else None
+    with evidence_backfill_gateway(os.environ["DATABASE_URL"]) as gateway:
+        candidates = gateway.select_candidates(limit=args.limit)
         report = run_backfill(
             candidates,
             gateway=gateway,
             apply=args.apply,
-            settled=lambda job_id: job_is_settled(connection, job_id=job_id),
+            settled=gateway.job_is_settled,
         )
 
     if args.json:

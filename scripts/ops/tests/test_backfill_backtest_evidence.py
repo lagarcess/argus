@@ -44,6 +44,26 @@ def test_entry_point_fails_closed_without_an_explicit_target(tmp_path: Path) -> 
     assert "DATABASE_URL must be set explicitly" in result.stderr
 
 
+def test_entry_point_holds_one_coordinate_and_rejects_a_bad_one(tmp_path: Path) -> None:
+    """Selection, the run read, finalization, and the re-check all run on the
+    one DATABASE_URL, so no Supabase URL or key is consulted, and an invalid
+    URL is refused before any connection opens."""
+    env = _clean_env()
+    env["DATABASE_URL"] = "https://not-a-database.example"
+    env["SUPABASE_URL"] = "https://ambient.example"
+    env["SUPABASE_SERVICE_ROLE_KEY"] = "ambient-key"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--apply"],
+        cwd=tmp_path,
+        env=_clean_env() | env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "DATABASE_URL must use postgres:// or postgresql://" in result.stderr
+
+
 def _module():
     sys.path.insert(0, str(OPS_DIR))
     try:

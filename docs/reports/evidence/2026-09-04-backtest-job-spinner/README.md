@@ -122,10 +122,12 @@ So the proof stops being a conversation job:
   conversation only, never status or the result link, and replays as a
   no-op. Chat jobs a proof-shadow deployment sent to the proof task carry no
   seeder signature and keep their scope and conversation.
-- `tests/test_workflow_proof_jobs_migration.py` pins the constraint's scope
-  list to the constants that own each scope and the reclassification to the
-  seeder's signature, and asserts the migration does not restate the settle
-  function. `tests/test_backtest_job_write_invariant.py` classifies the
+- Every scope value now has one owner, `argus.domain.backtest_job_scopes`;
+  the writers that stamp a scope import it from there, and the migration's
+  check constraint is rendered from its tuple.
+  `tests/test_workflow_proof_jobs_migration.py` pins the migration's
+  constraint to that rendering and the reclassification to the seeder's
+  signature, and asserts the migration does not restate the settle function. `tests/test_backtest_job_write_invariant.py` classifies the
   migration as a writer that cannot attach a result or change status.
 - `tests/test_workflow_proof_jobs_postgres.py` (disposable stack): a seeded
   proof job walked to `succeeded` never appears in
@@ -157,22 +159,30 @@ finalizer every live path uses:
   linked, completed run in the job's conversation with no artifact.
 - Each is finalized through `argus.domain.backtest_finalization.
   finalize_backtest_completion` with the stored run and card, which calls
-  `public.finalize_backtest_completion`: it inserts the idea, idea version,
-  and evidence artifact, enriches the card with the identity, and replays an
-  existing tuple rather than duplicating one. The RPC's identity check replays
-  the stored row field by field; `chart` and `trades` are plain JSON on every
-  candidate, and no idea or artifact exists for any of them, so no unique
-  constraint can collide.
+  `public.finalize_backtest_completion` the way the worker calls it (the
+  script's gateway extends `workflows.backtest_job.PostgresBacktestJobGateway`):
+  it inserts the idea, idea version, and evidence artifact, enriches the card
+  with the identity, and replays an existing tuple rather than duplicating
+  one. The RPC's identity check replays the stored row field by field;
+  `chart` and `trades` are plain JSON on every candidate, and no idea or
+  artifact exists for any of them, so no unique constraint can collide.
+- One coordinate: selection, the run read, the finalization, and the
+  settlement re-check all run on the one `DATABASE_URL` connection, so no
+  second URL can name a different project.
 - After each write the same owner predicate is re-read; a tuple the rule
   still rejects is reported as `unsettled`, never hidden.
-- Dry run by default, `--apply` writes, fail-closed target pinning like the
-  other ops scripts (`DATABASE_URL`, `SUPABASE_URL`, service role key set in
-  the process; no dotenv discovery), idempotent on rerun.
+- Dry run by default, `--apply` writes, fail-closed target resolution like
+  the other ops scripts (`DATABASE_URL` set explicitly in the process, host
+  validated and announced, no dotenv discovery), idempotent on rerun.
 - `tests/test_backtest_evidence_backfill_postgres.py` seeds a June-shaped job
-  and run on the disposable stack, proves the predicate rejects it and the
-  projection reads `checking`, runs the script's selection and finalization
-  through PostgREST against the real RPC, and proves the predicate accepts
-  it, the artifact and card identities agree, the projection reads
+  and run on the disposable stack, with generated values over two materially
+  different run shapes (a chart-and-trades equity run; a crypto run with
+  neither, a quick take, non-integer timestamps, tiny and negative metrics,
+  and non-ASCII text), proves the predicate rejects it and the projection
+  reads `checking`, runs the script's selection and finalization on one
+  connection against the real RPC, and proves the predicate accepts it, the
+  artifact and card identities agree, the stored payload replayed unchanged,
+  the evidence title and digest derive from the card, the projection reads
   `result_hydrateable = true`, and a second pass finds nothing.
 
 What the backfill changes for users: 122 runs become evidence (idea, idea

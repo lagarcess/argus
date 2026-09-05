@@ -2,13 +2,18 @@
 
 A June-shaped job: succeeded, linked to a completed run in its conversation,
 no idea / idea version / evidence artifact, card without identity. The owner
-predicate rejects it, the activity projection reads ``checking``. The backfill
-selects it with the owner predicate, finalizes it through
-``public.finalize_backtest_completion`` via the Supabase gateway, and the same
+predicate rejects it and the activity projection reads ``checking``. The
+backfill selects it with the owner predicate, finalizes it through
+``public.finalize_backtest_completion`` on the same connection, and the same
 predicate then accepts it. A second pass finds nothing.
 
-Set ``ARGUS_DISPOSABLE_DATABASE_URL`` plus ``ARGUS_LOCAL_SUPABASE_URL`` and
-``ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY`` to run locally.
+The backfill forwards the stored run into the finalizer, whose identity check
+replays it field by field, so the fixtures are generated rather than typed
+and parametrized over materially different run shapes: one with a chart and
+trades, one without either, with a quick take, non-integer timestamps, tiny
+and negative metrics, and non-ASCII text.
+
+Set ``ARGUS_DISPOSABLE_DATABASE_URL`` to run locally.
 """
 
 from __future__ import annotations
@@ -16,23 +21,27 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import timezone
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
+from faker import Faker
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
-LOCAL_URL = os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip()
-LOCAL_SERVICE_KEY = os.getenv("ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 pytestmark = pytest.mark.skipif(
-    not (DSN and LOCAL_URL and LOCAL_SERVICE_KEY),
-    reason="disposable local Supabase is not configured",
+    not DSN,
+    reason="ARGUS_DISPOSABLE_DATABASE_URL is not configured",
 )
 psycopg = pytest.importorskip("psycopg")
 
 OPS_DIR = Path(__file__).resolve().parents[1] / "scripts" / "ops"
+
+fake = Faker()
+Faker.seed(20260904)
 
 
 def _module():
@@ -48,18 +57,124 @@ def _connect():
     return psycopg.connect(DSN, autocommit=True)
 
 
-def _supabase_gateway():
-    from argus.domain.supabase_gateway import SupabaseGateway
+def _symbol() -> str:
+    return fake.lexify("????").upper()
 
-    from supabase import create_client
 
-    return SupabaseGateway(client=create_client(LOCAL_URL, LOCAL_SERVICE_KEY))
+@dataclass(frozen=True)
+class RunShape:
+    id: str
+    asset_class: str
+    symbol_count: int
+    with_chart: bool
+    with_trades: bool
+    with_quick_take: bool
+
+
+SHAPES = (
+    RunShape(
+        id="equity_with_chart_and_trades",
+        asset_class="equity",
+        symbol_count=2,
+        with_chart=True,
+        with_trades=True,
+        with_quick_take=False,
+    ),
+    RunShape(
+        id="crypto_without_chart_or_trades_with_quick_take",
+        asset_class="crypto",
+        symbol_count=1,
+        with_chart=False,
+        with_trades=False,
+        with_quick_take=True,
+    ),
+)
+
+
+def _generated_run(shape: RunShape) -> dict[str, Any]:
+    symbols = [_symbol() for _ in range(shape.symbol_count)]
+    start = fake.date_between(start_date="-3y", end_date="-1y")
+    end = fake.date_between(start_date=start, end_date="-1d")
+    total_return = fake.pyfloat(min_value=-60, max_value=180, right_digits=3)
+    card: dict[str, Any] = {
+        "title": f"{', '.join(symbols)} {fake.catch_phrase()}",
+        "symbols": symbols,
+        "strategy_label": fake.bs(),
+        "asset_class": shape.asset_class,
+        "date_range": f"{start.isoformat()} to {end.isoformat()}",
+        "status_label": "Completed",
+        "rows": [
+            {"label": "Total return", "value": f"{total_return:+.2f}%"},
+            {"label": fake.word().capitalize(), "value": fake.sentence(nb_words=4)},
+        ],
+        "benchmark_note": fake.sentence(nb_words=6),
+        "assumptions": [fake.sentence(nb_words=5) for _ in range(2)],
+        "actions": [{"type": "show_breakdown", "payload": {"note": fake.word()}}],
+    }
+    if shape.with_quick_take:
+        card["quick_take"] = f"Resumen: {fake.sentence(nb_words=8)} ñ é ü"
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": total_return,
+                "alpha": fake.pyfloat(
+                    min_value=-0.0001, max_value=0.0001, right_digits=8
+                ),
+            },
+            "risk": {"max_drawdown_pct": -abs(fake.pyfloat(min_value=0, max_value=45))},
+        },
+        "by_symbol": {
+            symbol: {"performance": {"total_return_pct": fake.pyfloat(right_digits=5)}}
+            for symbol in symbols
+        },
+    }
+    return {
+        "symbols": symbols,
+        "benchmark_symbol": _symbol(),
+        "metrics": metrics,
+        "config_snapshot": {
+            "template": fake.slug(),
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+            "parameters": {"window": fake.random_int(5, 200), "label": "ñandú"},
+        },
+        "card": card,
+        "chart": (
+            {
+                "kind": "equity_curve",
+                "currency": "USD",
+                "base_value": fake.random_int(1_000, 100_000),
+                "series": [
+                    {"date": fake.date_between(start, end).isoformat(), "value": v}
+                    for v in fake.pylist(6, False, [float])
+                ],
+                "markers": [],
+                "attribution": {"provider": fake.company()},
+            }
+            if shape.with_chart
+            else None
+        ),
+        "trades": (
+            [
+                {
+                    "symbol": symbols[0],
+                    "side": "buy",
+                    "qty": fake.pyfloat(min_value=0.001, max_value=50, right_digits=6),
+                }
+            ]
+            if shape.with_trades
+            else None
+        ),
+        "created_at": fake.date_time_between(
+            start_date="-4M", end_date="-2M", tzinfo=timezone.utc
+        ),
+    }
 
 
 def _seed_owner(connection) -> dict[str, str]:
     user_id = str(uuid4())
     conversation_id = str(uuid4())
-    email = f"backfill-{user_id[:8]}@argus.local"
+    email = fake.unique.email(domain="argus.local")
     with connection.cursor() as cursor:
         cursor.execute(
             "insert into auth.users (id, email) values (%s, %s)", (user_id, email)
@@ -68,31 +183,17 @@ def _seed_owner(connection) -> dict[str, str]:
             "insert into public.profiles (id, email) values (%s, %s)", (user_id, email)
         )
         cursor.execute(
-            "insert into public.conversations (id, user_id, title)"
-            " values (%s, %s, 'June backtest')",
-            (conversation_id, user_id),
+            "insert into public.conversations (id, user_id, title) values (%s, %s, %s)",
+            (conversation_id, user_id, fake.sentence(nb_words=3)),
         )
     return {"user_id": user_id, "conversation_id": conversation_id}
 
 
-def _seed_june_shaped_job(connection, owner) -> tuple[str, str]:
+def _seed_june_shaped_job(connection, owner, run: dict[str, Any]) -> tuple[str, str]:
     """The worker's pre-#201 output: run persisted, card without identity,
     job linked and succeeded, no evidence tuple."""
     run_id = str(uuid4())
     job_id = str(uuid4())
-    card = {
-        "title": "AAPL, MSFT buy and hold",
-        "symbols": ["AAPL", "MSFT"],
-        "strategy_label": "Buy and hold",
-        "date_range": "Jan 1, 2025 to Jun 5, 2026",
-        "status_label": "Completed",
-        "rows": [{"label": "Total return", "value": "+12.8%"}],
-        "benchmark_note": "SPY returned +26.1%",
-        "assumptions": ["No fees"],
-        "actions": [{"type": "show_breakdown", "payload": {}}],
-        "chart": {"kind": "equity_curve"},
-    }
-    finished = datetime(2026, 6, 10, 14, 18, tzinfo=timezone.utc)
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -100,29 +201,22 @@ def _seed_june_shaped_job(connection, owner) -> tuple[str, str]:
               (id, user_id, conversation_id, status, asset_class, symbols,
                allocation_method, benchmark_symbol, metrics, config_snapshot,
                conversation_result_card, chart, trades, created_at)
-            values (%s, %s, %s, 'completed', 'equity', %s, 'equal_weight', 'SPY',
+            values (%s, %s, %s, 'completed', %s, %s, 'equal_weight', %s,
                     %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s)
             """,
             (
                 run_id,
                 owner["user_id"],
                 owner["conversation_id"],
-                ["AAPL", "MSFT"],
-                json.dumps({"aggregate": {"performance": {"total_return_pct": 12.8}}}),
-                json.dumps({"template": "buy_and_hold", "start_date": "2025-01-01"}),
-                json.dumps(card),
-                json.dumps(
-                    {
-                        "kind": "equity_curve",
-                        "currency": "USD",
-                        "base_value": 10000,
-                        "series": [{"date": "2025-01-02", "value": 10000.5}],
-                        "markers": [],
-                        "attribution": {"provider": "test"},
-                    }
-                ),
-                json.dumps([{"symbol": "AAPL", "side": "buy", "qty": 1.25}]),
-                finished,
+                run["card"]["asset_class"],
+                run["symbols"],
+                run["benchmark_symbol"],
+                json.dumps(run["metrics"]),
+                json.dumps(run["config_snapshot"]),
+                json.dumps(run["card"]),
+                json.dumps(run["chart"]) if run["chart"] is not None else None,
+                json.dumps(run["trades"]) if run["trades"] is not None else None,
+                run["created_at"],
             ),
         )
         cursor.execute(
@@ -131,19 +225,21 @@ def _seed_june_shaped_job(connection, owner) -> tuple[str, str]:
               (id, user_id, conversation_id, operation_scope, idempotency_key,
                identity_hash, payload_hash, launch_payload, status, result_run_id,
                queued_at, started_at, finished_at, execution_metadata)
-            values (%s, %s, %s, 'chat.run_backtest', %s, 'sha256:identity',
-                    'sha256:payload', %s::jsonb, 'succeeded', %s, %s, %s, %s, %s::jsonb)
+            values (%s, %s, %s, 'chat.run_backtest', %s, %s, %s, %s::jsonb,
+                    'succeeded', %s, %s, %s, %s, %s::jsonb)
             """,
             (
                 job_id,
                 owner["user_id"],
                 owner["conversation_id"],
-                f"conf-{job_id[:8]}",
+                f"conf-{fake.uuid4()[:8]}",
+                f"sha256:{fake.sha256()}",
+                f"sha256:{fake.sha256()}",
                 json.dumps({"kind": "run_backtest_job", "request": {}}),
                 run_id,
-                finished,
-                finished,
-                finished,
+                run["created_at"],
+                run["created_at"],
+                run["created_at"],
                 json.dumps(
                     {
                         "shadow_mode": "true",
@@ -185,23 +281,24 @@ def _delete_identity(connection, user_id: str) -> None:
         cursor.execute("delete from auth.users where id = %s", (user_id,))
 
 
-def test_backfill_finalizes_a_june_shaped_job_until_the_owner_predicate_accepts_it() -> (
-    None
-):
+@pytest.mark.parametrize("shape", SHAPES, ids=[shape.id for shape in SHAPES])
+def test_backfill_finalizes_a_june_shaped_job_until_the_owner_predicate_accepts_it(
+    shape: RunShape,
+) -> None:
     module = _module()
-    with _connect() as connection:
+    run = _generated_run(shape)
+    with _connect() as connection, module.evidence_backfill_gateway(DSN) as gateway:
         owner = _seed_owner(connection)
         try:
-            job_id, run_id = _seed_june_shaped_job(connection, owner)
+            job_id, run_id = _seed_june_shaped_job(connection, owner, run)
             assert not _settled(connection, job_id)
             assert _job_source(connection, owner)["result_hydrateable"] is False
 
-            candidates = module.select_candidates(connection, limit=100)
+            candidates = gateway.select_candidates(limit=100)
             ours = [candidate for candidate in candidates if candidate.job_id == job_id]
             assert len(ours) == 1
             assert ours[0].result_run_id == run_id
 
-            gateway = _supabase_gateway()
             dry = module.run_backfill(
                 ours,
                 gateway=gateway,
@@ -212,12 +309,7 @@ def test_backfill_finalizes_a_june_shaped_job_until_the_owner_predicate_accepts_
             assert not _settled(connection, job_id)
 
             report = module.run_backfill(
-                ours,
-                gateway=gateway,
-                apply=True,
-                settled=lambda candidate_job_id: module.job_is_settled(
-                    connection, job_id=candidate_job_id
-                ),
+                ours, gateway=gateway, apply=True, settled=gateway.job_is_settled
             )
             assert report["status"] == "ready", report
             assert report["jobs"][0]["outcome"] == "finalized"
@@ -228,31 +320,52 @@ def test_backfill_finalizes_a_june_shaped_job_until_the_owner_predicate_accepts_
             with connection.cursor() as cursor:
                 cursor.execute(
                     "select e.id::text, e.idea_id::text, e.idea_version_id::text,"
-                    " e.source_conversation_id::text, r.conversation_result_card"
+                    " e.source_conversation_id::text, e.title, e.digest,"
+                    " r.conversation_result_card, r.chart, r.trades, r.metrics"
                     " from public.evidence_artifacts as e"
                     " join public.backtest_runs as r on r.id = e.source_run_id"
                     " where e.source_run_id = %s",
                     (run_id,),
                 )
-                artifact_id, idea_id, version_id, source_conversation, card = (
-                    cursor.fetchone()
-                )
-            assert artifact_id == identity["evidence_artifact_id"]
-            assert idea_id == identity["idea_id"]
-            assert version_id == identity["idea_version_id"]
+                (
+                    artifact_id,
+                    idea_id,
+                    version_id,
+                    source_conversation,
+                    title,
+                    digest,
+                    card,
+                    chart,
+                    trades,
+                    metrics,
+                ) = cursor.fetchone()
+            assert (artifact_id, idea_id, version_id) == (
+                identity["evidence_artifact_id"],
+                identity["idea_id"],
+                identity["idea_version_id"],
+            )
             assert source_conversation == owner["conversation_id"]
+            # The card gained exactly the identity; everything it held stays.
             assert card["evidence_artifact_id"] == artifact_id
             assert card["idea_id"] == idea_id
             assert card["idea_version_id"] == version_id
-            assert card["title"] == "AAPL, MSFT buy and hold"
-            assert card["rows"] == [{"label": "Total return", "value": "+12.8%"}]
+            assert {key: card[key] for key in run["card"]} == run["card"]
+            # The run's immutable payload replayed unchanged through the RPC.
+            assert chart == run["chart"]
+            assert trades == run["trades"]
+            assert metrics == run["metrics"]
+            # Evidence text derives from the card, not from anything typed here.
+            assert title == run["card"]["title"]
+            if shape.with_quick_take:
+                assert digest == run["card"]["quick_take"]
+            else:
+                assert run["card"]["rows"][0]["value"] in digest
 
             # A second pass has nothing left to do.
-            remaining = [
+            assert [
                 candidate
-                for candidate in module.select_candidates(connection, limit=100)
+                for candidate in gateway.select_candidates(limit=100)
                 if candidate.job_id == job_id
-            ]
-            assert remaining == []
+            ] == []
         finally:
             _delete_identity(connection, owner["user_id"])
