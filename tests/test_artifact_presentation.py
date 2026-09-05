@@ -70,12 +70,90 @@ def test_reader_never_exposes_private_prose_or_changes_storage(kind: str) -> Non
     assert payload == original
 
 
-def test_ordinary_text_does_not_become_an_artifact() -> None:
+@pytest.mark.parametrize(
+    "intent_kind", ["knowledge", "beginner_guidance", "unsupported_recovery"]
+)
+def test_ordinary_text_does_not_become_an_artifact(intent_kind, faker) -> None:
     payload = {
-        "content": "User-authored English",
-        "response_intent": {"kind": "knowledge"},
+        "content": faker.sentence(),
+        "response_intent": {"kind": intent_kind},
+        "result_fact_bank": {"symbols": ["AAPL"]},
     }
     assert reader_payload(payload) == payload
+
+
+def test_bare_legacy_fact_bank_still_hides_saved_result_prose(faker) -> None:
+    payload = {
+        "content": faker.sentence(),
+        "result_fact_bank": {"symbols": ["AAPL"]},
+    }
+    public = reader_payload(payload)
+    assert public["content"] == ""
+    assert public["result_fact_bank"] == payload["result_fact_bank"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["en", "es-419"])
+@pytest.mark.parametrize("fact_key", ["peak_date", "peak_value", "fee_bps"])
+async def test_factual_followup_survives_live_and_persisted_readers(
+    language: str, fact_key: str, faker
+) -> None:
+    from argus.agent_runtime.result_followups import result_followup_fact_bank
+    from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+        latest_result_answer_stage_result_if_applicable,
+    )
+    from argus.api.artifact_presentation import reader_chat_result
+    from argus.api.routers.conversations import _public_message_projection
+    from argus.domain.conversation_previews import project_conversation_preview
+
+    from tests.agent_runtime.test_latest_result_fact_answers import (
+        _decision,
+        _latest_result_reference,
+        _RecordingComposer,
+        _snapshot,
+    )
+
+    reference = _latest_result_reference()
+    fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
+    answer = f"{faker.sentence()} {fact}"
+    composer = _RecordingComposer(response=answer)
+    decision = _decision("result_card_fact").model_copy(
+        update={"result_followup_fact_key": fact_key}
+    )
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=_snapshot(),
+        current_user_message=faker.sentence(),
+        language=language,
+        compose_response_func=composer,
+    )
+    assert result is not None
+    assert composer.calls[0]["language"] == language
+    assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+    assert result.patch["response_intent"]["facts"][fact_key] == fact
+
+    live = reader_chat_result(result.patch, result.patch)
+    assert live["assistant_response"] == answer
+
+    message = Message(
+        id=faker.uuid4(),
+        conversation_id=faker.uuid4(),
+        role="assistant",
+        content=answer,
+        created_at=faker.date_time(tzinfo=timezone.utc),
+        metadata={
+            key: value
+            for key, value in result.patch.items()
+            if key != "assistant_response"
+        },
+    )
+    original = message.model_dump()
+    hydrated = _public_message_projection([message])[0]
+    assert hydrated.content == answer
+    preview = project_conversation_preview(hydrated.model_dump())
+    assert preview.kind == "text"
+    assert preview.text == answer
+    assert message.model_dump() == original
 
 
 def test_legacy_breakdown_gets_typed_intent_without_reading_saved_text() -> None:
