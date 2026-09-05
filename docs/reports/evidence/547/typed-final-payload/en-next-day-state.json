@@ -1,0 +1,238 @@
+{
+  "label": "en-next-day",
+  "mode": "next-day",
+  "language": "en",
+  "before": {
+    "owner": {
+      "user_id": "3332cb03-d6b7-4782-afb6-9b994903178f",
+      "conversation_id": "544143ce-ad11-4f83-ad6a-fef41feef2d0",
+      "period_start": "2026-09-05T02:41:29+00:00",
+      "period_end": "2026-09-12T02:41:29+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "3332cb03-d6b7-4782-afb6-9b994903178f",
+      "conversation_id": "544143ce-ad11-4f83-ad6a-fef41feef2d0",
+      "period_start": "2026-09-05T02:41:29+00:00",
+      "period_end": "2026-09-12T02:41:29+00:00"
+    },
+    "jobs": [
+      [
+        "708ab9d3-a317-4691-8416-4cde287af4fb",
+        "failed",
+        "account_conversion_required",
+        null
+      ]
+    ],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [
+    "Keep going with ArgusThis temporary chat has reached its simulation limit. It expires on Sep 11, 2026, 9:41 PM CDT. Create an account to continue now.Create your accountSign in to run another simulation.At least 8 characters.Sign upAlready have an account? Sign inBy signing up, you agree to our Terms and Privacy Policy."
+  ],
+  "errors": [],
+  "accountResponses": [
+    {
+      "user": {
+        "id": "3332cb03-d6b7-4782-afb6-9b994903178f",
+        "email": null,
+        "username": null,
+        "display_name": null,
+        "language": "en",
+        "locale": "en-US",
+        "theme": "dark",
+        "is_admin": false,
+        "onboarding": {
+          "completed": false,
+          "stage": "language_selection",
+          "language_confirmed": false,
+          "primary_goal": null
+        },
+        "created_at": "2026-09-05T02:41:29.401858Z",
+        "updated_at": "2026-09-05T02:41:29.401858Z"
+      },
+      "account_kind": "guest",
+      "guest": {
+        "expires_at": "2026-09-12T02:41:29Z",
+        "conversation_id": "544143ce-ad11-4f83-ad6a-fef41feef2d0",
+        "conversation_limit": 1,
+        "message_limit": 10,
+        "simulation_limit": 2,
+        "feedback_limit": 5
+      },
+      "capabilities": {
+        "can_create_additional_conversation": false,
+        "can_manage_conversation": false,
+        "can_save_decision": false,
+        "can_manage_account": false,
+        "can_use_omnisearch": true,
+        "can_search_current_workspace": true,
+        "can_use_grounded_discovery": true,
+        "can_submit_feedback": true
+      },
+      "public_account_access_enabled": true
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://127.0.0.1:55479/api/v1/memory/availability",
+      "status": 403,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/544143ce-ad11-4f83-ad6a-fef41feef2d0/messages?limit=100",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=50",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/me/usage",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/544143ce-ad11-4f83-ad6a-fef41feef2d0/activity",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/chat/stream",
+      "status": 200,
+      "method": "POST",
+      "request": "{\"conversation_id\":\"544143ce-ad11-4f83-ad6a-fef41feef2d0\",\"action\":{\"type\":\"run_backtest\",\"label\":\"Run backtest\",\"labelKey\":\"chat.confirmation.actions.run_backtest\",\"payload\":{\"artifact_id\":\"confirmation-f8dade9f-3c27-45e2-9886-d8047c268dce\",\"confirmation_id\":\"confirmation-f8dade9f-3c27-45e2-9886-d8047c268dce\",\"conversation_id\":\"544143ce-ad11-4f83-ad6a-fef41feef2d0\",\"launch_payload_hash\":\"fa83ba9176b6defb\"},\"presentation\":\"confirmation\"},\"language\":\"en\",\"viewport\":\"wide\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/analytics/guest-events",
+      "status": 200,
+      "method": "POST",
+      "request": "{\"event\":\"conversion_prompt_shown\",\"language\":\"en\",\"surface\":\"conversion_modal\",\"conversion_reason\":\"simulation_limit\",\"terminal_outcome\":\"shown\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=50",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/544143ce-ad11-4f83-ad6a-fef41feef2d0/messages?limit=100",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations/544143ce-ad11-4f83-ad6a-fef41feef2d0/activity",
+      "status": 200,
+      "method": "PATCH",
+      "request": "{\"action\":\"mark_read\",\"through_attention_cursor\":\"eyJpIjoiNzA4YWI5ZDMtYTMxNy00NjkxLTg0MTYtNGNkZTI4N2FmNGZiIiwiayI6ImJhY2t0ZXN0X2pvYiIsInYiOjF9\"}"
+    },
+    {
+      "url": "http://127.0.0.1:55479/api/v1/conversations?limit=30&archived=false&deleted=false",
+      "status": 200,
+      "method": "GET",
+      "request": null
+    }
+  ],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 0,
+            "remaining": 2,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ]
+}

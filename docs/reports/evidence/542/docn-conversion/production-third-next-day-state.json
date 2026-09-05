@@ -1,0 +1,107 @@
+{
+  "label": "production-third-next-day",
+  "mode": "run",
+  "before": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "210c1886-4459-4542-8ac1-586ee0456407",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "210c1886-4459-4542-8ac1-586ee0456407",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [],
+  "errors": [],
+  "usage_responses": [
+    {
+      "allowances": {
+        "messages": {
+          "hour": null,
+          "day": {
+            "limit": 10,
+            "used": 0,
+            "remaining": 10,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        },
+        "backtests": {
+          "hour": null,
+          "day": {
+            "limit": 2,
+            "used": 0,
+            "remaining": 2,
+            "period_end": "2026-09-06T00:00:00Z"
+          },
+          "guest_session": null,
+          "available_now": true,
+          "limiting_window": "day"
+        }
+      }
+    }
+  ],
+  "chat_stream_requests": [
+    {
+      "conversation_id": "210c1886-4459-4542-8ac1-586ee0456407",
+      "action": {
+        "type": "run_backtest",
+        "label": "Run backtest",
+        "labelKey": "chat.confirmation.actions.run_backtest",
+        "payload": {
+          "artifact_id": "confirmation-73e496dc-5c91-4101-9954-2c2e6b887ce1",
+          "confirmation_id": "confirmation-73e496dc-5c91-4101-9954-2c2e6b887ce1",
+          "conversation_id": "210c1886-4459-4542-8ac1-586ee0456407",
+          "launch_payload_hash": "fa83ba9176b6defb"
+        },
+        "presentation": "confirmation"
+      },
+      "language": "en",
+      "viewport": "wide"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
+import type { ChatFinalResponsePayload } from "./chat-final-response-payload";
 import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
 import type { DecisionState as RunDossierDecisionState } from "./run-dossier-contract";
 import type {
@@ -348,6 +349,7 @@ export type ChatStreamEvent =
 
 export type ChatFinalPayload = {
   code?: string;
+  final_response_payload?: ChatFinalResponsePayload | null;
   stage_outcome?: string;
   assistant_response?: string | null;
   assistant_prompt?: string | null;

@@ -3233,6 +3233,14 @@ completed in-stream run, the final payload includes `backtest_job` and omits
 }
 ```
 
+The final event may also carry nullable `final_response_payload`, the typed
+graph output. Its optional nullable `code` is the authoritative conversion
+signal for admission refusals (`account_conversion_required`). The frontend
+stream type imports `ChatFinalResponsePayload`, generated from the backend
+`FinalResponsePayload` model by
+`scripts/generate_chat_final_response_type.py`; do not hand-maintain a second
+field list. Clients accept legacy payloads without this object or code.
+
 When a turn reaches a recoverable assistant response without a completed card,
 the final payload and persisted assistant message metadata may include
 `retry_last_turn` and `recovery`. `recovery` is a typed status object with a
