@@ -7,12 +7,12 @@
 - Promotion target: `main`
 - Landing method: founder-owned GitHub merge commit, never squash or rebase
 - Approver: founder
-- Current production readback: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f` on the API and app; Workflow ready version `7d8ace4`.
+- Pre-promotion production readback: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f` on the API and app; Workflow ready version `7d8ace4`. The landed deployment is recorded under Deploy Proof.
 - Rollback target: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`
 - Corrected baseline selection: `7d8ace45e4ac717ffbfaf222cf66544c3355df6f`, deployed after PR #540 landed on September 3. The founder corrected the stale dispatch SHA on September 5 and authorized one new baseline run. The candidate scorecard remains unchanged.
 - Dispatch error retained in the record: the first baseline at `c7802b37f39772a1216514e37fb6ff2b63142181` measured the wrong tree because the dispatch named a stale production SHA. It is not valid evidence against current production. Its original scorecard remains committed at `docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-c7802b37.json`; it is excluded from the corrected comparison.
 - Commits ahead: 59 from current production, 86 from the dispatch's older baseline.
-- Measured-tree relationship: evidence, manifest, and the founder-authorized release-validator correction were added after measurement. The product tree remains unchanged from the measured candidate.
+- Measured-tree relationship: the original eval measured the candidate above. The subsequent factual-follow-up correction and its retained model-facing fingerprint are recorded below. The landed product tree is byte-identical to final promotion head `f55429b364f3d96208dcf9e0d960cf46dc4c114e` over `src/`, `web/app/`, `web/components/`, `web/lib/`, `web/public/`, `render.yaml`, and `supabase/`.
 
 ## What ships
 
@@ -154,25 +154,52 @@ Evidence: `docs/reports/evidence/2026-09-05-main-promotion/remaining-conversatio
 
 ## Deploy Proof
 
-Pending founder merge and deploy direction. The founder must merge the promotion PR using a merge commit. After landing, place the checkout at the landed SHA, rerun runbook steps 1 and 2, and run `production_migration_gate.py --candidate-sha <landed> --verify-landed-ref origin/main`. Require `status=pass` and landing verification `verified` before deployment.
+The founder merged [PR #552](https://github.com/lagarcess/argus/pull/552) at `2026-09-05T19:55:05Z`, producing `ee9c3491fa6219502f1e94abc5d9e661a06839d9`, and explicitly directed this production deployment. The operator checked out that exact landed SHA in detached mode and reran runbook steps 1 and 2. The initial local smoke stopped because an older local Next server occupied port 3100. After the founder directed stopping that server, the same smoke passed with `verification_status=ready`; no source change or timeout adjustment was made. The existing Python 3.10.20 environment was retained, and no env file was written.
 
-Then deploy API, app, and Workflow serially, waiting for each to become live. Release Workflow with `.github/render-env-sync.sh workflow-release <landed>`. Read back matching ready versions for all three before warmup and canaries.
+The landed-ref migration gate passed at `2026-09-05T20:06:33.330583Z`: `status=pass`, `landing_verification.status=verified`, resolved `origin/main` equal to the checkout SHA, and zero stop reasons. It read the ledger over verified TLS in a read-only session. Both migrations were already applied and were not reapplied. The known historical ledger reconciliation remains unchanged.
+
+Evidence directory: `docs/reports/evidence/2026-09-05-main-promotion/landed-deploy/`. The gate report is `production-migration-gate.json`; the successful local smoke is `local-smoke.txt`, with the original failed attempt retained in `local-smoke-initial-port-conflict.txt`.
+
+Deployment was serial, with each release command waiting for readiness before the next service started:
+
+| Service | Release started (UTC) | Ready version | Ready status | Deploy or version ID |
+| --- | --- | --- | --- | --- |
+| `argus-api` | `20:08:02` | `ee9c3491fa6219502f1e94abc5d9e661a06839d9` | `live`, finished `20:09:40` | `dep-dae7d8v40ujc73e4cev0` |
+| `argus-app` | `20:10:25` | `ee9c3491fa6219502f1e94abc5d9e661a06839d9` | `live`, finished `20:12:14` | `dep-dae7echt0dsc73948hig` |
+| `argus-backtests` | `20:12:55` | `ee9c349` | `ready`, release command completed `20:14:44` | `wfv-dae7fi0n74is73cmkslg` |
+
+API and app used pinned Render deploys. Workflow used `.github/render-env-sync.sh workflow-release ee9c3491fa6219502f1e94abc5d9e661a06839d9`. Render exposes the Workflow commit through its version-owned seven-character name, which matches the full API/app SHA. The combined readback at `2026-09-05T20:15:40.958863+00:00` passed for all three before warmup started. Command intervals and service readbacks are retained beside `three-service-ready-versions.json`.
+
+All three triggers remain `off`. No Blueprint sync, Render configuration change, branch-protection change, rollback, or product fix was performed. The API's existing real-workflow dispatch/execution flags were read back before deployment rather than rewritten.
 
 ## Post-Deploy Verification
 
-All items are pending deployment and must be reported separately from the eval.
+Verification stopped at step 12. `.github/warmup-render.sh --expect-mode real-workflow` exited 1. API health, forced product readiness, and frontend checks responded successfully. The stale-job scan returned `status=ready`, zero scanned/stale/unresolved jobs, and zero reconciliations. The subsequent release-config audit reported this additional, unaccepted failure:
 
-- [ ] All three services ready at the landed SHA.
-- [ ] Step 12 warmup with `--expect-mode real-workflow`.
-- [ ] Step 13 release-coherence canary; preserve and record the expected manual-trigger audit stop.
-- [ ] Step 13 authenticated-browser journey.
-- [ ] English guest with both free backtests used receives the account offer on the third attempt.
-- [ ] Spanish guest with both free backtests used receives the account offer on the third attempt.
-- [ ] Grounded research answer with sources in English.
-- [ ] Grounded research answer with sources in Spanish.
-- [ ] A real backtest completes and its result card renders.
-- [ ] Spanish result card, Quick Take, and assumptions contain no English prose.
-- [ ] Repeat canonical activity readback after deployment: no proof-seeder row or `workflows.proof` scope appears; the 121 historical checking conversations remain unchanged and attributed under PR #548's no-backfill decision. This criterion passed before deployment.
+```text
+forbidden argus-api:ENABLE_MARKET_DATA_CACHE unexpected_live_env
+```
+
+The same audit also reported the expected `autoDeployTrigger` mismatch (`expected=checksPass actual=off`) on all three services. That founder-locked manual setting was preserved. It does not account for the forbidden API env entry, so the stop is not dispositioned as only the expected manual-trigger exception. No configuration repair or further canary/browser work was attempted after this failure. The warmup did not reach its live Workflow proof.
+
+All ten requested checks are accounted for below. `FAIL (not run)` means the required acceptance proof is absent because execution stopped; it is not a demonstrated product defect. Paths are relative to `docs/reports/evidence/2026-09-05-main-promotion/landed-deploy/`.
+
+| # | Required check | Result | Evidence |
+| --- | --- | --- | --- |
+| 1 | Step 12 warmup, `--expect-mode real-workflow` | FAIL: exit 1, release-config audit | `warmup.txt`, `warmup-result.json` |
+| 2 | Step 13 release-coherence canary | FAIL (not run): stopped at step 12; expected manual-trigger discrepancy is recorded in warmup | `verification-status.json`, `warmup.txt` |
+| 3 | Step 13 authenticated-browser journey | FAIL (not run) | `verification-status.json` |
+| 4 | English exhausted guest receives an account offer on the third backtest | FAIL (not run) | `verification-status.json` |
+| 5 | Spanish exhausted guest receives an account offer on the third backtest | FAIL (not run) | `verification-status.json` |
+| 6 | Grounded research answer with sources, English | FAIL (not run) | `verification-status.json` |
+| 7 | Grounded research answer with sources, Spanish | FAIL (not run) | `verification-status.json` |
+| 8 | Real backtest completes and its result card renders | FAIL (not run) | `verification-status.json` |
+| 9 | Spanish result card, Quick Take, and assumptions contain no English prose | FAIL (not run) | `verification-status.json` |
+| 10 | Canonical activity readback excludes proof seeders and `workflows.proof`, with the attributed 121 historical checking conversations unchanged | FAIL (not run after deployment) | `verification-status.json` |
+
+The pre-deploy activity acceptance remains valid only for its recorded observation time. Its 121 historical checking conversations are an accepted remainder under [PR #548's no-backfill decision](https://github.com/lagarcess/argus/pull/548); their post-deploy count has not been measured. The warmup's stale-job scan is a different check and cannot substitute for `read_conversation_activity_sources`.
+
+Production is deployed at the landed SHA, but the promotion is not fully verified. The founder owns the next action, including any rollback decision.
 
 ## PR #552 Factual Follow-up Review
 
@@ -188,16 +215,16 @@ The replay uses eight committed synthetic QA messages and a canonical memory-onl
 
 The follow-up review at `5bc469b24a90110bd1b6a5dae0c980be0a3c27ac` identified the duplicated backend/frontend predicate. Commit `3fd260154db898dba3dbd55a2256248de73d9f42` removes the frontend classifier from the result fallback: the API projects its canonical `artifact_presentation_kind` on every read, and hydration consumes that field. The same two recorded live-provider answers were reloaded in English and Spanish against the restarted API and the committed frontend. Their public content is byte-for-byte unchanged, both have null presentation kind, and the browser retains the requested facts. Revalidation screenshots, public readback, source hashes, and red/green logs are under `factual-followup-review/owner/`. The original live evidence is retained because the answer generator and model-facing text did not change; no additional model calls were made. All 144 backend/transport/release tests, 1,558 frontend tests, and 237 mocked eval checks pass. The prompt fingerprint remains unchanged.
 
-At this evidence commit, final-head CI and a clean follow-up Codex review remain pending. Their terminal state belongs to the PR handoff. The PR stays non-draft throughout this review cycle.
+The final-head CI and follow-up Codex review subsequently returned clean before the founder merged. The [clean review](https://github.com/lagarcess/argus/pull/552#issuecomment-5554351480) and [terminal audit](https://github.com/lagarcess/argus/pull/552#issuecomment-5554359421) retain the handoff evidence. The PR remained non-draft throughout the review cycle.
 
 ## Release Decision
 
 - Promotion PR: [#552](https://github.com/lagarcess/argus/pull/552), with the P1 correction and bilingual browser evidence recorded above. The final PR head's GitHub checks and follow-up Codex review are the source for the merge handoff; both must be clean.
-- Founder merge: pending.
-- Deploy direction: pending.
-- Production code deployment: not performed.
+- Founder merge: completed as `ee9c3491fa6219502f1e94abc5d9e661a06839d9`.
+- Deploy direction: explicitly given by the founder after landing.
+- Production code deployment: all three services ready at the landed SHA; verification stopped at the step 12 release-config audit.
 - Blueprint sync and autodeploy change: not applicable and not attempted.
 - Pre-merge evaluation comparison: both candidate-only failures have accepted dispositions. The Spanish hint cannot reach the named consumers as null; the pre-existing missing Try next delivery remains a test-coverage observation without demonstrated user reachability. DCA is shared. The retained native candidate score remains 59 passed and three failed, and the corrected baseline remains 60 passed and two failed.
 - Required documentation tests: passed after correcting the #549 status-vocabulary gap; the total-tamper control still rejects incorrect counts.
-- Conversation activity acceptance: corrected pre-deploy criterion passed; 121 historical checking conversations remain deliberately under the founder-owned no-backfill decision. Repeat the same criterion after deployment.
-- The earlier eval dispositions remain accepted. The factual follow-up browser proof passes; final-head CI and the follow-up Codex review must still pass before the merge handoff. Founder merge, deployment, and post-deploy verification remain pending.
+- Conversation activity acceptance: corrected pre-deploy criterion passed; 121 historical checking conversations remain deliberately under the founder-owned no-backfill decision. The post-deploy readback was not run because verification stopped at warmup.
+- The earlier eval dispositions and factual follow-up browser proof remain accepted. The promotion is deployed but not fully verified. No rollback or repair was attempted after the warmup failure; the founder decides what happens next.

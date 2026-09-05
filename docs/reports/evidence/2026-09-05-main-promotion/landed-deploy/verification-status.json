@@ -1,0 +1,109 @@
+{
+  "recorded_at": "2026-09-05T20:22:42.153256+00:00",
+  "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "promotion_status": "deployed_verification_stopped",
+  "local_smoke": "pass",
+  "local_smoke_initial_failure": "port_3100_occupied; founder authorized stopping old local server; unchanged retry passed",
+  "migration_gate": "pass",
+  "landing_verification": "verified",
+  "three_service_versions": "pass",
+  "checks": [
+    {
+      "number": 1,
+      "id": "warmup",
+      "check": "Step 12 warmup with --expect-mode real-workflow",
+      "acceptance_result": "fail",
+      "execution_status": "failed",
+      "reason": "release_config_audit_failed",
+      "evidence": "warmup-result.json"
+    },
+    {
+      "number": 2,
+      "id": "release_coherence",
+      "check": "Step 13 release-coherence canary",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 3,
+      "id": "authenticated_browser",
+      "check": "Step 13 authenticated-browser journey",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 4,
+      "id": "guest_conversion_en",
+      "check": "English exhausted guest account offer on third backtest",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 5,
+      "id": "guest_conversion_es",
+      "check": "Spanish exhausted guest account offer on third backtest",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 6,
+      "id": "grounded_research_en",
+      "check": "Grounded research answer with sources in English",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 7,
+      "id": "grounded_research_es",
+      "check": "Grounded research answer with sources in Spanish",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 8,
+      "id": "real_backtest_card",
+      "check": "Real backtest completes and result card renders",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 9,
+      "id": "spanish_result_localization",
+      "check": "Spanish result card, Quick Take and assumptions contain no English prose",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    },
+    {
+      "number": 10,
+      "id": "conversation_activity",
+      "check": "Canonical activity reader excludes proof rows and retains attributed historical 121 checking conversations",
+      "acceptance_result": "fail",
+      "execution_status": "not_run",
+      "reason": "stopped_after_step_12_failure",
+      "evidence": "verification-status.json"
+    }
+  ],
+  "predeploy_activity_check": "passed at its recorded observation time only",
+  "postdeploy_activity_count": null,
+  "backfill_performed": false,
+  "rollback_performed": false,
+  "product_fixes": false,
+  "new_issues": false,
+  "stop_reason": "forbidden argus-api:ENABLE_MARKET_DATA_CACHE unexpected_live_env"
+}
