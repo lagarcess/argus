@@ -1,0 +1,23 @@
+{
+  "root": "/Users/garces/.codex/worktrees/b2c5/private-alpha-next/temp/docn-conversion/pr354",
+  "model_fields": [
+    "result",
+    "backtest_job",
+    "error",
+    "summary",
+    "result_card",
+    "explanation_context"
+  ],
+  "stage_patch": {
+    "error": "The backtest could not complete. Try again from the current setup or adjust it first.",
+    "code": "account_conversion_required"
+  },
+  "after_RunState_model_validate": {
+    "result": null,
+    "backtest_job": null,
+    "error": "The backtest could not complete. Try again from the current setup or adjust it first.",
+    "summary": null,
+    "result_card": null,
+    "explanation_context": null
+  }
+}
