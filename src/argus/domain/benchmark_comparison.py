@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from argus.domain.display_figure import display_figure
+
 BenchmarkComparisonClaim = Literal[
     "beat_benchmark",
     "lagged_benchmark",
@@ -54,8 +56,8 @@ def benchmark_comparison_from_delta(
 
 def _format_signed_percent(value: float) -> str:
     prefix = "+" if value >= 0 else ""
-    return f"{prefix}{value:.1f}%"
+    return f"{prefix}{display_figure(value):.1f}%"
 
 
 def _format_percentage_points(value: float) -> str:
-    return f"{value:.1f} percentage points"
+    return f"{display_figure(value):.1f} percentage points"

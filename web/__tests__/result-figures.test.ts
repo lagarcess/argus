@@ -2,13 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { createInstance } from "i18next";
 import en from "../public/locales/en/common.json";
 import es from "../public/locales/es-419/common.json";
-import parity from "../test-fixtures/tenth-figure-parity.json";
 import { nextExperimentReasonText } from "../lib/chat-next-experiments";
 import { resultCardPlaygroundFixtures } from "../lib/result-card-playground-fixtures";
-import { benchmarkComparisonView, signedPercentFigure, tenthFigure } from "../lib/result-figures";
+import { resultCardViewModel } from "../lib/result-card-view-model";
+import { benchmarkClaim, figureText, signedPercentText } from "../lib/result-figures";
 import { resultBreakdownText, resultQuickTakeText } from "../lib/result-readout-display";
 import { resultReadoutFacts } from "../lib/result-readout-facts";
-import { resultCardViewModel } from "../lib/result-card-view-model";
+import { formatRunDossierMetrics } from "../lib/run-dossier-items";
+import type { RunDossier } from "../lib/run-dossier-contract";
 
 const LANGUAGES = ["en", "es-419"] as const;
 
@@ -18,94 +19,105 @@ async function translator(language: string) {
   return i18n.t;
 }
 
-/** An engine-shaped fact bank: two-decimal returns beside the engine's own gap. */
-function bank(delta: number, totalReturn = 53.44, benchmarkReturn = 7.1, maxDrawdown = -18.35) {
+/** A reader payload as the backend ships it: two-decimal metrics beside the
+ * one-decimal figures the reader boundary rounded from them. */
+function bank(figures: Record<string, unknown>) {
   return {
     symbols: ["AAPL"], benchmark_symbol: "SPY", asset_class: "equity",
     config_snapshot: { template: "buy_and_hold", start_date: "2023-01-03", end_date: "2024-12-31" },
     metrics: { aggregate: {
-      performance: { total_return_pct: totalReturn, benchmark_return_pct: benchmarkReturn, delta_vs_benchmark_pct: delta },
-      risk: { max_drawdown_pct: maxDrawdown },
+      performance: { total_return_pct: 53.44, benchmark_return_pct: 7.1, delta_vs_benchmark_pct: 46.35 },
+      risk: { max_drawdown_pct: -18.35 },
     } },
+    figures,
   };
 }
 
-describe("one figure formatter for the result surfaces (#533)", () => {
-  test("prints exactly what the backend's fixed-point formatting prints", () => {
-    for (const row of parity.rows) {
-      expect(tenthFigure(row.value)).toBe(row.text);
-    }
+const ISSUE_FIGURES = {
+  total_return_pct: 53.4, benchmark_return_pct: 7.1, delta_vs_benchmark_pct: 46.4,
+  benchmark_comparison_claim: "beat_benchmark", max_drawdown_pct: -18.4,
+};
+
+describe("result figures are rounded once, by the backend (#533)", () => {
+  test("the client prints a figure's digits and only adds locale separators", () => {
+    expect(figureText(46.4, "en")).toBe("46.4");
+    expect(figureText(46.4, "es-419")).toBe("46.4");
+    expect(figureText(1234.6, "en")).toBe("1,234.6");
+    expect(figureText(1234.6, "es")).toBe("1234,6");
+    expect(signedPercentText(53.4, "en")).toBe("+53.4%");
+    expect(signedPercentText(-18.4, "es-419")).toBe("-18.4%");
+    expect(benchmarkClaim("lagged_benchmark")).toBe("lagged");
+    expect(benchmarkClaim("unknown")).toBeUndefined();
   });
 
-  test("Intl and toFixed are not that formatter, which is why one owner exists", () => {
-    // 46.15 sits below the decimal tie in binary, 46.25 is an exact tie.
-    expect(new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(46.15)).toBe("46.2");
-    expect((46.25).toFixed(1)).toBe("46.3");
-    expect(tenthFigure(46.15)).toBe("46.1");
-    expect(tenthFigure(46.25)).toBe("46.2");
+  test("engine metrics without backend figures are not printable, so the client never rounds them", async () => {
+    const t = await translator("en");
+    const facts = resultReadoutFacts(bank({}))!;
+    expect(facts.totalReturnPct).toBeUndefined();
+    expect(facts.benchmarkDeltaPct).toBeUndefined();
+    expect(facts.maxDrawdownPct).toBeUndefined();
+    const view = resultCardViewModel({ ...resultCardPlaygroundFixtures[0].result, readoutFacts: facts }, { t, locale: "en" });
+    expect(view.evidence.benchmark.value).toBe(t("chat.result_card.benchmark_unavailable"));
+    expect(JSON.stringify(view)).not.toContain("46.3");
+    expect(JSON.stringify(view)).not.toContain("53.44");
   });
 
-  test("the in-line claim is exactly the magnitude rounding to nothing", () => {
-    expect(benchmarkComparisonView(0.049)).toEqual({ claim: "matched", magnitude: "0.0" });
-    expect(benchmarkComparisonView(-0.049)).toEqual({ claim: "matched", magnitude: "0.0" });
-    expect(benchmarkComparisonView(0.05)).toEqual({ claim: "beat", magnitude: "0.1" });
-    expect(benchmarkComparisonView(-0.05)).toEqual({ claim: "lagged", magnitude: "0.1" });
-    expect(signedPercentFigure(53.44)).toBe("+53.4%");
-    expect(signedPercentFigure(-18.35)).toBe("-18.4%");
-  });
-
-  test.each(LANGUAGES)("the card, the Quick Take, the breakdown, and the Try next reason quote one gap in %s", async (language) => {
+  test.each(LANGUAGES)("the card, the Quick Take, the breakdown, and the Try next reason quote the backend gap in %s", async (language) => {
     const t = await translator(language);
-    for (const delta of [46.35, 46.34, 315.64, 46.25, -9.44, -0.75, 100.25]) {
-      const facts = resultReadoutFacts(bank(delta))!;
-      const result = { ...resultCardPlaygroundFixtures[0].result, symbols: ["AAPL"], readoutFacts: facts };
-      const view = resultCardViewModel(result, { t, locale: language });
-      const { magnitude, claim } = benchmarkComparisonView(delta);
-      expect(claim).toBe(delta > 0 ? "beat" : "lagged");
-      const cardText = view.evidence.benchmark.value;
-      expect(cardText).toBe(t(delta > 0 ? "chat.result_card.beat_by" : "chat.result_card.lagged_by", {
+    for (const [delta, claim] of [[46.4, "beat_benchmark"], [315.6, "beat_benchmark"], [9.4, "lagged_benchmark"], [1234.6, "beat_benchmark"]] as const) {
+      const signed = claim === "lagged_benchmark" ? -delta : delta;
+      const facts = resultReadoutFacts(bank({ ...ISSUE_FIGURES, delta_vs_benchmark_pct: signed, benchmark_comparison_claim: claim }))!;
+      const view = resultCardViewModel({ ...resultCardPlaygroundFixtures[0].result, symbols: ["AAPL"], readoutFacts: facts }, { t, locale: language });
+      const magnitude = figureText(delta, language);
+      const beat = claim === "beat_benchmark";
+      expect(view.evidence.benchmark.value).toBe(t(beat ? "chat.result_card.beat_by" : "chat.result_card.lagged_by", {
         value: t("chat.result_card.percentage_points", { value: magnitude }),
       }));
-      const quickTake = resultQuickTakeText(facts, t, language);
-      expect(quickTake).toContain(t(delta > 0 ? "chat.result_readout.beat" : "chat.result_readout.lagged", { symbol: "SPY", value: magnitude }));
+      expect(view.readout).toContain(t(beat ? "chat.result_readout.beat" : "chat.result_readout.lagged", { symbol: "SPY", value: magnitude }));
       expect(resultBreakdownText(facts, t, language)).toContain(magnitude);
-      const reason = nextExperimentReasonText({ code: delta > 0 ? "beat_benchmark" : "lost_to_benchmark", params: { points: Math.abs(delta) } }, t);
-      expect(reason).toBe(t(delta > 0 ? "chat.next_experiments.why.beat_benchmark" : "chat.next_experiments.why.lost_to_benchmark", { points: magnitude }));
-      // No surface may print the two-decimal engine value or a subtraction of
-      // the rounded returns (53.44 - 7.1 = 46.34 for the issue's own case).
-      for (const text of [cardText, quickTake, reason]) {
-        expect(text).not.toContain(String(delta));
-        if (delta === 46.35) expect(text).not.toContain("46.3");
-      }
+      const reason = nextExperimentReasonText({ code: beat ? "beat_benchmark" : "lost_to_benchmark", params: { points: delta } }, t, language);
+      expect(reason).toBe(t(beat ? "chat.next_experiments.why.beat_benchmark" : "chat.next_experiments.why.lost_to_benchmark", { points: magnitude }));
     }
   });
 
-  test.each(LANGUAGES)("returns and the worst drop read the same in the card and the Quick Take in %s", async (language) => {
+  test.each(LANGUAGES)("returns and the worst drop read the same everywhere in %s", async (language) => {
     const t = await translator(language);
-    const facts = resultReadoutFacts(bank(46.35))!;
+    const facts = resultReadoutFacts(bank(ISSUE_FIGURES))!;
     const view = resultCardViewModel({ ...resultCardPlaygroundFixtures[0].result, readoutFacts: facts }, { t, locale: language });
     expect(view.evidence.hero.detail).toContain("+53.4%");
     expect(view.evidence.worstDrop.value).toBe("-18.4%");
     expect(view.readout).toContain(t("chat.result_readout.total_return", { value: "+53.4%" }));
     expect(view.readout).toContain(t("chat.result_readout.drawdown", { value: "-18.4%" }));
-    expect(view.readout).not.toContain("53.44");
-    expect(view.readout).not.toContain("18.35");
     expect(resultBreakdownText(facts, t, language)).toContain(t("chat.result_readout.benchmark_return", { symbol: "SPY", value: "+7.1%" }));
+    for (const raw of ["53.44", "46.35", "18.35"]) expect(JSON.stringify(view)).not.toContain(raw);
   });
 
-  test.each(LANGUAGES)("a gap that rounds to nothing is in line on every surface in %s", async (language) => {
+  test.each(LANGUAGES)("the backend's in-line claim is in line on every surface in %s", async (language) => {
     const t = await translator(language);
-    const facts = resultReadoutFacts(bank(0.03))!;
+    const facts = resultReadoutFacts(bank({ ...ISSUE_FIGURES, delta_vs_benchmark_pct: 0, benchmark_comparison_claim: "matched_benchmark" }))!;
     const view = resultCardViewModel({ ...resultCardPlaygroundFixtures[0].result, readoutFacts: facts }, { t, locale: language });
     expect(view.evidence.benchmark.value).toBe(t("chat.result_card.in_line_with", { symbol: "SPY" }));
     expect(view.readout).toContain(t("chat.result_readout.matched", { symbol: "SPY" }));
-    expect(view.readout).not.toContain("0.03");
   });
 
-  test("the Try next reason prints the engine drop the way the card does", async () => {
+  test("the dossier grid prints the same backend figure as the Quick Take beside it", async () => {
     const t = await translator("en");
-    expect(nextExperimentReasonText({ code: "deep_drawdown", params: { drawdown: -22.35 } }, t)).toBe("Worst drop was -22.4%");
-    expect(nextExperimentReasonText({ code: "beat_benchmark", params: { points: 4.2 } }, t)).toBe("Beat the benchmark by 4.2 points");
-    expect(nextExperimentReasonText(null, t)).toBe("");
+    const dossier = {
+      outcome: { metrics: [{ name: "delta_vs_benchmark_pct", value: 46.2 }, { name: "max_drawdown_pct", value: -18.4 }, { name: "win_rate", value: 0.57 }] },
+    } as unknown as RunDossier;
+    expect(formatRunDossierMetrics(dossier, t, "en")).toEqual([
+      { name: "Against benchmark", value: "+46.2%" },
+      { name: "Worst drop", value: "-18.4%" },
+      { name: "Win rate", value: "57.0%" },
+    ]);
+    const facts = resultReadoutFacts(bank({ ...ISSUE_FIGURES, delta_vs_benchmark_pct: 46.2 }))!;
+    expect(resultQuickTakeText(facts, t, "en")).toContain("46.2 percentage points");
+  });
+
+  test("the Try next reason prints the backend drop the way the card does", async () => {
+    const t = await translator("en");
+    expect(nextExperimentReasonText({ code: "deep_drawdown", params: { drawdown: -22.4 } }, t, "en")).toBe("Worst drop was -22.4%");
+    expect(nextExperimentReasonText({ code: "beat_benchmark", params: { points: 4.2 } }, t, "en")).toBe("Beat the benchmark by 4.2 points");
+    expect(nextExperimentReasonText(null, t, "en")).toBe("");
   });
 });

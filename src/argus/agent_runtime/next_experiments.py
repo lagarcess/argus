@@ -15,6 +15,7 @@ from argus.domain.benchmark_comparison import (
     BenchmarkComparison,
     benchmark_comparison_from_delta,
 )
+from argus.domain.display_figure import display_figure
 from argus.domain.engine_launch.result_facts import structured_next_experiments
 
 NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1"
@@ -303,10 +304,13 @@ def _row_reason(
     benchmark_delta: float | None,
     max_drawdown: float | None,
 ) -> dict[str, Any] | None:
-    # Params carry engine figures at persisted precision; the client prints
-    # them through the same formatter as the result card.
+    # Params are display figures: rounded once here, printed verbatim by the
+    # client with locale separators, the same digits the result card shows.
     if max_drawdown is not None and max_drawdown <= _DEEP_DRAWDOWN_THRESHOLD_PCT:
-        return {"code": "deep_drawdown", "params": {"drawdown": max_drawdown}}
+        return {
+            "code": "deep_drawdown",
+            "params": {"drawdown": display_figure(max_drawdown)},
+        }
     if benchmark_delta is None or comparison.claim not in {
         "beat_benchmark",
         "lagged_benchmark",
@@ -315,7 +319,7 @@ def _row_reason(
     code = (
         "beat_benchmark" if comparison.claim == "beat_benchmark" else "lost_to_benchmark"
     )
-    return {"code": code, "params": {"points": abs(benchmark_delta)}}
+    return {"code": code, "params": {"points": display_figure(abs(benchmark_delta))}}
 
 
 def offered_kinds_from_thread_metadata(metadata: dict[str, Any] | None) -> list[str]:

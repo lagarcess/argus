@@ -1014,16 +1014,23 @@ Clients must use `status` and `rows[].key` for behavior. They must not infer
 card state from translated display labels. Result actions that mutate state must
 reference a canonical run id. `result_fact_bank` is a backend-provided,
 run-derived context object for result follow-ups; it is not a second metrics
-source of truth. Legacy `saved_strategy_id` metadata remains readable after
-reload, but clients must not use it to expose a new write action.
+source of truth. On every public read it also carries `figures`, the
+one-decimal display projection of its own `metrics` (`total_return_pct`,
+`benchmark_return_pct`, `delta_vs_benchmark_pct`, `benchmark_comparison_claim`,
+`max_drawdown_pct`, plus `gross_total_return_pct` and `net_total_return_pct`
+when costs were modeled). Public runs carry the same `figures` beside their
+`metrics`. The backend rounds once, with the same rounding its own prose uses;
+clients print those digits verbatim with locale separators and grouping and
+never round `metrics` for display. Legacy `saved_strategy_id` metadata remains
+readable after reload, but clients must not use it to expose a new write action.
 
 Result Quick Take, result breakdown, and dossier outcome prose render from the
 same typed run facts in the current workspace language. The figures those
 surfaces share with the result card (returns, the benchmark gap, worst drop)
-print through one client formatter at one decimal, mirroring the backend's own
-fixed-point formatting, and the benchmark gap is always the engine's
-`delta_vs_benchmark_pct`. No reader subtracts two rounded returns or rounds the
-gap a second time, so the card and the prose beside it cannot show two numbers
+are the backend's `figures`: rounded once, from the engine's own
+`delta_vs_benchmark_pct` and returns, and printed verbatim in the workspace
+locale. No reader subtracts two rounded returns or rounds a figure a second
+time, so the card, the prose beside it, and the dossier cannot show two numbers
 for one fact. Original LLM result prose remains immutable audit/model context,
 not a presentation fallback.
 Public result messages carry empty `content`; live result finals carry empty
@@ -4097,10 +4104,10 @@ localized row label, `why` is a typed reason (`code` + `params`, e.g.
 `beat_benchmark` with `points`), and prebaked rows add `detail` (a short
 suffix such as the pre-resolved peer symbol) plus `send_text` (the exact
 localized sentence a tap submits as an ordinary user turn). Reason params are
-engine facts at persisted precision: `points` is the magnitude of the run's
-`delta_vs_benchmark_pct` and `drawdown` is its `max_drawdown_pct`; a gap inside
-the in-line cut carries no benchmark reason. The client prints them through
-the result card's own figure formatter, so the reason never quotes a different
+one-decimal display figures the backend rounded: `points` is the magnitude of
+the run's `delta_vs_benchmark_pct` and `drawdown` is its `max_drawdown_pct`; a
+gap inside the in-line cut carries no benchmark reason. The client prints them
+verbatim in the workspace locale, so the reason never quotes a different
 number than the card above it. The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.

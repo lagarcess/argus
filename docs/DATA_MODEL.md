@@ -549,8 +549,10 @@ Represents individual messages within a conversation.
   projections omit them and voice only typed facts from the canonical run.
   Existing `result_fact_bank` is a read projection, not a second metrics owner;
   missing historical transport facts are repaired on read using owner and
-  conversation scoped run identity. No language-specific rows or backfill are
-  needed. Failed evidence lookup yields localized unavailable text, never
+  conversation scoped run identity. Its `figures` (and a public run's
+  `figures`) are derived on read from the persisted two-decimal `metrics`,
+  never stored: one backend rounding, no client rounding, no backfill. No
+  language-specific rows or backfill are needed. Failed evidence lookup yields localized unavailable text, never
   saved-prose fallback. Python and TypeScript AST guards pin private readers.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,

@@ -731,7 +731,7 @@ export default function ChatMessage({
                         : rowLabel;
                     // One result-level reason; captioning every row repeats it.
                     const whyText =
-                      rowIndex === 0 ? nextExperimentReasonText(row.why, t) : "";
+                      rowIndex === 0 ? nextExperimentReasonText(row.why, t, locale) : "";
                     return (
                       <NextMoveRow
                         key={row.kind}

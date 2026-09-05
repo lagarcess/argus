@@ -104,7 +104,7 @@ def test_deterministic_readout_and_try_next_reason_quote_the_engine_gap() -> Non
     assert "46.3" not in readout
     assert result.patch["next_experiments"]["rows"][0]["why"] == {
         "code": "beat_benchmark",
-        "params": {"points": ENGINE_DELTA_PCT},
+        "params": {"points": 46.4},
     }
 
 
@@ -118,7 +118,10 @@ def test_relative_truth_follows_the_engine_gap_not_the_rounded_returns(
     # 53.44 - 7.1 stays 46.34 whatever the engine gap says; the claim the LLM
     # draft is held to must come from the gap itself.
     context = _explanation_context(delta)
-    assert _quick_take_relative_truth(result_payload={}, explanation_context=context) == claim
+    assert (
+        _quick_take_relative_truth(result_payload={}, explanation_context=context)
+        == claim
+    )
 
 
 def test_an_engine_block_without_its_gap_makes_no_comparison_claim() -> None:

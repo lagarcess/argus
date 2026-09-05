@@ -2270,6 +2270,11 @@ components:
               type: object
             type: array
           - type: 'null'
+        figures:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
       type: object
       required:
       - id

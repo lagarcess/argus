@@ -1,46 +1,55 @@
 /**
- * The one place a shared result figure becomes text (#533).
+ * Locale rendering for result figures the backend already rounded (#533).
  *
- * The engine persists returns and the benchmark gap to two decimals; the
- * result card, the Quick Take, the breakdown, and the Try next reason all
- * print them to one. That rounding happens here and nowhere else, so two
- * surfaces on one screen cannot show two numbers for one fact.
+ * Every figure the result card, the Quick Take, the breakdown, the Try next
+ * reason, and the dossier share (returns, the benchmark gap, worst drop,
+ * modeled-cost returns) reaches the client at one decimal, rounded once by the
+ * backend and carried as `figures` beside the engine metrics. Nothing here
+ * rounds: it prints the digits it was given with the workspace locale's
+ * decimal separator and grouping, so no two surfaces can print two numbers
+ * for one fact.
  */
 
-/**
- * Python's fixed-point formatting, which every backend-voiced copy of these
- * figures uses: the exact binary value, correctly rounded, ties to even.
- * `toFixed` rounds the same exact value but breaks a tie away from zero, and
- * at one decimal the only exact ties are the .25 fractions.
- */
-export function tenthFigure(value: number): string {
-  const magnitude = Math.abs(value);
-  const text =
-    magnitude % 1 === 0.25
-      ? (Math.floor(magnitude) + 0.2).toFixed(1)
-      : magnitude.toFixed(1);
-  return value < 0 || Object.is(value, -0) ? `-${text}` : text;
+const FIGURE_DECIMALS = 1;
+
+export function figureText(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: FIGURE_DECIMALS,
+    maximumFractionDigits: FIGURE_DECIMALS,
+  }).format(value);
 }
 
-export function signedPercentFigure(value: number): string {
-  return `${value > 0 ? "+" : ""}${tenthFigure(value)}%`;
+export function percentText(value: number, locale: string): string {
+  return `${figureText(value, locale)}%`;
+}
+
+export function signedPercentText(value: number, locale: string): string {
+  return `${value > 0 ? "+" : ""}${percentText(value, locale)}`;
 }
 
 export type BenchmarkComparisonClaim = "beat" | "lagged" | "matched";
 
+const BACKEND_CLAIMS: Record<string, BenchmarkComparisonClaim> = {
+  beat_benchmark: "beat",
+  lagged_benchmark: "lagged",
+  matched_benchmark: "matched",
+};
+
+/** The backend's comparison claim; anything else is no claim at all. */
+export function benchmarkClaim(value: unknown): BenchmarkComparisonClaim | undefined {
+  return typeof value === "string" ? BACKEND_CLAIMS[value] : undefined;
+}
+
 export type BenchmarkComparisonView = {
   claim: BenchmarkComparisonClaim;
-  /** Unsigned, one decimal, in percentage points. */
+  /** Unsigned, one decimal, in percentage points, in the workspace locale. */
   magnitude: string;
 };
 
-/**
- * In line means the gap rounds to nothing at the printed precision. That is
- * the same 0.05-point cut the backend claim uses, and deriving the claim from
- * the printed digits means the two can never disagree on one card.
- */
-export function benchmarkComparisonView(deltaPct: number): BenchmarkComparisonView {
-  const magnitude = tenthFigure(Math.abs(deltaPct));
-  if (magnitude === "0.0") return { claim: "matched", magnitude };
-  return { claim: deltaPct > 0 ? "beat" : "lagged", magnitude };
+export function benchmarkComparisonView(
+  claim: BenchmarkComparisonClaim,
+  deltaPct: number,
+  locale: string,
+): BenchmarkComparisonView {
+  return { claim, magnitude: figureText(Math.abs(deltaPct), locale) };
 }

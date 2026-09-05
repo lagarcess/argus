@@ -59,15 +59,15 @@ def test_winning_run_leads_with_exploration() -> None:
     assert first["why"]["code"] == "beat_benchmark"
 
 
-def test_reason_carries_the_engine_gap_at_persisted_precision() -> None:
-    # The client prints this figure with the result card's own formatter; the
-    # sidecar must neither round it nor rebuild it from two rounded returns.
+def test_reason_carries_the_engine_gap_as_a_display_figure() -> None:
+    # Rounded once here, from the engine gap, never rebuilt from two rounded
+    # returns; the client prints the digits it receives.
     sidecar = next_experiments_sidecar(_BUY_AND_HOLD_FACTS, benchmark_delta=46.35)
 
     assert sidecar is not None
     assert sidecar["rows"][0]["why"] == {
         "code": "beat_benchmark",
-        "params": {"points": 46.35},
+        "params": {"points": 46.4},
     }
 
 

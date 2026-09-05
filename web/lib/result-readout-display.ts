@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import { contributionPhrase } from "./contribution-period-display";
 import { compactDateRangeDisplay } from "./date-range-display";
 import { formatCurrency } from "./result-card-display";
-import { benchmarkComparisonView, signedPercentFigure } from "./result-figures";
+import { benchmarkComparisonView, signedPercentText } from "./result-figures";
 import type { ResultReadoutFacts } from "./result-readout-facts";
 import { strategyDisplayLabel } from "./strategy-display";
 import { resultRuleGroupText } from "./result-readout-rules";
@@ -18,18 +18,18 @@ export function resultQuickTakeText(facts: ResultReadoutFacts | null | undefined
   const lines = [t(period ? "chat.result_readout.tested_period" : "chat.result_readout.tested", {
     strategy, symbols: facts.symbols.join(", ") || t("chat.result_readout.assets_unavailable"), period,
   }), t(facts.strategyType === "dca_accumulation" ? "chat.result_readout.contribution_return" : "chat.result_readout.total_return", {
-    value: signedPercentFigure(facts.totalReturnPct),
+    value: signedPercentText(facts.totalReturnPct, locale),
   })];
-  if (facts.benchmarkSymbol && facts.benchmarkDeltaPct !== undefined) {
-    // The engine's gap, printed by the same formatter the card uses.
-    const comparison = benchmarkComparisonView(facts.benchmarkDeltaPct);
+  if (facts.benchmarkSymbol && facts.benchmarkDeltaPct !== undefined && facts.benchmarkClaim !== undefined) {
+    // The backend's gap and claim, printed the way the card prints them.
+    const comparison = benchmarkComparisonView(facts.benchmarkClaim, facts.benchmarkDeltaPct, locale);
     lines.push(t(`chat.result_readout.${comparison.claim}`, {
       symbol: facts.benchmarkSymbol, value: comparison.magnitude,
     }));
   } else {
     lines.push(t("chat.result_readout.comparison_unavailable"));
   }
-  if (facts.maxDrawdownPct !== undefined) lines.push(t("chat.result_readout.drawdown", { value: signedPercentFigure(facts.maxDrawdownPct) }));
+  if (facts.maxDrawdownPct !== undefined) lines.push(t("chat.result_readout.drawdown", { value: signedPercentText(facts.maxDrawdownPct, locale) }));
   return lines.join(" ");
 }
 
@@ -42,14 +42,14 @@ export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined
     value: contributionPhrase(formatCurrency(facts.recurringContribution, locale), facts.contributionPeriod, t),
   }));
   if (facts.benchmarkSymbol && facts.benchmarkReturnPct !== undefined) details.push(t("chat.result_readout.benchmark_return", {
-    symbol: facts.benchmarkSymbol, value: signedPercentFigure(facts.benchmarkReturnPct),
+    symbol: facts.benchmarkSymbol, value: signedPercentText(facts.benchmarkReturnPct, locale),
   }));
   const costs = facts.costs;
   if (costs && costs.fee_bps != null && costs.slippage_bps != null) details.push(t("chat.result_readout.costs", {
     fee: figure(costs.fee_bps, locale), slippage: figure(costs.slippage_bps, locale),
   }));
-  if (costs?.gross_total_return_pct != null) details.push(t("chat.result_readout.gross_return", { value: signedPercentFigure(costs.gross_total_return_pct) }));
-  if (costs?.net_total_return_pct != null) details.push(t("chat.result_readout.net_return", { value: signedPercentFigure(costs.net_total_return_pct) }));
+  if (costs?.gross_total_return_pct != null) details.push(t("chat.result_readout.gross_return", { value: signedPercentText(costs.gross_total_return_pct, locale) }));
+  if (costs?.net_total_return_pct != null) details.push(t("chat.result_readout.net_return", { value: signedPercentText(costs.net_total_return_pct, locale) }));
   return [readout, ...details, t("chat.result_readout.historical")].join("\n\n");
 }
 

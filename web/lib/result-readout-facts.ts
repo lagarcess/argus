@@ -1,8 +1,13 @@
 import type { ExecutionCostEvidence } from "@/components/chat/types";
+import { benchmarkClaim, type BenchmarkComparisonClaim } from "./result-figures";
 import { canonicalStrategyType } from "./strategy-display";
 import { resultRuleGroups, type ResultRuleGroup } from "./result-readout-rules";
 
-/** Reader-safe projection. Deliberately has no place for retained source prose. */
+/**
+ * Reader-safe projection. Deliberately has no place for retained source prose.
+ * Every percentage below is a display figure the backend rounded once; the
+ * client prints it verbatim and never reads the two-decimal metrics to show it.
+ */
 export type ResultReadoutFacts = {
   symbols: string[];
   strategyType?: string;
@@ -11,6 +16,7 @@ export type ResultReadoutFacts = {
   totalReturnPct?: number;
   benchmarkReturnPct?: number;
   benchmarkDeltaPct?: number;
+  benchmarkClaim?: BenchmarkComparisonClaim;
   maxDrawdownPct?: number;
   startingCapital?: number;
   recurringContribution?: number;
@@ -40,17 +46,16 @@ export function resultReadoutFacts(value: unknown): ResultReadoutFacts | null {
   const config = record(bank.config_snapshot);
   const parameters = record(config.resolved_parameters);
   const strategy = record(config.resolved_strategy);
-  const metrics = record(bank.metrics);
-  const aggregate = record(metrics.aggregate);
-  const performance = record(aggregate.performance);
-  const risk = record(aggregate.risk);
+  // The backend's one-decimal display figures; a bank without them has no
+  // printable figure, because printing the engine metrics would mean rounding.
+  const figures = record(bank.figures);
   const strategyType = canonicalStrategyType(strategy.strategy_type)
     ?? canonicalStrategyType(config.template === "rsi_mean_reversion" ? "indicator_threshold" : config.template)
     ?? canonicalStrategyType(parameters.strategy_type);
   const symbols = Array.isArray(bank.symbols)
     ? bank.symbols.filter((symbol): symbol is string => typeof symbol === "string" && Boolean(symbol.trim()))
     : [];
-  const totalReturnPct = number(performance.total_return_pct);
+  const totalReturnPct = number(figures.total_return_pct);
   if (symbols.length === 0 && totalReturnPct === undefined && !strategyType) return null;
   const dateRange = record(config.date_range);
   const start = string(config.start_date) ?? string(dateRange.start);
@@ -71,10 +76,11 @@ export function resultReadoutFacts(value: unknown): ResultReadoutFacts | null {
     dateRange: start && end ? { start, end } : undefined,
     benchmarkSymbol: string(bank.benchmark_symbol) ?? string(parameters.benchmark_symbol) ?? string(config.benchmark_symbol),
     totalReturnPct,
-    benchmarkReturnPct: number(performance.benchmark_return_pct),
-    // This is the engine's comparison. Presentation must never recompute it.
-    benchmarkDeltaPct: number(performance.delta_vs_benchmark_pct),
-    maxDrawdownPct: number(risk.max_drawdown_pct) ?? number(performance.max_drawdown_pct),
+    benchmarkReturnPct: number(figures.benchmark_return_pct),
+    // The engine's comparison, rounded by the backend. Never recomputed here.
+    benchmarkDeltaPct: number(figures.delta_vs_benchmark_pct),
+    benchmarkClaim: benchmarkClaim(figures.benchmark_comparison_claim),
+    maxDrawdownPct: number(figures.max_drawdown_pct),
     startingCapital: strategyType === "dca_accumulation"
       ? number(parameters.starting_capital) ?? number(strategy.initial_capital)
       : number(config.starting_capital) ?? number(parameters.starting_capital) ?? number(strategy.capital_amount),
@@ -89,8 +95,8 @@ export function resultReadoutFacts(value: unknown): ResultReadoutFacts | null {
     rules: resultRuleGroups(strategy.rule_spec ?? parameters.rule_spec ?? record(config.parameters).rule_spec),
     costs: feeBps !== undefined || slippageBps !== undefined ? {
       fee_bps: feeBps, slippage_bps: slippageBps,
-      gross_total_return_pct: number(costData.gross_total_return_pct),
-      net_total_return_pct: number(costData.net_total_return_pct),
+      gross_total_return_pct: number(figures.gross_total_return_pct),
+      net_total_return_pct: number(figures.net_total_return_pct),
       benchmark_treatment: costData.benchmark_treatment === "same_modeled_costs" ? "same_modeled_costs" : undefined,
     } : undefined,
   };
