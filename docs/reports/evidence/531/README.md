@@ -1,5 +1,47 @@
 # Persisted artifact language: #531, #530, #528
 
+## Review reconciliation onto `9117fa7f`
+
+The founder requested a non-draft review round after the earlier handoff below.
+Integration `9117fa7f06c7f5a7326c6341d96c780b66f540db` was merged one way as
+`7eb10e2f8101d71d60641e1aad3cfbbd18121fa1`; no published history was rebased.
+Ready for review is a review state, not a waiver of the historical live/DCA
+acceptance limits recorded below. No merge or deploy is authorized.
+
+- #550 and #549 were already reconciled in the previous handoff. The new
+  interval adds #548's scope registry/migration and #547's conversion payload.
+- The sole textual conflict was in `web/lib/argus-api.ts` imports. Both the
+  typed conversation preview and generated `ChatFinalResponsePayload` imports
+  are retained. `ChatFinalPayload.final_response_payload` derives from #547's
+  generated type, and the backend's nullable `code` survives graph/checkpoint
+  transport. No duplicate hand-written nested payload shape was restored.
+- Semantic overlap: #547 shares the final SSE contract and its frontend
+  consumer; #548 shares gateway/job lifecycle owners and the candidate database
+  schema. Its proof-only reclassification migration is preserved unchanged.
+  No environment variable, prompt, or model input changed in this reconciliation.
+- Fresh offline `tests/evals/`: **260 passed, 2 skipped** (live-only suites).
+  All 62 cases keep #549's delivered-outcome assertions. This lane changes no
+  eval fixture, assertion, expected-failure mask, or fixture hash; no assertion
+  needed weakening to accommodate typed localization. The old live scorecard
+  remains historical and is not reinterpreted under the new harness.
+- Full `tests/agent_runtime/` and `tests/research/`: **2,289 passed, 2 failed**.
+  The failures are inherited, as explicitly identified by the founder:
+  `test_detected_turn_language_reaches_discovery_composer` and
+  `test_knowledge_turn_with_resolved_asset_is_not_interrogated`. Neither test
+  nor its implementation was changed in this reconciliation.
+- Focused payload, scope/migration, fingerprint, and private-prose checks:
+  **39 passed**. The scope AST sweep finds no production literal outside the
+  canonical registry. Generated payload type check passes without regeneration.
+- Frontend: **1,547 passed**. The focused conversion/localization/type-consumer
+  check passed 31 tests. Modularity passes on the reconciled tree.
+- Prompt fingerprint remains **unchanged**: `([], [], [])`, with all three
+  freeze tests passing. No scorecard or fingerprint was regenerated.
+
+Fresh browser provenance and final CI/Codex review results are recorded with
+the current PR handoff. The sections below preserve the earlier evidence and
+its original commit identities; their historical draft status is not the
+current GitHub review state.
+
 ## Scope and identity
 
 - PR: https://github.com/lagarcess/argus/pull/551, targeting `codex/private-alpha-next`.

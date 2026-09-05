@@ -88,3 +88,23 @@ in #549 only under `tests/evals/`; application source, frontend configuration,
 and reader contracts are byte-identical to the captured `5b3f020b` tree. The
 same browser evidence is explicitly retained. The stronger evaluation harness
 does not turn the prior live scorecard into a current-harness measurement.
+
+## Review after 9117 integration
+
+`review-9117-en-authored-es-workspace.png` repeats the provider-free hydration
+proof at merge head `7eb10e2f8101d71d60641e1aad3cfbbd18121fa1` after integration
+parent `9117fa7f06c7f5a7326c6341d96c780b66f540db` brought in #548 scope
+and migration changes plus #547 generated final-payload code.
+
+The headed browser loaded the same recorded English-authored META result from
+an immutable archive of the exact merge head. QA selected Spanish through
+Settings, fully reloaded the same conversation, and observed a Spanish
+`LECTURA RÁPIDA` sourced from typed facts. The saved English result body did
+not render, and the browser reported zero console errors. The replay loaded no
+credentials and made no model, market-data-provider, hosted-database, DCA, or
+backtest call.
+
+`review-9117-provenance.json` records the merge parents, screenshot digest,
+recorded-source digest, replay-harness adjustment, reader-boundary source
+hashes, and the generated final-payload source hashes reviewed in this
+reconciliation.
