@@ -145,6 +145,31 @@ set to `live_provider`, and the successful calendar probe.
 Expected-fail cases never count as passes. They are reported separately so
 known broken behavior stays visible.
 
+### Availability versus prose quality (#365)
+
+Runtime composer attempts come from the captured route receipts, not from
+matching recovery wording. When its chat attempts all fail or are skipped,
+the requested prose judgment is `unavailable`, with `pass: null` and no failed
+quality criteria. The localized recovery is retained as `observed` text; it
+was not sent to the judge. A successful fallback remains subject to the ordinary
+rubric. Missing text without outage evidence is still a product failure.
+An unavailable structured judge response is also a missing measurement, not
+an honesty zero. Typed assertions always run, including during an outage.
+
+An outage-only case has status `infrastructure_error`. It blocks the sanctioned
+gate, remains in the scorecard with its route receipts and costs, and contributes
+neither a pass nor a zero to the quality denominator. With no quality measurements,
+the category's `pass_rate` is `null`. A simultaneous typed failure remains `failed`
+with the infrastructure evidence beside it. Expected-fail masks cannot hide an
+outage. Historical schema-v2 scorecards are not rewritten; new scorecards add
+the infrastructure count and per-result `infrastructure_errors`.
+
+There is no automatic retry or paid A/B in this policy. Diagnose the recorded
+availability failure and explicitly authorize any later rerun; an unavailable
+measurement cannot establish either a product regression or a quality pass.
+The deterministic transport reproduction in `test_measurement_availability.py`
+costs $0 and does not certify current live-provider quality.
+
 ## Expected-Fail Cases
 
 An expected-fail case must be tagged with an issue number and scoped
