@@ -1,0 +1,77 @@
+{
+  "issue": 533,
+  "captured_at": "2026-09-05",
+  "browser": "headless Playwright Chromium (web/node_modules/@playwright/test), viewport 1200x1500 at 2x",
+  "before": {
+    "sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+    "subject": "Merge pull request #551 from lagarcess/codex/531-localized-backend-prose",
+    "source_tree_kind": "git archive of the exact integration SHA, node_modules linked from the lane worktree, served with next dev --webpack because Turbopack rejects a node_modules link outside the project root",
+    "screenshots": {
+      "before-en.png": {
+        "sha256": "3f51c49e6719231c753123cf91d21d9f3f8d77368ed777c16153314c25a7ef9d",
+        "dimensions": "2400x3000",
+        "card_benchmark": "Beat by 315.6 percentage points",
+        "card_worst_drop": "-18.4%",
+        "quick_take": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was 369.5%. It finished 315.64 percentage points ahead of SPY. The worst drop was -18.35%.",
+        "try_next_reason": "Beat the benchmark by 315.6 points"
+      },
+      "before-es-419.png": {
+        "sha256": "151d27fd0163022ef4f275e580d4b71b64563e8fd4e5df7f783249d7307a4eb4",
+        "dimensions": "2400x3000",
+        "card_benchmark": "Superó por 315.6 puntos porcentuales",
+        "card_worst_drop": "-18.4%",
+        "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de 369.5%. Terminó 315.64 puntos porcentuales por encima de SPY. La peor caída fue de -18.35%.",
+        "try_next_reason": "Superó la referencia por 315.6 puntos"
+      }
+    }
+  },
+  "after": {
+    "sha": "4288c5f588cdacc845826afe2c0d84051be0a767",
+    "subject": "fix(result): one owner for the benchmark gap the card and its prose print",
+    "source_tree_kind": "lane worktree at the exact fix commit, served with next dev",
+    "screenshots": {
+      "after-en.png": {
+        "sha256": "67e52310f11420109d7e0e1ae912cae928d08c126228a4cbbeb536c44613fa58",
+        "dimensions": "2400x3000",
+        "card_benchmark": "Beat by 315.6 percentage points",
+        "card_worst_drop": "-18.4%",
+        "quick_take": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was +369.5%. It finished 315.6 percentage points ahead of SPY. The worst drop was -18.4%.",
+        "try_next_reason": "Beat the benchmark by 315.6 points"
+      },
+      "after-es-419.png": {
+        "sha256": "dc23020a8a46af98645316a8d86b7b72735d9e2c1985d085551bf8abe8f8a3f1",
+        "dimensions": "2400x3000",
+        "card_benchmark": "Superó por 315.6 puntos porcentuales",
+        "card_worst_drop": "-18.4%",
+        "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.",
+        "try_next_reason": "Superó la referencia por 315.6 puntos"
+      }
+    }
+  },
+  "recorded_result_source": "docs/reports/evidence/411/browser/en-discovery-messages.json",
+  "recorded_result_source_sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+  "recorded_engine_facts": {
+    "total_return_pct": 369.5,
+    "benchmark_return_pct": 53.86,
+    "delta_vs_benchmark_pct": 315.64,
+    "max_drawdown_pct": -18.35,
+    "recorded_try_next_points": 315.6
+  },
+  "replay_harness_sha256": "767cc51543c3411eac06a055cfffb8f8e89e87b22e68b79454d27555901bd207",
+  "capture_driver_sha256": "82b92ef880094420206c850b56b976ace58476b96bb32a176d93ab0d0ceafc87",
+  "backend_environment": "memory persistence, memory checkpointer, mock auth, synthetic market-data mode, job dispatch and workflow execution off, every provider key blanked in the harness process",
+  "frontend_environment": "NEXT_PUBLIC_MOCK_AUTH=true, NEXT_PUBLIC_ENABLE_SPANISH=true, NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false, API URL pointed at the harness; no Supabase values and no env file",
+  "browser_steps": [
+    "open /chat under mock auth",
+    "PATCH /me with the workspace language and locale, set the i18next storage key, reload",
+    "expand Recents and open the recorded META conversation through normal hydration",
+    "wait for the Quick take label, then save the main pane's visible text and a full-page screenshot",
+    "repeat for the other language in a fresh browser context"
+  ],
+  "console_errors": {"before-en": 0, "before-es-419": 0, "after-en": 0, "after-es-419": 0},
+  "provider_calls": 0,
+  "credential_files_loaded": false,
+  "hosted_database_reads_or_writes": 0,
+  "chat_model_dca_or_backtest_actions": 0,
+  "auth_or_session_identifiers_in_evidence": false
+}
