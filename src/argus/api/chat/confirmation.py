@@ -916,9 +916,10 @@ def _sync_runtime_checkpoint_with_card(
         if not isinstance(values, dict) or not values:
             return False
         strategy = StrategySummary.model_validate(payload["strategy"])
-        updates: dict[str, Any] = {
-            "confirmation_payload": dict(payload),
-        }
+        # The pending card's checkpoint owners are the snapshot and the run
+        # state. The workflow-level ``confirmation_payload`` channel is the
+        # intra-turn launch hand-off and must not carry a card (#440).
+        updates: dict[str, Any] = {}
         snapshot = values.get("latest_task_snapshot")
         if isinstance(snapshot, dict):
             snapshot = TaskSnapshot.model_validate(snapshot)

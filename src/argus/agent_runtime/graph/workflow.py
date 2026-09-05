@@ -103,6 +103,9 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "assistant_response",
         "requested_field",
         "optional_parameter_choices",
+        # The launch hand-off between interpret and execute lives one turn;
+        # a stale value here is published over the turn's own card (#440).
+        "confirmation_payload",
         "backtest_job",
         "failure_classification",
         "final_response_payload",

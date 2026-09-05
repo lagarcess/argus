@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.state.models import (
+    ConfirmationPayload,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -70,12 +71,15 @@ def _seed_checkpoint(
         current_user_message="Buy and hold NFLX with $10,000 through 2023",
         recent_thread_history=[],
     )
+    # A confirmation turn leaves the card on the run state and the snapshot.
+    # The workflow-level ``confirmation_payload`` channel is the turn-scoped
+    # launch hand-off and stays empty after such a turn (#440).
+    run_state.confirmation_payload = ConfirmationPayload.model_validate(payload)
     asyncio.run(
         workflow.aupdate_state(
             {"configurable": {"thread_id": conversation_id}},
             {
                 "latest_task_snapshot": snapshot,
-                "confirmation_payload": dict(payload),
                 "run_state": run_state,
             },
         )
@@ -93,8 +97,9 @@ def _checkpoint_values(workflow: Any, conversation_id: str) -> dict[str, Any]:
 def test_conversational_turn_after_direct_edit_reads_edited_values() -> None:
     """A fallback-less turn reads the checkpoint verbatim, so the in-place
     write path must have updated it: the pending strategy, the active
-    reference's embedded payload, and the confirmation payload channel all
-    carry the edited values, never the pre-edit ones."""
+    reference's embedded payload, and the run state's payload all carry the
+    edited values, never the pre-edit ones. The workflow-level channel is
+    not one of the card's owners and stays untouched."""
     client = _client()
     conversation = _conversation(client)
     payload = _confirmation_payload()
@@ -123,9 +128,11 @@ def test_conversational_turn_after_direct_edit_reads_edited_values() -> None:
         "the reference's embedded payload is what the interpreter treats as "
         "the effective strategy; it must not describe the pre-edit card"
     )
-    channel_payload = values.get("confirmation_payload")
-    assert isinstance(channel_payload, dict)
-    assert channel_payload["strategy"]["capital_amount"] == 25000
+    assert values.get("confirmation_payload") is None, (
+        "the workflow-level channel is the intra-turn launch hand-off; a card "
+        "parked there outlives its turn and is published over every later "
+        "card in the conversation (#440)"
+    )
     run_state = values.get("run_state")
     assert run_state is not None
     assert run_state.confirmation_payload is not None
@@ -177,9 +184,11 @@ def test_late_sync_converges_to_the_persisted_card() -> None:
         "a delayed stale sync must converge to the persisted card, not "
         "clobber the newer edit"
     )
-    channel_payload = values.get("confirmation_payload")
-    assert isinstance(channel_payload, dict)
-    assert channel_payload["strategy"]["capital_amount"] == 25000
+    assert values.get("confirmation_payload") is None
+    run_state = values.get("run_state")
+    assert run_state is not None
+    assert run_state.confirmation_payload is not None
+    assert run_state.confirmation_payload.strategy.capital_amount == 25000
 
 
 def test_edit_without_a_checkpoint_still_succeeds() -> None:
