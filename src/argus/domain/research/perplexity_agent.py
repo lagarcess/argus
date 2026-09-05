@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 from urllib.parse import urlparse
@@ -45,10 +47,6 @@ from argus.domain.research.pricing import validated_research_cost_usd
 PERPLEXITY_AGENT_URL = "https://api.perplexity.ai/v1/agent"
 
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
-# Output item types that are tool results. Recorded responses carry exactly one
-# finance_results item per finance_search call and one search_results item per
-# web search; a response that ran no tool carries neither.
-_TOOL_RESULT_ITEM_TYPES = frozenset({"finance_results", "search_results"})
 
 
 class PerplexityAgentClient:
@@ -180,43 +178,19 @@ def _packet_from_response(
     if not isinstance(output, list):
         raise ResearchUnavailableError("malformed_response", "missing output list")
     text_blocks: list[str] = []
-    categories: list[str] = []
-    tickers: list[str] = []
-    sources: list[ResearchSource] = []
-    pairs: list[ResearchNamePair] = []
-    tool_results: list[str] = []
+    parsed = _ParsedToolResults()
     for item in output:
         if not isinstance(item, dict):
             continue
         item_type = item.get("type")
-        if item_type in _TOOL_RESULT_ITEM_TYPES:
-            tool_results.append(str(item_type))
-        if item_type == "finance_results":
-            for value in item.get("categories") or []:
-                if isinstance(value, str) and value not in categories:
-                    categories.append(value)
-            for value in item.get("tickers") or []:
-                if isinstance(value, str) and value not in tickers:
-                    tickers.append(value)
-            for result in item.get("results") or []:
-                if not isinstance(result, dict):
-                    continue
-                category = result.get("category")
-                if isinstance(category, str) and category not in categories:
-                    categories.append(category)
-                for url in result.get("sources") or []:
-                    _append_public_source(sources, {"url": url})
-                if category == "tickers_lookup":
-                    pairs.extend(_pairs_from_lookup(str(result.get("content") or "")))
-                elif category == "etf_holdings":
-                    pairs.extend(_pairs_from_holdings(str(result.get("content") or "")))
-        elif item_type == "search_results":
-            # Web search citations live in their own output items: title,
-            # url, and the publisher's own date. This is the channel the
-            # sector and comparison shapes fill.
-            for result in item.get("results") or []:
-                if isinstance(result, dict):
-                    _append_public_source(sources, result)
+        if not isinstance(item_type, str):
+            continue
+        reader = _TOOL_RESULT_READERS.get(item_type)
+        if reader is not None:
+            # Reading a tool result is what records it as retrieval evidence;
+            # the two facts share one owner and cannot drift.
+            parsed.tool_results.append(item_type)
+            reader(item, parsed)
         elif item_type == "message":
             for chunk in item.get("content") or []:
                 if not isinstance(chunk, dict) or chunk.get("type") != "output_text":
@@ -228,14 +202,14 @@ def _packet_from_response(
                 # same chunk instead of as search_results items.
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
-                        _append_public_source(sources, annotation)
+                        _append_public_source(parsed.sources, annotation)
     usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
     answer = _sanitize_answer("\n\n".join(text_blocks))
     if not answer:
         raise ResearchUnavailableError("empty_answer")
     seen: set[str] = set()
     unique_pairs = []
-    for pair in pairs:
+    for pair in parsed.pairs:
         key = pair.symbol.upper()
         if key in seen:
             continue
@@ -243,14 +217,66 @@ def _packet_from_response(
         unique_pairs.append(pair)
     return ResearchPacket(
         answer_markdown=answer[:MAX_ANSWER_CHARS],
-        categories=tuple(categories[:12]),
-        tickers=tuple(tickers[:MAX_PACKET_TICKERS]),
-        sources=tuple(sources[:MAX_PACKET_SOURCES]),
+        categories=tuple(parsed.categories[:12]),
+        tickers=tuple(parsed.tickers[:MAX_PACKET_TICKERS]),
+        sources=tuple(parsed.sources[:MAX_PACKET_SOURCES]),
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
-        tool_results=tuple(tool_results),
+        tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
     )
+
+
+@dataclass
+class _ParsedToolResults:
+    """Everything the tool result items of one response contribute."""
+
+    categories: list[str] = field(default_factory=list)
+    tickers: list[str] = field(default_factory=list)
+    sources: list[ResearchSource] = field(default_factory=list)
+    pairs: list[ResearchNamePair] = field(default_factory=list)
+    tool_results: list[str] = field(default_factory=list)
+
+
+def _read_finance_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
+    for value in item.get("categories") or []:
+        if isinstance(value, str) and value not in parsed.categories:
+            parsed.categories.append(value)
+    for value in item.get("tickers") or []:
+        if isinstance(value, str) and value not in parsed.tickers:
+            parsed.tickers.append(value)
+    for result in item.get("results") or []:
+        if not isinstance(result, dict):
+            continue
+        category = result.get("category")
+        if isinstance(category, str) and category not in parsed.categories:
+            parsed.categories.append(category)
+        for url in result.get("sources") or []:
+            _append_public_source(parsed.sources, {"url": url})
+        if category == "tickers_lookup":
+            parsed.pairs.extend(_pairs_from_lookup(str(result.get("content") or "")))
+        elif category == "etf_holdings":
+            parsed.pairs.extend(_pairs_from_holdings(str(result.get("content") or "")))
+
+
+def _read_search_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
+    # Web search citations live in their own output items: title, url, and
+    # the publisher's own date. This is the channel the sector and
+    # comparison shapes fill.
+    for result in item.get("results") or []:
+        if isinstance(result, dict):
+            _append_public_source(parsed.sources, result)
+
+
+# The one owner of which output items are tool results. Recorded responses
+# carry exactly one finance_results item per finance_search call and one
+# search_results item per web search; a response that ran no tool carries
+# neither. A kind read here is retrieval evidence whether or not the invoice
+# arrived.
+_TOOL_RESULT_READERS: dict[str, Callable[[dict[str, Any], _ParsedToolResults], None]] = {
+    "finance_results": _read_finance_results,
+    "search_results": _read_search_results,
+}
 
 
 def _usage_from_response(

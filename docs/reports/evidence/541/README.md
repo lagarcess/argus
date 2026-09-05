@@ -102,3 +102,30 @@ Coverage added:
 - Branch: `claude/issue-541-retrieval-billing-3b57ee`, opened against
   `codex/private-alpha-next`. A promotion measuring exactly `e3b98690` is in
   flight; this PR queues behind it and is not merged by the lane.
+
+## Review round 1
+
+Codex P1 on the first head `f8106b78` (comment 3941179356): the frozenset of
+tool result item types was a second enumerated owner beside the parsing
+branches, so the two could drift and a newly read kind could be missing from
+the retrieval record. Verified live at head: the comment's original commit
+equalled the PR head.
+
+Fix: one reader table, `_TOOL_RESULT_READERS`, both parses a tool result kind
+and, by being consulted, records it as retrieval evidence. The frozenset is
+gone; the two branch bodies moved verbatim into readers. A new test is
+parametrized over that table, so a kind registered there is covered the
+moment it exists, and asserts the invariant that the bare item proves
+retrieval with no invoice and no sources.
+
+Sweep within the lane's diff: the frozenset was the only enumeration this lane
+added. The pre-existing provider-key list in `_tool_invocation_count` is
+invoice parsing, not retrieval evidence, and is unchanged. Ruff caught one
+stale local in the message-annotation branch during the extraction; the
+existing annotation test in the citations suite covers that line and passes.
+
+Evidence at the review-fix head: research suite **353 passed**; wider
+hermetic gate **2436 passed**; ruff clean; mypy clean on the research domain
+and API writers with the same 8 pre-existing `research_grounded.py` errors as
+the base; modularity budget clean; `repro.py` output identical to
+[repro-after.txt](repro-after.txt).

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from argus.agent_runtime.research_grounded import _retrieval_happened
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import (
+    _TOOL_RESULT_READERS,
     PerplexityAgentClient,
     _sanitize_answer,
 )
@@ -515,3 +517,23 @@ def test_every_tool_result_item_is_kept_in_provider_order() -> None:
     packet = client.run_research("q", RESEARCH_CONFIG_SPECS["balanced"])
 
     assert packet.tool_results == ("finance_results", "search_results")
+
+
+@pytest.mark.parametrize("kind", sorted(_TOOL_RESULT_READERS))
+def test_every_kind_the_parser_reads_is_retrieval_evidence_without_an_invoice(
+    kind: str,
+) -> None:
+    """The invariant behind #541: reading a tool result is what records it,
+    so a kind the parser learns to read can never be missing from the
+    retrieval record. Parametrized over the parser's own table so a new
+    reader is covered the moment it is registered."""
+    response = agent_response(invocations=0)
+    del response["usage"]
+    response["output"].insert(1, {"type": kind})
+    client, _ = _client([response])
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.tool_results == (kind,)
+    assert not packet.sources, "the bare item must prove retrieval on its own"
+    assert _retrieval_happened(packet)
