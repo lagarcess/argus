@@ -5,6 +5,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        response: true
+        clarification_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: needs_clarification
       assets: ["AAPL"]
@@ -19,6 +22,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["AAPL"]
@@ -39,6 +44,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["TGT", "WMT", "COST"]
@@ -59,6 +66,8 @@ cases:
     user_language: en
     ui_language: en
     expected:
+      offered:
+        launch_matches_expected: true
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA"]
@@ -152,6 +161,8 @@ cases:
                 end: "2024-12-31"
               capital_amount: 1000
     expected:
+      offered:
+        launch_matches_expected: true
       intent: backtest_execution
       capability_verdict: executable
       assets: ["AAPL"]

@@ -65,6 +65,7 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
             "status": result["status"],
             "expected_fail_issue": expected_fail_issue_for_result(result),
             "failed_checks": result["failed_checks"],
+            "infrastructure_errors": result["infrastructure_errors"],
         }
         for result in blocking_eval_results(results)
     ]
