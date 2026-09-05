@@ -16,6 +16,7 @@ from typing import Any
 from loguru import logger
 
 from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
+from argus.api.artifact_presentation import reader_run
 from argus.api.chat.backtest_jobs import (
     REAL_BACKTEST_JOB_KIND,
     _utcnow_iso,
@@ -113,9 +114,7 @@ def link_shadow_backtest_job_result(
                     job_id=context.created_job_id,
                     standing_status=str(linked.get("status") or ""),
                 )
-            return ResultLinkOutcome(
-                publishable=True, reason="linked", job=dict(linked)
-            )
+            return ResultLinkOutcome(publishable=True, reason="linked", job=dict(linked))
         logger.warning(
             "Result link refused; publication is withheld so a restored "
             "card can never sit beside a result",
@@ -205,7 +204,7 @@ def apply_result_link_outcome(
     context_packets = result_card.get("context_packets")
     if isinstance(context_packets, list):
         metadata["context_packets"] = context_packets
-    runtime_result["run"] = run.model_dump(mode="json")
+    runtime_result["run"] = reader_run(run).model_dump(mode="json")
     return ResultPublication(publishable=True, result_card=result_card)
 
 

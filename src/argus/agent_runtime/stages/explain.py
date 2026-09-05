@@ -162,11 +162,11 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         rule_summary=result_rule_summary(result_facts),
     )
 
-    total_return, benchmark_return, same_period = _resolved_return_metrics(
+    returns = _resolved_return_metrics(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    if total_return is None or benchmark_return is None:
+    if returns.total_return is None or returns.benchmark_return is None:
         response = _build_incomplete_result_response(
             profile=profile,
             tested_summary=tested_summary,
@@ -191,10 +191,11 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         explanation_context=explanation_context,
     ).get("benchmark_symbol")
     response = _build_response(
-        total_return=total_return,
-        benchmark_return=benchmark_return,
+        total_return=returns.total_return,
+        benchmark_return=returns.benchmark_return,
+        benchmark_delta=returns.benchmark_delta,
         benchmark_symbol=str(benchmark_symbol or ""),
-        same_period=same_period,
+        same_period=returns.same_period,
         profile=profile,
         tested_summary=tested_summary,
         assumption_summary=assumption_summary,
@@ -208,8 +209,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         stage_patch=_with_next_experiments(
             {"assistant_response": response},
             result_facts=result_facts,
-            total_return=total_return,
-            benchmark_return=benchmark_return,
+            benchmark_delta=returns.benchmark_delta,
             max_drawdown=_max_drawdown_metric(result_payload),
             recent_user_messages=_recent_user_messages(state),
             previously_offered_kinds=state.prior_next_experiment_kinds,
@@ -222,8 +222,7 @@ def _with_next_experiments(
     patch: dict[str, Any],
     *,
     result_facts: dict[str, Any],
-    total_return: float | None = None,
-    benchmark_return: float | None = None,
+    benchmark_delta: float | None = None,
     max_drawdown: float | None = None,
     recent_user_messages: list[str] | None = None,
     previously_offered_kinds: list[str] | None = None,
@@ -231,8 +230,7 @@ def _with_next_experiments(
 ) -> dict[str, Any]:
     sidecar = next_experiments_sidecar(
         result_facts,
-        total_return=total_return,
-        benchmark_return=benchmark_return,
+        benchmark_delta=benchmark_delta,
         max_drawdown=max_drawdown,
         recent_user_messages=recent_user_messages,
         previously_offered_kinds=previously_offered_kinds,
@@ -364,10 +362,6 @@ async def _llm_explanation(
     allowed_next_experiments = structured_next_experiments(result_facts)
     benchmark_contract = _benchmark_contract(
         strategy=strategy,
-        result_payload=result_payload,
-        explanation_context=explanation_context,
-    )
-    total_return, benchmark_return, same_period = _resolved_return_metrics(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
@@ -542,16 +536,16 @@ def _quick_take_fact_bank(
     if benchmark_symbol:
         fact_bank["benchmark_symbol"] = str(benchmark_symbol)
 
-    total_return, benchmark_return, _ = _resolved_return_metrics(
+    returns = _resolved_return_metrics(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    if total_return is not None:
-        fact_bank["total_return"] = _format_percent_points(total_return)
-    if benchmark_return is not None:
-        fact_bank["benchmark_return"] = _format_percent_points(benchmark_return)
-    if total_return is not None and benchmark_return is not None:
-        comparison = benchmark_comparison_from_delta(total_return - benchmark_return)
+    if returns.total_return is not None:
+        fact_bank["total_return"] = _format_percent_points(returns.total_return)
+    if returns.benchmark_return is not None:
+        fact_bank["benchmark_return"] = _format_percent_points(returns.benchmark_return)
+    if returns.benchmark_delta is not None:
+        comparison = benchmark_comparison_from_delta(returns.benchmark_delta)
         fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
             comparison.magnitude_points,
             language=language,
@@ -588,14 +582,11 @@ def _quick_take_relative_truth(
     result_payload: dict[str, Any],
     explanation_context: dict[str, Any],
 ) -> QuickTakeRelativeClaim:
-    total_return, benchmark_return, _ = _resolved_return_metrics(
+    returns = _resolved_return_metrics(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    if total_return is None or benchmark_return is None:
-        return "unknown"
-    delta = total_return - benchmark_return
-    return benchmark_comparison_from_delta(delta).claim
+    return benchmark_comparison_from_delta(returns.benchmark_delta).claim
 
 
 def _format_percent_points(value: float) -> str:
@@ -1239,6 +1230,7 @@ def _build_response(
     *,
     total_return: float,
     benchmark_return: float,
+    benchmark_delta: float | None,
     benchmark_symbol: str,
     same_period: bool,
     profile: ResponseProfile | None,
@@ -1261,6 +1253,7 @@ def _build_response(
         return _result_readout_markdown(
             total_return=total_return,
             benchmark_return=benchmark_return,
+            benchmark_delta=benchmark_delta,
             benchmark_symbol=benchmark_symbol,
             same_period=same_period,
             tested_summary=tested_summary,
@@ -1276,6 +1269,7 @@ def _build_response(
     return _result_readout_markdown(
         total_return=total_return,
         benchmark_return=benchmark_return,
+        benchmark_delta=benchmark_delta,
         benchmark_symbol=benchmark_symbol,
         same_period=same_period,
         tested_summary=tested_summary,
@@ -1293,6 +1287,7 @@ def _result_readout_markdown(
     *,
     total_return: float,
     benchmark_return: float,
+    benchmark_delta: float | None,
     benchmark_symbol: str,
     same_period: bool,
     tested_summary: str | None,
@@ -1304,13 +1299,12 @@ def _result_readout_markdown(
     next_check_override: str | None,
     compact: bool,
 ) -> str:
-    delta = total_return - benchmark_return
     takeaway = _readout_takeaway(
         total_return=total_return,
         benchmark_return=benchmark_return,
         benchmark_symbol=benchmark_symbol,
         same_period=same_period,
-        delta=delta,
+        delta=benchmark_delta,
         execution_note=execution_note,
     )
     tested = _tested_readout_line(
@@ -1343,7 +1337,7 @@ def _readout_takeaway(
     benchmark_return: float,
     benchmark_symbol: str,
     same_period: bool,
-    delta: float,
+    delta: float | None,
     execution_note: str | None,
 ) -> str:
     benchmark_context = _benchmark_context_phrase(same_period)
@@ -1353,20 +1347,25 @@ def _readout_takeaway(
         return (
             "No trade opened. The strategy stayed in cash because its entry "
             f"condition never fired; it returned {total_return:.1f}% while the "
-            f"{benchmark_label} returned {benchmark_return:.1f}% {benchmark_context}; "
-            f"it {relative}"
+            f"{benchmark_label} returned {benchmark_return:.1f}% {benchmark_context}"
+            + (f"; it {relative}" if relative else ".")
         )
     return (
         f"The strategy returned {total_return:.1f}% while {benchmark_label} returned "
-        f"{benchmark_return:.1f}% {benchmark_context}, so it {relative}"
+        f"{benchmark_return:.1f}% {benchmark_context}"
+        + (f", so it {relative}" if relative else ".")
     )
 
 
-def _relative_performance_sentence(delta: float) -> str:
-    if abs(delta) < 0.05:
+def _relative_performance_sentence(delta: float | None) -> str | None:
+    # The domain comparison owns both the in-line cut and the printed magnitude.
+    comparison = benchmark_comparison_from_delta(delta)
+    if comparison.claim == "unknown":
+        return None
+    if comparison.claim == "matched_benchmark":
         return "was effectively in line with the benchmark."
-    direction = "outperformed" if delta > 0 else "lagged"
-    return f"{direction} by {abs(delta):.1f} percentage points."
+    direction = "outperformed" if comparison.claim == "beat_benchmark" else "lagged"
+    return f"{direction} by {comparison.magnitude_points}."
 
 
 def _tested_readout_line(
@@ -1492,17 +1491,24 @@ def _percent(value: Any) -> float | None:
         return None
 
 
+@dataclass(frozen=True)
+class _ReturnMetrics:
+    total_return: float | None
+    benchmark_return: float | None
+    benchmark_delta: float | None
+    same_period: bool
+
+
 def _resolved_return_metrics(
     *,
     result_payload: dict[str, Any],
     explanation_context: dict[str, Any],
-) -> tuple[float | None, float | None, bool]:
+) -> _ReturnMetrics:
+    """The only reader of result payload shapes; every comparison derives from it."""
     metrics = explanation_context.get("metrics", {})
     benchmark_metrics = explanation_context.get("benchmark_metrics", {})
-    total_return_pct = _nested_number(
-        metrics,
-        ("aggregate", "performance", "total_return_pct"),
-    )
+    engine_performance = _nested_dict(metrics, ("aggregate", "performance"))
+    total_return_pct = _nested_number(engine_performance, ("total_return_pct",))
     if total_return_pct is None:
         total_return_pct = _nested_number(metrics, ("total_return_pct",))
 
@@ -1521,13 +1527,58 @@ def _resolved_return_metrics(
             explanation_context.get("comparable_same_period")
             or result_payload.get("comparable_same_period")
         )
-        return total_return_pct, benchmark_return_pct, same_period
+        return _ReturnMetrics(
+            total_return=total_return_pct,
+            benchmark_return=benchmark_return_pct,
+            benchmark_delta=_benchmark_delta(
+                engine_performance,
+                total_return_pct=total_return_pct,
+                benchmark_return_pct=benchmark_return_pct,
+            ),
+            same_period=same_period,
+        )
 
-    return (
-        _percent(result_payload.get("total_return")),
-        _percent(result_payload.get("benchmark_return")),
-        bool(result_payload.get("comparable_same_period")),
+    total_return = _percent(result_payload.get("total_return"))
+    benchmark_return = _percent(result_payload.get("benchmark_return"))
+    return _ReturnMetrics(
+        total_return=total_return,
+        benchmark_return=benchmark_return,
+        benchmark_delta=_return_difference(total_return, benchmark_return),
+        same_period=bool(result_payload.get("comparable_same_period")),
     )
+
+
+def _benchmark_delta(
+    engine_performance: dict[str, Any] | None,
+    *,
+    total_return_pct: float,
+    benchmark_return_pct: float,
+) -> float | None:
+    # The engine publishes delta_vs_benchmark_pct beside the two returns it
+    # rounded; subtracting those again can land a tenth away from it (#533).
+    # Only payload shapes without an engine block leave subtraction as the
+    # sole comparison available.
+    if engine_performance is not None:
+        return _nested_number(engine_performance, ("delta_vs_benchmark_pct",))
+    return _return_difference(total_return_pct, benchmark_return_pct)
+
+
+def _return_difference(
+    total_return: float | None,
+    benchmark_return: float | None,
+) -> float | None:
+    if total_return is None or benchmark_return is None:
+        return None
+    return total_return - benchmark_return
+
+
+def _nested_dict(payload: Any, path: tuple[str, ...]) -> dict[str, Any] | None:
+    current = payload
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            return None
+        current = current[key]
+    return current if isinstance(current, dict) else None
 
 
 def _nested_number(payload: Any, path: tuple[str, ...]) -> float | None:

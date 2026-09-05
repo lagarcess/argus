@@ -3,6 +3,7 @@ import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
+import { benchmarkComparisonView, signedPercentText } from "@/lib/result-figures";
 
 type MetricLike = {
   key?: string;
@@ -258,19 +259,24 @@ export function heroDeltaEvidenceView(
   const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
   const typedFacts = result.readoutFacts;
   const costs = typedFacts?.costs ?? result.executionCosts;
+  const locale = options?.locale ?? "en";
   const totalReturnValue = typedFacts?.totalReturnPct !== undefined
-    ? formatSignedPercent(typedFacts.totalReturnPct)
-    : normalizeSignedPercent(totalReturn?.value);
+    ? signedPercentText(typedFacts.totalReturnPct, locale)
+    : normalizeSignedPercent(totalReturn?.value, locale);
   const isContributionReturn =
     totalReturn?.key === "contribution_return_pct" || typedFacts?.strategyType === "dca_accumulation";
   const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
   const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
   const benchmarkSymbol = facts.benchmark;
   const delta = typedFacts?.benchmarkDeltaPct;
-  const benchmarkValue = delta === undefined || !benchmarkSymbol ? copy.benchmarkUnavailable
-    : Math.abs(delta) < 0.05 ? copy.inLineWith(benchmarkSymbol)
-    : delta > 0 ? copy.beatBy(copy.percentagePoints(Math.abs(delta).toFixed(1)))
-    : copy.laggedBy(copy.percentagePoints(Math.abs(delta).toFixed(1)));
+  const claim = typedFacts?.benchmarkClaim;
+  const comparison = delta === undefined || claim === undefined
+    ? undefined
+    : benchmarkComparisonView(claim, delta, locale);
+  const benchmarkValue = comparison === undefined || !benchmarkSymbol ? copy.benchmarkUnavailable
+    : comparison.claim === "matched" ? copy.inLineWith(benchmarkSymbol)
+    : comparison.claim === "beat" ? copy.beatBy(copy.percentagePoints(comparison.magnitude))
+    : copy.laggedBy(copy.percentagePoints(comparison.magnitude));
 
   return {
     hero: {
@@ -294,8 +300,8 @@ export function heroDeltaEvidenceView(
     },
     worstDrop: {
       label: copy.worstDropLabel,
-      value: typedFacts?.maxDrawdownPct !== undefined ? formatSignedPercent(typedFacts.maxDrawdownPct) : normalizeSignedPercent(worstDrop?.value) ?? copy.unavailable,
-      unavailable: typedFacts?.maxDrawdownPct === undefined && !normalizeSignedPercent(worstDrop?.value),
+      value: typedFacts?.maxDrawdownPct !== undefined ? signedPercentText(typedFacts.maxDrawdownPct, locale) : normalizeSignedPercent(worstDrop?.value, locale) ?? copy.unavailable,
+      unavailable: typedFacts?.maxDrawdownPct === undefined && !normalizeSignedPercent(worstDrop?.value, locale),
     },
     timeframeDisplay: facts.timeframeDisplay,
     trustGroups: compactTrustGroups({ ...copy, trustStrip: costs?.fee_bps != null && costs.slippage_bps != null
@@ -380,7 +386,7 @@ function executionFacts(
     contribution?.amount
       ? { label: copy.contributionLabel, value: contribution.amount }
       : undefined,
-    ...executionCostDetails(result, copy),
+    ...executionCostDetails(result, copy, locale),
   ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 
   return {
@@ -410,10 +416,12 @@ function withBenchmarkCostTreatment(
 function executionCostDetails(
   result: StrategyResultPayload,
   copy: ResultCardDisplayCopy,
+  locale?: string,
 ): (EvidenceMetric | undefined)[] {
-  // Structured cost evidence from the backend artifact payload; present only
-  // when the engine modeled non-zero costs.
-  const costs = result.executionCosts;
+  // Gross and net returns are display figures the backend rounded; the bps
+  // parameters ride the structured cost evidence. Present only when the
+  // engine modeled non-zero costs.
+  const costs = result.readoutFacts?.costs;
   if (!costs) {
     return [];
   }
@@ -425,8 +433,8 @@ function executionCostDetails(
     return [];
   }
   return [
-    { label: copy.grossReturnLabel, value: formatSignedPercent(gross) },
-    { label: copy.netReturnLabel, value: formatSignedPercent(net) },
+    { label: copy.grossReturnLabel, value: signedPercentText(gross, locale ?? "en") },
+    { label: copy.netReturnLabel, value: signedPercentText(net, locale ?? "en") },
     feeBps === undefined && slippageBps === undefined
       ? undefined
       : {
@@ -441,11 +449,6 @@ function executionCostDetails(
 
 function finiteNumber(value: number | null | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function formatSignedPercent(value: number): string {
-  const rounded = value.toFixed(1);
-  return `${value > 0 ? "+" : ""}${rounded}%`;
 }
 
 function formatBpsValue(value: number): string {
@@ -619,12 +622,12 @@ function parseCurrency(value: string) {
   return Number(value.replace(/[$,\sKMB]/gi, "")) * multiplier;
 }
 
-function normalizeSignedPercent(value?: string) {
+function normalizeSignedPercent(value?: string, locale = "en") {
+  // Legacy rows carry the backend's one-decimal digits already; this only
+  // re-renders them in the workspace locale.
   const match = value?.match(PERCENT_VALUE_PATTERN)?.[0];
   if (!match) return undefined;
-  const numeric = Number(match.replace("%", ""));
-  const sign = numeric > 0 ? "+" : "";
-  return `${sign}${numeric.toFixed(1)}%`;
+  return signedPercentText(Number(match.replace("%", "")), locale);
 }
 
 function heroDetail(

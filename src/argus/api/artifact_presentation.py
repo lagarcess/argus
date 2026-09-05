@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, field_serializer
 
 from argus.domain.artifact_presentation_kind import artifact_presentation_kind
+from argus.domain.result_figures import result_display_figures, with_result_figures
 
 # These storage fields are private across their historical nesting locations.
 # The AST guard forbids a presentation consumer from reading them again.
@@ -58,6 +59,12 @@ def reader_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             "kind": "result_breakdown",
             "facts": {"result_fact_bank": public.get("result_fact_bank")},
         }
+    # Display figures are rounded here, once, from the bank's own metrics; a
+    # typed breakdown carries its bank inside the intent, older shapes at root.
+    with_result_figures(public.get("result_fact_bank"))
+    facts = (public.get("response_intent") or {}).get("facts")
+    if isinstance(facts, dict):
+        with_result_figures(facts.get("result_fact_bank"))
     return public
 
 
@@ -65,7 +72,9 @@ def reader_run(value: Any) -> Any:
     """Serialize a public run without changing its private persisted model."""
     if value is None:
         return None
-    return value.model_copy(update=without_private_prose(value.model_dump()))
+    public = without_private_prose(value.model_dump())
+    public["figures"] = result_display_figures(public.get("metrics"))
+    return value.model_copy(update=public)
 
 
 def reader_chat_result(

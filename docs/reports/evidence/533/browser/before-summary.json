@@ -1,0 +1,34 @@
+{
+  "en": {
+    "console_errors": [],
+    "card_benchmark": [
+      "Beat by 315.6 percentage points"
+    ],
+    "quick_take": [
+      "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was 369.5%. It finished 315.64 percentage points ahead of SPY. The worst drop was -18.35%."
+    ],
+    "try_next_reason": [
+      "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was 369.5%. It finished 315.64 percentage points ahead of SPY. The worst drop was -18.35%.",
+      "Test a different date range·Beat the benchmark by 315.6 points"
+    ],
+    "worst_drop": [
+      "-18.4%"
+    ]
+  },
+  "es-419": {
+    "console_errors": [],
+    "card_benchmark": [
+      "Superó por 315.6 puntos porcentuales"
+    ],
+    "quick_take": [
+      "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de 369.5%. Terminó 315.64 puntos porcentuales por encima de SPY. La peor caída fue de -18.35%."
+    ],
+    "try_next_reason": [
+      "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de 369.5%. Terminó 315.64 puntos porcentuales por encima de SPY. La peor caída fue de -18.35%.",
+      "Probar otro rango de fechas·Superó la referencia por 315.6 puntos"
+    ],
+    "worst_drop": [
+      "-18.4%"
+    ]
+  }
+}

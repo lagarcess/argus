@@ -25,6 +25,8 @@ const bank = {
     performance: { total_return_pct: 12.5, benchmark_return_pct: 8, delta_vs_benchmark_pct: 3.2 },
     risk: { max_drawdown_pct: -7.6 },
   }, by_symbol: {} },
+  // The reader boundary's one-decimal figures, as every public payload carries them.
+  figures: { total_return_pct: 12.5, benchmark_return_pct: 8.0, delta_vs_benchmark_pct: 3.2, benchmark_comparison_claim: "beat_benchmark", max_drawdown_pct: -7.6 },
   result_card: { quick_take: originalProse, execution_costs: { fee_bps: 10, slippage_bps: 5 } },
 };
 

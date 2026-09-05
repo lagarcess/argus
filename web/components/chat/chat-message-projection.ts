@@ -332,6 +332,7 @@ export function hydrateMessagesFromApi(
             stringOrNull(factBank?.benchmark_symbol) ?? undefined,
           config_snapshot: configSnapshot ?? undefined,
           metrics: recordOrNull(factBank?.metrics) as import("@/lib/argus-api").BacktestRun["metrics"] | undefined,
+          figures: recordOrNull(factBank?.figures) ?? undefined,
           symbols: stringArrayOrNull(factBank?.symbols) ?? undefined,
         });
         const context = resultActionContextFromMetadata(metadata, card);

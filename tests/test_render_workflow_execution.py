@@ -258,7 +258,11 @@ def _successful_tool_result() -> dict[str, object]:
                     "aggregate": {
                         "total_return": 0.123,
                         "total_return_pct": 12.3,
-                        "performance": {"total_return_pct": 12.3},
+                        "performance": {
+                            "total_return_pct": 12.3,
+                            "benchmark_return_pct": 8.1,
+                            "delta_vs_benchmark_pct": 4.2,
+                        },
                     }
                 },
                 "benchmark_metrics": {

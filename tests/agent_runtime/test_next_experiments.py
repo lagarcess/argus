@@ -31,8 +31,7 @@ def test_sidecar_caps_rows_and_carries_typed_identity() -> None:
 def test_losing_run_leads_with_refinement_and_says_why() -> None:
     sidecar = next_experiments_sidecar(
         _BUY_AND_HOLD_FACTS,
-        total_return=5.0,
-        benchmark_return=12.5,
+        benchmark_delta=-7.5,
     )
 
     assert sidecar is not None
@@ -51,8 +50,7 @@ def test_losing_run_leads_with_refinement_and_says_why() -> None:
 def test_winning_run_leads_with_exploration() -> None:
     sidecar = next_experiments_sidecar(
         _BUY_AND_HOLD_FACTS,
-        total_return=20.0,
-        benchmark_return=8.0,
+        benchmark_delta=12.0,
     )
 
     assert sidecar is not None
@@ -61,11 +59,30 @@ def test_winning_run_leads_with_exploration() -> None:
     assert first["why"]["code"] == "beat_benchmark"
 
 
+def test_reason_carries_the_engine_gap_as_a_display_figure() -> None:
+    # Rounded once here, from the engine gap, never rebuilt from two rounded
+    # returns; the client prints the digits it receives.
+    sidecar = next_experiments_sidecar(_BUY_AND_HOLD_FACTS, benchmark_delta=46.35)
+
+    assert sidecar is not None
+    assert sidecar["rows"][0]["why"] == {
+        "code": "beat_benchmark",
+        "params": {"points": 46.4},
+    }
+
+
+def test_a_gap_that_rounds_to_nothing_is_no_reason_and_no_loss() -> None:
+    sidecar = next_experiments_sidecar(_BUY_AND_HOLD_FACTS, benchmark_delta=-0.03)
+
+    assert sidecar is not None
+    assert all("why" not in row for row in sidecar["rows"])
+    assert sidecar["rows"][0]["kind"] in {"change_date_range", "same_setup_peer_asset"}
+
+
 def test_deep_drawdown_outranks_the_benchmark_story() -> None:
     sidecar = next_experiments_sidecar(
         _BUY_AND_HOLD_FACTS,
-        total_return=20.0,
-        benchmark_return=8.0,
+        benchmark_delta=12.0,
         max_drawdown=-22.4,
     )
 

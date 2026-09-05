@@ -436,6 +436,7 @@ class BacktestRun(BaseModel):
     created_at: datetime
     chart: dict[str, Any] | None = None
     trades: list[dict[str, Any]] | None = None
+    figures: dict[str, Any] | None = None  # display figures, derived on read
 
 
 class BacktestRunResponse(BaseModel):

@@ -99,11 +99,13 @@ def _legacy_result_followup_comparison(language: str) -> tuple[str, ...]:
 def _quick_take_comparison(language: str) -> tuple[str, ...]:
     facts = _quick_take_fact_bank(
         context={},
-        result_payload={
-            "total_return": TOTAL_RETURN_POINTS / 100,
-            "benchmark_return": BENCHMARK_RETURN_POINTS / 100,
+        result_payload={},
+        explanation_context={
+            "metrics": {"aggregate": {"performance": _run_performance()}},
+            "benchmark_metrics": {
+                "aggregate": {"total_return_pct": BENCHMARK_RETURN_POINTS}
+            },
         },
-        explanation_context={},
         language=language,
     )
     return (

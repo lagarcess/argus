@@ -1,0 +1,83 @@
+argus
+New chat
+Search
+Recents
+LAST 7 DAYS
+META Buy and Hold Strategy
+Backtest result · META · Buy and Hold
+Settings
+META Buy and Hold Strategy
+test META buy and hold
+
+What date window should I use for META?
+
+January 3, 2023 through December 31, 2024, with $10,000 starting capital
+
+Got it — META buy-and-hold with $10,000 starting capital. You mentioned January 3, 2023 through December 31, 2024. What are the exact start and end dates for the test?
+
+Start date: 2023-01-03. End date: 2024-12-31.
+META
+Buy and Hold
+Run complete
+STARTING CAPITAL
+$10,000
+PERIOD
+Jan 3, 2023 → Dec 31, 2024
+Stocks
+Daily data
+No fees
+No slippage
+Benchmark: SPY
+Run backtest
+META
+Buy and Hold
+
+Jan 3, 2023 → Dec 31, 2024 · Daily data
+
+Simulation Complete
+	
+	
+
+	
+	
+TradingView Lightweight Charts
+1M
+3M
+YTD
+1Y
+All
+Range details
+
+Visible period: Jan 3, 2023 to Dec 31, 2024.
+
+Ending value
+
+$46,950
+
++$36,950 gain · +369.5% total return
+
+Compared with SPY
+Beat by 315.6 percentage points
+Worst drop
+-18.4%
+
+Stocks · Historical simulation · No fees/slippage · Not advice
+
+View details
+Explain result
+Refine idea
+Add decision
+QUICK TAKE
+
+Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was 369.5%. It finished 315.64 percentage points ahead of SPY. The worst drop was -18.35%.
+
+TRY NEXT
+↳
+Test a different date range·Beat the benchmark by 315.6 points
+↳
+Test the same setup on a similar asset·GOOGL
+↳
+Try monthly recurring buys
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.
