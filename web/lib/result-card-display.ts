@@ -300,6 +300,7 @@ export function heroDeltaEvidenceView(
     timeframeDisplay: facts.timeframeDisplay,
     trustGroups: compactTrustGroups({ ...copy, trustStrip: costs?.fee_bps != null && costs.slippage_bps != null
       ? [copy.historicalSimulationLabel, copy.modeledCostsValue(String(costs.fee_bps), String(costs.slippage_bps)), copy.notAdviceLabel].join(" · ")
+      : costs ? [copy.historicalSimulationLabel, copy.notAdviceLabel].join(" · ")
       : copy.trustStrip }, result.assetClass),
     details: facts.details,
   };

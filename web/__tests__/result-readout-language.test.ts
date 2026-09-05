@@ -68,6 +68,18 @@ describe("persisted result presentation (#531)", () => {
     }
   });
 
+  test("incomplete modeled-cost evidence never claims no fees", async () => {
+    const t = await translator("es-419");
+    const result = {
+      ...resultCardPlaygroundFixtures[0].result, assetClass: undefined,
+      executionCosts: { fee_bps: bank.result_card.execution_costs.fee_bps },
+      readoutFacts: null,
+    };
+    expect(resultCardViewModel(result, { t, locale: "es-419" }).evidence.trustGroups).toEqual([
+      [t("chat.result_readout.historical_label"), t("chat.result_readout.not_advice")].join(" · "),
+    ]);
+  });
+
   test.each(["en", "es-419"])("voices the same typed DCA facts in %s", async (language) => {
     const t = await translator(language);
     const facts = resultReadoutFacts(bank);
