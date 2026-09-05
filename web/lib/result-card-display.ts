@@ -331,6 +331,9 @@ function executionFacts(
   locale?: string,
 ) {
   const config = result.configSnapshot;
+  // Completed runs wrap the actual launch config; older direct runs store it
+  // at the root. Select the typed config once, never fields from saved prose.
+  const engineConfig = recordValue(config?.engine_config) ?? config;
   const resolvedParameters = recordValue(config?.resolved_parameters);
   const parameters = recordValue(config?.parameters);
   const timeframe =
@@ -363,8 +366,8 @@ function executionFacts(
     ...valueSummaryDetails,
     { label: copy.dateRangeLabel, value: dateRangeDisplay },
     timeframe ? { label: copy.timeframeLabel, value: formatTimeframeForDisplay(timeframe, copy) ?? copy.unavailable } : undefined,
-    config?.side === "long" ? { label: copy.sideLabel, value: copy.longOnlyValue } : undefined,
-    config?.allocation_method === "equal_weight" ? { label: copy.allocationLabel, value: copy.equalWeightValue } : undefined,
+    engineConfig?.side === "long" ? { label: copy.sideLabel, value: copy.longOnlyValue } : undefined,
+    engineConfig?.allocation_method === "equal_weight" ? { label: copy.allocationLabel, value: copy.equalWeightValue } : undefined,
     benchmark
       ? {
           label: copy.benchmarkLabel,

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createInstance } from "i18next";
+import { readFileSync } from "node:fs";
 import en from "../public/locales/en/common.json";
 import es from "../public/locales/es-419/common.json";
 import { resultReadoutFacts } from "../lib/result-readout-facts";
@@ -34,6 +35,22 @@ async function translator(language: string) {
 }
 
 describe("persisted result presentation (#531)", () => {
+  test.each(["en", "es-419"])("reads execution assumptions from the real persisted %s result shape", async (language) => {
+    const recorded = JSON.parse(readFileSync(new URL(
+      "../../docs/reports/evidence/411/browser/en-discovery-messages.json", import.meta.url,
+    ), "utf8"));
+    const result = hydrateMessagesFromApi(recorded.items).messages.find((message) => message.result)?.result;
+    expect(result).toBeDefined();
+    const t = await translator(language);
+    const view = resultCardViewModel(result!, { t, locale: language });
+    expect(view.evidence.details).toContainEqual({
+      label: t("chat.result_card.details.side"), value: t("chat.result_card.details.long_only"),
+    });
+    expect(view.evidence.details).toContainEqual({
+      label: t("chat.result_card.details.allocation"), value: t("chat.result_card.details.equal_weight"),
+    });
+  });
+
   test.each(["en", "es-419"])("keeps typed execution assumptions in the %s card", async (language) => {
     const t = await translator(language);
     for (const costs of [undefined, bank.result_card.execution_costs]) {
