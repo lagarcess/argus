@@ -1,0 +1,132 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/a121/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 24 items
+
+tests/test_private_alpha_release_docs.py .....F................          [ 91%]
+tests/test_release_promotion_evidence_support.py ..                      [100%]
+
+=================================== FAILURES ===================================
+______ test_main_promotion_manifests_require_live_eval_scorecard_evidence ______
+
+    def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None:
+        manifest_dir = ROOT / "docs" / "release-manifests"
+        manifests = []
+        for manifest_path in sorted(manifest_dir.glob("*.md")):
+            if manifest_path.name == "TEMPLATE.md":
+                continue
+            manifest = manifest_path.read_text(encoding="utf-8")
+            if (
+                "main-production-promotion" in manifest_path.name
+                or re.search(r"^- Promotion target: `?main`?$", manifest, re.M)
+            ):
+                manifests.append(manifest_path)
+        missing_evidence: set[str] = set()
+        for manifest_path in manifests:
+            try:
+>               _assert_main_promotion_live_eval_evidence(manifest_path)
+
+tests/test_private_alpha_release_docs.py:797:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+manifest_path = PosixPath('/Users/garces/.codex/worktrees/a121/private-alpha-next/docs/release-manifests/2026-09-05-main-production-promotion.md')
+
+    def _assert_main_promotion_live_eval_evidence(
+        manifest_path: Path,
+        *,
+        repository_root: Path = ROOT,
+    ) -> None:
+        manifest = manifest_path.read_text(encoding="utf-8")
+        scorecard_match = re.search(
+            r"^- Live eval scorecard: `([^`]+\.json)`",
+            manifest,
+            re.M,
+        )
+        assert scorecard_match is not None, (
+            f"{manifest_path.name}: missing durable live eval scorecard"
+        )
+        candidate_match = re.search(
+            r"^- (?:Runtime )?Candidate SHA:\s*`([0-9a-f]{40})`",
+            manifest,
+            re.M,
+        )
+        assert candidate_match is not None, f"{manifest_path.name}: missing candidate SHA"
+        scorecard_path = (repository_root / scorecard_match.group(1)).resolve()
+        assert scorecard_path.is_file(), (
+            f"{manifest_path.name}: live eval scorecard does not exist"
+        )
+        assert scorecard_path.is_relative_to(
+            (repository_root / "docs" / "reports" / "evidence").resolve()
+        ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
+        scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+        assert scorecard.get("schema_version") == 2
+        provenance = scorecard.get("provenance", {})
+        assert provenance.get("evaluation_mode") == "live"
+        assert provenance.get("market_data_provider_mode") == "live_provider"
+        assert str(provenance.get("asset_provider_mode") or "").strip()
+        assert provenance.get("candidate_sha") == candidate_match.group(1)
+        assert re.fullmatch(r"\d+\.\d+\.\d+", provenance.get("python_version", ""))
+        assert re.fullmatch(r"[0-9a-f]{64}", provenance.get("fixture_sha256", ""))
+        assert provenance.get("worktree_clean") is True
+        probe = provenance.get("live_market_data_probe", {})
+        assert probe.get("requested_date_range") == {
+            "start": "2024-01-01",
+            "end": "2024-01-10",
+        }
+        assert probe.get("effective_date_range") == {
+            "start": "2024-01-02",
+            "end": "2024-01-10",
+        }
+        assert probe.get("adjustment_reason") == "calendar_alignment"
+        fixture_case_ids = provenance.get("fixture_case_ids")
+        assert (
+            isinstance(fixture_case_ids, list)
+            and fixture_case_ids
+            and all(isinstance(case_id, str) and case_id for case_id in fixture_case_ids)
+            and len(fixture_case_ids) == len(set(fixture_case_ids))
+        ), "live eval scorecard is missing fixture case identities"
+        candidate_fixture_identity = measurement_fixture_identity_at_git_sha(
+            candidate_sha=candidate_match.group(1),
+            repository_root=repository_root,
+        )
+        assert (
+            provenance.get("fixture_sha256") == candidate_fixture_identity.sha256
+            and fixture_case_ids == list(candidate_fixture_identity.case_ids)
+        ), "live eval scorecard does not match the candidate fixture identity"
+        results = scorecard.get("results")
+        assert isinstance(results, list), "live eval scorecard is missing results"
+        assert all(
+            isinstance(result, dict)
+            and isinstance(result.get("id"), str)
+            and isinstance(result.get("category"), str)
+            and result.get("status") in LIVE_EVAL_RESULT_STATUSES
+            for result in results
+        ), "live eval scorecard contains malformed results"
+        result_case_ids = [result["id"] for result in results]
+        assert result_case_ids == fixture_case_ids, (
+            "live eval scorecard does not contain the complete fixture result set"
+        )
+        totals = scorecard.get("totals", {})
+        calculated_totals = {
+            status: sum(result["status"] == status for result in results)
+            for status in LIVE_EVAL_RESULT_STATUSES
+        }
+>       assert totals == calculated_totals, (
+            "live eval scorecard totals do not match its complete results"
+        )
+E       AssertionError: live eval scorecard totals do not match its complete results
+E       assert {'expected_fa...sed': 59, ...} == {'expected_fa...pped': 0, ...}
+E
+E         Omitting 5 identical items, use -vv to show
+E         Left contains 1 more item:
+E         {'infrastructure_error': 0}
+E         Use -v to get more diff
+
+tests/test_private_alpha_release_docs.py:592: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence
+========================= 1 failed, 23 passed in 8.58s =========================

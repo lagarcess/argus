@@ -752,5 +752,21 @@
         ]
       }
     }
-  }
+  },
+  "candidate_only_dispositions": [
+    {
+      "case_id": "asset_discovery_not_result_followup_issue_244",
+      "disposition": "accepted_pre_existing_delivery_defect",
+      "basis": "Founder accepted the shared missing next-experiment row exposed by the stronger assertion in #549. The common delivery assertion fails both retained observations.",
+      "closed_misclassified_issue": "https://github.com/lagarcess/argus/issues/555",
+      "user_reachability": "Not demonstrated. Founder reported zero users asking what should I try next and zero human exposures to latest_result_followup_unavailable across 256 completed production runs. Not independently queried by this task.",
+      "classification": "Test-coverage observation; pre-existing delivery defect surfaced by #549, not a promotion regression or confirmed product bug."
+    },
+    {
+      "case_id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "disposition": "accepted_after_consumer_trace",
+      "basis": "Per-row resolver class owns tradability, research rows, and discovery selection. The nullable request hint cannot reach the named calendar or research-row consumers as null. The hint still matters to ambiguous-name corroboration.",
+      "evidence": "docs/reports/evidence/2026-09-05-main-promotion/spanish-equity-hint-code-trace.md"
+    }
+  ]
 }
