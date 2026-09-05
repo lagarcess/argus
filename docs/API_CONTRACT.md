@@ -880,7 +880,13 @@ Application-facing user object.
   "deleted_at": null,
   "created_at": "timestamp",
   "updated_at": "timestamp",
-  "last_message_preview": "..."
+  "last_message_preview": null,
+  "preview": {
+    "kind": "result",
+    "symbols": ["TSLA"],
+    "template": "buy_and_hold",
+    "text": null
+  }
 }
 ```
 
@@ -890,6 +896,17 @@ Application-facing user object.
 - `system_default`
 
 *AI-generated titles should be created from context after first prompt, save, or exit.*
+
+`preview` is a read-time projection of the latest owner-scoped message, shared
+by conversation lists (including archives), chat history, Recents and search.
+Its kind is `text | result | confirmation | assumptions | breakdown | empty |
+unavailable`; `symbols` and `template` are optional context facts. Only `text`
+previews may carry verbatim ordinary conversation/user text. Artifact previews
+never carry stored assistant prose; the current frontend language bundle voices
+their kind and facts. Existing messages receive this projection immediately,
+without a database backfill or a model call. The compatibility
+`last_message_preview` response is null for artifact messages. A missing source
+produces `unavailable`, never a saved-prose fallback.
 
 ## Message
 
@@ -964,11 +981,31 @@ machine-readable fields alongside display labels:
   provider_coverage_adjustment`; ordinary calendar alignment, full coverage,
   and legacy coverage without a reason omit it. Clients must not infer the
   reason from dates.
-- `display_facts`: optional canonical facts for localized card metadata, such as
-  `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`.
-  Clients should render these facts through locale-aware presentation code and
-  use legacy `assumptions` strings only as fallback for older persisted cards.
+- `display_facts`: canonical facts for localized card metadata, such as
+  `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`, plus
+  `capital` or the distinct recurring-plan roles `starting_capital`,
+  `recurring_contribution`, and `contribution_period`. The shared
+  `argus.agent_runtime.confirmation_facts.confirmation_display_facts` projection
+  owns these values for both cards and assumptions answers. Clients render the
+  facts through their language bundles. Legacy `assumptions` prose is
+  non-presentational compatibility context and must never become a fallback.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
+
+An assumptions answer has `response_intent.kind = artifact_assumptions` and
+`response_intent.facts = { artifact_kind, asset_class, display_facts }`.
+`artifact_kind` is `confirmation` or `current_idea`; the fact values come from
+the visible card or its typed confirmation payload. An empty
+`assistant_response` is valid for this successful `ready_to_respond` turn. The
+API persists the typed answer and a completed terminal message; the frontend
+voices it in the current workspace language for live display, reload, and copy.
+This answer does not approve, change, consume, or recreate a confirmation.
+
+For old confirmations without `display_facts`, the typed payload can supply the
+same projection. Missing facts yield localized unavailable copy. Historical
+freeform assumptions replies that stored neither an assumptions-specific
+response intent nor another typed discriminator cannot be classified safely;
+they retain ordinary transcript behavior. Clients must not infer their purpose
+or recover missing facts by parsing the saved English prose.
 
 Clients must use `status` and `rows[].key` for behavior. They must not infer
 card state from translated display labels. Result actions that mutate state must
@@ -976,6 +1013,19 @@ reference a canonical run id. `result_fact_bank` is a backend-provided,
 run-derived context object for result follow-ups; it is not a second metrics
 source of truth. Legacy `saved_strategy_id` metadata remains readable after
 reload, but clients must not use it to expose a new write action.
+
+Result Quick Take, result breakdown, and dossier outcome prose render from the
+same typed run facts in the current workspace language. Original LLM result
+prose remains immutable audit/model context, not a presentation fallback.
+Public result messages carry empty `content`; live result finals carry empty
+`assistant_response`. Public run/card payloads omit stored `quick_take`,
+`breakdown`, `result_readout`, and `audit_context`, including nested copies.
+The public dossier outcome carries `result_fact_bank` instead of `quick_take`.
+Breakdown replies carry `response_intent.kind = result_breakdown` and
+`facts.result_fact_bank`; legacy breakdown action metadata derives that intent
+on read. Old incomplete message facts can be repaired from the owner-scoped
+canonical run in a bounded batch, without rewriting history. Unavailable facts
+produce localized unavailable text, not translated or regenerated source prose.
 
 ## Legacy Strategy Record
 
@@ -4005,10 +4055,10 @@ Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
 with the current chat turn instead of staying open for workflow-duration
 execution.
 
-For completed workflow-backed jobs, `result_readout` is backend-generated
-Markdown using the same async explain-stage ownership as in-stream backtest
-results. The frontend renders this field when present; it must not synthesize a
-Quick take from result-card metrics. `result_readout_source` and
+For completed workflow-backed jobs, `result_readout` retains the original
+explain-stage prose privately in storage and is always null in the public
+response. Readers voice canonical run facts at the same presentation boundary
+used for in-stream and reloaded results. `result_readout_source` and
 `result_readout_fallback_used` expose whether the normal LLM/schema-grounded
 path produced the readout or whether Argus intentionally fell back to the
 deterministic safety renderer.
@@ -4115,7 +4165,7 @@ path and must declare `prompt_source = degraded_fallback`.
     "status": "completed",
     "conversation_result_card": {}
   },
-  "result_readout": "**Quick take**\n\nThe strategy returned 12.4% while SPY returned 10.1% over the same period; it beat the benchmark.\n\n- Tested: AAPL buy and hold over January 1, 2024 to June 5, 2026.\n- Keep in mind: This is a return comparison, not causal attribution.",
+  "result_readout": null,
   "result_readout_source": "llm_explain_stage",
   "result_readout_fallback_used": false,
   "result_readout_failure_mode": null,
@@ -4299,7 +4349,8 @@ Mixed recent activity feed.
       "id": "uuid",
       "title": "Tesla dip thread",
       "title_source": "ai_generated",
-      "subtitle": "Last message or metric preview",
+      "subtitle": "",
+      "preview": { "kind": "result", "symbols": ["TSLA"], "text": null },
       "pinned": false,
       "created_at": "timestamp",
       "conversation_id": "uuid",
@@ -4394,6 +4445,7 @@ the `/search` contract.
       "title": "Gold pullback ideas",
       "archived": false,
       "matched_text": "Hold through earnings.",
+      "preview": { "kind": "result", "symbols": ["GLD"], "text": null },
       "updated_at": "timestamp",
       "conversation_id": "uuid",
       "match": {
@@ -4470,6 +4522,15 @@ under each involved symbol. Each decision count comes from the latest
 owner-scoped DecisionNote reached through that run's EvidenceArtifact, so one
 run contributes to at most one decision state. `last_touched_at` is the latest
 activity on those runs or their evidence/decision lineage.
+
+Conversation search rows carry the same typed `preview` as Recents. Public
+`matched_text` and `match.fragment` retain text only for a `message` match,
+which is an owner-authored user message. Other match layers return empty
+fragments because their search corpus can contain retained artifact prose.
+Ranking, match layer/count, pagination and message anchors are preserved;
+user-authored DecisionNote text remains available through the dossier's
+decision projection. Search templates must render typed previews for those
+non-message matches and never fall back to the private search corpus.
 
 Text recall requires at least one normalized token with three characters. A
 single symbol-shaped query is separately eligible at two characters so stored

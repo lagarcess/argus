@@ -40,7 +40,6 @@ def offline_clarification_fallback(
     strategy: StrategySummary | dict[str, Any] | None = None,
 ) -> str:
     intent_question = intent_clarification_fallback(
-        language=language,
         response_intent=response_intent,
         strategy=strategy,
     )
@@ -136,7 +135,6 @@ def _coverage_facts(response_intent: dict[str, Any]) -> dict[str, Any] | None:
 
 def intent_clarification_fallback(
     *,
-    language: str | None,
     response_intent: dict[str, Any] | None,
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
@@ -144,9 +142,8 @@ def intent_clarification_fallback(
 
     This text is English by construction and never decides what a reader sees:
     the localized surface renders the typed contract from
-    `typed_clarification_contract` instead. `language` is accepted for existing
-    callers and deliberately does not choose words, because a per-language copy
-    table in the runtime is what `docs/CONVERSATIONAL_RUNTIME.md` forbids.
+    `typed_clarification_contract` instead. This private compatibility writer
+    has no language parameter: only the presentation boundary chooses words.
 
     The invariant that keeps a Spanish reader out of English: this function
     returns text only where `typed_clarification_contract` returns a contract,

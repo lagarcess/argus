@@ -1,0 +1,19 @@
+{
+  "issue": 531,
+  "capture": "before",
+  "integration_base": "5761dd417429895a24037df8231528c759af4179",
+  "source_payload": "docs/reports/evidence/411/browser/en-discovery-messages.json",
+  "source_payload_kind": "previously recorded real English-authored META result",
+  "browser": "headed Chromium driven by Playwright CLI",
+  "workspace_language_selected_in_ui": "es-419",
+  "persistence": "local process memory",
+  "api_origin": "http://127.0.0.1:8531/api/v1",
+  "web_origin": "http://127.0.0.1:3211",
+  "provider_calls": 0,
+  "hosted_database_reads_or_writes": 0,
+  "production_source_edits": 0,
+  "captured_at_utc": "2026-09-05T01:20:02Z",
+  "screenshot": "before-en-authored-es-workspace.png",
+  "screenshot_sha256": "5441b840307779a907c688dab6acdedeedc7c28caa8507ece9e5de6e2cfaec1c",
+  "observed": "Spanish result chrome and LECTURA RAPIDA label with an English saved Quick Take body"
+}

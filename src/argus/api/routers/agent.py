@@ -26,6 +26,7 @@ from argus.agent_runtime.turn_execution import (
     turn_execution_summary,
 )
 from argus.api import state as api_state
+from argus.api.artifact_presentation import reader_chat_result, result_breakdown_metadata
 from argus.api.chat import confirmation as chat_confirmation
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
@@ -57,6 +58,7 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
+from argus.api.chat.breakdown import result_breakdown_message_with_metadata
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -126,6 +128,7 @@ from argus.api.schemas import (
     StarterPromptsResponse,
     User,
 )
+from argus.domain.artifact_presentation_kind import artifact_presentation_kind
 from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.research.admission import research_attempt_admission_context
 from argus.domain.usage_limits import (
@@ -206,18 +209,6 @@ def fallback_private_alpha_save_response(language: str | None = None) -> str:
     )
 
     return _fallback_private_alpha_save_response(language=language)
-
-
-def result_breakdown_message_with_metadata(
-    run: BacktestRun | None,
-    *,
-    language: str = "en",
-) -> Any:
-    from argus.api.chat.breakdown import (
-        result_breakdown_message_with_metadata as _result_breakdown_message_with_metadata,
-    )
-
-    return _result_breakdown_message_with_metadata(run, language=language)
 
 
 def missing_result_action_run_message(
@@ -880,6 +871,9 @@ async def chat_stream(
                 else runtime_event_source(workflow)
             )
             final_seen = False
+            private_result_stream = (
+                getattr(payload.action, "type", None) == "show_breakdown"
+            )
             async for runtime_event in _runtime_events_with_keepalive(runtime_events):
                 if runtime_event is None:
                     yield sse_keepalive()
@@ -889,9 +883,12 @@ async def chat_stream(
                     content = str(runtime_event.get("content") or "")
                     if content:
                         streamed_text_parts.append(content)
-                    yield sse_data(runtime_event)
+                    if not private_result_stream:
+                        yield sse_data(runtime_event)
                     continue
                 if event_type in {"stage_start", "stage_outcome"}:
+                    if runtime_event.get("stage") == "explain":
+                        private_result_stream = True
                     yield sse_data(runtime_event)
                     continue
                 if event_type != "final":
@@ -1018,14 +1015,12 @@ async def chat_stream(
                             language=runtime_user.language_preference,
                         )
                         assistant_text = breakdown_message.text
-                        metadata["result_breakdown_source"] = breakdown_message.source
-                        metadata["result_breakdown_fallback_used"] = (
-                            breakdown_message.fallback_used
-                        )
-                        if breakdown_message.failure_mode is not None:
-                            metadata["result_breakdown_failure_mode"] = (
-                                breakdown_message.failure_mode
+                        metadata.update(
+                            result_breakdown_metadata(
+                                breakdown_message, result_action_run
                             )
+                        )
+                        runtime_result["response_intent"] = metadata["response_intent"]
                     elif result_action_type == "save_strategy":
                         yield sse_data({"type": "stage_start", "stage": "next_step"})
                         if result_action_run is None:
@@ -1049,11 +1044,10 @@ async def chat_stream(
                         runtime_result["assistant_response"] = assistant_text
                     if result_action_run is not None:
                         receipt_run_id = result_action_run.id
-                        metadata["latest_run_id"] = result_action_run.id
-                        metadata["result_run_id"] = result_action_run.id
-                        metadata["result_strategy_id"] = result_action_run.strategy_id
-                        metadata["result_fact_bank"] = result_fact_bank(result_action_run)
                         runtime_result["latest_run_id"] = result_action_run.id
+                        runtime_result["result_fact_bank"] = result_fact_bank(
+                            result_action_run
+                        )
                         runtime_result["result_run_id"] = result_action_run.id
                         runtime_result["result_strategy_id"] = (
                             result_action_run.strategy_id
@@ -1177,11 +1171,16 @@ async def chat_stream(
                 persisted_text = (
                     confirmation_anchor_text or assistant_text or streamed_text
                 )
+                typed_artifact_answer = artifact_presentation_kind(metadata) in {
+                    "assumptions",
+                    "breakdown",
+                }
                 if not (
                     persisted_text
                     or confirmation_card is not None
                     or run is not None
                     or backtest_job is not None
+                    or typed_artifact_answer
                 ):
                     logger.warning(
                         "Agent runtime returned no visible terminal state",
@@ -1192,7 +1191,11 @@ async def chat_stream(
                     )
                     raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
-                if persisted_text or lifecycle_hooks.turn_id is not None:
+                if (
+                    persisted_text
+                    or typed_artifact_answer
+                    or lifecycle_hooks.turn_id is not None
+                ):
                     # Discovery codes only; other retryable recoveries keep
                     # completed-turn settlement.
                     retryable_recovery_code = (
@@ -1283,20 +1286,20 @@ async def chat_stream(
                 )
                 if assistant_text and not runtime_result.get("assistant_response"):
                     runtime_result["assistant_response"] = assistant_text
+                public_result = reader_chat_result(runtime_result, metadata)
                 if (
                     not streamed_text_parts
                     and confirmation_card is None
                     and run is None
                     and assistant_text
+                    and public_result.get("assistant_response")
                 ):
                     yield sse_data({"type": "token", "content": assistant_text})
 
                 yield sse_data(
                     {
                         "type": "final",
-                        "payload": chat_confirmation.public_confirmation_projection(
-                            runtime_result
-                        ),
+                        "payload": public_result,
                     }
                 )
                 yield sse_done()

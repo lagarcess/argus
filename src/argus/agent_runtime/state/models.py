@@ -48,6 +48,7 @@ ResponseIntentKind = Literal[
     "ambiguity_check",
     "optional_settings",
     "artifact_action_recovery",
+    "artifact_assumptions",
     "result_followup_chrome",
 ]
 

@@ -33,6 +33,7 @@ import {
 } from "@/lib/chat-card-copy-text";
 import { confirmationCardViewModel } from "@/lib/confirmation-card-view-model";
 import { resultCardViewModel } from "@/lib/result-card-view-model";
+import { resultBreakdownText, resultQuickTakeText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
 import {
@@ -107,6 +108,7 @@ export default function ChatMessage({
   onDecisionResumeHandled,
 }: ChatMessageProps) {
   const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const { isBelowTablet } = useResponsiveLayout();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
@@ -183,21 +185,22 @@ export default function ChatMessage({
   };
 
   const getCopyText = () => {
+    if (!isUser && message.contentPresentation === "result_readout") {
+      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
+    }
     if (!isUser) {
-      const localizedRecovery = recoveryDisplayCopyText(message.recoveryDisplay, t);
+      const localizedRecovery = recoveryDisplayCopyText(message.recoveryDisplay, t, locale);
       if (localizedRecovery) {
         return normalizeCopyText(localizedRecovery);
       }
     }
     // Copy reads the card's own view model. Deriving it from the payload
     // again is what put backend English on a Spanish workspace (#509).
-    const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
     if (message.kind === "strategy_result" && message.result) {
       return normalizeCopyText(
         resultCardCopyText(
           resultCardViewModel(message.result, { t, locale }),
           t,
-          message.content ? normalizeAssistantDisplayText(message.content) : null,
         ),
       );
     }
@@ -209,6 +212,9 @@ export default function ChatMessage({
           locale,
         ),
       );
+    }
+    if (message.contentPresentation === "result_breakdown") {
+      return resultBreakdownText(null, t, locale);
     }
     return normalizeCopyText(message.content ?? "");
   };
@@ -222,12 +228,21 @@ export default function ChatMessage({
   };
 
   const getDisplayContent = () => {
+    if (!isUser && message.contentPresentation === "result_readout") {
+      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
+    }
+    if (!isUser && message.kind === "strategy_result") {
+      return resultQuickTakeText(message.result?.readoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
+    }
     const content = message.content ?? "";
     if (!isUser && message.recoveryDisplay) {
-      const recovered = recoveryDisplayText(message.recoveryDisplay, t);
+      const recovered = recoveryDisplayText(message.recoveryDisplay, t, locale);
       if (recovered.trim()) {
         return recovered;
       }
+    }
+    if (!isUser && message.contentPresentation === "result_breakdown") {
+      return resultBreakdownText(null, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
     }
     return isUser ? content : normalizeAssistantDisplayText(content);
   };
@@ -242,7 +257,7 @@ export default function ChatMessage({
   const retryAction = message.actions?.find(isRetryAction);
   const userRecoveryText =
     isUser && message.recoveryDisplay
-      ? recoveryDisplayText(message.recoveryDisplay, t).trim()
+      ? recoveryDisplayText(message.recoveryDisplay, t, locale).trim()
       : "";
   const footerMessageActions = (message.actions ?? []).filter(
     (action) => !isRetryAction(action) && !actionHasCardScopedOwnership(action),
@@ -419,6 +434,8 @@ export default function ChatMessage({
               />
               {isGuest ? <GuestArtifactHint kind="confirmation" /> : null}
             </div>
+          ) : message.contentPresentation === "result_readout" ? (
+            <ResultReadout content={displayContent} label={t("chat.result_readout.quick_take", "Quick take")} />
           ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (
             <ResultBreakdown
               ariaLabel={t("chat.result_breakdown.aria_label", "Result breakdown")}

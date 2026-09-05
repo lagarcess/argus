@@ -156,23 +156,21 @@ describe("card copy reads the language the card renders (#509)", () => {
     const copy = resultCardCopyText(
       resultCardViewModel(result, { t: english, locale: "en" }),
       english,
-      "Explanation text",
     );
 
     expect(copy).toContain("Buy and Hold");
     expect(copy).toContain("Assets: AAPL");
     expect(copy).toContain("Worst drop: -8.2%");
-    expect(copy).toContain("Assistant explanation:\nExplanation text");
+    expect(copy).toContain(`Assistant explanation:\n${english("chat.result_readout.unavailable")}`);
   });
 
   test("the assistant explanation heading is localized too", () => {
     const copy = resultCardCopyText(
       resultCardViewModel(result, { t: spanish, locale: "es-419" }),
       spanish,
-      "Texto explicativo",
     );
 
-    expect(copy).toContain("Explicación del asistente:\nTexto explicativo");
+    expect(copy).toContain(`Explicación del asistente:\n${spanish("chat.result_readout.unavailable")}`);
     expect(copy).not.toContain("Assistant explanation");
   });
 });

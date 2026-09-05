@@ -13,6 +13,7 @@ import {
   strategyDisplayLabel,
   strategyTypeFromResult,
 } from "@/lib/strategy-display";
+import { resultQuickTakeText, resultReadoutRuleDetails } from "@/lib/result-readout-display";
 
 export type ResultCardViewModel = {
   strategyLabel: string;
@@ -21,6 +22,7 @@ export type ResultCardViewModel = {
   periodDisplay: string;
   evidence: HeroDeltaEvidenceView;
   copy: ResultCardDisplayCopy;
+  readout: string;
 };
 
 /** The one localized read of a result payload: the card paints it and Copy
@@ -30,19 +32,24 @@ export function resultCardViewModel(
   { t, locale }: { t: TFunction; locale: string },
 ): ResultCardViewModel {
   const copy = resultDisplayCopy(t);
+  const costs = result.readoutFacts?.costs ?? result.executionCosts;
+  copy.trustStrip = costs?.fee_bps != null && costs.slippage_bps != null
+    ? t("chat.result_readout.costs_trust", { fee: costs.fee_bps, slippage: costs.slippage_bps })
+    : t("chat.result_readout.trust");
+  const evidence = heroDeltaEvidenceView(result, { copy, locale });
+  evidence.details.push(...resultReadoutRuleDetails(result.readoutFacts, t, locale));
   return {
     strategyLabel:
-      strategyDisplayLabel(strategyTypeFromResult(result), t, result.strategyLabel) ??
-      result.strategyLabel ??
-      result.strategyName,
+      strategyDisplayLabel(result.readoutFacts?.strategyType ?? strategyTypeFromResult(result), t) ?? t("chat.result_readout.strategy"),
     symbols: result.symbols ?? [],
     statusLabel: t(
       "chat.simulation_complete",
-      result.statusLabel || "Simulation Complete",
+      "Simulation Complete",
     ),
-    periodDisplay: compactDateRangeDisplay(result.dateRange, locale) ?? result.period,
-    evidence: heroDeltaEvidenceView(result, { copy, locale }),
+    periodDisplay: compactDateRangeDisplay(result.dateRange, locale) ?? copy.unavailable,
+    evidence,
     copy,
+    readout: resultQuickTakeText(result.readoutFacts, t, locale),
   };
 }
 
@@ -112,6 +119,8 @@ export function resultDisplayCopy(t: TFunction): ResultCardDisplayCopy {
       "chat.result_trust_strip",
       "Historical simulation · No fees/slippage · Not advice",
     ),
+    historicalSimulationLabel: t("chat.result_readout.historical_label"),
+    notAdviceLabel: t("chat.result_readout.not_advice"),
     startingCapitalLabel: t(
       "chat.result_card.details.starting_capital",
       "Starting capital",
@@ -160,7 +169,7 @@ export function resultDisplayCopy(t: TFunction): ResultCardDisplayCopy {
       t("chat.result_card.timeframe.interval", {
         amount,
         defaultValue: "{{amount}}-{{unit}} data",
-        unit,
+        unit: t(`chat.result_readout.timeframe_units.${unit}`),
       }),
     timeframeData: (value) =>
       t("chat.result_card.timeframe.generic", {

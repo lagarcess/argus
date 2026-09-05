@@ -65,7 +65,7 @@ describe("confirmation period adjustment", () => {
       "utf8",
     );
     const branchStart = source.indexOf(
-      'message.kind === "strategy_confirmation"',
+      ') : message.kind === "strategy_confirmation"',
     );
     const branchEnd = source.indexOf(
       'message.contentPresentation === "result_breakdown"',

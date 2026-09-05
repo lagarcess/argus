@@ -72,6 +72,7 @@ describe("Recents projection", () => {
       created_at: timestamp(8),
       updated_at: timestamp(1),
       last_message_preview: "Compare the result with SPY",
+      preview: { kind: "result", symbols: ["AAPL"] },
       language: "en",
       activity: workingActivity,
     };
@@ -85,7 +86,8 @@ describe("Recents projection", () => {
       id: "chat-1",
       title: "AAPL notes",
       title_source: "ai_generated",
-      subtitle: "Compare the result with SPY",
+      subtitle: "",
+      preview: conversation.preview,
       pinned: true,
       created_at: timestamp(1),
       conversation_id: "chat-1",

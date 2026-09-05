@@ -53,7 +53,7 @@ export type RunDossier = {
     run_label: string;
     completed_at: string;
     benchmark_symbol: string | null;
-    quick_take: string | null;
+    result_fact_bank?: unknown;
     metrics: Array<{ name: string; value: string | number }>;
   };
   decision: {

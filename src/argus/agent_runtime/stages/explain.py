@@ -160,7 +160,6 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         strategy=strategy,
         result_facts=result_facts,
         rule_summary=result_rule_summary(result_facts),
-        language=language,
     )
 
     total_return, benchmark_return, same_period = _resolved_return_metrics(
@@ -175,7 +174,6 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
             caveat=caveat,
             execution_note=execution_note,
             rule_summary=rule_summary,
-            language=language,
         )
         return StageResult(
             outcome="ready_to_respond",
@@ -203,7 +201,6 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         caveat=caveat,
         execution_note=execution_note,
         rule_summary=rule_summary,
-        language=language,
     )
 
     return StageResult(
@@ -357,7 +354,6 @@ async def _llm_explanation(
         strategy=strategy,
         result_facts=result_facts,
         rule_summary=result_rule_summary(result_facts),
-        language=language,
     )
     assumption_summary = _assumption_summary(
         optional_parameters=optional_parameters,
@@ -477,9 +473,7 @@ async def _llm_explanation(
             tested_line=_tested_readout_line(
                 tested_summary,
                 rule_summary,
-                language=language,
             ),
-            language=language,
         )
         if rendered is None:
             return _LLMExplanationResult(
@@ -618,7 +612,6 @@ def _render_quick_take_draft(
     allowed_next_experiments: Any,
     relative_performance_truth: QuickTakeRelativeClaim,
     tested_line: str,
-    language: str,
 ) -> str | None:
     response = _coerce_quick_take_draft(draft)
     if response is None:
@@ -1055,7 +1048,6 @@ def _display_rule_summary(
     strategy: dict[str, Any],
     result_facts: dict[str, Any],
     rule_summary: str | None,
-    language: str,
 ) -> str | None:
     strategy_type = str(
         strategy.get("strategy_type")
@@ -1073,7 +1065,6 @@ def _display_rule_summary(
     if strategy_type == "dca_accumulation":
         cadence = _cadence_display_label(
             strategy.get("cadence") or resolved_parameters.get("cadence"),
-            language=language,
         )
         cadence_phrase = f" on a {cadence} cadence" if cadence else ""
         return f"Rule: buy recurring contributions{cadence_phrase} and hold."
@@ -1098,7 +1089,7 @@ def _dict_value(value: Any, key: str) -> Any:
     return None
 
 
-def _cadence_display_label(value: Any, *, language: str) -> str:
+def _cadence_display_label(value: Any) -> str:
     cadence = str(value or "").strip().lower().replace("-", "_")
     if not cadence:
         return ""
@@ -1136,7 +1127,6 @@ def _tested_summary(
     assets = _asset_summary(strategy)
     strategy_label = _strategy_label(
         strategy.get("strategy_type") or explanation_context.get("strategy_type"),
-        language=language,
     )
     period = _period_summary(
         strategy.get("date_range")
@@ -1174,7 +1164,7 @@ def _asset_summary(strategy: dict[str, Any]) -> str | None:
     return None
 
 
-def _strategy_label(value: Any, *, language: str) -> str | None:
+def _strategy_label(value: Any) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
     return display_strategy_type({"strategy_type": value.strip()}).lower()
@@ -1257,7 +1247,6 @@ def _build_response(
     caveat: str,
     execution_note: str | None,
     rule_summary: str | None,
-    language: str,
     next_check_override: str | None = None,
 ) -> str:
     tone = profile.effective_tone if profile is not None else "friendly"
@@ -1266,7 +1255,7 @@ def _build_response(
         profile.effective_expertise_mode if profile is not None else "beginner"
     )
 
-    expertise_sentence = _expertise_sentence(expertise_mode, language=language)
+    expertise_sentence = _expertise_sentence(expertise_mode)
 
     if verbosity == "low":
         return _result_readout_markdown(
@@ -1282,7 +1271,6 @@ def _build_response(
             rule_summary=rule_summary,
             next_check_override=next_check_override,
             compact=True,
-            language=language,
         )
 
     return _result_readout_markdown(
@@ -1298,7 +1286,6 @@ def _build_response(
         rule_summary=rule_summary,
         next_check_override=next_check_override,
         compact=tone == "concise" and verbosity != "high",
-        language=language,
     )
 
 
@@ -1316,7 +1303,6 @@ def _result_readout_markdown(
     rule_summary: str | None,
     next_check_override: str | None,
     compact: bool,
-    language: str,
 ) -> str:
     delta = total_return - benchmark_return
     takeaway = _readout_takeaway(
@@ -1326,12 +1312,10 @@ def _result_readout_markdown(
         same_period=same_period,
         delta=delta,
         execution_note=execution_note,
-        language=language,
     )
     tested = _tested_readout_line(
         tested_summary,
         rule_summary,
-        language=language,
     )
     lines = [
         takeaway,
@@ -1339,14 +1323,11 @@ def _result_readout_markdown(
         f"- Tested: {tested}.",
     ]
     if execution_note:
-        lines.append(
-            f"- Signal: {_compact_execution_note(execution_note, language=language)}"
-        )
+        lines.append(f"- Signal: {_compact_execution_note(execution_note)}")
     else:
         lines.append(f"- What that means: {interpretation}")
     next_check = next_check_override or _next_check_line(
         execution_note=execution_note,
-        language=language,
     )
     if next_check:
         lines.append(f"- Next check: {next_check}")
@@ -1364,11 +1345,10 @@ def _readout_takeaway(
     same_period: bool,
     delta: float,
     execution_note: str | None,
-    language: str,
 ) -> str:
-    benchmark_context = _benchmark_context_phrase(same_period, language=language)
+    benchmark_context = _benchmark_context_phrase(same_period)
     benchmark_label = benchmark_symbol or "the benchmark"
-    relative = _relative_performance_sentence(delta, language=language)
+    relative = _relative_performance_sentence(delta)
     if execution_note and abs(total_return) < 0.05:
         return (
             "No trade opened. The strategy stayed in cash because its entry "
@@ -1382,7 +1362,7 @@ def _readout_takeaway(
     )
 
 
-def _relative_performance_sentence(delta: float, *, language: str) -> str:
+def _relative_performance_sentence(delta: float) -> str:
     if abs(delta) < 0.05:
         return "was effectively in line with the benchmark."
     direction = "outperformed" if delta > 0 else "lagged"
@@ -1392,8 +1372,6 @@ def _relative_performance_sentence(delta: float, *, language: str) -> str:
 def _tested_readout_line(
     tested_summary: str | None,
     rule_summary: str | None,
-    *,
-    language: str,
 ) -> str:
     fallback = "the confirmed strategy"
     tested = (tested_summary or fallback).strip().rstrip(".")
@@ -1405,7 +1383,7 @@ def _tested_readout_line(
     return f"{tested}. {rule.rstrip('.')}"
 
 
-def _compact_execution_note(execution_note: str, *, language: str) -> str:
+def _compact_execution_note(execution_note: str) -> str:
     note = execution_note.strip()
     if note.startswith("No entry trades were executed") and (
         "entry condition did not trigger" in note
@@ -1417,7 +1395,7 @@ def _compact_execution_note(execution_note: str, *, language: str) -> str:
     return note
 
 
-def _next_check_line(*, execution_note: str | None, language: str) -> str | None:
+def _next_check_line(*, execution_note: str | None) -> str | None:
     if execution_note and execution_note.startswith("No entry trades were executed"):
         return (
             "Loosen the entry threshold or widen the window before judging the " "idea."
@@ -1425,7 +1403,7 @@ def _next_check_line(*, execution_note: str | None, language: str) -> str | None
     return None
 
 
-def _benchmark_context_phrase(same_period: bool, *, language: str) -> str:
+def _benchmark_context_phrase(same_period: bool) -> str:
     if same_period:
         return "over the same period"
     return "for the comparison window"
@@ -1438,7 +1416,7 @@ def _strip_leading_label(value: str) -> str:
     return text
 
 
-def _expertise_sentence(expertise_mode: str, *, language: str) -> str:
+def _expertise_sentence(expertise_mode: str) -> str:
     if expertise_mode == "advanced":
         return "This is a return comparison only, without causal attribution."
     if expertise_mode == "intermediate":
@@ -1460,7 +1438,6 @@ def _build_incomplete_result_response(
     caveat: str,
     execution_note: str | None,
     rule_summary: str | None,
-    language: str,
 ) -> str:
     tone = profile.effective_tone if profile is not None else "friendly"
     verbosity = profile.effective_verbosity if profile is not None else "medium"
@@ -1472,7 +1449,7 @@ def _build_incomplete_result_response(
         if tested_summary is not None
         else "This applies to the confirmed strategy."
     )
-    expertise_sentence = _expertise_sentence(expertise_mode, language=language)
+    expertise_sentence = _expertise_sentence(expertise_mode)
     base = (
         "The result payload is incomplete, so I cannot report observed returns yet. "
         f"{tested_sentence} {expertise_sentence}"

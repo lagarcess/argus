@@ -1,7 +1,10 @@
-import type { TFunction } from "i18next";
+import i18next, { type TFunction } from "i18next";
 import type { ChatActionOption } from "@/components/chat/types";
 import { visibleComposerActions } from "@/lib/chat-action-ownership";
 import { isRetryAction } from "@/lib/chat-retry-actions";
+import { artifactAssumptionsFacts, artifactAssumptionsText, type ArtifactAssumptionsFacts } from "./artifact-assumptions-display";
+import { resultReadoutFacts, type ResultReadoutFacts } from "./result-readout-facts";
+import { resultBreakdownText } from "./result-readout-display";
 
 const UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX = "unsupported-strategy-";
 const NO_PROGRESS_ACTION_ID_PREFIX = "no-progress-";
@@ -30,6 +33,8 @@ function unsupportedRecoveryIsRenderable(
 }
 
 export type RecoveryDisplay =
+  | { kind: "artifact_assumptions"; facts: ArtifactAssumptionsFacts }
+  | { kind: "result_breakdown"; facts: ResultReadoutFacts | null }
   | {
       kind: "recovery_code";
       code: string;
@@ -91,6 +96,10 @@ function finiteNumberOrNull(value: unknown): number | null {
 export function recoveryDisplayFromMetadata(
   metadata: Record<string, unknown>,
 ): RecoveryDisplay | null {
+  const artifactDisplay = recoveryDisplayFromResponseIntent(metadata.response_intent);
+  if (artifactDisplay?.kind === "artifact_assumptions" || artifactDisplay?.kind === "result_breakdown") {
+    return artifactDisplay;
+  }
   const recoveryState = recoveryDisplayFromRecoveryState(metadata.recovery);
   if (recoveryState) {
     return recoveryState;
@@ -150,6 +159,12 @@ export function recoveryDisplayFromResponseIntent(
   if (!intent || !kind) {
     return null;
   }
+  if (kind === "artifact_assumptions") {
+    return { kind, facts: artifactAssumptionsFacts(intent.facts) };
+  }
+  if (kind === "result_breakdown") {
+    return { kind, facts: resultReadoutFacts(recordOrNull(intent.facts)?.result_fact_bank) };
+  }
   if (kind === "unsupported_recovery") {
     return unsupportedRecoveryDisplay(intent);
   }
@@ -169,9 +184,16 @@ export function recoveryDisplayFromResponseIntent(
 export function recoveryDisplayText(
   display: RecoveryDisplay | null | undefined,
   t: TFunction,
+  locale: string = i18next.resolvedLanguage ?? i18next.language ?? "en-US",
 ): string {
   if (!display) {
     return "";
+  }
+  if (display.kind === "artifact_assumptions") {
+    return artifactAssumptionsText(display.facts, t, locale);
+  }
+  if (display.kind === "result_breakdown") {
+    return resultBreakdownText(display.facts, t, locale);
   }
   if (display.kind === "recovery_code") {
     return t(`chat.recovery.${display.code}`, recoveryCodeValues(display, t));
@@ -255,8 +277,9 @@ export function recoveryDisplayText(
 export function recoveryDisplayCopyText(
   display: RecoveryDisplay | null | undefined,
   t: TFunction,
+  locale?: string,
 ): string | null {
-  const localized = recoveryDisplayText(display, t).trim();
+  const localized = recoveryDisplayText(display, t, locale).trim();
   return localized || null;
 }
 

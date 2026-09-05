@@ -27,7 +27,7 @@ function dossier(runId: string): RunDossier {
       run_label: `Run ${runId}`,
       completed_at: `2026-07-${runId.padStart(2, "0")}T12:00:00.000Z`,
       benchmark_symbol: "SPY",
-      quick_take: null,
+      result_fact_bank: null,
       metrics: [],
     },
     decision: null,

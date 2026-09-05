@@ -79,7 +79,6 @@ export function confirmationCardViewModel(
     (row) =>
       !summaryRowSet.has(row) && (row.key === null || !promotedKeys.has(row.key)),
   );
-  const promotedValues = summaryRows.map((row) => row.value);
   const localizedStrategyLabel = strategyDisplayLabel(
     strategyTypeFromConfirmation(confirmation),
     t,
@@ -96,9 +95,7 @@ export function confirmationCardViewModel(
     assumptions: confirmationAssumptionDisplay({
       assetClass: confirmation.asset_class,
       displayFacts: confirmation.display_facts,
-      fallbackAssumptions: confirmation.assumptions ?? [],
       locale: language,
-      promotedValues,
       t,
     }),
     retestPeriod: retestPeriodFromValue(confirmation.retest_period),

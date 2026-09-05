@@ -447,6 +447,14 @@ Represents an isolated chat thread. Each conversation represents a single invest
 - Conversations use **soft delete** behavior.
 - AI-generated titles should be created once sufficient context is established.
 - `language` can be stored at the thread level for continuity, but the user profile remains the primary source.
+- `last_message_preview` remains a private compatibility/search projection of
+  the immutable message. Reader previews derive from the latest owner-scoped
+  message metadata at read time, in a single bounded batch for the returned
+  page. No new column, per-language copy, backfill, or model call is required.
+  This also repairs existing English-authored artifact previews after a
+  workspace language change. Ordinary user/conversation text stays verbatim;
+  artifact previews contain only kind, symbols and strategy keys and render
+  through the frontend language bundle.
 ---
 
 # 8. messages
@@ -523,6 +531,27 @@ Represents individual messages within a conversation.
   immutable `metadata.agent_runtime_turn.turn_id`, `request_id`, `terminal`, and
   terminal `status`. These values match its `chat_turn_lifecycles` row and make
   terminal evidence discoverable if the lifecycle CAS does not complete.
+- Assumptions answers persist `metadata.response_intent.kind =
+  artifact_assumptions`, with `facts.artifact_kind`, `facts.asset_class`, and
+  `facts.display_facts`. The confirmation fact projector owns the values for
+  both the card and its answer; zero costs and the separate starting-capital
+  and recurring-contribution roles remain explicit numbers. These are ordinary
+  completed assistant messages even when `content` is empty. Reader language
+  and copy come from the typed facts, without another model call or a stored
+  per-language variant. Existing original prose stays immutable private
+  audit/model context and is never a fallback for a typed assumptions answer.
+  Old confirmation payloads can supply missing facts on read. Older freeform
+  assumptions messages without a typed assumptions discriminator cannot be
+  safely identified and keep ordinary transcript behavior; no prose classifier
+  or destructive historical rewrite is permitted.
+- Original result `content`, card `quick_take`/`breakdown`, and job
+  `result_readout` remain immutable private audit/model context. Public reader
+  projections omit them and voice only typed facts from the canonical run.
+  Existing `result_fact_bank` is a read projection, not a second metrics owner;
+  missing historical transport facts are repaired on read using owner and
+  conversation scoped run identity. No language-specific rows or backfill are
+  needed. Failed evidence lookup yields localized unavailable text, never
+  saved-prose fallback. Python and TypeScript AST guards pin private readers.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
   `result_card`, result identifiers, `chat_action`, `failed_action`,
