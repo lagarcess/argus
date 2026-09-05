@@ -159,11 +159,31 @@ describe("persisted result presentation (#531)", () => {
     expect(message.recoveryDisplay).toEqual({ kind: "result_breakdown", facts: resultReadoutFacts(bank) });
   });
 
-  test("a legacy result without card chrome still renders its repaired typed facts", () => {
+  test.each([
+    ["en", `The modeled fees were ${bank.result_card.execution_costs.fee_bps} bps.`],
+    ["es-419", `Las comisiones modeladas fueron de ${bank.result_card.execution_costs.fee_bps} bps.`],
+  ])("preserves the voiced %s factual answer when its fact bank is context", (language, answer) => {
+    const message = hydrateMessagesFromApi([{
+      id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), role: "assistant",
+      content: answer, created_at: new Date().toISOString(),
+      metadata: {
+        conversation_mode: "guide", result_run_id: crypto.randomUUID(), result_fact_bank: bank,
+        response_intent: {
+          kind: "beginner_guidance",
+          facts: { fact_key: "fee_bps", fee_bps: `${bank.result_card.execution_costs.fee_bps} bps`, language },
+        },
+      },
+    }]).messages[0];
+    expect(message.content).toBe(answer);
+    expect(message.contentPresentation).not.toBe("result_readout");
+    expect(message.resultReadoutFacts).toBeUndefined();
+  });
+
+  test.each([undefined, { kind: "result" }])("a legacy result without card chrome still renders its repaired typed facts (%j)", (intent) => {
     const message = hydrateMessagesFromApi([{
       id: "result-no-card", conversation_id: "conversation-language", role: "assistant",
       content: originalProse, created_at: "2025-12-31T17:00:00Z",
-      metadata: { result_fact_bank: bank },
+      metadata: { result_fact_bank: bank, response_intent: intent },
     }]).messages[0];
     expect(message.contentPresentation).toBe("result_readout");
     expect(message.resultReadoutFacts).toEqual(resultReadoutFacts(bank));
