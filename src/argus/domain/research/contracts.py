@@ -73,10 +73,13 @@ class ResearchUsage(BaseModel):
     # Compatibility name for persisted/public evidence: finance_search only.
     # Grounding checks use the explicit per-tool fields below so web or URL
     # retrieval is not mistaken for model-only synthesis.
-    invocations: int = Field(default=0, ge=0)
-    finance_search_invocations: int = Field(default=0, ge=0)
-    web_search_invocations: int = Field(default=0, ge=0)
-    fetch_url_invocations: int = Field(default=0, ge=0)
+    # Counts come from the provider's invoice. None means the invoice did not
+    # establish a count; it is never spelled as zero. Argus-built packets
+    # that ran no provider call keep the default zero.
+    invocations: int | None = Field(default=0, ge=0)
+    finance_search_invocations: int | None = Field(default=0, ge=0)
+    web_search_invocations: int | None = Field(default=0, ge=0)
+    fetch_url_invocations: int | None = Field(default=0, ge=0)
     model: str = ""
     latency_ms: int = Field(default=0, ge=0)
     cost_usd: float | None = Field(default=None, ge=0.0)
@@ -119,6 +122,9 @@ class ResearchPacket(BaseModel):
     tickers: tuple[str, ...] = ()
     sources: tuple[ResearchSource, ...] = ()
     name_pairs: tuple[ResearchNamePair, ...] = ()
+    # Tool result items in the provider's output, by item type and in order.
+    # This is the retrieval record; the invoice's tool counts are billing.
+    tool_results: tuple[str, ...] = ()
     usage: ResearchUsage = Field(default_factory=ResearchUsage)
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     background_id: str | None = None

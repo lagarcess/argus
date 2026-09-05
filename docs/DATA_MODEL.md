@@ -1177,6 +1177,8 @@ Current write hooks:
   success is independent of invoice reconciliation. Anomaly rows have unknown
   billable quantity and no cost amount; existing capability-class turn metering
   remains unchanged. Both records retain null cost for an unpriced call.
+  Tool invocation counts inside `usage_metadata` are null when the invoice did
+  not establish them; a null count is unknown, not zero.
 - API chat turns append OpenRouter cost rows from persisted route receipts.
 - Grounded-discovery turns append one `source = "research"` row per attempted
   Search call with `feature_area = "discovery"`, provider identity, latency,

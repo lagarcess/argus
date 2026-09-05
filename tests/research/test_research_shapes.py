@@ -78,20 +78,10 @@ MOVERS = agent_response(
 
 
 def _web_sources_without_assets(*, text: str) -> dict[str, Any]:
-    document = agent_response(
-        text=text,
-        tickers=[],
-        sources=[],
-        invocations=0,
-        web_search_invocations=1,
-    )
-    finance_results = next(
-        item for item in document["output"] if item.get("type") == "finance_results"
-    )
-    finance_results["tickers"] = []
-    finance_results["results"] = []
+    # The finance tool never ran, so web search is the only retrieval channel.
+    document = agent_response(text=text, invocations=0, web_search_invocations=1)
     document["output"].insert(
-        2,
+        1,
         {
             "type": "search_results",
             "results": [
@@ -448,17 +438,7 @@ def test_a_survey_that_never_called_the_tool_says_so(monkeypatch) -> None:
     """The one thing a market survey must not do is present model knowledge
     as the current state of the market."""
     set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
-    _wire(
-        monkeypatch,
-        [
-            agent_response(
-                text="Tech led the tape today.",
-                tickers=["NVDA"],
-                lookup_rows=[("NVIDIA", "NVDA", "NVIDIA Corporation")],
-                invocations=0,
-            )
-        ],
-    )
+    _wire(monkeypatch, [agent_response(text="Tech led the tape today.", invocations=0)])
 
     result = _run("What's moving in the market?")
 
@@ -604,3 +584,84 @@ def test_a_survey_that_skips_the_tool_twice_stays_honest(monkeypatch) -> None:
     assert result is not None
     assert len(transport.requests) == 2, "the retry never loops"
     assert result.stage_patch["research"]["degraded"] == {"code": "survey_not_grounded"}
+
+
+def _finance_only_survey() -> dict[str, Any]:
+    """A grounded movers answer: one finance call, no public-source rows."""
+    return agent_response(
+        text="NVDA +2.3%, TSLA -1.1% as of 3:15pm ET.",
+        tickers=["NVDA"],
+        lookup_rows=[("NVIDIA", "NVDA", "NVIDIA Corporation")],
+        invocations=1,
+    )
+
+
+def _without_invoice(document: dict[str, Any], malformation: str) -> dict[str, Any]:
+    if malformation == "missing":
+        del document["usage"]
+    elif malformation == "not_an_object":
+        document["usage"] = "unavailable"
+    else:
+        document["usage"]["tool_calls_details"] = 5
+    return document
+
+
+@pytest.mark.parametrize(
+    "malformation", ["missing", "not_an_object", "malformed_tool_details"]
+)
+def test_a_grounded_survey_without_an_invoice_is_delivered_once(
+    monkeypatch, malformation: str
+) -> None:
+    """The finance_results item is the retrieval record; the invoice is
+    billing. Losing the invoice must not read as "no retrieval", which paid
+    for a second request and, when the retry lost its invoice the same way,
+    replaced a usable answer with the survey-unavailable note (#541)."""
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+    # A second identical document is available so that a wrong retry would
+    # succeed with the same omission, exactly the production shape.
+    transport = _wire(
+        monkeypatch,
+        [
+            _without_invoice(_finance_only_survey(), malformation),
+            _without_invoice(_finance_only_survey(), malformation),
+        ],
+    )
+
+    result = _run("What's moving in the market?")
+
+    assert result is not None
+    assert len(transport.requests) == 1, "retrieval evidence must not be re-bought"
+    sidecar = result.stage_patch["research"]
+    assert "degraded" not in sidecar
+    assert "NVDA" in result.stage_patch["assistant_response"]
+    # Unknown is not zero: the sidecar says the count is unknown, and it
+    # still cannot claim a charge.
+    assert sidecar["usage"]["invocations"] is None
+    assert sidecar["usage"]["cost_usd"] is None
+
+
+def test_a_survey_with_no_tool_output_and_no_invoice_is_still_not_grounded(
+    monkeypatch,
+) -> None:
+    """Unknown counts are not evidence either way: with no tool output the
+    rail still asks once more, then says it could not retrieve."""
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+    transport = _wire(
+        monkeypatch,
+        [
+            _without_invoice(
+                agent_response(text="Markets were mixed.", invocations=0), "missing"
+            ),
+            _without_invoice(
+                agent_response(text="Still mixed.", invocations=0), "missing"
+            ),
+        ],
+    )
+
+    result = _run("anything interesting moving today")
+
+    assert result is not None
+    assert len(transport.requests) == 2, "one retry, then honesty"
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "survey_not_grounded"}
+    assert sidecar["usage"]["invocations"] is None
