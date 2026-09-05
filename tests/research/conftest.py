@@ -62,9 +62,16 @@ def agent_response(
             f"| {query} | {ticker} | {name} |" for query, ticker, name in lookup_rows
         )
         results.append({"category": "tickers_lookup", "content": table, "sources": []})
-    tool_calls_details: dict[str, dict[str, int]] = {
-        "finance_search": {"invocation": invocations}
-    }
+    if invocations == 0 and (tickers or lookup_rows or sources):
+        raise ValueError(
+            "a response whose finance tool never ran carries no finance rows; "
+            "pass invocations>=1 or drop tickers, lookup_rows and sources"
+        )
+    # Recorded zero-tool responses carry no finance_results item and omit
+    # usage.tool_calls_details entirely; only tools that ran are reported.
+    tool_calls_details: dict[str, dict[str, int]] = {}
+    if invocations:
+        tool_calls_details["finance_search"] = {"invocation": invocations}
     if web_search_invocations:
         # The request tool is web_search; Agent API usage currently reports
         # the provider-owned response key as search_web.
@@ -93,12 +100,18 @@ def agent_response(
         "model": model,
         "output": [
             {"type": "skill_loaded", "name": "finance"},
-            {
-                "type": "finance_results",
-                "categories": [item["category"] for item in results],
-                "tickers": list(tickers or ["AAPL"]),
-                "results": results,
-            },
+            *(
+                [
+                    {
+                        "type": "finance_results",
+                        "categories": [item["category"] for item in results],
+                        "tickers": list(tickers or ["AAPL"]),
+                        "results": results,
+                    }
+                ]
+                if invocations
+                else []
+            ),
             {
                 "type": "message",
                 "role": "assistant",
@@ -116,7 +129,7 @@ def agent_response(
             "output_tokens": output_tokens,
             "output_tokens_details": {"reasoning_tokens": 0},
             "total_tokens": input_tokens + output_tokens,
-            "tool_calls_details": tool_calls_details,
+            **({"tool_calls_details": tool_calls_details} if tool_calls_details else {}),
         },
     }
     if status is not None:

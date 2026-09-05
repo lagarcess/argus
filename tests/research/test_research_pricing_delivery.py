@@ -244,8 +244,12 @@ def test_incomplete_billing_metadata_cannot_erase_a_valid_answer(malformation, l
     assert packet.answer_markdown
     assert packet.usage.cost_usd is None
     assert ledger[0]["usage_metadata"]["pricing_status"] == "unpriced"
-    if malformation != "missing_usage":
-        assert packet.usage.finance_search_invocations == 1
+    # The recorded output keeps its retrieval record; the count is unknown
+    # only when the invoice itself is gone, never a zero.
+    assert packet.tool_results == ("finance_results",)
+    assert packet.usage.finance_search_invocations == (
+        None if malformation == "missing_usage" else 1
+    )
 
 
 @pytest.mark.parametrize(

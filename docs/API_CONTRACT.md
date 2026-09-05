@@ -3594,6 +3594,15 @@ Contract rules:
   Unpriced calls carry the reported invoice, expected range and discrepancy
   in ledger metadata and emit an ERROR alert. Transport, malformed answer,
   empty answer and missing required source evidence still fail closed.
+- Retrieval evidence is independent of the invoice. The provider's returned
+  output is the retrieval record: finance and web result items and the
+  citations they carry. Survey grounding and the single survey retry read
+  that record, plus any tool count the invoice did establish, so a usable
+  answer whose invoice is missing or malformed is delivered without a second
+  paid request. `usage.invocations` is the invoice's finance_search count. It
+  is null when the invoice did not establish a count and is never spelled as
+  zero unless the provider reported zero; an Argus-built turn that ran no
+  provider call reports zero.
 - A pure quote or market-data number may use `fast`; its public source list may
   be empty because provider provenance belongs to the route receipt rather
   than a publisher link. A narrative, causal, or explanatory clause is typed
@@ -3617,7 +3626,8 @@ Contract rules:
   answer itself names. One- and two-character tickers count only when their
   notation is unambiguous, such as a cashtag, parentheses, a table cell, or
   the resolved company name on the same line.
-- Survey grounding counts finance, web, and URL retrieval independently. A
+- Survey grounding counts finance, web, and URL retrieval independently,
+  reading returned tool output first and invoice counts second. A
   survey with no retrieval carries `degraded.code = "survey_not_grounded"`
   and replaces unsupported prose with the precise retrieval failure. A survey
   that retrieved but names no resolver-verified ticker carries

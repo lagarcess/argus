@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from argus.agent_runtime.research_grounded import _retrieval_happened
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import (
+    _TOOL_RESULT_READERS,
     PerplexityAgentClient,
     _sanitize_answer,
 )
@@ -442,3 +444,96 @@ def test_sanitizer_strips_provider_links_and_typographic_dashes() -> None:
     # A lone dash cell stays an empty-value marker, not punctuation.
     assert "| - |" in cleaned
     assert "[SEC filing](https://www.sec.gov/f)" in cleaned
+
+
+@pytest.mark.parametrize(
+    "malformation", ["missing_usage", "usage_not_an_object", "malformed_tool_count"]
+)
+def test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost(
+    malformation: str,
+) -> None:
+    """Recorded responses carry one finance_results item per finance call.
+    That output survives a lost invoice, and the counts the invoice would
+    have established are unknown, not zero."""
+    response = agent_response()
+    if malformation == "missing_usage":
+        del response["usage"]
+    elif malformation == "usage_not_an_object":
+        response["usage"] = "unavailable"
+    else:
+        response["usage"]["tool_calls_details"] = {
+            "finance_search": {"invocation": "one"}
+        }
+    client, _ = _client([response])
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.tool_results == ("finance_results",)
+    assert packet.usage.invocations is None
+    assert packet.usage.finance_search_invocations is None
+    assert packet.usage.web_search_invocations is None
+    assert packet.usage.fetch_url_invocations is None
+    assert packet.usage.cost_usd is None
+
+
+def test_a_response_that_ran_no_tool_reports_a_confirmed_zero() -> None:
+    """Recorded zero-tool responses omit tool_calls_details and bill no tool;
+    that is an established zero, distinct from an unknown count."""
+    client, _ = _client(
+        [
+            agent_response(
+                invocations=0,
+                # Synthetic bill: the recorded invoice minus its finance call.
+                cost_overrides={
+                    "tool_calls_cost": 0.0,
+                    "tool_calls_cost_details": {},
+                    "total_cost": 0.04895,
+                },
+            )
+        ]
+    )
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.tool_results == ()
+    assert packet.usage.invocations == 0
+    assert packet.usage.finance_search_invocations == 0
+    assert packet.usage.web_search_invocations == 0
+    assert packet.usage.fetch_url_invocations == 0
+    assert packet.usage.cost_usd == pytest.approx(0.04895)
+
+
+def test_every_tool_result_item_is_kept_in_provider_order() -> None:
+    response = agent_response(web_search_invocations=1)
+    response["output"].insert(
+        2,
+        {
+            "type": "search_results",
+            "results": [{"url": "https://www.sec.gov/b", "title": "Filing"}],
+        },
+    )
+    client, _ = _client([response])
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["balanced"])
+
+    assert packet.tool_results == ("finance_results", "search_results")
+
+
+@pytest.mark.parametrize("kind", sorted(_TOOL_RESULT_READERS))
+def test_every_kind_the_parser_reads_is_retrieval_evidence_without_an_invoice(
+    kind: str,
+) -> None:
+    """The invariant behind #541: reading a tool result is what records it,
+    so a kind the parser learns to read can never be missing from the
+    retrieval record. Parametrized over the parser's own table so a new
+    reader is covered the moment it is registered."""
+    response = agent_response(invocations=0)
+    del response["usage"]
+    response["output"].insert(1, {"type": kind})
+    client, _ = _client([response])
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.tool_results == (kind,)
+    assert not packet.sources, "the bare item must prove retrieval on its own"
+    assert _retrieval_happened(packet)
