@@ -8,10 +8,12 @@ import { resultCardFromRun } from "../lib/argus-api";
 import { resultCardViewModel } from "../lib/result-card-view-model";
 import { hydrateMessagesFromApi, messageStreamPresentation } from "../components/chat/chat-message-projection";
 import type { BacktestRun } from "../lib/argus-api";
+import { resultCardPlaygroundFixtures } from "../lib/result-card-playground-fixtures";
 
 const originalProse = "PRIVATE ENGLISH PROSE MUST NEVER RENDER";
 const config = {
   template: "dca_accumulation", timeframe: "1D",
+  side: "long", allocation_method: "equal_weight",
   start_date: "2025-01-02", end_date: "2025-12-31",
   resolved_parameters: { starting_capital: 500, recurring_contribution: 200, cadence: "monthly" },
 };
@@ -32,6 +34,40 @@ async function translator(language: string) {
 }
 
 describe("persisted result presentation (#531)", () => {
+  test.each(["en", "es-419"])("keeps typed execution assumptions in the %s card", async (language) => {
+    const t = await translator(language);
+    for (const costs of [undefined, bank.result_card.execution_costs]) {
+      const source = { ...bank, result_card: { assumptions: [originalProse], execution_costs: costs } };
+      const result = {
+        ...resultCardPlaygroundFixtures[0].result, assetClass: undefined, executionCosts: undefined,
+        symbols: bank.symbols, configSnapshot: config,
+        readoutFacts: resultReadoutFacts(source)!,
+      };
+      const view = resultCardViewModel(result, { t, locale: language });
+      expect(view.evidence.details).toContainEqual({
+        label: t("chat.result_card.details.side"), value: t("chat.result_card.details.long_only"),
+      });
+      expect(view.evidence.details).toContainEqual({
+        label: t("chat.result_card.details.allocation"), value: t("chat.result_card.details.equal_weight"),
+      });
+      expect(view.evidence.trustGroups.join(" · ")).toBe(costs
+        ? [t("chat.result_readout.historical_label"), t("chat.result_card.details.modeled_costs_value", {
+          fee: costs.fee_bps, slippage: costs.slippage_bps,
+        }), t("chat.result_readout.not_advice")].join(" · ")
+        : t("chat.result_trust_strip"));
+      expect(JSON.stringify(view)).not.toContain(originalProse);
+    }
+  });
+
+  test("never guesses side or allocation from retained prose or unknown typed values", async () => {
+    const t = await translator("es-419");
+    for (const configSnapshot of [{}, { side: "unknown", allocation_method: "unknown" }]) {
+      const view = resultCardViewModel({ ...resultCardPlaygroundFixtures[0].result, configSnapshot }, { t, locale: "es-419" });
+      expect(view.evidence.details.map((detail) => detail.label)).not.toContain(t("chat.result_card.details.side"));
+      expect(view.evidence.details.map((detail) => detail.label)).not.toContain(t("chat.result_card.details.allocation"));
+    }
+  });
+
   test.each(["en", "es-419"])("voices the same typed DCA facts in %s", async (language) => {
     const t = await translator(language);
     const facts = resultReadoutFacts(bank);

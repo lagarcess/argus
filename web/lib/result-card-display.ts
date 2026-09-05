@@ -47,7 +47,9 @@ export type ResultCardDisplayCopy = {
   dateRangeLabel: string;
   timeframeLabel: string;
   sideLabel: string;
+  longOnlyValue: string;
   allocationLabel: string;
+  equalWeightValue: string;
   benchmarkLabel: string;
   /** Amount and period as one phrase, so no surface labels a period alone. */
   contributionPhrase: (amount: string, period: string) => string;
@@ -92,7 +94,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   beatBy: (value) => `Beat by ${value}`,
   laggedBy: (value) => `Lagged by ${value}`,
   assetClassLabel: (assetClass) => assetClassDisplayLabel(assetClass) ?? assetClass,
-  trustStrip: "Historical simulation · Not advice",
+  trustStrip: "Historical simulation · No fees/slippage · Not advice",
   historicalSimulationLabel: "Historical simulation",
   notAdviceLabel: "Not advice",
   startingCapitalLabel: "Starting capital",
@@ -102,7 +104,9 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   dateRangeLabel: "Date range",
   timeframeLabel: "Timeframe",
   sideLabel: "Side",
+  longOnlyValue: "Long only",
   allocationLabel: "Allocation",
+  equalWeightValue: "Equal weight",
   benchmarkLabel: "Benchmark",
   contributionPhrase: (amount, period) => contributionPhrase(amount, period),
   contributionLabel: "Contribution",
@@ -253,6 +257,7 @@ export function heroDeltaEvidenceView(
   const worstDrop = findMetric(result, ["max_drawdown_pct", "max_drawdown"]);
   const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
   const typedFacts = result.readoutFacts;
+  const costs = typedFacts?.costs ?? result.executionCosts;
   const totalReturnValue = typedFacts?.totalReturnPct !== undefined
     ? formatSignedPercent(typedFacts.totalReturnPct)
     : normalizeSignedPercent(totalReturn?.value);
@@ -293,8 +298,8 @@ export function heroDeltaEvidenceView(
       unavailable: typedFacts?.maxDrawdownPct === undefined && !normalizeSignedPercent(worstDrop?.value),
     },
     timeframeDisplay: facts.timeframeDisplay,
-    trustGroups: compactTrustGroups({ ...copy, trustStrip: result.executionCosts?.fee_bps != null && result.executionCosts?.slippage_bps != null
-      ? [copy.historicalSimulationLabel, copy.modeledCostsValue(String(result.executionCosts.fee_bps), String(result.executionCosts.slippage_bps)), copy.notAdviceLabel].join(" · ")
+    trustGroups: compactTrustGroups({ ...copy, trustStrip: costs?.fee_bps != null && costs.slippage_bps != null
+      ? [copy.historicalSimulationLabel, copy.modeledCostsValue(String(costs.fee_bps), String(costs.slippage_bps)), copy.notAdviceLabel].join(" · ")
       : copy.trustStrip }, result.assetClass),
     details: facts.details,
   };
@@ -357,6 +362,8 @@ function executionFacts(
     ...valueSummaryDetails,
     { label: copy.dateRangeLabel, value: dateRangeDisplay },
     timeframe ? { label: copy.timeframeLabel, value: formatTimeframeForDisplay(timeframe, copy) ?? copy.unavailable } : undefined,
+    config?.side === "long" ? { label: copy.sideLabel, value: copy.longOnlyValue } : undefined,
+    config?.allocation_method === "equal_weight" ? { label: copy.allocationLabel, value: copy.equalWeightValue } : undefined,
     benchmark
       ? {
           label: copy.benchmarkLabel,

@@ -516,7 +516,7 @@ describe("result card playground", () => {
       (fixture) => fixture.id === "old-persisted-card-shape",
     )!.result;
     expect(compactTrustGroups()).toEqual([
-      "Historical simulation · Not advice",
+      defaultResultCardDisplayCopy.trustStrip,
     ]);
     expect(compactTrustStrip()).not.toContain("Universe:");
     expect(compactTrustStrip()).not.toContain("Benchmark: SPY");

@@ -32,10 +32,6 @@ export function resultCardViewModel(
   { t, locale }: { t: TFunction; locale: string },
 ): ResultCardViewModel {
   const copy = resultDisplayCopy(t);
-  const costs = result.readoutFacts?.costs ?? result.executionCosts;
-  copy.trustStrip = costs?.fee_bps != null && costs.slippage_bps != null
-    ? t("chat.result_readout.costs_trust", { fee: costs.fee_bps, slippage: costs.slippage_bps })
-    : t("chat.result_readout.trust");
   const evidence = heroDeltaEvidenceView(result, { copy, locale });
   evidence.details.push(...resultReadoutRuleDetails(result.readoutFacts, t, locale));
   return {
@@ -137,7 +133,9 @@ export function resultDisplayCopy(t: TFunction): ResultCardDisplayCopy {
     dateRangeLabel: t("chat.result_card.details.date_range", "Date range"),
     timeframeLabel: t("chat.result_card.details.timeframe", "Timeframe"),
     sideLabel: t("chat.result_card.details.side", "Side"),
+    longOnlyValue: t("chat.result_card.details.long_only", "Long only"),
     allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
+    equalWeightValue: t("chat.result_card.details.equal_weight", "Equal weight"),
     benchmarkLabel: t("chat.result_card.details.benchmark", "Benchmark"),
     contributionPhrase: (amount, period) => contributionPhrase(amount, period, t),
     contributionLabel: t(
