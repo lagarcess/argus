@@ -1,0 +1,20 @@
+{
+  "candidate_sha": "79c8d78eee3af878b9cc52247bb1da28e7dc90a5",
+  "browser": "headed Playwright CLI",
+  "source_tree_kind": "git archive of exact candidate SHA",
+  "recorded_result_source": "docs/reports/evidence/411/browser/en-discovery-messages.json",
+  "recorded_result_source_sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+  "language_change": "Settings > Preferences > App language > Espanol, then full reload",
+  "recents_screenshot": "after-es-recents-preview.png",
+  "recents_screenshot_sha256": "345b8c1ee0a7f19c6ffa1a69d7939ed7d28dd94574693f9540431e681438b88d",
+  "search_query": "A simple buy-and-hold",
+  "search_query_provenance": "prefix of the privately retained original English result body",
+  "search_screenshot": "after-es-search-preview.png",
+  "search_screenshot_sha256": "5e8f11538d378d4e3f4f7731c54933b062b66e66c25758baa0f728d2ab7cb80e",
+  "observed_preview": "Resultado de simulación · META · Comprar y mantener",
+  "retained_english_body_rendered": false,
+  "saved_identity_title_retained": true,
+  "provider_calls": 0,
+  "hosted_database_reads_or_writes": 0,
+  "auth_or_session_identifiers_in_evidence": false
+}
