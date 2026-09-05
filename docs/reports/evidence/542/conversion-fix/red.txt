@@ -37,9 +37,9 @@ durable_receipt = False, faker = <faker.proxy.Faker object at 0x10be52da0>
         graph_state = _apply_stage_result(
             {"run_state": state, "user": UserState(user_id=faker.uuid4())}, result
         )
-    
+
         payload = _checkpoint_to_public_sse(graph_state)
-    
+
         assert payload["stage_outcome"] == "execution_failed_terminally"
 >       assert payload["final_response_payload"]["code"] == "account_conversion_required"
 E       KeyError: 'code'
@@ -72,9 +72,9 @@ durable_receipt = True, faker = <faker.proxy.Faker object at 0x10be52da0>
         graph_state = _apply_stage_result(
             {"run_state": state, "user": UserState(user_id=faker.uuid4())}, result
         )
-    
+
         payload = _checkpoint_to_public_sse(graph_state)
-    
+
         assert payload["stage_outcome"] == "execution_failed_terminally"
 >       assert payload["final_response_payload"]["code"] == "account_conversion_required"
 E       KeyError: 'code'
