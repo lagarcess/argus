@@ -21,6 +21,8 @@ import {
 import type { GuestDossierDecisionResumeTarget } from "@/lib/guest-conversion";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { compactDateDisplay } from "@/lib/date-range-display";
+import { resultReadoutFacts } from "@/lib/result-readout-facts";
+import { resultQuickTakeText } from "@/lib/result-readout-display";
 
 import { DecisionEditor } from "./DecisionEditor";
 import { DecisionNoteDisplay } from "./DecisionNoteDisplay";
@@ -126,6 +128,7 @@ export function RunDossierView({
   const { t, i18n } = useTranslation();
   const retestDetailId = useId();
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
+  const quickTake = resultQuickTakeText(resultReadoutFacts(dossier.outcome.result_fact_bank), t, locale);
   const decisionAction = dossier.actions.find(
     (action): action is SearchDecisionAction => action.type === "decision",
   );
@@ -345,11 +348,11 @@ export function RunDossierView({
           </p>
         )}
 
-        {(dossier.outcome.quick_take || metrics.length > 0) && (
+        {(quickTake || metrics.length > 0) && (
           <div className="mt-4 border-t border-black/5 pt-4 dark:border-white/5">
-            {dossier.outcome.quick_take && (
+            {quickTake && (
               <p className="text-[13px] leading-relaxed text-black/65 dark:text-white/65">
-                {dossier.outcome.quick_take}
+                {quickTake}
               </p>
             )}
             {metrics.length > 0 && (

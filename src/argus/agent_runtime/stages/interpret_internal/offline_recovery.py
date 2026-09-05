@@ -18,9 +18,6 @@ from argus.agent_runtime.recovery_messages import (
     retry_last_turn_stage_patch,
 )
 from argus.agent_runtime.stages.artifact_context import (
-    draft_assumptions_response as _draft_assumptions_response,
-)
-from argus.agent_runtime.stages.artifact_context import (
     live_pending_confirmation,
 )
 from argus.agent_runtime.stages.interpret_internal.shared import (
@@ -192,9 +189,7 @@ def _offline_recovery_message(
         and snapshot.pending_strategy_summary is not None
         and snapshot.pending_strategy_summary != StrategySummary()
     ):
-        strategy = (
-            live.pending if live is not None else snapshot.pending_strategy_summary
-        )
+        strategy = live.pending if live is not None else snapshot.pending_strategy_summary
         setup_phrase = _current_setup_phrase(strategy)
         if _pending_assumption_edit_was_not_applied(
             current_user_message=current_user_message,
@@ -207,13 +202,10 @@ def _offline_recovery_message(
                 language=language,
                 setup_phrase=setup_phrase,
             )
-        assumptions_response = _draft_assumptions_response(snapshot)
         action_guidance = recovery_message(
             "confirmation_action_guidance",
             language=language,
         )
-        if assumptions_response is not None:
-            return f"{assumptions_response} {action_guidance}"
         return recovery_message(
             "confirmation_change_unapplied",
             language=language,

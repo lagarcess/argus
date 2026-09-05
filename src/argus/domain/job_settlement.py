@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-RESEARCH_OPERATION_SCOPE = "chat.research"
+from argus.domain.backtest_job_scopes import RESEARCH_OPERATION_SCOPE
 
 
 @dataclass(frozen=True)

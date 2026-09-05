@@ -837,6 +837,37 @@ SHA**, with identical provider modes, and the two are compared:
   Do not promote.
 - **Candidate passes what production fails** → an improvement, record it.
 
+#### A candidate-only PROSE failure is not a regression until both sides are measured
+
+**Enforced 2026-09-03 by `tests/release_promotion_evidence_support.py`.** Voiced
+prose is stochastic, so a single suite run can hand back a candidate-only prose
+failure that no user would meet twice. Naming it in the manifest is not a
+disposition, and the gate refuses one.
+
+Measure the rate on both sides with a targeted interleaved A/B:
+
+- one case, **ten rounds minimum**, baseline then candidate inside each round;
+- one session, live provider on both sides;
+- count occurrences of the specific defect, not the judge's verdict;
+- reference both side documents in the manifest and record the two rates.
+
+About ten minutes and **$0.20**, against $1.33 and half an hour for a suite
+re-run that cannot answer the question anyway, because re-running gives you one
+more sample of the same noise.
+
+**Do not substitute a judge-only replay.** Replaying the recorded text through
+the judge measures whether the *grader* is stable on that input. It cannot tell
+you whether the candidate voices the defect more often than production, which
+is the only thing a regression can mean. On 2026-09-03 the replay split 8 pass
+/ 12 fail and a browser turn did not reproduce it; neither settled anything.
+The A/B returned 0 of 10 on both sides and the promotion proceeded. On
+2026-08-27 a judge-only replay was accepted in place of this measurement; that
+manifest is grandfathered in the gate and named there as the reason the rule
+exists.
+
+The same method settled the disputed case on 2026-08-21. Reach for it before
+building a theory.
+
 Run the baseline from a detached worktree at `origin/main` so the candidate
 tree is untouched, and commit both scorecards as durable evidence.
 

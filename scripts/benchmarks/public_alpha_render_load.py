@@ -52,6 +52,7 @@ from argus.api.chat.backtest_jobs import (  # noqa: E402
     RenderTaskRunClient,
     RenderWorkflowDispatcher,
 )
+from argus.domain.backtest_job_scopes import CHAT_RUN_SCOPE  # noqa: E402
 
 from workflows.backtest_job import (  # noqa: E402
     CAPACITY_LOAD_AUTHORITY,
@@ -741,7 +742,7 @@ def _create_probe_job(
         "conversation_id": seed_job["conversation_id"],
         "request_message_id": seed_job.get("request_message_id"),
         "confirmation_message_id": seed_job["confirmation_message_id"],
-        "operation_scope": "chat.run_backtest",
+        "operation_scope": CHAT_RUN_SCOPE,
         "idempotency_key": idempotency_key,
         "identity_hash": identity_hash,
         "payload_hash": payload_hash,

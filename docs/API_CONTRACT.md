@@ -171,7 +171,10 @@ Alpha supports server-side idempotency for expensive state-changing operations.
   length/characters return `422 validation_error`.
 - The unique reservation key is
   `(user_id, operation_scope, Idempotency-Key)`. The two approved operation
-  scopes are `chat.run_backtest` and `backtests.run`.
+  scopes are `chat.run_backtest` and `backtests.run`. (`chat.research` rows are
+  created by the research rail and `workflows.proof` rows by the canary's
+  workflow proof; neither is admitted through this endpoint, and a proof row
+  belongs to no conversation.)
 - Before hashing, the launch request is validated and materialized as the full
   `LaunchBacktestRequest` target shape: declared defaults and explicit nulls are
   present; field aliases such as `_execution_realism` are used; dates are ISO
@@ -200,15 +203,26 @@ Alpha supports server-side idempotency for expensive state-changing operations.
   counts zero additional simulations.
 - Reusing the reservation key with a different canonical identity returns
   `409 idempotency_conflict`. The response must not expose the existing job or
-  Run, increment usage, reserve capacity, or execute work.
+  Run, increment usage, reserve capacity, or execute work. Chat execution also
+  persists a separate terminal failure receipt with a derived
+  `rejection:<hash>` key; that receipt records the attempted identity and does
+  not mutate or disclose the job that already owns the confirmation key.
 - Keys are scoped to the authenticated user. The same text used by another user
   is a different reservation and never reveals the first user's state.
 
 Durable `backtest_jobs` rows therefore store `operation_scope`,
 `idempotency_key`, `identity_hash`, and the existing launch `payload_hash` as
-separate fields. `idempotency_key` is non-null for accepted jobs, and the
+separate fields. `idempotency_key` is non-null for accepted jobs and failure
+receipts, and the
 database uniqueness boundary is
 `UNIQUE(user_id, operation_scope, idempotency_key)`.
+
+Every newly appended confirmation card checks this durable reservation before
+publication. If its proposed `confirmation_id` is already reserved, the server
+mints a fresh confirmation identity and rewrites the card and payload together.
+An accepted job therefore spends its confirmation identity for the lifetime of
+the reservation; checkpoint or fallback state cannot make that identity active
+again on a later card.
 
 #### Atomic admission and backpressure
 
@@ -224,6 +238,16 @@ the job and charge the allowance together. Per-user exhaustion is evaluated
 before global exhaustion when both apply. Exact replay returns before every
 allowance or capacity check, while a collision returns before either boundary
 can disclose or mutate state.
+
+After a non-replay chat refusal, the API inserts one terminal
+`backtest_jobs.status = failed` receipt for the attempted launch. The receipt
+has a distinct `rejection:<hash>` idempotency key, stable `failure_code` and
+`failure_detail`, and `execution_metadata.refused_before_dispatch = true`; it
+neither consumes an
+allowance nor occupies queued/running capacity. The assistant message links to
+that receipt and derives its user-safe copy from the receipt's recorded
+`failure_code`. If the receipt cannot be written, production fails closed
+instead of emitting an unrecorded business failure.
 
 The private-alpha limits remain:
 
@@ -422,6 +446,11 @@ One action identity maps to one durable backtest job. The canonical Run id is
 stable because finalization derives it from that same job identity and retries
 reuse the job. A new intentional experiment requires a new confirmation and
 therefore a new action identity.
+
+The one-row rule applies to accepted reservation owners. A refused attempt may
+have a separate terminal failure receipt with no reservation key; this is
+audit evidence, not an executable job and not a second owner of the action
+identity.
 
 The owner-scoped lookup is
 `GET /api/v1/backtest-jobs/by-action/{confirmation_id}` and returns the existing
@@ -854,7 +883,13 @@ Application-facing user object.
   "deleted_at": null,
   "created_at": "timestamp",
   "updated_at": "timestamp",
-  "last_message_preview": "..."
+  "last_message_preview": null,
+  "preview": {
+    "kind": "result",
+    "symbols": ["TSLA"],
+    "template": "buy_and_hold",
+    "text": null
+  }
 }
 ```
 
@@ -864,6 +899,17 @@ Application-facing user object.
 - `system_default`
 
 *AI-generated titles should be created from context after first prompt, save, or exit.*
+
+`preview` is a read-time projection of the latest owner-scoped message, shared
+by conversation lists (including archives), chat history, Recents and search.
+Its kind is `text | result | confirmation | assumptions | breakdown | empty |
+unavailable`; `symbols` and `template` are optional context facts. Only `text`
+previews may carry verbatim ordinary conversation/user text. Artifact previews
+never carry stored assistant prose; the current frontend language bundle voices
+their kind and facts. Existing messages receive this projection immediately,
+without a database backfill or a model call. The compatibility
+`last_message_preview` response is null for artifact messages. A missing source
+produces `unavailable`, never a saved-prose fallback.
 
 ## Message
 
@@ -938,11 +984,31 @@ machine-readable fields alongside display labels:
   provider_coverage_adjustment`; ordinary calendar alignment, full coverage,
   and legacy coverage without a reason omit it. Clients must not infer the
   reason from dates.
-- `display_facts`: optional canonical facts for localized card metadata, such as
-  `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`.
-  Clients should render these facts through locale-aware presentation code and
-  use legacy `assumptions` strings only as fallback for older persisted cards.
+- `display_facts`: canonical facts for localized card metadata, such as
+  `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`, plus
+  `capital` or the distinct recurring-plan roles `starting_capital`,
+  `recurring_contribution`, and `contribution_period`. The shared
+  `argus.agent_runtime.confirmation_facts.confirmation_display_facts` projection
+  owns these values for both cards and assumptions answers. Clients render the
+  facts through their language bundles. Legacy `assumptions` prose is
+  non-presentational compatibility context and must never become a fallback.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
+
+An assumptions answer has `response_intent.kind = artifact_assumptions` and
+`response_intent.facts = { artifact_kind, asset_class, display_facts }`.
+`artifact_kind` is `confirmation` or `current_idea`; the fact values come from
+the visible card or its typed confirmation payload. An empty
+`assistant_response` is valid for this successful `ready_to_respond` turn. The
+API persists the typed answer and a completed terminal message; the frontend
+voices it in the current workspace language for live display, reload, and copy.
+This answer does not approve, change, consume, or recreate a confirmation.
+
+For old confirmations without `display_facts`, the typed payload can supply the
+same projection. Missing facts yield localized unavailable copy. Historical
+freeform assumptions replies that stored neither an assumptions-specific
+response intent nor another typed discriminator cannot be classified safely;
+they retain ordinary transcript behavior. Clients must not infer their purpose
+or recover missing facts by parsing the saved English prose.
 
 Clients must use `status` and `rows[].key` for behavior. They must not infer
 card state from translated display labels. Result actions that mutate state must
@@ -950,6 +1016,19 @@ reference a canonical run id. `result_fact_bank` is a backend-provided,
 run-derived context object for result follow-ups; it is not a second metrics
 source of truth. Legacy `saved_strategy_id` metadata remains readable after
 reload, but clients must not use it to expose a new write action.
+
+Result Quick Take, result breakdown, and dossier outcome prose render from the
+same typed run facts in the current workspace language. Original LLM result
+prose remains immutable audit/model context, not a presentation fallback.
+Public result messages carry empty `content`; live result finals carry empty
+`assistant_response`. Public run/card payloads omit stored `quick_take`,
+`breakdown`, `result_readout`, and `audit_context`, including nested copies.
+The public dossier outcome carries `result_fact_bank` instead of `quick_take`.
+Breakdown replies carry `response_intent.kind = result_breakdown` and
+`facts.result_fact_bank`; legacy breakdown action metadata derives that intent
+on read. Old incomplete message facts can be repaired from the owner-scoped
+canonical run in a bounded batch, without rewriting history. Unavailable facts
+produce localized unavailable text, not translated or regenerated source prose.
 
 ## Legacy Strategy Record
 
@@ -3204,6 +3283,14 @@ completed in-stream run, the final payload includes `backtest_job` and omits
 }
 ```
 
+The final event may also carry nullable `final_response_payload`, the typed
+graph output. Its optional nullable `code` is the authoritative conversion
+signal for admission refusals (`account_conversion_required`). The frontend
+stream type imports `ChatFinalResponsePayload`, generated from the backend
+`FinalResponsePayload` model by
+`scripts/generate_chat_final_response_type.py`; do not hand-maintain a second
+field list. Clients accept legacy payloads without this object or code.
+
 When a turn reaches a recoverable assistant response without a completed card,
 the final payload and persisted assistant message metadata may include
 `retry_last_turn` and `recovery`. `recovery` is a typed status object with a
@@ -3485,6 +3572,19 @@ Contract rules:
   describes the work, not the configuration tier it ran on: a market survey
   is `screening` whether it grounded on the balanced tier or the thorough
   one, so retuning a shape never moves its metering.
+- Research capacity is claimed only after the shared cache misses and a
+  provider is configured, immediately before provider work starts. The
+  backend calls one atomic `claim_research_usage` transaction that checks the
+  shared daily ceiling and the optional visitor-keyed guest allowance, then
+  increments both or neither. Two concurrent turns from the same visitor can
+  consume at most the slots that remained when they arrived. Guests receive
+  three provider-backed research questions per UTC day; signed-in users have
+  no separate per-user research allowance, but every provider attempt uses the
+  shared ceiling. `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` defaults to `5000`.
+  Ordinary chat turns, cache hits, unconfigured-provider paths, and idempotent
+  persisted thorough-job replays do not claim capacity. An unreadable or
+  unwritable
+  claim fails closed into the existing honest capacity-exhausted response.
 - Pricing reconciliation does not gate a usable provider answer. Research
   `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
   replaced with zero or an estimated charge. Provider billing evidence stays
@@ -3966,10 +4066,10 @@ Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
 with the current chat turn instead of staying open for workflow-duration
 execution.
 
-For completed workflow-backed jobs, `result_readout` is backend-generated
-Markdown using the same async explain-stage ownership as in-stream backtest
-results. The frontend renders this field when present; it must not synthesize a
-Quick take from result-card metrics. `result_readout_source` and
+For completed workflow-backed jobs, `result_readout` retains the original
+explain-stage prose privately in storage and is always null in the public
+response. Readers voice canonical run facts at the same presentation boundary
+used for in-stream and reloaded results. `result_readout_source` and
 `result_readout_fallback_used` expose whether the normal LLM/schema-grounded
 path produced the readout or whether Argus intentionally fell back to the
 deterministic safety renderer.
@@ -4076,7 +4176,7 @@ path and must declare `prompt_source = degraded_fallback`.
     "status": "completed",
     "conversation_result_card": {}
   },
-  "result_readout": "**Quick take**\n\nThe strategy returned 12.4% while SPY returned 10.1% over the same period; it beat the benchmark.\n\n- Tested: AAPL buy and hold over January 1, 2024 to June 5, 2026.\n- Keep in mind: This is a return comparison, not causal attribution.",
+  "result_readout": null,
   "result_readout_source": "llm_explain_stage",
   "result_readout_fallback_used": false,
   "result_readout_failure_mode": null,
@@ -4260,7 +4360,8 @@ Mixed recent activity feed.
       "id": "uuid",
       "title": "Tesla dip thread",
       "title_source": "ai_generated",
-      "subtitle": "Last message or metric preview",
+      "subtitle": "",
+      "preview": { "kind": "result", "symbols": ["TSLA"], "text": null },
       "pinned": false,
       "created_at": "timestamp",
       "conversation_id": "uuid",
@@ -4355,6 +4456,7 @@ the `/search` contract.
       "title": "Gold pullback ideas",
       "archived": false,
       "matched_text": "Hold through earnings.",
+      "preview": { "kind": "result", "symbols": ["GLD"], "text": null },
       "updated_at": "timestamp",
       "conversation_id": "uuid",
       "match": {
@@ -4431,6 +4533,15 @@ under each involved symbol. Each decision count comes from the latest
 owner-scoped DecisionNote reached through that run's EvidenceArtifact, so one
 run contributes to at most one decision state. `last_touched_at` is the latest
 activity on those runs or their evidence/decision lineage.
+
+Conversation search rows carry the same typed `preview` as Recents. Public
+`matched_text` and `match.fragment` retain text only for a `message` match,
+which is an owner-authored user message. Other match layers return empty
+fragments because their search corpus can contain retained artifact prose.
+Ranking, match layer/count, pagination and message anchors are preserved;
+user-authored DecisionNote text remains available through the dossier's
+decision projection. Search templates must render typed previews for those
+non-message matches and never fall back to the private search corpus.
 
 Text recall requires at least one normalized token with three characters. A
 single symbol-shaped query is separately eligible at two characters so stored

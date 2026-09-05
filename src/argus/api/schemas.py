@@ -12,12 +12,15 @@ from pydantic import (
     Field,
     SerializerFunctionWrapHandler,
     WithJsonSchema,
+    field_serializer,
     field_validator,
     model_serializer,
     model_validator,
 )
 from typing_extensions import NotRequired, TypedDict
 
+from argus.api.artifact_presentation import ReaderJobResponse, reader_run
+from argus.api.conversation_preview_contract import ConversationPreview
 from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_DEPTH,
     MAX_FEEDBACK_CONTEXT_KEYS,
@@ -335,6 +338,7 @@ class Conversation(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_message_preview: str | None = None
+    preview: ConversationPreview | None = None
     language: Language | None = None
     activity: ConversationActivity | None = None
 
@@ -437,6 +441,10 @@ class BacktestRun(BaseModel):
 class BacktestRunResponse(BaseModel):
     run: BacktestRun
 
+    @field_serializer("run")
+    def serialize_reader_run(self, run: BacktestRun) -> BacktestRun:
+        return reader_run(run)
+
 
 class BacktestJob(BaseModel):
     id: str
@@ -458,7 +466,7 @@ class BacktestJob(BaseModel):
     updated_at: datetime | None = None
 
 
-class BacktestJobResponse(BaseModel):
+class BacktestJobResponse(ReaderJobResponse):
     job: BacktestJob
     run: BacktestRun | None = None
     # A succeeded 'chat.research' job's result is this assistant message, the
@@ -469,6 +477,10 @@ class BacktestJobResponse(BaseModel):
     result_readout_fallback_used: bool | None = None
     result_readout_failure_mode: str | None = None
     next_experiments: dict[str, Any] | None = None
+
+    @field_serializer("run")
+    def serialize_reader_run(self, run: BacktestRun | None) -> BacktestRun | None:
+        return reader_run(run)
 
 
 class Idea(BaseModel):
@@ -555,6 +567,7 @@ class HistoryItemWire(TypedDict):
     conversation_id: str | None
     expires_at: datetime | None
     activity: NotRequired[ConversationActivity]
+    preview: NotRequired[ConversationPreview]
 
 
 class HistoryItem(BaseModel):
@@ -570,6 +583,7 @@ class HistoryItem(BaseModel):
     expires_at: datetime | None = None
     # Chat items only; non-chat records omit the additive projection.
     activity: ConversationActivity | None = None
+    preview: ConversationPreview | None = None
 
     @model_serializer(mode="plain", return_type=HistoryItemWire)
     def _omit_absent_chat_fields(self) -> HistoryItemWire:
@@ -588,6 +602,8 @@ class HistoryItem(BaseModel):
             data["title_source"] = self.title_source
         if self.activity is not None:
             data["activity"] = self.activity
+        if self.preview is not None:
+            data["preview"] = self.preview
         return data
 
 
@@ -611,7 +627,7 @@ class SearchDossierOutcome(BaseModel):
     run_label: str = Field(max_length=160)
     completed_at: datetime
     benchmark_symbol: str | None = Field(default=None, max_length=24)
-    quick_take: str | None = Field(default=None, max_length=500)
+    result_fact_bank: dict[str, Any] | None = None
     metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
 
 
@@ -743,6 +759,7 @@ class SearchItem(BaseModel):
     title: str
     archived: bool
     matched_text: str
+    preview: ConversationPreview | None = None
     updated_at: datetime
     conversation_id: str
     match: SearchMatch

@@ -118,7 +118,7 @@ export const legacyPersistedRunFixture: BacktestRun = {
   allocation_method: "equal_weight",
   benchmark_symbol: "SPY",
   metrics: { aggregate: {}, by_symbol: {} },
-  config_snapshot: { template: "buy_and_hold" },
+  config_snapshot: { template: "buy_and_hold", timeframe: "1D" },
   created_at: "2026-05-30T00:00:00Z",
   conversation_result_card: {
     title: "AAPL Buy and Hold",
@@ -163,7 +163,7 @@ export const legacyPersistedRunFixture: BacktestRun = {
   trades: null,
 };
 
-export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
+const fixtures: ResultCardPlaygroundFixture[] = [
   {
     id: "positive-single-symbol",
     name: "Positive single-symbol buy-and-hold",
@@ -176,10 +176,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       period: "January 4, 2021 to December 31, 2025",
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,560" },
-        { label: "Total return", value: "+56.0%" },
-        { label: "Compared with SPY", value: "Beat SPY by 27.9 percentage points" },
-        { label: "Worst drop", value: "-12.4%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,560" },
+        { key: "total_return_pct", label: "Total return", value: "+56.0%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "Beat SPY by 27.9 percentage points" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-12.4%" },
       ],
       assumptions: defaultAssumptions,
       actions: resultActions,
@@ -222,10 +222,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       configSnapshot: { benchmark_symbol: "SPY" },
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,118" },
-        { label: "Total return", value: "+11.8%" },
-        { label: "Compared with SPY", value: "Beat SPY by 5.8 percentage points" },
-        { label: "Worst drop", value: "-0.2%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,118" },
+        { key: "total_return_pct", label: "Total return", value: "+11.8%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "Beat SPY by 5.8 percentage points" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-0.2%" },
       ],
       assumptions: [
         "Long-only",
@@ -274,10 +274,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       period: "January 3, 2022 to December 29, 2023",
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $820" },
-        { label: "Total return", value: "-18.0%" },
-        { label: "Compared with SPY", value: "Lagged SPY by 9.4 percentage points" },
-        { label: "Worst drop", value: "-24.6%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $820" },
+        { key: "total_return_pct", label: "Total return", value: "-18.0%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "Lagged SPY by 9.4 percentage points" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-24.6%" },
       ],
       assumptions: defaultAssumptions,
       actions: resultActions,
@@ -309,10 +309,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       period: "January 3, 2023 to December 29, 2023",
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,143" },
-        { label: "Total return", value: "+14.3%" },
-        { label: "Compared with SPY", value: "Lagged SPY by 10.1 percentage points" },
-        { label: "Worst drop", value: "-11.9%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,143" },
+        { key: "total_return_pct", label: "Total return", value: "+14.3%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "Lagged SPY by 10.1 percentage points" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-11.9%" },
       ],
       assumptions: defaultAssumptions,
       actions: resultActions,
@@ -362,14 +362,14 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       period: "January 3, 2022 to December 29, 2023",
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,000" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,000" },
         {
           key: "contribution_return_pct",
           label: "Return on contributions",
           value: "0.0%",
         },
-        { label: "Compared with SPY", value: "In line with SPY" },
-        { label: "Worst drop", value: "-2.2%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "In line with SPY" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-2.2%" },
       ],
       assumptions: [
         "Timeframe: 1D",
@@ -409,10 +409,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       period: "January 3, 2022 to December 29, 2023",
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,184" },
-        { label: "Total return", value: "+18.4%" },
-        { label: "Compared with SPY", value: "Beat SPY by 7.1 percentage points" },
-        { label: "Worst drop", value: "-9.6%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,184" },
+        { key: "total_return_pct", label: "Total return", value: "+18.4%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "Beat SPY by 7.1 percentage points" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-9.6%" },
       ],
       assumptions: [
         ...defaultAssumptions,
@@ -466,10 +466,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       },
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,120" },
-        { label: "Total return", value: "+12.0%" },
-        { label: "Compared with SPY", value: "Beat SPY by 5.2 percentage points" },
-        { label: "Worst drop", value: "-1.8%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,120" },
+        { key: "total_return_pct", label: "Total return", value: "+12.0%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "Beat SPY by 5.2 percentage points" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-1.8%" },
       ],
       assumptions: [
         "Timeframe: 1h",
@@ -525,10 +525,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       },
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,010" },
-        { label: "Total return", value: "+1.0%" },
-        { label: "Compared with SPY", value: "In line with SPY" },
-        { label: "Worst drop", value: "-0.4%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,010" },
+        { key: "total_return_pct", label: "Total return", value: "+1.0%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "In line with SPY" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-0.4%" },
       ],
       assumptions: defaultAssumptions,
       actions: resultActions,
@@ -574,10 +574,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       period: "January 3, 2023 to December 29, 2023",
       statusLabel: "Simulation Complete",
       metrics: [
-        { label: "Ending value", value: "$1,000 -> $1,427" },
-        { label: "Total return", value: "+42.7%" },
-        { label: "Compared with SPY", value: "Beat SPY by 18.3 percentage points" },
-        { label: "Worst drop", value: "-12.4%" },
+        { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,427" },
+        { key: "total_return_pct", label: "Total return", value: "+42.7%" },
+        { key: "benchmark_delta", label: "Compared with SPY", value: "Beat SPY by 18.3 percentage points" },
+        { key: "max_drawdown_pct", label: "Worst drop", value: "-12.4%" },
       ],
       assumptions: defaultAssumptions,
       actions: resultActions,
@@ -604,3 +604,35 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
     result: resultCardFromRun(legacyPersistedRunFixture),
   },
 ];
+
+// Canonical scalar facts accompany fixture chrome just as persisted runs do.
+// Keeping them explicit also makes a missing fact testable without parsing copy.
+const fixtureComparisons: Record<string, number> = {
+  "positive-single-symbol": 27.9,
+  "modeled-execution-costs": 5.8,
+  "negative-single-symbol": -9.4,
+  "benchmark-underperformance-positive": -10.1,
+  "dca-result": 0,
+  "trade-based-strategy": 7.1,
+  "adaptive-intraday-result": 5.2,
+  "short-series-result": 0,
+  "multi-symbol-same-asset": 18.3,
+  "old-persisted-card-shape": 46.4,
+};
+
+export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = fixtures.map((fixture) => {
+  const result = fixture.result;
+  const dates = result.chart?.series;
+  return {
+    ...fixture,
+    result: {
+      ...result,
+      dateRange: result.dateRange ?? (dates?.length ? { start: dates[0]!.time.slice(0, 10), end: dates.at(-1)!.time.slice(0, 10) } : undefined),
+      configSnapshot: { timeframe: "1D", benchmark_symbol: "SPY", ...result.configSnapshot },
+      readoutFacts: {
+        symbols: result.symbols ?? [],
+        benchmarkDeltaPct: fixtureComparisons[fixture.id],
+      },
+    },
+  };
+});

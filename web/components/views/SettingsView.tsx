@@ -1,5 +1,7 @@
 "use client";
 
+import { conversationPreviewText } from "@/lib/conversation-preview-display";
+
 import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import {
@@ -212,7 +214,7 @@ export default function SettingsView({
                       {chat.title || t("chat.new_chat")}
                     </span>
                     <span className="text-[13px] text-black/40 dark:text-white/40 truncate">
-                      {chat.last_message_preview || t("chat.no_messages")}
+                      {conversationPreviewText(chat.preview, t)}
                     </span>
                   </div>
                   <button

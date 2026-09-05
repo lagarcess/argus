@@ -1,0 +1,58 @@
+{
+  "before": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "210c1886-4459-4542-8ac1-586ee0456407",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "after": {
+    "owner": {
+      "user_id": "1e177b33-43e6-49bf-8684-2408f73f9774",
+      "conversation_id": "210c1886-4459-4542-8ac1-586ee0456407",
+      "period_start": "2026-09-05T00:28:29+00:00",
+      "period_end": "2026-09-12T00:28:29+00:00"
+    },
+    "jobs": [],
+    "runs": [],
+    "workspace_usage": [
+      [
+        "backtest_runs",
+        "guest_session",
+        2,
+        2
+      ]
+    ],
+    "visitor_usage": [
+      [
+        "backtest_runs",
+        "day",
+        "2026-09-04 00:00:00+00:00",
+        2
+      ]
+    ]
+  },
+  "dialogs": [
+    "Keep going with ArgusThis temporary chat has reached its simulation limit. It expires on Sep 11, 2026, 7:28 PM CDT. Request access or sign in to continue.Request access to ArgusArgus is in early access. Share your email to request access. If approved, we\u2019ll email you when you can create an account.Email addressRequest accessAlready approved? Sign upAlready have an account? Sign in"
+  ],
+  "errors": []
+}

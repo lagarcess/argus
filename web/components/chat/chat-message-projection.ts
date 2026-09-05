@@ -13,6 +13,7 @@ import {
 } from "@/lib/chat-discovery-sidecar";
 import { replaceOrAppendFinalAssistantMessage } from "@/lib/chat-send-state";
 import { memoryRecallsFromMetadata } from "@/lib/memory-recalls";
+import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
@@ -218,6 +219,9 @@ export function messageStreamPresentation(
     isWorkingMessage:
       isLatestAi &&
       message.kind === "text" &&
+      message.contentPresentation !== "result_readout" &&
+      message.contentPresentation !== "result_breakdown" &&
+      message.recoveryDisplay?.kind !== "artifact_assumptions" &&
       (isStreamingResponse ||
         hasVisibleStreamStatus ||
         (message.content ?? "") === ""),
@@ -285,6 +289,7 @@ export function hydrateMessagesFromApi(
     .filter((message) => !hiddenMessageIds.has(message.id))
     .map((message) => {
       const metadata = message.metadata ?? {};
+      const responseIntentKind = recordOrNull(metadata.response_intent)?.kind;
       const chatAction = metadata.chat_action as ChatActionOption | undefined;
       const confirmation = metadata.confirmation_card as
         | StrategyConfirmationPayload
@@ -327,6 +332,8 @@ export function hydrateMessagesFromApi(
           benchmark_symbol:
             stringOrNull(factBank?.benchmark_symbol) ?? undefined,
           config_snapshot: configSnapshot ?? undefined,
+          metrics: recordOrNull(factBank?.metrics) as import("@/lib/argus-api").BacktestRun["metrics"] | undefined,
+          symbols: stringArrayOrNull(factBank?.symbols) ?? undefined,
         });
         const context = resultActionContextFromMetadata(metadata, card);
         const actions = hydrateResultActions(card.actions ?? [], {
@@ -342,7 +349,7 @@ export function hydrateMessagesFromApi(
           id: message.id,
           role: "ai",
           kind: "strategy_result",
-          content: message.content,
+          content: undefined,
           result: {
             ...card,
             symbols: context.symbols,
@@ -356,6 +363,21 @@ export function hydrateMessagesFromApi(
             nextExperimentRowsFromMetadata(metadata) ?? undefined,
           savedStrategyId,
           memoryRecalls: memoryRecallsFromMetadata(metadata) ?? undefined,
+        };
+      }
+      if (
+        message.role !== "user" &&
+        recordOrNull(metadata.result_fact_bank) &&
+        (responseIntentKind == null || responseIntentKind === "result") &&
+        !isBreakdownActionMetadata(metadata) &&
+        chatAction?.type !== "save_strategy"
+      ) {
+        return {
+          id: message.id,
+          role: "ai",
+          kind: "text",
+          contentPresentation: "result_readout",
+          resultReadoutFacts: resultReadoutFacts(metadata.result_fact_bank),
         };
       }
       const jobMessage = backtestJobMessageFromApi(message);
@@ -394,6 +416,16 @@ export function hydrateMessagesFromApi(
             ? "result_breakdown"
             : undefined,
       });
+      if (message.role !== "user" && isBreakdownActionMetadata(metadata)) {
+        return {
+          ...hydratedText,
+          content: undefined,
+          recoveryDisplay: {
+            kind: "result_breakdown" as const,
+            facts: resultReadoutFacts(metadata.result_fact_bank),
+          },
+        };
+      }
       if (message.role !== "user") {
         const discovery = discoverySidecarFromMetadata(metadata);
         const researchSources = researchSourcesFromMetadata(metadata);

@@ -38,6 +38,8 @@ export type ResultCardDisplayCopy = {
   laggedBy: (value: string) => string;
   assetClassLabel: (assetClass: AssetClass) => string;
   trustStrip: string;
+  historicalSimulationLabel: string;
+  notAdviceLabel: string;
   startingCapitalLabel: string;
   totalContributedLabel: string;
   peakValueLabel: string;
@@ -45,7 +47,9 @@ export type ResultCardDisplayCopy = {
   dateRangeLabel: string;
   timeframeLabel: string;
   sideLabel: string;
+  longOnlyValue: string;
   allocationLabel: string;
+  equalWeightValue: string;
   benchmarkLabel: string;
   /** Amount and period as one phrase, so no surface labels a period alone. */
   contributionPhrase: (amount: string, period: string) => string;
@@ -91,6 +95,8 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   laggedBy: (value) => `Lagged by ${value}`,
   assetClassLabel: (assetClass) => assetClassDisplayLabel(assetClass) ?? assetClass,
   trustStrip: "Historical simulation · No fees/slippage · Not advice",
+  historicalSimulationLabel: "Historical simulation",
+  notAdviceLabel: "Not advice",
   startingCapitalLabel: "Starting capital",
   totalContributedLabel: "Total contributed",
   peakValueLabel: "Peak value",
@@ -98,7 +104,9 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   dateRangeLabel: "Date range",
   timeframeLabel: "Timeframe",
   sideLabel: "Side",
+  longOnlyValue: "Long only",
   allocationLabel: "Allocation",
+  equalWeightValue: "Equal weight",
   benchmarkLabel: "Benchmark",
   contributionPhrase: (amount, period) => contributionPhrase(amount, period),
   contributionLabel: "Contribution",
@@ -135,36 +143,25 @@ function benchmarkLabel(
 export function resultMetricDisplayOrder(metric: MetricLike) {
   if (
     metric.key === "cash_value" ||
-    metric.key === "final_value" ||
-    metric.label === "Cash Value ($)" ||
-    metric.label === "Final Value ($)" ||
-    metric.label === "Ending value"
+    metric.key === "final_value" || metric.key === "ending_value"
   ) {
     return 0;
   }
   if (
     metric.key === "total_return_pct" ||
-    metric.key === "contribution_return_pct" ||
-    metric.label === "Total Return (%)" ||
-    metric.label === "Total Return" ||
-    metric.label === "Total return" ||
-    metric.label === "Return on contributions"
+    metric.key === "contribution_return_pct"
   ) {
     return 1;
   }
   if (
     metric.key === "benchmark_delta" ||
-    metric.key === "benchmark_delta_pct" ||
-    metric.label === "Vs benchmark" ||
-    metric.label.startsWith("Compared with ")
+    metric.key === "benchmark_delta_pct"
   ) {
     return 2;
   }
   if (
     metric.key === "max_drawdown_pct" ||
-    metric.key === "max_drawdown" ||
-    metric.label === "Max Drawdown" ||
-    metric.label === "Worst drop"
+    metric.key === "max_drawdown"
   ) {
     return 3;
   }
@@ -181,41 +178,32 @@ export function displayResultMetricLabel(
     return copy.contributionReturnLabel;
   }
   if (
-    metric.key === "total_return_pct" ||
-    metric.label === "Total Return (%)" ||
-    metric.label === "Total Return"
+    metric.key === "total_return_pct"
   ) {
     return copy.totalReturnLabel;
   }
   if (
     metric.key === "cash_value" ||
-    metric.key === "final_value" ||
-    metric.label === "Cash Value ($)" ||
-    metric.label === "Final Value ($)"
+    metric.key === "final_value" || metric.key === "ending_value"
   ) {
     return copy.endingValueLabel;
   }
   if (
     metric.key === "max_drawdown_pct" ||
-    metric.key === "max_drawdown" ||
-    metric.label === "Max Drawdown"
+    metric.key === "max_drawdown"
   ) {
     return copy.worstDropLabel;
   }
   if (
     metric.key === "benchmark_delta" ||
-    metric.key === "benchmark_delta_pct" ||
-    metric.label === "Vs benchmark"
+    metric.key === "benchmark_delta_pct"
   ) {
     if (benchmarkSymbol) {
       return benchmarkLabel(benchmarkSymbol, copy);
     }
-    if (metric.label.startsWith("Compared with ")) {
-      return metric.label;
-    }
     return benchmarkLabel(benchmarkSymbol, copy);
   }
-  return metric.label;
+  return copy.unavailable;
 }
 
 export function displayResultActionLabel(
@@ -230,20 +218,6 @@ export function displayResultActionLabel(
     return copy.refineIdeaAction;
   }
   return action.label ?? "";
-}
-
-export function displayResultBenchmarkNote(note?: string | null) {
-  const text = note?.trim();
-  if (!text) return undefined;
-
-  const normalized = text.toLowerCase();
-  const repeatsBenchmarkOrUniverse =
-    normalized.includes("benchmark:") ||
-    normalized.includes("referencia:") ||
-    normalized.startsWith("universe:") ||
-    normalized.startsWith("universo:");
-
-  return repeatsBenchmarkOrUniverse ? undefined : text;
 }
 
 type EvidenceTone = "positive" | "negative" | "neutral";
@@ -278,43 +252,29 @@ export function heroDeltaEvidenceView(
   options?: ResultCardDisplayOptions,
 ): HeroDeltaEvidenceView {
   const copy = resultCardCopy(options);
-  const endingValue = findMetric(result, [
-    copy.endingValueLabel,
-    "Ending value",
-    "Cash Value ($)",
-    "Final Value ($)",
-  ]);
-  const totalReturn = findMetric(result, [
-    copy.totalReturnLabel,
-    "Total return",
-    "Total Return",
-    "Total Return (%)",
-    copy.contributionReturnLabel,
-    "Return on contributions",
-    "Retorno sobre aportes",
-  ]);
-  const benchmark = findBenchmarkMetric(result, copy);
-  const worstDrop = findMetric(result, [
-    copy.worstDropLabel,
-    "Worst drop",
-    "Max Drawdown",
-  ]);
+  const endingValue = findMetric(result, ["cash_value", "final_value", "ending_value"]);
+  const totalReturn = findMetric(result, ["total_return_pct", "contribution_return_pct"]);
+  const worstDrop = findMetric(result, ["max_drawdown_pct", "max_drawdown"]);
   const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
-  const totalReturnValue = normalizeSignedPercent(totalReturn?.value);
+  const typedFacts = result.readoutFacts;
+  const costs = typedFacts?.costs ?? result.executionCosts;
+  const totalReturnValue = typedFacts?.totalReturnPct !== undefined
+    ? formatSignedPercent(typedFacts.totalReturnPct)
+    : normalizeSignedPercent(totalReturn?.value);
   const isContributionReturn =
-    totalReturn?.key === "contribution_return_pct" ||
-    [
-      copy.contributionReturnLabel.toLowerCase(),
-      "return on contributions",
-      "retorno sobre aportes",
-    ].includes((totalReturn?.label ?? "").toLowerCase());
+    totalReturn?.key === "contribution_return_pct" || typedFacts?.strategyType === "dca_accumulation";
   const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
   const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
-  const benchmarkSymbol = facts.benchmark ?? benchmarkSymbolFromMetric(benchmark);
+  const benchmarkSymbol = facts.benchmark;
+  const delta = typedFacts?.benchmarkDeltaPct;
+  const benchmarkValue = delta === undefined || !benchmarkSymbol ? copy.benchmarkUnavailable
+    : Math.abs(delta) < 0.05 ? copy.inLineWith(benchmarkSymbol)
+    : delta > 0 ? copy.beatBy(copy.percentagePoints(Math.abs(delta).toFixed(1)))
+    : copy.laggedBy(copy.percentagePoints(Math.abs(delta).toFixed(1)));
 
   return {
     hero: {
-      value: parsedEndingValue?.endingDisplay ?? endingValue?.value ?? copy.unavailable,
+      value: parsedEndingValue?.endingDisplay ?? copy.unavailable,
       label: copy.endingValueLabel,
       detail: heroDetail(
         parsedEndingValue?.change,
@@ -325,24 +285,23 @@ export function heroDeltaEvidenceView(
       ),
       tone,
       // Unavailable values must read as absent, never as a healthy metric.
-      unavailable: !(parsedEndingValue?.endingDisplay ?? endingValue?.value),
+      unavailable: !parsedEndingValue?.endingDisplay,
     },
     benchmark: {
       label: benchmarkLabel(benchmarkSymbol, copy),
-      value: benchmarkDisplayValue(benchmark, copy),
-      unavailable: !benchmark?.value.trim(),
+      value: benchmarkValue,
+      unavailable: delta === undefined || !benchmarkSymbol,
     },
     worstDrop: {
       label: copy.worstDropLabel,
-      value: worstDrop?.value ?? copy.unavailable,
-      unavailable: !worstDrop?.value,
+      value: typedFacts?.maxDrawdownPct !== undefined ? formatSignedPercent(typedFacts.maxDrawdownPct) : normalizeSignedPercent(worstDrop?.value) ?? copy.unavailable,
+      unavailable: typedFacts?.maxDrawdownPct === undefined && !normalizeSignedPercent(worstDrop?.value),
     },
     timeframeDisplay: facts.timeframeDisplay,
-    trustGroups: compactTrustGroups(
-      copy,
-      result.assetClass,
-      modeledExecutionCostAssumption(result),
-    ),
+    trustGroups: compactTrustGroups({ ...copy, trustStrip: costs?.fee_bps != null && costs.slippage_bps != null
+      ? [copy.historicalSimulationLabel, copy.modeledCostsValue(String(costs.fee_bps), String(costs.slippage_bps)), copy.notAdviceLabel].join(" · ")
+      : costs ? [copy.historicalSimulationLabel, copy.notAdviceLabel].join(" · ")
+      : copy.trustStrip }, result.assetClass),
     details: facts.details,
   };
 }
@@ -350,20 +309,8 @@ export function heroDeltaEvidenceView(
 export function compactTrustGroups(
   copy = defaultResultCardDisplayCopy,
   assetClass?: AssetClass,
-  modeledCostAssumption?: string,
 ) {
   const assetClassLabel = assetClass ? copy.assetClassLabel(assetClass) : undefined;
-  if (modeledCostAssumption) {
-    const normalizedCostAssumption = modeledCostAssumption.toLowerCase();
-    const isSpanish =
-      normalizedCostAssumption.startsWith("neto de") ||
-      normalizedCostAssumption.startsWith("modela");
-    const historical = isSpanish ? "Simulación histórica" : "Historical simulation";
-    const notAdvice = isSpanish ? "No es asesoría" : "Not advice";
-    return [
-      `${assetClassLabel ? `${assetClassLabel} · ` : ""}${historical} · ${modeledCostAssumption} · ${notAdvice}`,
-    ];
-  }
   return [
     assetClassLabel ? `${assetClassLabel} · ${copy.trustStrip}` : copy.trustStrip,
   ];
@@ -373,26 +320,8 @@ export function compactTrustStrip(copy = defaultResultCardDisplayCopy) {
   return compactTrustGroups(copy).join(" · ");
 }
 
-function findMetric(result: StrategyResultPayload, labels: string[]) {
-  const normalizedLabels = labels.map((label) => label.toLowerCase());
-  return result.metrics.find(
-    (metric) => normalizedLabels.includes(metric.label.toLowerCase()),
-  );
-}
-
-function findBenchmarkMetric(
-  result: StrategyResultPayload,
-  copy = defaultResultCardDisplayCopy,
-) {
-  const labels = [
-    "vs benchmark",
-    "compared with ",
-    "comparado con ",
-    copy.comparedWithBenchmarkLabel.toLowerCase(),
-  ];
-  return result.metrics.find((metric) =>
-    labels.some((label) => metric.label.toLowerCase().startsWith(label)),
-  );
+function findMetric(result: StrategyResultPayload, keys: string[]) {
+  return result.metrics.find((metric) => metric.key !== undefined && keys.includes(metric.key));
 }
 
 function executionFacts(
@@ -401,35 +330,28 @@ function executionFacts(
   copy: ResultCardDisplayCopy,
   locale?: string,
 ) {
-  const assumptions = normalizedAssumptions(result);
   const config = result.configSnapshot;
+  // Completed runs wrap the actual launch config; older direct runs store it
+  // at the root. Select the typed config once, never fields from saved prose.
+  const engineConfig = recordValue(config?.engine_config) ?? config;
   const resolvedParameters = recordValue(config?.resolved_parameters);
   const parameters = recordValue(config?.parameters);
   const timeframe =
     stringValue(config?.timeframe) ??
-    stringValue(resolvedParameters?.timeframe) ??
-    assumptionValue(assumptions, "Timeframe");
+    stringValue(resolvedParameters?.timeframe);
   const benchmark =
-    stringValue(resolvedParameters?.benchmark_symbol) ??
-    stringValue(config?.benchmark_symbol) ??
-    assumptionValue(assumptions, "Benchmark") ??
-    benchmarkFromMetric(result);
+    result.readoutFacts?.benchmarkSymbol ?? stringValue(resolvedParameters?.benchmark_symbol) ??
+    stringValue(config?.benchmark_symbol);
   const contribution = contributionFromStructuredFacts(
     resolvedParameters,
     parameters,
     locale,
     copy,
   );
-  const entryRule = assumptionValue(assumptions, "Entry");
-  const exitRule = assumptionValue(assumptions, "Exit");
-  const side = assumptions.find((assumption) => assumption.toLowerCase() === "long-only");
-  const allocation = assumptions.find(
-    (assumption) => assumption.toLowerCase() === "equal weight",
-  );
   const startingCapital =
     parsedStartingCapital ?? result.chart?.base_value ?? undefined;
   const dateRangeDisplay =
-    compactDateRangeDisplay(result.dateRange, locale || "en-US") ?? result.period;
+    compactDateRangeDisplay(result.dateRange, locale || "en-US") ?? copy.unavailable;
   const capitalBasisLabel = isRecurringContributionResult(
     result,
     resolvedParameters,
@@ -443,9 +365,9 @@ function executionFacts(
       : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
     ...valueSummaryDetails,
     { label: copy.dateRangeLabel, value: dateRangeDisplay },
-    timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
-    side ? { label: copy.sideLabel, value: side } : undefined,
-    allocation ? { label: copy.allocationLabel, value: allocation } : undefined,
+    timeframe ? { label: copy.timeframeLabel, value: formatTimeframeForDisplay(timeframe, copy) ?? copy.unavailable } : undefined,
+    engineConfig?.side === "long" ? { label: copy.sideLabel, value: copy.longOnlyValue } : undefined,
+    engineConfig?.allocation_method === "equal_weight" ? { label: copy.allocationLabel, value: copy.equalWeightValue } : undefined,
     benchmark
       ? {
           label: copy.benchmarkLabel,
@@ -458,8 +380,6 @@ function executionFacts(
     contribution?.amount
       ? { label: copy.contributionLabel, value: contribution.amount }
       : undefined,
-    entryRule ? { label: copy.entryRuleLabel, value: entryRule } : undefined,
-    exitRule ? { label: copy.exitRuleLabel, value: exitRule } : undefined,
     ...executionCostDetails(result, copy),
   ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 
@@ -594,34 +514,6 @@ function stringValue(value: unknown) {
     : undefined;
 }
 
-function normalizedAssumptions(result: StrategyResultPayload) {
-  return (result.assumptions ?? [])
-    .map((assumption) => assumption.trim().replace(/[.]+$/, ""))
-    .filter(Boolean)
-    .filter((assumption) => !assumption.toLowerCase().startsWith("universe:"));
-}
-
-function modeledExecutionCostAssumption(result: StrategyResultPayload) {
-  return normalizedAssumptions(result).find((assumption) => {
-    const normalized = assumption.toLowerCase();
-    return (
-      normalized.startsWith("net of ") ||
-      normalized.startsWith("neto de ") ||
-      // Older persisted cards carry the longer modeled-cost phrasing.
-      normalized.startsWith("modeled ") ||
-      normalized.startsWith("modela ")
-    );
-  });
-}
-
-function assumptionValue(assumptions: string[], label: string) {
-  const prefix = `${label}:`;
-  const value = assumptions.find((assumption) =>
-    assumption.toLowerCase().startsWith(prefix.toLowerCase()),
-  );
-  return value?.slice(prefix.length).trim();
-}
-
 function contributionFromStructuredFacts(
   resolvedParameters?: Record<string, unknown>,
   parameters?: Record<string, unknown>,
@@ -696,19 +588,6 @@ function timeframeUnitLabel(unit: string) {
   return "period";
 }
 
-function benchmarkFromMetric(result: StrategyResultPayload) {
-  const metric = findBenchmarkMetric(result);
-  const match = metric?.label.match(/^Compared with\s+(.+)$/i);
-  return match?.[1]?.trim() ?? benchmarkSymbolFromMetric(metric);
-}
-
-function benchmarkSymbolFromMetric(metric?: EvidenceMetric) {
-  const valueSymbol = metric?.value.match(/\bvs\s+([A-Z0-9.-]+)\b/i)?.[1];
-  if (valueSymbol) return valueSymbol;
-  const labelSymbol = metric?.label.match(/^Compared with\s+(.+)$/i)?.[1]?.trim();
-  return labelSymbol;
-}
-
 function parseEndingValue(value?: string, locale?: string) {
   const matches = value?.match(CURRENCY_VALUE_PATTERN) ?? [];
   if (matches.length === 0) return undefined;
@@ -772,45 +651,6 @@ function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
   const basis = numericReturn ?? change;
   if (basis == null || Math.abs(basis) <= 0.5) return "neutral";
   return basis > 0 ? "positive" : "negative";
-}
-
-function benchmarkDisplayValue(
-  metric: EvidenceMetric | undefined,
-  copy: ResultCardDisplayCopy,
-) {
-  const value = metric?.value.trim();
-  if (!value) return copy.benchmarkUnavailable;
-  const benchmarkValue = value.match(
-    /^([+-]?\d+(?:\.\d+)?)\s+(?:percentage points|pts)\s+vs\s+([A-Z0-9.-]+)$/i,
-  );
-  if (benchmarkValue) {
-    const numericValue = Number(benchmarkValue[1]);
-    const benchmarkSymbol = benchmarkValue[2];
-    if (Math.abs(numericValue) < 0.05) return copy.inLineWith(benchmarkSymbol);
-    const valueText = copy.percentagePoints(Math.abs(numericValue).toFixed(1));
-    return numericValue > 0 ? copy.beatBy(valueText) : copy.laggedBy(valueText);
-  }
-  const namedBenchmarkValue = value.match(
-    /^(Beat|Lagged)\s+(?:[A-Z0-9.-]+\s+)?by\s+([+-]?\d+(?:\.\d+)?)\s+(?:percentage points|pts)$/i,
-  );
-  if (namedBenchmarkValue) {
-    const direction = namedBenchmarkValue[1].toLowerCase();
-    const valueText = copy.percentagePoints(
-      Math.abs(Number(namedBenchmarkValue[2])).toFixed(1),
-    );
-    return direction === "beat" ? copy.beatBy(valueText) : copy.laggedBy(valueText);
-  }
-  return value
-    .replace(/^Beat\s+[A-Z0-9.-]+\s+by\s+(.+)$/i, (_, amount: string) =>
-      copy.beatBy(amount),
-    )
-    .replace(/^Lagged\s+[A-Z0-9.-]+\s+by\s+(.+)$/i, (_, amount: string) =>
-      copy.laggedBy(amount),
-    )
-    .replace(/^In line with\s+([A-Z0-9.-]+)$/i, (_, symbol: string) =>
-      copy.inLineWith(symbol),
-    )
-    .replace(/\bpts\b/gi, "percentage points");
 }
 
 export function formatCurrency(value: number, locale = "en-US", currency = "USD") {

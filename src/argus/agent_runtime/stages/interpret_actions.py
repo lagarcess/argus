@@ -1031,7 +1031,7 @@ def pending_artifact_followup_stage_result_if_applicable(
                 "missing_required_fields": [],
             }
         ),
-        stage_patch={"assistant_response": draft_response},
+        stage_patch={"assistant_response": "", "response_intent": draft_response},
     )
 
 
@@ -1066,7 +1066,7 @@ async def artifact_followup_stage_result_if_applicable(
             return StageResult(
                 outcome="ready_to_respond",
                 decision=_result_followup_decision(decision, focus=focus),
-                stage_patch={"assistant_response": draft_response},
+                stage_patch={"assistant_response": "", "response_intent": draft_response},
             )
     reference = (
         snapshot.latest_backtest_result_reference if snapshot is not None else None

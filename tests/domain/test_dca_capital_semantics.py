@@ -896,7 +896,9 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
         action["type"] for action in evidence["actions"]
     ]
     assert produced["rows"] == evidence["rows"]
-    assert produced["assumptions"] == evidence["assumptions"]
+    # The historical image's assumption values are still represented by the
+    # same typed facts. New cards no longer duplicate them as Python prose.
+    assert produced["assumptions"] == []
     assert produced["display_facts"] == evidence["display_facts"]
     # The editable date window's upper bound is today by construction, so a
     # frozen copy of it in the fixture stops matching the moment the clock

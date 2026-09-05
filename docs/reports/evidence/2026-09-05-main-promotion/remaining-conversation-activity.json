@@ -1,0 +1,58 @@
+{
+  "checked_at": "2026-09-05T05:05:36.609305+00:00",
+  "query_source": "public.read_conversation_activity_sources",
+  "aggregate_only": true,
+  "remaining_activity_causes": [
+    {
+      "source_kind": "backtest_job",
+      "status": "succeeded",
+      "result_hydrateable": "false",
+      "operation_scope": "chat.run_backtest",
+      "created_by": "not_proof_seed",
+      "job_has_run": false,
+      "run_exists": false,
+      "run_status": null,
+      "run_has_card": false,
+      "card_has_evidence_identity": false,
+      "evidence_exists": false,
+      "emitted_rows": 1,
+      "conversations": 1,
+      "oldest_job": "2026-06-06 19:43:47.126716+00:00",
+      "newest_job": "2026-06-06 19:43:47.126716+00:00"
+    },
+    {
+      "source_kind": "backtest_job",
+      "status": "succeeded",
+      "result_hydrateable": "false",
+      "operation_scope": "chat.run_backtest",
+      "created_by": "not_proof_seed",
+      "job_has_run": true,
+      "run_exists": true,
+      "run_status": "completed",
+      "run_has_card": true,
+      "card_has_evidence_identity": false,
+      "evidence_exists": false,
+      "emitted_rows": 120,
+      "conversations": 120,
+      "oldest_job": "2026-06-06 06:25:42.694667+00:00",
+      "newest_job": "2026-07-12 19:50:50.526094+00:00"
+    },
+    {
+      "source_kind": "chat_turn",
+      "status": "running",
+      "result_hydrateable": "false",
+      "operation_scope": null,
+      "created_by": "not_proof_seed",
+      "job_has_run": false,
+      "run_exists": false,
+      "run_status": null,
+      "run_has_card": false,
+      "card_has_evidence_identity": false,
+      "evidence_exists": false,
+      "emitted_rows": 7,
+      "conversations": 7,
+      "oldest_job": null,
+      "newest_job": null
+    }
+  ]
+}

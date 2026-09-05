@@ -1,0 +1,17 @@
+Comprar y mantener
+Activos: META
+Periodo: 3 ene 2023 → 31 dic 2024 · Datos diarios
+Simulación completa
+Valor final: $46,950
++$36,950 ganancia · +369.5% rendimiento total
+Comparado con SPY: Superó por 315.6 puntos porcentuales
+Peor caída: -18.4%
+Capital inicial: $10,000
+Valor máximo: $50,694
+Valor mínimo: $10,000
+Rango de fechas: 3 ene 2023 → 31 dic 2024
+Temporalidad: Datos diarios
+Referencia: SPY
+Acciones · Simulación histórica · No es asesoría
+Explicación del asistente:
+Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de 369.5%. Terminó 315.64 puntos porcentuales por encima de SPY. La peor caída fue de -18.35%.

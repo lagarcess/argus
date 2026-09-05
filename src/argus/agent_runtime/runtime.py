@@ -55,8 +55,6 @@ def build_workflow_input(
     | None = None,
     fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
     discovery_allowance_available: bool = True,
-    research_allowance_available: bool = True,
-    research_guest_allowance_exhausted: bool = False,
 ) -> WorkflowState:
     normalized_message = " ".join(message.strip().split())
     run_state = RunState.new(
@@ -68,8 +66,6 @@ def build_workflow_input(
         action_context=action_context,
     )
     run_state.discovery_allowance_available = discovery_allowance_available
-    run_state.research_allowance_available = research_allowance_available
-    run_state.research_guest_allowance_exhausted = research_guest_allowance_exhausted
     run_state.prior_next_experiment_kinds = offered_kinds_from_thread_metadata(
         fallback_selected_thread_metadata
     )

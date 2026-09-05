@@ -1,4 +1,12 @@
 {
+  "conversation_preview": {
+    "result": "Resultado de simulación",
+    "confirmation": "Simulación lista para revisar",
+    "assumptions": "Supuestos de la simulación",
+    "breakdown": "Explicación de la simulación",
+    "empty": "Todavía no hay mensajes",
+    "unavailable": "Abre la conversación para ver los detalles"
+  },
   "common": {
     "and": "y",
     "archive": "Archivar",
@@ -221,6 +229,14 @@
     "close": "Cerrar comentarios"
   },
   "chat": {
+    "artifact_assumptions": {
+      "confirmation": "Para la confirmación, estos son los supuestos: {{assumptions}}.",
+      "current_idea": "Para esta idea, estos son los supuestos conocidos: {{assumptions}}.",
+      "unavailable": "El artefacto guardado no incluye los datos necesarios para mostrar sus supuestos.",
+      "starting_capital": "Capital inicial: {{amount}}",
+      "contribution": "Aportación: {{amount}} {{period}}",
+      "contribution_without_period": "Aportación: {{amount}}"
+    },
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
     "input_placeholder": "Pregunta sobre cualquier empresa o idea",
     "input_placeholder_prerail": "Describe una idea de inversión...",
@@ -467,7 +483,39 @@
       "updated_duration": "Duración actualizada: {{duration}}"
     },
     "result_readout": {
-      "quick_take": "Lectura rápida"
+      "quick_take": "Lectura rápida",
+      "unavailable": "Los datos guardados no son suficientes para mostrar este resultado. Ábrelo de nuevo cuando su evidencia esté disponible.",
+      "strategy": "Prueba histórica",
+      "assets_unavailable": "activos no disponibles",
+      "tested": "{{strategy}} de {{symbols}}.",
+      "tested_period": "{{strategy}} de {{symbols}}, {{period}}.",
+      "total_return": "El retorno total fue de {{value}}.",
+      "contribution_return": "El retorno sobre los aportes fue de {{value}}.",
+      "beat": "Terminó {{value}} puntos porcentuales por encima de {{symbol}}.",
+      "lagged": "Terminó {{value}} puntos porcentuales por debajo de {{symbol}}.",
+      "matched": "Terminó al mismo nivel que {{symbol}}.",
+      "comparison_unavailable": "La comparación con la referencia no está disponible.",
+      "drawdown": "La peor caída fue de {{value}}.",
+      "starting_capital": "Capital inicial: {{value}}.",
+      "contribution": "Aporte recurrente: {{value}}.",
+      "benchmark_return": "{{symbol}} tuvo un retorno de {{value}} durante el período probado.",
+      "costs": "Costos modelados: {{fee}} puntos básicos de comisión y {{slippage}} de deslizamiento.",
+      "gross_return": "Retorno antes de costos: {{value}}.",
+      "net_return": "Retorno después de costos: {{value}}.",
+      "historical": "Esta es una simulación histórica, no un pronóstico ni asesoría de inversión.",
+      "rsi_entry": "RSI({{period}}) igual o inferior a {{threshold}}.",
+      "rsi_exit": "RSI({{period}}) igual o superior a {{threshold}}.",
+      "parameter_unavailable": "no disponible",
+      "timeframe_units": { "minute": "minutos", "hour": "horas", "day": "días", "week": "semanas", "period": "períodos" },
+      "rule_series": { "open": "Apertura", "high": "Máximo", "low": "Mínimo", "close": "Cierre", "volume": "Volumen" },
+      "rule_outputs": { "macd": "línea", "signal": "línea de señal", "histogram": "histograma", "upper": "banda superior", "lower": "banda inferior", "middle": "banda media", "value": "valor" },
+      "rule_operators": { "lt": "{{left}} es inferior a {{right}}", "lte": "{{left}} es igual o inferior a {{right}}", "gt": "{{left}} es superior a {{right}}", "gte": "{{left}} es igual o superior a {{right}}", "cross_above": "{{left}} cruza por encima de {{right}}", "cross_below": "{{left}} cruza por debajo de {{right}}" },
+      "rule_combinators": { "all": " y ", "any": " o " },
+      "rule_parameters": { "fast": "rápida", "slow": "lenta", "signal": "señal", "length": "período", "std": "desviaciones" },
+      "historical_label": "Simulación histórica",
+      "not_advice": "No es asesoría",
+      "trust": "Simulación histórica · No es asesoría",
+      "costs_trust": "Simulación histórica · {{fee}} puntos básicos de comisión + {{slippage}} de deslizamiento · No es asesoría"
     },
     "discovery_results": {
       "test_candidate": "Simular {{symbol}}",
@@ -644,7 +692,9 @@
         "date_range": "Rango de fechas",
         "timeframe": "Temporalidad",
         "side": "Dirección",
+        "long_only": "Solo posiciones largas",
         "allocation": "Asignación",
+        "equal_weight": "Pesos iguales",
         "benchmark": "Referencia",
         "contribution": "Contribución",
         "entry_rule": "Regla de entrada",

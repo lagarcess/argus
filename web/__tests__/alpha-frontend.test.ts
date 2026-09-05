@@ -76,12 +76,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(result.strategyName).toBe("TSLA RSI Mean Reversion");
     expect(result.period).toBe("April 23, 2025 to April 23, 2026");
     expect(result.metrics).toEqual([
-      { label: "Ending value", value: "$1.0k -> $2.0k" },
-      { label: "Total return", value: "+12.4%" },
-      { label: "Compared with SPY", value: "+4.2 pts vs SPY" },
-      { label: "Worst drop", value: "-8.1%" },
+      { key: "cash_value", label: "Ending value", value: "$1.0k -> $2.0k" },
+      { key: "total_return_pct", label: "Total return", value: "+12.4%" },
+      { key: "benchmark_delta", label: "Compared with SPY", value: "+4.2 pts vs SPY" },
+      { key: "max_drawdown_pct", label: "Worst drop", value: "-8.1%" },
     ]);
-    expect(result.benchmarkNote).toBeUndefined();
+    expect("benchmarkNote" in result).toBe(false);
     expect(result.chart?.kind).toBe("portfolio_equity");
   });
 

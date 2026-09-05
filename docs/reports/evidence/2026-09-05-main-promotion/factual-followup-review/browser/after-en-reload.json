@@ -1,0 +1,24 @@
+[
+  {
+    "role": "user",
+    "content": "On what date did the portfolio reach its highest value?"
+  },
+  {
+    "role": "assistant",
+    "content": "The portfolio hit its highest value of **$50,694.08 on December 11, 2024**, more than halfway through the second year of this buy-and-hold run for META. It started from $10,000 on January 3, 2023.\n\nKeep in mind, this is a historical simulation, not a prediction or trading recommendation \u2014 past results don't guarantee future outcomes.",
+    "response_intent": {
+      "kind": "beginner_guidance",
+      "semantic_needs": [],
+      "requested_fields": [],
+      "facts": {
+        "peak_date": "2024-12-11T05:00:00",
+        "peak_value": "$50,694.08",
+        "fact_key": "peak_date",
+        "source": "result_followup_fact_bank"
+      },
+      "options": []
+    },
+    "conversation_mode": "guide",
+    "result_run_id": "00000000-0000-4000-8000-000000005312"
+  }
+]

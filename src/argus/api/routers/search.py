@@ -11,6 +11,7 @@ from argus.api.client_capabilities import (
     ClientCapabilitiesHeader,
     dossier_decision_action_availability,
 )
+from argus.api.conversation_previews import conversation_previews
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
 from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
@@ -302,6 +303,26 @@ def search(
     page = filtered if id_scoped_recall else filtered[: limit + 1]
     has_more = False if id_scoped_recall else len(page) > limit
     page_items = page if id_scoped_recall else page[:limit]
+    previews = conversation_previews(
+        user_id=user.id, conversation_ids=[item.conversation_id for _, item in page_items]
+    )
+    page_items = [
+        (
+            score,
+            item.model_copy(
+                update={
+                    "preview": previews[item.conversation_id],
+                    "matched_text": item.matched_text
+                    if item.match.layer == "message"
+                    else "",
+                    "match": item.match
+                    if item.match.layer == "message"
+                    else item.match.model_copy(update={"fragment": ""}),
+                }
+            ),
+        )
+        for score, item in page_items
+    ]
     next_cursor = None
     if has_more and page_items:
         _, last_item = page_items[-1]

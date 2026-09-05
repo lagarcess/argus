@@ -298,6 +298,14 @@ def test_history_guest_single_workspace_behavior_is_unchanged(
     gateway.get_or_create_profile_for_auth_user.return_value = profile
     gateway.get_active_guest_workspace.return_value = workspace
     gateway.get_conversation.return_value = conversation
+    gateway.read_conversation_preview_messages.return_value = [
+        {
+            "conversation_id": CONVERSATION_ID,
+            "role": "user",
+            "content": "A truthful preview",
+            "metadata": {},
+        }
+    ]
     _configure_activity_projection(gateway)
 
     with (
@@ -318,7 +326,13 @@ def test_history_guest_single_workspace_behavior_is_unchanged(
                 "id": CONVERSATION_ID,
                 "title": "Temporary idea",
                 "title_source": "system_default",
-                "subtitle": "A truthful preview",
+                "subtitle": "",
+                "preview": {
+                    "kind": "text",
+                    "text": "A truthful preview",
+                    "symbols": [],
+                    "template": None,
+                },
                 "pinned": False,
                 "created_at": conversation.updated_at.isoformat().replace("+00:00", "Z"),
                 "conversation_id": CONVERSATION_ID,
@@ -336,6 +350,9 @@ def test_history_guest_single_workspace_behavior_is_unchanged(
         "next_cursor": None,
     }
     gateway.list_history_rows.assert_not_called()
+    gateway.read_conversation_preview_messages.assert_called_once_with(
+        user_id=USER_ID, conversation_ids=[CONVERSATION_ID]
+    )
 
 
 def test_guest_search_is_limited_to_current_workspace_artifacts(

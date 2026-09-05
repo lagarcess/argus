@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { compactDateDisplay } from "@/lib/date-range-display";
+import { contributionPeriodDisplayLabel } from "@/lib/contribution-period-display";
 import {
   defaultResultCardDisplayCopy,
   formatTimeframeForDisplay,
@@ -26,42 +27,43 @@ type Translate = TFunction;
 export function confirmationAssumptionDisplay({
   assetClass,
   displayFacts,
-  fallbackAssumptions,
   locale,
-  promotedValues,
   t,
 }: {
   assetClass?: AssetClass | null;
   displayFacts?: ConfirmationDisplayFacts | null;
-  fallbackAssumptions: string[];
   locale: string;
-  promotedValues: string[];
   t: Translate;
 }) {
   const assetClassLabel = assetClassDisplayLabel(assetClass, t as TFunction);
   const canonicalFacts = displayFacts
     ? confirmationDisplayFacts(displayFacts, locale, t)
     : [];
-  if (canonicalFacts.length > 0) {
-    return prependAssetClass(canonicalFacts, assetClassLabel);
-  }
-  return prependAssetClass(
-    fallbackAssumptions.filter(
-      (assumption) =>
-        !promotedValues.some(
-          (value) => value.trim() && assumption.includes(value.trim()),
-        ),
-    ),
-    assetClassLabel,
-  );
+  return prependAssetClass(canonicalFacts, assetClassLabel);
 }
 
-function confirmationDisplayFacts(
+export function confirmationDisplayFacts(
   facts: ConfirmationDisplayFacts,
   locale: string,
   t: Translate,
+  { includeMoney = false }: { includeMoney?: boolean } = {},
 ) {
   const display: string[] = [];
+  if (includeMoney) {
+    const money = (value: number) => new Intl.NumberFormat(locale, {
+      style: "currency", currency: "USD", maximumFractionDigits: 2,
+    }).format(value);
+    const startingCapital = facts.starting_capital ?? facts.capital;
+    if (typeof startingCapital === "number" && Number.isFinite(startingCapital)) {
+      display.push(t("chat.artifact_assumptions.starting_capital", { amount: money(startingCapital) }));
+    }
+    if (typeof facts.recurring_contribution === "number" && Number.isFinite(facts.recurring_contribution)) {
+      const period = contributionPeriodDisplayLabel(facts.contribution_period, t);
+      display.push(t(period ? "chat.artifact_assumptions.contribution" : "chat.artifact_assumptions.contribution_without_period", {
+        amount: money(facts.recurring_contribution), period,
+      }));
+    }
+  }
   const timeframe = formatConfirmationTimeframe(facts.timeframe, t);
   if (timeframe) {
     display.push(timeframe);

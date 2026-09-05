@@ -1,0 +1,37 @@
+{
+  "captured_at": "2026-09-05 UTC",
+  "code_sha": "5cecbe43d87f1e624f102789e5f98aa82774e81a",
+  "integration_base": "77be94d68ae2217f43148883fc8c56348c4a40dc",
+  "environment": {
+    "python": "3.10.20 (main, Jun 11 2026, 03:55:32) [Clang 22.1.3 ]",
+    "node": "v26.4.0",
+    "browser": "Playwright Chromium headless, 1440x1000",
+    "server": "Next.js 16.2.4 optimized build --webpack and next start",
+    "auth": "local FastAPI dependency fixture returning a real disposable guest owner; NEXT_PUBLIC_MOCK_AUTH=true",
+    "market_data": "synthetic_unit_fixture; real RealBacktestTool, engine and result persistence",
+    "workflow_dispatch": "disabled; synchronous engine for first two runs; refusals precede dispatch in the shared admission path",
+    "checkpointer": "LangGraph MemorySaver",
+    "production_access": "None; all writes use a disposable loopback database",
+    "database": "Supabase PostgreSQL 17.6 and PostgREST v14.14; integration migrations",
+    "packages": {
+      "pydantic": "2.12.5",
+      "fastapi": "0.124.4",
+      "langgraph": "1.1.6",
+      "postgrest": "2.28.3",
+      "psycopg": "3.3.4"
+    },
+    "cleanup": "Both fixture owners deleted; API, frontend and disposable PostgreSQL/PostgREST containers stopped and removed"
+  },
+  "languages": [
+    "en",
+    "es-419"
+  ],
+  "response_interception": false,
+  "modal_cases_passed": 4,
+  "completed_engine_runs": 4,
+  "source_verification": {
+    "sha": "5cecbe43d87f1e624f102789e5f98aa82774e81a",
+    "source_files_checked": 1242,
+    "changed": []
+  }
+}

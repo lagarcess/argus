@@ -205,9 +205,7 @@ describe("workspace language prose", () => {
     const displayFacts = { fees: 0, slippage: 0, timeframe: "1D" };
     const spanish = confirmationAssumptionDisplay({
       displayFacts,
-      fallbackAssumptions: ["$10,000 starting capital", "Datos diarios"],
       locale: "es-419",
-      promotedValues: [],
       t: tEs,
     });
 
@@ -218,13 +216,10 @@ describe("workspace language prose", () => {
   });
 
   test("a card persisted before typed facts still avoids English cost prose", () => {
-    // Older rows carry only the strip. Nothing in it should be English cost
-    // prose, because the backend stopped writing that.
+    // A missing typed projection cannot fall back to a saved prose strip.
     const spanish = confirmationAssumptionDisplay({
       displayFacts: null,
-      fallbackAssumptions: ["Datos diarios", "Benchmark: SPY"],
       locale: "es-419",
-      promotedValues: [],
       t: tEs,
     });
 

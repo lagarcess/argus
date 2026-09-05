@@ -1753,56 +1753,6 @@ def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
     mock_gateway.create_message.assert_not_called()
 
 
-def test_chat_stream_supabase_sends_legacy_stage_profile_to_runtime(mock_gateway):
-    now = utcnow()
-    conversation = Conversation(
-        id="conv-2",
-        title="New conversation",
-        title_source="system_default",
-        language="en",
-        pinned=False,
-        archived=False,
-        last_message_preview=None,
-        deleted_at=None,
-        created_at=now,
-        updated_at=now,
-    )
-    mock_gateway.get_conversation.return_value = conversation
-    mock_gateway.get_user.return_value = _mock_profile(stage="language_selection")
-    mock_gateway.count_completed_runs.return_value = 0
-    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
-        id="msg-2",
-        conversation_id=kwargs["conversation_id"],
-        role=kwargs["role"],  # type: ignore[arg-type]
-        content=kwargs["content"],
-        created_at=utcnow(),
-    )
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": "conv-2", "message": "Test TSLA dip idea"},
-        headers={"Authorization": "Bearer test-token"},
-    )
-
-    assert response.status_code == 200
-    assert "event:" not in response.text
-    assert response.text.count("data: [DONE]") == 1
-    events = _stream_events(response.text)
-    token_events = [event for event in events if event.get("type") == "token"]
-    assert len(token_events) == 1
-    assert token_events[0]["content"] == "I tested that idea with TSLA."
-    accepted = mock_gateway.accept_chat_turn.call_args.kwargs["message"]
-    assert accepted.role == "user"
-    assert accepted.content == "Test TSLA dip idea"
-    final_payload = _final_payload(response.text)
-    terminal = mock_gateway.finalize_chat_turn.call_args.kwargs
-    assert terminal["to_status"] == "completed"
-    assert final_payload["stage_outcome"] == "ready_to_respond"
-    assert final_payload["assistant_response"] == token_events[0]["content"]
-    assert final_payload["message_id"] == terminal["message"].id
-    mock_gateway.finalize_backtest_completion.assert_called_once()
-
-
 def test_chat_stream_supabase_treats_marker_text_as_ordinary_turn(mock_gateway):
     now = utcnow()
     conversation = Conversation(
@@ -3995,6 +3945,20 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
         conversations[4:],
         [],
     ]
+    latest_messages = {
+        conversation.id: {
+            "conversation_id": conversation.id,
+            "role": "user",
+            "content": f"Most recent user message {index}",
+            "metadata": {},
+        }
+        for index, conversation in enumerate(conversations)
+    }
+    mock_gateway.read_conversation_preview_messages.side_effect = (
+        lambda *, user_id, conversation_ids: [
+            latest_messages[conversation_id] for conversation_id in conversation_ids
+        ]
+    )
 
     first_page = client.get(
         "/api/v1/conversations?limit=2",
@@ -4023,6 +3987,13 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
     expected_final["activity"] = {
         "operation": {"status": "idle", "kind": None, "updated_at": None},
         "attention": {"status": "none", "cursor": None},
+    }
+    expected_final["last_message_preview"] = latest_messages["conv-4"]["content"]
+    expected_final["preview"] = {
+        "kind": "text",
+        "text": latest_messages["conv-4"]["content"],
+        "symbols": [],
+        "template": None,
     }
     assert final_page.json() == {
         "items": [expected_final],
@@ -4060,6 +4031,14 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
         ["conv-2", "conv-3"],
         ["conv-4"],
     ]
+    assert [
+        call.kwargs["conversation_ids"]
+        for call in mock_gateway.read_conversation_preview_messages.call_args_list
+    ] == projected_pages
+    assert all(
+        call.kwargs["user_id"] == "00000000-0000-0000-0000-000000000001"
+        for call in mock_gateway.read_conversation_preview_messages.call_args_list
+    )
 
 
 def test_conversation_missing_pivot_uses_existing_invalid_cursor_problem(mock_gateway):

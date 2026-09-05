@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-09-05T05:02:02.966091+00:00",
+  "services": [
+    {
+      "name": "argus-api",
+      "autoDeployTrigger": "off",
+      "branch": "main",
+      "id": "srv-d78tanmuk2gs73e17nn0"
+    },
+    {
+      "name": "argus-app",
+      "autoDeployTrigger": "off",
+      "branch": "main",
+      "id": "srv-d7ap6bmslomc73eqp8m0"
+    },
+    {
+      "name": "argus-backtests",
+      "autoDeployTrigger": "off",
+      "branch": null,
+      "id": "wfl-d8hpsmuq1p3s73duv3q0"
+    }
+  ]
+}

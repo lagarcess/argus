@@ -1,5 +1,7 @@
 "use client";
 
+import { conversationPreviewText } from "@/lib/conversation-preview-display";
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
@@ -709,7 +711,7 @@ export default function ChatSidebar({
                                   {displayTitle}
                                 </span>
                                 <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
-                                  {item.subtitle}
+                                  {conversationPreviewText(item.preview, t)}
                                 </span>
                                 {isGuest && expiresAt ? (
                                   <time

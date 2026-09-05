@@ -7,6 +7,10 @@ from typing import Any
 
 from argus.api import state as api_state
 from argus.api.chat import research_jobs
+from argus.domain.research.admission import (
+    ResearchAttemptAdmission,
+    research_attempt_admission_context,
+)
 from argus.domain.research.contracts import BackgroundPoll, ResearchPacket
 
 
@@ -250,6 +254,62 @@ def test_sync_fallback_composes_and_caches(monkeypatch) -> None:
     from argus.domain.research.cache import cache_get
 
     assert cache_get("research-job-cache-key") is packet
+
+
+def test_atomic_claim_denial_stops_a_thorough_submission(monkeypatch) -> None:
+    gateway = _JobGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    client = _FakeClient([])
+    monkeypatch.setattr(research_jobs, "_client", lambda: client)
+    runtime_result: dict[str, Any] = {"research_job_request": _job_request()}
+
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(available=False, guest_exhausted=True)
+    ):
+        job = research_jobs.apply_research_job_request(
+            runtime_result,
+            user_id="u1",
+            conversation_id="c1",
+            request_message_id="m1",
+            request_id="r1",
+        )
+
+    assert job is None
+    assert client.submitted == []
+    assert "free research" in runtime_result["assistant_response"]
+    assert runtime_result["research"]["degraded"] == {
+        "code": "research_capacity_exhausted"
+    }
+
+
+def test_persisted_thorough_job_replay_does_not_claim_again(monkeypatch) -> None:
+    gateway = _JobGateway()
+    gateway.create_backtest_job(
+        conversation_id="c1",
+        request_message_id="m1",
+        operation_scope="chat.research",
+        launch_payload={},
+        execution_metadata={},
+    )
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    client = _FakeClient([])
+    monkeypatch.setattr(research_jobs, "_client", lambda: client)
+
+    def reject_claim() -> ResearchAttemptAdmission:
+        raise AssertionError("a persisted replay must reuse the first claim")
+
+    with research_attempt_admission_context(reject_claim):
+        job, packet = research_jobs.start_research_job(
+            job_request=_job_request(),
+            user_id="u1",
+            conversation_id="c1",
+            request_message_id="m1",
+            request_id="r1",
+        )
+
+    assert job is not None
+    assert packet is None
+    assert client.submitted == []
 
 
 def test_poller_failure_marks_the_job_and_posts_an_honest_note(monkeypatch) -> None:
