@@ -136,8 +136,13 @@ def test_outage_does_not_mask_a_typed_route_failure(capability_run: Any) -> None
     judge.assert_not_called()
 
 
-def test_judge_without_structured_result_is_unavailable(monkeypatch: Any) -> None:
+@pytest.mark.parametrize("raises_timeout", [False, True])
+def test_judge_without_structured_result_is_unavailable(
+    monkeypatch: Any, raises_timeout: bool
+) -> None:
     async def no_judge(**_kwargs: Any) -> None:
+        if raises_timeout:
+            raise TimeoutError("fixture judge timeout")
         return None
 
     monkeypatch.setattr(harness, "invoke_openrouter_json_schema", no_judge)

@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +27,11 @@ from argus.llm.openrouter import (
 )
 from pydantic import BaseModel, Field
 
+from tests.evals.measurement_assertions import (
+    _compare,
+    _compare_date_range,
+    _compare_subset,
+)
 from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
     measurement_fixture_documents,
@@ -202,6 +206,19 @@ def run_eval_case(
                 contract=contract,
                 language=case.user_language,
             )
+            if confirm_result.outcome == "needs_clarification":
+                clarify_result = clarify_stage(
+                    state=_state_from_interpret_patch(
+                        case=case,
+                        interpret_patch={
+                            **interpret_result.patch,
+                            **confirm_result.patch,
+                        },
+                    ),
+                    contract=contract,
+                    clarification_generator=clarifier,
+                    language=case.user_language,
+                )
         elif interpret_result.outcome == "needs_clarification":
             clarify_state = _state_from_interpret_patch(
                 case=case,
@@ -463,7 +480,12 @@ def typed_expectation_failures(
             failures,
         )
     if expected.offered is not None:
-        compare_offered(expected.offered, outcome.get("offered"), failures)
+        compare_offered(
+            expected.offered,
+            outcome.get("offered"),
+            failures,
+            expected_fields=vars(expected),
+        )
     return failures
 
 
@@ -494,13 +516,18 @@ def judge_prose_quality(
     assistant_text: str,
     rendered_beside_reply: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    response = asyncio.run(
-        _judge_prose_quality_async(
-            case=case,
-            assistant_text=assistant_text,
-            rendered_beside_reply=rendered_beside_reply or {},
+    try:
+        response = asyncio.run(
+            _judge_prose_quality_async(
+                case=case,
+                assistant_text=assistant_text,
+                rendered_beside_reply=rendered_beside_reply or {},
+            )
         )
-    )
+    except Exception as exc:
+        # Judge transport/schema failures make this measurement unavailable;
+        # retain the receipts in run_eval_case and fail the gate, not the prose.
+        return unavailable_prose_result(f"prose judge error: {type(exc).__name__}")
     if response is None:
         return unavailable_prose_result("prose judge did not return a structured result")
     return {
@@ -563,6 +590,19 @@ def _run_followup_turn_if_needed(
             contract=contract,
             language=case.user_language,
         )
+        if followup_confirm.outcome == "needs_clarification":
+            followup_clarify = clarify_stage(
+                state=_state_for_followup_clarification(
+                    prompt=case.followup_prompt,
+                    interpret_patch={
+                        **followup_interpret.patch,
+                        **followup_confirm.patch,
+                    },
+                ),
+                contract=contract,
+                clarification_generator=clarification_generator,
+                language=case.user_language,
+            )
     elif followup_interpret.outcome == "needs_clarification":
         followup_clarify = clarify_stage(
             state=_state_for_followup_clarification(
@@ -915,8 +955,8 @@ def _typed_outcome(
             *([] if confirm_result is None else [str(confirm_result.outcome)]),
             *([] if clarify_result is None else [str(clarify_result.outcome)]),
             *([] if followup_interpret is None else [str(followup_interpret.outcome)]),
-            *([] if followup_clarify is None else [str(followup_clarify.outcome)]),
             *([] if followup_confirm is None else [str(followup_confirm.outcome)]),
+            *([] if followup_clarify is None else [str(followup_clarify.outcome)]),
         ],
         "assets": _symbols(launch_payload=launch_payload, strategy=strategy),
         "asset_class": launch_payload.get("asset_class") or strategy.get("asset_class"),
@@ -981,10 +1021,14 @@ def _final_patch(
     confirm_result: Any | None,
     clarify_result: Any | None,
 ) -> dict[str, Any]:
+    if clarify_result is not None:
+        return {
+            **interpret_result.patch,
+            **(confirm_result.patch if confirm_result is not None else {}),
+            **clarify_result.patch,
+        }
     if confirm_result is not None:
         return confirm_result.patch
-    if clarify_result is not None:
-        return {**interpret_result.patch, **clarify_result.patch}
     return interpret_result.patch
 
 
@@ -1048,13 +1092,6 @@ def _compare_intent(
     _compare("intent", expected, actual, failures)
 
 
-def _compare(name: str, expected: Any, actual: Any, failures: list[str]) -> None:
-    if expected is None:
-        return
-    if actual != expected:
-        failures.append(f"{name}: expected {expected!r}, got {actual!r}")
-
-
 def _compare_asset_discovery(
     expected: dict[str, Any],
     actual: Any,
@@ -1101,70 +1138,6 @@ def _compare_asset_discovery(
                 "asset_discovery.category_description: expected any of "
                 f"{list(include_terms)!r} in {description!r}"
             )
-
-
-def _compare_subset(
-    name: str,
-    expected: Any,
-    actual: Any,
-    failures: list[str],
-) -> None:
-    if isinstance(expected, dict):
-        if not isinstance(actual, dict):
-            failures.append(
-                f"{name}: expected mapping subset {expected!r}, got {actual!r}"
-            )
-            return
-        for key, expected_value in expected.items():
-            _compare_subset(f"{name}.{key}", expected_value, actual.get(key), failures)
-        return
-    _compare(name, expected, actual, failures)
-
-
-def _compare_date_range(
-    name: str,
-    expected: Any,
-    actual: Any,
-    failures: list[str],
-) -> None:
-    expected_window = _date_range_window(expected)
-    actual_window = _date_range_window(actual)
-    if expected_window is not None and actual_window is not None:
-        if actual_window != expected_window:
-            failures.append(f"{name}: expected {expected!r}, got {actual!r}")
-        return
-    _compare(name, expected, actual, failures)
-
-
-def _date_range_window(value: Any) -> tuple[date, date] | None:
-    if isinstance(value, dict):
-        start = _date_boundary(value.get("start"))
-        end = _date_boundary(value.get("end"))
-        if start is None or end is None:
-            return None
-        return (start, end)
-    if isinstance(value, str):
-        parts = value.split("/")
-        if len(parts) != 2:
-            return None
-        start = _date_boundary(parts[0])
-        end = _date_boundary(parts[1])
-        if start is None or end is None:
-            return None
-        return (start, end)
-    return None
-
-
-def _date_boundary(value: Any) -> date | None:
-    if not isinstance(value, str):
-        return None
-    text = value.strip()
-    if len(text) < 10:
-        return None
-    try:
-        return date.fromisoformat(text[:10])
-    except ValueError:
-        return None
 
 
 def _last_stage_outcome(
