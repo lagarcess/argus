@@ -1,0 +1,49 @@
+### Page
+- Page URL: https://arguschat.ai/chat?conversation=qa_conversation_1873c7dbe34c
+- Page Title: META Buy and Hold Backtest vs · Argus
+- Console: 6 errors, 12 warnings
+### Snapshot
+```yaml
+- dialog "Sources Argus read" [ref=e880]:
+  - generic [ref=e881]:
+    - generic [ref=e882]:
+      - paragraph [ref=e883]: Sources Argus read
+      - paragraph [ref=e884]: Sources used to inform this answer. Links open in a new tab.
+    - button "Close sources" [active] [ref=e885] [cursor=pointer]
+  - list [ref=e889]:
+    - listitem [ref=e890]:
+      - link "0001065280-26-000034 dn711005.ca.archive.org · Jul 25, 2026 Opens in a new tab" [ref=e891] [cursor=pointer]:
+        - /url: https://dn711005.ca.archive.org/0/items/01-netflix-nflx-proxy-statement-2026-06-04/02%20Netflix%20(NFLX)%20Annual%20Report,%202025.pdf
+        - generic [ref=e892]: 0001065280-26-000034
+        - generic [ref=e893]:
+          - generic [ref=e894]: dn711005.ca.archive.org · Jul 25, 2026
+          - generic [ref=e899]: Opens in a new tab
+    - listitem [ref=e900]:
+      - link "Financials - Annual Reports & Proxies ir.netflix.net · Aug 26, 2026 Opens in a new tab" [ref=e901] [cursor=pointer]:
+        - /url: https://ir.netflix.net/financials/annual-reports-and-proxies/default.aspx
+        - generic [ref=e902]: Financials - Annual Reports & Proxies
+        - generic [ref=e903]:
+          - generic [ref=e904]: ir.netflix.net · Aug 26, 2026
+          - generic [ref=e909]: Opens in a new tab
+    - listitem [ref=e910]:
+      - link "Netflix's advertising strategy shift is starting to pay off www.cnbc.com · Jan 21, 2026 Opens in a new tab" [ref=e911] [cursor=pointer]:
+        - /url: https://www.cnbc.com/2026/01/21/netflix-advertising-revenue-strategy-paying-off.html
+        - generic [ref=e912]: Netflix's advertising strategy shift is starting to pay off
+        - generic [ref=e913]:
+          - generic [ref=e914]: www.cnbc.com · Jan 21, 2026
+          - generic [ref=e919]: Opens in a new tab
+    - listitem [ref=e920]:
+      - link "Netflix, Inc. - The Teardown theteardown.co · Jul 15, 2026 Opens in a new tab" [ref=e921] [cursor=pointer]:
+        - /url: https://theteardown.co/netflix
+        - generic [ref=e922]: Netflix, Inc. - The Teardown
+        - generic [ref=e923]:
+          - generic [ref=e924]: theteardown.co · Jul 15, 2026
+          - generic [ref=e929]: Opens in a new tab
+    - listitem [ref=e930]:
+      - 'link "Media Quick Take: Netflix closes out 2025 on a strong note www.spglobal.com · Jan 30, 2026 Opens in a new tab" [ref=e931] [cursor=pointer]':
+        - /url: https://www.spglobal.com/market-intelligence/en/news-insights/research/2026/01/media-quick-take-netflix-closes-out-2025-on-a-strong-note
+        - generic [ref=e932]: "Media Quick Take: Netflix closes out 2025 on a strong note"
+        - generic [ref=e933]:
+          - generic [ref=e934]: www.spglobal.com · Jan 30, 2026
+          - generic [ref=e939]: Opens in a new tab
+```

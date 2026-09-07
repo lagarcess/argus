@@ -23,7 +23,11 @@ def artifact_presentation_kind(
         return "breakdown"
     if any(isinstance(metadata.get(key), Mapping) for key in ("result_card", "run")):
         return "result"
-    if "result_fact_bank" in metadata and action_type != "save_strategy":
+    if (
+        "result_fact_bank" in metadata
+        and intent_kind in (None, "result")
+        and action_type != "save_strategy"
+    ):
         return "result"
     if (
         metadata.get("result_run_id")

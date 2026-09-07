@@ -1,0 +1,70 @@
+{
+  "reviewed_head": "6fd92c6500921d8e0d72f0faa03f54163c946353",
+  "review_comment_id": 3941427527,
+  "fix_status": "committed source and verified bilingual browser proof; GitHub CI/review pending",
+  "baseline_source_sha256": "0ff73c134314db8473c039112660d5f59c4e2799acf0231ce6cbf720dad5ef47",
+  "fixed_source_sha256": "b8cd75c4ca0f4aca0da124f1498657853eafc312c65b394afa247e81d683e785",
+  "tests_sha256": "adaf32ab8ca0c09e610ab5503287027e0e9cd9112901e9c7bfeace909f104a4c",
+  "red": {
+    "failed": 9,
+    "passed": 1,
+    "assertion": "public reader removes the supplied answer or content"
+  },
+  "green": {
+    "passed": 104,
+    "failed": 0
+  },
+  "mocked_eval": {
+    "passed": 237,
+    "failed": 0
+  },
+  "browser_verified": true,
+  "live_eval_suite_rerun": false,
+  "evidence_hashes": {
+    "README.md": "e6c393edc820eacec697ceb715ad331ae3cac5d6127bfec49189efd0e8888836",
+    "baseline-regression-tests.log": "eb711cb058697738579e7553f1b2d583796acdb2b0ec997d0837f7005753c637",
+    "browser/after-en-answer.png": "bfe3f0f38f47efb87cc4933d1a3137dedc758575cc1357497eae13bb41a22fcc",
+    "browser/after-en-initial-recovery.png": "2125d40da42c91f5a0f7a9196c5c27814f71d2ad0e99eeaae43a57b9187f2b7d",
+    "browser/after-en-live.json": "0faa8ae2de7a5a3224329266585f7ce48f6ea76d6830ab42b337d9884035acf9",
+    "browser/after-en-reload.json": "44105d436a09db3dfa19cdc8fbb42924d8359de2bec19fe43f05ff1c99ed2af6",
+    "browser/after-en-reload.png": "28d58419bea9ac45db68d039bd97d449471732c9ef505985e6b9715e52e886c6",
+    "browser/after-en-retry-recovery.png": "31c67d2765c708b06c0ad3c7790c8d791f2478a469287edeb0babdb7a9d5c5e1",
+    "browser/after-es-answer.png": "c8125cd691f3baedc1d9ff6188525ad9bfd0fa1a5c7667ba404b68502503cf87",
+    "browser/after-es-fallback-answer.png": "ab9075161e0a6779000a4ee9d687ca31622f1c02da1d7cab5341ee1fda60281a",
+    "browser/after-es-fees-unavailable.png": "4b2c7c066f17007e2420d165c976164665bc1fee50f83788c77180a90fa2cea2",
+    "browser/after-es-live.json": "f9b4cb8bfe0100889f712a6711c21de91d48d321b7c63cdb6bce883e7eb25fa4",
+    "browser/after-es-reload.json": "d52dc5532dbeaa8b073a6f9d0c16beb70f52bba95729a4d0face9d65b30c1376",
+    "browser/after-es-reload.png": "822c20949246dda2a55b517a4db44d0b802f6dcbd74e47c28f9b7f159f2c2d0e",
+    "browser/after-es-value-fallback.png": "ecf59918dab782a9314cc5bd4da1a6bf0593a4ea311e181c63d8efa864784936",
+    "browser/backend-only-en-reload-incorrect.png": "454d1c15cb4d29363bc70b58fdacfc9ab8fca004694793c630013b7beff1d135",
+    "browser/before-en-empty.png": "64bce0b4a1f006a153c743b350215cfc5576bdb36201dfd3b2ba730075f6e0ab",
+    "browser/before-en-reload.json": "9f78effbc33de1c921d72da56e5d0f6827674f6dcd6deee70c7a9693ad486e87",
+    "browser/before-en-reload.png": "b75014109d0805a33ad6511159d57ae054994e21fd54fcc7f135c5591e34ebc8",
+    "browser/before-es-empty.png": "45855cb1ab7e5fa093e3c2a2a4785be0fc7d53ec7f827062ae5da70115a89e7b",
+    "browser/before-es-live.json": "373d4fd6d2b46286f2b1c7307f1070110e01e0fec4bd74a4aa5801b46803a549",
+    "browser/before-es-reload.json": "61510e9f6c6aab1e8984d5e284fd33e1557aaf5d8df883a30d6d2fcbee3b878b",
+    "browser/before-es-reload.png": "5aac4d2c0f63eae1951b81480c41be359f564686850b04f04596ad9c7c50cb0e",
+    "browser/english-amount-only-fallback.json": "57b337d1f82627ac8d662f2515bce19b58c0dfda497db89726638d771b36bcbe",
+    "browser/english-initial-recovery.json": "1a930e3eef662f0c585b7c24318a880ac573e4b9003c093535e81e01516a6d0a",
+    "browser/english-retry-recovery.json": "1a930e3eef662f0c585b7c24318a880ac573e4b9003c093535e81e01516a6d0a",
+    "browser/proof.json": "eecc4a356a4ed60bc044ce7c22191ca132e757b1f5a0bba05e2e1a197c5ab799",
+    "browser/provider-receipts.json": "7c6056cc680576e8946522bf3abbc727b65665b07129635af0707ae97c0fda55",
+    "browser/replay_api.py": "93f19a583a2c49544f92391e7074acf9074b8878ce399f000f8dd37a4e15f8bd",
+    "browser/spanish-date-fallback.json": "b6c651e92390dd40de6db2bb82a9e7bab09108093ef641d2fa2c96badff233b2",
+    "browser/spanish-fees-unavailable.json": "bc1e1f73ade2acfbab3d64cdaf937eb4ffa19a04439f6148d6396790b151abdd",
+    "browser/spanish-value-fallback.json": "b4c1d8e750949e8e66fe8d94c1ebbbf8227aad19b281766cf8bec5ed5b4486ea",
+    "final-manifest-tests.log": "de3385f245730a8ed3db4a8ac9e9390f3e12902bbba872b5c0bb3532a98efdd8",
+    "fixed-reader-tests.log": "a841e384ce69c126029041260823e9e2c501ec3d8a6675c8fb4c87522e498c34",
+    "frontend-focused-tests.log": "eeb7b07e96305630d1991ea1ba303cf23c6858e1d4b751abff937a76c1b791db",
+    "frontend-full-tests.log": "e9e22cbe833f4e13af7370bcc920b93de62c3e72c1f1e5c1777de03907830c08",
+    "frontend-regression-tests.log": "e74e16c720368a7366e5142b3eea1bbc549403901854782fae697480cb8e6d40",
+    "mocked-eval.log": "832c4bd972ec399e15964f2363cc6a5e33e4c10a2f5c89082caca149e1d6d226",
+    "modularity.log": "2b61dc4cdc646d7f69a010c28a440144ee29246c653ba2d0af84d5f4be1c66c6",
+    "prompt-surface-comparison.json": "3904b130c310c09be4b4c23c3ba3fc73c6a1f8f270bf1f5ec61e356289b60f19"
+  },
+  "complete_source_head": "bb3bff50902a1dc221745fb4b0b87ab6b42f5b5d",
+  "frontend_full": {
+    "passed": 1556,
+    "failed": 0
+  }
+}

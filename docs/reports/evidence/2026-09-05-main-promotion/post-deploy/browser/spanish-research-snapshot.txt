@@ -1,0 +1,106 @@
+### Page
+- Page URL: https://arguschat.ai/chat?conversation=qa_conversation_4d3c96fb3ba2
+- Page Title: Prueba de compra y retención de · Argus
+- Console: 6 errors, 9 warnings
+### Snapshot
+```yaml
+- generic [ref=e296]:
+  - button "Copiar texto" [ref=e297] [cursor=pointer]
+  - generic [ref=e302]:
+    - generic [ref=e303]:
+      - heading "Netflix gana dinero principalmente cobrando suscripciones mensuales" [level=2] [ref=e304]
+      - paragraph [ref=e305]: "La empresa ofrece distintos planes, con y sin anuncios, y cobra por adelantado cada mes. Los precios y características cambian según el país: resolución, cantidad de dispositivos simultáneos y posibilidad de agregar miembros adicionales. Netflix reconoce ese ingreso durante el mes de servicio."
+      - paragraph [ref=e306]: Además, vende espacios publicitarios dentro de su plan con anuncios. También obtiene ingresos menores de productos de consumo, experiencias en vivo y otras actividades, pero Netflix indica que esas fuentes distintas de las cuotas mensuales todavía no fueron materiales en 2025.
+      - heading "El modelo, en términos sencillos" [level=3] [ref=e307]
+      - table [ref=e308]:
+        - rowgroup [ref=e309]:
+          - row [ref=e310]:
+            - columnheader "Fuente de ingresos" [ref=e311]
+            - columnheader "Quién paga" [ref=e312]
+            - columnheader "Cómo funciona" [ref=e313]
+        - rowgroup [ref=e314]:
+          - row [ref=e315]:
+            - cell [ref=e316]:
+              - strong [ref=e317]: Suscripciones
+            - cell "Hogares y usuarios" [ref=e318]
+            - cell "Pagan una cuota mensual por acceder a series, películas, juegos y programación en vivo. Es la fuente principal." [ref=e319]
+          - row [ref=e320]:
+            - cell [ref=e321]:
+              - strong [ref=e322]: Publicidad
+            - cell "Anunciantes" [ref=e323]
+            - cell "Pagan para mostrar anuncios a los miembros del plan más económico con publicidad. Ese plan genera tanto cuotas de suscripción como ventas publicitarias." [ref=e324]
+          - row [ref=e325]:
+            - cell [ref=e326]:
+              - strong [ref=e327]: Miembros adicionales
+            - cell "Titulares de ciertas cuentas" [ref=e328]
+            - cell "En planes elegibles, se cobra una cuota adicional por usuarios que no viven en el mismo hogar." [ref=e329]
+          - row [ref=e330]:
+            - cell [ref=e331]:
+              - strong [ref=e332]: Otras actividades
+            - cell "Consumidores y socios comerciales" [ref=e333]
+            - cell "Incluyen productos de consumo y experiencias en vivo. En conjunto, no constituyeron una parte material de los ingresos de 2025." [ref=e334]
+      - paragraph [ref=e335]: Los videojuegos están incluidos en los planes señalados por Netflix; por tanto, no constituyen una fuente separada y material de ingresos divulgada por la empresa.
+      - heading "¿Cómo convierte esos cobros en ganancias?" [level=2] [ref=e336]
+      - paragraph [ref=e337]: "Netflix utiliza las cuotas y los ingresos publicitarios para financiar principalmente:"
+      - list [ref=e338]:
+        - listitem [ref=e339]: producción y licenciamiento de películas, series y demás contenido;
+        - listitem [ref=e340]: distribución técnica del streaming;
+        - listitem [ref=e341]: mercadotecnia;
+        - listitem [ref=e342]: tecnología, recomendaciones e interfaz;
+        - listitem [ref=e343]: personal y administración.
+      - paragraph [ref=e344]:
+        - text: Su mayor costo es el contenido. En 2025, el costo de ingresos fue de
+        - strong [ref=e345]: US$23,275.329 millones
+        - text: ", de los cuales"
+        - strong [ref=e346]: US$16,422.166 millones
+        - text: correspondieron a amortización de contenido. Esta amortización distribuye contablemente el costo de producir o licenciar títulos durante su periodo esperado de uso, en vez de reconocer todo el costo inmediatamente.
+      - paragraph [ref=e347]: Netflix obtiene utilidad cuando los ingresos por suscripciones, anuncios y otras fuentes superan esos costos y los demás gastos operativos.
+      - heading "Resultados que muestran la escala del modelo" [level=3] [ref=e348]
+      - paragraph [ref=e349]:
+        - emphasis [ref=e350]: Cifras del ejercicio terminado el 31 de diciembre de 2025, las últimas anuales disponibles al 5 de septiembre de 2026.
+      - table [ref=e351]:
+        - rowgroup [ref=e352]:
+          - row [ref=e353]:
+            - columnheader "Indicador 2025" [ref=e354]
+            - columnheader "Resultado" [ref=e355]
+        - rowgroup [ref=e356]:
+          - row [ref=e357]:
+            - cell "Ingresos" [ref=e358]
+            - cell [ref=e359]:
+              - strong [ref=e360]: US$45,183.036 millones
+          - row [ref=e361]:
+            - cell "Utilidad operativa" [ref=e362]
+            - cell [ref=e363]:
+              - strong [ref=e364]: US$13,326.603 millones
+          - row [ref=e365]:
+            - cell "Margen operativo" [ref=e366]
+            - cell [ref=e367]:
+              - strong [ref=e368]: 29%
+          - row [ref=e369]:
+            - cell "Utilidad neta atribuible a accionistas comunes" [ref=e370]
+            - cell [ref=e371]:
+              - strong [ref=e372]: US$10,981.201 millones
+          - row [ref=e373]:
+            - cell "Flujo de efectivo de operaciones" [ref=e374]
+            - cell [ref=e375]:
+              - strong [ref=e376]: US$10,149.273 millones
+      - paragraph [ref=e377]:
+        - text: Los ingresos crecieron
+        - strong [ref=e378]: 16%
+        - text: frente a 2024. Netflix atribuyó el aumento principalmente al crecimiento de membresías, incrementos de precios y mayores ingresos publicitarios, parcialmente contrarrestados por movimientos cambiarios desfavorables.
+      - paragraph [ref=e379]:
+        - strong [ref=e380]: "En resumen:"
+        - text: Netflix sigue siendo fundamentalmente un negocio de suscripción. La publicidad agrega una segunda forma de monetizar la misma audiencia, especialmente a quienes prefieren un plan de menor precio. La rentabilidad depende de atraer y retener miembros, fijar precios que sostengan el valor del servicio y obtener suficiente uso e ingreso de su catálogo para cubrir el elevado costo del contenido y la operación tecnológica.
+    - button "5 fuentes ›" [ref=e382] [cursor=pointer]
+    - region "Qué probar después" [ref=e383]:
+      - button "Probar Netflix (NFLX) en los últimos 3 años" [ref=e386] [cursor=pointer]:
+        - generic [aria-hidden] [ref=e387]: ↳
+        - generic [ref=e389]:
+          - text: Probar Netflix
+          - generic [ref=e390]: NFLX
+          - text: en los últimos 3 años
+    - generic [ref=e393]:
+      - button "Buena respuesta" [ref=e394] [cursor=pointer]
+      - button "Mala respuesta" [ref=e397] [cursor=pointer]
+      - button "Más acciones" [ref=e400] [cursor=pointer]
+```

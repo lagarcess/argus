@@ -1,0 +1,48 @@
+{
+  "candidate_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+  "application_order": [
+    {
+      "file": "20260903000000_claim_research_usage.sql",
+      "version": "20260903000000",
+      "sha256": "ba47070ad1ca3eff0f0a1ef790376b0c2b522cca3b009e25fa7d08b3306cd298",
+      "statements_sha256": "1b692f52aef4aa344a5fbd0577e07ced5aba4a79ddde82cfb50a80bb21ba3a98",
+      "statement_count": 4,
+      "statement_rowcounts": [
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "started_at": "2026-09-05T05:03:45.168304+00:00",
+      "committed_at": "2026-09-05T05:03:45.900064+00:00",
+      "duration_seconds": 0.732,
+      "transaction": "committed",
+      "ledger_readback": "exact name and statement array matched"
+    },
+    {
+      "file": "20260905000000_workflow_proof_jobs_leave_conversations.sql",
+      "version": "20260905000000",
+      "sha256": "ffb79be4bed36fb343ae4e81830e120c2b6620f1944fa0099774890578134759",
+      "statements_sha256": "e3ff76f9bcbeec13554a4cd5f7f4558ed99029e8ba7908e8e80ac138a2d08a86",
+      "statement_count": 3,
+      "statement_rowcounts": [
+        -1,
+        -1,
+        148
+      ],
+      "started_at": "2026-09-05T05:03:45.919946+00:00",
+      "committed_at": "2026-09-05T05:03:46.609486+00:00",
+      "duration_seconds": 0.69,
+      "transaction": "committed",
+      "ledger_readback": "exact name and statement array matched"
+    }
+  ],
+  "authorization": "Founder explicitly authorized these two pinned files before deployment",
+  "deployed_code_unchanged": true,
+  "private_rollback_snapshot": {
+    "path": "/private/tmp/argus-promotion-20260905-proof-rollback-private.json",
+    "row_count": 148,
+    "sha256": "997cd51098dc1a5d4e139f1526f7801f89ed1c58bc0b32dc2f39a61f8899b5e8",
+    "contains": "job id, prior scope, prior conversation link, prior updated_at; not committed"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "command": ".github/warmup-render.sh --expect-mode real-workflow",
+  "status": "failed",
+  "exit_code": 1,
+  "failure_stage": "release_config_audit",
+  "findings": [
+    "forbidden argus-api:ENABLE_MARKET_DATA_CACHE unexpected_live_env",
+    "drift argus-api:autoDeployTrigger expected=checksPass actual=off",
+    "drift argus-app:autoDeployTrigger expected=checksPass actual=off",
+    "drift argus-backtests:autoDeployTrigger expected=checksPass actual=off"
+  ],
+  "accepted_manual_trigger_mismatch": true,
+  "unaccepted_failure": "forbidden argus-api:ENABLE_MARKET_DATA_CACHE unexpected_live_env",
+  "api_health": "responded",
+  "product_readiness": "responded",
+  "frontend": "responded",
+  "stale_job_scan": {
+    "status": "ready",
+    "scanned_count": 0,
+    "stale_count": 0,
+    "unresolved_count": 0,
+    "reconciled_count": 0,
+    "error_count": 0
+  },
+  "workflow_proof": "not_reached",
+  "production_configuration_changes": false,
+  "rollback_performed": false
+}

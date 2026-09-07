@@ -43,6 +43,9 @@ def reader_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Strip source prose and materialize old typed artifact intent on read."""
     kind = artifact_presentation_kind(payload)
     public: dict[str, Any] = without_private_prose(payload)
+    # The transport owns this decision, including for legacy persisted rows.
+    # Readers consume it instead of independently classifying attached facts.
+    public["artifact_presentation_kind"] = kind
     if kind not in {"result", "breakdown", "assumptions"}:
         return public
     if kind == "result" and not isinstance(public.get("result_fact_bank"), dict):

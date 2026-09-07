@@ -1,0 +1,24 @@
+{
+  "test": "tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence",
+  "command": [
+    "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence",
+    "-q",
+    "--no-cov"
+  ],
+  "scorecard": "docs/reports/evidence/2026-09-05-main-promotion/candidate-eval-scorecard-e3b98690.json",
+  "original_sha256": "50bbedd21df687c59096231761569c48bfe53f69f734842eebeafff845bd6d93",
+  "intact_before": "24 passed in 9.83s; full required test pair",
+  "tampered_field": "totals.passed",
+  "original_value": 59,
+  "tampered_value": 60,
+  "tampered_test_exit_code": 1,
+  "tampered_test_result": "failed at totals == calculated_totals with live eval scorecard totals do not match its complete results",
+  "restored_bytes_match": true,
+  "restored_sha256": "50bbedd21df687c59096231761569c48bfe53f69f734842eebeafff845bd6d93",
+  "restored_full_tests": "24 passed in 9.02s",
+  "scope": "Only the temporary total changed. No result, fixture, expectation, or retained scorecard was changed.",
+  "restored_full_tests_log": "docs/reports/evidence/2026-09-05-main-promotion/status-validator-restored-tests.log"
+}

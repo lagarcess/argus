@@ -240,7 +240,10 @@ export type ApiMessage = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
-  metadata?: Record<string, unknown> | null;
+  metadata?: (Record<string, unknown> & {
+    /** Read-time API decision; clients must not infer it from attached facts. */
+    artifact_presentation_kind?: "result" | "breakdown" | "assumptions" | "confirmation" | null;
+  }) | null;
 };
 
 type HistoryItemBase = {

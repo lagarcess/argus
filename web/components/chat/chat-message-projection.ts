@@ -367,9 +367,7 @@ export function hydrateMessagesFromApi(
       }
       if (
         message.role !== "user" &&
-        recordOrNull(metadata.result_fact_bank) &&
-        !isBreakdownActionMetadata(metadata) &&
-        chatAction?.type !== "save_strategy"
+        metadata.artifact_presentation_kind === "result"
       ) {
         return {
           id: message.id,

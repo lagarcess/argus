@@ -1,0 +1,33 @@
+{
+  "checked_at": "2026-09-05T05:21:43.112388+00:00",
+  "services": [
+    {
+      "service": "argus-api",
+      "deploy_id": "dep-dad1048n74is73cq57q0",
+      "status": "live",
+      "commit": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+      "commit_short": "7d8ace4",
+      "created_at": "2026-09-04T00:25:53.19375Z",
+      "finished_at": "2026-09-04T00:27:36.506701Z"
+    },
+    {
+      "service": "argus-app",
+      "deploy_id": "dep-dad111ifngtc73fcqkfg",
+      "status": "live",
+      "commit": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+      "commit_short": "7d8ace4",
+      "created_at": "2026-09-04T00:27:50.079751Z",
+      "finished_at": "2026-09-04T00:29:24.978432Z"
+    },
+    {
+      "service": "argus-backtests",
+      "workflow_id": "wfl-d8hpsmuq1p3s73duv3q0",
+      "workflow_version_id": "wfv-dad11tdg1s2s73ejbm30",
+      "status": "ready",
+      "commit": "7d8ace4",
+      "created_at": "2026-09-04T00:29:41.214965Z"
+    }
+  ],
+  "origin_main_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+  "candidate_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d"
+}

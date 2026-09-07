@@ -1128,7 +1128,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(api).toContain("metadata?: Record<string, unknown> | null");
+    expect(api).toContain("artifact_presentation_kind?");
     expect(chat).toContain("metadata.confirmation_card");
     expect(chat).toContain("metadata.result_card");
     expect(chat).toContain("isBreakdownActionMetadata(metadata)");

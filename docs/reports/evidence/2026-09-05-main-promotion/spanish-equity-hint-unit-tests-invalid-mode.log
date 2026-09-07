@@ -1,0 +1,104 @@
+Command: PYTHONPATH="$PWD/src:$PWD" ARGUS_RUN_LIVE_EVALS=0 ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic ARGUS_ASSET_PROVIDER_MODE=static_fixture NUMBA_CACHE_DIR=/private/tmp/argus-promotion-numba-cache /Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.venv/bin/python -m pytest tests/agent_runtime/discovery/test_discovery_validation.py tests/agent_runtime/discovery/test_discovery_selection_action.py tests/research/test_research_rows.py tests/agent_runtime/test_conversation_stages.py::test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py::test_llm_interpreter_validates_asset_class_with_alpaca_resolver -q --no-cov
+
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/a121/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 35 items
+
+tests/agent_runtime/discovery/test_discovery_validation.py ............. [ 37%]
+...                                                                      [ 45%]
+tests/agent_runtime/discovery/test_discovery_selection_action.py ......  [ 62%]
+tests/research/test_research_rows.py ..F........                         [ 94%]
+tests/agent_runtime/test_conversation_stages.py F                        [ 97%]
+tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py . [100%]
+
+=================================== FAILURES ===================================
+___________ test_resolver_gate_uses_the_real_catalog_in_fixture_mode ___________
+
+    def test_resolver_gate_uses_the_real_catalog_in_fixture_mode() -> None:
+        # Synthetic fixture catalog: NFLX resolves as equity, a fake ticker never
+        # resolves, and BTC resolves but is not equity, so neither becomes a row.
+        peers = verified_peers(_pairs("NFLX", "ZZZZFAKE", "BTC"), exclude=set())
+>       assert [p["symbol"] for p in peers] == ["NFLX"]
+E       AssertionError: assert [] == ['NFLX']
+E
+E         Right contains one more item: 'NFLX'
+E         Use -v to get more diff
+
+tests/research/test_research_rows.py:39: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 11:49:26.708 | DEBUG    | argus.agent_runtime.research_rows:_resolve_bounded:118 - Peer verification skipped
+2026-09-05 11:49:26.709 | DEBUG    | argus.agent_runtime.research_rows:_resolve_bounded:118 - Peer verification skipped
+2026-09-05 11:49:26.709 | DEBUG    | argus.agent_runtime.research_rows:_resolve_bounded:118 - Peer verification skipped
+____ test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10f373ee0>
+
+    def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from datetime import datetime
+
+        from argus.agent_runtime.stages import confirm as confirm_module
+        from argus.domain.market_data.capabilities import MarketClockSnapshot
+
+        monkeypatch.setattr(
+            confirm_module,
+            "_today",
+            lambda: date(2026, 6, 3),
+            raising=False,
+        )
+        monkeypatch.setattr(
+            confirm_module,
+            "_market_clock_for_strategy",
+            lambda _: MarketClockSnapshot(
+                provider="alpaca",
+                timestamp=datetime(2026, 6, 3, 8, 0),
+                is_open=False,
+                next_open=datetime(2026, 6, 3, 9, 30),
+                next_close=datetime(2026, 6, 3, 16, 0),
+                is_market_day=True,
+            ),
+            raising=False,
+        )
+        state = RunState.new(
+            current_user_message=(
+                "Let's see what an investment of 500 in NU could have made this "
+                "year so far."
+            ),
+            recent_thread_history=[],
+        )
+        state.candidate_strategy_draft = StrategySummary(
+            raw_user_phrasing=state.current_user_message,
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold NU this year so far.",
+            asset_universe=["NU"],
+            asset_class="equity",
+            capital_amount=5000,
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        )
+
+        result = confirm_module.confirm_stage(
+            state=state,
+            contract=build_default_capability_contract(),
+        )
+
+>       assert result.outcome == "await_approval"
+E       AssertionError: assert 'needs_clarification' == 'await_approval'
+E
+E         - await_approval
+E         + needs_clarification
+
+tests/agent_runtime/test_conversation_stages.py:2864: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 11:49:26.835 | DEBUG    | argus.agent_runtime.stages.confirm:confirm_stage:56 - Confirm stage started
+2026-09-05 11:49:26.836 | DEBUG    | argus.agent_runtime.stages.confirm:_strategy_with_latest_complete_data_adjustment:461 - Confirm stage latest data adjustment started
+2026-09-05 11:49:26.836 | DEBUG    | argus.agent_runtime.stages.confirm:confirm_stage:64 - Confirm stage latest complete data adjustment checked
+=========================== short test summary info ============================
+FAILED tests/research/test_research_rows.py::test_resolver_gate_uses_the_real_catalog_in_fixture_mode
+FAILED tests/agent_runtime/test_conversation_stages.py::test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data
+========================= 2 failed, 33 passed in 2.59s =========================

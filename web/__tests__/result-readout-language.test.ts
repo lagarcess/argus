@@ -161,16 +161,48 @@ describe("persisted result presentation (#531)", () => {
     expect(message.recoveryDisplay).toEqual({ kind: "result_breakdown", facts: resultReadoutFacts(bank) });
   });
 
-  test("a legacy result without card chrome still renders its repaired typed facts", () => {
+  test.each([
+    ["en", `The modeled fees were ${bank.result_card.execution_costs.fee_bps} bps.`],
+    ["es-419", `Las comisiones modeladas fueron de ${bank.result_card.execution_costs.fee_bps} bps.`],
+  ])("preserves the voiced %s factual answer when its fact bank is context", (language, answer) => {
+    const message = hydrateMessagesFromApi([{
+      id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), role: "assistant",
+      content: answer, created_at: new Date().toISOString(),
+      metadata: {
+        artifact_presentation_kind: null,
+        conversation_mode: "guide", result_run_id: crypto.randomUUID(), result_fact_bank: bank,
+        response_intent: {
+          kind: "beginner_guidance",
+          facts: { fact_key: "fee_bps", fee_bps: `${bank.result_card.execution_costs.fee_bps} bps`, language },
+        },
+      },
+    }]).messages[0];
+    expect(message.content).toBe(answer);
+    expect(message.contentPresentation).not.toBe("result_readout");
+    expect(message.resultReadoutFacts).toBeUndefined();
+  });
+
+  test("a legacy result without card chrome renders the backend-classified typed facts", () => {
     const message = hydrateMessagesFromApi([{
       id: "result-no-card", conversation_id: "conversation-language", role: "assistant",
       content: originalProse, created_at: "2025-12-31T17:00:00Z",
-      metadata: { result_fact_bank: bank },
+      metadata: { result_fact_bank: bank, artifact_presentation_kind: "result" },
     }]).messages[0];
     expect(message.contentPresentation).toBe("result_readout");
     expect(message.resultReadoutFacts).toEqual(resultReadoutFacts(bank));
     expect(message.content).toBeUndefined();
     expect(messageStreamPresentation([message], message, 0, false, false).isWorkingMessage).toBe(false);
+  });
+
+  test.each([null, undefined, "result"] as const)("uses the public presentation kind (%j), not an independent intent classifier", (kind) => {
+    const answer = "A voiced fact from the run.";
+    const message = hydrateMessagesFromApi([{
+      id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), role: "assistant",
+      content: answer, created_at: new Date().toISOString(),
+      metadata: { result_fact_bank: bank, artifact_presentation_kind: kind },
+    }]).messages[0];
+    expect(message.contentPresentation).toBe(kind === "result" ? "result_readout" : undefined);
+    expect(message.content).toBe(kind === "result" ? undefined : answer);
   });
 
   test("live run and historical message carry the same language-neutral facts", async () => {
@@ -196,7 +228,7 @@ describe("persisted result presentation (#531)", () => {
     const message = hydrateMessagesFromApi([{
       id: "missing-run", conversation_id: "conversation-language", role: "assistant",
       content: "", created_at: "2025-12-31T17:00:00Z",
-      metadata: { conversation_mode: "result_review", result_run_id: "lost-run", result_fact_bank: {} },
+      metadata: { conversation_mode: "result_review", result_run_id: "lost-run", result_fact_bank: {}, artifact_presentation_kind: "result" },
     }]).messages[0];
     const t = await translator("es-419");
     expect(message.contentPresentation).toBe("result_readout");

@@ -121,6 +121,7 @@ LIVE_EVAL_RESULT_STATUSES = (
     "expected_failed",
     "unexpected_pass",
     "skipped",
+    "infrastructure_error",
 )
 
 KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL = frozenset(
@@ -584,7 +585,8 @@ def _assert_main_promotion_live_eval_evidence(
     assert result_case_ids == fixture_case_ids, (
         "live eval scorecard does not contain the complete fixture result set"
     )
-    totals = scorecard.get("totals", {})
+    # Scorecards written before #549 omit the zero infrastructure-error count.
+    totals = {"infrastructure_error": 0, **scorecard.get("totals", {})}
     calculated_totals = {
         status: sum(result["status"] == status for result in results)
         for status in LIVE_EVAL_RESULT_STATUSES

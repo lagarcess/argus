@@ -1,0 +1,17 @@
+### Page
+- Page URL: https://arguschat.ai/chat?conversation=qa_conversation_1873c7dbe34c
+- Page Title: META Buy and Hold Backtest vs · Argus
+- Console: 1 errors, 4 warnings
+### Snapshot
+```yaml
+- generic [ref=f9e901]:
+  - button "Copiar texto" [ref=f9e902] [cursor=pointer]
+  - generic [ref=f9e907]:
+    - paragraph [ref=f9e909]: "Para la confirmación, estos son los supuestos: Acciones; Capital inicial: USD 10,000.00; Datos diarios; Sin comisiones; Sin deslizamiento; Referencia: SPY."
+    - generic [ref=f9e911]:
+      - button "Buena respuesta" [ref=f9e912] [cursor=pointer]
+      - button "Mala respuesta" [ref=f9e915] [cursor=pointer]
+      - button "Más acciones" [ref=f9e918] [cursor=pointer]
+```
+### Events
+- New console entries: .playwright-cli/console-2026-09-05T20-45-39-073Z.log#L41

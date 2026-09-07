@@ -1,0 +1,20 @@
+[
+  {
+    "service": "argus-api",
+    "id": "srv-d78tanmuk2gs73e17nn0",
+    "autoDeployTrigger": "off",
+    "branch": "main"
+  },
+  {
+    "service": "argus-app",
+    "id": "srv-d7ap6bmslomc73eqp8m0",
+    "autoDeployTrigger": "off",
+    "branch": "main"
+  },
+  {
+    "service": "argus-backtests",
+    "id": "wfl-d8hpsmuq1p3s73duv3q0",
+    "autoDeployTrigger": "off",
+    "branch": null
+  }
+]

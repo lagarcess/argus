@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-09-05T05:28:22.928483+00:00",
+  "reader": "public.read_conversation_activity_sources",
+  "aggregate_only": true,
+  "conversation_visibility": [
+    {
+      "deleted": false,
+      "archived": false,
+      "conversations": 486,
+      "has_unhydrateable_succeeded_job": 91,
+      "has_active_source": 7
+    },
+    {
+      "deleted": false,
+      "archived": true,
+      "conversations": 4,
+      "has_unhydrateable_succeeded_job": 2,
+      "has_active_source": 0
+    },
+    {
+      "deleted": true,
+      "archived": false,
+      "conversations": 76,
+      "has_unhydrateable_succeeded_job": 28,
+      "has_active_source": 0
+    }
+  ]
+}
