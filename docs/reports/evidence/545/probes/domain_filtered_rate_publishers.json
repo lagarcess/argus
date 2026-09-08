@@ -1,0 +1,303 @@
+{
+  "probe": "domain_filtered_rate_publishers",
+  "purpose": "mechanism demonstration with candidate rate publishers, not the seed list: does a local rate arrive as a cited row",
+  "candidate_sha": "7ef0055b431e45be77a7213e415a6eeee0acd012",
+  "captured_at": "2026-09-08T21:31:07.757565+00:00",
+  "elapsed_s": 19.38,
+  "request_overrides": {},
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "¿Qué tasa de interés pasiva promedio pagan los bancos dominicanos hoy por un certificado financiero a un año en pesos?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nResponde en español latinoamericano (es-419).",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week",
+              "search_domain_filter": [
+                "popularenlinea.com",
+                "sb.gob.do",
+                "bancentral.gov.do"
+              ]
+            },
+            "user_location": {
+              "country": "DO"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "es",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "properties": {
+                      "label": {
+                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value",
+                      "unit",
+                      "as_of",
+                      "symbol",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "background": false,
+        "completed_at": 1788903048,
+        "created_at": 1788903048,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_30247135-10ac-41e3-b3c0-40ebe7632a4e",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "name": "finance",
+            "type": "skill_loaded"
+          },
+          {
+            "queries": [
+              "site:bancentral.gov.do tasas de interés pasivas certificados financieros 360 días septiembre 2026",
+              "site:sb.gob.do tasa pasiva promedio certificado financiero un año pesos septiembre 2026",
+              "Banco Central República Dominicana tasas interés pasivas por plazo 360 días"
+            ],
+            "results": null,
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "tasas de interés pasivas 360 días bancos múltiples República Dominicana",
+              "certificados financieros tasa promedio ponderada 360 días República Dominicana",
+              "BCRD tasas de interés pasivas bancos múltiples moneda nacional plazo"
+            ],
+            "results": null,
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "tasa promedio certificado financiero 1 año pesos dominicanos",
+              "tasa certificado financiero 360 días República Dominicana promedio bancos",
+              "estadísticas tasas pasivas bancos múltiples septiembre 2026 República Dominicana"
+            ],
+            "results": null,
+            "type": "search_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"La tasa pasiva promedio vigente para un certificado financiero a un año en pesos dominicanos no pudo ser verificada en una publicación pública actual. Por eso, no es posible dar una cifra confiable sin estimarla.\",\"rows\":[]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_089e376a-b3d4-4389-ac82-ac478dd26a07",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week",
+              "search_domain_filter": [
+                "popularenlinea.com",
+                "sb.gob.do",
+                "bancentral.gov.do"
+              ]
+            },
+            "user_location": {
+              "country": "DO"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.03204,
+            "cache_read_cost": 0.00945,
+            "currency": "USD",
+            "input_cost": 6e-05,
+            "output_cost": 0.01056,
+            "tool_calls_cost": 0.0075,
+            "tool_calls_cost_details": {
+              "search_web": 0.0075
+            },
+            "total_cost": 0.05961
+          },
+          "input_tokens": 30036,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 6407,
+            "cache_read_input_tokens": 23614,
+            "cached_tokens": 23614
+          },
+          "output_tokens": 528,
+          "output_tokens_details": {
+            "reasoning_tokens": 160
+          },
+          "tool_calls_details": {
+            "search_web": {
+              "cost_usd": 0.0075,
+              "invocation": 3
+            }
+          },
+          "total_tokens": 30564
+        },
+        "user": null
+      }
+    }
+  ],
+  "packet": {
+    "typed_answer": true,
+    "uncited_rows": 0,
+    "rows": [],
+    "sources": [],
+    "tool_results": [
+      "search_results",
+      "search_results",
+      "search_results"
+    ],
+    "tickers": [],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 3,
+      "fetch_url_invocations": 0,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 19377,
+      "cost_usd": null,
+      "input_tokens": 30036,
+      "output_tokens": 528,
+      "cache_creation_input_tokens": 6407,
+      "cache_read_input_tokens": 23614
+    },
+    "answer_markdown": "La tasa pasiva promedio vigente para un certificado financiero a un año en pesos dominicanos no pudo ser verificada en una publicación pública actual. Por eso, no es posible dar una cifra confiable sin estimarla."
+  },
+  "error": null
+}

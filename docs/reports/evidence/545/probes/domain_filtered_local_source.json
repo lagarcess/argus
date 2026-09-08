@@ -1,0 +1,402 @@
+{
+  "probe": "domain_filtered_local_source",
+  "purpose": "domain-filtered call citing a local source, DO location, es",
+  "candidate_sha": "7ef0055b431e45be77a7213e415a6eeee0acd012",
+  "captured_at": "2026-09-08T21:30:48.375347+00:00",
+  "elapsed_s": 9.74,
+  "request_overrides": {},
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "¿Qué tasa de interés paga hoy el Banco Popular Dominicano por un certificado financiero a un año en pesos?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nResponde en español latinoamericano (es-419).",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week",
+              "search_domain_filter": [
+                "popularenlinea.com"
+              ]
+            },
+            "user_location": {
+              "country": "DO"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "es",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "properties": {
+                      "label": {
+                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value",
+                      "unit",
+                      "as_of",
+                      "symbol",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "background": false,
+        "completed_at": 1788903038,
+        "created_at": 1788903038,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_2ef6c7c7-eb13-4133-be27-ea2d8b833e1b",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "queries": [
+              "site:popularenlinea.com certificado financiero tasa 1 año pesos",
+              "Banco Popular Dominicano tarifario certificado financiero pesos 360 días"
+            ],
+            "results": [
+              {
+                "date": "2026-09-03",
+                "id": 1,
+                "last_updated": "2026-08-26",
+                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nPagos anticipados de Préstamos iguales o mayores al 20% del capital (a partir del 20 de julio): 2.5% 1 año, sobre el valor amortizado y 2.0% 1-2 años, sobre el valor amortizado.",
+                "source": "web",
+                "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 2,
+                "last_updated": "2026-09-07",
+                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
+                "source": "web",
+                "title": "Retiro Comercial - Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 3,
+                "last_updated": "2026-08-27",
+                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
+                "source": "web",
+                "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
+                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 4,
+                "last_updated": "2026-08-17",
+                "snippet": "### 1.\nEmpieza a planificar sin afectar tu presupuesto habitual\n...\nEl primer paso consiste en determinar con exactitud cuánto dinero se puede destinar al gasto escolar:\n- **Calcula tus ingresos disponibles:** Suma los recursos con los que cuentas para esta temporada.\n- **Resta los gastos fijos:** Asegura primero los compromisos de vivienda, alimentación, salud, transporte y servicios básicos.\n- **Establece un techo de gasto: ** El monto resultante será la referencia definitiva para fijar tu presupuesto escolar realista.\n...\n### 2.\nHaz un presupuesto detallado antes de salir de compras\nAntes de realizar cualquier gasto, revisa con atención la **lista de útiles escolares** proporcionada por el centro educativo.\nPara trabajar con mayor orden, agrupa los requerimientos por categorías estratégicas:\n- **Uniformes y calzado escolar **\n- **Libros de texto y cuadernos **\n- **Útiles de papelería y mochilas **\n- **Dispositivos de tecnología **\n- **Actividades extracurriculares **\n...\n### 3.\nLleva un control riguroso de cada gasto\n...\nPuedes apoyarte en diferentes herramientas según tu preferencia:\n- **Aplicaciones móviles** de finanzas personales o gestión familiar.\n- **Hojas de cálculo** digitales sincronizadas en tu teléfono.\n- **Una libreta de apuntes** exclusiva para el control del gasto escolar.\n...\n### 4.\nCompara precios en diferentes establecimientos\n...\n### 5.\nReutiliza todos los materiales que se encuentren en buen estado\nAntes de acudir a la papelería o a las tiendas por departamento, haz una auditoría en casa del material del año anterior.\n...\n### 6.\nConsidera la compra de libros de texto usados\n...\n### 7.\nEscalona tus compras en el tiempo\n...\n### 8. Aprovecha las ofertas y promociones de forma inteligente\n...\n### 9.\nEvalúa la opción de tecnología reacondicionada (refurbished)\n...\n### 10.\nOpta por libros y recursos educativos digitales\n...\nLa combinación más rentable consiste en planificar las compras con anticipación, definir un presupuesto cerrado por categorías, auditar en casa los materiales reutilizables de años anteriores y comparar precios entre comercios antes de comprar.",
+                "source": "web",
+                "title": "Como ahorrar en la vuelta a clases? 10 consejos para cuidar el ...",
+                "url": "https://popularenlinea.com/Personas/blog/Pages/Como-ahorrar-vuelta-clases-consejos-cuidar-presupuesto-familiar.aspx"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "site:popularenlinea.com tarifario tasas pasivas certificado financiero pesos",
+              "site:popularenlinea.com tasas de interés certificados financieros"
+            ],
+            "results": null,
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "Banco Popular Dominicano certificado financiero 360 días tasa",
+              "Banco Popular certificado financiero un año tasa pesos dominicanos",
+              "Popularenlinea certificado financiero pesos tasa anual"
+            ],
+            "results": [
+              {
+                "date": "2026-09-03",
+                "id": 5,
+                "last_updated": "2026-08-26",
+                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nA partir del desembolso se producirán intereses calculados sobre saldos insolutos mensuales a ser pagados mensualmente por el deudor: Los intereses se calcularán sobre el capital por la tasa de interés, en base a un (1) año de trescientos sesenta (360) días y el resultado se multiplicará por los días calendario (365).\nEs decir: i=(capital x (tasa de interés porcentual/360) x días calendario 365.",
+                "source": "web",
+                "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 6,
+                "last_updated": "2026-08-27",
+                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
+                "source": "web",
+                "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
+                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 7,
+                "last_updated": "2026-09-07",
+                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**\nBPD.Accessibility",
+                "source": "web",
+                "title": "Retiro Comercial - Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 8,
+                "last_updated": "2026-03-15",
+                "snippet": "#### La forma más ágil\n...\nRealice sus transacciones en pesos, dólares y euros.",
+                "source": "web",
+                "title": "internet-banking-empresarial - Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/empresarial/paginas/servicios/internet-banking-empresarial.aspx"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 9,
+                "last_updated": "2026-08-17",
+                "snippet": "### 1.\nEmpieza a planificar sin afectar tu presupuesto habitual\n...\nEl primer paso consiste en determinar con exactitud cuánto dinero se puede destinar al gasto escolar:\n- **Calcula tus ingresos disponibles:** Suma los recursos con los que cuentas para esta temporada.\n- **Resta los gastos fijos:** Asegura primero los compromisos de vivienda, alimentación, salud, transporte y servicios básicos.\n- **Establece un techo de gasto: ** El monto resultante será la referencia definitiva para fijar tu presupuesto escolar realista.\n...\n### 2.\nHaz un presupuesto detallado antes de salir de compras\nAntes de realizar cualquier gasto, revisa con atención la **lista de útiles escolares** proporcionada por el centro educativo.\nPara trabajar con mayor orden, agrupa los requerimientos por categorías estratégicas:\n- **Uniformes y calzado escolar **\n- **Libros de texto y cuadernos **\n- **Útiles de papelería y mochilas **\n- **Dispositivos de tecnología **\n- **Actividades extracurriculares **\n...\n### 3.\nLleva un control riguroso de cada gasto\n...\nPuedes apoyarte en diferentes herramientas según tu preferencia:\n- **Aplicaciones móviles** de finanzas personales o gestión familiar.\n- **Hojas de cálculo** digitales sincronizadas en tu teléfono.\n- **Una libreta de apuntes** exclusiva para el control del gasto escolar.\n...\n### 4.\nCompara precios en diferentes establecimientos\n...\n### 5.\nReutiliza todos los materiales que se encuentren en buen estado\nAntes de acudir a la papelería o a las tiendas por departamento, haz una auditoría en casa del material del año anterior.\n...\n### 6.\nConsidera la compra de libros de texto usados\n...\n### 7.\nEscalona tus compras en el tiempo\n...\nIdentifica con los profesores qué insumos son prioritarios para el inicio de las clases y cuáles se requerirán más adelante.\n...\n### 8. Aprovecha las ofertas y promociones de forma inteligente\n...\n### 9.\nEvalúa la opción de tecnología reacondicionada (refurbished)\n...\n### 10.\nOpta por libros y recursos educativos digitales\n...\nLa combinación más rentable consiste en planificar las compras con anticipación, definir un presupuesto cerrado por categorías, auditar en casa los materiales reutilizables de años anteriores y comparar precios entre comercios antes de comprar.",
+                "source": "web",
+                "title": "Como ahorrar en la vuelta a clases? 10 consejos para cuidar el ...",
+                "url": "https://popularenlinea.com/Personas/blog/Pages/Como-ahorrar-vuelta-clases-consejos-cuidar-presupuesto-familiar.aspx"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"La tasa vigente no pudo verificarse en una página pública oficial del Banco Popular Dominicano.\",\"rows\":[]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_093c1500-2c90-4767-ad8e-0b4792dae5ef",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week",
+              "search_domain_filter": [
+                "popularenlinea.com"
+              ]
+            },
+            "user_location": {
+              "country": "DO"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.03671,
+            "cache_read_cost": 0.00456,
+            "currency": "USD",
+            "input_cost": 4e-05,
+            "output_cost": 0.00682,
+            "tool_calls_cost": 0.0075,
+            "tool_calls_cost_details": {
+              "search_web": 0.0075
+            },
+            "total_cost": 0.05563
+          },
+          "input_tokens": 18743,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 7342,
+            "cache_read_input_tokens": 11392,
+            "cached_tokens": 11392
+          },
+          "output_tokens": 341,
+          "output_tokens_details": {
+            "reasoning_tokens": 69
+          },
+          "tool_calls_details": {
+            "search_web": {
+              "cost_usd": 0.0075,
+              "invocation": 3
+            }
+          },
+          "total_tokens": 19084
+        },
+        "user": null
+      }
+    }
+  ],
+  "packet": {
+    "typed_answer": true,
+    "uncited_rows": 0,
+    "rows": [],
+    "sources": [
+      {
+        "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx",
+        "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx",
+        "title": "Retiro Comercial - Banco Popular Dominicano",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx",
+        "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://popularenlinea.com/Personas/blog/Pages/Como-ahorrar-vuelta-clases-consejos-cuidar-presupuesto-familiar.aspx",
+        "title": "Como ahorrar en la vuelta a clases? 10 consejos para cuidar el ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://popularenlinea.com/empresarial/paginas/servicios/internet-banking-empresarial.aspx",
+        "title": "internet-banking-empresarial - Banco Popular Dominicano",
+        "source_date": "2026-09-03"
+      }
+    ],
+    "tool_results": [
+      "search_results",
+      "search_results",
+      "search_results"
+    ],
+    "tickers": [],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 3,
+      "fetch_url_invocations": 0,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 9735,
+      "cost_usd": null,
+      "input_tokens": 18743,
+      "output_tokens": 341,
+      "cache_creation_input_tokens": 7342,
+      "cache_read_input_tokens": 11392
+    },
+    "answer_markdown": "La tasa vigente no pudo verificarse en una página pública oficial del Banco Popular Dominicano."
+  },
+  "error": null
+}

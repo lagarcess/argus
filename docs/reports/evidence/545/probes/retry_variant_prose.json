@@ -1,0 +1,139 @@
+{
+  "probe": "retry_variant_prose",
+  "purpose": "isolation: the same finance-only retry with no instructions and no schema, the pre-lane request shape",
+  "candidate_sha": "d87ef80e06525b90a3c46bd5d2a8a2f5b855d127",
+  "captured_at": "2026-09-08T21:37:13.717961+00:00",
+  "elapsed_s": 3.75,
+  "request_overrides": {},
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "Retrieve today's top gainers, top losers, and most active US-listed stocks with their percentage moves, prices, and volumes.\nThe user asked: anything interesting moving today\nLead with the figures you retrieve and state their as-of time. If retrieval fails, say only that you could not retrieve current figures. Do not write a sources line, include links, or name any tool, provider, or internal system.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "finance_search"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "en"
+      },
+      "http_status": 200,
+      "response": {
+        "background": false,
+        "completed_at": 1788903430,
+        "created_at": 1788903430,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_fcfc43cf-b649-46d7-abb8-887412234026",
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "name": "finance",
+            "type": "skill_loaded"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "I could not retrieve current figures.",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_9864054a-80be-4a84-b034-2db65ac126a2",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "finance_search"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.02459,
+            "cache_read_cost": 0.00163,
+            "currency": "USD",
+            "input_cost": 2e-05,
+            "output_cost": 0.00138,
+            "total_cost": 0.02762
+          },
+          "input_tokens": 8992,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 4918,
+            "cache_read_input_tokens": 4068,
+            "cached_tokens": 4068
+          },
+          "output_tokens": 69,
+          "output_tokens_details": {
+            "reasoning_tokens": 38
+          },
+          "total_tokens": 9061
+        },
+        "user": null
+      }
+    }
+  ],
+  "packet": {
+    "typed_answer": false,
+    "uncited_rows": 0,
+    "rows": [],
+    "sources": [],
+    "tool_results": [],
+    "tickers": [],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 0,
+      "fetch_url_invocations": 0,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 3749,
+      "cost_usd": null,
+      "input_tokens": 8992,
+      "output_tokens": 69,
+      "cache_creation_input_tokens": 4918,
+      "cache_read_input_tokens": 4068
+    },
+    "answer_markdown": "I could not retrieve current figures."
+  },
+  "error": null
+}

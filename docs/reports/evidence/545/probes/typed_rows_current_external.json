@@ -1,0 +1,992 @@
+{
+  "probe": "typed_rows_current_external",
+  "purpose": "#545: typed rows and dated publisher sources, one-week recency",
+  "candidate_sha": "7ef0055b431e45be77a7213e415a6eeee0acd012",
+  "captured_at": "2026-09-08T21:30:38.629754+00:00",
+  "elapsed_s": 29.99,
+  "request_overrides": {},
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "Why is NVIDIA stock moving this week?\nTickers: NVIDIA (NVDA)\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "en",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "properties": {
+                      "label": {
+                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value",
+                      "unit",
+                      "as_of",
+                      "symbol",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "background": false,
+        "completed_at": 1788903008,
+        "created_at": 1788903008,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_68d91c5c-d16b-44f2-a894-a2b5a3db458f",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "name": "finance",
+            "type": "skill_loaded"
+          },
+          {
+            "categories": [
+              "quote"
+            ],
+            "results": [
+              {
+                "category": "quote",
+                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-08 20:00:00 UTC | 2026-09-08 21:30:13 UTC | after_hours | 225.73 | USD | -4.63 | -2.01 |\n\nData available in: `NVDA_quotes_12c136.csv` (row key column: symbol)",
+                "sources": [
+                  "https://www.perplexity.ai/finance/NVDA"
+                ],
+                "tickers": [
+                  "NVDA"
+                ]
+              }
+            ],
+            "tickers": [
+              "NVDA"
+            ],
+            "type": "finance_results"
+          },
+          {
+            "queries": [
+              "NVIDIA stock moving this week September 8 2026",
+              "NVDA shares September 8 2026 news",
+              "NVIDIA investor relations September 2026"
+            ],
+            "results": [
+              {
+                "date": "2026-09-08",
+                "id": 1,
+                "last_updated": "2026-09-08",
+                "snippet": "NVDA trades at $230.36, up 0.84% on the day, testing the top of its five-month rising channel as the market digests NVIDIA’s $12.93 billion Hugging Face acquisition.\n...\nNVDA is holding near $230.36 as of 11:15 IST on 8 September 2026, up 0.84% over the past 24-hour candle, after a range of $229.63 to $234.76 on an open of $231.09.",
+                "source": "web",
+                "title": "Market Outlook On NVIDIA Corporation Today: Technical Summary ...",
+                "url": "https://www.capitalstreetfx.com/market-outlook/market-outlook-nvidia-corporation-08-09-2026/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 2,
+                "last_updated": "2026-09-08",
+                "snippet": "Tue, September 8, 2026 at 9:12 AM PDT5 min read\n- NVDA\n-2.01%",
+                "source": "web",
+                "title": "3 Things Bears Have Wrong About Nvidia Right Now",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/3-things-bears-wrong-nvidia-161200599.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 3,
+                "last_updated": "2026-09-08",
+                "snippet": "NVIDIA Corporation $NVDA Shares Sold by First Pacific Financial Written by MarketBeatSeptember 8, 2026Add As Preferred SourceShareShareShare This ArticleLink copied to clipboard.Close Image from MarketBeat Media, LLC.",
+                "source": "web",
+                "title": "NVIDIA Corporation $NVDA Shares Sold by First Pacific ...",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-nvidia-corporation-nvda-shares-sold-by-first-pacific-financial-2026-09-08/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 4,
+                "last_updated": "2026-09-08",
+                "snippet": "Analysts maintain a “Moderate Buy” consensus rating with an average price target of $324.83.",
+                "source": "web",
+                "title": "Sound Income Strategies LLC Grows Position in NVIDIA Corporation $NVDA",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-sound-income-strategies-llc-grows-position-in-nvidia-corporation-nvda-2026-09-08/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 5,
+                "last_updated": "2026-09-08",
+                "snippet": "Tue, September 8, 2026 at 5:26 AM EDT4 min read\n- NVDA\n+0.84%",
+                "source": "web",
+                "title": "Nvidia, Palantir, and Meta Platforms Are Rattling Wall Street With This $18.6 Billion Warning",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-palantir-meta-platforms-rattling-092601179.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 6,
+                "last_updated": "2026-09-08",
+                "snippet": "Last Updated: Sep 8, 2026 4:48 p.m.\nEDTDelayed quote\n## $ 225.61\n-0.12 -0.05%\nAfter Hours Volume: 6.3M\n|Close|Chg|Chg %|\n...\n|$225.73|-4.63|-2.01%|",
+                "source": "web",
+                "title": "NVIDIA Corp. Stock Quote (U.S. - NVDA - MarketWatch",
+                "url": "https://www.marketwatch.com/investing/stock/nvda"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 7,
+                "last_updated": "2026-09-08",
+                "snippet": "Tue, September 8, 2026 at 4:51 AM EDT1 min read\n...\n- NVDA NVIDIA Corporation 230.36+1.91(+0.84%)",
+                "source": "web",
+                "title": "Company News for Sep 8, 2026 - Yahoo Finance",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/company-news-sep-8-2026-085100393.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 8,
+                "last_updated": "2026-09-08",
+                "snippet": "On September 08, 2026, Nvidia CEO Jensen Huang reaffirmed his bullish stance on the company’s AI chips, highlighting a 22% rise in rental prices for the H100 GPUs over the past month, now commanding $3.28 per hour.\n...\n- **GF Value™ verdict:** NVDA’s GF Value™ stands at $386.29 versus a current price of $230.36, indicating the stock is approximately 40.4% undervalued.\n...\nAccording to GuruFocus’ proprietary GF Value™ model, Nvidia is trading at $230.36, while its intrinsic value estimate is $386.29.",
+                "source": "web",
+                "title": "NVDA Looks 40.4% Undervalued on GF Value™ as AI ...",
+                "url": "https://www.gurufocus.com/news/9069999/nvda-looks-404-undervalued-on-gf-value-as-ai-chip-demand-accelerates"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 9,
+                "last_updated": "2026-09-08",
+                "snippet": "- NVDA NVIDIA Corporation 230.36(+0.84%)\n- 1,740.00(+11.90%)",
+                "source": "web",
+                "title": "Stock Market News for Sep 8, 2026",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/stock-market-news-sep-8-084700152.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 10,
+                "last_updated": "2026-09-08",
+                "snippet": "🔹 Nvidia $NVDA: Demonstrated relative resilience, edging higher as persistent enterprise AI infrastructure demand supported major semiconductor hardware suppliers.\"\n- Markets Today",
+                "source": "web",
+                "title": "September 08, 2026 🔹 Tesla $TSLA: Lower by nearly ...",
+                "url": "https://x.com/marketsday/status/2097254497580175447"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 11,
+                "last_updated": "2026-09-08",
+                "snippet": "Tuesday pre-market moves included:\n...\nAMD: approximately +1.30%\nNvidia: approximately +0.20%",
+                "source": "web",
+                "title": "u.s. stock market, global news review — 08 september 2026 - Moomoo",
+                "url": "https://www.moomoo.com/community/feed/u-s-stock-market-global-news-review-08-september-2026-117235591020550"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 12,
+                "last_updated": "2026-09-08",
+                "snippet": "GF Value™ verdict: NVDA is currently priced at $230.36, which is 40.4% undervalued compared to its GF Value™ of $386.29.\n...\nAccording to the GF Value™, NVIDIA's intrinsic value is estimated at $386.29, which positions the current stock price of $230.36 at a substantial 40.4% undervaluation.",
+                "source": "web",
+                "title": "US Futures Dip as Brent Oil Nears $100, Market Anticipates Rate",
+                "url": "https://www.gurufocus.com/news/9070378/us-futures-dip-as-brent-oil-nears-100-market-anticipates-rate-hikes"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 13,
+                "last_updated": "2026-09-08",
+                "snippet": "NVIDIA Price PerformanceMarketBeat Week in Review – 08/31 - 09/04NVDA opened at $230.36 on Monday.",
+                "source": "web",
+                "title": "Smithbridge Asset Management Inc. DE Sells 3,236 Shares of NVIDIA Corporation $NVDA",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-smithbridge-asset-management-inc-de-sells-3236-shares-of-nvidia-corporation-nvda-2026-09-07/"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 14,
+                "last_updated": "2026-09-07",
+                "snippet": "**What happened:** Nvidia (NVDA) stock rose as much as 2% on Friday before giving up some of its gains, putting the stock within striking distance of a new record high.\n...\n230.36 +1.91 (+0.84%)",
+                "source": "web",
+                "title": "Nvidia stock moves closer to all-time high - Yahoo Finance",
+                "url": "https://finance.yahoo.com/markets/article/nvidia-stock-moves-closer-to-all-time-high-193309793.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 15,
+                "last_updated": "2026-09-08",
+                "snippet": "The Magnificent Seven mega-cap tech stocks pointed mostly lower, with the Roundhill Magnificent Seven ETF (MAGS) down about 0.5%, although Nvidia (NVDA), the world's most valuable public company, pointed up slightly.",
+                "source": "web",
+                "title": "Stock Market Today: Indexes Retreat to Start Holiday-Shortened Week",
+                "url": "https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-09082026-12110868"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "Nvidia stock moves closer to all-time high\n\n1. 1. 1. Compare Credit Cards\n   2. Best 0% APR cards\n   3. Best balance transfer cards\n   4. Best rewards cards\n   5. Best travel cards\n\nA pro-grade research workspace with advanced charts, company data and real-time news. Now part of Yahoo Finance Gold.\n\nGet Finance Plus\n\n### U.S. markets closed\n\nCryptocurrencies\n\nRates\n\nCommodities\n\nCurrencies\n\nS&P 500 7,718.60-29.11-0.38%\n\nDow 30 53,414.25-271.85-0.51%\n\nNasdaq 26,506.99-77.11-0.29%\n\nRussell 2000 2,975.65+7.38+0.25%\n\nVIX 15.30+0.77+5.30%\n\nGold 4,476.60-63.30-1.39%\n\nBitcoin USD 79,230.39-714.77-0.89%\n\nCrude Oil Oct 26 91.48+0.18+0.20%\n\n# Nvidia stock moves closer to all-time high\n\nInes Ferré · Senior Business Reporter\n\nFri, September 4, 2026 at 1:13 PM PDT1 min read\n\n- NVDA\n  +0.84%\n\nTrade NVIDIA on Coinbase Trading disclosure\n\n## Trading disclosure\n\nThe above button links to Coinbase. Yahoo Finance is not a broker-dealer or investment adviser and does not offer securities or cryptocurrencies for sale or facilitate trading. Coinbase pays us for certain activity generated through this link. Prices displayed are informational.\n\nLearn more\n\n**What happened:** Nvidia (NVDA) stock rose as much as 2% on Friday before giving up some of its gains, putting the stock within striking distance of a new record high.\n\n**What's behind the move: ** Nvidia extended its advance from the previous session as AI-related semiconductor stocks continued to climb. The stock closed at $230.36, just shy of its record high of $235.74 on May 14.\n\nThe move higher coincides with reports that AI developer Anthropic is preparing to file for its IPO soon. The AI chip heavyweight committed up to $10 billion to Anthropic last year.\n\nMeanwhile, on Thursday, Nvidia announced the acquisition of open-weight AI model hub, Hugging Face, for nearly $13 billion.\n\nMore than 18 million developers and creators and 200,000 companies use the platform to share and adopt AI models, according to Nvidia.\n\n\"Nvidia wants to be in front of this, access to more developers, access to more enterprises,\" Futurum CEO Daniel Newman told Yahoo Finance on Thursday.\n\n### ( NVDA )\n\nGo deeper with AlphaSpace\n\n230.36 +1.91 (+0.84%)\n\nAt close: September 4 at 4:00:00 PM EDT\n\nNVDA AMD MU\n\n**What else you need to know:** Nvidia has been on a spending spree as it expands its reach across the AI ecosystem.\n\nOn Monday, the company announced a $3.5 billion investment in Taiwanese chip designer MediaTek, which will adopt Nvidia's NVFusion platform.\n\nThe move keeps Nvidia in the revenue flywheel as hyperscalers increasingly turn to custom silicon.\n\n*Ines Ferre is a senior business reporter for Yahoo Finance.*\n\n**Click here for in-depth analysis of the latest stock market news and events moving stock prices**\n\n**Read the latest financial and business news from Yahoo Finance**\n\nView Comments\n\n- - BTC-USD Bitcoin USD 63,925.97-905.20(-1.40%)\n  - ETH-USD Ethereum USD 1,848.24-49.27(-2.60%)\n  - XRP-USD XRP USD 1.09-0.02(-1.94%)\n  - BBD-B.TO Bombardier Inc. 315.12+10.82(+3.56%)\n  - CL=F Crude Oil Oct 26 91.48+0.18(+0.20%)\n- Earnings events",
+                "title": "Nvidia stock moves closer to all-time high",
+                "url": "https://finance.yahoo.com/markets/article/nvidia-stock-moves-closer-to-all-time-high-193309793.html"
+              },
+              {
+                "snippet": "Stock futures pointed to a mostly lower open Tuesday, a day after U.S. stock and bond markets were closed for Labor Day, as oil prices and Treasury yields advanced.\nDow Jones Industrial Average and S&P 500 futures were down 0.7% and 0.2%, respectively, while Nasdaq 100 futures ticked 0.1% higher.\nLast Friday, major stock indexes closed lower amid fresh concerns that the Federal Reserve will decide to raise its key interest rate later this month following a hotter-than-expected jobs report, although the Nasdaq Composite and S&P 500 ended higher for a second straight week.\nThis week, investors will be eagerly anticipating Friday's August Consumer Price Index reading, which could sway whether the Fed's decision on interest rates next week. Traders now see a 58% likelihood that the Fed will raise rates at the meeting, per the CME Group's FedWatch tool.\nCrude prices rose Monday as the U.S. and Iran exchanged military strikes over the weekend. Brent crude futures, the global benchmark, approached the $100-a-barrel threshold and recently were up 1.6% at $98.55 a barrel. U.S. benchmark West Texas Intermediate prices were 2.7% higher at nearly $94.\nAmid concerns that high oil prices will keep inflation elevated, the 10-year yield rose one basis point from Friday's close to 4.80%. Last Wednesday, it touched 4.82%, its highest intraday level since November 2023.\nBitcoin recently was at $78,800, down modestly over the past 24 hours. The U.S. dollar index, which tracks the value of the greenback against a basket of foreign currencies, was down 0.2% to 98.96. Gold futures were 0.8% lower at $4,440 an ounce.\nNovartis (NVS) shares tanked 12% in premarket trading after the pharmaceutical firm announced a pair of disappointing drug-trial results. One of them, about a cholesterol treatment announced late Friday, pulled down shares of Amgen (AMGN), which is working on a rival drug. Amgen stock's 5% decline weighed on Dow futures.\nThe Magnificent Seven mega-cap tech stocks pointed mostly lower, with the Roundhill Magnificent Seven ETF (MAGS) down about 0.5%, although Nvidia (NVDA), the world's most valuable public company, pointed up slightly. Tesla (TSLA) shares were little changed after sinking 6% Friday after the U.S. National Highway Traffic Safety Administration said it had opened a probe 'to examine the process and technical data on which Tesla relied when certifying the Cybercab and related issues.'\nMemory stocks rose modestly, with Sandisk (SNDK), Seagate Technology (STX), and Western Digital (WDC) all up less than 1% after surging between 6% and 12% Friday. The Roundhill Memory ETF (DRAM) and the broader iShares Semiconductor ETF (SOXX) were about 2% and 1% higher, respectively.\nShares of Bloom Energy (BE), Everpure (P), and Illumina (ILMN) pointed up 5%, 3%, and 1%, respectively, after S&P Dow Jones Indices late Friday said the stocks would join the S&P 500 before the start of trading on Sept. 21. The companies they are replacing—Molson Coors Beverage (TAP), The Trade Desk (TTD), and Builders FirstSource (BLDR)—declined slightly.",
+                "title": "Stock Market Today: Futures Point Mostly Lower to Start Holiday-Shortened Week as Oil Prices, Treasury Yields Rise",
+                "url": "https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-09082026-12110868"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "queries": [
+              "NVDA fell 2.01% September 8 2026 why",
+              "Nvidia September 8 2026 stock fell news Reuters",
+              "Nvidia September 2026 acquisition Hugging Face announcement"
+            ],
+            "results": [
+              {
+                "date": "2026-09-03",
+                "id": 16,
+                "last_updated": "2026-09-08",
+                "snippet": "Computer chip company Nvidia is buying artificial intelligence software platform Hugging Face for $12.93 billion.",
+                "source": "web",
+                "title": "Nvidia to spend $13 billion on Hugging Face, leaving it as ...",
+                "url": "https://abcnews.com/Technology/wireStory/nvidia-spend-13-billion-hugging-face-leaving-open-136169595"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 17,
+                "last_updated": "2026-09-08",
+                "snippet": "Nvidia announced on Thursday that it will buy artificial intelligence startup Hugging Face for $12.9 billion, a massive bet by the chipmaker to expand the reach of open-source AI technology.\n...\nUnder the deal announced Thursday, Nvidia will pay $11.9 billion to Hugging Face shareholders.",
+                "source": "web",
+                "title": "Nvidia inks $13 billion deal to buy the AI startup that was ...",
+                "url": "https://www.cnn.com/2026/09/03/tech/nvidia-hugging-face-ai-acquisition"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 18,
+                "last_updated": "2026-09-08",
+                "snippet": "Nvidia (NVDA) on Thursday confirmed its plans to acquire the open-weight AI platform Hugging Face for roughly $13 billion, sending its shares up roughly 2%.\nThe deal will see Nvidia pay $12.93 billion for the platform, per a press release.",
+                "source": "web",
+                "title": "Nvidia confirms $13 billion acquisition of open-weight AI platform ...",
+                "url": "https://finance.yahoo.com/markets/article/nvidia-confirms-13-billion-acquisition-of-open-weight-ai-platform-hugging-face-141058641.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 19,
+                "last_updated": "2026-09-08",
+                "snippet": "Sept 3 (Reuters) - Nvidia will buy popular developer platform Hugging Face for $12.93 billion, using its growing AI war chest to expand its influence in ‌the booming market for open-source models that can nearly match the best from OpenAI and Anthropic at lower costs.",
+                "source": "web",
+                "title": "Nvidia bets $13 billion on open AI models with Hugging ...",
+                "url": "https://www.reuters.com/business/nvidia-buy-hugging-face-nearly-13-billion-big-bet-open-ai-models-2026-09-03/"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 20,
+                "last_updated": "2026-09-08",
+                "snippet": "Nvidia will acquire open-source AI model hosting platform Hugging Face for $12.9 billion, CEO Jensen Huang said in a blog post on Thursday, while also committing to keeping the platform open for developers of open models and apps.\n...\nIn an SEC filing on Thursday, Nvidia said it would acquire Hugging Face in a deal worth $12.9 billion, which it expects to close within the first half of 2027.",
+                "source": "web",
+                "title": "Nvidia Will Buy Hugging Face For Nearly $13 Billion - Forbes",
+                "url": "https://www.forbes.com/sites/zacharyfolk/2026/09/03/nvidia-is-acquiring-hugging-face-for-almost-13-billion/"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 21,
+                "last_updated": "2026-09-08",
+                "snippet": "**NVIDIA Corporation** NVDA made a major move in artificial intelligence (AI) on Thursday, agreeing to acquire Hugging Face for $12.9 billion.",
+                "source": "web",
+                "title": "Nvidia's $13 Billion Hugging Face Deal Expands Open- ...",
+                "url": "https://finance.yahoo.com/technology/ai/articles/nvidias-13-billion-hugging-face-121800081.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 22,
+                "last_updated": "2026-09-08",
+                "snippet": "Key Points\n- Nvidia agreed to buy Hugging Face, an open-source AI platform, for $12.9 billion.",
+                "source": "web",
+                "title": "Nvidia agrees to buy Hugging Face for almost $13 billion, AI ... - CNBC",
+                "url": "https://www.cnbc.com/2026/09/03/nvidia-agrees-to-buy-hugging-face-for-almost-13-billion-ai-expansion.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 23,
+                "last_updated": "2026-09-05",
+                "snippet": "Nvidia will buy the popular developer platform Hugging Face for nearly $13bn, betting that support for ⁠open AI models could offset a potential slowdown in demand for the semiconductor giant’s chips.\nShares ⁠in Nvidia were ⁠slightly lower ​after the $12.93bn (£9.57bn) deal – which ranks among its biggest ever – was announced for the database of AI models on Thursday.",
+                "source": "web",
+                "title": "Nvidia to buy developer platform Hugging Face in $12.9bn deal",
+                "url": "https://www.theguardian.com/technology/2026/sep/03/nvidia-to-buy-hugging-face-in-129bn-deal"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 24,
+                "last_updated": "2026-09-08",
+                "snippet": "Key Points\n- Nvidia’s $12.9 billion deal for Hugging Face puts it closer to millions of AI developers and one of the industry’s most important open-model platforms.",
+                "source": "web",
+                "title": "Why Nvidia's Hugging Face deal is about much more than ...",
+                "url": "https://www.cnbc.com/2026/09/04/nvidia-hugging-face-deal-chips.html"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 25,
+                "last_updated": "2026-09-08",
+                "snippet": "NVIDIA announced on September 3, 2026, that it will acquire Hugging Face for $12.93 billion, a deal structured as approximately $11.9 billion in cash and up to $1 billion in equity retention for staff.",
+                "source": "web",
+                "title": "NVIDIA's $12.93B Hugging Face Acquisition Becomes ...",
+                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-12-93b-hugging-face-075456869.html"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 26,
+                "last_updated": "2026-09-08",
+                "snippet": "Nvidia has confirmed it will acquire US-based AI company Hugging Face for a price of just over $12.93bn.",
+                "source": "web",
+                "title": "Nvidia strikes $12.9bn deal for AI platform Hugging Face",
+                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-strikes-12-9bn-deal-090738500.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 27,
+                "last_updated": "2026-09-05",
+                "snippet": "Nvidia (NASDAQ:NVDA) has entered into a definitive agreement to acquire open-source artificial intelligence platform Hugging Face for $12.93 billion, bringing together Nvidia's computing infrastructure with Hugging Face's AI development ecosystem.",
+                "source": "web",
+                "title": "Nvidia Agrees to Acquire Hugging Face for $12.93 Billion",
+                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-agrees-acquire-hugging-face-132500720.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 28,
+                "last_updated": "2026-09-08",
+                "snippet": "Nvidia has agreed to buy AI developer platform Hugging Face for $12.9 billion, tightening its grip on the ecosystem surrounding open models.",
+                "source": "web",
+                "title": "Nvidia buys Hugging Face for $12.9B, promises not to squeeze too hard",
+                "url": "https://www.theregister.com/ai-and-ml/2026/09/03/nvidia-buys-hugging-face-for-129b-promises-not-to-squeeze-too-hard/5294208"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 29,
+                "last_updated": "2026-09-08",
+                "snippet": "Investing.com -- Nvidia has entered into a definitive agreement to acquire Hugging Face, the leading platform for open-source artificial intelligence, for $12.93 billion.",
+                "source": "web",
+                "title": "Nvidia to acquire AI platform Hugging Face in landmark ...",
+                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-acquire-ai-platform-hugging-124357614.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 30,
+                "last_updated": "2026-09-07",
+                "snippet": "NVIDIA Corporation NVDA announced on September 2, 2026, that it has entered into a definitive agreement to acquire Hugging Face, Inc., a leading platform and community for developing, sharing, and deploying open-source models, datasets, and applications.\nThe transaction is valued at approximately $11.9 billion, payable to Hugging Face stockholders, subject to customary adjustments, and includes an additional equity-based retention program of up to approximately $1.0 billion for Hugging Face employees joining NVIDIA.\nThe acquisition is expected to close in the first half of 2027, pending the satisfaction of customary closing conditions, including receipt of required regulatory approvals.",
+                "source": "web",
+                "title": "NVIDIA (NVDA) to Acquire Hugging Face in $11.9 Billion Deal to B",
+                "url": "https://www.gurufocus.com/news/9066913/nvidia-nvda-to-acquire-hugging-face-in-119-billion-deal-to-bolster-opensource-ai-ecosystem"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "September 8 2026 Nvidia closed down 2.01 market report",
+              "September 8 2026 NVDA 225.73 why down",
+              "stock market close September 8 2026 Nvidia decline"
+            ],
+            "results": [
+              {
+                "date": "2026-09-08",
+                "id": 31,
+                "last_updated": "2026-09-08",
+                "snippet": "On the downside, Nvidia (NVDA) fell 2.01%, Apple (AAPL) dropped 1.17%, Microsoft (MSFT) declined 1.15%, Amazon (AMZN) slipped 0.60%, Meta Platforms (META) edged down 0.53%, and Google (GOOGL) dipped 0.03%.",
+                "source": "web",
+                "title": "Semiconductor Stocks Strengthen, Intel Rises 9%, SK Hynix Gains ...",
+                "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262156857-us-stock-close-dow-nasdaq-drop-chip-memory-treasury-bonds-cpi-intel-tradingkey"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 32,
+                "last_updated": "2026-09-08",
+                "snippet": "Gainers were led by Meta (META), up 1.0% to $616.77, and NVIDIA (NVDA), which rose 0.8% to $230.36.",
+                "source": "web",
+                "title": "Stock Market Today: Trade Wars, Earnings, and Key Movers ...",
+                "url": "https://finobird.com/news/roundup/stock-trade-tensions-escalate-as-earnings-season-looms-market-roundup-for-september-8-2026-2026-09-08/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 33,
+                "last_updated": "2026-09-08",
+                "snippet": "Tuesday pre-market moves included:\n...\nAMD: approximately +1.30%\nNvidia: approximately +0.20%",
+                "source": "web",
+                "title": "u.s. stock market, global news review — 08 september 2026 - Moomoo",
+                "url": "https://www.moomoo.com/community/feed/u-s-stock-market-global-news-review-08-september-2026-117235591020550"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 34,
+                "last_updated": "2026-09-08",
+                "snippet": "S&P 500 lost 44.66 points, or 0.58%, to end at 7,673.94 points, while the Nasdaq Composite lost 83.30 points, or 0.31%, to 26,423.69.",
+                "source": "web",
+                "title": "Dow Jones| Nasdaq | S&P 500 | US Stock Market Today",
+                "url": "https://economictimes.indiatimes.com/markets/us-stocks/news/dow-jones-stock-market-live-updates-nasdaq-sp-500-us-iran-israel-war-hormuz-deal-brent-crude-oil-earnings-forecast-nvidia-intel-coinbase-stock-price-news-8th-september-2026/liveblog/133925001.cms"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 35,
+                "last_updated": "2026-09-08",
+                "snippet": "The Dow Jones Industrial Average (DJI) fell 0.5%, or 272.51 points, to close at 53,413.60.\n...\nView Comments\n...\n- NVDA NVIDIA Corporation 230.36(+0.84%)",
+                "source": "web",
+                "title": "Stock Market News for Sep 8, 2026",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/stock-market-news-sep-8-084700152.html"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 36,
+                "last_updated": "2026-09-08",
+                "snippet": "Major stocks, including Apple, Nvidia, Tesla, Amazon and Microsoft, also have no regular trading session today.",
+                "source": "web",
+                "title": "US Stock Market Closed for Labour Day: S&P 500 at 7,718.60, Nasdaq at 26,506.99 as Trading Halts - HDFCSky",
+                "url": "https://hdfcsky.com/news/us-stock-market-closed-for-labour-day-sp-500-at-7718-60-nasdaq-at-26506-99-as-trading-halts"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 37,
+                "last_updated": "2026-09-08",
+                "snippet": "|Market Closed - Nasdaq 04:00:00 2026-09-08 pm EDT|Market Closed - Nasdaq 04:00:00 2026-09-08 pm EDT|Market Closed - Nasdaq 04:00:00 2026-09-08 pm EDT|After hours 05:02:44 pm|After hours 05:02:44 pm|\n...\n|225.73^USD^|-2.01%| |225.74|+0.00%|\n...\n| | |225.73USD|-2.01%|+3.81%|5,563B|",
+                "source": "web",
+                "title": "Why is Nvidia paying nearly $13 billion for Hugging Face?",
+                "url": "https://www.marketscreener.com/news/why-is-nvidia-paying-nearly-13-billion-for-hugging-face-ce785bdada80f52c"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 38,
+                "last_updated": "2026-09-08",
+                "snippet": "The stock dipped on macro (oil + Middle East risk) while AI peers rose, and the article flags NVDA as the cheapest compute name on 2028 earnings plus under-owned.\n...\nNvidia stock fell about 1.5% on Tuesday to around $227, taking a breather after three consecutive sessions of gains as broader markets came under pressure from rising oil prices and renewed Middle East tensions.",
+                "source": "web",
+                "title": "Why Nvidia stock is down over 1% today even as AI peers are surging",
+                "url": "https://invezz.com/ie/news/2026/09/08/why-nvidia-stock-is-down-over-1percent-today-even-as-ai-peers-are-surging/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 39,
+                "last_updated": "2026-09-08",
+                "snippet": "- NVDA\n-2.01%\n...\n**Stock Advisor returns as of September 8, 2026.*",
+                "source": "web",
+                "title": "3 Things Bears Have Wrong About Nvidia Right Now",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/3-things-bears-wrong-nvidia-161200599.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 40,
+                "last_updated": "2026-09-08",
+                "snippet": "-5.42%\n- NVDA\n-2.01%\n...\n* ***Continue »* **\n...\n- - 103.09",
+                "source": "web",
+                "title": "1 Glorious Growth Stock Down 78% to Buy on the Dip in September",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/1-glorious-growth-stock-down-135000741.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 41,
+                "last_updated": "2026-09-08",
+                "snippet": "Last Updated: Sep 8, 2026 4:48 p.m.\nEDTDelayed quote\n## $ 225.61\n-0.12 -0.05%\n...\n|Close|Chg|Chg %|\n|--|--|--|\n|$225.73|-4.63|-2.01%|",
+                "source": "web",
+                "title": "NVIDIA Corp. Stock Quote (U.S. - NVDA - MarketWatch",
+                "url": "https://www.marketwatch.com/investing/stock/nvda"
+              },
+              {
+                "date": "2026-09-02",
+                "id": 42,
+                "last_updated": "2026-09-08",
+                "snippet": "Elsewhere, a 3.2% rise in Nvidia also helped markets.",
+                "source": "web",
+                "title": "Wall Street ends higher on Dell, Nvidia boost and a let up in oil ...",
+                "url": "https://www.investing.com/news/stock-market-news/us-futures-muted-as-markets-parse-rate-jitters-more-iran-strikes-4885211"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 43,
+                "last_updated": "2026-09-08",
+                "snippet": "Among major tech stocks, Meta Platforms (META) rose 1.00%, Nvidia (NVDA) gained 0.84%, and Broadcom (AVGO) advanced 0.21%.",
+                "source": "web",
+                "title": "US Stocks Fall, Dow Drops 270 Points; SOX Bucks Trend to Gain Over 3% Led by Memory, Optical Communication Stocks; SanDisk Rises Nearly 12%, Tesla Drops Almost 6%",
+                "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262152205-us-stock-close-dow-nasdaq-philadelphia-semiconductor-rise-sandisk-tesla-tradingkey"
+              },
+              {
+                "date": "2026-09-02",
+                "id": 44,
+                "last_updated": "2026-09-08",
+                "snippet": "- ^GSPC\n-0.45%\n- NVDA\n-2.01%",
+                "source": "web",
+                "title": "Wall Street's Scariest Seasonal Pattern Returns in ...",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/wall-streets-scariest-seasonal-pattern-090500750.html"
+              },
+              {
+                "date": "2026-09-02",
+                "id": 45,
+                "last_updated": "2026-09-07",
+                "snippet": "S&P 500 7,718.60-29.11-0.38%\n...\n- NVDA\n+0.84%",
+                "source": "web",
+                "title": "History Says September Is Brutal for Stocks. Is This the ...",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/history-says-september-brutal-stocks-071000060.html"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "Key Risk: The upgrade is premature and Intel's turnaround execution misses (process/manufacturing or product roadmap), causing the rally to fade fast.\nBuy INTC. It surged 8% on an upgrade to Outperform, and the move happened while semis broadly firmed (PHLX +2%). If the market is rotating back into beaten-down chip exposure, INTC can catch a second wave as investors re-rate the group beyond just AI accelerators.\nKey Risk: AI capex slows or gets delayed enough that NVDA's 2028 growth/outlook breaks.\nBuy NVDA. The stock dipped on macro (oil + Middle East risk) while AI peers rose, and the article flags NVDA as the cheapest compute name on 2028 earnings plus under-owned. Fundamentals are still accelerating: fiscal Q2 revenue +106% and October-quarter guidance $108B vs ~$105B consensus; Morningstar lifts fair value to $310 and cites the 2028 outlook as the key driver.\nNvidia stock fell about 1.5% on Tuesday to around $227, taking a breather after three consecutive sessions of gains as broader markets came under pressure from rising oil prices and renewed Middle East tensions.\nThe pullback was notable because several major semiconductor stocks moved higher.\nIntel surged more than 8% after Northland Capital Markets analyst Gus Richard upgraded the stock to Outperform from Market Perform.\nAMD gained about 5%, while Broadcom rose roughly 3%. The PHLX Semiconductor Sector index was also up around 2%.\nThe broader market moved in the opposite direction. The Dow Jones Industrial Average fell 574 points, or 1.1%, while the S&P 500 declined 0.4% and the Nasdaq Composite slipped 0.3%.\nUS markets were closed on Monday for the Labor Day holiday.\nNvidia trails semiconductor peers\nOil prices remained a key source of pressure for equities on Tuesday as West Texas Intermediate crude futures rose for a sixth consecutive session, extending their longest winning streak since March.\nBrent crude was trading around $98 a barrel as tensions between the US and Iran escalated over the weekend.\nAgainst that backdrop, Nvidia's decline comes after a strong run over recent months.\nThe stock is up about 24% over the past six months and remains just below its record high of $236.54.\nHowever, Nvidia has significantly underperformed some semiconductor peers over the same period, with both AMD and Intel gaining more than 100%.\nAd\nCantor maintains $350 Nvidia target\nCantor Fitzgerald reiterated its Overweight rating on Nvidia and maintained a $350 price target.\nThe firm highlighted continued demand for AI infrastructure while acknowledging supply constraints across the semiconductor industry.\nAnalyst C.J. Muse said investors remain divided over the durability of the AI investment cycle as macroeconomic and debt concerns weigh on markets.\nCantor also emphasized Nvidia's position as TSMC's largest customer and argued that the stock trades at the cheapest valuation among compute companies based on calendar 2028 earnings estimates.\nThe firm also believes Nvidia remains under-owned by both hedge funds and long-only investors.\nMuse addressed Nvidia's high-bandwidth memory specifications, characterizing HBM de-specification as an economic decision aimed at optimizing gross margins and GPU sales around a finite number of bits.\nMorningstar sees further upside\nEarlier this month, Morningstar raised its fair value estimate to $310 from $280, implying roughly 30% upside from the stock's current level.\nNvidia reported $96 billion in fiscal second-quarter revenue, up 106% from a year earlier and above its $91 billion guidance.\nThe company expects October-quarter revenue of $108 billion, ahead of FactSet consensus of $105 billion.\nMorningstar identified Nvidia's fiscal 2028 outlook as the most significant part of the earnings report.\nNvidia expects revenue growth of 70% next year, implying nearly $700 billion in total revenue compared with Morningstar and FactSet estimates of roughly $570 billion.\nThe outlook reinforces the longer-term bullish case, even as Nvidia's shares pause after their recent gains.",
+                "title": "Why Nvidia stock is down over 1% today even as AI peers are surging",
+                "url": "https://invezz.com/ie/news/2026/09/08/why-nvidia-stock-is-down-over-1percent-today-even-as-ai-peers-are-surging/"
+              },
+              {
+                "snippet": "Nvidia bets $13 billion on open AI models with Hugging Face deal | Reuters\n\n# Nvidia bets $13 billion on open AI models with Hugging Face deal\n\nBy Aditya Soni, Anhata Rooprai and Harshita Mary Varghese\nSeptember 3, 202612:08 PM UTCUpdated September 4, 2026\n\n- Summary\n- Companies\n\n- Nvidia to pay about $11.9 billion to Hugging Face investors\n- Deal includes equity-based retention program of up to $1 billion for employees joining Nvidia\n- Nvidia CEO Jensen Huang says Hugging Face will remain open platform and not require its chips\n\nSept 3 (Reuters) - Nvidia will buy popular developer platform Hugging Face for $12.93 billion, using its growing AI war chest to expand its influence in ‌the booming market for open-source models that can nearly match the best from OpenAI and Anthropic at lower costs.\n\nThe deal, one of Nvidia's (NVDA.O), opens new tab biggest ever, will bring the chip giant closer to the developers who use Hugging Face to find models and tools, potentially helping it create a pipeline of customers that may buy its processors ​to run AI services.\n\n Sign up here.\n\nIt marks the company's latest effort to use its surging cash pile, totaling more than $22 billion at the ​end of July, to broaden its customer base when clients such as Meta (META.O), opens new tab, OpenAI and Microsoft (MSFT.O), opens new tab are developing their ⁠own AI chips to reduce their reliance on Nvidia.\n\nThe chip giant's increasing investments, sometimes in its own customers, have, however, sparked investor fears the $5.4 trillion company ​could be artificially inflating valuations and contributing to a bubble in the industry.\n\nOpen models \"broaden access to AI and help ensure that AI leadership is distributed ​across companies, institutions and communities,\" Nvidia CEO Jensen Huang said on Thursday. \"They enable organizations to match the right model to the right job.\"\n\nUnlike the closed systems built by OpenAI and Anthropic, open models can be freely downloaded, run and customized by developers. Demand for such models has surged as businesses balk at the steep bill of ​deploying the technology, with Chinese companies such as DeepSeek and Z.ai emerging as crucial players.\n\nSeeking to assure developers that Nvidia's involvement would not alter ​their access to models, Huang said that \"Hugging Face will remain an open platform for the entire AI ecosystem.\"\n\nHe added that developers could choose their preferred models, chips ‌and ⁠cloud platforms.\n\nNvidia will pay about $11.9 billion to Hugging Face investors under the deal, while offering an equity-based retention program of up to $1 billion for staff who join Nvidia.\n\nThe Nvidia Corporation's logo during the CERAWeek energy conference 2026 in Houston, Texas, U.S., March 24, 2026. REUTERS/Danielle Villasana Purchase Licensing Rights, opens new tab\n\nThe two companies already work together to help developers use Nvidia's computing services on the platform.\n\n## DEVELOPER CONCERNS\n\nSome analysts and developers said they were concerned that Nvidia may gradually neglect rival hardware, making its chips the only practical choice for those building on Hugging Face.\n\n\"While they have stated ​otherwise, it is likely that, at ​a minimum, technical methods will get ⁠instrumented to provide a competitive advantage,\" said Harold Byun, CEO of BlueRock, a startup that helps companies run AI systems safely.\n\n\"That's something any rational company would seek to do.\"\n\nFor Nvidia, building up open source may help it cushion ​a demand slowdown from some of its biggest customers.\n\n\"Nvidia is clearly buying strategic influence as much as current earnings,\" ​said Axel Rudolph, ⁠chief technical analyst at IG Group, adding that the deal was another sign that the company's ambitions extend far beyond selling chips.\n\nFounded in 2016 by French entrepreneurs Clément Delangue, Julien Chaumond and Thomas Wolf, Hugging Face has also been in the news recently after a hack by rogue AI agents that escaped OpenAI's ⁠testing environment. ​Beyond hosting AI models, it offers datasets, software libraries and cloud services used to ​build and deploy AI applications.\n\nThe New York-based startup was valued at $4.5 billion in its last disclosed funding round in August 2023, when it raised $235 million from investors such as Salesforce (CRM.N), opens new tab, AMD (AMD.O), opens new tab ​and Amazon (AMZN.O), opens new tab\n\nReporting by Aditya Soni, Anhata Rooprai and Harshita Mary Varghese in Bengaluru, additional reporting by Akash Sriram; Editing by Pooja Desai and Leroy Leo\n\nOur Standards: The Thomson Reuters Trust Principles., opens new tab\n\n- Suggested Topics:\n- Artificial Intelligence\n- Mergers & Acquisitions\n- Capital Markets\n- Corporate Counsel\n- Corporate Governance\n\nPurchase Licensing Rights\n\n## Read Next\n\n- September 7, 2026Worldcategory\n  From dance floor to war: China readies humanoid robots for combat\n- September 7, 2026Technologycategory\n- September 7, 2026\n- Verizon signs optical fiber deal with Corning to expand broadband, support AI growth\n- agoBusinesscategory\n  Goldman expands AI push with new engineering office in Bellevue\n- agoTechnologycategory\n  Qualcomm strikes AI chip deal with Amazon, offers right to buy about $4 billion in stock\n\n## Business\n\n- ### Canadian dollar hits nearly three-week high as investors shake off trade angst\n  Businesscategory · September 8, 2026 · 5:20 PM UTC · ago\n  The Canadian dollar strengthened to nearly a three-week high against its U.S. counterpart on Tuesday as investors ​focused on higher oil prices rather than an escalating trade ‌war between the U.S. and Canada.\n- WorldcategoryUS Navy's next-generation fighter decision to be unveiled soon, sources say\n  5:05 PM UTC\n- BusinesscategoryWizz Air, Ryanair call for NATS overhaul after UK flight disruption\n  4:36 PM UTC\n- categoryVenezuela's mining sector: more data needed on geological potential\n  4:24 PM UTC\n- Media & TelecomcategoryIrish regulator opens formal investigation into X over child access, parental controls\n  4:21 PM UTC\n\nReuters, the news and media division of Thomson Reuters, is the world’s largest multimedia news provider, reaching billions of people worldwide every day. Reuters provides business, financial, national and international news to professionals via desktop terminals, the world's media organizations, industry events and directly to consumers.\n\n### LSEG Products\n- #### Workspace , opens new tab Access unmatched financial data, news and content in a highly-customised workflow experience on desktop, web and mobile.\n- #### Data Catalogue , opens new tab Browse an unrivalled portfolio of real-time and historical market data and insights from worldwide sources and experts.\n- #### World-Check , opens new tab Screen for heightened risk individual and entities globally to help uncover hidden risks in business relationships and human networks.",
+                "title": "Nvidia bets $13 billion on open AI models with Hugging ...",
+                "url": "https://www.reuters.com/business/nvidia-buy-hugging-face-nearly-13-billion-big-bet-open-ai-models-2026-09-03/"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"**NVIDIA is moving on two competing forces this week: a broad risk-off market pullback is weighing on the shares today, while enthusiasm over its Hugging Face acquisition supported them late last week.**\\n\\nAs of **September 8, 2026**, NVDA closed at **$225.73**, down **2.01%** for the session. Reporting attributes the pullback primarily to rising oil prices and renewed Middle East tensions, which pressured the broader market. Because several semiconductor peers rose, the decline was not simply an industry-wide chip selloff; it also followed NVIDIA’s recent run-up.\\n\\nThe company-specific backdrop remains the planned **$12.93 billion** acquisition of Hugging Face, announced September 3. Investors initially viewed that deal as a way for NVIDIA to deepen its relationships with AI developers and broaden demand for its computing ecosystem. At the same time, reporting has highlighted concerns about NVIDIA investing heavily across the AI industry and potentially reinforcing elevated sector valuations.\\n\\n**Bottom line:** this week’s movement looks like profit-taking and macroeconomic risk competing with optimism about NVIDIA’s expansion beyond chips—not a newly reported collapse in its underlying AI business.\\n\\nThis is an explanation of the market move, not investment advice.\",\"rows\":[{\"as_of\":\"2026-09-08\",\"label\":\"NVIDIA closing stock price\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":225.73},{\"as_of\":\"2026-09-08\",\"label\":\"NVIDIA daily stock-price change\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"symbol\":\"NVDA\",\"unit\":\"percent\",\"value\":-2.01},{\"as_of\":\"2026-09-03\",\"label\":\"NVIDIA Hugging Face acquisition value\",\"source_url\":\"https://www.reuters.com/business/nvidia-buy-hugging-face-nearly-13-billion-big-bet-open-ai-models-2026-09-03/\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":12930000000}]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_fd638fdd-b019-4ae6-b99b-3511135c509c",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.12681,
+            "cache_read_cost": 0.0144,
+            "currency": "USD",
+            "input_cost": 0.00036,
+            "output_cost": 0.02712,
+            "tool_calls_cost": 0.0135,
+            "tool_calls_cost_details": {
+              "fetch_url": 0.001,
+              "finance_search": 0.005,
+              "search_web": 0.0075
+            },
+            "total_cost": 0.18219
+          },
+          "input_tokens": 61464,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 25362,
+            "cache_read_input_tokens": 36012,
+            "cached_tokens": 36012
+          },
+          "output_tokens": 1356,
+          "output_tokens_details": {
+            "reasoning_tokens": 387
+          },
+          "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.001,
+              "invocation": 2
+            },
+            "finance_search": {
+              "cost_usd": 0.005,
+              "invocation": 1
+            },
+            "search_web": {
+              "cost_usd": 0.0075,
+              "invocation": 3
+            }
+          },
+          "total_tokens": 62820
+        },
+        "user": null
+      }
+    }
+  ],
+  "packet": {
+    "typed_answer": true,
+    "uncited_rows": 0,
+    "rows": [
+      {
+        "label": "NVIDIA closing stock price",
+        "value": 225.73,
+        "unit": "USD",
+        "as_of": "2026-09-08",
+        "symbol": "NVDA",
+        "source_url": null
+      },
+      {
+        "label": "NVIDIA daily stock-price change",
+        "value": -2.01,
+        "unit": "percent",
+        "as_of": "2026-09-08",
+        "symbol": "NVDA",
+        "source_url": null
+      },
+      {
+        "label": "NVIDIA Hugging Face acquisition value",
+        "value": 12930000000.0,
+        "unit": "USD",
+        "as_of": "2026-09-03",
+        "symbol": "NVDA",
+        "source_url": "https://www.reuters.com/business/nvidia-buy-hugging-face-nearly-13-billion-big-bet-open-ai-models-2026-09-03/"
+      }
+    ],
+    "sources": [
+      {
+        "url": "https://www.capitalstreetfx.com/market-outlook/market-outlook-nvidia-corporation-08-09-2026/",
+        "title": "Market Outlook On NVIDIA Corporation Today: Technical Summary ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/3-things-bears-wrong-nvidia-161200599.html",
+        "title": "3 Things Bears Have Wrong About Nvidia Right Now",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/filing-nvidia-corporation-nvda-shares-sold-by-first-pacific-financial-2026-09-08/",
+        "title": "NVIDIA Corporation $NVDA Shares Sold by First Pacific ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/filing-sound-income-strategies-llc-grows-position-in-nvidia-corporation-nvda-2026-09-08/",
+        "title": "Sound Income Strategies LLC Grows Position in NVIDIA Corporation $NVDA",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-palantir-meta-platforms-rattling-092601179.html",
+        "title": "Nvidia, Palantir, and Meta Platforms Are Rattling Wall Street With This $18.6 Billion Warning",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.marketwatch.com/investing/stock/nvda",
+        "title": "NVIDIA Corp. Stock Quote (U.S. - NVDA - MarketWatch",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/company-news-sep-8-2026-085100393.html",
+        "title": "Company News for Sep 8, 2026 - Yahoo Finance",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.gurufocus.com/news/9069999/nvda-looks-404-undervalued-on-gf-value-as-ai-chip-demand-accelerates",
+        "title": "NVDA Looks 40.4% Undervalued on GF Value™ as AI ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/stock-market-news-sep-8-084700152.html",
+        "title": "Stock Market News for Sep 8, 2026",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://x.com/marketsday/status/2097254497580175447",
+        "title": "September 08, 2026 🔹 Tesla $TSLA: Lower by nearly ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.moomoo.com/community/feed/u-s-stock-market-global-news-review-08-september-2026-117235591020550",
+        "title": "u.s. stock market, global news review — 08 september 2026 - Moomoo",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.gurufocus.com/news/9070378/us-futures-dip-as-brent-oil-nears-100-market-anticipates-rate-hikes",
+        "title": "US Futures Dip as Brent Oil Nears $100, Market Anticipates Rate",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/filing-smithbridge-asset-management-inc-de-sells-3236-shares-of-nvidia-corporation-nvda-2026-09-07/",
+        "title": "Smithbridge Asset Management Inc. DE Sells 3,236 Shares of NVIDIA Corporation $NVDA",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/article/nvidia-stock-moves-closer-to-all-time-high-193309793.html",
+        "title": "Nvidia stock moves closer to all-time high - Yahoo Finance",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-09082026-12110868",
+        "title": "Stock Market Today: Indexes Retreat to Start Holiday-Shortened Week",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://abcnews.com/Technology/wireStory/nvidia-spend-13-billion-hugging-face-leaving-open-136169595",
+        "title": "Nvidia to spend $13 billion on Hugging Face, leaving it as ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.cnn.com/2026/09/03/tech/nvidia-hugging-face-ai-acquisition",
+        "title": "Nvidia inks $13 billion deal to buy the AI startup that was ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/article/nvidia-confirms-13-billion-acquisition-of-open-weight-ai-platform-hugging-face-141058641.html",
+        "title": "Nvidia confirms $13 billion acquisition of open-weight AI platform ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.reuters.com/business/nvidia-buy-hugging-face-nearly-13-billion-big-bet-open-ai-models-2026-09-03/",
+        "title": "Nvidia bets $13 billion on open AI models with Hugging ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.forbes.com/sites/zacharyfolk/2026/09/03/nvidia-is-acquiring-hugging-face-for-almost-13-billion/",
+        "title": "Nvidia Will Buy Hugging Face For Nearly $13 Billion - Forbes",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://finance.yahoo.com/technology/ai/articles/nvidias-13-billion-hugging-face-121800081.html",
+        "title": "Nvidia's $13 Billion Hugging Face Deal Expands Open- ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.cnbc.com/2026/09/03/nvidia-agrees-to-buy-hugging-face-for-almost-13-billion-ai-expansion.html",
+        "title": "Nvidia agrees to buy Hugging Face for almost $13 billion, AI ... - CNBC",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.theguardian.com/technology/2026/sep/03/nvidia-to-buy-hugging-face-in-129bn-deal",
+        "title": "Nvidia to buy developer platform Hugging Face in $12.9bn deal",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.cnbc.com/2026/09/04/nvidia-hugging-face-deal-chips.html",
+        "title": "Why Nvidia's Hugging Face deal is about much more than ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-12-93b-hugging-face-075456869.html",
+        "title": "NVIDIA's $12.93B Hugging Face Acquisition Becomes ...",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-strikes-12-9bn-deal-090738500.html",
+        "title": "Nvidia strikes $12.9bn deal for AI platform Hugging Face",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-agrees-acquire-hugging-face-132500720.html",
+        "title": "Nvidia Agrees to Acquire Hugging Face for $12.93 Billion",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.theregister.com/ai-and-ml/2026/09/03/nvidia-buys-hugging-face-for-129b-promises-not-to-squeeze-too-hard/5294208",
+        "title": "Nvidia buys Hugging Face for $12.9B, promises not to squeeze too hard",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-acquire-ai-platform-hugging-124357614.html",
+        "title": "Nvidia to acquire AI platform Hugging Face in landmark ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.gurufocus.com/news/9066913/nvidia-nvda-to-acquire-hugging-face-in-119-billion-deal-to-bolster-opensource-ai-ecosystem",
+        "title": "NVIDIA (NVDA) to Acquire Hugging Face in $11.9 Billion Deal to B",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262156857-us-stock-close-dow-nasdaq-drop-chip-memory-treasury-bonds-cpi-intel-tradingkey",
+        "title": "Semiconductor Stocks Strengthen, Intel Rises 9%, SK Hynix Gains ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finobird.com/news/roundup/stock-trade-tensions-escalate-as-earnings-season-looms-market-roundup-for-september-8-2026-2026-09-08/",
+        "title": "Stock Market Today: Trade Wars, Earnings, and Key Movers ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://economictimes.indiatimes.com/markets/us-stocks/news/dow-jones-stock-market-live-updates-nasdaq-sp-500-us-iran-israel-war-hormuz-deal-brent-crude-oil-earnings-forecast-nvidia-intel-coinbase-stock-price-news-8th-september-2026/liveblog/133925001.cms",
+        "title": "Dow Jones| Nasdaq | S&P 500 | US Stock Market Today",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://hdfcsky.com/news/us-stock-market-closed-for-labour-day-sp-500-at-7718-60-nasdaq-at-26506-99-as-trading-halts",
+        "title": "US Stock Market Closed for Labour Day: S&P 500 at 7,718.60, Nasdaq at 26,506.99 as Trading Halts - HDFCSky",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://www.marketscreener.com/news/why-is-nvidia-paying-nearly-13-billion-for-hugging-face-ce785bdada80f52c",
+        "title": "Why is Nvidia paying nearly $13 billion for Hugging Face?",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://invezz.com/ie/news/2026/09/08/why-nvidia-stock-is-down-over-1percent-today-even-as-ai-peers-are-surging/",
+        "title": "Why Nvidia stock is down over 1% today even as AI peers are surging",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/1-glorious-growth-stock-down-135000741.html",
+        "title": "1 Glorious Growth Stock Down 78% to Buy on the Dip in September",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.investing.com/news/stock-market-news/us-futures-muted-as-markets-parse-rate-jitters-more-iran-strikes-4885211",
+        "title": "Wall Street ends higher on Dell, Nvidia boost and a let up in oil ...",
+        "source_date": "2026-09-02"
+      },
+      {
+        "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262152205-us-stock-close-dow-nasdaq-philadelphia-semiconductor-rise-sandisk-tesla-tradingkey",
+        "title": "US Stocks Fall, Dow Drops 270 Points; SOX Bucks Trend to Gain Over 3% Led by Memory, Optical Communication Stocks; SanDisk Rises Nearly 12%, Tesla Drops Almost 6%",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/wall-streets-scariest-seasonal-pattern-090500750.html",
+        "title": "Wall Street's Scariest Seasonal Pattern Returns in ...",
+        "source_date": "2026-09-02"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/history-says-september-brutal-stocks-071000060.html",
+        "title": "History Says September Is Brutal for Stocks. Is This the ...",
+        "source_date": "2026-09-02"
+      }
+    ],
+    "tool_results": [
+      "finance_results",
+      "search_results",
+      "fetch_url_results",
+      "search_results",
+      "search_results",
+      "fetch_url_results"
+    ],
+    "tickers": [
+      "NVDA"
+    ],
+    "usage": {
+      "invocations": 1,
+      "finance_search_invocations": 1,
+      "web_search_invocations": 3,
+      "fetch_url_invocations": 2,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 29987,
+      "cost_usd": null,
+      "input_tokens": 61464,
+      "output_tokens": 1356,
+      "cache_creation_input_tokens": 25362,
+      "cache_read_input_tokens": 36012
+    },
+    "answer_markdown": "**NVIDIA is moving on two competing forces this week: a broad risk-off market pullback is weighing on the shares today, while enthusiasm over its Hugging Face acquisition supported them late last week.**\n\nAs of **September 8, 2026**, NVDA closed at **$225.73**, down **2.01%** for the session. Reporting attributes the pullback primarily to rising oil prices and renewed Middle East tensions, which pressured the broader market. Because several semiconductor peers rose, the decline was not simply an industry-wide chip selloff; it also followed NVIDIA’s recent run-up.\n\nThe company-specific backdrop remains the planned **$12.93 billion** acquisition of Hugging Face, announced September 3. Investors initially viewed that deal as a way for NVIDIA to deepen its relationships with AI developers and broaden demand for its computing ecosystem. At the same time, reporting has highlighted concerns about NVIDIA investing heavily across the AI industry and potentially reinforcing elevated sector valuations.\n\n**Bottom line:** this week’s movement looks like profit-taking and macroeconomic risk competing with optimism about NVIDIA’s expansion beyond chips, not a newly reported collapse in its underlying AI business.\n\nThis is an explanation of the market move, not investment advice."
+  },
+  "error": null
+}
