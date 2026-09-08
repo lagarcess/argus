@@ -82,8 +82,9 @@ def observe(client, db, body, *, category, sample_id, case_id, headers=None):
     if job:
         record["job"] = poll_job(client, job["id"], started)
         record["job"].setdefault("operation_scope", job.get("operation_scope"))
-        record["completion_ms"] = record["job"]["completion_ms"]
-        record["status"] = record["job"]["status"]
+        if record["status"] == "stream_complete":
+            record["completion_ms"] = record["job"]["completion_ms"]
+            record["status"] = record["job"]["status"]
     try:
         record["receipts"] = receipts_for(db, request_id) if request_id else []
         record["receipt_status"] = "read" if request_id else "missing_request_id"

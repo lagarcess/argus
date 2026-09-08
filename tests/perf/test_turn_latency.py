@@ -7,6 +7,7 @@ import pytest
 from faker import Faker
 
 from scripts.benchmarks import run_turn_latency as runner
+from scripts.benchmarks.summarize_turn_latency import summarize
 from scripts.benchmarks.turn_latency import StreamObservation, distribution, poll_job
 
 fake = Faker()
@@ -172,3 +173,76 @@ def test_poll_failure_retains_the_observed_prefix():
     assert result["status"] == "measurement_error"
     assert result["completion_ms"] is None
     assert result["polls"][0]["status"] == "running"
+
+
+@pytest.mark.parametrize(
+    "failure,expected_status,failure_group",
+    [
+        (None, "succeeded", None),
+        ("transport", "stream_error", "stream_error"),
+        ("sse", "stream_error", "stream_error"),
+        ("truncated", "incomplete_stream", "incomplete"),
+    ],
+)
+@pytest.mark.parametrize(
+    "scope,artifact,category",
+    [
+        ("chat.research", "result_message", "research_thorough"),
+        ("chat.run_backtest", "run", "backtest_run"),
+    ],
+)
+def test_successful_job_cannot_hide_a_broken_stream(
+    monkeypatch, failure, expected_status, failure_group, scope, artifact, category
+):
+    job = {"id": fake.uuid4(), "operation_scope": scope, "status": "succeeded"}
+    monkeypatch.setattr(runner, "receipts_for", lambda *args: [])
+
+    class JobEnvelopeStream(httpx.SyncByteStream):
+        def __iter__(self):
+            yield frame({"type": "final", "payload": {"backtest_job": job}}).encode()
+            if failure == "transport":
+                raise httpx.ReadError("private stream detail")
+            if failure == "sse":
+                yield frame({"type": "error", "code": "runtime_failure"}).encode()
+            if failure != "truncated":
+                yield b"data: [DONE]\n\n"
+
+    def handle(request):
+        if request.method == "POST":
+            return httpx.Response(
+                200,
+                stream=JobEnvelopeStream(),
+                headers={"x-request-id": fake.uuid4()},
+            )
+        return httpx.Response(
+            200,
+            json={
+                "job": job,
+                artifact: {"id": fake.uuid4(), "content": fake.sentence()},
+            },
+        )
+
+    with httpx.Client(
+        base_url="https://example.test", transport=httpx.MockTransport(handle)
+    ) as client:
+        row, _, _ = runner.observe(
+            client,
+            None,
+            {"language": "en", "conversation_id": fake.uuid4()},
+            category=category,
+            sample_id="test",
+            case_id="test",
+        )
+
+    assert row["status"] == expected_status
+    assert row["job"]["status"] == "succeeded"
+    assert row["job"]["completion_ms"] is not None
+    assert "private stream detail" not in json.dumps(row)
+    expected_group = category if failure_group is None else failure_group
+    group = summarize([row])["groups"][expected_group]
+    assert group["statuses"] == {expected_status: 1}
+    if failure:
+        assert row["completion_ms"] is None
+        assert group["metrics"]["first_grounded_answer_ms"]["missing"] == 1
+    else:
+        assert row["completion_ms"] == row["job"]["completion_ms"]

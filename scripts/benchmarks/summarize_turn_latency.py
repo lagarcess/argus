@@ -17,6 +17,8 @@ def actual_turn_type(row):
     outcome = row["outcome"]
     if row["status"] == "stream_error":
         return "stream_error"
+    if row["status"] == "incomplete_stream":
+        return "incomplete"
     if job.get("operation_scope") == CHAT_RUN_SCOPE or outcome.get("run"):
         return "backtest_run"
     if job.get("operation_scope") == RESEARCH_OPERATION_SCOPE:
@@ -25,8 +27,6 @@ def actual_turn_type(row):
         return "research_" + outcome["research_shape"]
     if outcome.get("confirmation"):
         return "confirmation"
-    if row["status"] == "incomplete_stream":
-        return "incomplete"
     if outcome.get("stage_outcome") == "await_user_reply":
         return "clarification"
     return "ordinary_chat"
