@@ -1,0 +1,2159 @@
+{
+  "records": [
+    {
+      "tag": "buy-and-hold-390-en",
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "status": 200,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "main": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 1141.15625,
+        "bottom": 1141.15625,
+        "right": 390
+      },
+      "heading": {
+        "x": 20,
+        "y": 54,
+        "width": 350,
+        "height": 53.359375,
+        "bottom": 107.359375,
+        "right": 370
+      },
+      "headingCount": 1,
+      "headingText": "Apple vs SPY, a historical comparison",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 773,
+        "width": 390,
+        "height": 71,
+        "bottom": 844,
+        "right": 390
+      },
+      "action": {
+        "x": 202.3515625,
+        "y": 786,
+        "width": 167.6484375,
+        "height": 46,
+        "bottom": 832,
+        "right": 370
+      },
+      "actionText": "Test your own idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 0,
+        "y": 388.5625,
+        "width": 390,
+        "height": 220,
+        "bottom": 608.5625,
+        "right": 390
+      },
+      "pageLanguage": "en",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Tested with Argus\nSEPTEMBER 8, 2026\nApple vs SPY, a historical comparison\n+18.4%\n\n9.3 pts ahead of SPY \u00b7 SPY +9.1%\n\nWhat\nAAPL \u00b7 Stocks\nWhen\nJan 2, 2024 to Mar 1, 2024\nWorst dip\n-6.2%\n\t\n\t\nWHAT RAN\n\nBought once at the start and held to the end. It never sold.\n\nLong only\nEqual weight\n10 bps fee + 5 bps slippage\nCompared with SPY, same costs\n\nThese numbers are locked and will not change.\n\nA historical comparison to help understand this idea.\n\nSomeone wondered how this idea would have gone, so Argus checked it against what the market actually did on those dates. No real money moved, nobody bought anything, and this says nothing about what happens next.\n\nThis is a what if, not a tip.\n\nTest your own idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 297,
+        "lastContentBottom": 732.15625,
+        "barTop": 773,
+        "clearance": 40.84375
+      },
+      "cookies": []
+    },
+    {
+      "tag": "buy-and-hold-1280-en",
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "status": 200,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "scrollWidth": 1280,
+      "main": {
+        "x": 330,
+        "y": 0,
+        "width": 620,
+        "height": 1085.0390625,
+        "bottom": 1085.0390625,
+        "right": 950
+      },
+      "heading": {
+        "x": 362,
+        "y": 70,
+        "width": 556,
+        "height": 34.796875,
+        "bottom": 104.796875,
+        "right": 918
+      },
+      "headingCount": 1,
+      "headingText": "Apple vs SPY, a historical comparison",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 829,
+        "width": 1280,
+        "height": 71,
+        "bottom": 900,
+        "right": 1280
+      },
+      "action": {
+        "x": 750.3515625,
+        "y": 842,
+        "width": 167.6484375,
+        "height": 46,
+        "bottom": 888,
+        "right": 918
+      },
+      "actionText": "Test your own idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 330,
+        "y": 395.8046875,
+        "width": 620,
+        "height": 220,
+        "bottom": 615.8046875,
+        "right": 950
+      },
+      "pageLanguage": "en",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Tested with Argus\nSEPTEMBER 8, 2026\nApple vs SPY, a historical comparison\n+18.4%\n\n9.3 pts ahead of SPY \u00b7 SPY +9.1%\n\nWhat\nAAPL \u00b7 Stocks\nWhen\nJan 2, 2024 to Mar 1, 2024\nWorst dip\n-6.2%\n\t\n\t\nWHAT RAN\n\nBought once at the start and held to the end. It never sold.\n\nLong only\nEqual weight\n10 bps fee + 5 bps slippage\nCompared with SPY, same costs\n\nThese numbers are locked and will not change.\n\nA historical comparison to help understand this idea.\n\nSomeone wondered how this idea would have gone, so Argus checked it against what the market actually did on those dates. No real money moved, nobody bought anything, and this says nothing about what happens next.\n\nThis is a what if, not a tip.\n\nTest your own idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 185,
+        "lastContentBottom": 788.0390625,
+        "barTop": 829,
+        "clearance": 40.9609375
+      },
+      "cookies": []
+    },
+    {
+      "tag": "buy-and-hold-390-es-419",
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "status": 200,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "main": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 1161.46875,
+        "bottom": 1161.46875,
+        "right": 390
+      },
+      "heading": {
+        "x": 20,
+        "y": 54,
+        "width": 350,
+        "height": 53.359375,
+        "bottom": 107.359375,
+        "right": 370
+      },
+      "headingCount": 1,
+      "headingText": "Apple vs SPY, a historical comparison",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 773,
+        "width": 390,
+        "height": 71,
+        "bottom": 844,
+        "right": 390
+      },
+      "action": {
+        "x": 184.421875,
+        "y": 786,
+        "width": 185.578125,
+        "height": 46,
+        "bottom": 832,
+        "right": 370
+      },
+      "actionText": "Prueba tu propia idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 0,
+        "y": 388.5625,
+        "width": 390,
+        "height": 220,
+        "bottom": 608.5625,
+        "right": 390
+      },
+      "pageLanguage": "es-419",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Probado con Argus\n8 DE SEPTIEMBRE DE 2026\nApple vs SPY, a historical comparison\n+18.4%\n\n9.3 pts por encima de SPY \u00b7 SPY +9.1%\n\nQu\u00e9\nAAPL \u00b7 Acciones\nCu\u00e1ndo\n2 ene 2024 al 1 mar 2024\nPeor ca\u00edda\n-6.2%\n\t\n\t\nQU\u00c9 SE EJECUT\u00d3\n\nCompr\u00f3 una vez al principio y mantuvo hasta el final. Nunca vendi\u00f3.\n\nSolo largo\nPeso igual\nComisi\u00f3n 10 bps + deslizamiento 5 bps\nComparado con SPY, mismos costos\n\nEstos n\u00fameros quedaron fijos y no van a cambiar.\n\nA historical comparison to help understand this idea.\n\nAlguien tuvo curiosidad por saber c\u00f3mo le habr\u00eda ido a esta idea, as\u00ed que Argus la revis\u00f3 con lo que el mercado hizo de verdad en esas fechas. No se movi\u00f3 dinero real, nadie compr\u00f3 nada, y esto no dice nada sobre lo que va a pasar.\n\nEsto es un qu\u00e9 habr\u00eda pasado, no un consejo.\n\nPrueba tu propia idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 317.5,
+        "lastContentBottom": 731.96875,
+        "barTop": 773,
+        "clearance": 41.03125
+      },
+      "cookies": []
+    },
+    {
+      "tag": "buy-and-hold-1280-es-419",
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "status": 200,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "scrollWidth": 1280,
+      "main": {
+        "x": 330,
+        "y": 0,
+        "width": 620,
+        "height": 1085.0390625,
+        "bottom": 1085.0390625,
+        "right": 950
+      },
+      "heading": {
+        "x": 362,
+        "y": 70,
+        "width": 556,
+        "height": 34.796875,
+        "bottom": 104.796875,
+        "right": 918
+      },
+      "headingCount": 1,
+      "headingText": "Apple vs SPY, a historical comparison",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 829,
+        "width": 1280,
+        "height": 71,
+        "bottom": 900,
+        "right": 1280
+      },
+      "action": {
+        "x": 732.421875,
+        "y": 842,
+        "width": 185.578125,
+        "height": 46,
+        "bottom": 888,
+        "right": 918
+      },
+      "actionText": "Prueba tu propia idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 330,
+        "y": 395.8046875,
+        "width": 620,
+        "height": 220,
+        "bottom": 615.8046875,
+        "right": 950
+      },
+      "pageLanguage": "es-419",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Probado con Argus\n8 DE SEPTIEMBRE DE 2026\nApple vs SPY, a historical comparison\n+18.4%\n\n9.3 pts por encima de SPY \u00b7 SPY +9.1%\n\nQu\u00e9\nAAPL \u00b7 Acciones\nCu\u00e1ndo\n2 ene 2024 al 1 mar 2024\nPeor ca\u00edda\n-6.2%\n\t\n\t\nQU\u00c9 SE EJECUT\u00d3\n\nCompr\u00f3 una vez al principio y mantuvo hasta el final. Nunca vendi\u00f3.\n\nSolo largo\nPeso igual\nComisi\u00f3n 10 bps + deslizamiento 5 bps\nComparado con SPY, mismos costos\n\nEstos n\u00fameros quedaron fijos y no van a cambiar.\n\nA historical comparison to help understand this idea.\n\nAlguien tuvo curiosidad por saber c\u00f3mo le habr\u00eda ido a esta idea, as\u00ed que Argus la revis\u00f3 con lo que el mercado hizo de verdad en esas fechas. No se movi\u00f3 dinero real, nadie compr\u00f3 nada, y esto no dice nada sobre lo que va a pasar.\n\nEsto es un qu\u00e9 habr\u00eda pasado, no un consejo.\n\nPrueba tu propia idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 185,
+        "lastContentBottom": 788.0390625,
+        "barTop": 829,
+        "clearance": 40.9609375
+      },
+      "cookies": []
+    },
+    {
+      "tag": "monthly-contribution-390-en",
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "status": 200,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "main": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 1204.90625,
+        "bottom": 1204.90625,
+        "right": 390
+      },
+      "heading": {
+        "x": 20,
+        "y": 54,
+        "width": 350,
+        "height": 53.359375,
+        "bottom": 107.359375,
+        "right": 370
+      },
+      "headingCount": 1,
+      "headingText": "Building an Apple position with monthly contributions",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 773,
+        "width": 390,
+        "height": 71,
+        "bottom": 844,
+        "right": 390
+      },
+      "action": {
+        "x": 202.3515625,
+        "y": 786,
+        "width": 167.6484375,
+        "height": 46,
+        "bottom": 832,
+        "right": 370
+      },
+      "actionText": "Test your own idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 0,
+        "y": 388.5625,
+        "width": 390,
+        "height": 220,
+        "bottom": 608.5625,
+        "right": 390
+      },
+      "pageLanguage": "en",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Tested with Argus\nSEPTEMBER 8, 2026\nBuilding an Apple position with monthly contributions\n+18.4%\n\n9.3 pts ahead of SPY \u00b7 SPY +9.1%\n\nWhat\nAAPL \u00b7 Stocks\nWhen\nJan 2, 2024 to Mar 1, 2024\nWorst dip\n-6.2%\n\t\n\t\nWHAT RAN\n\nBought every month, whatever the price was that day. It never sold.\n\n$200 every month\n$0 to start\nFractional shares, nothing left as cash\nLong only\nEqual weight\n10 bps fee + 5 bps slippage\nCompared with SPY, same costs\n\nThese numbers are locked and will not change.\n\nA historical comparison to help understand this idea.\n\nSomeone wondered how this idea would have gone, so Argus checked it against what the market actually did on those dates. No real money moved, nobody bought anything, and this says nothing about what happens next.\n\nThis is a what if, not a tip.\n\nTest your own idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 361,
+        "lastContentBottom": 731.90625,
+        "barTop": 773,
+        "clearance": 41.09375
+      },
+      "cookies": []
+    },
+    {
+      "tag": "monthly-contribution-1280-en",
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "status": 200,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "scrollWidth": 1280,
+      "main": {
+        "x": 330,
+        "y": 0,
+        "width": 620,
+        "height": 1183.5859375,
+        "bottom": 1183.5859375,
+        "right": 950
+      },
+      "heading": {
+        "x": 362,
+        "y": 70,
+        "width": 556,
+        "height": 69.59375,
+        "bottom": 139.59375,
+        "right": 918
+      },
+      "headingCount": 1,
+      "headingText": "Building an Apple position with monthly contributions",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 829,
+        "width": 1280,
+        "height": 71,
+        "bottom": 900,
+        "right": 1280
+      },
+      "action": {
+        "x": 750.3515625,
+        "y": 842,
+        "width": 167.6484375,
+        "height": 46,
+        "bottom": 888,
+        "right": 918
+      },
+      "actionText": "Test your own idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 330,
+        "y": 430.6015625,
+        "width": 620,
+        "height": 220,
+        "bottom": 650.6015625,
+        "right": 950
+      },
+      "pageLanguage": "en",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Tested with Argus\nSEPTEMBER 8, 2026\nBuilding an Apple position with monthly contributions\n+18.4%\n\n9.3 pts ahead of SPY \u00b7 SPY +9.1%\n\nWhat\nAAPL \u00b7 Stocks\nWhen\nJan 2, 2024 to Mar 1, 2024\nWorst dip\n-6.2%\n\t\n\t\nWHAT RAN\n\nBought every month, whatever the price was that day. It never sold.\n\n$200 every month\n$0 to start\nFractional shares, nothing left as cash\nLong only\nEqual weight\n10 bps fee + 5 bps slippage\nCompared with SPY, same costs\n\nThese numbers are locked and will not change.\n\nA historical comparison to help understand this idea.\n\nSomeone wondered how this idea would have gone, so Argus checked it against what the market actually did on those dates. No real money moved, nobody bought anything, and this says nothing about what happens next.\n\nThis is a what if, not a tip.\n\nTest your own idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 283.5,
+        "lastContentBottom": 788.0859375,
+        "barTop": 829,
+        "clearance": 40.9140625
+      },
+      "cookies": []
+    },
+    {
+      "tag": "monthly-contribution-390-es-419",
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "status": 200,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "main": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 1225.21875,
+        "bottom": 1225.21875,
+        "right": 390
+      },
+      "heading": {
+        "x": 20,
+        "y": 54,
+        "width": 350,
+        "height": 53.359375,
+        "bottom": 107.359375,
+        "right": 370
+      },
+      "headingCount": 1,
+      "headingText": "Building an Apple position with monthly contributions",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 773,
+        "width": 390,
+        "height": 71,
+        "bottom": 844,
+        "right": 390
+      },
+      "action": {
+        "x": 184.421875,
+        "y": 786,
+        "width": 185.578125,
+        "height": 46,
+        "bottom": 832,
+        "right": 370
+      },
+      "actionText": "Prueba tu propia idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 0,
+        "y": 388.5625,
+        "width": 390,
+        "height": 220,
+        "bottom": 608.5625,
+        "right": 390
+      },
+      "pageLanguage": "es-419",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Probado con Argus\n8 DE SEPTIEMBRE DE 2026\nBuilding an Apple position with monthly contributions\n+18.4%\n\n9.3 pts por encima de SPY \u00b7 SPY +9.1%\n\nQu\u00e9\nAAPL \u00b7 Acciones\nCu\u00e1ndo\n2 ene 2024 al 1 mar 2024\nPeor ca\u00edda\n-6.2%\n\t\n\t\nQU\u00c9 SE EJECUT\u00d3\n\nCompr\u00f3 cada mes, sin importar el precio de ese d\u00eda. Nunca vendi\u00f3.\n\n$200 cada mes\n$0 al inicio\nFracciones de acciones, nada queda en efectivo\nSolo largo\nPeso igual\nComisi\u00f3n 10 bps + deslizamiento 5 bps\nComparado con SPY, mismos costos\n\nEstos n\u00fameros quedaron fijos y no van a cambiar.\n\nA historical comparison to help understand this idea.\n\nAlguien tuvo curiosidad por saber c\u00f3mo le habr\u00eda ido a esta idea, as\u00ed que Argus la revis\u00f3 con lo que el mercado hizo de verdad en esas fechas. No se movi\u00f3 dinero real, nadie compr\u00f3 nada, y esto no dice nada sobre lo que va a pasar.\n\nEsto es un qu\u00e9 habr\u00eda pasado, no un consejo.\n\nPrueba tu propia idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 381,
+        "lastContentBottom": 732.21875,
+        "barTop": 773,
+        "clearance": 40.78125
+      },
+      "cookies": []
+    },
+    {
+      "tag": "monthly-contribution-1280-es-419",
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "status": 200,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "scrollWidth": 1280,
+      "main": {
+        "x": 330,
+        "y": 0,
+        "width": 620,
+        "height": 1183.5859375,
+        "bottom": 1183.5859375,
+        "right": 950
+      },
+      "heading": {
+        "x": 362,
+        "y": 70,
+        "width": 556,
+        "height": 69.59375,
+        "bottom": 139.59375,
+        "right": 918
+      },
+      "headingCount": 1,
+      "headingText": "Building an Apple position with monthly contributions",
+      "headingLanguage": "en",
+      "bar": {
+        "x": 0,
+        "y": 829,
+        "width": 1280,
+        "height": 71,
+        "bottom": 900,
+        "right": 1280
+      },
+      "action": {
+        "x": 732.421875,
+        "y": 842,
+        "width": 185.578125,
+        "height": 46,
+        "bottom": 888,
+        "right": 918
+      },
+      "actionText": "Prueba tu propia idea",
+      "actionPath": "/",
+      "chart": {
+        "x": 330,
+        "y": 430.6015625,
+        "width": 620,
+        "height": 220,
+        "bottom": 650.6015625,
+        "right": 950
+      },
+      "pageLanguage": "es-419",
+      "robots": "noindex, nofollow, nocache",
+      "storage": {
+        "local": [
+          "i18nextLng"
+        ],
+        "session": []
+      },
+      "forbiddenChrome": {
+        "search": 0,
+        "dialogs": 0,
+        "navigation": 0
+      },
+      "bodyText": "Probado con Argus\n8 DE SEPTIEMBRE DE 2026\nBuilding an Apple position with monthly contributions\n+18.4%\n\n9.3 pts por encima de SPY \u00b7 SPY +9.1%\n\nQu\u00e9\nAAPL \u00b7 Acciones\nCu\u00e1ndo\n2 ene 2024 al 1 mar 2024\nPeor ca\u00edda\n-6.2%\n\t\n\t\nQU\u00c9 SE EJECUT\u00d3\n\nCompr\u00f3 cada mes, sin importar el precio de ese d\u00eda. Nunca vendi\u00f3.\n\n$200 cada mes\n$0 al inicio\nFracciones de acciones, nada queda en efectivo\nSolo largo\nPeso igual\nComisi\u00f3n 10 bps + deslizamiento 5 bps\nComparado con SPY, mismos costos\n\nEstos n\u00fameros quedaron fijos y no van a cambiar.\n\nA historical comparison to help understand this idea.\n\nAlguien tuvo curiosidad por saber c\u00f3mo le habr\u00eda ido a esta idea, as\u00ed que Argus la revis\u00f3 con lo que el mercado hizo de verdad en esas fechas. No se movi\u00f3 dinero real, nadie compr\u00f3 nada, y esto no dice nada sobre lo que va a pasar.\n\nEsto es un qu\u00e9 habr\u00eda pasado, no un consejo.\n\nPrueba tu propia idea",
+      "overflow": [],
+      "atEnd": {
+        "scrollY": 283.5,
+        "lastContentBottom": 788.0859375,
+        "barTop": 829,
+        "clearance": 40.9140625
+      },
+      "cookies": []
+    }
+  ],
+  "edges": [
+    {
+      "width": 320,
+      "scrollWidth": 320,
+      "chartWidth": 320,
+      "titleWidth": 280
+    },
+    {
+      "width": 375,
+      "scrollWidth": 375,
+      "chartWidth": 374,
+      "titleWidth": 335
+    },
+    {
+      "width": 399,
+      "scrollWidth": 399,
+      "chartWidth": 398,
+      "titleWidth": 359
+    },
+    {
+      "width": 400,
+      "scrollWidth": 400,
+      "chartWidth": 400,
+      "titleWidth": 360
+    },
+    {
+      "width": 719,
+      "scrollWidth": 719,
+      "chartWidth": 620,
+      "titleWidth": 556
+    },
+    {
+      "width": 720,
+      "scrollWidth": 720,
+      "chartWidth": 620,
+      "titleWidth": 556
+    },
+    {
+      "width": 721,
+      "scrollWidth": 721,
+      "chartWidth": 620,
+      "titleWidth": 556
+    },
+    {
+      "width": 1023,
+      "scrollWidth": 1023,
+      "chartWidth": 620,
+      "titleWidth": 556
+    },
+    {
+      "width": 1024,
+      "scrollWidth": 1024,
+      "chartWidth": 620,
+      "titleWidth": 556
+    },
+    {
+      "width": 1025,
+      "scrollWidth": 1025,
+      "chartWidth": 620,
+      "titleWidth": 556
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "chartWidth": 620,
+      "titleWidth": 556
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "chartWidth": 390,
+      "titleWidth": 350
+    }
+  ],
+  "tombstone": {
+    "text": "COMPARTIDO CONTIGO\nProbado con Argus\nEste ya no est\u00e1\n\nLa persona que lo comparti\u00f3 quit\u00f3 el enlace, o borr\u00f3 el resultado que hab\u00eda detr\u00e1s. No queda nada por mostrar.\n\nAun as\u00ed puedes probar Argus por tu cuenta.\n\nEsto es un qu\u00e9 habr\u00eda pasado, no un consejo.\n\nPrueba tu propia idea",
+    "cookies": []
+  },
+  "errors": [],
+  "requests": [
+    {
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=hztoa",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1jffu",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=5hokf",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=104wk",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=hztoa",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1jffu",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=5hokf",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=104wk",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=hztoa",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1jffu",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=5hokf",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=104wk",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=hztoa",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1jffu",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=5hokf",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=104wk",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=mfegy",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1nv0n",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=9x9d3",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=14khc",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=mfegy",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1nv0n",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=9x9d3",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=14khc",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=mfegy",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1nv0n",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=9x9d3",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=14khc",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=mfegy",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=1nv0n",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=9x9d3",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=14khc",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/r/unknownreceipt00000000000000",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0.3ni1lv1f-59.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/13h9bys~f~77o.css",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/03edqrb4zdj~g.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0z4i83stzylgo.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0bmpc66o4m-9z.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0_ut92gkaazo1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0pqt~8bl3ukh4.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/turbopack-0q78jkvtpbhq3.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/15qq7cmpq29u1.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/02scjtuttsap9.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0018dy-m-kusj.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0akvd4cfpbvgz.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0r8ioh5mzsl7d.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0g5rm4vd7eja0.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/locales/en/common.json",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:8317/api/v1/public/receipt-funnel",
+      "method": "POST",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/favicon.ico?favicon.0lb7p~f~3gr9l.ico",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=lojxn",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=10oft",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=sqn58",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/?_rsc=o10su",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/0q3lpsu59xv46.js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    },
+    {
+      "url": "http://127.0.0.1:3317/_next/static/chunks/14zx~iz~h66v..js",
+      "method": "GET",
+      "authorization": false,
+      "cookie": false
+    }
+  ]
+}

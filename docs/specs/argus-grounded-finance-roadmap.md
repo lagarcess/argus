@@ -387,12 +387,12 @@ and none needs a rebase.
 
 | Lane | Where it actually is |
 | --- | --- |
-| Lift the loop, Lane A | PR #560 at `53a7a523`. **Verified, landable.** CI 7/7 and `mergeStateStatus` CLEAN, Codex round completed naming `53a7a52`, zero review threads. Merged onto integration in a throwaway worktree: zero conflicts, and the merged tree differs from the branch tree by this roadmap file alone, so the branch's CI is valid for the merge. The relocation holds independently: the interpreter prompt fingerprint never enters the merged diff, every outside importer still goes through the `confirmation` and `next_experiments` facades, the only names to leave the facade surface are `logger` and `threading` which nothing imports or patches, and the one monkeypatch hazard, `_confirmation_today`, stays in `confirmation.py` and is guarded. |
+| Lift the loop, Lane A | **LANDED** 2026-09-08 as `f7c9192b`, PR #560 at `53a7a523`, CI 7/7, Codex cleared at the head, zero review threads. |
 | Refusal log | PR #559, now at `aa8d5371`. `c748950b` failed `guest-release-gates` on the lane's own postgres test, which seeded `auth.users` and `public.profiles` with two independent `fake.email()` values and tripped `validate_profile_auth_identity`. **The lane found and fixed it before anyone sent it back**, and fixed it better than a one-line patch: seeding is now one `_seed_owner` helper so the identity rule holds by construction. Still owed at the new head: `guest-release-gates` finishing, and a fresh Codex round, since the cleared review names the superseded `c748950b`. |
 | Metering | No branch pushed. Mid-flight locally, 21 dirty files, and `src/argus/api/schemas.py` is among them, so the overlap is real. |
 | Decisions | No branch pushed, no commits, no dirty files. **Not started.** |
 | Retrieval parameters | No branch pushed. Mid-flight locally, 10 dirty files. It edits `render.yaml`, `.github/private-alpha-release-profile.json`, and `.github/argus-env.sh` to register `ARGUS_RESEARCH_HOME_COUNTRY`, which is the release surface feature lanes may not author. The value belongs on this item; the three release-surface lines are the founder's to apply at promotion. |
-| Sharing on | Done. See the item. |
+| Sharing on | **Done.** Evidence landed on integration. Only the flag flip remains and the founder has deferred it to the next promotion. |
 | #462 latency | No branch pushed. Mid-flight locally, five untracked benchmark scripts under `scripts/benchmarks/` and `tests/perf/`. |
 
 ### The finishing bar every build lane owes
@@ -547,6 +547,25 @@ so no latency on a path that must feel instant. No fingerprint surface. And it
 is bilingual for free: the template is a locale key and the arguments are typed
 facts, which is operating rule 4 doing the work again. The stage-keyed strings
 are deleted.
+
+**The receipt renders from the card contract, not from backtest fields.**
+Founder, 2026-09-08. Sharing is the distribution lever, and today the only
+shareable answer is a backtest, because `web/components/receipt/ReceiptBody.tsx`
+reads `receiptPlan`, `receiptAssumptions`, `benchmarkReturn` and
+`benchmarkVerdict`. Ship the calculations without this and every new answer is
+unshareable on the day it lands. Point the receipt at the same contract the card
+renders and sharing generalizes for free, which keeps operating rule 3 at four
+artifacts instead of a fifth per calculation. This is the same move Lane A made
+on the confirmation envelope. It belongs here, in The spine, because after the
+calculations ship it is a retrofit across every card.
+
+**Whole-conversation sharing follows from this, and only from this.**
+`docs/specs/conversation-sharing.md` section 9 already holds the design the
+founder described: the owner selects turns, only eligible ones are selectable,
+one link, one tombstone, revocable. It was sequenced, not rejected, and its
+unit is the turn. A thread share is a sequence of turn receipts, so it cannot
+exist until a turn that is not a backtest can be a receipt. Not on this board;
+placed after the calculations land.
 
 **Surface.** `src/argus/domain/capability_registry.py`,
 `src/argus/agent_runtime/llm_interpreter_types.py`,
@@ -741,7 +760,10 @@ x-axis label, is unreachable for a different reason: the receipt uses
 verification did not re-prove, because it seeded the fixture directly, is the
 owner's Share button and database persistence; those were driven end to end at
 `5d408acf` and no receipt source file has changed in the 94 commits since.
-**All that remains on this item is the founder's flag decision.**
+**Founder decision 2026-09-08: the flag flips at the next promotion, not before.**
+The four lines are `render.yaml` lines 59 and 182 and
+`.github/private-alpha-release-profile.json` lines 23 and 89, all `false` today,
+and they are the founder's to author.
 
 ---
 
@@ -829,6 +851,23 @@ the machinery.
 **Proof.** Behavior-preserving for backtests: a guest still gets the same
 execution allowance. Compute operations never decrement anything. No live eval
 required.
+
+**Read the meter labels once before the Plumbing promotion.** Founder,
+2026-09-08. The meter is cost recovery by design, so it names only the two
+things that cost us money, and the thing Argus actually sells, the computation
+and the honesty line, is free and therefore absent from the panel. PR #561's
+own strings are already close: "Searches with sources" names the guarantee and
+not just the supplier. So this is one reading pass over four locale strings, not
+a rework, and it belongs in #561 while that file is open rather than in a later
+pass. Pricing is not on this board and should not be decided while production
+usage is one non-founder message in thirty days.
+
+**The guest ceiling is not a product meter.** "Never for talking" is a pricing
+rule and it stays. It does not say an anonymous endpoint may be unbounded. A
+silent abuse ceiling on guest turns protects interpreter spend, never appears in
+the Usage panel, and is not promised in `PRODUCT.md` as an allowance. Codex's
+open P1 on PR #561 is asking for that distinction, not for the old
+ten-terminal meter back.
 
 ---
 
