@@ -2528,8 +2528,9 @@ Three operation classes, one meter each:
   carries has capacity. A guest whose workspace counter is at 2/2 reads
   `available_now: false` even after the visitor day has reset (#546).
 - `limiting_window` is backend-derived: the window with the smaller remaining
-  capacity, and on ties the window that resets later (`day` over `hour`,
-  `guest_session` over `day`). The frontend must not compute, estimate, or
+  capacity, and on ties the window whose `period_end` is later (`day` over
+  `hour`; for a guest, whichever of `day` and `guest_session` ends later, which
+  on the workspace's final calendar day is `day`). The frontend must not compute, estimate, or
   hardcode quota truth; it renders these derived fields and reads
   `limiting_window` to choose which reset horizon to show.
 - The UI emphasizes the daily allowance, reveals the hourly window whenever

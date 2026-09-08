@@ -251,7 +251,7 @@ def get_me_usage(
 
     def guest_execution_allowance() -> UsageAllowance:
         """Both bounds admission enforces: the visitor's day and the
-        workspace lifetime (#546). Ties name the window that resets later."""
+        workspace lifetime (#546)."""
         day = visitor_day_window(SIMULATION_USAGE_RESOURCE, GUEST_SIMULATION_ALLOWANCE)
         guest_session = window(
             SIMULATION_USAGE_RESOURCE,
@@ -259,14 +259,23 @@ def get_me_usage(
             GUEST_SIMULATION_ALLOWANCE,
             fixed_period_end=context.expires_at,
         )
+        if day.remaining != guest_session.remaining:
+            limiting_window = (
+                "day" if day.remaining < guest_session.remaining else "guest_session"
+            )
+        else:
+            # Equal capacity: name the window that resets later. On the
+            # workspace's final calendar day that is the visitor day, and a
+            # renewed workspace would not clear it.
+            limiting_window = (
+                "guest_session" if guest_session.period_end >= day.period_end else "day"
+            )
         return UsageAllowance(
             hour=None,
             day=day,
             guest_session=guest_session,
             available_now=day.remaining > 0 and guest_session.remaining > 0,
-            limiting_window=(
-                "day" if day.remaining < guest_session.remaining else "guest_session"
-            ),
+            limiting_window=limiting_window,
         )
 
     def guest_grounding_allowance() -> UsageAllowance:

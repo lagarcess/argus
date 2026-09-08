@@ -142,6 +142,18 @@ def allowance_windows(
 
 
 @dataclass(frozen=True)
+class UsageMeter:
+    """One counter and the windows one account kind is bounded by on it.
+
+    Empty ``limits`` means no account window bounds the class; only a shared
+    ceiling does, and that is a circuit breaker rather than an allowance.
+    """
+
+    resource: str
+    limits: list[tuple[str, int]]
+
+
+@dataclass(frozen=True)
 class AllowanceWindow:
     period: str
     limit: int

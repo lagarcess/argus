@@ -8,10 +8,12 @@ admission (#546).
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
+from argus.api.chat import discovery_evidence, research_evidence
+from argus.api.routers import profile as profile_router
 from argus.domain.guest_workspaces import GuestWorkspace
 
 from tests.test_allowance_accounting import (
@@ -238,12 +240,16 @@ def _configure_guest_usage(
     *,
     visitor_used: dict[str, int],
     workspace_simulations_used: int,
+    expires_at: datetime | None = None,
 ) -> GuestWorkspace:
     monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     workspace = _configure_guest_account(mock_gateway)
+    if expires_at is not None:
+        workspace = workspace.model_copy(update={"expires_at": expires_at})
+        mock_gateway.get_active_guest_workspace.return_value = workspace
     # Visitor-keyed day windows survive a renewed workspace...
     mock_gateway.client = _FakeVisitorClient(visitor_used)
 
@@ -409,3 +415,71 @@ def test_deprecated_aliases_mirror_the_classes_for_stale_bundles(
     allowances = response.json()["allowances"]
     assert allowances["messages"] == allowances["compute"] == UNBOUNDED_ALLOWANCE
     assert allowances["backtests"] == allowances["execution"]
+
+
+@pytest.mark.parametrize(
+    ("expiry_offset", "limiting_window"),
+    [
+        # Workspace expires this afternoon: the visitor day still holds past
+        # the renewal, so it names the later reset.
+        (timedelta(hours=2), "day"),
+        # Workspace outlives midnight: its expiry is the reset that holds.
+        (timedelta(days=3), "guest_session"),
+    ],
+)
+def test_guest_execution_tie_names_the_window_that_resets_later(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+    research_rail_on,
+    expiry_offset: timedelta,
+    limiting_window: str,
+):
+    frozen = datetime(2026, 9, 8, 10, 0, tzinfo=timezone.utc)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            return frozen if tz is not None else frozen.replace(tzinfo=None)
+
+    monkeypatch.setattr(profile_router, "datetime", _FrozenDatetime)
+    _configure_guest_usage(
+        mock_gateway,
+        monkeypatch,
+        visitor_used={"backtest_runs": 2},
+        workspace_simulations_used=2,
+        expires_at=frozen + expiry_offset,
+    )
+
+    response = client.get(
+        "/api/v1/me/usage", headers={"Authorization": "Bearer guest-token"}
+    )
+
+    assert response.status_code == 200
+    execution = response.json()["allowances"]["execution"]
+    assert execution["day"]["remaining"] == 0
+    assert execution["guest_session"]["remaining"] == 0
+    assert execution["available_now"] is False
+    assert execution["limiting_window"] == limiting_window
+
+
+@pytest.mark.parametrize("rail_on", [True, False])
+def test_grounding_projection_names_the_meter_the_rail_charges(
+    monkeypatch: pytest.MonkeyPatch, rail_on: bool
+):
+    # One owner per rail: the projection reads the same descriptor the
+    # claim and the discovery charge read, so they cannot drift apart.
+    if rail_on:
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    else:
+        monkeypatch.delenv("ARGUS_RESEARCH_RAIL_ENABLED", raising=False)
+    for is_guest in (True, False):
+        expected = (
+            research_evidence.research_meter(is_guest=is_guest)
+            if rail_on
+            else discovery_evidence.discovery_meter(is_guest=is_guest)
+        )
+        assert research_evidence.grounding_meter(is_guest=is_guest) == expected
+    assert research_evidence.research_meter(is_guest=True).resource == (
+        research_evidence.RESEARCH_USAGE_RESOURCE
+    )
+    assert research_evidence.research_meter(is_guest=False).limits == []

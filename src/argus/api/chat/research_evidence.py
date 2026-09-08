@@ -20,22 +20,19 @@ to the visitor (spec section 9b). What this module owns:
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.api.chat.discovery_evidence import (
-    DISCOVERY_USAGE_RESOURCE,
-    discovery_usage_limits,
-)
+from argus.api.chat.discovery_evidence import discovery_meter
 from argus.domain.research.admission import ResearchAttemptAdmission
 from argus.domain.research.config import research_rail_enabled
 from argus.domain.usage_limits import (
     GLOBAL_RESEARCH_CEILING_SUBJECT,
     GUEST_RESEARCH_VISITOR_LIMITS,
+    UsageMeter,
     align_usage_period,
     global_research_daily_ceiling,
     read_memory_usage,
@@ -60,30 +57,21 @@ def _ceiling_limits() -> list[tuple[str, int]]:
     return [("day", global_research_daily_ceiling())]
 
 
-@dataclass(frozen=True)
-class GroundingMeter:
-    """The counter a retrieval is charged against for one account kind.
-
-    Empty ``limits`` means no account window bounds grounding; only the shared
-    ceiling does, and that is a circuit breaker rather than an allowance.
-    """
-
-    resource: str
-    limits: list[tuple[str, int]]
-
-
-def grounding_meter(*, is_guest: bool) -> GroundingMeter:
-    """Which meter grounds a retrieval, rail on or off, so the allowance
-    projection and the claim can never name different counters."""
-    if research_rail_enabled():
-        return GroundingMeter(
-            resource=RESEARCH_USAGE_RESOURCE,
-            limits=list(GUEST_RESEARCH_VISITOR_LIMITS) if is_guest else [],
-        )
-    return GroundingMeter(
-        resource=DISCOVERY_USAGE_RESOURCE,
-        limits=discovery_usage_limits(is_guest=is_guest),
+def research_meter(*, is_guest: bool) -> UsageMeter:
+    """The per-visitor research counter the atomic claim charges; a signed-in
+    account has no window of its own on it."""
+    return UsageMeter(
+        resource=RESEARCH_USAGE_RESOURCE,
+        limits=list(GUEST_RESEARCH_VISITOR_LIMITS) if is_guest else [],
     )
+
+
+def grounding_meter(*, is_guest: bool) -> UsageMeter:
+    """Which meter grounds a retrieval: the one the live rail charges, so the
+    allowance projection can never name a counter the charge does not."""
+    if research_rail_enabled():
+        return research_meter(is_guest=is_guest)
+    return discovery_meter(is_guest=is_guest)
 
 
 def guest_research_visitor_key(
@@ -115,6 +103,7 @@ def claim_research_provider_attempt(
     if not research_rail_enabled():
         return ResearchAttemptAdmission(available=True)
     now = datetime.now(timezone.utc)
+    guest_meter = research_meter(is_guest=True)
     try:
         if api_state.supabase_gateway is not None:
             client = api_state.supabase_gateway.client
@@ -122,10 +111,10 @@ def claim_research_provider_attempt(
                 "claim_research_usage",
                 {
                     "p_guest_visitor_key": guest_visitor_key,
-                    "p_resource": RESEARCH_USAGE_RESOURCE,
+                    "p_resource": guest_meter.resource,
                     "p_global_visitor_key": GLOBAL_CEILING_KEY,
                     "p_global_limit": global_research_daily_ceiling(),
-                    "p_guest_limit": GUEST_RESEARCH_VISITOR_LIMITS[0][1],
+                    "p_guest_limit": dict(guest_meter.limits)["day"],
                 },
             ).execute()
             payload = getattr(result, "data", None)
@@ -137,6 +126,7 @@ def claim_research_provider_attempt(
             )
         return _claim_memory_research_usage(
             guest_visitor_key=guest_visitor_key,
+            guest_meter=guest_meter,
             now=now,
         )
     except Exception as exc:  # noqa: BLE001
@@ -150,6 +140,7 @@ def claim_research_provider_attempt(
 def _claim_memory_research_usage(
     *,
     guest_visitor_key: str | None,
+    guest_meter: UsageMeter,
     now: datetime,
 ) -> ResearchAttemptAdmission:
     """Process-local twin of the database transaction used in tests/dev."""
@@ -159,8 +150,8 @@ def _claim_memory_research_usage(
             guest_within = memory_visitor_within_limits(
                 api_state.store.visitor_usage_counters,
                 visitor_key=guest_visitor_key,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
+                resource=guest_meter.resource,
+                limits=list(guest_meter.limits),
                 now=now,
             )
             if not guest_within:
@@ -181,8 +172,8 @@ def _claim_memory_research_usage(
             settle_memory_visitor_usage(
                 api_state.store.visitor_usage_counters,
                 visitor_key=guest_visitor_key,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
+                resource=guest_meter.resource,
+                limits=list(guest_meter.limits),
                 now=now,
             )
         return ResearchAttemptAdmission(available=True)
