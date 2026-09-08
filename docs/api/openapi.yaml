@@ -1359,6 +1359,12 @@ paths:
     get:
       tags:
       - profile
+      description: 'Allowance truth keyed by operation class.
+
+
+        Compute never has a window. Execution and grounding project the counters
+
+        their admission owners charge, so availability here is availability there.'
       responses:
         '200':
           description: Successful Response
@@ -3104,10 +3110,6 @@ components:
           type: integer
           maximum: 2147483647.0
           minimum: 1.0
-        message_limit:
-          type: integer
-          maximum: 2147483647.0
-          minimum: 1.0
         simulation_limit:
           type: integer
           maximum: 2147483647.0
@@ -3121,7 +3123,6 @@ components:
       - expires_at
       - conversation_id
       - conversation_limit
-      - message_limit
       - simulation_limit
       - feedback_limit
     GuestBootstrapRequest:
@@ -3169,7 +3170,6 @@ components:
             enum:
             - second_simulation
             - simulation_limit
-            - message_limit
             - save_decision
             - new_conversation
             - keep_history
@@ -3241,7 +3241,6 @@ components:
           enum:
           - second_simulation
           - simulation_limit
-          - message_limit
           - save_decision
           - new_conversation
           - keep_history
@@ -4878,6 +4877,27 @@ components:
       type: object
       required:
       - success
+    UnboundedAllowance:
+      properties:
+        hour:
+          type: 'null'
+        day:
+          type: 'null'
+        guest_session:
+          type: 'null'
+        available_now:
+          type: boolean
+          const: true
+          default: true
+        limiting_window:
+          type: 'null'
+      type: object
+      description: 'An operation class no account window bounds, so nothing decrements.
+
+
+        Compute is never metered. A signed-in account''s grounding is bounded only
+
+        by the shared research ceiling, a circuit breaker rather than an allowance.'
     UsageAllowance:
       properties:
         hour:
@@ -4917,14 +4937,25 @@ components:
       - allowances
     UsageAllowances:
       properties:
-        messages:
-          $ref: '#/components/schemas/UsageAllowance'
-        backtests:
+        compute:
+          $ref: '#/components/schemas/UnboundedAllowance'
+        grounding:
+          anyOf:
+          - $ref: '#/components/schemas/UsageAllowance'
+          - $ref: '#/components/schemas/UnboundedAllowance'
+        execution:
           $ref: '#/components/schemas/UsageAllowance'
       type: object
       required:
-      - messages
-      - backtests
+      - compute
+      - grounding
+      - execution
+      description: 'Allowance truth keyed by operation class.
+
+
+        Compute is free and unlimited, grounding is metered per retrieval, and
+
+        execution is metered per run.'
     UsageWindow:
       properties:
         limit:

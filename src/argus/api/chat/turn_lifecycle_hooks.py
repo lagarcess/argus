@@ -59,7 +59,7 @@ class ChatTurnLifecycleHooks:
         *,
         content: str,
         metadata: dict[str, Any] | None,
-        settle_usage: dict[str, Any] | None,
+        settle_usage: dict[str, Any] | None = None,
     ) -> Message:
         public_metadata = _public_metadata(metadata)
         if self.turn_id is None:

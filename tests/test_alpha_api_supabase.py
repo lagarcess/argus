@@ -175,7 +175,6 @@ def test_guest_account_response_contract_is_typed_and_exact() -> None:
             expires_at=now + timedelta(days=7),
             conversation_id="00000000-0000-0000-0000-000000000002",
             conversation_limit=1,
-            message_limit=10,
             simulation_limit=1,
             feedback_limit=5,
         ),
@@ -194,7 +193,6 @@ def test_guest_account_response_contract_is_typed_and_exact() -> None:
 
     assert response.guest is not None
     assert response.guest.conversation_limit == 1
-    assert response.guest.message_limit == 10
     assert response.guest.simulation_limit == 1
     assert response.guest.feedback_limit == 5
     assert response.model_dump()["account_kind"] == "guest"
@@ -710,25 +708,7 @@ def test_direct_run_persists_requested_and_effective_data_windows(
     mock_gateway.admit_backtest_job.assert_called_once()
 
 
-def test_chat_stream_quota_exceeded(mock_gateway):
-    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
-        "Quota exceeded for chat_messages (day)"
-    )
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": "test-conv", "message": "hello"},
-        headers={"Authorization": "Bearer test-token"},
-    )
-    assert response.status_code == 429
-    data = response.json()
-    assert data["code"] == "too_many_requests"
-    assert "Quota exceeded for chat_messages" in data["detail"]
-    assert response.headers.get("Retry-After") == "60"
-    mock_gateway.check_and_increment_usage_limits.assert_not_called()
-
-
-def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
+def test_chat_entry_reads_no_conversation_meter(mock_gateway):
     now = utcnow()
     conversation = Conversation(
         id="conv-1",
@@ -758,11 +738,8 @@ def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
     )
 
     assert response.status_code == 200
-    mock_gateway.check_usage_limits.assert_called_once_with(
-        user_id="00000000-0000-0000-0000-000000000001",
-        resource="chat_messages",
-        limits=[("hour", 60), ("day", 200)],
-    )
+    # Conversation is compute: no window is consulted or charged.
+    mock_gateway.check_usage_limits.assert_not_called()
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
@@ -786,26 +763,22 @@ def test_me_reads_profile_from_supabase_gateway(mock_gateway):
     assert mock_gateway.get_user.call_count >= 1
 
 
-def test_me_usage_returns_exact_owner_scoped_allowance_truth(mock_gateway):
+def test_me_usage_returns_exact_owner_scoped_allowance_truth(mock_gateway, monkeypatch):
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+
     def _list(*, user_id, resources, period, at):
         assert user_id == "00000000-0000-0000-0000-000000000001"
-        assert set(resources) == {"chat_messages", "backtest_runs"}
+        assert set(resources) == {"backtest_runs"}
         if period == "hour":
             return [
                 {
-                    "resource": "chat_messages",
-                    "limit_count": 60,
+                    "resource": "backtest_runs",
+                    "limit_count": 10,
                     "used_count": 2,
                     "period_end": "2026-07-17T15:00:00+00:00",
                 },
             ]
         return [
-            {
-                "resource": "chat_messages",
-                "limit_count": 200,
-                "used_count": 12,
-                "period_end": "2026-07-18T00:00:00+00:00",
-            },
             {
                 "resource": "backtest_runs",
                 "limit_count": 50,
@@ -822,27 +795,35 @@ def test_me_usage_returns_exact_owner_scoped_allowance_truth(mock_gateway):
 
     assert response.status_code == 200
     allowances = response.json()["allowances"]
-    assert allowances["messages"]["hour"] == {
-        "limit": 60,
+    unbounded = {
+        "hour": None,
+        "day": None,
+        "guest_session": None,
+        "available_now": True,
+        "limiting_window": None,
+    }
+    assert allowances["compute"] == unbounded
+    assert allowances["grounding"] == unbounded
+    assert allowances["execution"]["hour"] == {
+        "limit": 10,
         "used": 2,
-        "remaining": 58,
+        "remaining": 8,
         "period_end": "2026-07-17T15:00:00Z",
     }
-    assert allowances["messages"]["day"] == {
-        "limit": 200,
-        "used": 12,
-        "remaining": 188,
+    assert allowances["execution"]["day"] == {
+        "limit": 50,
+        "used": 53,
+        "remaining": 0,
         "period_end": "2026-07-18T00:00:00Z",
     }
-    assert allowances["messages"]["available_now"] is True
-    assert allowances["messages"]["limiting_window"] == "hour"
-    assert allowances["backtests"]["day"]["used"] == 53
-    assert allowances["backtests"]["day"]["remaining"] == 0
-    assert allowances["backtests"]["available_now"] is False
-    assert allowances["backtests"]["limiting_window"] == "day"
+    assert allowances["execution"]["available_now"] is False
+    assert allowances["execution"]["limiting_window"] == "day"
 
 
-def test_me_usage_zero_state_does_not_create_or_increment_counters(mock_gateway):
+def test_me_usage_zero_state_does_not_create_or_increment_counters(
+    mock_gateway, monkeypatch
+):
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
     mock_gateway.list_current_usage_counters.return_value = []
 
     response = client.get(
@@ -851,39 +832,53 @@ def test_me_usage_zero_state_does_not_create_or_increment_counters(mock_gateway)
 
     assert response.status_code == 200
     allowances = response.json()["allowances"]
-    assert allowances["messages"]["hour"]["used"] == 0
-    assert allowances["messages"]["hour"]["remaining"] == 60
-    assert allowances["messages"]["day"]["remaining"] == 200
-    assert allowances["backtests"]["hour"]["remaining"] == 10
-    assert allowances["backtests"]["day"]["remaining"] == 50
-    assert allowances["messages"]["available_now"] is True
-    assert allowances["backtests"]["available_now"] is True
+    assert allowances["execution"]["hour"]["used"] == 0
+    assert allowances["execution"]["hour"]["remaining"] == 10
+    assert allowances["execution"]["day"]["remaining"] == 50
+    assert allowances["execution"]["available_now"] is True
+    assert allowances["compute"]["available_now"] is True
+    assert allowances["grounding"]["available_now"] is True
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
-def test_me_usage_openapi_contract_publishes_both_windowed_allowances():
-    generated_schema = app.openapi()["components"]["schemas"]["UsageAllowances"]
+def test_me_usage_openapi_contract_publishes_operation_classes():
+    generated = app.openapi()["components"]["schemas"]
     checked_openapi = yaml.safe_load(
         (Path(__file__).resolve().parents[1] / "docs" / "api" / "openapi.yaml").read_text(
             encoding="utf-8"
         )
     )
-    checked_schema = checked_openapi["components"]["schemas"]["UsageAllowances"]
+    checked = checked_openapi["components"]["schemas"]
 
-    for schema in (generated_schema, checked_schema):
-        assert schema["required"] == ["messages", "backtests"]
-        assert set(schema["properties"]) == {"messages", "backtests"}
+    for schemas in (generated, checked):
+        container = schemas["UsageAllowances"]
+        assert container["required"] == ["compute", "grounding", "execution"]
+        assert set(container["properties"]) == {"compute", "grounding", "execution"}
+        # Compute can only ever be unbounded; grounding depends on the
+        # account kind; execution always carries windows.
+        assert container["properties"]["compute"] == {
+            "$ref": "#/components/schemas/UnboundedAllowance"
+        }
+        assert container["properties"]["grounding"]["anyOf"] == [
+            {"$ref": "#/components/schemas/UsageAllowance"},
+            {"$ref": "#/components/schemas/UnboundedAllowance"},
+        ]
+        assert container["properties"]["execution"] == {
+            "$ref": "#/components/schemas/UsageAllowance"
+        }
 
-    generated_allowance = app.openapi()["components"]["schemas"]["UsageAllowance"]
-    checked_allowance = checked_openapi["components"]["schemas"]["UsageAllowance"]
-    for schema in (generated_allowance, checked_allowance):
-        assert set(schema["properties"]) == {
+        window_keys = {"hour", "day", "guest_session", "available_now", "limiting_window"}
+        assert set(schemas["UsageAllowance"]["properties"]) == window_keys
+        assert schemas["UsageAllowance"]["properties"]["limiting_window"]["enum"] == [
             "hour",
             "day",
             "guest_session",
-            "available_now",
-            "limiting_window",
-        }
+        ]
+        unbounded = schemas["UnboundedAllowance"]["properties"]
+        assert set(unbounded) == window_keys
+        for key in ("hour", "day", "guest_session", "limiting_window"):
+            assert unbounded[key]["type"] == "null"
+        assert unbounded["available_now"]["const"] is True
 
 
 def test_me_usage_requires_authentication(mock_gateway, monkeypatch):
@@ -1014,7 +1009,6 @@ def test_registered_profile_exposes_a_default_avatar_theme_but_guest_does_not():
             expires_at=now + timedelta(days=7),
             conversation_id="00000000-0000-0000-0000-000000000002",
             conversation_limit=1,
-            message_limit=10,
             simulation_limit=1,
             feedback_limit=5,
         ),

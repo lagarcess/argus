@@ -17,14 +17,14 @@ class QuotaExceededError(Exception):
 
 USAGE_COUNTER_LOCK = threading.Lock()
 
-MESSAGE_ALLOWANCE_LIMITS: list[tuple[str, int]] = [("hour", 60), ("day", 200)]
 SIMULATION_ALLOWANCE_LIMITS: list[tuple[str, int]] = [("hour", 10), ("day", 50)]
 
+# Conversation is compute: free, unlimited, never settled. The resource name
+# survives only because historical counter rows carry it.
 MESSAGE_USAGE_RESOURCE = "chat_messages"
 SIMULATION_USAGE_RESOURCE = "backtest_runs"
 FEEDBACK_USAGE_RESOURCE = "feedback"
 
-GUEST_MESSAGE_ALLOWANCE = 10
 GUEST_SIMULATION_ALLOWANCE = 2
 GUEST_FEEDBACK_ALLOWANCE = 5
 GUEST_CONVERSATION_ALLOWANCE = 1
@@ -45,7 +45,6 @@ GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
 
 # Guest allowances follow the visitor per day; a fresh session grants
 # nothing new. Decision record: docs/PRODUCT.md (guest access).
-GUEST_MESSAGE_VISITOR_LIMITS: list[tuple[str, int]] = [("day", GUEST_MESSAGE_ALLOWANCE)]
 GUEST_SIMULATION_VISITOR_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_SIMULATION_ALLOWANCE)
 ]
@@ -103,12 +102,10 @@ def global_research_daily_ceiling() -> int:
 
 
 _REGISTERED_ALLOWANCES: dict[str, list[tuple[str, int]]] = {
-    MESSAGE_USAGE_RESOURCE: MESSAGE_ALLOWANCE_LIMITS,
     SIMULATION_USAGE_RESOURCE: SIMULATION_ALLOWANCE_LIMITS,
     FEEDBACK_USAGE_RESOURCE: [("day", 50), ("hour", 20)],
 }
 _GUEST_ALLOWANCES = {
-    MESSAGE_USAGE_RESOURCE: GUEST_MESSAGE_ALLOWANCE,
     SIMULATION_USAGE_RESOURCE: GUEST_SIMULATION_ALLOWANCE,
     FEEDBACK_USAGE_RESOURCE: GUEST_FEEDBACK_ALLOWANCE,
 }
@@ -142,29 +139,6 @@ def allowance_windows(
     return [
         {"period": period, "limit": limit_count} for period, limit_count in registered
     ]
-
-
-def message_usage_settlement(
-    account: AccountContext | None = None,
-    *,
-    visitor_key: str | None = None,
-) -> dict[str, Any]:
-    """One message unit settled with a durable terminal product outcome.
-
-    Guests settle against the visitor (day window), not the workspace: a
-    fresh session must not mint a fresh allowance."""
-    if account is not None and account.kind == "guest":
-        from argus.domain.visitor_usage import visitor_key_for
-
-        return {
-            "resource": MESSAGE_USAGE_RESOURCE,
-            "limits": list(GUEST_MESSAGE_VISITOR_LIMITS),
-            "visitor_key": visitor_key or visitor_key_for(None),
-        }
-    return {
-        "resource": MESSAGE_USAGE_RESOURCE,
-        "limits": list(MESSAGE_ALLOWANCE_LIMITS),
-    }
 
 
 @dataclass(frozen=True)

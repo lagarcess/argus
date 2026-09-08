@@ -44,10 +44,6 @@ from argus.api.chat.actions import (
     run_for_result_action,
     stale_confirmation_action_message,
 )
-from argus.api.chat.allowance import (
-    check_message_allowance,
-    ordinary_turn_settlement,
-)
 from argus.api.chat.artifacts import (
     ensure_unspent_confirmation_identity,
     result_fact_bank,
@@ -280,9 +276,6 @@ async def chat_stream(
             request=request,
             idempotency_key=clean_idempotency_key,
         )
-    if not is_run_backtest_turn and not cancel_confirmation_action:
-        check_message_allowance(request, user)
-
     current_user_profile = None
     if api_state.supabase_gateway is not None:
         try:
@@ -720,15 +713,6 @@ async def chat_stream(
             assistant_message = lifecycle_hooks.complete(
                 content=assistant_text,
                 metadata=metadata,
-                settle_usage=ordinary_turn_settlement(
-                    is_run_backtest_turn=is_run_backtest_turn,
-                    account=turn_account,
-                    visitor_key=(
-                        visitor_key_for(turn_client_identity)
-                        if turn_account.kind == "guest"
-                        else None
-                    ),
-                ),
             )
             progress = "redirected" if stale_card_redirect else "clarification"
             record_control_exit("retry_failed_action", progress)
@@ -763,15 +747,6 @@ async def chat_stream(
                     lifecycle_hooks=lifecycle_hooks,
                     conversation_id=conversation.id,
                     language=runtime_user.language_preference,
-                    settle_usage=ordinary_turn_settlement(
-                        is_run_backtest_turn=False,
-                        account=turn_account,
-                        visitor_key=(
-                            visitor_key_for(turn_client_identity)
-                            if turn_account.kind == "guest"
-                            else None
-                        ),
-                    ),
                 )
             except Exception:
                 logger.exception(
@@ -1244,15 +1219,6 @@ async def chat_stream(
                         assistant_message = lifecycle_hooks.complete(
                             content=persisted_text or "",
                             metadata=metadata,
-                            settle_usage=ordinary_turn_settlement(
-                                is_run_backtest_turn=is_run_backtest_turn,
-                                account=turn_account,
-                                visitor_key=(
-                                    visitor_key_for(turn_client_identity)
-                                    if turn_account.kind == "guest"
-                                    else None
-                                ),
-                            ),
                         )
                     if (
                         lifecycle_hooks.turn_id is not None

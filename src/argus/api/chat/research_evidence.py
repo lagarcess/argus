@@ -1,10 +1,9 @@
 """Research rail metering: one flat meter for users, rich classes underneath.
 
-For a signed-in account, research turns count as ordinary chat turns (spec
-section 9) and the message allowance is the meter. A guest is the exception
-(section 9b): ten free messages spent entirely on the most expensive shape is
-not an allowance anyone sized, so a guest carries a small research allowance of
-their own, keyed to the visitor. What this module owns:
+Retrieval is the grounding operation class: metered per retrieval, never per
+turn. A signed-in account has no research window of its own and is bounded
+only by the shared ceiling. A guest carries a small research allowance keyed
+to the visitor (spec section 9b). What this module owns:
 
 - the shared global daily ceiling, atomically claimed immediately before a
   cache miss enters provider work;
@@ -21,12 +20,17 @@ their own, keyed to the visitor. What this module owns:
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat.discovery_evidence import (
+    DISCOVERY_USAGE_RESOURCE,
+    discovery_usage_limits,
+)
 from argus.domain.research.admission import ResearchAttemptAdmission
 from argus.domain.research.config import research_rail_enabled
 from argus.domain.usage_limits import (
@@ -56,6 +60,32 @@ def _ceiling_limits() -> list[tuple[str, int]]:
     return [("day", global_research_daily_ceiling())]
 
 
+@dataclass(frozen=True)
+class GroundingMeter:
+    """The counter a retrieval is charged against for one account kind.
+
+    Empty ``limits`` means no account window bounds grounding; only the shared
+    ceiling does, and that is a circuit breaker rather than an allowance.
+    """
+
+    resource: str
+    limits: list[tuple[str, int]]
+
+
+def grounding_meter(*, is_guest: bool) -> GroundingMeter:
+    """Which meter grounds a retrieval, rail on or off, so the allowance
+    projection and the claim can never name different counters."""
+    if research_rail_enabled():
+        return GroundingMeter(
+            resource=RESEARCH_USAGE_RESOURCE,
+            limits=list(GUEST_RESEARCH_VISITOR_LIMITS) if is_guest else [],
+        )
+    return GroundingMeter(
+        resource=DISCOVERY_USAGE_RESOURCE,
+        limits=discovery_usage_limits(is_guest=is_guest),
+    )
+
+
 def guest_research_visitor_key(
     *, is_guest: bool, client_identity: str | None
 ) -> str | None:
@@ -75,10 +105,8 @@ def claim_research_provider_attempt(
     """Atomically claim capacity immediately before billable provider work.
 
     Two bounds are owned here: the shared global circuit breaker, and, for a
-    guest, that visitor's own daily research allowance. A signed-in user still
-    meters research through their message allowance (spec section 9); a guest
-    does not, because ten free messages spent entirely on the most expensive
-    shape is not an allowance anyone sized.
+    guest, that visitor's own daily research allowance. A signed-in user has
+    no research window of their own.
 
     Flag-off short-circuits to available. Fails closed: without writable truth,
     no research spend is allowed, and

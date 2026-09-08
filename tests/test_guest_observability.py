@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
-from argus.api.chat.allowance import check_message_allowance
 from argus.api.dependencies import current_user
 from argus.api.guest_access import guest_account_context
 from argus.api.guest_observability import (
@@ -23,7 +22,6 @@ from argus.observability.guest_funnel import (
     GUEST_FUNNEL_EVENT_MAP,
     build_guest_funnel_event,
 )
-from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -448,60 +446,6 @@ def test_registered_context_never_emits_a_guest_event() -> None:
         )
 
     capture.assert_not_called()
-
-
-def test_guest_message_limit_emits_from_authoritative_precheck() -> None:
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/api/v1/chat/stream",
-            "headers": [],
-        }
-    )
-    request.state.request_id = "request-1"
-    account = _guest_context()
-    gateway = Mock()
-
-    class _ExhaustedVisitorClient:
-        def table(self, name):
-            assert name == "visitor_usage_counters"
-            return self
-
-        def select(self, *_args):
-            return self
-
-        def eq(self, *_args):
-            return self
-
-        def limit(self, *_args):
-            return self
-
-        def execute(self):
-            from types import SimpleNamespace
-
-            return SimpleNamespace(data=[{"used_count": 10}])
-
-    gateway.client = _ExhaustedVisitorClient()
-
-    with (
-        patch("argus.api.chat.allowance.api_state.supabase_gateway", gateway),
-        patch("argus.api.chat.allowance.account_context", return_value=account),
-        patch("argus.api.chat.allowance.emit_guest_funnel_event") as emit,
-        pytest.raises(HTTPException) as exc_info,
-    ):
-        check_message_allowance(request, _guest_profile())
-
-    assert exc_info.value.status_code == 429
-    emit.assert_called_once_with(
-        account=account,
-        kind="guest_limit_reached",
-        user_id=GUEST_USER_ID,
-        surface="chat",
-        product_capability="chat",
-        conversion_reason="message_limit",
-        terminal_outcome="limit_reached",
-    )
 
 
 @pytest.mark.parametrize(

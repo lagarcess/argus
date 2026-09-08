@@ -2117,7 +2117,7 @@ permanent accounts rather than allowing them.
   and server capabilities with the ordinary profile.
 
 The response includes `user`, `account_kind`, a nullable `guest` summary with
-expiry plus limits `1/10/2/5`, typed `capabilities`, and the
+expiry plus limits `1/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
@@ -2406,33 +2406,38 @@ Retrieve the current authenticated user profile and preferences.
 
 ## `GET /me/usage`
 
-Return the authenticated user's current private-alpha message and simulation
-allowance truth. This is an owner-only read surface. The backend returns
-zero-state windows when a counter row does not exist; reading usage does not
-create or increment a counter.
+Return the authenticated account's current allowance truth keyed by operation
+class. This is an owner-only read surface. The backend returns zero-state
+windows when a counter row does not exist; reading usage does not create or
+increment a counter.
 
-**Response:**
+Three operation classes, one meter each:
+
+| Class | Covers | Metered |
+| --- | --- | --- |
+| `compute` | Conversation: interpretation, answers, clarifications, edits | Never. Free and unlimited. |
+| `grounding` | A retrieval that produces cited facts | Per retrieval. |
+| `execution` | A backtest run | Per unique durable admission. |
+
+**Response (registered account, research rail on):**
 ```json
 {
   "allowances": {
-    "messages": {
-      "hour": {
-        "limit": 60,
-        "used": 3,
-        "remaining": 57,
-        "period_end": "2026-07-21T15:00:00Z"
-      },
-      "day": {
-        "limit": 200,
-        "used": 12,
-        "remaining": 188,
-        "period_end": "2026-07-22T00:00:00Z"
-      },
+    "compute": {
+      "hour": null,
+      "day": null,
       "guest_session": null,
       "available_now": true,
-      "limiting_window": "hour"
+      "limiting_window": null
     },
-    "backtests": {
+    "grounding": {
+      "hour": null,
+      "day": null,
+      "guest_session": null,
+      "available_now": true,
+      "limiting_window": null
+    },
+    "execution": {
       "hour": {
         "limit": 10,
         "used": 1,
@@ -2453,46 +2458,96 @@ create or increment a counter.
 }
 ```
 
-Guests receive the same typed resource keys with `hour` and `guest_session`
-set to `null`. Their visitor-owned UTC-day counter is returned as `day`; for
-example, message usage at 8/10 reports `used: 8`, `remaining: 2`, UTC midnight
-as `period_end`, and `limiting_window: "day"`. A 2/2 guest simulation counter
-reports `available_now: false`. The separate workspace-lifetime ceiling is
-enforced during admission and is not misrepresented as another UI reset
-window.
+**Response (guest whose workspace allowance is spent):**
+```json
+{
+  "allowances": {
+    "compute": {
+      "hour": null,
+      "day": null,
+      "guest_session": null,
+      "available_now": true,
+      "limiting_window": null
+    },
+    "grounding": {
+      "hour": null,
+      "day": {
+        "limit": 3,
+        "used": 1,
+        "remaining": 2,
+        "period_end": "2026-07-22T00:00:00Z"
+      },
+      "guest_session": null,
+      "available_now": true,
+      "limiting_window": "day"
+    },
+    "execution": {
+      "hour": null,
+      "day": {
+        "limit": 2,
+        "used": 0,
+        "remaining": 2,
+        "period_end": "2026-07-22T00:00:00Z"
+      },
+      "guest_session": {
+        "limit": 2,
+        "used": 2,
+        "remaining": 0,
+        "period_end": "2026-07-27T14:03:09Z"
+      },
+      "available_now": false,
+      "limiting_window": "guest_session"
+    }
+  }
+}
+```
 
 **Allowance semantics:**
-- `messages` reports the `chat_messages` counters; `backtests` reports the
-  `backtest_runs` counters charged by unique durable simulation admission.
-- Registered accounts receive both active UTC calendar windows. Guests receive
-  only the visitor-owned UTC `day` window. Every populated window carries the
-  exact backend-owned `period_end`; clients may localize its display, but must
-  not infer or replace it with a countdown, local timer, or `Retry-After` value.
+- Every class carries the same five keys. An unbounded class has every window
+  `null`, `available_now: true`, and `limiting_window: null`. `compute` is
+  always unbounded. `grounding` is unbounded for a signed-in account while the
+  research rail is on: no per-account research window exists, only the shared
+  daily ceiling, which is a circuit breaker rather than an allowance and is
+  not projected here.
+- `grounding` reports the counter the live retrieval rail claims. Rail on, that
+  is `research_searches`: guests receive the visitor-owned UTC `day` window of
+  three. Rail off, it is `discovery_searches`: guests receive two per visitor
+  day and signed-in accounts receive the discovery `hour` and `day` windows.
+- `execution` reports the `backtest_runs` counters charged by unique durable
+  simulation admission. Registered accounts receive both UTC calendar windows.
+  Guests receive the visitor-owned UTC `day` window and the workspace-lifetime
+  `guest_session` window, whose `period_end` is the fixed workspace expiry,
+  because admission enforces both.
+- Every populated window carries the exact backend-owned `period_end`; clients
+  may localize its display, but must not infer or replace it with a countdown,
+  local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
-  concurrent in-flight turns settle, and `remaining` clamps at zero.
-- `available_now` is backend-derived: for registered accounts it is true when
-  both calendar windows have capacity; for guests it follows the visitor-owned
-  UTC `day` window. The separate workspace ceiling is admission-only.
-- `limiting_window` is backend-derived: registered accounts use the calendar
-  window with the smaller remaining capacity (`day` on ties), while guests use
-  `day`. The frontend must not compute, estimate, or hardcode quota truth; it
-  renders these derived fields.
-- The UI emphasizes the daily allowance and reveals the hourly window whenever
-  `limiting_window` is `hour` or the hourly window is exhausted.
+  concurrent in-flight admissions settle, and `remaining` clamps at zero.
+- `available_now` is backend-derived and true only when every window the class
+  carries has capacity. A guest whose workspace counter is at 2/2 reads
+  `available_now: false` even after the visitor day has reset (#546).
+- `limiting_window` is backend-derived: the window with the smaller remaining
+  capacity, and on ties the window that resets later (`day` over `hour`,
+  `guest_session` over `day`). The frontend must not compute, estimate, or
+  hardcode quota truth; it renders these derived fields and reads
+  `limiting_window` to choose which reset horizon to show.
+- The UI emphasizes the daily allowance, reveals the hourly window whenever
+  `limiting_window` is `hour`, and reveals the workspace window whenever it is
+  `guest_session`.
 
 **Accounting semantics:**
-- One message unit settles atomically with the first durable insert of an
-  ordinary turn's terminal product message (normal answers, clarifications,
-  honest supported/unsupported boundary responses, and structured-action
-  acknowledgments). Malformed, unauthenticated, duplicate-replay, abandoned,
-  and Argus infrastructure-failed turns settle zero. A committed terminal
-  response followed by transport disconnect remains exactly one unit.
-- `chat.run_backtest` action turns consume the simulation allowance at unique
-  durable admission instead of a message unit; replays and pre-admission
-  rejections (including data-window preflight) consume zero, and a
-  post-admission execution or finalization failure still counts exactly one.
-  Chat and direct API launches follow the same rule.
+- Conversation is compute. Ordinary turns settle nothing at entry or at their
+  terminal outcome, are never rejected for an exhausted counter, and write no
+  `chat_messages` row. That resource survives only in historical rows.
+- Grounding capacity is claimed atomically immediately before billable
+  provider work (see the research rail section); cache hits, unconfigured
+  providers, and replays claim nothing.
+- `chat.run_backtest` action turns consume the execution allowance at unique
+  durable admission; replays and pre-admission rejections (including
+  data-window preflight) consume zero, and a post-admission execution or
+  finalization failure still counts exactly one. Chat and direct API launches
+  follow the same rule.
 
 **Error rules:**
 - `401 Unauthorized`: authentication is missing or invalid.
@@ -3127,7 +3182,7 @@ Contract rules:
   backtests and ordinary follow-ups make zero Search calls.
 - A retryable discovery recovery finalizes its chat turn as
   `recoverable_failed` with a durable `retry_last_turn` anchored to the
-  persisted user request, and does not settle the message allowance.
+  persisted user request, and settles no allowance.
 - Charging: the per-subject search allowance settles only for usable results
   (no `fallback_code`); the global daily ceiling counts every attempt.
 
@@ -3602,6 +3657,7 @@ Contract rules:
   three provider-backed research questions per UTC day; signed-in users have
   no separate per-user research allowance, but every provider attempt uses the
   shared ceiling. `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` defaults to `5000`.
+  `GET /me/usage` projects this meter as the `grounding` operation class.
   Ordinary chat turns, cache hits, unconfigured-provider paths, and idempotent
   persisted thorough-job replays do not claim capacity. An unreadable or
   unwritable
@@ -3749,7 +3805,7 @@ Contract rules:
 ## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets`
 
 Grows or restores the active confirmation's basket **without spending a
-turn**: no message allowance, no interpretation, no LLM call. Available only
+turn**: no allowance, no interpretation, no LLM call. Available only
 while `ARGUS_RESEARCH_RAIL_ENABLED` and `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`
 are both on (404 otherwise; the in-place surface ships default off until
 the run-consumption guard lane closes).
@@ -3781,7 +3837,7 @@ nothing.
 ## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit`
 
 Edits the active confirmation's capital, dates, or costs **without spending a
-turn**: no message allowance, no interpretation, no LLM call, no backtest
+turn**: no allowance, no interpretation, no LLM call, no backtest
 row. Available only while `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` is on (404
 otherwise); the surface ships default off until the run-consumption guard
 lane closes, and while dark, cards advertise no `direct_edits` so the

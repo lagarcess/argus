@@ -221,7 +221,8 @@ def _configure_guest_account(mock_gateway: MagicMock) -> GuestWorkspace:
     return workspace
 
 
-def test_chat_entry_checks_but_never_consumes_message_allowance(mock_gateway):
+def test_chat_entry_reads_no_conversation_meter(mock_gateway):
+    # Conversation is compute: entry neither checks nor charges a counter.
     response = client.post(
         "/api/v1/chat/stream",
         json={"conversation_id": "conv-1", "message": "Test TSLA dip idea"},
@@ -230,11 +231,7 @@ def test_chat_entry_checks_but_never_consumes_message_allowance(mock_gateway):
 
     assert response.status_code == 200, response.text
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
-    mock_gateway.check_usage_limits.assert_called_once_with(
-        user_id=USER_ID,
-        resource="chat_messages",
-        limits=[("hour", 60), ("day", 200)],
-    )
+    mock_gateway.check_usage_limits.assert_not_called()
 
 
 def test_chat_stream_rejects_malformed_idempotency_keys_before_admission(
@@ -254,7 +251,8 @@ def test_chat_stream_rejects_malformed_idempotency_keys_before_admission(
     mock_gateway.admit_backtest_job.assert_not_called()
 
 
-def test_completed_turn_settles_exactly_one_message_unit_at_terminal(mock_gateway):
+def test_completed_turn_settles_nothing(mock_gateway):
+    # A compute operation decrements nothing, even at its durable terminal.
     response = client.post(
         "/api/v1/chat/stream",
         json={"conversation_id": "conv-1", "message": "Test TSLA dip idea"},
@@ -262,10 +260,8 @@ def test_completed_turn_settles_exactly_one_message_unit_at_terminal(mock_gatewa
     )
 
     assert response.status_code == 200
-    settlements = _assistant_settlements(mock_gateway)
-    assert len(settlements) == 1
-    assert settlements[0]["resource"] == "chat_messages"
-    assert settlements[0]["limits"] == [("hour", 60), ("day", 200)]
+    assert mock_gateway.finalize_chat_turn.call_count >= 1
+    assert _assistant_settlements(mock_gateway) == []
 
 
 def test_runtime_failure_before_terminal_outcome_consumes_zero_message_units(
@@ -296,7 +292,9 @@ def test_runtime_failure_before_terminal_outcome_consumes_zero_message_units(
     assert _assistant_settlements(mock_gateway) == []
 
 
-def test_message_quota_exhaustion_rejects_at_entry_without_charging(mock_gateway):
+def test_exhausted_counters_never_wall_conversation(mock_gateway):
+    # Even a gateway that would refuse every window cannot 429 a turn: no
+    # conversation meter is consulted.
     from argus.domain.supabase_gateway import QuotaExceededError
 
     mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
@@ -309,19 +307,12 @@ def test_message_quota_exhaustion_rejects_at_entry_without_charging(mock_gateway
         headers={"Authorization": "Bearer test-token"},
     )
 
-    assert response.status_code == 429
-    assert response.json()["code"] == "too_many_requests"
-    assert response.headers.get("Retry-After") == "60"
+    assert response.status_code == 200, response.text
+    mock_gateway.check_usage_limits.assert_not_called()
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
-    mock_gateway.create_message.assert_not_called()
 
 
-def test_cancel_confirmation_bypasses_quota_and_settles_zero_units(mock_gateway):
-    from argus.domain.supabase_gateway import QuotaExceededError
-
-    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
-        "Quota exceeded for chat_messages (hour)"
-    )
+def test_cancel_confirmation_settles_zero_units(mock_gateway):
     mock_gateway.list_messages.return_value = [
         Message(
             id="confirmation-message",
@@ -548,208 +539,6 @@ def test_direct_run_admits_durably_and_never_uses_legacy_increment(
     success = mock_gateway.finalize_direct_backtest_success.call_args.kwargs
     assert success["job_id"] == "job-admitted-1"
     mock_gateway.finalize_direct_backtest_job.assert_not_called()
-
-
-def _usage_row(
-    resource: str,
-    period: str,
-    used: int,
-    limit: int,
-    period_end: str,
-) -> dict[str, Any]:
-    return {
-        "resource": resource,
-        "period": period,
-        "limit_count": limit,
-        "used_count": used,
-        "period_end": period_end,
-    }
-
-
-def _mock_usage_rows(
-    mock_gateway,
-    *,
-    hour_rows: list[dict[str, Any]],
-    day_rows: list[dict[str, Any]],
-) -> None:
-    def _list(*, user_id: str, resources: tuple, period: str, at: Any):
-        assert user_id == USER_ID
-        assert set(resources) == {"chat_messages", "backtest_runs"}
-        return hour_rows if period == "hour" else day_rows
-
-    mock_gateway.list_current_usage_counters.side_effect = _list
-
-
-def test_me_usage_returns_hourly_and_daily_truth_for_both_resources(mock_gateway):
-    _mock_usage_rows(
-        mock_gateway,
-        hour_rows=[
-            _usage_row("chat_messages", "hour", 3, 60, "2026-07-21T15:00:00Z"),
-            _usage_row("backtest_runs", "hour", 1, 10, "2026-07-21T15:00:00Z"),
-        ],
-        day_rows=[
-            _usage_row("chat_messages", "day", 12, 200, "2026-07-22T00:00:00Z"),
-            _usage_row("backtest_runs", "day", 4, 50, "2026-07-22T00:00:00Z"),
-        ],
-    )
-
-    response = client.get(
-        "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
-    )
-
-    assert response.status_code == 200
-    allowances = response.json()["allowances"]
-    messages = allowances["messages"]
-    backtests = allowances["backtests"]
-
-    assert messages["hour"] == {
-        "limit": 60,
-        "used": 3,
-        "remaining": 57,
-        "period_end": "2026-07-21T15:00:00Z",
-    }
-    assert messages["day"] == {
-        "limit": 200,
-        "used": 12,
-        "remaining": 188,
-        "period_end": "2026-07-22T00:00:00Z",
-    }
-    assert messages["available_now"] is True
-    assert messages["limiting_window"] == "hour"
-
-    assert backtests["hour"]["remaining"] == 9
-    assert backtests["day"]["remaining"] == 46
-    assert backtests["available_now"] is True
-    assert backtests["limiting_window"] == "hour"
-
-
-def test_me_usage_missing_rows_read_zero_without_creating_counters(mock_gateway):
-    _mock_usage_rows(mock_gateway, hour_rows=[], day_rows=[])
-
-    response = client.get(
-        "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
-    )
-
-    assert response.status_code == 200
-    allowances = response.json()["allowances"]
-    for resource_key, hour_limit, day_limit in (
-        ("messages", 60, 200),
-        ("backtests", 10, 50),
-    ):
-        allowance = allowances[resource_key]
-        assert allowance["hour"]["used"] == 0
-        assert allowance["hour"]["limit"] == hour_limit
-        assert allowance["hour"]["remaining"] == hour_limit
-        assert allowance["day"]["used"] == 0
-        assert allowance["day"]["limit"] == day_limit
-        assert allowance["day"]["remaining"] == day_limit
-        assert allowance["available_now"] is True
-        assert allowance["hour"]["period_end"] <= allowance["day"]["period_end"]
-    mock_gateway.check_and_increment_usage_limits.assert_not_called()
-
-
-def test_me_usage_hourly_limited_while_daily_available(mock_gateway):
-    _mock_usage_rows(
-        mock_gateway,
-        hour_rows=[
-            _usage_row("chat_messages", "hour", 60, 60, "2026-07-21T15:00:00Z"),
-        ],
-        day_rows=[
-            _usage_row("chat_messages", "day", 90, 200, "2026-07-22T00:00:00Z"),
-        ],
-    )
-
-    response = client.get(
-        "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
-    )
-
-    assert response.status_code == 200
-    messages = response.json()["allowances"]["messages"]
-    assert messages["hour"]["remaining"] == 0
-    assert messages["day"]["remaining"] == 110
-    assert messages["available_now"] is False
-    assert messages["limiting_window"] == "hour"
-
-
-def test_me_usage_daily_exhaustion_limits_across_fresh_hourly_window(mock_gateway):
-    _mock_usage_rows(
-        mock_gateway,
-        hour_rows=[],
-        day_rows=[
-            _usage_row("chat_messages", "day", 200, 200, "2026-07-22T00:00:00Z"),
-        ],
-    )
-
-    response = client.get(
-        "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
-    )
-
-    assert response.status_code == 200
-    messages = response.json()["allowances"]["messages"]
-    assert messages["hour"]["used"] == 0
-    assert messages["day"]["remaining"] == 0
-    assert messages["available_now"] is False
-    assert messages["limiting_window"] == "day"
-
-
-def test_me_usage_used_beyond_limit_clamps_remaining_to_zero(mock_gateway):
-    _mock_usage_rows(
-        mock_gateway,
-        hour_rows=[],
-        day_rows=[
-            _usage_row("backtest_runs", "day", 53, 50, "2026-07-22T00:00:00Z"),
-        ],
-    )
-
-    response = client.get(
-        "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
-    )
-
-    assert response.status_code == 200
-    backtests = response.json()["allowances"]["backtests"]
-    assert backtests["day"]["used"] == 53
-    assert backtests["day"]["remaining"] == 0
-    assert backtests["available_now"] is False
-
-
-def test_guest_me_usage_returns_only_fixed_session_truth(
-    mock_gateway,
-    monkeypatch: pytest.MonkeyPatch,
-):
-    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
-    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
-    _configure_guest_account(mock_gateway)
-
-    # Visitor-keyed day windows: the workspace no longer owns guest truth.
-    mock_gateway.client = _FakeVisitorClient(
-        {"chat_messages": 8, "backtest_runs": 1}
-    )
-
-    response = client.get(
-        "/api/v1/me/usage", headers={"Authorization": "Bearer guest-token"}
-    )
-
-    assert response.status_code == 200
-    allowances = response.json()["allowances"]
-    messages = allowances["messages"]
-    assert messages["hour"] is None
-    assert messages["guest_session"] is None
-    assert messages["limiting_window"] == "day"
-    assert messages["day"]["limit"] == 10
-    assert messages["day"]["used"] == 8
-    assert messages["day"]["remaining"] == 2
-    assert messages["available_now"] is True
-    backtests = allowances["backtests"]
-    assert backtests["day"] == {
-        "limit": 2,
-        "used": 1,
-        "remaining": 1,
-        "period_end": backtests["day"]["period_end"],
-    }
-    assert backtests["available_now"] is True
-    assert backtests["limiting_window"] == "day"
 
 
 # ---------------------------------------------------------------------------
@@ -1112,7 +901,6 @@ def test_guest_third_direct_run_requires_conversion_before_provider_access(
     mock_gateway,
     monkeypatch: pytest.MonkeyPatch,
 ):
-
     monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
