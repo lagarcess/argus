@@ -1,0 +1,275 @@
+[
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "OPTIONS",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/unknownreceipt00000000000000",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/F8ueGQ0iUbcQokKCMyHdt2EK1DI0bx6m",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/RzTdSpkhr-NweAQDAZ9tocP9487XqtJb",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  },
+  {
+    "path": "/api/v1/public/receipts/unknownreceipt00000000000000",
+    "method": "GET",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 200
+  },
+  {
+    "path": "/api/v1/public/receipt-funnel",
+    "method": "POST",
+    "authorization_present": false,
+    "cookie_present": false,
+    "status": 204
+  }
+]
