@@ -361,6 +361,60 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ---
 
+## What is running right now
+
+Dispatched 2026-09-08 from integration `00331188`. Seven lanes, all disjoint
+except one pair. **Nothing has landed yet.**
+
+| Lane | Kind | Model | Notes |
+| --- | --- | --- | --- |
+| Lift the loop, Lane A relocation | build | Opus 5 | sent first; the `confirmation.py` window was open |
+| Refusal log | build | GPT Astra | |
+| Metering | build | Fable 5.1 | **overlaps decisions on `schemas.py`** |
+| Decisions | build | Fable 5.1 | **overlaps metering on `schemas.py`** |
+| Retrieval parameters | build | Fable 5.1 | |
+| Sharing on | verification | GPT Astra | already built and dark; no build expected |
+| #462 latency | measurement | GPT Astra | measure only, optimize nothing |
+
+**Before landing metering and decisions**, do a real
+`git merge --no-commit --no-ff` in a throwaway worktree. Do not read the
+file-overlap list and do not trust `git merge-tree`: `grep -c` inside `$(...)`
+has returned blank rather than 0 in this repo and cost a wrong call.
+
+**Observed 2026-09-08, 21:15Z, at integration `2846b421`.** Only the board doc
+has landed since the dispatch base, so every lane is still effectively current
+and none needs a rebase.
+
+| Lane | Where it actually is |
+| --- | --- |
+| Lift the loop, Lane A | PR #560 at `53a7a523`. **Verified, landable.** CI 7/7 and `mergeStateStatus` CLEAN, Codex round completed naming `53a7a52`, zero review threads. Merged onto integration in a throwaway worktree: zero conflicts, and the merged tree differs from the branch tree by this roadmap file alone, so the branch's CI is valid for the merge. The relocation holds independently: the interpreter prompt fingerprint never enters the merged diff, every outside importer still goes through the `confirmation` and `next_experiments` facades, the only names to leave the facade surface are `logger` and `threading` which nothing imports or patches, and the one monkeypatch hazard, `_confirmation_today`, stays in `confirmation.py` and is guarded. |
+| Refusal log | PR #559, now at `aa8d5371`. `c748950b` failed `guest-release-gates` on the lane's own postgres test, which seeded `auth.users` and `public.profiles` with two independent `fake.email()` values and tripped `validate_profile_auth_identity`. **The lane found and fixed it before anyone sent it back**, and fixed it better than a one-line patch: seeding is now one `_seed_owner` helper so the identity rule holds by construction. Still owed at the new head: `guest-release-gates` finishing, and a fresh Codex round, since the cleared review names the superseded `c748950b`. |
+| Metering | No branch pushed. Mid-flight locally, 21 dirty files, and `src/argus/api/schemas.py` is among them, so the overlap is real. |
+| Decisions | No branch pushed, no commits, no dirty files. **Not started.** |
+| Retrieval parameters | No branch pushed. Mid-flight locally, 10 dirty files. It edits `render.yaml`, `.github/private-alpha-release-profile.json`, and `.github/argus-env.sh` to register `ARGUS_RESEARCH_HOME_COUNTRY`, which is the release surface feature lanes may not author. The value belongs on this item; the three release-surface lines are the founder's to apply at promotion. |
+| Sharing on | Done. See the item. |
+| #462 latency | No branch pushed. Mid-flight locally, five untracked benchmark scripts under `scripts/benchmarks/` and `tests/perf/`. |
+
+### The finishing bar every build lane owes
+
+Recorded because the first dispatch omitted it and the founder caught it. A PR
+existing is not done. Done is:
+
+- focused tests written by the lane, passing, not merely the existing suite
+  still green
+- CI green on the exact head, all required checks; the clean-checkout baseline
+  is 14 pre-existing failures and those are not the lane's to chase
+- a Codex review round completed and cleared at the current head. **A 👍
+  reaction is not proof a review ran**; the summary comment is edited in place,
+  so the reliable signal is a review comment naming the exact commit SHA
+- zero unresolved review threads
+- browser evidence in both languages if anything user-visible changed
+
+A lane that hits something contradicting this board stops and says so rather
+than working around it.
+
+---
+
 ## The items
 
 Each item carries what done means, the surface it may touch, what it must not
@@ -671,8 +725,23 @@ spec.
 
 **Proof.** Browser evidence of a shared receipt at mobile and desktop widths.
 The responsive shell shipped 2026-08-08 in PR #393 and is unconditional, so this
-is verification rather than build. **#422** carries seven open lower-severity
-breakpoint findings; check them against a shared receipt specifically.
+is verification rather than build.
+
+**Verified 2026-09-08 against `00331188`, evidence-only, no code change.** The
+signed-out receipt opens correctly at 390 and 1280 in both languages, eight
+loads, zero horizontal overflow, no credential on any request, `noindex` on
+every receipt. Evidence lives under
+`docs/reports/evidence/sharing-verification-00331188/`. This board's earlier
+claim that **#422** carries seven open findings was stale: #422 was closed by PR
+#447, and all seven dispositions come back not applicable. Six are on components
+the `/r/` route never mounts, omnisearch, row menus, confirmation cards, usage
+counts, auth strings and the dossier sheet. The seventh, the clipped first
+x-axis label, is unreachable for a different reason: the receipt uses
+`ReceiptChart`, which hides both axes, not `ResultEquityChart`. What the
+verification did not re-prove, because it seeded the fixture directly, is the
+owner's Share button and database persistence; those were driven end to end at
+`5d408acf` and no receipt source file has changed in the 94 commits since.
+**All that remains on this item is the founder's flag decision.**
 
 ---
 
