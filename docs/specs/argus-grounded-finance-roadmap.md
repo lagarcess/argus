@@ -307,7 +307,7 @@ the card is honest without being redesigned:
 > You would have 45,000 pesos, about $740. Want to see what that would have done
 > in an index fund over the same period?
 
-### 4. The refusal log — CP1, ships first and alone
+### 4. The refusal log — CP1, live before distribution
 
 Every question the brain cannot map gets recorded, sorted by frequency.
 
@@ -418,18 +418,29 @@ interpreter promotes **without a $1.33 live eval run**.
 | --- | --- | --- | --- |
 | **CP0** | The three fixes already on integration | drawer dates, benchmark gap, retrieval evidence | no |
 | **CP1** | Item 4 refusal log, plus #462 | nothing | no |
+
+Checkpoint numbers are cut boundaries, not a running order. The order is in the
+rules below.
 | **CP2** | Item 9 metering, item 6 decisions detach | nothing, behavior preserving | no |
 | **CP3** | Item 7 sharing on, mobile verification | a result can be shared | probably not |
 | **CP4** | Item 1 lift the loop, item 2 registry | **nothing, if done right** | yes |
 | **CP5** | Item 3 time value of money | the first new capability | yes |
 | **CP6** | Item 5 grounding, item 8 teach the method | cited local rates, guided broad questions | yes |
 
-Two rules about the order.
+**The ordering rule is distribution, not checkpoint number.** Founder,
+2026-09-08: *this initiative is to get Argus outside of its box so I can
+distribute again and collect more signal.* Argus has one non-founder message in
+thirty days, so nothing on this board earns priority by collecting data sooner.
+It earns priority by being required before the next distribution.
 
-**CP1 ships immediately and alone.** The refusal log's value is proportional to
-how long it has been collecting, so every day it is not live is a day of data
-that does not exist. It is also the safest change on the board, and it is what
-tells you whether CP5 and CP6 are aimed correctly before they are built.
+That makes **the spine the critical path**: item 1, item 2, item 3, then item 8.
+Without them the next distribution repeats 2026-08-12, and the goalpost stays
+unreachable.
+
+An earlier draft of this section ranked CP1 first on the grounds that the
+refusal log's value scales with how long it has collected. That reasoning is
+wrong while nobody is using the product. The refusal log ships **before**
+distribution so it is live when signal arrives, not first.
 
 **CP4 ships with nothing else in it.** A pure extraction plus a registry holding
 only the calculations that already exist should be invisible. If a user notices
@@ -445,7 +456,7 @@ item that needs it.
 
 | Document | Change | When |
 | --- | --- | --- |
-| **`docs/PRODUCT.md`** | Section 1 Product Truth says "speak an investing or trading idea," and section 11 supported AI responsibilities is written around that. Both widen to "bring a money question." **The file is marked locked and only the founder can move it.** The audience does not change, which is what makes this an additive refinement rather than the scope shift the lock forbids. | **Blocks item 1.** Nothing in the spine should be built against a Product Truth that contradicts it. |
+| **`docs/PRODUCT.md`** | Section 1 Product Truth says "speak an investing or trading idea," and section 11 supported AI responsibilities is written around that. Both widen to "bring a money question." **The file is marked locked and only the founder can move it.** The audience does not change, which is what makes this an additive refinement rather than the scope shift the lock forbids. | **Founder-approved 2026-09-08, see decision 7.** The edit itself is still owed before item 1 merges; nothing in the spine ships against the old Product Truth. |
 | **`docs/ARCHITECTURE.md`** | The registry layer; in-process versus Workflow execution; artifacts without runs. | With item 2. |
 | **`docs/API_CONTRACT.md`** | Calculation request and response shapes; the allowance response going from two meters to three operation classes. | With items 2 and 9. |
 | **`docs/DATA_MODEL.md`** | Artifacts beyond backtest results; decisions carrying inputs and detaching from `run_label`. | With items 3 and 6. |
@@ -462,8 +473,10 @@ Personal money math means users type **salary, expenses, and debts**. That is
 materially more sensitive than "backtest AAPL," and the current posture was
 written for market questions.
 
-- **Day one, blocking item 3's first write:** decide whether figures a user
-  states about their own finances are retained, and where. Personalization
+- **Day one, DECIDED 2026-09-08, see decision 8:** figures a user states about
+  their own finances are ephemeral facts. They live in the conversation and
+  never reach personalization memory. Item 3 is unblocked. Original framing
+  kept below because the reasoning still governs new surfaces. Personalization
   memory already carries a categorical never-store list, covering broker
   credentials and raw conversation. Stated personal financial figures either
   join that list or get an explicit, recorded decision. This changes what gets
@@ -519,6 +532,23 @@ bilingual cost does not compound across calculations. See #434, #489, #527,
 effective annual cost for your stated spend" is arithmetic. "Best card for you"
 is advice. A copy rule, not an architecture one, and it is what keeps the terms
 review short.
+
+**7. `PRODUCT.md` section 1 and section 11 widen. Founder-approved
+2026-09-08.** Section 1's Product Truth becomes, subject to founder wording at
+edit time: *Argus is the easiest place to bring a money question and get an
+answer you can check. Every answer is computed from real data or cited to a
+source, and the ones that can be tested against history end in a backtest.* The
+audience does not change, which is what makes this an additive refinement rather
+than the scope shift the lock forbids. What this implies for guest mode and the
+empty state is deliberately deferred to item 8 rather than settled here.
+
+**8. Stated personal figures are ephemeral facts. Founder-approved
+2026-09-08.** A salary, an expense, or a debt the user types lives in the
+conversation like any other message, because it is inside a message and dropping
+it would break the conversation. It never travels further: it joins the
+categorical never-store list for personalization memory, alongside broker
+credentials and raw conversation. No new storage, no new retention surface, and
+item 3 is unblocked.
 
 ### Still open
 
