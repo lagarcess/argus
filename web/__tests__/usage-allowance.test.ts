@@ -6,7 +6,10 @@ import {
   allowanceMeterTone,
   classifyAllowance,
   formatAllowancePeriodEnd,
+  isUnboundedAllowance,
   showsHourlyWindow,
+  showsWorkspaceWindow,
+  type UnboundedAllowance,
   type UsageAllowance,
 } from "@/lib/usage-allowance";
 
@@ -170,6 +173,43 @@ describe("private-alpha usage allowance", () => {
   test("reveals the hourly window only when the backend marks it limiting", () => {
     expect(showsHourlyWindow({ limiting_window: "hour" })).toBe(true);
     expect(showsHourlyWindow({ limiting_window: "day" })).toBe(false);
+    expect(showsHourlyWindow({ limiting_window: "guest_session" })).toBe(false);
+  });
+
+  test("reveals the workspace window only when it is what holds the guest", () => {
+    expect(showsWorkspaceWindow({ limiting_window: "guest_session" })).toBe(true);
+    expect(showsWorkspaceWindow({ limiting_window: "day" })).toBe(false);
+    expect(showsWorkspaceWindow({ limiting_window: "hour" })).toBe(false);
+  });
+
+  test("an unbounded class is the one the backend gives no window", () => {
+    const unbounded: UnboundedAllowance = {
+      hour: null,
+      day: null,
+      guest_session: null,
+      available_now: true,
+      limiting_window: null,
+    };
+    const guestExecution: UsageAllowance = {
+      hour: null,
+      day: {
+        limit: 2,
+        used: 0,
+        remaining: 2,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: {
+        limit: 2,
+        used: 2,
+        remaining: 0,
+        period_end: "2026-08-10T12:00:00Z",
+      },
+      available_now: false,
+      limiting_window: "guest_session",
+    };
+
+    expect(isUnboundedAllowance(unbounded)).toBe(true);
+    expect(isUnboundedAllowance(guestExecution)).toBe(false);
   });
 
   test("formats the exact backend period end in English and Spanish", () => {
@@ -202,7 +242,9 @@ describe("private-alpha usage allowance", () => {
     expect(api).toContain("runActionIdempotencyKey(input)");
     expect(usageLib).toContain('input.type !== "run_backtest"');
     expect(usageLib).toContain("confirmation_id");
-    expect(usageLib).toContain("backtests: UsageAllowance");
+    expect(usageLib).toContain("compute: UnboundedAllowance;");
+    expect(usageLib).toContain("grounding: OperationClassAllowance;");
+    expect(usageLib).toContain("execution: UsageAllowance;");
     expect(usageLib).toContain('limiting_window: "hour" | "day"');
     expect(profileMenu).toContain('openModal("usage")');
     expect(
@@ -212,8 +254,15 @@ describe("private-alpha usage allowance", () => {
       ),
     ).toContain("<UsageModal");
     expect(modal).toContain("getUsageAllowances");
-    expect(modal).toContain("usage.allowances.messages");
-    expect(modal).toContain("usage.allowances.backtests");
+    expect(modal).toContain("usage.allowances.compute");
+    expect(modal).toContain("usage.allowances.grounding");
+    expect(modal).toContain("usage.allowances.execution");
+    expect(modal).not.toContain("allowances.messages");
+    expect(modal).not.toContain("allowances.backtests");
+    expect(modal).toContain("isUnboundedAllowance");
+    expect(modal).toContain("showsWorkspaceWindow");
+    expect(modal).toContain("conversation_rule");
+    expect(modal).toContain("search_rule");
     expect(modal).toContain("simulation_rule");
     expect(modal).toContain("showsHourlyWindow");
     expect(modal).not.toContain("Retry-After");
@@ -289,13 +338,21 @@ describe("private-alpha usage allowance", () => {
     const en = readLocale("en").settings.data.usage_panel;
     const es = readLocale("es-419").settings.data.usage_panel;
 
-    expect(en.messages).toBe("Messages");
+    expect(en.conversation).toBe("Conversation");
+    expect(en.searches).toBe("Searches with sources");
     expect(en.simulations).toBe("Simulations");
+    expect(en.no_limit).toBe("No limit");
+    expect(en.messages).toBeUndefined();
+    expect(en.message_rule).toBeUndefined();
     expect(en.left_today).toContain("{{count}}");
     expect(en.hourly_available).toContain("{{count}}");
+    expect(en.workspace_available).toContain("{{count}}");
     expect(en.what_counts).toBe("What counts?");
-    expect(en.message_rule).toBe(
-      "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
+    expect(en.conversation_rule).toBe(
+      "Conversation is free. Asking questions and reading answers never counts.",
+    );
+    expect(en.search_rule).toBe(
+      "Searches with sources count once per search Argus runs for you. Answers from Argus data don’t count.",
     );
     expect(en.simulation_rule).toBe(
       "New simulations count once. Retrying the same simulation doesn’t count again.",
@@ -303,13 +360,21 @@ describe("private-alpha usage allowance", () => {
     expect(en.description).toBeUndefined();
     expect(en.no_usage).toBeUndefined();
     expect(en.remaining).toBeUndefined();
-    expect(es.messages).toBe("Mensajes");
+    expect(es.conversation).toBe("Conversación");
+    expect(es.searches).toBe("Búsquedas con fuentes");
     expect(es.simulations).toBe("Simulaciones");
+    expect(es.no_limit).toBe("Sin límite");
+    expect(es.messages).toBeUndefined();
+    expect(es.message_rule).toBeUndefined();
     expect(es.left_today).toContain("{{count}}");
     expect(es.hourly_available).toContain("{{count}}");
+    expect(es.workspace_available).toContain("{{count}}");
     expect(es.what_counts.length).toBeGreaterThan(0);
-    expect(es.message_rule).toBe(
-      "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
+    expect(es.conversation_rule).toBe(
+      "La conversación es gratis. Preguntar y leer respuestas nunca cuenta.",
+    );
+    expect(es.search_rule).toBe(
+      "Las búsquedas con fuentes cuentan una vez por cada búsqueda que Argus hace por ti. Las respuestas con datos de Argus no cuentan.",
     );
     expect(es.simulation_rule).toBe(
       "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar.",
@@ -364,6 +429,18 @@ describe("private-alpha usage allowance", () => {
         time: "9:00",
       }),
     ).toBe("2 disponibles esta hora · se restablece 9:00");
+    expect(
+      i18n.t("settings.data.usage_panel.workspace_available", {
+        count: 1,
+        time: "10 sep",
+      }),
+    ).toBe("Queda 1 en este chat temporal · vence 10 sep");
+    expect(
+      i18n.t("settings.data.usage_panel.workspace_available", {
+        count: 2,
+        time: "10 sep",
+      }),
+    ).toBe("Quedan 2 en este chat temporal · vence 10 sep");
 
     const es = readLocale("es-419");
     expect(es.command_palette.decision_note_count).toBe("{{count}} / {{max}}");
@@ -387,7 +464,7 @@ describe("private-alpha usage allowance", () => {
     expect(modal).not.toContain("usage_panel.remaining");
     expect(modal.match(/what_counts/g)?.length).toBeGreaterThanOrEqual(1);
     expect(modal.match(/aria-expanded/g)?.length).toBe(1);
-    expect(modal).toContain("message_rule");
+    expect(modal).toContain("conversation_rule");
     expect(modal).toContain("simulation_rule");
     expect(modal).toContain("classifyAllowance");
   });

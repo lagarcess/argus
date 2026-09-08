@@ -7,6 +7,7 @@ const CONVERSATION_ID = "00000000-0000-4000-8000-000000000202";
 const REPLACEMENT_CONVERSATION_ID =
   "00000000-0000-4000-8000-000000000303";
 const EXPIRES_AT = "2026-07-31T18:00:00Z";
+const DAY_END = "2026-07-25T00:00:00Z";
 const EN_EXPIRY_DATE = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
 }).format(new Date(EXPIRES_AT));
@@ -83,7 +84,6 @@ function guestMe(language: "en" | "es-419" = "en") {
       expires_at: EXPIRES_AT,
       conversation_id: CONVERSATION_ID,
       conversation_limit: 1,
-      message_limit: 10,
       simulation_limit: 1,
       feedback_limit: 5,
     },
@@ -241,25 +241,37 @@ async function mockGuestJourney(
     evidence.requestOrder.push("/me/usage");
     await fulfillJson(route, {
       allowances: {
-        messages: {
+        compute: {
           hour: null,
           day: null,
-          guest_session: {
-            used: 0,
-            limit: 10,
-            remaining: 10,
-            period_end: EXPIRES_AT,
-          },
+          guest_session: null,
           available_now: true,
-          limiting_window: "guest_session",
+          limiting_window: null,
         },
-        backtests: {
+        grounding: {
           hour: null,
-          day: null,
+          day: {
+            used: 0,
+            limit: 3,
+            remaining: 3,
+            period_end: DAY_END,
+          },
+          guest_session: null,
+          available_now: true,
+          limiting_window: "day",
+        },
+        execution: {
+          hour: null,
+          day: {
+            used: 0,
+            limit: 2,
+            remaining: 2,
+            period_end: DAY_END,
+          },
           guest_session: {
             used: 0,
-            limit: 1,
-            remaining: 1,
+            limit: 2,
+            remaining: 2,
             period_end: EXPIRES_AT,
           },
           available_now: true,

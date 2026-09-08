@@ -2,29 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  decideGuestMessageGate,
   decideGuestNewConversationGate,
   decideGuestSimulationGate,
-  guestSimulationPrecheckResetAt,
+  guestSimulationPrecheckReset,
   isExactGuestRunReplay,
 } from "../lib/guest-capability-gates";
 
 describe("guest capability gate policy", () => {
-  test("stops an exhausted guest message before sending but never gates registered users", () => {
-    expect(
-      decideGuestMessageGate({
-        accountKind: "guest",
-        availableNow: false,
-      }),
-    ).toEqual({ kind: "convert", reason: "message_limit" });
-    expect(
-      decideGuestMessageGate({
-        accountKind: "registered",
-        availableNow: false,
-      }),
-    ).toEqual({ kind: "allow" });
-  });
-
   test("allows exact replay before converting a third unique guest simulation", () => {
     expect(
       decideGuestSimulationGate({
@@ -74,19 +58,33 @@ describe("guest capability gate policy", () => {
     ).toBe(false);
   });
 
-  test("uses the visitor-day reset after a workspace renewal", () => {
-    const newWorkspaceExpiresAt = "2026-08-10T12:00:00Z";
+  test("names the horizon the backend says holds the guest", () => {
+    const workspaceExpiresAt = "2026-08-10T12:00:00Z";
+    const dayEnd = "2026-08-04T00:00:00Z";
 
+    // The visitor's day is spent while the workspace still has room.
     expect(
-      guestSimulationPrecheckResetAt({
-        day: { period_end: "2026-08-04T00:00:00Z" },
+      guestSimulationPrecheckReset({
+        day: { period_end: dayEnd },
+        guest_session: { period_end: workspaceExpiresAt },
+        limiting_window: "day",
       }),
-    ).toBe("2026-08-04T00:00:00Z");
+    ).toEqual({ resetAt: dayEnd, resetKind: "daily" });
+    // #546: the workspace is spent although the day reset at midnight.
     expect(
-      guestSimulationPrecheckResetAt({
-        day: { period_end: "2026-08-04T00:00:00Z" },
+      guestSimulationPrecheckReset({
+        day: { period_end: dayEnd },
+        guest_session: { period_end: workspaceExpiresAt },
+        limiting_window: "guest_session",
       }),
-    ).not.toBe(newWorkspaceExpiresAt);
+    ).toEqual({ resetAt: workspaceExpiresAt, resetKind: "workspace" });
+    expect(
+      guestSimulationPrecheckReset({
+        day: null,
+        guest_session: null,
+        limiting_window: null,
+      }),
+    ).toEqual({ resetAt: null, resetKind: "daily" });
   });
 
   test("resets an empty guest chat and asks before replacing accepted content", () => {
@@ -155,22 +153,32 @@ describe("a spent allowance always explains itself", () => {
     "utf-8",
   );
 
-  test("neither gate drops the send before requesting conversion", () => {
+  test("the run gate does not drop the send before requesting conversion", () => {
     const start = source.indexOf("const usage = await getUsageAllowances()");
     // Anchor on the call site; the bare name also appears in the imports, and
     // slicing from there produced an empty body that asserted nothing.
-    const end = source.indexOf("return true;", source.indexOf("decideGuestMessageGate({"));
+    const end = source.indexOf("return true;", source.indexOf("decideGuestSimulationGate({"));
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
 
     const gateBody = source.slice(start, end);
     expect(gateBody).toContain("decideGuestSimulationGate({");
-    expect(gateBody).toContain("decideGuestMessageGate({");
+    expect(gateBody).toContain("usage.allowances.execution");
     expect(gateBody).not.toContain("if (!conversationId) return false;");
   });
 
+  test("conversation is never gated: a plain send skips the usage read", () => {
+    // Compute is free, so nothing about a message waits on /me/usage.
+    const skip = source.indexOf('if (action?.type !== "run_backtest") return true;');
+    const read = source.indexOf("const usage = await getUsageAllowances()");
+    expect(skip).toBeGreaterThan(-1);
+    expect(skip).toBeLessThan(read);
+    expect(source).not.toContain("decideGuestMessageGate");
+    expect(source).not.toContain("message_limit");
+  });
+
   test("the pending action is what needs a conversation, not the prompt", () => {
-    for (const reason of ["simulation_limit", "message_limit"]) {
+    for (const reason of ["simulation_limit"]) {
       const at = source.indexOf(`reason: "${reason}"`);
       expect(at).toBeGreaterThan(-1);
       // The payload is built conditionally and collapses to null without a

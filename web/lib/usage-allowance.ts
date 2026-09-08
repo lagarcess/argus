@@ -16,19 +16,37 @@ export type RegisteredUsageAllowance = {
 export type GuestUsageAllowance = {
   hour: null;
   day: UsageWindow;
-  guest_session: null;
+  guest_session: UsageWindow | null;
   available_now: boolean;
-  limiting_window: "day";
+  limiting_window: "day" | "guest_session";
 };
 
 export type UsageAllowance = RegisteredUsageAllowance | GuestUsageAllowance;
 
+/** No account window bounds this operation class, so nothing decrements. */
+export type UnboundedAllowance = {
+  hour: null;
+  day: null;
+  guest_session: null;
+  available_now: true;
+  limiting_window: null;
+};
+
+export type OperationClassAllowance = UsageAllowance | UnboundedAllowance;
+
 export type UsageAllowanceResponse = {
   allowances: {
-    messages: UsageAllowance;
-    backtests: UsageAllowance;
+    compute: UnboundedAllowance;
+    grounding: OperationClassAllowance;
+    execution: UsageAllowance;
   };
 };
+
+export function isUnboundedAllowance(
+  allowance: OperationClassAllowance,
+): allowance is UnboundedAllowance {
+  return allowance.limiting_window === null;
+}
 
 export type AllowanceState = "zero" | "active" | "hourly_limited" | "exhausted";
 export type AllowanceMeterTone = "teal" | "warning" | "danger";
@@ -64,9 +82,15 @@ export function classifyAllowance(allowance: {
 }
 
 export function showsHourlyWindow(allowance: {
-  limiting_window: "hour" | "day";
+  limiting_window: "hour" | "day" | "guest_session";
 }): boolean {
   return allowance.limiting_window === "hour";
+}
+
+export function showsWorkspaceWindow(allowance: {
+  limiting_window: "hour" | "day" | "guest_session";
+}): boolean {
+  return allowance.limiting_window === "guest_session";
 }
 
 export function runActionIdempotencyKey(input: {
