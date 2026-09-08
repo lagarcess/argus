@@ -116,7 +116,7 @@ def test_every_lifecycle_writer_embeds_the_generated_predicates() -> None:
     assert (
         "{job_success_write_sql_predicate()}" in proof
     ), "the proof task's status writes must interpolate the generated fragment"
-    restore = (root / "src/argus/api/chat/confirmation.py").read_text()
+    restore = (root / "src/argus/api/chat/confirmation_lifecycle.py").read_text()
     assert (
         "classify_job_for_card" in restore
     ), "the restore filter must derive from the same classification"
