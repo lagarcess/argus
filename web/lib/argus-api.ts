@@ -297,17 +297,10 @@ export type EvidenceArtifact = {
   updated_at: string;
 };
 
-export type DecisionNote = {
-  id: string;
-  idea_id: string;
-  idea_version_id: string;
-  evidence_artifact_id: string;
-  source_conversation_id?: string | null;
-  decision_state: DecisionState;
-  note?: string | null;
-  created_at: string;
-  updated_at: string;
-};
+// The decision contract owns this shape; a decision attaches to an evidence
+// artifact or to a computed answer's message.
+export type { DecisionNote } from "./decision-contract";
+import type { DecisionNote } from "./decision-contract";
 
 export type SearchConversationItem = SearchConversationContract;
 
