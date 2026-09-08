@@ -3661,11 +3661,13 @@ Contract rules:
   reading returned tool output first and invoice counts second. A
   survey with no retrieval carries `degraded.code = "survey_not_grounded"`
   and replaces unsupported prose with the precise retrieval failure. A survey
-  that retrieved but names no resolver-verified ticker carries
+  that retrieved but names no resolver-verified ticker, or whose typed
+  answer states no cited figure at all, carries
   `degraded.code = "survey_synthesis_incomplete"` and says that sources were
-  found but the requested assets could not be extracted. Neither failure
-  renders subject-dependent figure or asset copy, and neither emits a
-  runnable row.
+  found but the requested assets could not be extracted; a survey is
+  accepted only with a figure and a verified name, on the first attempt or
+  after the one concrete retry. Neither failure renders subject-dependent
+  figure or asset copy, and neither emits a runnable row.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
@@ -3691,9 +3693,14 @@ Contract rules:
   asserted. Fetched pages are typed sources too, without a publisher date. A row
   read from the provider's own finance data keeps its evidence in the tool
   result and carries `source_url: null`, the way every provider-host citation
-  is scrubbed. `rows` is additive on the sidecar and may be empty; a
-  degraded turn always carries an empty list. Prose that arrives under a
-  typed request is still delivered and recorded as prose.
+  is scrubbed. **A rejected row withholds the whole answer:** the prose states
+  the figure the row was dropped for and cannot be trimmed of one claim, so
+  the turn carries `degraded.code = "research_figures_uncited"`, an honest
+  note replaces the prose, the subjects the user named stay testable, and the
+  packet is never cached. `rows` is additive on the sidecar and may be empty;
+  a degraded turn always carries an empty list, enforced by the sidecar
+  builder. Prose that arrives under a typed request is still delivered and
+  recorded as prose.
 - **Retrieval parameters are configuration per question shape.** Each call
   sends a model fallback chain (`models`, the primary and the other priced
   model, served in order; the invoice names the model that served), the

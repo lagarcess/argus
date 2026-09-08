@@ -277,15 +277,18 @@ async def grounded_result(
                 decision=decision,
                 reason="missing_public_sources",
             )
-        cache_put(
-            key,
-            packet,
-            ttl_seconds=ttl_for_packet(
-                question_kind=query.question_kind,
-                categories=packet.categories,
-                closed_period=query.period_is_closed_window,
-            ),
-        )
+        if not _rejected_figures(packet):
+            # A packet whose prose will be withheld is not worth serving
+            # again; the next identical question earns a fresh attempt.
+            cache_put(
+                key,
+                packet,
+                ttl_seconds=ttl_for_packet(
+                    question_kind=query.question_kind,
+                    categories=packet.categories,
+                    closed_period=query.period_is_closed_window,
+                ),
+            )
     if publisher_sources_required and not _packet_has_public_sources(
         packet,
         query=query,
@@ -361,38 +364,29 @@ def _packet_stage_result(
         scan_limit=SURVEY_CANDIDATE_SCAN_LIMIT if survey else MAX_PEER_PAIRS,
     )
     answer = packet.answer_markdown
-    degraded_code: str | None = None
-    if survey:
-        retrieved = _retrieval_happened(packet)
-        named_symbols = (
-            _named_verified_symbols(answer, [*subjects, *peers]) if retrieved else set()
-        )
-        if not retrieved or not named_symbols:
-            answer = _survey_recovery_note(
-                language,
-                question_kind=question_kind,
-                retrieval_happened=retrieved,
-            )
-            degraded_code = (
-                "survey_synthesis_incomplete" if retrieved else "survey_not_grounded"
-            )
-            subjects = []
-            peers = []
-        else:
+    degraded_code = _withheld_code(packet, survey=survey)
+    if degraded_code is None and survey:
+        named_symbols = _named_verified_symbols(answer, [*subjects, *peers])
+        if named_symbols:
             subjects = [s for s in subjects if s["symbol"] in named_symbols]
             peers = [p for p in peers if p["symbol"] in named_symbols]
+        else:
+            degraded_code = "survey_synthesis_incomplete"
+    if degraded_code is not None:
+        # The prose is withheld whole: it cannot be trimmed of one claim.
+        # The subjects the user named stay testable; a survey named none.
+        answer = _withheld_note(language, code=degraded_code, question_kind=question_kind)
+        peers = []
+        if survey:
+            subjects = []
     if not subjects and peers:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the
         # first verified name keeps every answer one tap from a test.
         subjects = peers[:1]
         peers = peers[1:]
-    rows = (
-        None
-        if degraded_code is not None
-        else research_next_experiment_rows(
-            subjects=subjects, peers=peers, language=language
-        )
+    rows = research_next_experiment_rows(
+        subjects=subjects, peers=peers, language=language
     )
     if not rows and subjects:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
@@ -862,6 +856,45 @@ def _survey_has_figures(packet: ResearchPacket) -> bool:
     return bool(packet.rows) if packet.typed_answer else True
 
 
+def _rejected_figures(packet: ResearchPacket) -> bool:
+    """The typed answer stated a figure it could not cite to a retrieved page.
+    The parser drops such rows and counts them; the prose still states the
+    figure, so the packet is not publishable and not worth caching."""
+    return packet.uncited_rows > 0
+
+
+def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
+    """Why a packet's prose cannot be published, or None.
+
+    The one owner of the honesty line at the composition seam, for every
+    shape and both composition paths: a figure the model stated but could
+    not cite, or a survey that stated no figure at all. Prose cannot be
+    trimmed of one claim, so a withheld packet is withheld whole and the
+    turn says why through its typed degraded code."""
+    if _rejected_figures(packet):
+        return "research_figures_uncited"
+    if survey and not _survey_has_figures(packet):
+        return (
+            "survey_synthesis_incomplete"
+            if _retrieval_happened(packet)
+            else "survey_not_grounded"
+        )
+    return None
+
+
+def _withheld_note(language: str, *, code: str, question_kind: str | None) -> str:
+    """The honest line for a withheld answer, keyed by its degraded code."""
+    if code == "research_figures_uncited":
+        return _uncited_figure_note(language)
+    if code == "research_unavailable_missing_public_sources":
+        return _missing_public_source_note(language)
+    return _survey_recovery_note(
+        language,
+        question_kind=question_kind,
+        retrieval_happened=code != "survey_not_grounded",
+    )
+
+
 def _packet_has_public_sources(
     packet: ResearchPacket,
     *,
@@ -1111,6 +1144,18 @@ def _missing_public_source_note(language: str) -> str:
     )
 
 
+def _uncited_figure_note(language: str) -> str:
+    if language == "es-419":
+        return (
+            "Encontré fuentes, pero no pude verificar con ellas todas las cifras "
+            "de esa respuesta, así que no las citaré."
+        )
+    return (
+        "I found sources, but couldn't verify every figure in that answer "
+        "against them, so I won't quote it."
+    )
+
+
 def retrieval_spec_for_job(job_request: dict[str, Any]) -> ResearchConfigSpec:
     """The thorough configuration with the job's own retrieval parameters,
     rebuilt from the typed job request the same way the prompt is."""
@@ -1151,7 +1196,7 @@ def store_research_packet_for_job(
     question answers inline for the six-hour class TTL (30 days when the
     asked-about window is closed). Both completion paths call this."""
     key = str(job_request.get("cache_key") or "")
-    if not key:
+    if not key or _rejected_figures(packet):
         return
     if job_request.get("requires_publisher_sources") and not typed_sources(
         packet,
@@ -1189,18 +1234,23 @@ def compose_completed_research(
         for s in job_request.get("subjects") or []
         if isinstance(s, dict) and s.get("symbol")
     ]
+    question_kind = str(job_request.get("question_kind") or "cross_company")
     sources = typed_sources(
         packet,
-        question_kind=str(job_request.get("question_kind") or "cross_company"),
+        question_kind=question_kind,
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
-    missing_required_sources = bool(
-        job_request.get("requires_publisher_sources") and not sources
-    )
+    degraded_code = _withheld_code(packet, survey=is_market_survey(question_kind))
+    if (
+        degraded_code is None
+        and job_request.get("requires_publisher_sources")
+        and not sources
+    ):
+        degraded_code = "research_unavailable_missing_public_sources"
     peers = (
         []
-        if missing_required_sources
+        if degraded_code is not None
         else verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
     )
     if not subjects and peers:
@@ -1213,8 +1263,8 @@ def compose_completed_research(
         subjects=subjects, peers=peers, language=language
     )
     answer = (
-        _missing_public_source_note(language)
-        if missing_required_sources
+        _withheld_note(language, code=degraded_code, question_kind=question_kind)
+        if degraded_code is not None
         else packet.answer_markdown
     )
     if not rows and subjects:
@@ -1226,7 +1276,7 @@ def compose_completed_research(
             capability_class=capability_class,
             shape="thorough",
             sources=sources,
-            retrieved_rows=[] if missing_required_sources else typed_rows(packet),
+            retrieved_rows=typed_rows(packet),
             retrieved_at=packet.retrieved_at.isoformat(),
             subjects=subjects,
             peers=peers,
@@ -1243,11 +1293,7 @@ def compose_completed_research(
                 if job_request.get("period_of_interest")
                 else None
             ),
-            degraded_code=(
-                "research_unavailable_missing_public_sources"
-                if missing_required_sources
-                else None
-            ),
+            degraded_code=degraded_code,
         ),
         "next_experiments": rows,
     }
@@ -1475,7 +1521,9 @@ def build_research_sidecar(
         "capability_class": capability_class,
         "shape": shape,
         "sources": sources,
-        "rows": list(retrieved_rows or []),
+        # A degraded turn carries no rows: the documented shape, enforced by
+        # the builder rather than remembered by every producer.
+        "rows": [] if degraded_code else list(retrieved_rows or []),
         "retrieved_at": retrieved_at,
         "anchor_symbols": [subject["symbol"] for subject in subjects],
         "peers": peers,
