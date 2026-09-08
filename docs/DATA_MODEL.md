@@ -112,6 +112,7 @@ private_alpha_allowlist
 profiles
    ├── conversations
    │      ├── messages
+   │      │      └── decision_notes             # decisions on computed answers
    │      ├── chat_turn_lifecycles
    │      ├── backtest_jobs
    │      └── backtest_runs
@@ -1016,27 +1017,53 @@ Payload rules:
 
 ### decision_notes
 
-Explicit user judgment after reviewing evidence. P1 stores the current decision
-for an evidence artifact, not an append-only decision history. A later slice may
-add history if the product needs audit trails.
+Explicit user judgment on a computation. A decision attaches to exactly one
+computation owner and stores the current decision, not an append-only history:
+
+- A backtest decision attaches to its evidence artifact. `evidence_artifact_id`,
+  `idea_id`, and `idea_version_id` are set; `source_message_id` and
+  `computation` are null. The run behind the artifact owns the inputs, so
+  readers derive the computation (`backtest` with the run id) instead of
+  storing a copy.
+- A computed-answer decision attaches to the assistant message that carried
+  the answer. `source_message_id` and `computation` are set; the three lineage
+  columns are null. The computation is stored so the decision survives the
+  message and can be re-run when opened.
 
 Fields:
 - `id`: `uuid` (Primary Key)
-- `idea_id`: `uuid` (References `ideas.id` ON DELETE CASCADE)
-- `idea_version_id`: `uuid` (References `idea_versions.id` ON DELETE CASCADE)
-- `evidence_artifact_id`: `uuid` (References `evidence_artifacts.id` ON DELETE CASCADE)
+- `idea_id`: `uuid` (Nullable, references `ideas.id` ON DELETE CASCADE)
+- `idea_version_id`: `uuid` (Nullable, references `idea_versions.id` ON DELETE CASCADE)
+- `evidence_artifact_id`: `uuid` (Nullable, references `evidence_artifacts.id` ON DELETE CASCADE)
 - `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
 - `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
+- `source_message_id`: `uuid` (Nullable, references `messages.id` ON DELETE SET NULL)
+- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`)
 - `decision_state`: `text` (`watching`, `promising`, `rejected`, `revisit_later`)
 - `note`: `text` (Nullable)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
 Constraints:
+- `decision_notes_attachment_check`: `(evidence_artifact_id is not null) <>
+  (computation is not null)`, one owner per row.
+- `decision_notes_evidence_lineage_check`: `idea_id` and `idea_version_id` are
+  null exactly when `evidence_artifact_id` is null.
 - `UNIQUE(user_id, evidence_artifact_id)` enforces one current decision per
   user-owned evidence artifact.
+- `UNIQUE(user_id, source_message_id)` enforces one current decision per
+  user-owned answer message. Nulls do not collide.
 - Duplicate POST/retry semantics update the existing decision row and return the
-  canonical current decision.
+  canonical current decision; a repeated write on a computed answer keeps the
+  first stored computation.
+- The message metadata that declares a computation (`metadata.computation`)
+  and the decision stamp the backend writes beside it (`decision_note_id`,
+  `decision_state`) share the keys `argus.domain.decision_attachment` owns.
+- Migration `20260908120000_decision_notes_attach_to_computations.sql` relaxes
+  the three lineage columns and adds the attachment columns and constraints;
+  no row is rewritten and no object is removed. The promotion gate classifies
+  it destructive only because `alter column ... drop not null` carries the
+  word the classifier reads as destructive.
 - The public decision write contract accepts at most 500 note characters. The
   durable column remains nullable `text` so previously accepted longer notes
   stay readable; no migration or destructive truncation is introduced.
