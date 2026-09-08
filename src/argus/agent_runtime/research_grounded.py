@@ -872,20 +872,21 @@ def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     word that its prose states no figure is never trusted. Prose cannot be
     trimmed of one claim, so a withheld packet is withheld whole, is never
     cached, and the turn says why through its typed degraded code."""
+    if not _retrieval_happened(packet):
+        # Nothing was retrieved, so nothing in the answer can be verified,
+        # whatever rows the model wrote: every one is uncited by
+        # construction, and the note must not claim sources were found. A
+        # prose answer that never retrieved keeps the pre-contract test on
+        # the shapes that had one.
+        if survey:
+            return "survey_not_grounded"
+        return "research_not_grounded" if packet.typed_answer else None
     if _rejected_figures(packet):
         return "research_figures_unverified"
     if survey and not _has_figures(packet):
-        return (
-            "survey_synthesis_incomplete"
-            if _retrieval_happened(packet)
-            else "survey_not_grounded"
-        )
+        return "survey_synthesis_incomplete"
     if packet.typed_answer and not packet.rows:
-        return (
-            "research_figures_unverified"
-            if _retrieval_happened(packet)
-            else "research_not_grounded"
-        )
+        return "research_figures_unverified"
     return None
 
 

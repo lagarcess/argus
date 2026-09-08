@@ -882,6 +882,37 @@ def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
                 )
             ],
         ),
+        (
+            "live_quote",
+            lambda: [
+                agent_response(
+                    text=typed_answer_text(
+                        "AAPL is **$4.3** today.",
+                        [retrieved_row(label="AAPL", value=4.3, symbol="AAPL")],
+                    ),
+                    invocations=0,
+                )
+            ],
+        ),
+        (
+            "market_pulse",
+            lambda: [
+                agent_response(
+                    text=typed_answer_text(
+                        "NVDA (NVDA) rose **4.3%**.",
+                        [retrieved_row(label="NVDA", value=4.3)],
+                    ),
+                    invocations=0,
+                ),
+                agent_response(
+                    text=typed_answer_text(
+                        "NVDA (NVDA) rose **4.3%**.",
+                        [retrieved_row(label="NVDA", value=4.3)],
+                    ),
+                    invocations=0,
+                ),
+            ],
+        ),
     ],
 )
 def test_no_degraded_turn_asserts_a_figure_or_carries_a_row(
@@ -981,3 +1012,55 @@ def test_the_thorough_job_withholds_a_rowless_typed_answer_too() -> None:
     assert composed["research"]["degraded"] == {"code": "research_figures_unverified"}
     assert "16" not in composed["answer"]
     assert composed["research"]["rows"] == []
+
+
+def test_rows_without_any_retrieval_are_not_grounded_not_unverified(monkeypatch) -> None:
+    """Round 3: a typed answer that never retrieved has every row rejected by
+    construction. Absence of retrieval is the stronger fact, so the turn says
+    the lookup did not complete rather than that sources were found."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    _wire(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "AAPL is **$200** today.",
+                    [retrieved_row(label="AAPL price", value=200.0, symbol="AAPL")],
+                ),
+                invocations=0,
+            )
+        ],
+    )
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_not_grounded"}
+    answer = result.stage_patch["assistant_response"]
+    assert answer.startswith("I couldn't complete the data lookup")
+    assert "found sources" not in answer and "200" not in answer
+    assert sidecar["sources"] == [] and sidecar["rows"] == []
+
+
+def test_a_survey_with_rows_but_no_retrieval_keeps_its_own_code(monkeypatch) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+    document = agent_response(
+        text=typed_answer_text(
+            "NVDA (NVDA) rose **4.3%**.", [retrieved_row(label="NVDA", value=4.3)]
+        ),
+        invocations=0,
+    )
+    transport = _wire(monkeypatch, [document, document])
+
+    result = _run("anything interesting moving today")
+
+    assert result is not None
+    assert len(transport.requests) == 2, "the concrete retry still fires once"
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "survey_not_grounded"}
+    assert result.stage_patch["assistant_response"] == (
+        "I couldn't retrieve today's market movers."
+    )
