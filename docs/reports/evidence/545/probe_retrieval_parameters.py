@@ -281,10 +281,12 @@ def main() -> None:
     parser.add_argument("--probe", nargs="+", default=["all"])
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args()
-    if (
-        not args.allow_dirty
-        and subprocess.check_output(["git", "status", "--porcelain"], text=True).strip()
-    ):
+    # Recordings are untracked until they are committed, so only tracked
+    # modifications make the head something the recording cannot vouch for.
+    dirty = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=no"], text=True
+    ).strip()
+    if dirty and not args.allow_dirty:
         raise SystemExit("Recordings vouch for a committed head; commit first")
     sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     load_dotenv(args.env_file, override=False)
