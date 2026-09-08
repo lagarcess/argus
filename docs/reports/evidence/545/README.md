@@ -150,9 +150,10 @@ Runtime head `7ef0055b` is what the requests and responses vouch for, and
 every later commit was re-validated against them rather than re-recorded:
 `tests/research/test_retrieval_contract_probe.py` rebuilds each recorded
 request from the code at head and re-parses each recorded response with the
-parser at head. The review-round fix `cd749fa0` changed only the composition
-seam (a rejected row now withholds the whole answer, a figureless survey is
-never accepted, a degraded sidecar carries no rows). The `turn` inside
+parser at head. The review-round fixes `cd749fa0` and `9e0ee7f1` changed only
+the composition seam (a typed answer is publishable only with at least one
+cited row and no rejected one, on every shape; a degraded sidecar carries no
+rows). The `turn` inside
 `market_pulse_vaguest_rail.json` was composed at `503db34d`; the same two
 exchanges compose to the same degraded outcome under the fix, which the
 hermetic tests in `tests/research/test_retrieval_parameters.py` pin, so it
