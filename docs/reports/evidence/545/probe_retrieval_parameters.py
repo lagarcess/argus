@@ -96,6 +96,21 @@ def _record(
 
 
 def run_probe(name: str, *, sha: str) -> dict[str, Any]:
+    """One probe, with the home market set only for the local-source call so
+    every other recording shows the request a deployment without a declared
+    market sends."""
+    previous = os.environ.pop("ARGUS_RESEARCH_HOME_COUNTRY", None)
+    if name == "domain_filtered_local_source":
+        os.environ["ARGUS_RESEARCH_HOME_COUNTRY"] = "DO"
+    try:
+        return _run_probe(name, sha=sha)
+    finally:
+        os.environ.pop("ARGUS_RESEARCH_HOME_COUNTRY", None)
+        if previous is not None:
+            os.environ["ARGUS_RESEARCH_HOME_COUNTRY"] = previous
+
+
+def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
     from argus.agent_runtime import research_grounded as grounded
     from argus.domain.research.config import PRIMARY_MODEL, retrieval_spec
     from argus.domain.research.contracts import ResearchUnavailableError
@@ -134,7 +149,6 @@ def run_probe(name: str, *, sha: str) -> dict[str, Any]:
         )
         purpose = "#545: typed rows and dated publisher sources, one-week recency"
     elif name == "domain_filtered_local_source":
-        os.environ["ARGUS_RESEARCH_HOME_COUNTRY"] = "DO"
         spec = retrieval_spec(
             "balanced",
             question_kind="current_external",
