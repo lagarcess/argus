@@ -1,6 +1,9 @@
 # Argus Active Roadmap
 
-Status: **ACTIVE — this is the execution board.** Opened 2026-08-06.
+Status: **SUPERSEDED 2026-09-05** by
+[`argus-grounded-finance-roadmap.md`](argus-grounded-finance-roadmap.md). Landed
+work and the secondary tracker state below remain valid history; the ranked
+items are no longer the board. Opened 2026-08-06.
 
 Supersedes the two short-lived next-cycle boards and the completed interim
 roadmap. `docs/specs/private-alpha-next-roadmap.md` remains as P2 history and
