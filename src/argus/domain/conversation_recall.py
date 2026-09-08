@@ -475,6 +475,18 @@ def _match_candidates(
             )
         )
     for decision in decisions:
+        # A hydrated row carries the text of whatever the decision attaches
+        # to, evidence or answer, as one field; older readers still hand the
+        # evidence fields over separately.
+        attachment_text = _text(decision.get("attachment_text"))
+        attachment_parts = (
+            (attachment_text,)
+            if attachment_text
+            else (
+                _text(decision.get("artifact_title")),
+                _text(decision.get("artifact_digest")),
+            )
+        )
         candidates.append(
             _MatchCandidate(
                 60,
@@ -484,9 +496,7 @@ def _match_candidates(
                     for part in (
                         _text(decision.get("note")),
                         _text(decision.get("decision_state")),
-                        _text(decision.get("artifact_title")),
-                        _text(decision.get("artifact_digest")),
-                        _text(decision.get("attachment_text")),
+                        *attachment_parts,
                     )
                     if part
                 ),
