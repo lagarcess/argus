@@ -852,16 +852,15 @@ the machinery.
 execution allowance. Compute operations never decrement anything. No live eval
 required.
 
-**Owed before the Plumbing promotion: rename the metered classes in the panel.**
-Founder, 2026-09-08. The meter is cost recovery by design, so the only two
-things it names are the two things that cost us money, and the thing Argus
-actually sells, the computation and the honesty line, is free and therefore
-invisible. "Searches" names our supplier and makes the panel argue that Argus is
-a retrieval wrapper. Name each meter for what the reader gets, not for what we
-buy. It is two locale strings per language and no code. This is a labelling fix
-before promotion, not a pricing decision; pricing is not on this board and
-should not be decided while production usage is one non-founder message in
-thirty days.
+**Read the meter labels once before the Plumbing promotion.** Founder,
+2026-09-08. The meter is cost recovery by design, so it names only the two
+things that cost us money, and the thing Argus actually sells, the computation
+and the honesty line, is free and therefore absent from the panel. PR #561's
+own strings are already close: "Searches with sources" names the guarantee and
+not just the supplier. So this is one reading pass over four locale strings, not
+a rework, and it belongs in #561 while that file is open rather than in a later
+pass. Pricing is not on this board and should not be decided while production
+usage is one non-founder message in thirty days.
 
 **The guest ceiling is not a product meter.** "Never for talking" is a pricing
 rule and it stays. It does not say an anonymous endpoint may be unbounded. A
