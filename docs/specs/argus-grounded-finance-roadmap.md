@@ -444,6 +444,28 @@ interpreter's capability text is generated from the registry, extending the
 mechanism `unsupported_admission.requested_strategy_template_capability_clause`
 already uses, never hand-written per calculation.
 
+**The progress line is part of the declaration.** Today the seven status
+strings are keyed on the graph stage and every one of them is backtest prose:
+`chat.status.execute` says "Running backtest...", plus `extracting_strategy`,
+`running_backtest` and `calculating_metrics`. Ask a savings question today and
+you watch three lies in a row.
+
+The fix is not new copy. A tool declares a **progress template with its typed
+arguments interpolated**, the way Claude Code and Codex report the tool that is
+actually running rather than asking a model what they are doing:
+
+```
+fetch_rate(bank="Banco Popular")   -> "Checking Banco Popular's current rate"
+solve_for_unknown(target=45000)    -> "Working out your monthly savings"
+run_backtest(asset="AAPL")         -> "Running the Apple backtest"
+```
+
+It cannot lie, because it names the call that is executing. No extra model call,
+so no latency on a path that must feel instant. No fingerprint surface. And it
+is bilingual for free: the template is a locale key and the arguments are typed
+facts, which is operating rule 4 doing the work again. The stage-keyed strings
+are deleted.
+
 **Surface.** `src/argus/domain/capability_registry.py`,
 `src/argus/agent_runtime/llm_interpreter_types.py`,
 `src/argus/agent_runtime/state/models.py`,
@@ -637,6 +659,31 @@ Both of Johana's suggestions, which are one request stated twice.
 
 **Done means.** A broad question returns derived follow-ups, never a catalogue.
 The guest empty state states the method in one line.
+
+**`chat.welcome` is rewritten.** It currently reads *"Tell me an investing idea
+in plain language and I will help test it with Alpha-safe assumptions."* That is
+the box, stated before the user has typed anything, and it is the single
+highest-leverage string in the product.
+
+**Greetings are gated by demonstrated interest, not deleted.** Founder,
+2026-09-08. The market-state greetings are genuinely good for someone who cares
+about markets and wrong for someone who arrived with a savings question.
+
+- **Generic by default.** Market flavor is earned.
+- The signal is **the user's own conversation history**, has this person ever run
+  a backtest, do they ask about assets. Not personalization memory, which is
+  dark behind two gates and an order of magnitude larger than this.
+- **Guests always generic**, because a guest has no history, and guests are the
+  2026-08-12 cohort who arrived with money questions and were told about
+  backtests.
+- This is the same signal the counterfactual choice reads when the model picks
+  what to compare against. **One notion of what we know about this person, used
+  in two places**, built once rather than as two lookups that drift.
+
+Two copy deletions regardless of gating: the Spanish weekend lines, whose
+trailing clause is filler, and `noctámbulo` in `night_a`, a word no Dominican
+says out loud. Roughly thirty greeting variants hand-written in two languages is
+also a rule 4 problem in miniature; cut the count.
 
 **Surface.** `src/argus/agent_runtime/llm_clarifier.py`, the empty state, the
 starter chips.
