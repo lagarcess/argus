@@ -57,7 +57,8 @@
     "missing_final_or_done": 0,
     "succeeded_jobs_missing_artifact": 0,
     "duplicates": 0,
-    "collector_change": "The final collector adds error retention and waits for temporarily absent artifacts. The running collector was loaded before those changes. Every captured main sample was audited and exercised the unchanged successful collection path; no paid rerun was required."
+    "collector_change": "The final collector adds error retention and waits for temporarily absent artifacts. The running collector was loaded before those changes. Every captured main sample was audited and exercised the unchanged successful collection path; no paid rerun was required.",
+    "scope_registry_followup": "A later CI fix replaced the three operation-scope literals with the canonical registry imports. Values and successful collection behavior are unchanged; the full 68-row summary remains byte-identical, confirmed by a clean delta review."
   },
   "source_sha_meaning": "Checkout base, not deployed API SHA or a claim that the collector was committed. Collector file hashes identify the bytes loaded at collection. deployment-during.json and deployment-after.json identify the measured API.",
   "privacy": "No raw answers, source URLs, identities, request/job/message ids, credentials, or runtime fingerprints. Private correlation maps remain gitignored in temp/. Runtime summary copies are reduced to one maximum duration per request, never added together."

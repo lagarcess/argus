@@ -7,6 +7,8 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from argus.domain.backtest_job_scopes import CHAT_RUN_SCOPE, RESEARCH_OPERATION_SCOPE
+
 from scripts.benchmarks.turn_latency import distribution
 
 
@@ -15,9 +17,9 @@ def actual_turn_type(row):
     outcome = row["outcome"]
     if row["status"] == "stream_error":
         return "stream_error"
-    if job.get("operation_scope") == "chat.run_backtest" or outcome.get("run"):
+    if job.get("operation_scope") == CHAT_RUN_SCOPE or outcome.get("run"):
         return "backtest_run"
-    if job.get("operation_scope") == "chat.research":
+    if job.get("operation_scope") == RESEARCH_OPERATION_SCOPE:
         return "research_thorough"
     if outcome.get("research_shape"):
         return "research_" + outcome["research_shape"]

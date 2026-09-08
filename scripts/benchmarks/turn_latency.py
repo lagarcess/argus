@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
+from argus.domain.backtest_job_scopes import RESEARCH_OPERATION_SCOPE
 
 from scripts.benchmarks.render_internet_benchmark import _confirmation_cards
 
@@ -173,7 +174,7 @@ def poll_job(
         if job["status"] == "succeeded":
             artifact = (
                 "result_message"
-                if job.get("operation_scope") == "chat.research"
+                if job.get("operation_scope") == RESEARCH_OPERATION_SCOPE
                 else "run"
             )
             if not payload.get(artifact):
