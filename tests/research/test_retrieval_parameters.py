@@ -697,10 +697,10 @@ def test_a_rejected_row_withholds_the_whole_answer(monkeypatch) -> None:
 
     assert result is not None
     sidecar = result.stage_patch["research"]
-    assert sidecar["degraded"] == {"code": "research_figures_uncited"}
+    assert sidecar["degraded"] == {"code": "research_figures_unverified"}
     answer = result.stage_patch["assistant_response"]
     assert "250" not in answer and "4.3" not in answer
-    assert answer.startswith("I found sources, but couldn't verify every figure")
+    assert answer.startswith("I found sources, but couldn't verify the figures")
     assert sidecar["rows"] == []
     assert [source["url"] for source in sidecar["sources"]] == [PUBLISHER]
     # The subject the user named stays testable; nothing else is offered.
@@ -745,7 +745,7 @@ def test_a_rejected_row_withholds_the_thorough_answer_too() -> None:
     composed = grounded.compose_completed_research(job_request=job_request, packet=packet)
     grounded.store_research_packet_for_job(job_request, packet)
 
-    assert composed["research"]["degraded"] == {"code": "research_figures_uncited"}
+    assert composed["research"]["degraded"] == {"code": "research_figures_unverified"}
     assert composed["research"]["rows"] == []
     assert "250" not in composed["answer"] and "4.3" not in composed["answer"]
     assert composed["answer"].startswith("Encontré fuentes, pero no pude verificar")
@@ -868,6 +868,20 @@ def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
                 ),
             ],
         ),
+        (
+            "live_quote",
+            lambda: [
+                agent_response(text=typed_answer_text("AAPL is **$4.3** today.", []))
+            ],
+        ),
+        (
+            "live_quote",
+            lambda: [
+                agent_response(
+                    text=typed_answer_text("AAPL is **$4.3** today.", []), invocations=0
+                )
+            ],
+        ),
     ],
 )
 def test_no_degraded_turn_asserts_a_figure_or_carries_a_row(
@@ -880,7 +894,9 @@ def test_no_degraded_turn_asserts_a_figure_or_carries_a_row(
         monkeypatch,
         globals(),
         question_kind=question_kind,
-        symbols=["NVDA"] if question_kind == "current_external" else [],
+        symbols={"current_external": ["NVDA"], "live_quote": ["AAPL"]}.get(
+            question_kind, []
+        ),
     )
     _wire(monkeypatch, documents())
 
@@ -892,3 +908,76 @@ def test_no_degraded_turn_asserts_a_figure_or_carries_a_row(
     assert sidecar["rows"] == []
     assert sidecar["peers"] == []
     assert "4.3" not in result.stage_patch["assistant_response"]
+
+
+def test_a_rowless_typed_quote_is_withheld(monkeypatch) -> None:
+    """Round 2: the model's word that its prose states no figure is never
+    trusted. A typed quote that retrieved and wrote no row is withheld on
+    every shape, not only on surveys, and is never cached."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    rowless = agent_response(text=typed_answer_text("AAPL is **$200** today.", []))
+    transport = _wire(monkeypatch, [rowless, rowless])
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_figures_unverified"}
+    answer = result.stage_patch["assistant_response"]
+    assert "200" not in answer
+    assert answer.startswith("I found sources, but couldn't verify the figures")
+    assert sidecar["rows"] == []
+    assert sidecar["anchor_symbols"] == ["AAPL"], "the named subject stays testable"
+    assert result.stage_patch["next_experiments"]["rows"]
+
+    _run("What is Apple at?")
+    assert len(transport.requests) == 2, "a withheld packet is never served from cache"
+
+
+def test_a_rowless_typed_answer_without_retrieval_is_not_grounded(monkeypatch) -> None:
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    _wire(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text("AAPL is **$200** today.", []), invocations=0
+            )
+        ],
+    )
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_not_grounded"}
+    answer = result.stage_patch["assistant_response"]
+    assert "200" not in answer
+    assert answer.startswith("I couldn't complete the data lookup")
+    assert sidecar["rows"] == [] and sidecar["sources"] == []
+
+
+def test_the_thorough_job_withholds_a_rowless_typed_answer_too() -> None:
+    from argus.domain.research.perplexity_agent import _packet_from_response
+
+    packet = _packet_from_response(
+        agent_response(text=typed_answer_text("Netflix grew **16%**.", [])),
+        latency_ms=1,
+        on_unpriced=lambda _: None,
+    )
+    composed = grounded.compose_completed_research(
+        job_request={
+            "capability_class": "thorough_research",
+            "language": "en",
+            "question_kind": "cross_company",
+            "subjects": [{"symbol": "NFLX", "name": "Netflix", "asset_class": "equity"}],
+            "cache_key": "k",
+        },
+        packet=packet,
+    )
+    assert composed["research"]["degraded"] == {"code": "research_figures_unverified"}
+    assert "16" not in composed["answer"]
+    assert composed["research"]["rows"] == []

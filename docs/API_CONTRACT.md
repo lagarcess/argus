@@ -3693,14 +3693,18 @@ Contract rules:
   asserted. Fetched pages are typed sources too, without a publisher date. A row
   read from the provider's own finance data keeps its evidence in the tool
   result and carries `source_url: null`, the way every provider-host citation
-  is scrubbed. **A rejected row withholds the whole answer:** the prose states
-  the figure the row was dropped for and cannot be trimmed of one claim, so
-  the turn carries `degraded.code = "research_figures_uncited"`, an honest
-  note replaces the prose, the subjects the user named stay testable, and the
-  packet is never cached. `rows` is additive on the sidecar and may be empty;
-  a degraded turn always carries an empty list, enforced by the sidecar
-  builder. Prose that arrives under a typed request is still delivered and
-  recorded as prose.
+  is scrubbed. **A typed answer is publishable only with at least one cited
+  row and no rejected one.** The model's word that its prose states no figure
+  is never trusted, and prose cannot be trimmed of one claim, so a rejected
+  row, or a typed answer that retrieved and wrote no row, withholds the whole
+  answer: the turn carries `degraded.code = "research_figures_unverified"`,
+  an honest note replaces the prose, the subjects the user named stay
+  testable, and the packet is never cached. A typed answer with no row and
+  no retrieval at all carries `research_not_grounded` with the unavailable
+  note. Surveys keep their own codes below. `rows` is additive on the
+  sidecar and may be empty; a degraded turn always carries an empty list,
+  enforced by the sidecar builder. Prose that arrives under a typed request
+  is still delivered and recorded as prose.
 - **Retrieval parameters are configuration per question shape.** Each call
   sends a model fallback chain (`models`, the primary and the other priced
   model, served in order; the invoice names the model that served), the

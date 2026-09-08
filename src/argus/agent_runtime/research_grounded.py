@@ -202,7 +202,7 @@ async def grounded_result(
                 reason=exc.reason,
             )
         retry_prompt: str | None = None
-        if is_market_survey(query.question_kind) and not _survey_has_figures(packet):
+        if is_market_survey(query.question_kind) and not _has_figures(packet):
             # Asking again is deterministic escalation, not a second router:
             # a vague survey ("anything moving today?") lets the model answer
             # from memory, or retrieve and still state no figure, however
@@ -229,7 +229,7 @@ async def grounded_result(
             except ResearchUnavailableError:
                 retried = None
             if retried is not None and (
-                _survey_has_figures(retried)
+                _has_figures(retried)
                 or (_retrieval_happened(retried) and not _retrieval_happened(packet))
             ):
                 packet = retried
@@ -277,7 +277,7 @@ async def grounded_result(
                 decision=decision,
                 reason="missing_public_sources",
             )
-        if not _rejected_figures(packet):
+        if _withheld_code(packet, survey=is_market_survey(query.question_kind)) is None:
             # A packet whose prose will be withheld is not worth serving
             # again; the next identical question earns a fresh attempt.
             cache_put(
@@ -846,11 +846,11 @@ def _retrieval_happened(packet: ResearchPacket) -> bool:
     )
 
 
-def _survey_has_figures(packet: ResearchPacket) -> bool:
-    """A survey is grounded when it retrieved and, under the typed contract,
-    stated at least one cited figure. A typed answer that retrieved pages
-    and then wrote no row is the vaguest phrasing answered with nothing;
-    prose answers keep the retrieval-only test."""
+def _has_figures(packet: ResearchPacket) -> bool:
+    """Under the typed contract an answer's figures are its rows: a typed
+    answer that retrieved pages and wrote no row stated nothing verifiable,
+    whatever its prose says. A prose answer, the schema not honored, keeps
+    the retrieval-only test and is recorded as prose by the parser."""
     if not _retrieval_happened(packet):
         return False
     return bool(packet.rows) if packet.typed_answer else True
@@ -859,7 +859,7 @@ def _survey_has_figures(packet: ResearchPacket) -> bool:
 def _rejected_figures(packet: ResearchPacket) -> bool:
     """The typed answer stated a figure it could not cite to a retrieved page.
     The parser drops such rows and counts them; the prose still states the
-    figure, so the packet is not publishable and not worth caching."""
+    figure."""
     return packet.uncited_rows > 0
 
 
@@ -867,25 +867,34 @@ def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     """Why a packet's prose cannot be published, or None.
 
     The one owner of the honesty line at the composition seam, for every
-    shape and both composition paths: a figure the model stated but could
-    not cite, or a survey that stated no figure at all. Prose cannot be
-    trimmed of one claim, so a withheld packet is withheld whole and the
-    turn says why through its typed degraded code."""
+    shape and both composition paths. A typed answer is publishable only
+    when it carries at least one cited row and no rejected one; the model's
+    word that its prose states no figure is never trusted. Prose cannot be
+    trimmed of one claim, so a withheld packet is withheld whole, is never
+    cached, and the turn says why through its typed degraded code."""
     if _rejected_figures(packet):
-        return "research_figures_uncited"
-    if survey and not _survey_has_figures(packet):
+        return "research_figures_unverified"
+    if survey and not _has_figures(packet):
         return (
             "survey_synthesis_incomplete"
             if _retrieval_happened(packet)
             else "survey_not_grounded"
+        )
+    if packet.typed_answer and not packet.rows:
+        return (
+            "research_figures_unverified"
+            if _retrieval_happened(packet)
+            else "research_not_grounded"
         )
     return None
 
 
 def _withheld_note(language: str, *, code: str, question_kind: str | None) -> str:
     """The honest line for a withheld answer, keyed by its degraded code."""
-    if code == "research_figures_uncited":
-        return _uncited_figure_note(language)
+    if code == "research_figures_unverified":
+        return _unverified_figure_note(language)
+    if code == "research_not_grounded":
+        return _unavailable_note(language)
     if code == "research_unavailable_missing_public_sources":
         return _missing_public_source_note(language)
     return _survey_recovery_note(
@@ -1144,15 +1153,15 @@ def _missing_public_source_note(language: str) -> str:
     )
 
 
-def _uncited_figure_note(language: str) -> str:
+def _unverified_figure_note(language: str) -> str:
     if language == "es-419":
         return (
-            "Encontré fuentes, pero no pude verificar con ellas todas las cifras "
-            "de esa respuesta, así que no las citaré."
+            "Encontré fuentes, pero no pude verificar con ellas las cifras de "
+            "esa respuesta, así que no las citaré."
         )
     return (
-        "I found sources, but couldn't verify every figure in that answer "
-        "against them, so I won't quote it."
+        "I found sources, but couldn't verify the figures in that answer "
+        "against them, so I won't quote them."
     )
 
 
@@ -1196,7 +1205,8 @@ def store_research_packet_for_job(
     question answers inline for the six-hour class TTL (30 days when the
     asked-about window is closed). Both completion paths call this."""
     key = str(job_request.get("cache_key") or "")
-    if not key or _rejected_figures(packet):
+    question_kind = str(job_request.get("question_kind") or "cross_company")
+    if not key or _withheld_code(packet, survey=is_market_survey(question_kind)):
         return
     if job_request.get("requires_publisher_sources") and not typed_sources(
         packet,
