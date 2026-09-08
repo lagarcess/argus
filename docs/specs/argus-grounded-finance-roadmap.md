@@ -13,7 +13,8 @@ or its audience.
 
 The previous board opened on 2026-08-06 with the right diagnosis: *users are
 lost at the first question, before reaching the thing Argus is actually good
-at.* Lift the loop, "Answer the first question," shipped to production on 2026-08-11.
+at.* Its first item, "Answer the first question," shipped to production on
+2026-08-11.
 It worked. Argus answered ordinary finance questions in both languages without
 refusing.
 
@@ -240,9 +241,13 @@ Founder-locked for this board.
    shows its inputs underneath, editable, recomputing live. Driving a savings
    question through a confirm card is the friction that killed the funnel the
    first time.
-3. **Adding a calculation is one file.** Declaration, compute function, tests.
-   If it is more than that, the abstraction failed and the board stops to fix
-   it before calculation four.
+3. **Adding a calculation is a declaration, a compute function, tests, and a
+   card.** The 2026-09-08 scout disproved the one-file version: the result
+   artifact is backtest by content at every layer, card, readout, explain,
+   followups, breakdown and chart, so only the message envelope transfers and a
+   time-value answer needs its own card. Four artifacts is the bar. If it grows
+   past that, the abstraction failed and the board stops before calculation
+   four.
 4. **Retrieval produces typed rows, never prose.** Prose that looks computed is
    the defect class this repo has paid for repeatedly.
 5. **Perplexity for facts scattered in prose. APIs for datasets that already
@@ -308,6 +313,24 @@ and is the one a real Dominican audience is already asking a human.
 **Also replay the real 2026-08-12 transcripts.** They are in the database, they
 are what actual users typed, and none of them was written by us.
 
+### How acceptance is actually checked
+
+Two sets, and the second is the one that counts.
+
+- **The smoke test above is visible.** Anyone building can read it, which means
+  it can be gamed by special-casing. It catches obvious failure, not overfit.
+- **The held-out set is the real 2026-08-12 transcripts.** Roughly twenty
+  people, all guests, all non-finance, and **none of it written by us or for
+  this purpose.** It predates the board, so it cannot have been designed
+  against. Pull it from the database, replay it, and read what happens.
+
+A release is accepted when its own proof in the item passes **and** the
+held-out replay shows no refusal that names a capability the user did not ask
+about.
+
+Nobody on a lane writes new acceptance questions. If a lane needs a question
+that is not in either set, that is a signal the lane is enumerating.
+
 ---
 
 ## The items
@@ -323,56 +346,98 @@ section.
 
 ### Lift the loop  ·  ships in **The spine**
 
-The loop is proven by one instance and trapped inside it. Extract what is
-general; leave what is genuinely backtest-only.
+**Scoped by the 2026-09-08 read-only scout.** Finding at
+`docs/reports/2026-09-08-lift-the-loop-scout.md`.
 
-**General, currently trapped:** the confirm card as a pattern rather than a
-required step; the edit contract, where every requested change is applied or
-explicitly surfaced as not applied with no third outcome; field provenance, what
-the user said versus what we inferred; the assumptions readout; the result
-artifact with the working shown; Try next, decisions, evidence receipts,
-sharing.
+**The thesis was about half right, and the correction narrows the lane.**
 
-**Genuinely backtest-only:** asset resolution, market calendars, the data fetch,
-benchmarks, the engine.
+- **The envelopes are general and thin:** the pending-artifact lifecycle, the
+  edit disclosure channel, applied-or-unapplied bookkeeping, the Try next row
+  contract, and the typed-facts-to-client-copy mechanism.
+- **The bodies are backtest:** the confirm stage, card rows, the edit target
+  vocabulary and applier, the planner prompt, the contextual merge, the display
+  fact vocabulary, Try next composition, and the whole result artifact.
 
-**Done means.** A second calculation can reach confirm, edit, provenance,
-disclosure, and artifact rendering without importing anything from the backtest,
-and the backtest still routes through the same code with byte-identical
-behavior. `StrategySummary` is documented and used as the backtest's input type,
-not the universal one.
+**Two things this board called general are out of scope, on evidence.**
 
-**Surface.** `src/argus/api/chat/confirmation.py`,
-`src/argus/agent_runtime/artifact_edit_planner.py`,
-`src/argus/agent_runtime/stages/interpret_internal/`,
-`src/argus/agent_runtime/state/models.py`, and the web confirm and result
-components.
+- **Field provenance is not a component.** It is a dict key in
+  `extra_parameters` that 35 files agree on by convention, with 24 value strings
+  and three readers checking different subsets. Lifting it means building a
+  typed model across 35 files, six of them fingerprinted. Not this lane.
+- **The result artifact is backtest by content at every layer:** card, readout,
+  explain, followups, breakdown, chart. Only the message envelope transfers.
+  This is why operating rule 3 now says four artifacts rather than one file.
 
-**Do not touch.** No universal input schema. The loop is earned by one instance;
-a parameter shape guessed from one example is not. No model-facing text: this
-extraction must leave `.agent/interpreter_prompt_fingerprint.json` unchanged.
+**The seam the board missed, and why it can wait.** The CONFIRM graph node is
+hard-wired to `LaunchBacktestRequest`. Nothing scheduled here confirms, because
+operating rule 2 has cheap calculations answering first, so this waits for the
+first expensive non-backtest calculation.
 
-**Proof.** The fingerprint is byte-identical before and after. The existing
-backtest suite passes unchanged. A throwaway second calculation, not shipped,
-demonstrates the loop is reachable without backtest imports.
+**Three lanes, in order.**
 
-**Scoping first.** Size is unknown and the extraction is the largest thing on
-this board. A read-only pass returns the seam and a number before any code.
+- **Lane A, pure relocation.** `confirmation.py` splits three ways: card
+  builder, pending-artifact lifecycle, research peer rows, with re-exports so
+  test edits stay at zero. `next_experiments.py` and `artifact_edit_planner.py`
+  optionally split into contract plus composer. One to two rounds.
+- **Lane B, parameterize the pending-artifact lifecycle** and give the web card
+  a `kind` discriminator. Two to three rounds. **Optional for the spine.**
+- **Lane C, the throwaway proof.** A second calculation driven by a unit
+  harness, never merged, run before the registry lane so the registry is
+  designed from what the throwaway actually needed. One round.
+
+**Almost nothing moves.** `models.py`, `confirm.py`, `contextual_merge.py` and
+the web card stay untouched.
+
+**Do not touch.**
+
+- **`api/state.py:76` pins `state.models` class paths by string** in the
+  checkpoint serializer. Those classes must never move or rename.
+- **`EditOperation.target` is model-facing schema the fingerprint does not
+  see.** It must not widen. This is the one trap that would ship an unmeasured
+  behavior change.
+- **`artifact_assumption_edit.py` has 72 of its 75 growth lines spent.** Leave
+  it alone.
+- No universal input schema. No model-facing text.
+
+**Proof.** `.agent/interpreter_prompt_fingerprint.json` byte-identical before
+and after; none of the five files is in the surface, so this is achievable.
+Existing backtest suite passes unchanged. Lane C demonstrates the envelopes are
+reachable without backtest imports.
+
+**Blast radius.** 57 source files import `StrategySummary`. 65 test files with
+1,663 test functions touch the surface. Re-exports keep Lane A test edits at
+zero.
+
+**Size: two mergeable lanes plus one throwaway, about five review rounds.**
+Smaller than this board originally assumed. The bill moved to the registry.
+
+**Start Lane A now.** `confirmation.py` has 36 commits in 90 days and zero open
+PRs against it, so the window is open and closes the moment another lane opens
+on that file.
 
 ---
 
 ### The registry  ·  ships in **The spine**
 
+**It is a tool catalog, not a question classifier.** Founder, 2026-09-08: the
+model has a brain, eyes, hands, memory and tools. A user asks something, the
+model reasons about it, and it calls the grounded calculators Argus owns. It
+does not match a question to a named calculation and fill that calculation's
+schema; matching is enumeration one level deeper than operating rule 8 removes
+it, and it fails the moment a question needs two tools, or one tool twice, or
+none.
+
+So a calculation is declared the way a tool is: what it does, typed arguments,
+what it returns. `solve_for_unknown(present_value, payment, rate, periods,
+future_value)` with one argument left blank. Nobody declares "the savings goal
+calculation," and Johana's question never has to match a name.
+
 Data-shaped, the way `capability_registry.py` already works for strategies:
 typed data in one home, and the schema, the runtime contract, discovery, and
 capability answers all derive from it.
 
-A calculation declares four things: a name and when to use it, typed inputs, a
-compute function, an output shape. Everything else, extraction, the confirm
-surface, the edit contract, provenance, disclosure, localization, reads the
-declaration.
-
-**Done means.** Adding a calculation is one file. The seven intents collapse to
+**Done means.** Adding a calculation is a declaration, a compute function,
+tests and a card, per operating rule 3. The seven intents collapse to
 roughly four: explain, calculate, follow up, cannot. The five existing rail
 shapes are registered as calculations rather than a parallel system. The
 interpreter's capability text is generated from the registry, extending the
@@ -389,8 +454,12 @@ It stops being the catch-all for "Argus does not do that."
 
 **Proof.** A committed scorecard, because `llm_interpreter_types.py` is
 fingerprinted. Targeted interleaved A/B where the change is bounded, about
-$0.20; a full suite where it is not. Plus a test that registering a calculation
-requires exactly one new file.
+$0.20; a full suite where it is not.
+
+**This lane carries the bill.** The 2026-09-08 scout found lift-the-loop
+smaller than the board assumed and this larger: intent collapse under a
+scorecard, a second card component, and a compute-to-message path all land
+here.
 
 ---
 
@@ -408,7 +477,8 @@ unreachable.
 | **Comparison over a set** | second; consumes retrieved rows |
 | **Historical performance** | already built; registered, not rebuilt |
 
-**Done means.** Each is one file: declaration, compute function, tests. Each
+**Done means.** Each is a declaration, a compute function, tests, and its own
+card, per operating rule 3. Each
 carries the inverted shape from operating rule 2: answer first, inputs shown
 underneath and editable, recomputing live. Each ends with the counterfactual
 offer where one applies. Comparison takes retrieved rows and a computed ranking
@@ -439,6 +509,13 @@ with what was asked and which primitive was missing.
 **Done means.** A refusal is a typed record, not a log line, queryable by
 frequency. #314's rejected artifact actions land in the same place; it is the
 same instrumentation.
+
+**Do not build a taxonomy.** Record what was asked and what happened, and read
+it later. The only question that matters is *could Argus have answered this and
+did not*, and that is a judgment made when reading, not a field written at the
+time. A bond's past performance refused is a bug. A three-year extrapolation
+refused is correct and permanent. Classifying at write time is the enumeration
+trap again, one level down.
 
 **Surface.** `src/argus/observability/`, the unsupported path, the recovery
 messages surface.
@@ -506,6 +583,10 @@ a result card.
 > You decided in September to put 5,000 a month toward the iPad. It is
 > December. Here is where you actually are, and here is what that money would
 > have done in the market instead.
+
+**The re-run happens when the user opens the decision.** Nothing reaches out.
+Email and notifications are a surface Argus does not have, and building one is
+not on this board.
 
 A backtest has no follow-up date. A decision does. This is the retention loop
 the previous board was building as product memory, keyed to the wrong object,
@@ -761,6 +842,20 @@ the calculations are unblocked.
 **Which Dominican sources go in the domain list, and who maintains it.** Founder
 supplies these when retrieval starts. The mechanism does not wait on the complete
 list: seed it with the banks users actually named, and let the refusal log grow it. Spec section 10, question 3.
+
+---
+
+## Known gaps, not scheduled
+
+- **The edit planner's 85-line system prompt escapes the fingerprint by
+  construction.** It steers every card edit with no scorecard. Pre-existing,
+  found by the 2026-09-08 scout, and it is a separate lane rather than part of
+  lift the loop.
+- **Field provenance has no typed model.** A dict key 35 files agree on by
+  convention, 24 value strings, three readers checking different subsets. It
+  will have to be typed eventually; it is out of scope for the spine.
+- **The CONFIRM graph node is hard-wired to `LaunchBacktestRequest`.** Waits for
+  the first expensive non-backtest calculation.
 
 ---
 
