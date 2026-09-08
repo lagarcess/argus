@@ -13,7 +13,7 @@ or its audience.
 
 The previous board opened on 2026-08-06 with the right diagnosis: *users are
 lost at the first question, before reaching the thing Argus is actually good
-at.* Item 1, "Answer the first question," shipped to production on 2026-08-11.
+at.* Lift the loop, "Answer the first question," shipped to production on 2026-08-11.
 It worked. Argus answered ordinary finance questions in both languages without
 refusing.
 
@@ -165,7 +165,7 @@ What comes off, and what replaces it:
 | `unsupported_or_out_of_scope` as the catch-all for every non-backtest turn | the only machine was the backtest | a calculation from the registry, or an honest boundary with the computation still shown |
 | `unsupported_admission.py`, 598 fingerprinted lines of typed guards | keeping the interpreter from promising strategies the engine cannot run | keeps its job for **strategy templates**; stops standing in for "Argus does not do that" generally |
 | The five rail shapes as the only non-backtest answers | the rail was bolted beside the backtest | five calculations in one registry |
-| Six Perplexity parameters sent of twenty available | nobody widened it after the first integration | item 5, which is configuration, not construction |
+| Six Perplexity parameters sent of twenty available | nobody widened it after the first integration | retrieval, which is configuration, not construction |
 
 The capability clause the interpreter reads is already **generated from the
 canonical registry** (`unsupported_admission.requested_strategy_template_capability_clause`).
@@ -194,7 +194,7 @@ typed inputs, run a compute kernel, produce an artifact.
 **Most calculations run in-process. Only the backtest uses the Workflow.** Time
 value of money is microseconds. `argus-backtests` stays the backtest's executor
 and new calculations never reach it, so the three-service topology and the
-release contract are untouched by everything on this board except item 3's
+release contract are untouched by everything on this board except the calculations's
 handoff.
 
 **Artifacts widen past backtest results.** A savings answer has no run and no
@@ -321,7 +321,7 @@ section.
 
 ---
 
-### 1. Lift the loop — CP4
+### Lift the loop  ·  ships in **The spine**
 
 The loop is proven by one instance and trapped inside it. Extract what is
 general; leave what is genuinely backtest-only.
@@ -361,7 +361,7 @@ this board. A read-only pass returns the seam and a number before any code.
 
 ---
 
-### 2. The calculation registry — CP4
+### The registry  ·  ships in **The spine**
 
 Data-shaped, the way `capability_registry.py` already works for strategies:
 typed data in one home, and the schema, the runtime contract, discovery, and
@@ -394,7 +394,7 @@ requires exactly one new file.
 
 ---
 
-### 3. The five primitives — CP5
+### The five calculations  ·  ships in **The calculations**
 
 The board schedules all five, not one. Four of the smoke-test questions need
 ratios or comparison, and shipping only time value of money leaves the goalpost
@@ -431,7 +431,7 @@ committed scorecard for the model-facing surface.
 
 ---
 
-### 4. The refusal log — CP1, live before distribution
+### Refusal log  ·  ships in **Instrumentation**
 
 Every question the model cannot map, and every boundary Argus states, recorded
 with what was asked and which primitive was missing.
@@ -453,7 +453,7 @@ collecting when signal arrives.
 
 ---
 
-### 5. Retrieval: send the parameters we already pay for — CP6
+### Retrieval parameters  ·  ships in **Grounding**
 
 **This item is configuration, not construction.** Argus calls
 `https://api.perplexity.ai/v1/agent` with six parameters. The endpoint accepts
@@ -472,7 +472,7 @@ not sending, and #545, publisher URLs stranded in prose with no typed sources,
 is what not sending it causes.
 
 `search_domain_filter` is the local moat and its 20-domain ceiling is the real
-constraint on the source list. `user_location` derives item 3's currency default.
+constraint on the source list. `user_location` derives the calculations's currency default.
 
 **Done means.** Retrieved facts arrive as typed rows with citations, never as
 prose to be re-parsed. Domain filtering and location are configured per
@@ -492,7 +492,7 @@ domains when this starts; seed from banks users actually named.
 
 ---
 
-### 6. Decisions detach from runs — CP2
+### Decisions  ·  ships in **Plumbing**
 
 Today a decision hangs off a run: `SearchDossierDecision` carries `run_label`,
 and the affordance lives in `StrategyResultCard.tsx`, `RunDossierView.tsx`, and
@@ -522,7 +522,7 @@ and re-run with changed inputs. Behavior-preserving for existing decisions.
 
 ---
 
-### 7. Sharing, turned on — CP3
+### Sharing on  ·  ships in **Sharing**
 
 Built and dark since 2026-08-10. `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and
 `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED` are `false` in `render.yaml` and
@@ -545,7 +545,7 @@ breakpoint findings; check them against a shared receipt specifically.
 
 ---
 
-### 8. Teach the methodology — CP6
+### Teach the method  ·  ships in **Grounding**
 
 Both of Johana's suggestions, which are one request stated twice.
 
@@ -570,7 +570,7 @@ evidence in both languages.
 
 ---
 
-### 9. Metering follows the new cost shape — CP2
+### Metering  ·  ships in **Plumbing**
 
 `UsageAllowances` has two hardcoded meters, `messages` and `backtests`. The
 windowing underneath is general and good: hour, day, guest session,
@@ -607,7 +607,7 @@ required.
 
 ---
 
-## Promotion checkpoints
+## Releases
 
 The board does not wait for the vision to be complete. Each checkpoint is
 cohesive on its own, and cutting them small is cheaper as well as safer:
@@ -615,18 +615,18 @@ cohesive on its own, and cutting them small is cheaper as well as safer:
 cannot reach the measured code, so a checkpoint that does not touch the
 interpreter promotes **without a $1.33 live eval run**.
 
-| | Ships | What a user sees | Live eval |
+| Release | Ships | What a user sees | Live eval |
 | --- | --- | --- | --- |
-| **CP0** | The three fixes already on integration | drawer dates, benchmark gap, retrieval evidence | no |
-| **CP1** | Item 4 refusal log, plus #462 | nothing | no |
+| **The fixes** | three bug fixes already on integration | drawer dates, benchmark gap, retrieval evidence | no |
+| **Instrumentation** | refusal log, plus #462 latency | nothing | no |
 
-Checkpoint numbers are cut boundaries, not a running order. The order is in the
+Release names are cut boundaries, not a running order. The order is in the
 rules below.
-| **CP2** | Item 9 metering, item 6 decisions detach | nothing, behavior preserving | no |
-| **CP3** | Item 7 sharing on, mobile verification | a result can be shared | probably not |
-| **CP4** | Item 1 lift the loop, item 2 registry | **nothing, if done right** | yes |
-| **CP5** | Item 3, the five primitives | Argus answers money questions it used to refuse | yes |
-| **CP6** | Item 5 retrieval parameters, item 8 teach the method | cited local rates, guided broad questions | yes |
+| **Plumbing** | metering, decisions | nothing, behavior preserving | no |
+| **Sharing** | sharing on, mobile verification | a result can be shared | probably not |
+| **The spine** | lift the loop, the registry | **nothing, if done right** | yes |
+| **The calculations** | the five calculations | Argus answers money questions it used to refuse | yes |
+| **Grounding** | retrieval parameters, teach the method | cited local rates, guided broad questions | yes |
 
 **The ordering rule is distribution, not checkpoint number.** Founder,
 2026-09-08: *this initiative is to get Argus outside of its box so I can
@@ -634,23 +634,23 @@ distribute again and collect more signal.* Argus has one non-founder message in
 thirty days, so nothing on this board earns priority by collecting data sooner.
 It earns priority by being required before the next distribution.
 
-That makes **the spine the critical path**: item 1, item 2, item 3, then item 8.
+That makes **the spine the critical path**: lift the loop, the registry, the calculations, then teach the method.
 Without them the next distribution repeats 2026-08-12, and the goalpost stays
 unreachable.
 
-An earlier draft of this section ranked CP1 first on the grounds that the
+An earlier draft ranked instrumentation first on the grounds that the
 refusal log's value scales with how long it has collected. That reasoning is
 wrong while nobody is using the product. The refusal log ships **before**
 distribution so it is live when signal arrives, not first.
 
-**CP5 may be two promotions.** Time value of money and growth ship together and
+**The calculations may be two promotions.** Time value of money and growth ship together and
 prove the registry; ratios and comparison follow. Splitting them is allowed and
 the checkpoint table stays one row, because the cut is cohesive either way: each
 half is a set of primitives, not half a primitive.
 
-**CP4 ships with nothing else in it.** A pure extraction plus a registry holding
+**The spine ships with nothing else in it.** A pure extraction plus a registry holding
 only the calculations that already exist should be invisible. If a user notices
-anything at CP4, something went wrong, and that must not be tangled with a new
+anything in the spine release, something went wrong, and that must not be tangled with a new
 capability landing in the same promotion.
 
 ---
@@ -662,12 +662,12 @@ item that needs it.
 
 | Document | Change | When |
 | --- | --- | --- |
-| **`docs/PRODUCT.md`** | Section 1 Product Truth says "speak an investing or trading idea," and section 11 supported AI responsibilities is written around that. Both widen to "bring a money question." **The file is marked locked and only the founder can move it.** The audience does not change, which is what makes this an additive refinement rather than the scope shift the lock forbids. | **Founder-approved 2026-09-08, see decision 7.** The edit itself is still owed before item 1 merges; nothing in the spine ships against the old Product Truth. |
-| **`docs/ARCHITECTURE.md`** | The registry layer; in-process versus Workflow execution; artifacts without runs. | With item 2. |
-| **`docs/API_CONTRACT.md`** | Calculation request and response shapes; the allowance response going from two meters to three operation classes. | With items 2 and 9. |
-| **`docs/DATA_MODEL.md`** | Artifacts beyond backtest results; decisions carrying inputs and detaching from `run_label`. | With items 3 and 6. |
-| **`.agent/designs/argus/DESIGN.md`** | The answer-first-then-editable-inputs pattern from operating rule 2. | With item 3. |
-| **`AGENTS.md`** | Operating rules 1 through 7 become permanent repository rules rather than board rules. A board is superseded; these should outlive it. | Any time after item 1 proves rule 1 holds. |
+| **`docs/PRODUCT.md`** | Section 1 Product Truth says "speak an investing or trading idea," and section 11 supported AI responsibilities is written around that. Both widen to "bring a money question." **The file is marked locked and only the founder can move it.** The audience does not change, which is what makes this an additive refinement rather than the scope shift the lock forbids. | **Founder-approved 2026-09-08, see decision 7.** The edit itself is still owed before lift the loop merges; nothing in the spine ships against the old Product Truth. |
+| **`docs/ARCHITECTURE.md`** | The registry layer; in-process versus Workflow execution; artifacts without runs. | With the registry. |
+| **`docs/API_CONTRACT.md`** | Calculation request and response shapes; the allowance response going from two meters to three operation classes. | With the registry and metering. |
+| **`docs/DATA_MODEL.md`** | Artifacts beyond backtest results; decisions carrying inputs and detaching from `run_label`. | With the calculations and decisions. |
+| **`.agent/designs/argus/DESIGN.md`** | The answer-first-then-editable-inputs pattern from operating rule 2. | With the calculations. |
+| **`AGENTS.md`** | Operating rules 1 through 7 become permanent repository rules rather than board rules. A board is superseded; these should outlive it. | Any time after lift-the-loop proves rule 1 holds. |
 
 ---
 
@@ -681,7 +681,7 @@ written for market questions.
 
 - **Day one, DECIDED 2026-09-08, see decision 8:** figures a user states about
   their own finances are ephemeral facts. They live in the conversation and
-  never reach personalization memory. Item 3 is unblocked. Original framing
+  never reach personalization memory. The calculations are unblocked. Original framing
   kept below because the reasoning still governs new surfaces. Personalization
   memory already carries a categorical never-store list, covering broker
   credentials and raw conversation. Stated personal financial figures either
@@ -707,7 +707,7 @@ Answered 2026-09-08. Recorded here so agents do not re-open them per lane.
 **1. Personal money math is neither a sixth rail shape nor a separate surface.**
 It is a calculation in the registry, and the rail's five existing shapes become
 five more calculations. The question only exists while the backtest and the rail
-are two machines; item 2 dissolves it.
+are two machines; the registry dissolves it.
 
 **2. Beginner before trader.** Every user Argus has ever had is a non-finance
 person. The trader cohort is hypothetical. This costs nothing at the advanced
@@ -746,7 +746,7 @@ answer you can check. Every answer is computed from real data or cited to a
 source, and the ones that can be tested against history end in a backtest.* The
 audience does not change, which is what makes this an additive refinement rather
 than the scope shift the lock forbids. What this implies for guest mode and the
-empty state is deliberately deferred to item 8 rather than settled here.
+empty state is deliberately deferred to teach-the-method rather than settled here.
 
 **8. Stated personal figures are ephemeral facts. Founder-approved
 2026-09-08.** A salary, an expense, or a debt the user types lives in the
@@ -754,14 +754,13 @@ conversation like any other message, because it is inside a message and dropping
 it would break the conversation. It never travels further: it joins the
 categorical never-store list for personalization memory, alongside broker
 credentials and raw conversation. No new storage, no new retention surface, and
-item 3 is unblocked.
+the calculations are unblocked.
 
 ### Still open
 
 **Which Dominican sources go in the domain list, and who maintains it.** Founder
-supplies these when item 5 starts. The mechanism does not wait on the complete
-list: seed it with the banks users actually named, and let the refusal log from
-item 4 grow it. Spec section 10, question 3.
+supplies these when retrieval starts. The mechanism does not wait on the complete
+list: seed it with the banks users actually named, and let the refusal log grow it. Spec section 10, question 3.
 
 ---
 
@@ -780,7 +779,7 @@ item 4 grow it. Spec section 10, question 3.
   support burden that do not exist today.
 - **A universal input schema**, until two calculations exist to derive it from.
 - **A skill grid or capability menu.** The classification lives in the model.
-- **Card currency rendering.** Item 3 covers prose only.
+- **Card currency rendering.** The calculations covers prose only.
 - **Product memory as Idea and IdeaVersion.** The `DecisionNote` is the part
   worth keeping; the scaffolding around it is backtest-shaped.
 
@@ -791,8 +790,8 @@ item 4 grow it. Spec section 10, question 3.
 - Landed work and the secondary tracker state in
   [`argus-active-roadmap.md`](argus-active-roadmap.md) remain valid history.
 - **Mobile shipped**, 2026-08-08, and is not a gate. It becomes a verification
-  dependency of item 7.
-- **Sharing is built and dark**, and is promoted from item 5 on that board to
+  dependency of sharing.
+- **Sharing is built and dark**, and is promoted from retrieval on that board to
   the distribution anchor on this one.
 - **#462** carries forward, and is now decision 3's blocking measurement.
 - The five research rail shapes stay. They become five of the calculations,
