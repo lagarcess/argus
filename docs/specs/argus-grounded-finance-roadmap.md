@@ -204,6 +204,34 @@ job kind with no run by design, from #532, and the settle rule has one owner in
 `argus.domain.job_settlement`. New calculations follow that seam rather than
 minting heavyweight rows for instant work.
 
+**Our interpreter is the brain. Perplexity is the eyes. Our Python is the
+hands.** Decided 2026-09-08 after the alternative was examined seriously.
+
+Perplexity's Agents API exposes `function` and `mcp` tool types, so its agent
+could in principle call our calculators and orchestrate the whole loop. It
+should not, for three measured reasons.
+
+- **Cost runs the wrong way.** Tier 3 is `x-ai/grok-4.3` with
+  `anthropic/claude-haiku-4.5` behind it, and a structured call there is a
+  fraction of a cent. Perplexity Agents runs `openai/gpt-5.6-sol` at up to ten
+  steps on `thorough`, priced per token. Moving reasoning to Perplexity moves it
+  from the cheap model to the expensive one.
+- **It would bill every money question**, including the ones needing no facts at
+  all. "If I save 5,000 a month for nine months, what do I have" is one grok
+  call and microseconds of Python today. As an agent run it is a loop with
+  steps.
+- **It breaks decision 3.** Compute answers under one second to first token. An
+  agent loop cannot do that; the `thorough` shape already carries a
+  600-second background deadline.
+
+The turn already hits the interpreter on every turn, so that cost is the
+existing baseline rather than an addition. Retrieval is what is additive, and it
+is paid only when a fact is actually needed. Cheap calculations never leave the
+process.
+
+Perplexity is still shaped precisely, through `instructions` and
+`response_format`. It is simply not paid to think about arithmetic we own.
+
 **The cheap path inverts the confirm card.** Answer first, inputs shown
 underneath and editable, recomputing live. See operating rule 2. This is a new
 interaction pattern, not a variant of the confirm card, and `DESIGN.md` owes it
@@ -901,6 +929,14 @@ list: seed it with the banks users actually named, and let the refusal log grow 
 - **Field provenance has no typed model.** A dict key 35 files agree on by
   convention, 24 value strings, three readers checking different subsets. It
   will have to be typed eventually; it is out of scope for the spine.
+- **Research has no fallback model and is a single point of failure.** The
+  request body sends `"model": spec.model`, one string, and there is no fallback
+  logic anywhere in `src/argus/domain/research/`. The Agents API accepts a
+  `models` array of up to five. A provider hiccup on `openai/gpt-5.6-sol` takes
+  research down with nothing behind it, while every OpenRouter tier has a
+  fallback configured. Adding the array is one line and belongs in the retrieval
+  lane. Model costs differ by provider, so the chain is also a cost lever, which
+  the founder parked as later tinkering on 2026-09-08.
 - **The CONFIRM graph node is hard-wired to `LaunchBacktestRequest`.** Waits for
   the first expensive non-backtest calculation.
 
