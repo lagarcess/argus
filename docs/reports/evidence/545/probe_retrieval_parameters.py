@@ -197,6 +197,13 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             "mechanism demonstration with candidate rate publishers, not the seed "
             "list: does a local rate arrive as a cited row"
         )
+    elif name == "market_pulse_vaguest_rail":
+        spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en")
+        prompt = ""
+        purpose = (
+            "#404 end to end: the rail's grounded path on the vaguest phrasing, "
+            "including the concrete retry it fires on a figureless typed answer"
+        )
     elif name in ("market_pulse_vaguest", "tool_choice_required"):
         spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en")
         prompt = grounded._research_prompt(
@@ -246,6 +253,15 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
 
     overrides: dict[str, Any] = {}
     try:
+        if name == "market_pulse_vaguest_rail":
+            return _rail_survey_record(
+                name=name,
+                purpose=purpose,
+                sha=sha,
+                transport=transport,
+                started=started,
+                client=client,
+            )
         if name == "tool_choice_required":
             body = client._request_body(prompt, spec)
             body["tool_choice"] = "required"
@@ -293,12 +309,66 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
     )
 
 
+def _rail_survey_record(
+    *,
+    name: str,
+    purpose: str,
+    sha: str,
+    transport: RecordingHTTPTransport,
+    started: float,
+    client: Any,
+) -> dict[str, Any]:
+    """Drive the rail's own grounded path, not the bare client, so the
+    recording shows every provider exchange the turn makes and the sidecar
+    the reader gets. Assets resolve against the live provider catalog, the
+    way production verifies a survey's named tickers."""
+    import asyncio
+
+    from argus.agent_runtime import research_grounded as grounded
+    from argus.agent_runtime.research_query import ResearchQueryExtraction
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+    from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
+
+    os.environ["ARGUS_MARKET_DATA_PROVIDER_MODE"] = "live_provider"
+    grounded._client = lambda: client  # type: ignore[assignment]
+    message = "anything interesting moving today"
+    result = asyncio.run(
+        grounded.grounded_result(
+            query=ResearchQueryExtraction(question_kind="market_pulse", symbols=[]),
+            subjects=[],
+            shape="balanced",
+            interpretation=StructuredInterpretation(
+                intent="unsupported_or_out_of_scope",
+                task_relation="new_task",
+                user_goal_summary="question",
+                semantic_turn_act="educational_question",
+                requires_clarification=False,
+                candidate_strategy_draft=StrategySummary(),
+            ),
+            state=RunState.new(current_user_message=message, recent_thread_history=[]),
+            user=UserState(user_id="probe", language_preference="en"),
+        )
+    )
+    record = _record(
+        name=name, purpose=purpose, sha=sha, transport=transport, started=started
+    )
+    patch = result.stage_patch if result is not None else {}
+    record["turn"] = {
+        "message": message,
+        "assistant_response": patch.get("assistant_response"),
+        "research": patch.get("research"),
+        "next_experiments": patch.get("next_experiments"),
+    }
+    return record
+
+
 PROBES = (
     "fast_quote_typed",
     "typed_rows_current_external",
     "domain_filtered_local_source",
     "domain_filtered_rate_publishers",
     "market_pulse_vaguest",
+    "market_pulse_vaguest_rail",
     "models_fallback_forced",
     "tool_choice_required",
     "thorough_typed_background",
