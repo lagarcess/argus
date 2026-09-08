@@ -1,0 +1,32 @@
+{
+  "observed_at": "2026-09-08T21:07:56.566305+00:00",
+  "services": {
+    "api": {
+      "status": "live",
+      "commit_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+      "finished_at": "2026-09-05T20:09:40.296661Z"
+    },
+    "web": {
+      "status": "live",
+      "commit_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+      "finished_at": "2026-09-05T20:12:14.817637Z"
+    }
+  },
+  "api_nonsecret_config": {
+    "ARGUS_RESEARCH_RAIL_ENABLED": "true",
+    "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "true",
+    "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "true",
+    "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
+    "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
+    "ARGUS_UTILITY_FALLBACK_MODEL": "qwen/qwen3.5-9b",
+    "ARGUS_UTILITY_MODEL": "google/gemini-2.5-flash-lite",
+    "ARGUS_CONTEXT_MODEL": "openai/gpt-oss-120b",
+    "ARGUS_CONTEXT_FALLBACK_MODEL": "deepseek/deepseek-v4-flash",
+    "ARGUS_CHAT_FALLBACK_MODEL": "qwen/qwen3.5-9b",
+    "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash",
+    "ARGUS_MOCK_AUTH": "false",
+    "ARGUS_CHECKPOINTER_MODE": "postgres",
+    "ARGUS_MARKET_DATA_PROVIDER_MODE": "live_provider",
+    "ARGUS_PERSISTENCE_MODE": "supabase"
+  }
+}

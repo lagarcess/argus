@@ -1,0 +1,52 @@
+{
+  "recorded_at": "2026-09-08T21:43:07.436316+00:00",
+  "scope": "Local verification of the measurement tools and packaged evidence; GitHub checks are attached to the published PR head.",
+  "integration": {
+    "original_base_sha": "00331188c9e42bb86b74042d0a74a8e24e423af3",
+    "current_integration_sha": "3d663402db0a2526399dc73db0662137ffc19739",
+    "reconciliation_merge_sha": "d5c5345e5d829f66ab937eb8a11b572a1f555750",
+    "intervening_diff": "Three documentation-only commits changed docs/specs/argus-grounded-finance-roadmap.md. No shared runtime owner, API/data contract, UI state, migration, environment variable or directly affected test changed.",
+    "overlap_disposition": "No semantic overlap. Original live evidence retained against deployed ee9c3491fa6219502f1e94abc5d9e661a06839d9; unchanged deployment and non-secret settings confirmed after collection.",
+    "merged_tree_modularity": "passed, no budget violations after reconciliation",
+    "ownership_gate": "No policy for this measurement branch; repository tool skipped enforcement."
+  },
+  "tests": {
+    "recorder_and_summarizer": {
+      "passed": 24,
+      "scope": "Fragmented SSE, token/card clocks, nearest-rank missing data, retained errors, terminal artifact waits, actual turn classification, acknowledgement versus grounded answer, receipt aggregation."
+    },
+    "focused_and_mocked_harness": {
+      "passed": 273,
+      "failed": 0,
+      "duration_seconds": 7.34,
+      "ran_after_reconciliation": true
+    },
+    "ci_surface_ruff": "poetry run ruff check src tests workflows scripts: passed",
+    "broad_ruff_note": "An additional ruff check . found 93 pre-existing violations in eight untouched evidence harness files under docs/reports/evidence. None is in this PR; CI lint does not include that directory.",
+    "diff_whitespace": "passed"
+  },
+  "evidence_checks": {
+    "offline_summary": "recomputed JSON matches packaged summary byte for byte",
+    "main_observations": 68,
+    "preliminary_observations_excluded": 6,
+    "missing_final_or_done": 0,
+    "error_events": 0,
+    "duplicate_samples": 0,
+    "succeeded_jobs_missing_artifact": 0,
+    "privacy_scan": "No UUID-shaped identifiers or configured secret values found in packaged evidence; no private correlation file staged.",
+    "cohort_hash": "matches the manifest hash recorded during collection",
+    "qa_cleanup": "66 of 66 created conversations archived; no deletion"
+  },
+  "codex_review": {
+    "recorder_initial": "Three P2 findings about error retention and artifact availability were confirmed and fixed with red/green checks.",
+    "recorder_delta": "clean; no new findings",
+    "final_evidence": "clean; reviewer independently reproduced summary and checked report numbers, all outcomes, privacy and source/deployment provenance",
+    "active_followups": 0
+  },
+  "no_touch_verification": "git diff --exit-code 00331188 -- src web workflows .github render.yaml: passed. No product runtime, UI, configuration or model-facing text changed.",
+  "final_tool_sha256": {
+    "scripts/benchmarks/turn_latency.py": "a39e28a051932a27bc4c07039b09e189b7da64f25d6c2cb0009c3f7709f7ce3f",
+    "scripts/benchmarks/run_turn_latency.py": "1562c904bb27f5177a906beaea587ad0ff8ad2133be53c206d06615da5d4c2f4",
+    "scripts/benchmarks/summarize_turn_latency.py": "5b68d4055ee163ed08452e0260c4c3067ff1a69722b94b43bd41080ba977a713"
+  }
+}
