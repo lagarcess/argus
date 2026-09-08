@@ -178,3 +178,21 @@ def test_account_context_requires_current_user_to_establish_verified_truth() -> 
 
     with pytest.raises(RuntimeError, match="not established"):
         account_context(request)
+
+
+def test_persisted_message_limit_handoff_still_claims() -> None:
+    # No client creates message_limit any more, but a handoff persisted by an
+    # earlier bundle can carry it; the claim path re-validates the stored
+    # action after the RPC consumed the handoff, so it must still parse.
+    from argus.api.schemas import GuestPendingAction
+
+    action = GuestPendingAction.model_validate(
+        {
+            "reason": "message_limit",
+            "conversation_id": "00000000-0000-0000-0000-000000000101",
+            "action_id": "message-11",
+        }
+    )
+
+    assert action.reason == "message_limit"
+    assert action.artifact_id is None

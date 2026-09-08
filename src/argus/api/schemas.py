@@ -1082,9 +1082,13 @@ class GuestBootstrapRequest(BaseModel):
 GuestHandoffKind = Literal["existing_account", "new_account_signup"]
 
 
+# message_limit is legacy: no client creates it since conversation became
+# compute, but a handoff persisted by an earlier bundle can still carry it and
+# must claim cleanly until it expires.
 GuestConversionReason = Literal[
     "second_simulation",
     "simulation_limit",
+    "message_limit",
     "save_decision",
     "new_conversation",
     "keep_history",

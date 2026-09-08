@@ -3170,6 +3170,7 @@ components:
             enum:
             - second_simulation
             - simulation_limit
+            - message_limit
             - save_decision
             - new_conversation
             - keep_history
@@ -3241,6 +3242,7 @@ components:
           enum:
           - second_simulation
           - simulation_limit
+          - message_limit
           - save_decision
           - new_conversation
           - keep_history
