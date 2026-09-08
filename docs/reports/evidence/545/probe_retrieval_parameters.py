@@ -238,6 +238,21 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             "#404 end to end: the rail's grounded path on the vaguest phrasing, "
             "including the concrete retry it fires on a figureless typed answer"
         )
+    elif name in RETRY_VARIANTS:
+        spec = retrieval_spec(
+            "balanced", question_kind="market_pulse", language_tag="en"
+        ).model_copy(
+            update={
+                "tools": ("finance_search",),
+                "typed_output": name != "retry_variant_prose",
+            }
+        )
+        prompt = grounded._survey_retry_prompt(
+            question_kind="market_pulse",
+            message="anything interesting moving today",
+            language="en",
+        )
+        purpose = RETRY_VARIANTS[name]
     elif name == "market_pulse_retry_finance_only":
         # Operating rule 5: movers are a structured finance dataset. The
         # concrete retry asked with only the finance tool available, so the
@@ -309,10 +324,14 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
                 started=started,
                 client=client,
             )
-        if name == "tool_choice_required":
+        if name in RAW_OVERRIDES:
             body = client._request_body(prompt, spec)
-            body["tool_choice"] = "required"
-            overrides = {"tool_choice": "required"}
+            overrides = RAW_OVERRIDES[name]
+            for key, value in overrides.items():
+                if value is None:
+                    body.pop(key, None)
+                else:
+                    body[key] = value
             document = client._post(body, timeout_seconds=spec.timeout_seconds)
             packet = _packet_from_response(document, latency_ms=0)
         elif spec.background:
@@ -409,6 +428,40 @@ def _rail_survey_record(
     return record
 
 
+# Candidate wording for the retrieval instructions, tried against the retry
+# that refused to call the finance tool under the shipped wording.
+INSTRUCTIONS_RETRIEVAL_FIRST = (
+    "You are the retrieval service of a finance calculator. Call the available "
+    "tools before answering: every current figure you state must come from a "
+    "tool result in this response, never from memory. Reply in the requested "
+    "JSON shape. answer_markdown is the prose for the reader: no links, no list "
+    "of sources, no mention of tools, providers or models. Every figure "
+    "answer_markdown states appears once in rows, with the URL of the tool "
+    "result or page it was read from. Only when the tools return no figure at "
+    "all, say so in one sentence."
+)
+
+RETRY_VARIANTS = {
+    "retry_variant_prose": (
+        "isolation: the same finance-only retry with no instructions and no "
+        "schema, the pre-lane request shape"
+    ),
+    "retry_variant_no_instructions": (
+        "isolation: the strict schema without the instructions text"
+    ),
+    "retry_variant_instructions_v2": (
+        "isolation: the strict schema with retrieval-first instructions"
+    ),
+}
+
+# Raw request overrides applied after the client builds the body; None
+# removes the key.
+RAW_OVERRIDES: dict[str, dict[str, Any]] = {
+    "tool_choice_required": {"tool_choice": "required"},
+    "retry_variant_no_instructions": {"instructions": None},
+    "retry_variant_instructions_v2": {"instructions": INSTRUCTIONS_RETRIEVAL_FIRST},
+}
+
 PROBES = (
     "fast_quote_typed",
     "typed_rows_current_external",
@@ -418,6 +471,9 @@ PROBES = (
     "market_pulse_vaguest",
     "market_pulse_vaguest_rail",
     "market_pulse_retry_finance_only",
+    "retry_variant_prose",
+    "retry_variant_no_instructions",
+    "retry_variant_instructions_v2",
     "models_fallback_forced",
     "tool_choice_required",
     "thorough_typed_background",
