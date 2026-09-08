@@ -167,6 +167,40 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             publisher_sources_required=True,
         )
         purpose = "domain-filtered call citing a local source, DO location, es"
+    elif name == "domain_filtered_rate_publishers_no_recency":
+        # The same candidate publishers without the one-week recency filter:
+        # a rate table is updated monthly, so a current-facts recency window
+        # can exclude the very page that carries the figure.
+        spec = retrieval_spec(
+            "balanced",
+            question_kind="current_external",
+            language_tag="es-419",
+            local_sources=True,
+        ).model_copy(
+            update={
+                "source_domains": (
+                    "popularenlinea.com",
+                    "sb.gob.do",
+                    "bancentral.gov.do",
+                ),
+                "recency": None,
+            }
+        )
+        prompt = grounded._research_prompt(
+            message=(
+                "¿Qué tasa de interés pasiva promedio pagan los bancos "
+                "dominicanos hoy por un certificado financiero a un año en pesos?"
+            ),
+            subjects=[],
+            period=None,
+            language="es-419",
+            question_kind="current_external",
+            publisher_sources_required=True,
+        )
+        purpose = (
+            "mechanism demonstration: the same candidate rate publishers with no "
+            "recency filter"
+        )
     elif name == "domain_filtered_rate_publishers":
         # Not the seed list. A mechanism demonstration for the founder's list
         # decision: which candidate Dominican publishers actually carry a
@@ -367,6 +401,7 @@ PROBES = (
     "typed_rows_current_external",
     "domain_filtered_local_source",
     "domain_filtered_rate_publishers",
+    "domain_filtered_rate_publishers_no_recency",
     "market_pulse_vaguest",
     "market_pulse_vaguest_rail",
     "models_fallback_forced",
