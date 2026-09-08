@@ -4,6 +4,11 @@ One HTTP boundary with an injectable transport so tests stay hermetic. The
 parser is deterministic: it walks the typed ``output`` items the Agent API
 documents, never user language. Provider identity is scrubbed at parse time
 because route receipts and the cost ledger own provenance, not prose.
+
+Every request carries the retrieval parameters the spec derived for it: the
+model fallback chain, the strict typed-output schema, the response language,
+and the web search options. The answer is read back in that typed shape; a
+row is kept only when its citation is a page this same response retrieved.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from urllib.parse import urlparse
 
 import httpx
 from loguru import logger
+from pydantic import ValidationError
 
 from argus.domain.research.billing import (
     UnpricedResearchSpend,
@@ -26,9 +32,10 @@ from argus.domain.research.billing import (
     record_unpriced_spend,
     unpriced_spend,
 )
-from argus.domain.research.config import ResearchConfigSpec
+from argus.domain.research.config import RETRIEVAL_INSTRUCTIONS, ResearchConfigSpec
 from argus.domain.research.contracts import (
     MAX_ANSWER_CHARS,
+    MAX_PACKET_ROWS,
     MAX_PACKET_SOURCES,
     MAX_PACKET_TICKERS,
     MAX_PEER_PAIRS,
@@ -41,6 +48,9 @@ from argus.domain.research.contracts import (
     ResearchSource,
     ResearchUnavailableError,
     ResearchUsage,
+    RetrievedRow,
+    TypedRetrieval,
+    typed_response_format,
 )
 from argus.domain.research.pricing import validated_research_cost_usd
 
@@ -68,6 +78,7 @@ class PerplexityAgentClient:
         packet = _packet_from_response(
             response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
         )
+        _observe_retrieval(packet, spec)
         return packet
 
     def submit_background(self, prompt: str, spec: ResearchConfigSpec) -> str:
@@ -80,7 +91,11 @@ class PerplexityAgentClient:
         return background_id
 
     def poll_background(
-        self, background_id: str, *, timeout_seconds: float = 30.0
+        self,
+        background_id: str,
+        *,
+        timeout_seconds: float = 30.0,
+        spec: ResearchConfigSpec | None = None,
     ) -> BackgroundPoll:
         started = time.monotonic()
         response = self._get(
@@ -99,6 +114,8 @@ class PerplexityAgentClient:
         packet = _packet_from_response(
             response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
         )
+        if spec is not None:
+            _observe_retrieval(packet, spec)
         return BackgroundPoll(status="completed", packet=packet)
 
     def _record_unpriced(self, spend: UnpricedResearchSpend) -> None:
@@ -111,14 +128,19 @@ class PerplexityAgentClient:
 
     def _request_body(self, prompt: str, spec: ResearchConfigSpec) -> dict[str, Any]:
         body: dict[str, Any] = {
-            "model": spec.model,
+            "models": list(spec.models),
             "input": prompt,
-            "tools": [{"type": tool} for tool in spec.tools],
+            "tools": [_tool_declaration(tool, spec) for tool in spec.tools],
             "max_steps": spec.max_steps,
             "max_output_tokens": spec.max_output_tokens,
         }
         if spec.reasoning_effort is not None:
             body["reasoning"] = {"effort": spec.reasoning_effort}
+        if spec.language:
+            body["language_preference"] = spec.language
+        if spec.typed_output:
+            body["instructions"] = RETRIEVAL_INSTRUCTIONS
+            body["response_format"] = typed_response_format()
         return body
 
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
@@ -202,9 +224,16 @@ def _packet_from_response(
                 # same chunk instead of as search_results items.
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
-                        _append_public_source(parsed.sources, annotation)
+                        _append_public_source(parsed, annotation)
     usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
-    answer = _sanitize_answer("\n\n".join(text_blocks))
+    typed = _typed_retrieval("\n\n".join(text_blocks))
+    rows: list[RetrievedRow] = []
+    uncited_rows = 0
+    if typed is not None:
+        rows, uncited_rows = _cited_rows(typed.rows, parsed)
+        answer = _sanitize_answer(typed.answer_markdown)
+    else:
+        answer = _sanitize_answer("\n\n".join(text_blocks))
     if not answer:
         raise ResearchUnavailableError("empty_answer")
     seen: set[str] = set()
@@ -221,6 +250,9 @@ def _packet_from_response(
         tickers=tuple(parsed.tickers[:MAX_PACKET_TICKERS]),
         sources=tuple(parsed.sources[:MAX_PACKET_SOURCES]),
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
+        rows=tuple(rows),
+        typed_answer=typed is not None,
+        uncited_rows=uncited_rows,
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
@@ -236,6 +268,89 @@ class _ParsedToolResults:
     sources: list[ResearchSource] = field(default_factory=list)
     pairs: list[ResearchNamePair] = field(default_factory=list)
     tool_results: list[str] = field(default_factory=list)
+    # Every page URL a tool result or annotation carried, provider hosts
+    # included: the record a row's citation is checked against.
+    retrieved_urls: set[str] = field(default_factory=set)
+
+
+def _typed_retrieval(text: str) -> TypedRetrieval | None:
+    """The answer in its requested typed shape, or None when it is prose.
+
+    Machine format only: a JSON object, optionally inside a code fence. A
+    document that is not one is prose and is delivered as such."""
+    body = text.strip()
+    if body.startswith("```"):
+        body = body.split("\n", 1)[1] if "\n" in body else ""
+        body = body.rsplit("```", 1)[0].strip()
+    if not body.startswith("{"):
+        return None
+    try:
+        return TypedRetrieval.model_validate(json.loads(body))
+    except (ValueError, ValidationError):
+        return None
+
+
+def _cited_rows(
+    rows: list[RetrievedRow], parsed: _ParsedToolResults
+) -> tuple[list[RetrievedRow], int]:
+    """Rows whose citation is a page this response retrieved, and the count
+    of rows that were not. A row read from the provider's own finance data
+    keeps its evidence in the tool result and loses the provider URL, the
+    way every provider-host citation does."""
+    kept: list[RetrievedRow] = []
+    uncited = 0
+    for row in rows:
+        url = str(row.source_url or "").strip().rstrip("/")
+        if not url or url not in parsed.retrieved_urls:
+            uncited += 1
+            continue
+        if _is_provider_host(urlparse(url).netloc.lower()):
+            row = row.model_copy(update={"source_url": None})
+        kept.append(row)
+    return kept[:MAX_PACKET_ROWS], uncited
+
+
+def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None:
+    """Record the compensations, so a decaying provider read is visible.
+
+    The deployed log sink drops structured extras, so every fact is in the
+    message itself."""
+    served = packet.usage.model
+    if served and served != spec.models[0]:
+        logger.warning(
+            "Research served by a fallback model"
+            f" shape={spec.shape} primary={spec.models[0]} served={served}"
+        )
+    if spec.typed_output and not packet.typed_answer:
+        logger.warning(
+            "Research answer arrived as prose under a typed request"
+            f" shape={spec.shape} model={served or 'unknown'}"
+        )
+    if packet.uncited_rows:
+        logger.warning(
+            "Research rows dropped for citing no retrieved page"
+            f" shape={spec.shape} dropped={packet.uncited_rows} kept={len(packet.rows)}"
+        )
+
+
+def _tool_declaration(tool: str, spec: ResearchConfigSpec) -> dict[str, Any]:
+    """One tool entry in the request. Only web search takes options: context
+    size, the recency and domain filters, and the reader's location."""
+    declaration: dict[str, Any] = {"type": tool}
+    if tool != "web_search":
+        return declaration
+    if spec.search_context_size is not None:
+        declaration["search_context_size"] = spec.search_context_size
+    filters: dict[str, Any] = {}
+    if spec.recency is not None:
+        filters["search_recency_filter"] = spec.recency
+    if spec.source_domains:
+        filters["search_domain_filter"] = list(spec.source_domains)
+    if filters:
+        declaration["filters"] = filters
+    if spec.location is not None:
+        declaration["user_location"] = spec.location.model_dump(exclude_none=True)
+    return declaration
 
 
 def _read_finance_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
@@ -252,7 +367,7 @@ def _read_finance_results(item: dict[str, Any], parsed: _ParsedToolResults) -> N
         if isinstance(category, str) and category not in parsed.categories:
             parsed.categories.append(category)
         for url in result.get("sources") or []:
-            _append_public_source(parsed.sources, {"url": url})
+            _append_public_source(parsed, {"url": url})
         if category == "tickers_lookup":
             parsed.pairs.extend(_pairs_from_lookup(str(result.get("content") or "")))
         elif category == "etf_holdings":
@@ -265,7 +380,7 @@ def _read_search_results(item: dict[str, Any], parsed: _ParsedToolResults) -> No
     # comparison shapes fill.
     for result in item.get("results") or []:
         if isinstance(result, dict):
-            _append_public_source(parsed.sources, result)
+            _append_public_source(parsed, result)
 
 
 # The one owner of which output items are tool results. Recorded responses
@@ -523,12 +638,17 @@ def symbols_from_answer_tables(markdown: str) -> list[str]:
     return symbols
 
 
-def _append_public_source(sources: list[ResearchSource], entry: Any) -> None:
+def _is_provider_host(host: str) -> bool:
+    return any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS)
+
+
+def _append_public_source(parsed: _ParsedToolResults, entry: Any) -> None:
     """One citation, bounded and scrubbed.
 
     Accepts either channel's shape: a search result, an annotation, or a
-    bare finance URL. Provider-identity hosts never survive, so Argus never
-    cites the tool that answered it.
+    bare finance URL. Every retrieved page joins the retrieval record first;
+    provider-identity hosts never survive into the public sources, so Argus
+    never cites the tool that answered it.
     """
     if not isinstance(entry, dict):
         return
@@ -538,8 +658,9 @@ def _append_public_source(sources: list[ResearchSource], entry: Any) -> None:
     candidate = raw_url.strip()
     if not candidate.startswith("https://") or len(candidate) > MAX_URL_CHARS:
         return
-    host = urlparse(candidate).netloc.lower()
-    if any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS):
+    parsed.retrieved_urls.add(candidate.rstrip("/"))
+    sources = parsed.sources
+    if _is_provider_host(urlparse(candidate).netloc.lower()):
         return
     if any(source.url == candidate for source in sources):
         return
@@ -678,8 +799,7 @@ def _sanitize_answer(text: str) -> str:
     typographic dashes normalize to house style (digit ranges keep a hyphen)."""
 
     def _replace_link(match: re.Match[str]) -> str:
-        host = urlparse(match.group(2)).netloc.lower()
-        if any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS):
+        if _is_provider_host(urlparse(match.group(2)).netloc.lower()):
             return match.group(1)
         return match.group(0)
 

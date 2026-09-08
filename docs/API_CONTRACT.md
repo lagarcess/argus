@@ -3563,6 +3563,16 @@ final payload and persisted metadata:
         "source_date": "2026-07-16"
       }
     ],
+    "rows": [
+      {
+        "label": "Netflix Q2 2026 revenue",
+        "value": 11079000000,
+        "unit": "USD",
+        "as_of": "2026-07-16",
+        "symbol": "NFLX",
+        "source_url": "https://example.com/filing"
+      }
+    ],
     "retrieved_at": "2026-08-07T15:04:05Z",
     "anchor_symbols": ["NFLX"],
     "peers": [
@@ -3671,6 +3681,37 @@ Contract rules:
   the question date is its freshness lower bound. Classifier-supplied period
   lower bounds are ISO-date typed; a malformed value is rejected instead of
   turning a bounded question into an unbounded one.
+- **Retrieval produces typed rows, never prose** (grounded-finance board,
+  operating rule 4). Every provider call requests a strict `json_schema`
+  response: the answer prose plus `rows`, one per figure the answer states,
+  each `{label, value, unit, as_of, symbol, source_url}` with `value` a plain
+  number. A row survives parsing only when its `source_url` is a page the
+  same response retrieved (a finance or web tool result, or an annotation);
+  a row citing anything else is dropped and counted, never asserted. A row
+  read from the provider's own finance data keeps its evidence in the tool
+  result and carries `source_url: null`, the way every provider-host citation
+  is scrubbed. `rows` is additive on the sidecar and may be empty; a
+  degraded turn always carries an empty list. Prose that arrives under a
+  typed request is still delivered and recorded as prose.
+- **Retrieval parameters are configuration per question shape.** Each call
+  sends a model fallback chain (`models`, the primary and the other priced
+  model, served in order; the invoice names the model that served), the
+  reader's language (`language_preference`, ISO 639-1 from the profile
+  language), the shape's web search context size, a recency filter derived
+  from the question's section 7 data class (current classes a week, analyst
+  estimates a month, quarterly and closed classes none, so a closed window is
+  never filtered to the past week), the deployment's home market as the
+  reader's location (`ARGUS_RESEARCH_HOME_COUNTRY`, ISO 3166-1 alpha-2;
+  unset sends none, and Argus holds no per-user country yet), and, for a
+  local question, that market's curated publisher list as the domain filter
+  (at most twenty domains, the provider's ceiling). No rail shape today is
+  local; the list is seeded from the bank users actually named and is
+  consumed by the first local calculation.
+- Current external facts ("why is NVDA moving this week") are claim-shaped:
+  they ground through the balanced shape with publisher sources required and
+  a one-week recency filter, and persist the ordinary `research` sidecar with
+  typed, dated `sources`. Publisher URLs are never written into the prose
+  (#545). Flag off, the pre-rail search-and-voice path is unchanged.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around

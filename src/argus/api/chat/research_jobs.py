@@ -35,7 +35,6 @@ from argus.domain.research.admission import (
 )
 from argus.domain.research.config import (
     BACKGROUND_POLL_INTERVAL_SECONDS,
-    RESEARCH_CONFIG_SPECS,
     background_deadline_seconds,
 )
 from argus.domain.research.contracts import ResearchPacket, ResearchUnavailableError
@@ -123,12 +122,15 @@ def start_research_job(
     ``(None, packet)`` for the synchronous dev fallback, and ``(None, None)``
     when the provider is unavailable.
     """
-    from argus.agent_runtime.research_answer import research_prompt_for_job
+    from argus.agent_runtime.research_answer import (
+        research_prompt_for_job,
+        retrieval_spec_for_job,
+    )
 
     client = _client()
     if client is None:
         return None, None
-    spec = RESEARCH_CONFIG_SPECS["thorough"]
+    spec = retrieval_spec_for_job(job_request)
     prompt = research_prompt_for_job(job_request)
     if api_state.supabase_gateway is None:
         # Dev memory persistence has no durable job surface; run the same
@@ -257,17 +259,22 @@ async def _poll_and_finalize(
     conversation_id: str,
     request_id: str | None,
 ) -> None:
+    from argus.agent_runtime.research_answer import retrieval_spec_for_job
+
     client = _client()
     if client is None:
         _fail_job(job_id=job_id, user_id=user_id, detail="provider key missing")
         return
+    spec = retrieval_spec_for_job(job_request)
     deadline = time.monotonic() + background_deadline_seconds()
     marked_running = False
     try:
         while True:
             await asyncio.sleep(BACKGROUND_POLL_INTERVAL_SECONDS)
             try:
-                poll = await asyncio.to_thread(client.poll_background, background_id)
+                poll = await asyncio.to_thread(
+                    client.poll_background, background_id, spec=spec
+                )
             except ResearchUnavailableError as exc:
                 # No reason class is provably deterministic from one poll: a
                 # 401/403 can be an edge or WAF in front of the provider and a

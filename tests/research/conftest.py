@@ -167,3 +167,33 @@ def set_research_query(monkeypatch, namespace, **fields):
         return original(*args, **kwargs).model_copy(update={"research_query": query})
 
     monkeypatch.setitem(namespace, "_interpretation", interpreted)
+
+
+def typed_answer_text(answer: str, rows: list[dict[str, Any]]) -> str:
+    """The provider's message text under the strict typed retrieval schema."""
+    return json.dumps({"answer_markdown": answer, "rows": rows})
+
+
+def retrieved_row(
+    *,
+    label: str = "NVIDIA share price change today",
+    value: float = -4.3,
+    unit: str = "percent",
+    as_of: str | None = "2026-09-04",
+    symbol: str | None = "NVDA",
+    source_url: str | None = "https://www.perplexity.ai/finance/NVDA",
+) -> dict[str, Any]:
+    """One row in the shape the schema requires: every field present."""
+    return {
+        "label": label,
+        "value": value,
+        "unit": unit,
+        "as_of": as_of,
+        "symbol": symbol,
+        "source_url": source_url,
+    }
+
+
+def search_results_item(*results: dict[str, Any]) -> dict[str, Any]:
+    """A web search output item carrying the given publisher results."""
+    return {"type": "search_results", "results": list(results)}

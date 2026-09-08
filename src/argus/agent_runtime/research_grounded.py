@@ -55,8 +55,9 @@ from argus.domain.research.cache import (
     ttl_for_packet,
 )
 from argus.domain.research.config import (
-    RESEARCH_CONFIG_SPECS,
+    ResearchConfigSpec,
     capability_class_for_shape,
+    retrieval_spec,
 )
 from argus.domain.research.contracts import (
     MAX_PEER_PAIRS,
@@ -81,6 +82,7 @@ RESEARCH_SIDECAR_KEYS = frozenset(
         "capability_class",
         "shape",
         "sources",
+        "rows",
         "retrieved_at",
         "anchor_symbols",
         "peers",
@@ -123,13 +125,18 @@ async def grounded_result(
     user: UserState,
     decision: InterpretDecision | None = None,
 ) -> StageResult | None:
-    spec = RESEARCH_CONFIG_SPECS[shape]
     publisher_sources_required = requires_publisher_sources(query)
     question_as_of_date = datetime.now(timezone.utc).date()
     capability_class = capability_class_for_shape(
         shape, screening=is_market_survey(query.question_kind)
     )
     language = language_tag(user.language_preference)
+    spec = retrieval_spec(
+        shape,
+        question_kind=query.question_kind,
+        closed_period=query.period_is_closed_window,
+        language_tag=language,
+    )
     prompt = _research_prompt(
         message=state.current_user_message,
         subjects=subjects,
@@ -330,6 +337,7 @@ def _packet_stage_result(
         seen = {pair.symbol.upper() for pair in candidates}
         for symbol in (
             *packet.tickers,
+            *(row.symbol for row in packet.rows if row.symbol),
             *symbols_from_answer_tables(packet.answer_markdown),
         ):
             if symbol.upper() in seen:
@@ -659,7 +667,11 @@ def unavailable_result(
 def shape_for_kind(kind: str) -> QuestionShape:
     if kind == "live_quote":
         return "fast"
-    if kind in ("company_lookup", "etf_constituents") or is_market_survey(kind):
+    if kind in (
+        "company_lookup",
+        "etf_constituents",
+        "current_external",
+    ) or is_market_survey(kind):
         return "balanced"
     return "thorough"
 
@@ -667,12 +679,13 @@ def shape_for_kind(kind: str) -> QuestionShape:
 def requires_publisher_sources(query: ResearchQueryExtraction) -> bool:
     """Whether publishing the requested claim requires a public publisher.
 
-    Company reads are claim-shaped by definition. The explicit classifier bit
-    is the multilingual escape hatch for a mixed quote plus narrative request
-    that might otherwise retain the quote kind.
+    Company reads and current external facts ("why is it moving") are
+    claim-shaped by definition. The explicit classifier bit is the
+    multilingual escape hatch for a mixed quote plus narrative request that
+    might otherwise retain the quote kind.
     """
     return bool(getattr(query, "requires_publisher_sources", False)) or (
-        query.question_kind == "company_lookup"
+        query.question_kind in ("company_lookup", "current_external")
     )
 
 
@@ -1079,6 +1092,17 @@ def _missing_public_source_note(language: str) -> str:
     )
 
 
+def retrieval_spec_for_job(job_request: dict[str, Any]) -> ResearchConfigSpec:
+    """The thorough configuration with the job's own retrieval parameters,
+    rebuilt from the typed job request the same way the prompt is."""
+    return retrieval_spec(
+        "thorough",
+        question_kind=str(job_request.get("question_kind") or "cross_company"),
+        closed_period=bool(job_request.get("period_is_closed_window")),
+        language_tag=str(job_request.get("language") or "en"),
+    )
+
+
 def research_prompt_for_job(job_request: dict[str, Any]) -> str:
     """Rebuild the documented prompt from the typed job request."""
     subjects = [
@@ -1183,6 +1207,7 @@ def compose_completed_research(
             capability_class=capability_class,
             shape="thorough",
             sources=sources,
+            retrieved_rows=[] if missing_required_sources else typed_rows(packet),
             retrieved_at=packet.retrieved_at.isoformat(),
             subjects=subjects,
             peers=peers,
@@ -1354,6 +1379,15 @@ def typed_sources(
     return entries
 
 
+def typed_rows(packet: ResearchPacket) -> list[dict[str, Any]]:
+    """The packet's cited figures in the one shape the sidecar carries.
+
+    Every row already passed the parse-time citation check: its page was
+    retrieved in the same response, and a provider-host citation was
+    scrubbed to null there, so nothing here can name the provider."""
+    return [row.model_dump() for row in packet.rows]
+
+
 def _coerce_date(value: date | str | None) -> date | None:
     if isinstance(value, date):
         return value
@@ -1414,6 +1448,7 @@ def build_research_sidecar(
     period_of_interest: str | None,
     category: str | None = None,
     degraded_code: str | None = None,
+    retrieved_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build the only supported research sidecar shape."""
     sidecar: dict[str, Any] = {
@@ -1421,6 +1456,7 @@ def build_research_sidecar(
         "capability_class": capability_class,
         "shape": shape,
         "sources": sources,
+        "rows": list(retrieved_rows or []),
         "retrieved_at": retrieved_at,
         "anchor_symbols": [subject["symbol"] for subject in subjects],
         "peers": peers,
@@ -1475,6 +1511,7 @@ def research_stage_result(
                 period_start_date=period_start_date,
                 question_as_of_date=question_as_of_date,
             ),
+            retrieved_rows=typed_rows(packet),
             retrieved_at=packet.retrieved_at.isoformat(),
             subjects=subjects,
             peers=peers,
