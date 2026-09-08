@@ -361,6 +361,46 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ---
 
+## What is running right now
+
+Dispatched 2026-09-08 from integration `00331188`. Seven lanes, all disjoint
+except one pair. **Nothing has landed yet.**
+
+| Lane | Kind | Model | Notes |
+| --- | --- | --- | --- |
+| Lift the loop, Lane A relocation | build | Opus 5 | sent first; the `confirmation.py` window was open |
+| Refusal log | build | GPT Astra | |
+| Metering | build | Fable 5.1 | **overlaps decisions on `schemas.py`** |
+| Decisions | build | Fable 5.1 | **overlaps metering on `schemas.py`** |
+| Retrieval parameters | build | Fable 5.1 | |
+| Sharing on | verification | GPT Astra | already built and dark; no build expected |
+| #462 latency | measurement | GPT Astra | measure only, optimize nothing |
+
+**Before landing metering and decisions**, do a real
+`git merge --no-commit --no-ff` in a throwaway worktree. Do not read the
+file-overlap list and do not trust `git merge-tree`: `grep -c` inside `$(...)`
+has returned blank rather than 0 in this repo and cost a wrong call.
+
+### The finishing bar every build lane owes
+
+Recorded because the first dispatch omitted it and the founder caught it. A PR
+existing is not done. Done is:
+
+- focused tests written by the lane, passing, not merely the existing suite
+  still green
+- CI green on the exact head, all required checks; the clean-checkout baseline
+  is 14 pre-existing failures and those are not the lane's to chase
+- a Codex review round completed and cleared at the current head. **A 👍
+  reaction is not proof a review ran**; the summary comment is edited in place,
+  so the reliable signal is a review comment naming the exact commit SHA
+- zero unresolved review threads
+- browser evidence in both languages if anything user-visible changed
+
+A lane that hits something contradicting this board stops and says so rather
+than working around it.
+
+---
+
 ## The items
 
 Each item carries what done means, the surface it may touch, what it must not
