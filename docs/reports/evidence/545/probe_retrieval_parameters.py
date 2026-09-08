@@ -238,6 +238,19 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             "#404 end to end: the rail's grounded path on the vaguest phrasing, "
             "including the concrete retry it fires on a figureless typed answer"
         )
+    elif name == "market_pulse_retry_finance_only":
+        # Operating rule 5: movers are a structured finance dataset. The
+        # concrete retry asked with only the finance tool available, so the
+        # model cannot spend its steps reconstructing the table from web prose.
+        spec = retrieval_spec(
+            "balanced", question_kind="market_pulse", language_tag="en"
+        ).model_copy(update={"tools": ("finance_search",)})
+        prompt = grounded._survey_retry_prompt(
+            question_kind="market_pulse",
+            message="anything interesting moving today",
+            language="en",
+        )
+        purpose = "#404: the concrete survey retry with the finance tool alone"
     elif name in ("market_pulse_vaguest", "tool_choice_required"):
         spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en")
         prompt = grounded._research_prompt(
@@ -404,6 +417,7 @@ PROBES = (
     "domain_filtered_rate_publishers_no_recency",
     "market_pulse_vaguest",
     "market_pulse_vaguest_rail",
+    "market_pulse_retry_finance_only",
     "models_fallback_forced",
     "tool_choice_required",
     "thorough_typed_background",

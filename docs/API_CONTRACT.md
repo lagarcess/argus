@@ -3686,8 +3686,9 @@ Contract rules:
   response: the answer prose plus `rows`, one per figure the answer states,
   each `{label, value, unit, as_of, symbol, source_url}` with `value` a plain
   number. A row survives parsing only when its `source_url` is a page the
-  same response retrieved (a finance or web tool result, or an annotation);
-  a row citing anything else is dropped and counted, never asserted. A row
+  same response retrieved (a finance or web tool result, a fetched page, or
+  an annotation); a row citing anything else is dropped and counted, never
+  asserted. Fetched pages are typed sources too, without a publisher date. A row
   read from the provider's own finance data keeps its evidence in the tool
   result and carries `source_url: null`, the way every provider-host citation
   is scrubbed. `rows` is additive on the sidecar and may be empty; a
