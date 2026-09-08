@@ -100,7 +100,7 @@ def run_probe(name: str, *, sha: str) -> dict[str, Any]:
     every other recording shows the request a deployment without a declared
     market sends."""
     previous = os.environ.pop("ARGUS_RESEARCH_HOME_COUNTRY", None)
-    if name == "domain_filtered_local_source":
+    if name.startswith("domain_filtered_"):
         os.environ["ARGUS_RESEARCH_HOME_COUNTRY"] = "DO"
     try:
         return _run_probe(name, sha=sha)
@@ -167,6 +167,36 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             publisher_sources_required=True,
         )
         purpose = "domain-filtered call citing a local source, DO location, es"
+    elif name == "domain_filtered_rate_publishers":
+        # Not the seed list. A mechanism demonstration for the founder's list
+        # decision: which candidate Dominican publishers actually carry a
+        # retrievable rate. The regulator and the central bank publish every
+        # bank's rates; a bank's own site may not.
+        spec = retrieval_spec(
+            "balanced",
+            question_kind="current_external",
+            language_tag="es-419",
+            local_sources=True,
+        ).model_copy(
+            update={
+                "source_domains": ("popularenlinea.com", "sb.gob.do", "bancentral.gov.do")
+            }
+        )
+        prompt = grounded._research_prompt(
+            message=(
+                "¿Qué tasa de interés pasiva promedio pagan los bancos "
+                "dominicanos hoy por un certificado financiero a un año en pesos?"
+            ),
+            subjects=[],
+            period=None,
+            language="es-419",
+            question_kind="current_external",
+            publisher_sources_required=True,
+        )
+        purpose = (
+            "mechanism demonstration with candidate rate publishers, not the seed "
+            "list: does a local rate arrive as a cited row"
+        )
     elif name in ("market_pulse_vaguest", "tool_choice_required"):
         spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en")
         prompt = grounded._research_prompt(
@@ -267,6 +297,7 @@ PROBES = (
     "fast_quote_typed",
     "typed_rows_current_external",
     "domain_filtered_local_source",
+    "domain_filtered_rate_publishers",
     "market_pulse_vaguest",
     "models_fallback_forced",
     "tool_choice_required",

@@ -197,3 +197,8 @@ def retrieved_row(
 def search_results_item(*results: dict[str, Any]) -> dict[str, Any]:
     """A web search output item carrying the given publisher results."""
     return {"type": "search_results", "results": list(results)}
+
+
+def fetch_url_results_item(*contents: dict[str, Any]) -> dict[str, Any]:
+    """A fetched-pages output item: title, url and an excerpt per page."""
+    return {"type": "fetch_url_results", "contents": list(contents)}

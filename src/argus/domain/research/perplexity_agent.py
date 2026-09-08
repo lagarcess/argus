@@ -383,14 +383,24 @@ def _read_search_results(item: dict[str, Any], parsed: _ParsedToolResults) -> No
             _append_public_source(parsed, result)
 
 
+def _read_fetch_url_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
+    # A page the model opened is a page it read: title, url and an excerpt,
+    # no publisher date. Typed rows cite these pages, so they must be in the
+    # retrieval record or a row read from a fetched page would be dropped.
+    for content in item.get("contents") or []:
+        if isinstance(content, dict):
+            _append_public_source(parsed, content)
+
+
 # The one owner of which output items are tool results. Recorded responses
-# carry exactly one finance_results item per finance_search call and one
-# search_results item per web search; a response that ran no tool carries
-# neither. A kind read here is retrieval evidence whether or not the invoice
-# arrived.
+# carry exactly one finance_results item per finance_search call, one
+# search_results item per web search and one fetch_url_results item per
+# fetched page batch; a response that ran no tool carries none. A kind read
+# here is retrieval evidence whether or not the invoice arrived.
 _TOOL_RESULT_READERS: dict[str, Callable[[dict[str, Any], _ParsedToolResults], None]] = {
     "finance_results": _read_finance_results,
     "search_results": _read_search_results,
+    "fetch_url_results": _read_fetch_url_results,
 }
 
 

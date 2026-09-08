@@ -540,3 +540,124 @@ def test_the_spec_is_one_object_per_call() -> None:
     second parameter object can drift from it."""
     fields = set(ResearchConfigSpec.model_fields)
     assert {"models", "language", "location", "recency", "source_domains"} <= fields
+
+
+# --- fetched pages and the survey retry ------------------------------------
+
+
+def test_fetched_pages_join_the_retrieval_record() -> None:
+    """A page the model opened is a page it read: rows citing it are kept and
+    it reaches the typed sources like a search hit."""
+    from tests.research.conftest import fetch_url_results_item
+
+    page = "https://finance.yahoo.com/markets/stocks/gainers/"
+    document = agent_response(
+        text=typed_answer_text(
+            "BLTE led the gainers, up 13.16%.",
+            [
+                retrieved_row(
+                    label="BLTE daily change",
+                    value=13.16,
+                    symbol="BLTE",
+                    source_url=page,
+                )
+            ],
+        ),
+        invocations=0,
+        fetch_url_invocations=1,
+    )
+    document["output"].insert(
+        1,
+        fetch_url_results_item(
+            {"url": page, "title": "Top Stock Gainers Today", "snippet": "BLTE +13.16%"}
+        ),
+    )
+    client = PerplexityAgentClient("k", transport=RecordingTransport([document]))
+
+    packet = client.run_research("movers", RESEARCH_CONFIG_SPECS["balanced"])
+
+    assert packet.tool_results == ("fetch_url_results",)
+    assert [row.source_url for row in packet.rows] == [page]
+    assert packet.uncited_rows == 0
+    assert [(source.url, source.title) for source in packet.sources] == [
+        (page, "Top Stock Gainers Today")
+    ]
+
+
+def _figureless_survey_document() -> dict[str, Any]:
+    document = agent_response(
+        text=typed_answer_text("I could not retrieve current figures.", []),
+        invocations=0,
+        web_search_invocations=1,
+    )
+    document["output"].insert(
+        1,
+        search_results_item(
+            {"url": PUBLISHER, "title": "Movers today", "date": "2026-09-08"}
+        ),
+    )
+    return document
+
+
+def test_a_figureless_typed_survey_is_asked_again_concretely(monkeypatch) -> None:
+    """#404: the vaguest phrasing can retrieve pages and still state no
+    figure. The typed contract makes that visible, and the existing concrete
+    retry is the deterministic escalation. One retry, then honesty."""
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+    grounded_document = agent_response(
+        text=typed_answer_text(
+            "NVIDIA (NVDA) leads today's gainers, up 4.2%.",
+            [retrieved_row(label="NVDA change today", value=4.2)],
+        ),
+        sources=[PROVIDER_PAGE],
+    )
+    transport = _wire(monkeypatch, [_figureless_survey_document(), grounded_document])
+
+    result = _run("anything interesting moving today")
+
+    assert result is not None
+    assert len(transport.requests) == 2, "exactly one retry"
+    retry = request_body(transport.requests[1])
+    assert str(retry["input"]).startswith("Retrieve today's top gainers")
+    sidecar = result.stage_patch["research"]
+    assert "degraded" not in sidecar
+    assert sidecar["anchor_symbols"] == ["NVDA"]
+    assert sidecar["rows"][0]["value"] == 4.2
+
+
+def test_a_survey_still_without_figures_after_the_retry_stays_honest(
+    monkeypatch,
+) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+    transport = _wire(
+        monkeypatch, [_figureless_survey_document(), _figureless_survey_document()]
+    )
+
+    result = _run("anything interesting moving today")
+
+    assert result is not None
+    assert len(transport.requests) == 2, "the retry never loops"
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "survey_synthesis_incomplete"}
+    assert sidecar["rows"] == []
+
+
+def test_a_survey_with_figures_is_not_retried(monkeypatch) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+    transport = _wire(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "NVIDIA (NVDA) leads today's gainers, up 4.2%.",
+                    [retrieved_row(label="NVDA change today", value=4.2)],
+                ),
+                sources=[PROVIDER_PAGE],
+            )
+        ],
+    )
+
+    result = _run("what is moving today")
+
+    assert result is not None
+    assert len(transport.requests) == 1

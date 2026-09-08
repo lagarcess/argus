@@ -202,12 +202,18 @@ async def grounded_result(
                 reason=exc.reason,
             )
         retry_prompt: str | None = None
-        if is_market_survey(query.question_kind) and not _retrieval_happened(packet):
+        if is_market_survey(query.question_kind) and not _survey_has_figures(packet):
             # Asking again is deterministic escalation, not a second router:
             # a vague survey ("anything moving today?") lets the model answer
-            # from memory however firmly the prompt asks for the tool, so the
-            # retry states the concrete question the shape actually means.
-            # One retry only; if it still skips the tool the answer says so.
+            # from memory, or retrieve and still state no figure, however
+            # firmly the prompt asks, so the retry states the concrete
+            # question the shape actually means. One retry only; if it still
+            # comes back without figures the answer says so.
+            logger.info(
+                "Survey retried with the concrete ask"
+                f" kind={query.question_kind}"
+                f" reason={'no_retrieval' if not _retrieval_happened(packet) else 'no_rows'}"
+            )
             retry_prompt = _survey_retry_prompt(
                 question_kind=query.question_kind,
                 message=state.current_user_message,
@@ -222,7 +228,10 @@ async def grounded_result(
                 )
             except ResearchUnavailableError:
                 retried = None
-            if retried is not None and _retrieval_happened(retried):
+            if retried is not None and (
+                _survey_has_figures(retried)
+                or (_retrieval_happened(retried) and not _retrieval_happened(packet))
+            ):
                 packet = retried
         if publisher_sources_required and not _packet_has_public_sources(
             packet,
@@ -841,6 +850,16 @@ def _retrieval_happened(packet: ResearchPacket) -> bool:
         or usage.web_search_invocations
         or usage.fetch_url_invocations
     )
+
+
+def _survey_has_figures(packet: ResearchPacket) -> bool:
+    """A survey is grounded when it retrieved and, under the typed contract,
+    stated at least one cited figure. A typed answer that retrieved pages
+    and then wrote no row is the vaguest phrasing answered with nothing;
+    prose answers keep the retrieval-only test."""
+    if not _retrieval_happened(packet):
+        return False
+    return bool(packet.rows) if packet.typed_answer else True
 
 
 def _packet_has_public_sources(
