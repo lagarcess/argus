@@ -346,8 +346,8 @@ section.
 
 ### Lift the loop  ·  ships in **The spine**
 
-**Scoped by the 2026-09-08 read-only scout.** Finding at
-`docs/reports/2026-09-08-lift-the-loop-scout.md`.
+**Scoped by a read-only scout, 2026-09-08.** Its findings are recorded inline
+below rather than in a separate report.
 
 **The thesis was about half right, and the correction narrows the lane.**
 

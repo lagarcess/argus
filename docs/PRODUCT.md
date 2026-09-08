@@ -13,23 +13,36 @@
 
 # 1. Product Truth
 
-**Argus is the easiest place to speak an investing or trading idea and instantly see how it would have played out.**
+**Argus is the easiest place to bring a money question and get an answer you can check.**
 
-**Argus is AI-powered investing and trading idea validation for everyone.**
+Every answer is computed by Argus or cited to a source, never asserted. The questions that can be tested against real history end in a backtest.
+
+**Argus is AI-powered, grounded money answers for everyone.**
 
 Argus is a **chat-first, AI-first investing sandbox** where users interact through natural conversation instead of dashboards, technical forms, or intimidating trading tools.
 
-Users describe ideas in plain language.
+Users describe questions and ideas in plain language.
 
 Argus helps them:
 
 - understand concepts
+- compute what they are actually asking, from the numbers they gave
 - refine ideas
 - simulate strategies
 - inspect outcomes
 - learn without risking capital
 
-The backtesting engine is critical infrastructure.
+A money question is any question a person asks about their own money or about
+an asset: what to save, what something costs over time, what a rate really
+means, what an instrument would return, what a company is trading at, what an
+idea would have done. Argus answers them the same way, by computing or citing.
+
+**Compute what the user gave you. Never prescribe what they should do.**
+Arithmetic on someone's own numbers is a grounded calculator. Telling them what
+they ought to do is advice, and Argus does not give it.
+
+The backtesting engine is critical infrastructure, and the first calculation
+Argus learned.
 
 The conversation is the product.
 
@@ -310,15 +323,24 @@ The AI assistant should:
 
 - welcome first-time users into ordinary conversation
 - explain financial terms simply
+- **answer money questions by computing them or citing a source**
+- **teach the method: when a question is too broad, offer specific questions
+  derived from what the user actually said**
 - gather requirements for supported backtests
 - recommend **localized generic starter prompts**
 - guide users toward successful flows
 - explain results
-- suggest next experiments
+- suggest next experiments, including **what the same money would have done in
+  the market over the same period**
 - remember thread context appropriately
-- adapt to preferred language
+- adapt to preferred language, **and to the currency of the user's locale**
 
-The AI assistant should **not** pretend unsupported capabilities exist.
+The AI assistant should **not** pretend unsupported capabilities exist, **and
+should not refuse a question it can compute or ground.** A refusal that names a
+capability the user did not ask about is a defect.
+
+It does **not** predict, forecast, or extrapolate future prices or returns, in
+any framing. That boundary is permanent and is not a gap to close.
 
 ---
 
