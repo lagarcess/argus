@@ -148,6 +148,38 @@ capability catalogue. The classification lives in the model, not in the UI.
 
 ---
 
+## Architecture decisions
+
+Locked 2026-09-08. These are the answers agents build against; do not re-derive
+them per lane.
+
+**Unchanged.** The runtime spine (interpret, confirm, execute, explain),
+Supabase as canonical truth, backend-owned state with the frontend rendering it
+rather than inventing it, and the three-service topology.
+
+**A registry layer appears between interpretation and execution.** Today it is
+interpret, strategy, engine. It becomes interpret, select a calculation, collect
+typed inputs, run a compute kernel, produce an artifact.
+
+**Most calculations run in-process. Only the backtest uses the Workflow.** Time
+value of money is microseconds. `argus-backtests` stays the backtest's executor
+and new calculations never reach it, so the three-service topology and the
+release contract are untouched by everything on this board except item 3's
+handoff.
+
+**Artifacts widen past backtest results.** A savings answer has no run and no
+job in the backtest sense. The precedent already exists: `chat.research` is a
+job kind with no run by design, from #532, and the settle rule has one owner in
+`argus.domain.job_settlement`. New calculations follow that seam rather than
+minting heavyweight rows for instant work.
+
+**The cheap path inverts the confirm card.** Answer first, inputs shown
+underneath and editable, recomputing live. See operating rule 2. This is a new
+interaction pattern, not a variant of the confirm card, and `DESIGN.md` owes it
+a section.
+
+---
+
 ## Vocabulary
 
 Founder-locked for this board. Agents use these words and no synonyms.
@@ -223,9 +255,10 @@ Plus the influencer's question, which is number 4 and number 5 combined.
 
 ## The items
 
-Ordered. The order is load bearing.
+Ordered. The order is load bearing, and each item carries the promotion
+checkpoint it ships in.
 
-### 1. Lift the loop
+### 1. Lift the loop — CP4
 
 The loop is proven by one instance and trapped inside it. Extract what is
 general; leave what is genuinely backtest-only.
@@ -247,7 +280,7 @@ benchmarks, the engine.
 than the universal one. **Do not force a universal input schema.** The loop is
 earned; a universal parameter shape guessed from one example is not.
 
-### 2. The calculation registry
+### 2. The calculation registry — CP4
 
 Data-shaped, the way `capability_registry.py` already works for strategies:
 typed data in one home, and the schema, the contract, discovery, and capability
@@ -260,7 +293,7 @@ Calculations become data instead of code paths.
 Never-Violate 12 wants a committed scorecard each time. About $0.20 with the
 targeted interleaved A/B, not $1.33 for a suite.
 
-### 3. Time value of money, the first new calculation
+### 3. Time value of money, the first new calculation — CP5
 
 One relationship, solved for any unknown, which is most of consumer finance.
 Ships with the inverted shape from operating rule 2: answer first, inputs
@@ -274,7 +307,7 @@ the card is honest without being redesigned:
 > You would have 45,000 pesos, about $740. Want to see what that would have done
 > in an index fund over the same period?
 
-### 4. The refusal log
+### 4. The refusal log — CP1, ships first and alone
 
 Every question the brain cannot map gets recorded, sorted by frequency.
 
@@ -282,7 +315,7 @@ Small, needs no users to build, and it is the difference between the next
 distribution writing the roadmap and the founder reading messages by hand. This
 board exists because that logging did not.
 
-### 5. Grounded retrieval, local first
+### 5. Grounded retrieval, local first — CP6
 
 Perplexity domain filtering against a curated list of Dominican finance and bank
 sources, plus the location filter that also derives item 3's currency default.
@@ -295,7 +328,7 @@ Unused capability already paid for: `FRED_API_KEY` is free, present, and has
 never run in production. Adding a data source is a tier-2 decision, not an
 architecture decision.
 
-### 6. Decisions detach from runs
+### 6. Decisions detach from runs — CP2
 
 Today a decision hangs off a run: `SearchDossierDecision` carries `run_label`,
 and the affordance lives in `StrategyResultCard.tsx`, `RunDossierView.tsx`, and
@@ -314,7 +347,7 @@ the previous board was building as "product memory," keyed to the wrong object,
 and it is the best shareable artifact in the product: not "here is a backtest,"
 but "here is what I decided and here is the math."
 
-### 7. Sharing, turned on
+### 7. Sharing, turned on — CP3
 
 Built and dark since 2026-08-10. `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and
 `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED` are `false` in `render.yaml` and
@@ -329,7 +362,7 @@ so this is a verification item rather than a build item. **#422** carries seven
 open lower-severity breakpoint findings; check them against a shared receipt
 specifically before enabling.
 
-### 8. Teach the methodology
+### 8. Teach the methodology — CP6
 
 Both of Johana's suggestions, which are one request stated twice.
 
@@ -343,7 +376,7 @@ input are a response to their input. Steal the "try asking" pattern from
 competitors' skill cards: one concrete example sentence teaches without becoming
 a catalogue.
 
-### 9. Metering follows the new cost shape
+### 9. Metering follows the new cost shape — CP2
 
 `UsageAllowances` has two hardcoded meters, `messages` and `backtests`. The
 windowing underneath is general and good: hour, day, guest session,
@@ -373,35 +406,126 @@ rather than worse, which is an acquisition story instead of a wall.
 
 ---
 
-## Open questions for the founder
+## Promotion checkpoints
 
-These block specific items, not the board. Recorded here rather than guessed.
+The board does not wait for the vision to be complete. Each checkpoint is
+cohesive on its own, and cutting them small is cheaper as well as safer:
+`eval_measured_code_unchanged` in the promotion gate returns early when a change
+cannot reach the measured code, so a checkpoint that does not touch the
+interpreter promotes **without a $1.33 live eval run**.
 
-1. **Is personal money math a sixth research rail shape, or a separate
-   surface?** Spec section 10, question 1, open since 2026-08-12. Blocks the
-   shape of item 3.
-2. **Beginner or trader first?** Spec section 10, question 5. Every user Argus
-   has ever had is a non-finance Dominican. The reference list above spans
-   savings goals and reverse DCF, and those two audiences may want opposite
-   products. Changes the order of items 3 and 5.
-3. **Latency budget per calculation.** A backtest is slow and people tolerate it
-   because it is visibly working. A time-value answer that takes four seconds
-   breaks the calculator promise. **#462** is the open measurement issue from
-   2026-08-12 and it matters more now than when it was filed.
-4. **What Argus says when it cannot ground something.** The honesty line holds
-   until retrieval fails or the fact does not exist, and far more answers will
-   depend on retrieval than today. Research was one hundred percent down for
-   three days in this repo's recent history and nobody noticed. "I could not
-   verify that rate" has to be a designed answer, not a failure mode.
-5. **Bilingual cost per calculation.** Prose without a typed code is the defect
-   class behind #434, #489, #527 and #507. If each calculation ships
-   hand-written Spanish, that tax compounds. The typed-facts pattern has to hold
-   at the registry boundary.
-6. **Regulatory posture on product ranking.** "Compute what they gave you, never
-   prescribe" still governs, but it does more work once Argus is ranking credit
-   cards and local bonds than it did when Argus only backtested.
-7. **Which Dominican sources go in the domain list, and who maintains it.**
-   Spec section 10, question 3.
+| | Ships | What a user sees | Live eval |
+| --- | --- | --- | --- |
+| **CP0** | The three fixes already on integration | drawer dates, benchmark gap, retrieval evidence | no |
+| **CP1** | Item 4 refusal log, plus #462 | nothing | no |
+| **CP2** | Item 9 metering, item 6 decisions detach | nothing, behavior preserving | no |
+| **CP3** | Item 7 sharing on, mobile verification | a result can be shared | probably not |
+| **CP4** | Item 1 lift the loop, item 2 registry | **nothing, if done right** | yes |
+| **CP5** | Item 3 time value of money | the first new capability | yes |
+| **CP6** | Item 5 grounding, item 8 teach the method | cited local rates, guided broad questions | yes |
+
+Two rules about the order.
+
+**CP1 ships immediately and alone.** The refusal log's value is proportional to
+how long it has been collecting, so every day it is not live is a day of data
+that does not exist. It is also the safest change on the board, and it is what
+tells you whether CP5 and CP6 are aimed correctly before they are built.
+
+**CP4 ships with nothing else in it.** A pure extraction plus a registry holding
+only the calculations that already exist should be invisible. If a user notices
+anything at CP4, something went wrong, and that must not be tangled with a new
+capability landing in the same promotion.
+
+---
+
+## Canon documents this board changes
+
+To-do items, not background. Each is a real edit owed before or alongside the
+item that needs it.
+
+| Document | Change | When |
+| --- | --- | --- |
+| **`docs/PRODUCT.md`** | Section 1 Product Truth says "speak an investing or trading idea," and section 11 supported AI responsibilities is written around that. Both widen to "bring a money question." **The file is marked locked and only the founder can move it.** The audience does not change, which is what makes this an additive refinement rather than the scope shift the lock forbids. | **Blocks item 1.** Nothing in the spine should be built against a Product Truth that contradicts it. |
+| **`docs/ARCHITECTURE.md`** | The registry layer; in-process versus Workflow execution; artifacts without runs. | With item 2. |
+| **`docs/API_CONTRACT.md`** | Calculation request and response shapes; the allowance response going from two meters to three operation classes. | With items 2 and 9. |
+| **`docs/DATA_MODEL.md`** | Artifacts beyond backtest results; decisions carrying inputs and detaching from `run_label`. | With items 3 and 6. |
+| **`.agent/designs/argus/DESIGN.md`** | The answer-first-then-editable-inputs pattern from operating rule 2. | With item 3. |
+| **`AGENTS.md`** | Operating rules 1 through 7 become permanent repository rules rather than board rules. A board is superseded; these should outlive it. | Any time after item 1 proves rule 1 holds. |
+
+---
+
+## Privacy and terms
+
+**The paperwork is end-stage. One decision is not.**
+
+Personal money math means users type **salary, expenses, and debts**. That is
+materially more sensitive than "backtest AAPL," and the current posture was
+written for market questions.
+
+- **Day one, blocking item 3's first write:** decide whether figures a user
+  states about their own finances are retained, and where. Personalization
+  memory already carries a categorical never-store list, covering broker
+  credentials and raw conversation. Stated personal financial figures either
+  join that list or get an explicit, recorded decision. This changes what gets
+  built, so it cannot be deferred to a legal pass.
+- **End stage, before distribution:** privacy policy text describing what is
+  collected, retained and deleted for personal money questions.
+- **One review, not one per feature:** terms. Ranking financial products leans
+  harder on the existing not-advice framing than backtesting ever did. Decision
+  6 below, rank by a visible computed number and never by a recommendation, is
+  what keeps that review short.
+
+The legal cookie and storage inventory work concluded Argus needs no consent
+banner. Nothing on this board changes that, because none of these items adds
+third-party storage in the browser.
+
+---
+
+## Decisions
+
+Answered 2026-09-08. Recorded here so agents do not re-open them per lane.
+
+**1. Personal money math is neither a sixth rail shape nor a separate surface.**
+It is a calculation in the registry, and the rail's five existing shapes become
+five more calculations. The question only exists while the backtest and the rail
+are two machines; item 2 dissolves it.
+
+**2. Beginner before trader.** Every user Argus has ever had is a non-finance
+person. The trader cohort is hypothetical. This costs nothing at the advanced
+end later, because time value of money serves the beginner and reverse DCF
+serves the trader and they are the same primitive.
+
+**3. Measure latency before setting a budget.** #462 first. Working target,
+subject to what the measurement says: compute answers under one second to first
+token, grounded answers under four. A backtest is slow and tolerated because it
+is visibly working; a time-value answer that takes four seconds breaks the
+calculator promise.
+
+**4. When Argus cannot ground something it returns a typed unverified state,
+never prose.** The answer shows the computation with the missing input named and
+empty: "I could not verify the current rate at Banco Popular. Give me the rate
+and I will run it." That obeys the honesty line, is a designed answer rather
+than a failure mode, and converts instead of dead-ending. Research was one
+hundred percent down for three days in this repository's recent history and
+nobody noticed; that must not be reachable again from a path this common.
+
+**5. The registry declares typed facts and copy renders from them.** No
+hand-written prose per calculation, in either language, ever. This is operating
+rule 4 applied at the output boundary, and it is the only version where the
+bilingual cost does not compound across calculations. See #434, #489, #527,
+#507.
+
+**6. Rank by a visible computed number, never by a recommendation.** "Lowest
+effective annual cost for your stated spend" is arithmetic. "Best card for you"
+is advice. A copy rule, not an architecture one, and it is what keeps the terms
+review short.
+
+### Still open
+
+**Which Dominican sources go in the domain list, and who maintains it.** Founder
+supplies these when item 5 starts. The mechanism does not wait on the complete
+list: seed it with the banks users actually named, and let the refusal log from
+item 4 grow it. Spec section 10, question 3.
 
 ---
 
@@ -434,6 +558,6 @@ These block specific items, not the board. Recorded here rather than guessed.
   dependency of item 7.
 - **Sharing is built and dark**, and is promoted from item 5 on that board to
   the distribution anchor on this one.
-- **#462** carries forward as open question 3.
+- **#462** carries forward, and is now decision 3's blocking measurement.
 - The five research rail shapes stay. They become five of the calculations,
   not a separate system.
