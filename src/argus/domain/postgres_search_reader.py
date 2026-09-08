@@ -529,12 +529,16 @@ _LATE_DECISION = _LateSource(
         left join public.evidence_artifacts as decision_evidence
           on decision_evidence.id = decision.evidence_artifact_id
          and decision_evidence.user_id = input.user_id
+        left join public.messages as decision_message
+          on decision_message.id = decision.source_message_id
+         and decision_message.user_id = input.user_id
     """,
     filters="true",
     title_expression="""
         coalesce(
             nullif(decision_evidence.title, ''),
             nullif(decision_evidence.digest, ''),
+            nullif(decision_message.content, ''),
             decision.id::text
         )
     """,
@@ -543,7 +547,8 @@ _LATE_DECISION = _LateSource(
             ' ',
             decision.decision_state,
             decision.note,
-            decision_evidence.digest
+            decision_evidence.digest,
+            decision_message.content
         )
     """,
     haystack_expression="""
@@ -552,7 +557,8 @@ _LATE_DECISION = _LateSource(
             decision.decision_state,
             decision.note,
             decision_evidence.title,
-            decision_evidence.digest
+            decision_evidence.digest,
+            decision_message.content
         )
     """,
     candidate_haystack_expression=None,
@@ -575,6 +581,8 @@ _LATE_DECISION = _LateSource(
             'note', decision.note,
             'evidence_artifact_id', decision.evidence_artifact_id,
             'source_conversation_id', decision.source_conversation_id,
+            'source_message_id', decision.source_message_id,
+            'computation', decision.computation,
             'updated_at', decision.updated_at
         )
     """,
@@ -2805,12 +2813,18 @@ left join lateral (
         'source_run_id', evidence.source_run_id,
         'artifact_title', evidence.title,
         'artifact_digest', evidence.digest,
-        'artifact_payload', evidence.payload
+        'artifact_payload', evidence.payload,
+        'source_message_id', decision.source_message_id,
+        'computation', decision.computation,
+        'attachment_text', decision_message.content
     ) as payload
     from public.decision_notes as decision
     left join public.evidence_artifacts as evidence
       on evidence.id = decision.evidence_artifact_id
      and evidence.user_id = %(user_id)s
+    left join public.messages as decision_message
+      on decision_message.id = decision.source_message_id
+     and decision_message.user_id = %(user_id)s
     where decision.user_id = %(user_id)s
       and decision.source_conversation_id = conversation.id
     order by decision.updated_at desc, decision.id desc

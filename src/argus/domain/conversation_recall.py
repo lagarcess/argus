@@ -319,16 +319,27 @@ def project_conversation_recall(
     total_runs = int(summary.get("total_runs") or len(eligible))
     decided_runs = int(summary.get("decided_runs") or len(eligible_decisions))
     summary_states = _text_list(summary.get("decision_states"))
+    # A computed-answer decision has no artifact, so it is current by itself
+    # and joins the artifact-current decisions in the conversation aggregate.
+    aggregate_decisions = (
+        [
+            *eligible_decisions,
+            *(
+                row
+                for row in relevant_decisions
+                if row.get("evidence_artifact_id") is None
+            ),
+        ]
+        if eligible_decisions
+        else relevant_decisions
+    )
     decision_states = tuple(
         state
         for state in _DECISION_STATES
         if state in summary_states
         or (
             not summary_states
-            and any(
-                row.get("decision_state") == state
-                for row in (eligible_decisions or relevant_decisions)
-            )
+            and any(row.get("decision_state") == state for row in aggregate_decisions)
         )
     )
     summary_activity = _datetime(summary.get("latest_activity"))
@@ -475,6 +486,7 @@ def _match_candidates(
                         _text(decision.get("decision_state")),
                         _text(decision.get("artifact_title")),
                         _text(decision.get("artifact_digest")),
+                        _text(decision.get("attachment_text")),
                     )
                     if part
                 ),

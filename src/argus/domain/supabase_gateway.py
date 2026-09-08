@@ -31,6 +31,10 @@ from argus.domain.backtest_job_scopes import RESEARCH_OPERATION_SCOPE
 from argus.domain.chat_turn_lifecycle_gateway import (
     ChatTurnLifecycleGatewayMixin,
 )
+from argus.domain.decision_attachment import (
+    DECISION_NOTE_ID_METADATA_KEY,
+    DECISION_STATE_METADATA_KEY,
+)
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.postgres_history_reader import (
     PostgresHistoryReader,
@@ -56,6 +60,7 @@ from argus.domain.supabase_conversation_activity import (
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
+from argus.domain.supabase_decisions import DecisionAttachmentPersistenceMixin
 from argus.domain.supabase_guest_accounts import GuestAccountPersistenceMixin
 from argus.domain.supabase_message_reads import (
     _COMPLETED_RESULT_BATCH_SIZE,
@@ -139,6 +144,7 @@ class SupabaseGateway(
     SupabasePublicExcerptMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
+    DecisionAttachmentPersistenceMixin,
 ):
     client: Client
     auth_client: Client | None = None
@@ -752,8 +758,8 @@ class SupabaseGateway(
                 decision_id=decision_id,
                 decision_state=decision_state,  # type: ignore[arg-type]
             )
-            metadata["decision_note_id"] = decision_id
-            metadata["decision_state"] = decision_state
+            metadata[DECISION_NOTE_ID_METADATA_KEY] = decision_id
+            metadata[DECISION_STATE_METADATA_KEY] = decision_state
             self.client.table("messages").update({"metadata": metadata}).eq(
                 "user_id", user_id
             ).eq("id", message.id).execute()
