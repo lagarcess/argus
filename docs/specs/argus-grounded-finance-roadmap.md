@@ -148,6 +148,36 @@ capability catalogue. The classification lives in the model, not in the UI.
 
 ---
 
+## The work is subtractive
+
+Argus does not refuse because it lacks intelligence. It refuses because we put
+guardrails in front of one that already reasons about money perfectly well. The
+guardrails were correct when the product was a backtester. They are what keeps
+it in the box now.
+
+**So this board mostly removes things.** Where an item says "build," check first
+whether the capability already exists and is being blocked.
+
+What comes off, and what replaces it:
+
+| Guardrail today | Why it exists | What replaces it |
+| --- | --- | --- |
+| `unsupported_or_out_of_scope` as the catch-all for every non-backtest turn | the only machine was the backtest | a calculation from the registry, or an honest boundary with the computation still shown |
+| `unsupported_admission.py`, 598 fingerprinted lines of typed guards | keeping the interpreter from promising strategies the engine cannot run | keeps its job for **strategy templates**; stops standing in for "Argus does not do that" generally |
+| The five rail shapes as the only non-backtest answers | the rail was bolted beside the backtest | five calculations in one registry |
+| Six Perplexity parameters sent of twenty available | nobody widened it after the first integration | item 5, which is configuration, not construction |
+
+The capability clause the interpreter reads is already **generated from the
+canonical registry** (`unsupported_admission.requested_strategy_template_capability_clause`).
+That is the seam: widen the registry and the model-facing text widens with it,
+rather than being hand-edited.
+
+**The test for any lane on this board:** if the change adds a rule the model
+could have followed on its own, it is probably wrong. We supply math, facts, and
+boundaries. The model supplies judgment.
+
+---
+
 ## Architecture decisions
 
 Locked 2026-09-08. These are the answers agents build against; do not re-derive
@@ -224,109 +254,243 @@ Founder-locked for this board.
 7. **The interpreter spine is unchanged.** No regex, phrase, or language gate
    before the LLM. Deterministic guardrails after interpretation, recording when
    they fire.
+8. **Never enumerate questions.** Enumerate math, and let the model map. A lane
+   that adds a branch for a specific question shape, a keyword, or a named
+   scenario has built the next refusal. The smoke test in the goalpost is how we
+   check the general mechanism, never a list to satisfy one at a time.
+9. **Loosen before you build.** Where a capability appears missing, first prove
+   it is not simply blocked. See "The work is subtractive."
+
 
 ---
 
 ## The goalpost
 
-**Pull the real messages from 2026-08-12 out of the database, make them the eval
-set, and replay them. When Argus answers them, distribute.**
+**Distribute again, to people who are not us, with a product that answers what
+they actually bring.**
 
-Not a feeling, a pass or fail, runnable before a single link is sent.
+### Acceptance is behavioral, not a list
 
-Ten reference answers this board is aimed at. Nine are refused today.
+The ten questions below are a **smoke test, not the scope.** Building for a list
+guarantees the eleventh question, asked in a shape nobody anticipated, breaks
+the product. That is the mistake this board already made once: the previous
+board scoped turn one from a competitor review and shipped a fix for the wrong
+first question.
 
-| # | Topic | Question |
-| --- | --- | --- |
-| 1 | Savings goal | *"¿Cuánto debo ahorrar mensual si gano 38,000 pesos y quiero una iPad?"* |
-| 2 | Affordability | *"What do I need to earn to afford a Porsche?"* |
-| 3 | Debt payoff | *"I owe 180,000 on the car at 14 percent, is paying extra worth it?"* |
-| 4 | Local fixed income | *"¿DOP$1 millón en un bono del Banco Popular?"* |
-| 5 | Product shopping | *"Which credit card should I get?"* |
-| 6 | Valuation | *"Is Apple expensive at this P/E?"* |
-| 7 | Currency | *"¿Ahorro en pesos o en dólares?"* |
-| 8 | Inflation | *"Is my savings account actually losing money?"* |
-| 9 | Backtest | *"Buy and hold Apple for the last year with $10,000."* Already S-tier. |
-| 10 | The boundary | *"Should I put my emergency fund in crypto?"* Compute the drawdown that amount would have taken, show it, stop. No advice. |
+Acceptance is this:
 
-Plus the influencer's question, which is number 4 and number 5 combined.
+> A money question in a shape nobody wrote down lands on a primitive, gets
+> computed or honestly bounded, and never returns a refusal that names a
+> capability the user did not ask about.
+
+The smoke test is how we check it, and every one of the ten must pass. But a
+lane that satisfies a listed question by special-casing it has failed, and a
+reviewer should reject it on operating rule 8.
+
+### The smoke test
+
+| # | Topic | Question | Primitives |
+| --- | --- | --- | --- |
+| 1 | Savings goal | *"¿Cuánto debo ahorrar mensual si gano 38,000 pesos y quiero una iPad?"* | TVM + retrieval |
+| 2 | Affordability | *"What do I need to earn to afford a Porsche?"* | TVM + retrieval |
+| 3 | Debt payoff | *"I owe 180,000 on the car at 14 percent, is paying extra worth it?"* | TVM + comparison |
+| 4 | Local fixed income | *"¿DOP$1 millón en un bono del Banco Popular?"* | TVM + retrieval |
+| 5 | Product shopping | *"Which credit card should I get?"* | comparison + retrieval |
+| 6 | Valuation | *"Is Apple expensive at this P/E?"* | ratios + retrieval |
+| 7 | Currency | *"¿Ahorro en pesos o en dólares?"* | growth + comparison + retrieval |
+| 8 | Inflation | *"Is my savings account actually losing money?"* | growth + retrieval |
+| 9 | Backtest | *"Buy and hold Apple for the last year with $10,000."* | historical |
+| 10 | The boundary | *"Should I put my emergency fund in crypto?"* | historical; compute the drawdown, show it, stop |
+
+Plus the influencer's post from the section above, which is 4 and 5 combined
+and is the one a real Dominican audience is already asking a human.
+
+**Also replay the real 2026-08-12 transcripts.** They are in the database, they
+are what actual users typed, and none of them was written by us.
 
 ---
 
 ## The items
 
-Ordered. The order is load bearing, and each item carries the promotion
-checkpoint it ships in.
+Each item carries what done means, the surface it may touch, what it must not
+touch, and the proof it owes. A dispatch is a pointer to the item; the agent
+should need nothing else.
+
+Checkpoint tags are cut boundaries. The running order is in the checkpoints
+section.
+
+---
 
 ### 1. Lift the loop — CP4
 
 The loop is proven by one instance and trapped inside it. Extract what is
 general; leave what is genuinely backtest-only.
 
-**General, currently trapped in the backtest:**
-
-- the confirm card, as a pattern, not as a required step
-- the edit contract, where every requested change is applied or explicitly
-  surfaced as not applied, with no third outcome
-- field provenance, what the user said versus what we inferred
-- the assumptions readout
-- the result artifact with the working shown
-- Try next, decisions, evidence receipts, sharing
+**General, currently trapped:** the confirm card as a pattern rather than a
+required step; the edit contract, where every requested change is applied or
+explicitly surfaced as not applied with no third outcome; field provenance, what
+the user said versus what we inferred; the assumptions readout; the result
+artifact with the working shown; Try next, decisions, evidence receipts,
+sharing.
 
 **Genuinely backtest-only:** asset resolution, market calendars, the data fetch,
 benchmarks, the engine.
 
-`StrategySummary` becomes what it actually is, the backtest's input type, rather
-than the universal one. **Do not force a universal input schema.** The loop is
-earned; a universal parameter shape guessed from one example is not.
+**Done means.** A second calculation can reach confirm, edit, provenance,
+disclosure, and artifact rendering without importing anything from the backtest,
+and the backtest still routes through the same code with byte-identical
+behavior. `StrategySummary` is documented and used as the backtest's input type,
+not the universal one.
+
+**Surface.** `src/argus/api/chat/confirmation.py`,
+`src/argus/agent_runtime/artifact_edit_planner.py`,
+`src/argus/agent_runtime/stages/interpret_internal/`,
+`src/argus/agent_runtime/state/models.py`, and the web confirm and result
+components.
+
+**Do not touch.** No universal input schema. The loop is earned by one instance;
+a parameter shape guessed from one example is not. No model-facing text: this
+extraction must leave `.agent/interpreter_prompt_fingerprint.json` unchanged.
+
+**Proof.** The fingerprint is byte-identical before and after. The existing
+backtest suite passes unchanged. A throwaway second calculation, not shipped,
+demonstrates the loop is reachable without backtest imports.
+
+**Scoping first.** Size is unknown and the extraction is the largest thing on
+this board. A read-only pass returns the seam and a number before any code.
+
+---
 
 ### 2. The calculation registry — CP4
 
 Data-shaped, the way `capability_registry.py` already works for strategies:
-typed data in one home, and the schema, the contract, discovery, and capability
-answers all derive from it.
+typed data in one home, and the schema, the runtime contract, discovery, and
+capability answers all derive from it.
 
-Seven intents collapse to roughly four: explain, calculate, follow up, cannot.
-Calculations become data instead of code paths.
+A calculation declares four things: a name and when to use it, typed inputs, a
+compute function, an output shape. Everything else, extraction, the confirm
+surface, the edit contract, provenance, disclosure, localization, reads the
+declaration.
 
-**Known cost:** each new calculation moves model-facing surface, so
-Never-Violate 12 wants a committed scorecard each time. About $0.20 with the
-targeted interleaved A/B, not $1.33 for a suite.
+**Done means.** Adding a calculation is one file. The seven intents collapse to
+roughly four: explain, calculate, follow up, cannot. The five existing rail
+shapes are registered as calculations rather than a parallel system. The
+interpreter's capability text is generated from the registry, extending the
+mechanism `unsupported_admission.requested_strategy_template_capability_clause`
+already uses, never hand-written per calculation.
 
-### 3. Time value of money, the first new calculation — CP5
+**Surface.** `src/argus/domain/capability_registry.py`,
+`src/argus/agent_runtime/llm_interpreter_types.py`,
+`src/argus/agent_runtime/state/models.py`,
+`src/argus/agent_runtime/interpreter/unsupported_admission.py`.
 
-One relationship, solved for any unknown, which is most of consumer finance.
-Ships with the inverted shape from operating rule 2: answer first, inputs
-visible and editable underneath, recompute live.
+**Do not touch.** `unsupported_admission` keeps its job for strategy templates.
+It stops being the catch-all for "Argus does not do that."
 
-Carries currency: **infer the operating currency from geography, let the user
-override, and label it in prose.** Cards are out of scope for this item and stay
-as they are. At the handoff to a backtest, convert explicitly in the prose, so
-the card is honest without being redesigned:
+**Proof.** A committed scorecard, because `llm_interpreter_types.py` is
+fingerprinted. Targeted interleaved A/B where the change is bounded, about
+$0.20; a full suite where it is not. Plus a test that registering a calculation
+requires exactly one new file.
 
-> You would have 45,000 pesos, about $740. Want to see what that would have done
-> in an index fund over the same period?
+---
+
+### 3. The five primitives — CP5
+
+The board schedules all five, not one. Four of the smoke-test questions need
+ratios or comparison, and shipping only time value of money leaves the goalpost
+unreachable.
+
+| Primitive | Ships |
+| --- | --- |
+| **Time value of money**, any unknown | first; proves the registry |
+| **Growth and compounding** | with TVM; they share inputs |
+| **Ratios** | second |
+| **Comparison over a set** | second; consumes retrieved rows |
+| **Historical performance** | already built; registered, not rebuilt |
+
+**Done means.** Each is one file: declaration, compute function, tests. Each
+carries the inverted shape from operating rule 2: answer first, inputs shown
+underneath and editable, recomputing live. Each ends with the counterfactual
+offer where one applies. Comparison takes retrieved rows and a computed ranking
+key; it never ranks by recommendation. See decision 6.
+
+**Currency.** Infer the operating currency from geography, let the user
+override, label it in prose. Cards stay as they are. At a handoff to a backtest
+the prose converts explicitly, so the card is honest without being redesigned.
+
+**Surface.** New calculation files, the registry, and the compute kernels.
+Money math stays in Python in this repository under unit tests; operating rule
+6.
+
+**Do not touch.** No branch for a named scenario. A Porsche and an iPad are the
+same calculation. Operating rule 8.
+
+**Proof.** Unit tests per primitive against worked examples. The smoke test's
+ten questions answered end to end, in both languages, with browser evidence. A
+committed scorecard for the model-facing surface.
+
+---
 
 ### 4. The refusal log — CP1, live before distribution
 
-Every question the brain cannot map gets recorded, sorted by frequency.
+Every question the model cannot map, and every boundary Argus states, recorded
+with what was asked and which primitive was missing.
 
-Small, needs no users to build, and it is the difference between the next
-distribution writing the roadmap and the founder reading messages by hand. This
-board exists because that logging did not.
+**Done means.** A refusal is a typed record, not a log line, queryable by
+frequency. #314's rejected artifact actions land in the same place; it is the
+same instrumentation.
 
-### 5. Grounded retrieval, local first — CP6
+**Surface.** `src/argus/observability/`, the unsupported path, the recovery
+messages surface.
 
-Perplexity domain filtering against a curated list of Dominican finance and bank
-sources, plus the location filter that also derives item 3's currency default.
+**Do not touch.** No user-visible change. No model-facing text.
 
-**This is the moat.** A general assistant guesses at a Dominican bank's rate.
-Argus cites today's. It is the only item on this board that a larger model
-cannot match by being smarter.
+**Proof.** A refusal produced in a test appears in the record with its shape.
+No live eval required, because nothing reaches the measured code.
 
-Unused capability already paid for: `FRED_API_KEY` is free, present, and has
-never run in production. Adding a data source is a tier-2 decision, not an
-architecture decision.
+**Timing.** Not first for its own sake. It ships before distribution so it is
+collecting when signal arrives.
+
+---
+
+### 5. Retrieval: send the parameters we already pay for — CP6
+
+**This item is configuration, not construction.** Argus calls
+`https://api.perplexity.ai/v1/agent` with six parameters. The endpoint accepts
+twenty.
+
+Unused today: `response_format` with a strict `json_schema`;
+`web_search.search_domain_filter`, capped at 20 domains; `user_location` with
+city, country, latitude, longitude and region; `search_recency_filter`;
+`search_context_size`; `language_preference`; `instructions`; the
+`people_search` tool; `skills`, up to 16; `models`, up to 5 for fallback;
+`previous_response_id` for continuity.
+
+**The one that matters most is `response_format: json_schema`.** Operating rule
+4 says retrieval produces typed rows and never prose. That is a parameter we are
+not sending, and #545, publisher URLs stranded in prose with no typed sources,
+is what not sending it causes.
+
+`search_domain_filter` is the local moat and its 20-domain ceiling is the real
+constraint on the source list. `user_location` derives item 3's currency default.
+
+**Done means.** Retrieved facts arrive as typed rows with citations, never as
+prose to be re-parsed. Domain filtering and location are configured per
+question shape. #404 and #545 close.
+
+**Surface.** `src/argus/domain/research/perplexity_agent.py`,
+`config.py`, `source_selection.py`, `contracts.py`.
+
+**Do not touch.** The `sandbox` tool. Perplexity offers code execution and the
+2026-08-12 spec section 7 already ruled it out: money math stays in Python where
+it can be unit tested. There is no SEC tool on the Agents API; `search_mode:
+sec` belongs to Sonar chat completions, which we do not use.
+
+**Proof.** A recorded response showing typed rows under a strict schema. A
+domain-filtered call citing a local source. Founder supplies the Dominican
+domains when this starts; seed from banks users actually named.
+
+---
 
 ### 6. Decisions detach from runs — CP2
 
@@ -335,17 +499,28 @@ and the affordance lives in `StrategyResultCard.tsx`, `RunDossierView.tsx`, and
 `AssetHistoryRollup.tsx`. All three are backtest objects, so the decision index
 can only ever hold backtest decisions.
 
-A decision attaches to a **computation** and carries its inputs, which makes it
-re-runnable against reality later:
+**Done means.** A decision attaches to a computation and carries its inputs, so
+it can be re-run against reality later. Any computed answer offers it, not only
+a result card.
 
 > You decided in September to put 5,000 a month toward the iPad. It is
 > December. Here is where you actually are, and here is what that money would
 > have done in the market instead.
 
-A backtest has no follow-up date. A decision does. **This is the retention loop**
-the previous board was building as "product memory," keyed to the wrong object,
-and it is the best shareable artifact in the product: not "here is a backtest,"
-but "here is what I decided and here is the math."
+A backtest has no follow-up date. A decision does. This is the retention loop
+the previous board was building as product memory, keyed to the wrong object,
+and it is the best shareable artifact in the product.
+
+**Surface.** `src/argus/api/schemas.py`, the memory store, search candidates,
+and the web decision components.
+
+**Do not touch.** The Idea and IdeaVersion scaffolding. The `DecisionNote` is
+the part worth keeping.
+
+**Proof.** A decision recorded against a non-backtest computation, retrieved,
+and re-run with changed inputs. Behavior-preserving for existing decisions.
+
+---
 
 ### 7. Sharing, turned on — CP3
 
@@ -354,13 +529,21 @@ Built and dark since 2026-08-10. `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and
 the release profile.
 
 **Sharing is the distribution anchor.** Nail the answer, let them send it.
-Enabling is a separate founder decision from any merge.
 
-Mobile is a dependency, not a separate pillar: every shared link opens on a
-phone. The responsive shell shipped 2026-08-08 in PR #393 and is unconditional,
-so this is a verification item rather than a build item. **#422** carries seven
-open lower-severity breakpoint findings; check them against a shared receipt
-specifically before enabling.
+**Done means.** A shared receipt opens correctly for a signed-out visitor on a
+phone. Enabling is a separate founder decision from any merge.
+
+**Surface.** Flags and QA. Little or no code.
+
+**Do not touch.** Guest sharing and forking stay out of scope per the sharing
+spec.
+
+**Proof.** Browser evidence of a shared receipt at mobile and desktop widths.
+The responsive shell shipped 2026-08-08 in PR #393 and is unconditional, so this
+is verification rather than build. **#422** carries seven open lower-severity
+breakpoint findings; check them against a shared receipt specifically.
+
+---
 
 ### 8. Teach the methodology — CP6
 
@@ -371,10 +554,21 @@ Both of Johana's suggestions, which are one request stated twice.
 - **When a question is too broad**, three specific questions derived from what
   the user actually said, instead of a refusal or one open question.
 
-This is not the menu the roadmap forbids. Three questions derived from their
-input are a response to their input. Steal the "try asking" pattern from
-competitors' skill cards: one concrete example sentence teaches without becoming
-a catalogue.
+**Done means.** A broad question returns derived follow-ups, never a catalogue.
+The guest empty state states the method in one line.
+
+**Surface.** `src/argus/agent_runtime/llm_clarifier.py`, the empty state, the
+starter chips.
+
+**Do not touch.** No skill grid, no capability list, no picker. Three questions
+derived from the user's input are a response to their input; a menu shown
+regardless of input is what `PRODUCT.md` forbids. Borrow the "try asking"
+pattern of one concrete example sentence, never the grid.
+
+**Proof.** A committed scorecard; `llm_clarifier.py` is fingerprinted. Browser
+evidence in both languages.
+
+---
 
 ### 9. Metering follows the new cost shape — CP2
 
@@ -383,16 +577,10 @@ windowing underneath is general and good: hour, day, guest session,
 `limiting_window`, `available_now`, plus the atomic claim from #544. The
 taxonomy is two welded field names.
 
-Both break under this board:
-
-- `messages` becomes the wrong meter. Most calculations are free and instant, so
-  metering conversation rebuilds the turn-one wall.
-- `backtests` stops being the only expensive thing. **Retrieval becomes the
-  dominant variable cost**, because every grounded answer pulls sources. The
-  moat and the cost driver are the same thing.
-
-Replace two field names with three operation classes, keeping the windows and
-the claim:
+Both break here. `messages` becomes the wrong meter, because most calculations
+are free and instant and metering conversation rebuilds the turn-one wall.
+`backtests` stops being the only expensive thing: **retrieval becomes the
+dominant variable cost**, so the moat and the cost driver are the same thing.
 
 | Class | Cost | Metered |
 | --- | --- | --- |
@@ -400,9 +588,22 @@ the claim:
 | Grounding | per retrieval | yes |
 | Execution | per run | yes |
 
-**Positioning that falls out of it: charge for evidence and execution, never for
-talking.** A general assistant charges for talking. The free tier gets better
-rather than worse, which is an acquisition story instead of a wall.
+**Charge for evidence and execution, never for talking.** A general assistant
+charges for talking. The free tier gets better rather than worse, which is an
+acquisition story instead of a wall.
+
+**Done means.** The meter is keyed by operation class. #546 closes. Existing
+guest and daily behavior is preserved for execution.
+
+**Surface.** `src/argus/api/schemas.py`, `src/argus/api/chat/allowance.py`,
+`src/argus/api/guest_access.py`, `routers/profile.py`.
+
+**Do not touch.** The windows and the atomic claim. Replace field names, keep
+the machinery.
+
+**Proof.** Behavior-preserving for backtests: a guest still gets the same
+execution allowance. Compute operations never decrement anything. No live eval
+required.
 
 ---
 
@@ -424,8 +625,8 @@ rules below.
 | **CP2** | Item 9 metering, item 6 decisions detach | nothing, behavior preserving | no |
 | **CP3** | Item 7 sharing on, mobile verification | a result can be shared | probably not |
 | **CP4** | Item 1 lift the loop, item 2 registry | **nothing, if done right** | yes |
-| **CP5** | Item 3 time value of money | the first new capability | yes |
-| **CP6** | Item 5 grounding, item 8 teach the method | cited local rates, guided broad questions | yes |
+| **CP5** | Item 3, the five primitives | Argus answers money questions it used to refuse | yes |
+| **CP6** | Item 5 retrieval parameters, item 8 teach the method | cited local rates, guided broad questions | yes |
 
 **The ordering rule is distribution, not checkpoint number.** Founder,
 2026-09-08: *this initiative is to get Argus outside of its box so I can
@@ -441,6 +642,11 @@ An earlier draft of this section ranked CP1 first on the grounds that the
 refusal log's value scales with how long it has collected. That reasoning is
 wrong while nobody is using the product. The refusal log ships **before**
 distribution so it is live when signal arrives, not first.
+
+**CP5 may be two promotions.** Time value of money and growth ship together and
+prove the registry; ratios and comparison follow. Splitting them is allowed and
+the checkpoint table stays one row, because the cut is cohesive either way: each
+half is a set of primitives, not half a primitive.
 
 **CP4 ships with nothing else in it.** A pure extraction plus a registry holding
 only the calculations that already exist should be invisible. If a user notices
