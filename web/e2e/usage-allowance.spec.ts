@@ -10,9 +10,9 @@ type UsageWindow = {
 type UsageAllowance = {
   hour: UsageWindow;
   day: UsageWindow;
-  guest_session: null;
+  guest_session: UsageWindow | null;
   available_now: boolean;
-  limiting_window: "hour" | "day";
+  limiting_window: "hour" | "day" | "guest_session";
 };
 
 type UnboundedAllowance = {
@@ -504,8 +504,12 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
   const disclosure = dialog.getByRole("button", { name: "¿Qué cuenta?" });
   await disclosure.click();
   await expect(dialog).toContainText(
-    "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
+    "La conversación es gratis. Preguntar y leer respuestas nunca cuenta.",
   );
+  await expect(dialog).toContainText(
+    "Las búsquedas con fuentes cuentan una vez por cada búsqueda que Argus hace por ti. Las respuestas con datos de Argus no cuentan.",
+  );
+  await expect(dialog).toContainText("Sin límite");
   await expect(dialog).toContainText(
     "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar.",
   );
@@ -514,3 +518,79 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
     dialog.locator(`time[datetime="${dayEnd}"]`).first(),
   ).not.toBeEmpty();
 });
+
+// Operation classes: an unbounded class shows no gauge. Screenshots land
+// under docs/reports/evidence/561 only when the capture flag is set. The
+// guest workspace line needs a real guest bootstrap and is covered by unit
+// tests instead.
+const OPERATION_CLASS_EVIDENCE_DIR =
+  "../docs/reports/evidence/561/usage-operation-classes";
+
+for (const classCase of [
+  {
+    language: "en" as const,
+    locale: "en-US" as const,
+    theme: "light" as const,
+    labels: { settings: "Settings", data: "Data Controls", usage: "Usage" },
+    noLimit: "No limit",
+    simulationsLeft: "46 left today",
+  },
+  {
+    language: "es-419" as const,
+    locale: "es-419" as const,
+    theme: "dark" as const,
+    labels: { settings: "Ajustes", data: "Controles de datos", usage: "Uso" },
+    noLimit: "Sin límite",
+    simulationsLeft: "Quedan 46 hoy",
+  },
+]) {
+  test(`Usage keys allowances by operation class in ${classCase.language}`, async ({
+    page,
+  }) => {
+    const hourEnd = "2026-07-17T15:00:00Z";
+    const dayEnd = "2026-07-18T00:00:00Z";
+    await page.addInitScript((theme) => {
+      window.localStorage.setItem("argus-theme", theme);
+    }, classCase.theme);
+    await mockUsageShell(page, {
+      language: classCase.language,
+      locale: classCase.locale,
+      allowances: {
+        compute: UNBOUNDED,
+        grounding: UNBOUNDED,
+        execution: {
+          hour: { limit: 10, used: 1, remaining: 9, period_end: hourEnd },
+          day: { limit: 50, used: 4, remaining: 46, period_end: dayEnd },
+          guest_session: null,
+          available_now: true,
+          limiting_window: "hour",
+        },
+      },
+    });
+    await page.goto("/chat", { waitUntil: "networkidle" });
+    await openUsageDialog(page, classCase.labels);
+
+    const dialog = page.getByRole("dialog", { name: classCase.labels.usage });
+    // Rail on: conversation and searches are both unbounded for an account,
+    // so only simulations carries a gauge.
+    await expect(dialog.getByText(classCase.noLimit)).toHaveCount(2);
+    await expect(dialog.getByRole("progressbar")).toHaveCount(1);
+    await expect(dialog).toContainText(classCase.simulationsLeft);
+    await expect(dialog).not.toContainText("temporary chat");
+
+    if (process.env.ARGUS_CAPTURE_USAGE_CLASSES_EVIDENCE === "1") {
+      await page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
+      await dialog.screenshot({
+        path: `${OPERATION_CLASS_EVIDENCE_DIR}/${classCase.language}-${classCase.theme}-registered.png`,
+        animations: "disabled",
+      });
+    }
+  });
+}
