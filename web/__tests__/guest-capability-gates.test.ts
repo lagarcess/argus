@@ -175,6 +175,10 @@ describe("a spent allowance always explains itself", () => {
     expect(skip).toBeLessThan(read);
     expect(source).not.toContain("decideGuestMessageGate");
     expect(source).not.toContain("message_limit");
+    // The deprecated aliases exist for stale bundles only; new code reads
+    // the operation-class keys.
+    expect(source).not.toContain("allowances.messages");
+    expect(source).not.toContain("allowances.backtests");
   });
 
   test("the pending action is what needs a conversation, not the prompt", () => {

@@ -4945,11 +4945,21 @@ components:
           - $ref: '#/components/schemas/UnboundedAllowance'
         execution:
           $ref: '#/components/schemas/UsageAllowance'
+        messages:
+          $ref: '#/components/schemas/UnboundedAllowance'
+          deprecated: true
+          readOnly: true
+        backtests:
+          $ref: '#/components/schemas/UsageAllowance'
+          deprecated: true
+          readOnly: true
       type: object
       required:
       - compute
       - grounding
       - execution
+      - messages
+      - backtests
       description: 'Allowance truth keyed by operation class.
 
 

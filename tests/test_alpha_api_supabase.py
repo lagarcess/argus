@@ -852,8 +852,19 @@ def test_me_usage_openapi_contract_publishes_operation_classes():
 
     for schemas in (generated, checked):
         container = schemas["UsageAllowances"]
-        assert container["required"] == ["compute", "grounding", "execution"]
-        assert set(container["properties"]) == {"compute", "grounding", "execution"}
+        classes = ["compute", "grounding", "execution"]
+        # messages and backtests stay for deployed bundles, marked deprecated
+        # and derived from the classes; they leave after the next promotion.
+        aliases = {"messages": "compute", "backtests": "execution"}
+        assert container["required"] == classes + list(aliases)
+        assert set(container["properties"]) == set(classes) | set(aliases)
+        for alias, source in aliases.items():
+            assert container["properties"][alias]["deprecated"] is True
+            assert container["properties"][alias]["readOnly"] is True
+            assert (
+                container["properties"][alias]["$ref"]
+                == container["properties"][source]["$ref"]
+            )
         # Compute can only ever be unbounded; grounding depends on the
         # account kind; execution always carries windows.
         assert container["properties"]["compute"] == {

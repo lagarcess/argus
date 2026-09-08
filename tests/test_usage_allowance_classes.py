@@ -84,7 +84,15 @@ def test_me_usage_keys_allowances_by_operation_class(mock_gateway, research_rail
 
     assert response.status_code == 200
     allowances = response.json()["allowances"]
-    assert set(allowances) == {"compute", "grounding", "execution"}
+    # The two deprecated aliases ride along for stale bundles; see the alias
+    # test below for their derivation.
+    assert set(allowances) == {
+        "compute",
+        "grounding",
+        "execution",
+        "messages",
+        "backtests",
+    }
     assert allowances["compute"] == UNBOUNDED_ALLOWANCE
     # Rail on, a signed-in account has no research window of its own.
     assert allowances["grounding"] == UNBOUNDED_ALLOWANCE
@@ -372,3 +380,32 @@ def test_guest_execution_availability_holds_every_enforced_bound(
     )
     assert execution["available_now"] is available_now
     assert execution["limiting_window"] == limiting_window
+
+
+@pytest.mark.parametrize("account", ["registered", "guest"])
+def test_deprecated_aliases_mirror_the_classes_for_stale_bundles(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+    research_rail_on,
+    account: str,
+):
+    # Deployed bundles read messages and backtests until they reload; both
+    # derive from the classes, so a stale tab sees the same truth.
+    if account == "guest":
+        _configure_guest_usage(
+            mock_gateway,
+            monkeypatch,
+            visitor_used={"backtest_runs": 2},
+            workspace_simulations_used=1,
+        )
+        headers = {"Authorization": "Bearer guest-token"}
+    else:
+        _mock_usage_rows(mock_gateway, hour_rows=[], day_rows=[])
+        headers = {"Authorization": "Bearer test-token"}
+
+    response = client.get("/api/v1/me/usage", headers=headers)
+
+    assert response.status_code == 200
+    allowances = response.json()["allowances"]
+    assert allowances["messages"] == allowances["compute"] == UNBOUNDED_ALLOWANCE
+    assert allowances["backtests"] == allowances["execution"]

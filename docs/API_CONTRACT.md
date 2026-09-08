@@ -2535,6 +2535,13 @@ Three operation classes, one meter each:
 - The UI emphasizes the daily allowance, reveals the hourly window whenever
   `limiting_window` is `hour`, and reveals the workspace window whenever it is
   `guest_session`.
+- `messages` and `backtests` are deprecated aliases of `compute` and
+  `execution`, present in every response (omitted from the examples above)
+  so deployed web bundles keep a stable shape during the rollout, as `GET /me`
+  does for `onboarding`. They are derived from the classes, marked
+  `deprecated` in the OpenAPI artifact, and are removed after the first
+  promotion that carries the operation-class keys. New clients must not read
+  them.
 
 **Accounting semantics:**
 - Conversation is compute. Ordinary turns settle nothing at entry or at their

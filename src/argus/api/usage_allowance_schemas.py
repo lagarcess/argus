@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class UsageWindow(BaseModel):
@@ -62,6 +62,19 @@ class UsageAllowances(BaseModel):
     compute: UnboundedAllowance
     grounding: UsageAllowance | UnboundedAllowance
     execution: UsageAllowance
+
+    # Deployed web bundles read these until they reload. Both derive from the
+    # classes so they cannot drift; they are removed after the first promotion
+    # that carries the operation-class keys.
+    @computed_field(json_schema_extra={"deprecated": True})  # type: ignore[prop-decorator]
+    @property
+    def messages(self) -> UnboundedAllowance:
+        return self.compute
+
+    @computed_field(json_schema_extra={"deprecated": True})  # type: ignore[prop-decorator]
+    @property
+    def backtests(self) -> UsageAllowance:
+        return self.execution
 
 
 class UsageAllowanceResponse(BaseModel):
