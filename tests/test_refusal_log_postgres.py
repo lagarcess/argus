@@ -29,26 +29,29 @@ fake = Faker()
 @pytest.fixture
 def database() -> Iterator[tuple[Any, dict[str, str]]]:
     with psycopg.connect(DSN) as connection:
-        owner = {
-            key: fake.uuid4() for key in ("user_id", "conversation_id", "request_id")
-        }
-        email = fake.email()
-        connection.execute(
-            "insert into auth.users (id, email) values (%s, %s)",
-            (owner["user_id"], email),
-        )
-        connection.execute(
-            "insert into public.profiles (id, email) values (%s, %s)",
-            (owner["user_id"], email),
-        )
-        connection.execute(
-            "insert into public.conversations (id, user_id, title) values (%s, %s, %s)",
-            (owner["conversation_id"], owner["user_id"], fake.sentence()),
-        )
         try:
-            yield connection, owner
+            yield connection, _seed_owner(connection)
         finally:
             connection.rollback()
+
+
+def _seed_owner(connection: Any) -> dict[str, str]:
+    owner = {key: fake.uuid4() for key in ("user_id", "conversation_id", "request_id")}
+    # Auth owns the email; every profile in the fixture derives from that value.
+    email = fake.email()
+    connection.execute(
+        "insert into auth.users (id, email) values (%s, %s)",
+        (owner["user_id"], email),
+    )
+    connection.execute(
+        "insert into public.profiles (id, email) values (%s, %s)",
+        (owner["user_id"], email),
+    )
+    connection.execute(
+        "insert into public.conversations (id, user_id, title) values (%s, %s, %s)",
+        (owner["conversation_id"], owner["user_id"], fake.sentence()),
+    )
+    return owner
 
 
 def _message(
@@ -249,24 +252,10 @@ def test_rejected_target_is_a_claim_and_never_joins_other_users_messages(
     database: tuple[Any, dict[str, str]],
 ) -> None:
     connection, owner = database
-    foreign_owner = fake.uuid4()
-    supplied_target, foreign_message = fake.uuid4(), fake.uuid4()
-    connection.execute(
-        "insert into auth.users (id, email) values (%s, %s)",
-        (foreign_owner, fake.email()),
-    )
-    connection.execute(
-        "insert into public.profiles (id, email) values (%s, %s)",
-        (foreign_owner, fake.email()),
-    )
-    connection.execute(
-        "insert into public.conversations (id, user_id, title) values (%s, %s, %s)",
-        (supplied_target, foreign_owner, fake.sentence()),
-    )
-    connection.execute(
-        "insert into public.messages (id, user_id, conversation_id, role, content)"
-        " values (%s, %s, %s, 'assistant', %s)",
-        (foreign_message, foreign_owner, supplied_target, fake.sentence()),
+    foreign_owner = _seed_owner(connection)
+    supplied_target = foreign_owner["conversation_id"]
+    foreign_message = _message(
+        connection, foreign_owner, role="assistant", content=fake.sentence()
     )
     observation = RefusalObservation(
         **{**owner, "conversation_id": supplied_target},
