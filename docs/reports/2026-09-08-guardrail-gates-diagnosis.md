@@ -328,7 +328,66 @@ admission, persistence and SSE around it is untouched by this lane. Runs were
 interleaved head, base, head, base and pooled per label
 ([evidence/565](evidence/565/README.md)).
 
-RESULTS_TABLE
+Pooled over two interleaved runs per label, twenty turns per category per
+label, the same ten messages each run. "Four-call" is the time in the four
+gated calls; "other calls" is every other provider call on the turn
+(preflight, interpretation, composer, and the run-field audits on
+confirmations), which this lane does not touch, so a move there is provider
+drift between windows.
+
+| Turn type | label | n | interpret p50 | p95 | provider mean | other calls | four-call mean | share | composer skipped |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Ordinary chat | base | 20 | 35.27s | 63.75s | 37.46s | 20.90s | 16.56s | 44% | 2 |
+| Ordinary chat | head | 20 | 15.63s | 35.39s | 18.77s | 18.33s | 0.44s | 2% | 0 |
+| Compute-intent probe | base | 20 | 25.85s | 45.42s | 27.20s | 15.31s | 11.89s | 44% | 0 |
+| Compute-intent probe | head | 20 | 16.14s | 27.13s | 17.73s | 13.80s | 3.93s | 22% | 0 |
+| Confirmation | base | 20 | 32.08s | 58.51s | 38.13s | 35.57s | 2.56s | 7% | 0 |
+| Confirmation | head | 20 | 29.80s | 38.13s | 27.66s | 27.26s | 0.40s | 1% | 0 |
+
+Fires per label, twenty turns each:
+
+| Turn type | call | base fires / turns | head fires / turns |
+| --- | --- | ---: | ---: |
+| Ordinary chat | `FocusedAssetDiscoveryRead` | 15 / 15 | 0 / 0 |
+| Ordinary chat | `CapabilitySideQuestionAudit` | 8 / 8 | 0 / 0 |
+| Ordinary chat | `ContextQuestionAudit` | 13 / 13 | 0 / 0 |
+| Ordinary chat | `FocusedStrategyExtraction` | 32 / 16 | 2 / 2 |
+| Compute-intent probe | `FocusedAssetDiscoveryRead` | 7 / 7 | 0 / 0 |
+| Compute-intent probe | `CapabilitySideQuestionAudit` | 7 / 7 | 0 / 0 |
+| Compute-intent probe | `ContextQuestionAudit` | 7 / 7 | 4 / 4 |
+| Compute-intent probe | `FocusedStrategyExtraction` | 36 / 20 | 20 / 20 |
+| Confirmation | `FocusedStrategyExtraction` | 4 / 3 | 2 / 2 |
+
+What the numbers say.
+
+- **Ordinary chat drops from 35.27s to 15.63s at the interpret stage**, and
+  the four calls go from 16.56s per turn to 0.44s. The two starved composers on
+  base (2 of 20, the turn-10 failure mode from #563) do not recur. Adding the
+  roughly 1.7s of transport around the interpret node, the deployed first
+  token for ordinary chat should land near 17s against the 33.14s baseline,
+  which is what round one projected from the receipts (17.97s). Decision 3's
+  one-second target stays out of reach on this spine; the interpretation call
+  (9 to 13s) and the composer (5 to 10s) are the next two levers.
+- **The residual repair on ordinary chat is the unsupported thesis clause.**
+  Both head fires are Spanish concept questions whose primary read failed its
+  contract and was re-read by the fallback model; that read labeled the turn
+  unsupported with a paraphrased thesis, which the pinned clause admits. One
+  call, no material fields, ladder ended. Relabeling concept questions away
+  from `unsupported_or_out_of_scope` is the registry lane's job and removes
+  this at the source.
+- **Compute probes halve** (25.85s to 16.14s). Their numbers count as
+  execution evidence, so the repair still runs once per turn, and two of ten
+  probes still become backtest clarifications, as in #563: the calculations
+  lane's problem, unchanged here. The context audit's four remaining fires are
+  the forced unsupported path, kept on purpose.
+- **Confirmations keep their repair.** Two of twenty needed the focused
+  extraction on head, as one of ten did in #563, and reached their card. The
+  confirmation wall time moved with the provider, not the lane: base run 1
+  averaged 38.2s of non-gated calls per turn against 23.1s on head run 1 with
+  only 0.7s of gated time to explain, which is why the runs were interleaved
+  and pooled, and why the four-call column is the lane's number.
+- Cost per ordinary turn halved with the calls: $0.397 to $0.192 across the
+  twenty turns.
 
 ## Round two: the live scorecard
 
