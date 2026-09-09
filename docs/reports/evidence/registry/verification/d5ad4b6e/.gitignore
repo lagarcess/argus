@@ -1,0 +1,4 @@
+# Retain these bounded verification logs.
+!frontend-build.log
+!modularity.log
+!import-probes-checkpoints.log

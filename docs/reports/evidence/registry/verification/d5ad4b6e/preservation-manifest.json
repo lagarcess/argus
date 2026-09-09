@@ -1,0 +1,187 @@
+{
+  "evidence_kind": "exact_file_preservation_and_bounded_log_excerpts",
+  "measured_candidate_sha": "d5ad4b6e1c3e475820a33fa1d55f4f6f1658e467",
+  "raw_copies": [
+    {
+      "source": "/Users/garces/.codex/worktrees/aa72/private-alpha-next/temp/argus_eval_scorecards/argus-eval-scorecard-20260909T211620Z.json",
+      "retained_path": "live-measurement-second.json",
+      "bytes": 813342,
+      "sha256": "b7d832f67b514c3d45f3d82b35642f848d606948f34119b8651ebb5b533ed8a9",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-baseline-comparison.json",
+      "retained_path": "baseline-comparison-second.json",
+      "bytes": 34763,
+      "sha256": "1bd48ebd304eb356b5bf5e16134e8c2c4f0e3aeee64f32bc09497bd571ac549b",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/README.md",
+      "retained_path": "browser/d5ad4b6e/README.md",
+      "bytes": 4251,
+      "sha256": "266785cc03f590b15aa30c7f99bf872cae4b26eaff22322f36720a01c25c1ad7",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/browser.log",
+      "retained_path": "browser/d5ad4b6e/browser.log",
+      "bytes": 3551,
+      "sha256": "b51382fb8cfbbc538b9f9410e9196a7aa290558091fcac5a7eddbb51e80ad7e5",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/scroll-capture.cjs",
+      "retained_path": "browser/d5ad4b6e/scroll-capture.cjs",
+      "bytes": 2058,
+      "sha256": "495e6b63ef42212b040be2d63eddbc0ef0de5bdef7e451117ba3c7d9e1ede40d",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/scroll-captures.jsonl",
+      "retained_path": "browser/d5ad4b6e/scroll-captures.jsonl",
+      "bytes": 3134,
+      "sha256": "691bf3878e5b89b89f638ccbefe7fb72fdab1162ac6a69152eb2080c8f25c8b1",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-backtest-en.png",
+      "retained_path": "browser/d5ad4b6e/tool-backtest-en.png",
+      "bytes": 45067,
+      "sha256": "2eae33d8f3e3ccca2e9a1d577d0bfb7865465dc0cdef9316b7dded3468c0ff50",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-backtest-es-419.png",
+      "retained_path": "browser/d5ad4b6e/tool-backtest-es-419.png",
+      "bytes": 50035,
+      "sha256": "ecca3b8527be56005c4cba2b3efaf86c6b412903a5d4e57698391953f5e82e85",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-card-en-1280.png",
+      "retained_path": "browser/d5ad4b6e/tool-card-en-1280.png",
+      "bytes": 9942,
+      "sha256": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-card-en-390.png",
+      "retained_path": "browser/d5ad4b6e/tool-card-en-390.png",
+      "bytes": 9942,
+      "sha256": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-card-es-419-1280.png",
+      "retained_path": "browser/d5ad4b6e/tool-card-es-419-1280.png",
+      "bytes": 11431,
+      "sha256": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-card-es-419-390.png",
+      "retained_path": "browser/d5ad4b6e/tool-card-es-419-390.png",
+      "bytes": 11431,
+      "sha256": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-history-en.png",
+      "retained_path": "browser/d5ad4b6e/tool-history-en.png",
+      "bytes": 44145,
+      "sha256": "6fe1075536e0a0a67556370281d305c7511e7017c6441ae08e5ee1575cec50db",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-history-es-419.png",
+      "retained_path": "browser/d5ad4b6e/tool-history-es-419.png",
+      "bytes": 48140,
+      "sha256": "2c177d7fc85b5c776f0d08a846e57a248eb6790ea9ac54a8cae477e03ec23d47",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-jobs-en.png",
+      "retained_path": "browser/d5ad4b6e/tool-jobs-en.png",
+      "bytes": 69985,
+      "sha256": "c7f882aa3fe151d6814dfc95950cb2dd2cabfcc72e9abe37511c23da601dcf11",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-jobs-es-419.png",
+      "retained_path": "browser/d5ad4b6e/tool-jobs-es-419.png",
+      "bytes": 77915,
+      "sha256": "0539afeb11d0c6cda85d2bd564ee917b280a5f136d23619a215a8084c92cbc2b",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-progress-en.png",
+      "retained_path": "browser/d5ad4b6e/tool-progress-en.png",
+      "bytes": 54900,
+      "sha256": "55460d6c35c3b15d08fdf5c3b03292e3ac515d1c2eacf9a1ac377625f4b56335",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-browser-d5ad4b6e/tool-progress-es-419.png",
+      "retained_path": "browser/d5ad4b6e/tool-progress-es-419.png",
+      "bytes": 56778,
+      "sha256": "fee9b5a7f22c30647e19d59cf67377de0dd8f1adca21e8e81b28e5af8a9a62a3",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-preflight-d5ad4b6e.json",
+      "retained_path": "verification/d5ad4b6e/preflight.json",
+      "bytes": 569,
+      "sha256": "a0cc619c92e2f2e397d9ce73ddfb5a8484eb3468bfc4df6e2112eb85e66d9600",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-frontend-build-d5ad4b6e.log",
+      "retained_path": "verification/d5ad4b6e/frontend-build.log",
+      "bytes": 1354,
+      "sha256": "ca639e10b2332cf4fa865b0f86aa59666c6b2141e0a0a0b0984ad467a3697b77",
+      "copy_exact": true
+    },
+    {
+      "source": "/private/tmp/registry-modularity-d5ad4b6e.log",
+      "retained_path": "verification/d5ad4b6e/modularity.log",
+      "bytes": 1969,
+      "sha256": "fcb6fd2bef2fa69753785c405f8416e1c2dff080e2918555e6e46594a4d68b51",
+      "copy_exact": true
+    },
+    {
+      "source": "/Users/garces/.codex/worktrees/aa72/private-alpha-next/temp/registry-repaired-import-proof.log",
+      "retained_path": "verification/d5ad4b6e/import-probes-checkpoints.log",
+      "bytes": 181,
+      "sha256": "0439a95eef8fa3f9ad87a9e27edbd8b883c2c421db0b8bce6e67836faef3f584",
+      "copy_exact": true
+    }
+  ],
+  "terminal_summary_excerpts": [
+    {
+      "source_log": "/Users/garces/.codex/worktrees/aa72/private-alpha-next/temp/registry-backend-repaired-final.log",
+      "source_sha256": "1aa293f69361d76f19682ef8998a1a476b6b91eaa578a6b4b3b072236a40e805",
+      "retained_path": "verification/d5ad4b6e/backend-summary.txt",
+      "kind": "exact_selected_terminal_lines",
+      "retained_sha256": "7952f06499b103d75c5d46d1158f64021d3fad7707f96ea3474d7ca7d76b4598"
+    },
+    {
+      "source_log": "/private/tmp/registry-frontend-d5ad4b6e.log",
+      "source_sha256": "5a110508f970f5ba906273bff429ce8751b39cf3ee5e5f9ab1e16404f71369f0",
+      "retained_path": "verification/d5ad4b6e/frontend-summary.txt",
+      "kind": "exact_selected_terminal_lines",
+      "retained_sha256": "f7e7a6b00b89cf0d489e00f5553d9e14e909500717a6bfc903cff86c350ac79a"
+    },
+    {
+      "source_log": "/Users/garces/.codex/worktrees/aa72/private-alpha-next/temp/registry-live-full-d5ad4b6e.log",
+      "source_sha256": "9faa6fae38c8b269cce41014b5c7c3cabee77895888fa1e9d8528da28bae4f50",
+      "retained_path": "verification/d5ad4b6e/live-summary.txt",
+      "kind": "exact_selected_terminal_lines",
+      "retained_sha256": "a3b94d66291f2ca3e6c2c10b05f11952c33fde55384af29e336e092718b13c37"
+    }
+  ],
+  "browser_source_file_count": 16,
+  "browser_png_count": 12,
+  "provider_calls_during_preservation": 0,
+  "historical_scorecards_regraded": false
+}
