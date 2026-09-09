@@ -39,3 +39,11 @@ they are not browser checks of the public `/r/` route.
 For durable candidate screenshots, run with `REGISTRY_SCREENSHOT_DIR` set to the
 absolute path of this directory's `browser/` subdirectory. Capture or explicitly
 revalidate them after the candidate commit and record that SHA in the lane audit.
+
+The latest capture at `53ed45df` passed 14 cases. Its
+[capture record](browser/53ed45df/README.md) documents the fixture boundary,
+viewport adjustments, command, and clean candidate. View the
+[English mobile card](browser/53ed45df/tool-card-en-390.png),
+[Spanish mobile card](browser/53ed45df/tool-card-es-419-390.png),
+[English DCA result](browser/53ed45df/tool-backtest-en.png), and
+[Spanish call progress](browser/53ed45df/tool-progress-es-419.png).

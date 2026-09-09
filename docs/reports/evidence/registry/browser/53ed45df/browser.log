@@ -1,0 +1,36 @@
+(node:24218) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2m[WebServer] [22m(node:24229) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:24230) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 14 tests using 1 worker
+
+(node:24231) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24231) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:24231) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:24235) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:24235) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[2m[WebServer] [22m(node:24237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:24237) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+  ✓   1 [chromium] › e2e/tool-registry.spec.ts:22:7 › a later saved user message makes old tool inputs read-only en (1.3s)
+  ✓   2 [chromium] › e2e/tool-registry.spec.ts:38:7 › sending another turn cancels the pending tool edit en (1.5s)
+  ✓   3 [chromium] › e2e/tool-registry.spec.ts:75:7 › declared backtest keeps DCA assumptions and the receipt visual en (773ms)
+  ✓   4 [chromium] › e2e/tool-registry.spec.ts:101:7 › executing-call progress is localizable without another turn en (963ms)
+  ✓   5 [chromium] › e2e/tool-registry.spec.ts:133:9 › tool results live, recompute and reload en 1280 (2.3s)
+  ✓   6 [chromium] › e2e/tool-registry.spec.ts:133:9 › tool results live, recompute and reload en 390 (2.2s)
+  ✓   7 [chromium] › e2e/tool-registry.spec.ts:22:7 › a later saved user message makes old tool inputs read-only es-419 (761ms)
+  ✓   8 [chromium] › e2e/tool-registry.spec.ts:38:7 › sending another turn cancels the pending tool edit es-419 (1.5s)
+  ✓   9 [chromium] › e2e/tool-registry.spec.ts:75:7 › declared backtest keeps DCA assumptions and the receipt visual es-419 (766ms)
+  ✓  10 [chromium] › e2e/tool-registry.spec.ts:101:7 › executing-call progress is localizable without another turn es-419 (930ms)
+  ✓  11 [chromium] › e2e/tool-registry.spec.ts:133:9 › tool results live, recompute and reload es-419 1280 (2.2s)
+  ✓  12 [chromium] › e2e/tool-registry.spec.ts:133:9 › tool results live, recompute and reload es-419 390 (2.3s)
+  ✓  13 [chromium] › e2e/tool-registry.spec.ts:197:7 › repeated asynchronous calls settle independently en (1.4s)
+  ✓  14 [chromium] › e2e/tool-registry.spec.ts:197:7 › repeated asynchronous calls settle independently es-419 (1.3s)
+
+  14 passed (21.0s)
