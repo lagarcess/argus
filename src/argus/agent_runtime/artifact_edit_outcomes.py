@@ -8,7 +8,10 @@ from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     ResolvedArtifactEdit,
 )
-from argus.agent_runtime.artifacts.asset_edits import apply_asset_universe_edit
+from argus.agent_runtime.artifacts.asset_edits import (
+    apply_asset_universe_edit,
+    normalized_asset_symbols,
+)
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.semantic_integrity import _supported_timeframe_value
 from argus.domain.edit_contract import complete_edit_disclosure
@@ -163,7 +166,9 @@ def artifact_edit_disclosure(
             # basket through the existing asset semantics owner.
             legacy_value = (
                 apply_asset_universe_edit(
-                    current_asset_universe, flat, plan.asset_universe_operation
+                    normalized_asset_symbols(current_asset_universe),
+                    flat,
+                    plan.asset_universe_operation,
                 )
                 if field == "asset_universe"
                 else flat

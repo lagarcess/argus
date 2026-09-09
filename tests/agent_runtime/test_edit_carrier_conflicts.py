@@ -15,7 +15,31 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (
 
 from tests.agent_runtime._pending_edit_outcome_support import card_for_edit_plan
 from tests.agent_runtime.test_compound_edit_contract import _request
-from tests.agent_runtime.test_recovery_edit_outcomes import _recover_and_confirm
+from tests.agent_runtime.test_recovery_edit_outcomes import _recover, _recover_and_confirm
+
+
+@pytest.mark.parametrize("route", ["main", "recovery"])
+@pytest.mark.parametrize("base", [["BRK-B"], [" brk-b ", "BRK/B"]])
+def test_asset_carriers_share_canonical_starting_basket(monkeypatch, route, base):
+    request = _request("Add MSFT", requested_field="assumption")
+    request.latest_task_snapshot.pending_strategy_summary.asset_universe = base
+    plan = {
+        "outcome": "ready_to_confirm",
+        "operations": [{"op": "add", "target": "asset", "symbols": ["MSFT"]}],
+        "asset_universe": ["MSFT"],
+        "asset_universe_operation": "append",
+    }
+    response = (
+        _response_from_artifact_assumption_edit_plan(
+            plan=ArtifactAssumptionEditPlan(**plan), request=request
+        )
+        if route == "main"
+        else asyncio.run(_recover(request, plan, monkeypatch))
+    )
+    assert response is not None
+    draft = response.candidate_strategy_draft
+    assert draft.asset_universe == ["BRK/B", "MSFT"]
+    assert not draft.extra_parameters.get("edit_disclosure")
 
 
 @pytest.mark.parametrize("route", ["main", "recovery"])
@@ -124,9 +148,9 @@ def test_asset_carriers_compare_final_baskets(
             card_for_edit_plan(monkeypatch, plan, request=request)
         )
         assert outcome == "await_approval"
-        actual = next(row["value"] for row in card["rows"] if row["key"] == "assets").split(
-            ", "
-        )
+        actual = next(
+            row["value"] for row in card["rows"] if row["key"] == "assets"
+        ).split(", ")
     else:
         card = asyncio.run(_recover_and_confirm(request, plan, monkeypatch))
         actual = card["strategy"]["asset_universe"]
