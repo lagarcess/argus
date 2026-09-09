@@ -3,7 +3,11 @@
 import asyncio
 
 import pytest
-from argus.agent_runtime.artifact_edit_planner import ArtifactAssumptionEditPlan
+from argus.agent_runtime.artifact_edit_outcomes import artifact_edit_disclosure
+from argus.agent_runtime.artifact_edit_planner import (
+    ArtifactAssumptionEditPlan,
+    ResolvedArtifactEdit,
+)
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
     _response_from_artifact_assumption_edit_plan,
@@ -83,4 +87,51 @@ def test_valid_timeframe_conflict_keeps_typed_winner_in_both_routes(monkeypatch,
         assert card["strategy"]["timeframe"] == typed
     assert card["edit_disclosure"]["unapplied"] == [
         {"op": "set", "target": "timeframe", "reason": "conflicting_edit_carriers"}
+    ]
+
+
+@pytest.mark.parametrize("route", ["main", "recovery"])
+@pytest.mark.parametrize("asset_operation", [None, "replace"])
+def test_explicit_empty_asset_carrier_is_accounted_for_beside_success(
+    monkeypatch, route, asset_operation
+):
+    request = _request("Change capital and assets", requested_field="assumption")
+    capital = request.latest_task_snapshot.pending_strategy_summary.capital_amount * 0.9
+    plan = {
+        "outcome": "ready_to_confirm",
+        "operations": [{"op": "set", "target": "capital", "number": capital}],
+        "asset_universe": [],
+        "asset_universe_operation": asset_operation,
+    }
+    if route == "main":
+        outcome, card = asyncio.run(card_for_edit_plan(monkeypatch, plan))
+        assert outcome == "await_approval"
+    else:
+        card = asyncio.run(_recover_and_confirm(request, plan, monkeypatch))
+    if asset_operation is not None:
+        assert card["edit_disclosure"]["unapplied"] == [
+            {"op": "set", "target": "asset", "reason": "not_materialized"}
+        ]
+    else:
+        assert not card.get("edit_disclosure")
+
+
+def test_explicit_empty_asset_carrier_cannot_hide_behind_a_typed_asset_target():
+    assets = _request(
+        "Change assets"
+    ).latest_task_snapshot.pending_strategy_summary.asset_universe
+    plan = ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        operations=[{"op": "replace", "target": "asset", "symbols": assets}],
+        asset_universe=[],
+        asset_universe_operation="replace",
+    )
+    disclosure = artifact_edit_disclosure(
+        plan,
+        materialized_targets={"asset"},
+        has_changes=False,
+        resolved=ResolvedArtifactEdit(asset_universe=assets),
+    )
+    assert disclosure["unapplied"] == [
+        {"op": "set", "target": "asset", "reason": "conflicting_edit_carriers"}
     ]

@@ -37,6 +37,20 @@ def _canonical_target(target: str) -> str:
     return "capital" if target == "starting_capital" else target
 
 
+def _requested_legacy_fields(plan: ArtifactAssumptionEditPlan) -> dict[str, Any]:
+    """An explicit operation owns intent even when its value is empty."""
+    return {
+        field: value
+        for field in _LEGACY_PLAN_TARGETS
+        if (value := getattr(plan, field)) is not None
+        and (
+            field != "asset_universe"
+            or value
+            or plan.asset_universe_operation is not None
+        )
+    }
+
+
 def canonical_artifact_edit_plan(
     plan: ArtifactAssumptionEditPlan,
 ) -> ArtifactAssumptionEditPlan:
@@ -136,27 +150,20 @@ def artifact_edit_disclosure(
         for entry in (existing or {}).get("unapplied", [])
     ]
     refused_targets = {entry["target"] for entry in unapplied}
+    legacy_fields = _requested_legacy_fields(plan)
     if resolved is not None:
-        for field, target in _LEGACY_PLAN_TARGETS.items():
-            flat = getattr(plan, field)
-            if (
-                target not in operation_targets
-                or target in refused_targets
-                or flat is None
-            ):
-                continue
-            if field == "asset_universe" and not flat:
+        for field, flat in legacy_fields.items():
+            target = _LEGACY_PLAN_TARGETS[field]
+            if target not in operation_targets or target in refused_targets:
                 continue
             if _carrier_value(flat) != _carrier_value(getattr(resolved, field)):
                 unapplied.append(
                     {"op": "set", "target": target, "reason": "conflicting_edit_carriers"}
                 )
     requested.extend(
-        ("set", target)
-        for field, target in _LEGACY_PLAN_TARGETS.items()
-        if getattr(plan, field) is not None
-        and (field != "asset_universe" or plan.asset_universe)
-        and target not in operation_targets
+        ("set", _LEGACY_PLAN_TARGETS[field])
+        for field in legacy_fields
+        if _LEGACY_PLAN_TARGETS[field] not in operation_targets
     )
     return complete_edit_disclosure(
         requested=requested,

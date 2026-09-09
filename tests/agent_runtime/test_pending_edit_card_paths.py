@@ -26,7 +26,7 @@ from tests.agent_runtime._pending_edit_outcome_support import card_for_edit_plan
         (
             {"asset_universe": [], "asset_universe_operation": "replace"},
             False,
-            "requested_change",
+            "asset",
         ),
         (
             {"operations": [{"op": "add", "target": "asset", "symbols": []}]},

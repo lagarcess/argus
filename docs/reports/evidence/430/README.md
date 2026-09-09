@@ -68,7 +68,7 @@ $500 monthly contribution separately.
 
 ## Verification
 
-- Focused backend acceptance: 197 tests passed across shared contracts, real
+- Focused backend acceptance: 202 tests passed across shared contracts, real
   planner-to-card paths, recovery, existing compound edits, lifecycle, direct
   edits, run consumption, checkpoint sync and card output.
 - Mocked evaluation harness: 237 tests passed across the documented mocked tier.
@@ -90,7 +90,7 @@ came from local feature flags and passed with default settings. The remaining
 unchanged test, `test_openrouter_failure_log_reports_raising_origin`, assumes its
 checkout path contains `/argus/`; this worktree is named `private-alpha-next`.
 CI's normal checkout supplies that path. These local limitations are not recorded
-as a green full backend suite; hosted CI must complete independently.
+as a green full backend suite; hosted CI must complete independently. The first hosted run then exposed three new recovery tests relying on local model configuration. The shared recovery test helper now owns its controlled model candidate; the focused suite passes with model environment values explicitly empty.
 
 Reproduce cards from the repository root:
 

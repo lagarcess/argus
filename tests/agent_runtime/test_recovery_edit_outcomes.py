@@ -39,9 +39,6 @@ def recovery_request(monkeypatch: pytest.MonkeyPatch) -> InterpretationRequest:
 
     monkeypatch.setattr(interpreter, "resolve_asset", resolve_asset)
     monkeypatch.setattr(confirm_module, "fetch_alpaca_market_clock", lambda: None)
-    monkeypatch.setattr(
-        planner, "openrouter_structured_model_candidates", lambda: ["test-model"]
-    )
     return request
 
 
@@ -57,6 +54,9 @@ async def _recover(
         return schema_model(**plan_data)
 
     monkeypatch.setattr(planner, "invoke_openrouter_json_schema", invoke)
+    monkeypatch.setattr(
+        planner, "openrouter_structured_model_candidates", lambda: ["test-model"]
+    )
     return await planned_active_confirmation_edit_interpretation(
         snapshot=request.latest_task_snapshot,
         current_user_message=request.current_user_message,
