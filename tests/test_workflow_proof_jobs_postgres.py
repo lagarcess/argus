@@ -168,18 +168,20 @@ def test_legacy_proof_row_projects_checking_until_reclassified() -> None:
         try:
             conversation_id = _seed_conversation(connection, user_id=user_id)
             job_id = str(uuid4())
-            # Postgres trims trailing zeros from a timestamptz, so these
-            # microseconds serialize as a five-digit fraction on every run.
-            finished_at = datetime.now(timezone.utc).replace(microsecond=123_450)
+            # A succeeded row the reader cannot hydrate is projected from
+            # updated_at, not finished_at, so that is the column that has to
+            # carry the short fraction. Postgres trims trailing zeros, so
+            # these microseconds serialize as five digits on every run.
+            occurred_at = datetime.now(timezone.utc).replace(microsecond=123_450)
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     insert into public.backtest_jobs
                       (id, user_id, conversation_id, operation_scope, payload_hash,
-                       launch_payload, status, started_at, finished_at,
+                       launch_payload, status, started_at, finished_at, updated_at,
                        execution_metadata)
                     values (%s, %s, %s, 'chat.run_backtest', 'sha256:legacy',
-                            %s::jsonb, 'succeeded', %s, %s, %s::jsonb)
+                            %s::jsonb, 'succeeded', %s, %s, %s, %s::jsonb)
                     """,
                     (
                         job_id,
@@ -192,8 +194,9 @@ def test_legacy_proof_row_projects_checking_until_reclassified() -> None:
                                 "created_by": PROOF_SEED_CREATED_BY,
                             }
                         ),
-                        finished_at,
-                        finished_at,
+                        occurred_at,
+                        occurred_at,
+                        occurred_at,
                         json.dumps({"workflow_proof": {"kind": PROOF_KIND}}),
                     ),
                 )
