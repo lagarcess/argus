@@ -964,7 +964,7 @@ integration and green there, not shipped to a user.
 | --- | --- | --- |
 | Subtract the guardrails | **LANDED** `695d9250`, PR #565 | done; surface released |
 | Cut the catalog import edge | **LANDED** `772aa276`, PR #567 | done; surface released |
-| Withheld answers keep their sources, and are not paid for twice | not yet pushed | `research_grounded.py`, `perplexity_agent.py`, research contracts |
+| Withheld answers keep their sources, and are not paid for twice | **LANDED** `6f7e7354`, PR #568 | done; surface released |
 | Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
 
 `llm_interpreter.py` has roughly 19 lines of modularity headroom and belongs to
@@ -976,7 +976,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
 | Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
 | Decisions | Plumbing | **Landed** `67facaf5`. |
-| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. |
+| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569: on the inline path `missing_public_sources` discards a paid packet, so the cost ledger records zero for a turn that made two provider calls. |
 | Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
