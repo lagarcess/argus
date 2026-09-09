@@ -508,16 +508,27 @@ false. The calculations lane would build on a runtime that cannot keep it, and
 the same audits would then fire on the new calculations too, turning a one-file
 change into a retrofit across five cards.
 
-**Nothing is built.** Every audit and repair already runs *after*
-`LLMInterpretationResponse` and takes it as input, so the shape is known by the
-time they fire, and each is already gated:
-`_response_needs_capability_side_question_audit`,
+**What is known, and what is not.** Known: every audit and repair runs *after*
+`LLMInterpretationResponse` and takes it as input, so they are post-hoc rather
+than routing, and each is already gated by an existing predicate
+(`_response_needs_capability_side_question_audit`,
 `_response_needs_context_question_audit`,
-`_strategy_extraction_repair_is_allowed`. The gates are simply too loose. Narrow
-them to interpretations that are actually backtest-shaped.
+`_strategy_extraction_repair_is_allowed`). Known: they fire on plain
+conversation, and the repair's own trigger is
+`required_strategy_shape_missing`, a backtest shape that a conversation turn
+will never have.
 
-**Done means.** The backtest audits and the strategy repair no longer fire on
-turns with no backtest. Ordinary chat first token drops materially against the
+**Not known, and this lane's first job: whether those gates can be narrowed
+without losing what they catch.** Nobody has read what each predicate actually
+tests, why it admits a conversation turn, or what the audit corrects when it
+does fire. The fix may be a tighter predicate, a cheaper check, a reordering, or
+for one of them, nothing. **The lane diagnoses before it proposes.** A dispatch
+that says "narrow the gates" is a guess; the board does not carry guesses.
+
+**Done means.** Each of the four calls has a written answer to: what does it
+catch, what admitted this turn, and what is the smallest change that stops it
+firing where there is nothing to check. Then the changes that survive that
+answer are made, and ordinary chat first token drops materially against the
 #563 baseline. No new machinery, no model-facing text, no fingerprint change.
 
 **The second lever, measure before acting.** The interpretation call itself is
