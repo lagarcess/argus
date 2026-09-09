@@ -206,7 +206,6 @@ export type GuestMe = {
   guest: {
     expires_at: string;
     conversation_id: string | null;
-    message_limit: number;
     simulation_limit: number;
     feedback_limit: number;
   } | null;
@@ -221,19 +220,26 @@ export type UsageWindow = {
 
 export type GuestUsage = {
   allowances: {
-    messages: {
+    compute: {
       hour: null;
       day: null;
-      guest_session: UsageWindow;
-      available_now: boolean;
-      limiting_window: "guest_session";
+      guest_session: null;
+      available_now: true;
+      limiting_window: null;
     };
-    backtests: {
+    grounding: {
       hour: null;
-      day: null;
+      day: UsageWindow;
+      guest_session: null;
+      available_now: boolean;
+      limiting_window: "day";
+    };
+    execution: {
+      hour: null;
+      day: UsageWindow;
       guest_session: UsageWindow;
       available_now: boolean;
-      limiting_window: "guest_session";
+      limiting_window: "day" | "guest_session";
     };
   };
 };

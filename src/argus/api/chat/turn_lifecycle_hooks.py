@@ -60,7 +60,7 @@ class ChatTurnLifecycleHooks:
         *,
         content: str,
         metadata: dict[str, Any] | None,
-        settle_usage: dict[str, Any] | None,
+        settle_usage: dict[str, Any] | None = None,
     ) -> Message:
         return self._observe(
             self._complete(content=content, metadata=metadata, settle_usage=settle_usage)
