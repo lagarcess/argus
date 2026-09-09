@@ -5,26 +5,27 @@ rootdir: /Users/garces/.codex/worktrees/e0cd/private-alpha-next
 configfile: pyproject.toml
 plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
 asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collected 482 items
+collected 528 items
 
-tests/test_result_dca_readout.py ....................................... [  8%]
-..................                                                       [ 11%]
-tests/test_result_figures.py .....................                       [ 16%]
-tests/test_artifact_presentation.py ......................               [ 20%]
-tests/test_backtest_message_projection.py ............                   [ 23%]
-tests/test_run_dossiers.py ...........                                   [ 25%]
-tests/test_public_excerpt_api.py ....................................... [ 33%]
-.........                                                                [ 35%]
+tests/research/test_discarded_spend.py ....................              [  3%]
+tests/test_result_dca_readout.py ....................................... [ 11%]
+..................                                                       [ 14%]
+tests/test_result_figures.py .....................                       [ 18%]
+tests/test_artifact_presentation.py ......................               [ 22%]
+tests/test_backtest_message_projection.py ............                   [ 25%]
+tests/test_run_dossiers.py ...........                                   [ 27%]
+tests/test_public_excerpt_api.py ....................................... [ 34%]
+.........                                                                [ 36%]
 tests/test_public_excerpt_receipts.py .................................. [ 42%]
 .......................................                                  [ 50%]
-tests/test_public_excerpt_owner_notes.py ............................... [ 57%]
-........                                                                 [ 58%]
-tests/test_public_excerpt_read_path.py .....                             [ 59%]
-tests/test_public_excerpt_language.py .................................. [ 66%]
-.....................................................................    [ 81%]
-tests/test_public_excerpt_turns.py ..................................... [ 88%]
-.........................                                                [ 93%]
+tests/test_public_excerpt_owner_notes.py ............................... [ 55%]
+........                                                                 [ 57%]
+tests/test_public_excerpt_read_path.py .....                             [ 58%]
+tests/test_public_excerpt_language.py .................................. [ 64%]
+.....................................................................    [ 77%]
+tests/test_public_excerpt_turns.py ..................................... [ 84%]
+...................................................                      [ 94%]
 tests/test_guest_conversion.py ......................                    [ 98%]
 tests/test_guest_access_policy.py .......                                [100%]
 
-============================= 482 passed in 4.83s ==============================
+============================= 528 passed in 5.35s ==============================

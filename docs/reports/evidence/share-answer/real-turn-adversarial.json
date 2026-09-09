@@ -1,5 +1,5 @@
 {
-  "candidate_sha": "92a6abde93ab0283aaace559f6a33c713042e1da",
+  "candidate_sha": "070aab20be941980391e5dde90117ab814553324",
   "new_provider_calls": 0,
   "writes": 0,
   "results": [
@@ -57,6 +57,38 @@
           "reason": "unsafe_text",
           "field": "owner_note"
         }
+      ],
+      "integration_usage_checks": [
+        {
+          "case": "summed",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "unknown",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "cache_hit",
+          "payload_and_digest_unchanged": true
+        }
+      ],
+      "integration_failure_checks": [
+        {
+          "case": "research_unavailable_missing_public_sources",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_empty_answer",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_malformed_response",
+          "reason": "degraded"
+        },
+        {
+          "case": "billed_thorough_failure",
+          "reason": "not_completed"
+        }
       ]
     },
     {
@@ -112,6 +144,38 @@
           "case": "owner_note",
           "reason": "unsafe_text",
           "field": "owner_note"
+        }
+      ],
+      "integration_usage_checks": [
+        {
+          "case": "summed",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "unknown",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "cache_hit",
+          "payload_and_digest_unchanged": true
+        }
+      ],
+      "integration_failure_checks": [
+        {
+          "case": "research_unavailable_missing_public_sources",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_empty_answer",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_malformed_response",
+          "reason": "degraded"
+        },
+        {
+          "case": "billed_thorough_failure",
+          "reason": "not_completed"
         }
       ]
     }

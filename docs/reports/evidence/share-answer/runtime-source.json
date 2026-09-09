@@ -1,14 +1,17 @@
 {
-  "runtime_sha": "dfb86ef8e3a6b994f3462cb4ee0d300b56543195",
+  "runtime_sha": "070aab20be941980391e5dde90117ab814553324",
   "web_build_sha": "92a6abde93ab0283aaace559f6a33c713042e1da",
   "original_integration_base": "743dfda3da9b467d32023ac32e900dad5a392500",
-  "current_integration_sha": "743dfda3da9b467d32023ac32e900dad5a392500",
+  "current_integration_sha": "377190bd2911959e14ad9d92f2f4dba3edeb8453",
   "trees": {
-    "src": "c28119c203fa0bbd90e388ca794f901ea494483c",
+    "src": "3064fb43182ca1e3fde2974dc23718ca04de65be",
     "web": "5310fc9246da3bd207abb25e4a32c89f75f5d9ee",
     "supabase": "8a607e142410f402345b6397eeed724b873af95d"
   },
   "final_dca_browser_source": "dfb86ef8e3a6b994f3462cb4ee0d300b56543195",
   "v1_revalidated_source": "dfb86ef8e3a6b994f3462cb4ee0d300b56543195",
-  "retained_evidence": "The DCA normalization changes no research source, stored snapshot reader, selection UI, Settings/revoke, or guest-entry behavior. Those accepted surfaces retain their source evidence; DCA card/mixed receipt and v1 compatibility were revalidated at this runtime."
+  "retained_evidence": "DCA card/mixed receipt and exact v1 body evidence retain their recorded capture sources. The required-figure guard changes eligibility only, with new bilingual 390/1280 before/after browser evidence. Integration changes private research spend/failure handling, with no public schema, UI, migration or environment change. Saved successful research and existing selection/lifecycle/preview evidence are retained. The merged runtime replays saved real turns and revalidates all 20 public cases without provider calls or writes; final-head readback is recorded in the terminal PR audit.",
+  "reconciliation_merge_sha": "070aab20be941980391e5dde90117ab814553324",
+  "required_figures_browser_source": "746b7b745f7cd1ed35916587a508a95e8312ef80",
+  "public_revalidated_source": "070aab20be941980391e5dde90117ab814553324"
 }

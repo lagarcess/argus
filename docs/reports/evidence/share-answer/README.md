@@ -31,7 +31,7 @@ of general personal-information detection.
 ## Browser evidence
 
 Every public matrix covers 390 and 1280 CSS pixels with `en` and `es-419` reader
-chrome. The original author language remains unchanged. Public reads returned200,
+chrome. The original author language remains unchanged. Public reads returned 200,
 with no cookies, no horizontal overflow, and `noindex, nofollow, nocache`.
 
 | Proof | Records and representative images |
@@ -43,6 +43,7 @@ with no cookies, no horizontal overflow, and `noindex, nofollow, nocache`.
 | The original result card reads the same DCA facts and has no share control | [Records](dca-card.json), [English phone](dca-card-390-en.png), [Spanish desktop](dca-card-1280-es-419.png) |
 | Eligible-only selection and readable refusal reasons | [English](selection-en-result.json), [Spanish](selection-es-419-result.json), [English phone](selection-390-en-reasons.png), [Spanish phone](selection-390-es-419-reasons.png) |
 | Refusal identifies question, answer and owner note | [English fields](selection-1280-en-fields.png), [Spanish fields](selection-1280-es-419-fields.png), [English note](selection-390-en-note.png), [Spanish note](selection-390-es-419-note.png) |
+| Incomplete historical returns/benchmarks cannot be selected | [Before/after](incomplete-selection.json), [English phone](incomplete-missing_headline-390-en.png), [Spanish desktop](incomplete-missing_benchmark-1280-es-419.png) |
 | Five eligible turns: no arbitrary Select all, manual cap four | [Records](cap-five-result.json), [phone](cap-five-390-en.png), [desktop](cap-five-1280-en.png) |
 | Same Settings list and revoke | [Records](settings-revoke.json), [before](settings-revoke-before.png), [after](settings-revoke-after.png) |
 | Revoked research link becomes the same tombstone | [Matrix](tombstone-public.json), [English phone](tombstone-390-en.png), [Spanish phone](tombstone-390-es-419.png) |
@@ -64,6 +65,14 @@ selected again through the header. Its frozen payload was never rewritten.
 Refreshed proof shows $0 principal, $200 monthly, 10 bps fee and 5 bps slippage in
 both languages. Only that affected acceptance was invalidated; the research,
 selection/refusal and lifecycle evidence was retained.
+
+The GitHub review found that a historical run with only some figures could be
+selected. The receipt now requires the headline return and complete evidence for
+any named benchmark, including valid zero values. Intentionally incomplete copies
+of the saved synthetic example reproduce the old eligibility gap and then show
+disabled choices with their reason in both languages. No link was published from
+either incomplete example. The original private readers and frozen receipt bodies
+are unchanged.
 
 The CTA has literal href `/`; normal guest bootstrap settles at `/chat` with no
 query, fragment, assistant turns or composer text. One beacon request was observed
@@ -93,8 +102,11 @@ comparison pass.
 
 ## Deterministic verification and revalidation
 
-- [482 backend checks](backend-focused.txt), including 57 new DCA reader cases;
+- [528 backend checks](backend-focused.txt), including 57 new DCA reader cases and 20 integration spend cases;
   [23 OpenAPI checks](openapi-checks.txt).
+- [34 guest Auth/conversion checks](guest-auth.txt), including all 12 real local
+  Auth cases with zero skips. A stale expected response field list found in CI now
+  derives from the canonical pending-action model; runtime behavior is unchanged.
 - [60 real PostgreSQL checks](postgres-sharing.txt), zero skips: shared selections,
   insertion/deletion races, role grants, immutability, browser denial and handoff.
 - 1,653 Bun tests; two exact v1 snapshots; frontend lint has zero errors and eight
@@ -108,13 +120,21 @@ comparison pass.
 [Runtime trees](runtime-source.json) bind the built code independently of later
 documentation/evidence commits. The final PR audit explicitly revalidates these
 unchanged trees at the exact PR head, and is written only after the final review
-returns. Original and freshly fetched integration both equal `743dfda3`; no merge
-commit or overlapping integration delta was needed.
+returns. Original integration was `743dfda3`; current integration `377190bd` was
+merged normally at `070aab20`. The [overlap audit](reconciliation.md) identifies
+private research spend/failure handling as the only runtime overlap. Saved
+English/Spanish turn replay proves six usage/digest invariants and eight new
+failure refusals. [All 20 public cases](reconciled-public-readback.json) were
+revalidated at the merged runtime. Existing successful research, UI, lifecycle
+and version 1 evidence is retained; no paid rerun was needed.
 
 The focused final code review cleared `9531c164..dfb86ef8`, including 57 passing
 reader tests, with no actionable finding. Version 1 was re-read and compared again
 after that backend fix: all four HTML, text, box and RGB pixel comparisons remain
 exact. This local review does not replace the exact-head GitHub Codex round.
+
+The subsequent local review cleared the Auth assertion and required-figure fixes
+in `1d087fce..746b7b74`: 27 receipt cases and 22 guest-conversion tests passed.
 
 Drivers live in [drivers](drivers). Inputs containing credentials or source ids
 are supplied from ignored local storage. The v1 transport driver is baseline-only;
