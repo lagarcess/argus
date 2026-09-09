@@ -3702,10 +3702,12 @@ Contract rules:
   the value under the response language's number convention at the written
   precision, the scale word (12.93 billion is 12930000000, never 12.93), the
   sign when the prose writes one or a direction word fixes it, the unit
-  family (a percent is never a price; a ratio row is a percent), and the
-  subject, which the figure's own sentence or table line must name by the
-  row's symbol or a proper noun of its label. Bare integers such as years,
-  dates and index names are not audited. Prose cannot be trimmed of one claim, so a rejected
+  kind (a percent needs a percent or ratio row, a currency-marked figure a
+  currency row, an ISO code or a currency word, a multiple a multiple row),
+  and the subject, which the figure's own sentence or table line must name
+  by the row's symbol or a proper noun of its label; a row that names no
+  entity verifies nothing. Bare integers such as years, dates and index
+  names are not audited. Prose cannot be trimmed of one claim, so a rejected
   row, an unverified prose figure, or a typed answer that retrieved and wrote
   no row, withholds the whole answer: the turn carries `degraded.code = "research_figures_unverified"`,
   an honest note replaces the prose, the subjects the user named stay

@@ -153,8 +153,9 @@ part, a thousands separator, a scale word or a multiple) is now verified only
 by a row that agrees on every dimension the prose exposes: the value under
 the response language's number convention at the written precision, the
 scale word, the sign when written or fixed by a direction word, the unit
-family, and the subject, which the figure's own sentence or table line must
-name by the row's symbol or a proper noun of its label. One unverified figure
+kind (currency, multiple, percent or ratio, plain quantity), and the subject,
+which the figure's own sentence or table line must name by the row's symbol
+or a proper noun of its label; a row naming no entity verifies nothing. One unverified figure
 withholds the answer as `research_figures_unverified`. Re-parsed at head, the
 three typed recordings with figures come out as:
 

@@ -774,8 +774,28 @@ def _row(label: str, value: float, unit: str = "USD", symbol: str | None = None)
             0,
             "en",
         ),
-        # a label naming no entity cannot be checked for subject
-        ("Apple is at $200 today.", [_row("share price", 200.0, "USD")], 0, "en"),
+        # a row naming no entity and carrying no symbol verifies nothing
+        ("Apple is at $200 today.", [_row("share price", 200.0, "USD")], 1, "en"),
+        ("MSFT rose 5% today.", [_row("apple daily change", 5.0, "percent")], 1, "en"),
+        # unit kind: a price is never a share count, a multiple never a currency
+        (
+            "Apple trades at $5.00.",
+            [_row("Apple shares outstanding", 5.0, "shares", "AAPL")],
+            1,
+            "en",
+        ),
+        (
+            "Apple trades at 1.5x sales.",
+            [_row("Apple price to sales", 1.5, "USD", "AAPL")],
+            1,
+            "en",
+        ),
+        (
+            "Apple revenue was 12.93 billion.",
+            [_row("Apple revenue", 12930000000.0, "USD", "AAPL")],
+            0,
+            "en",
+        ),
         # bare integers are not figures; multiples and counts are quantities
         (
             "Apple trades at 1.5x sales; the S&P 500 fell; a 52-week high; FY2025; Q2.",
@@ -804,8 +824,9 @@ def test_prose_figures_are_audited_against_the_rows(
 ) -> None:
     """A figure is verified only by a row that agrees on every dimension the
     prose exposes: value under the response language's number convention at
-    the written precision, scale, sign, unit family and subject. Bare
-    integers such as years, dates and index names are not figures."""
+    the written precision, scale, sign, unit kind and subject, and a row that
+    names no entity verifies nothing. Bare integers such as years, dates and
+    index names are not figures."""
     from argus.domain.research.perplexity_agent import _unverified_figure_count
 
     assert _unverified_figure_count(prose, rows, language=language) == unverified

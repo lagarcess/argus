@@ -419,7 +419,39 @@ _PERCENT_UNITS = (
     "puntos porcentuales",
 )
 _RATIO_UNITS = ("ratio", "fraction", "decimal")
+_CURRENCY_UNITS = ("$", "dollar", "d\u00f3lar", "peso", "euro", "usd", "dop", "eur")
+_MULTIPLE_UNITS = ("x", "times", "multiple", "veces")
 _SEGMENT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _unit_family(unit: str) -> str:
+    """The kind of quantity a row's unit names: percent, ratio, multiple,
+    currency (an ISO code or a currency word) or a plain quantity."""
+    lowered = unit.strip().lower()
+    if any(mark in lowered for mark in _PERCENT_UNITS):
+        return "percent"
+    if any(mark in lowered for mark in _RATIO_UNITS):
+        return "ratio"
+    if lowered in _MULTIPLE_UNITS or "multiple" in lowered:
+        return "multiple"
+    stripped = unit.strip()
+    if any(mark in lowered for mark in _CURRENCY_UNITS) or (
+        len(stripped) == 3 and stripped.isalpha() and stripped.isupper()
+    ):
+        return "currency"
+    return "quantity"
+
+
+# The row families a written figure of each kind may be verified by. An
+# unmarked figure (a decimal, a separator or a scale word alone) is a plain
+# quantity and may name a currency amount or a multiple written without its
+# mark; a marked figure needs the matching kind.
+_COMPATIBLE_FAMILIES = {
+    "percent": {"percent", "ratio"},
+    "currency": {"currency"},
+    "multiple": {"multiple"},
+    "quantity": {"quantity", "currency", "multiple"},
+}
 
 
 def _written_value(number: str, language: str) -> tuple[float, int]:
@@ -449,7 +481,7 @@ def _written_value(number: str, language: str) -> tuple[float, int]:
 def _subject_tokens(row: RetrievedRow) -> set[str]:
     """What names the row's entity: its symbol and the proper nouns of its
     label (the schema asks the label to name the entity). Empty when the
-    label names none, in which case the subject cannot be checked."""
+    label names none, and such a row verifies nothing."""
     tokens = {row.symbol.lower()} if row.symbol else set()
     for word in row.label.split():
         cleaned = "".join(ch for ch in word if ch.isalnum())
@@ -469,10 +501,11 @@ def _unverified_figure_count(
     exposes: the value under the response language's number convention at
     the written precision, the scale word (12.93 billion is 12930000000, not
     12.93), the sign when the prose writes one or a direction word fixes it,
-    the unit family (a percent is never a price), and the subject, which the
+    the unit kind (a percent is never a price, a price is never a share
+    count, a multiple is never a currency), and the subject, which the
     figure's own sentence or table line must name by the row's symbol or a
-    proper noun of its label. One unverified figure withholds the answer at
-    the composition seam."""
+    proper noun of its label; a row naming no entity verifies nothing. One
+    unverified figure withholds the answer at the composition seam."""
     unverified = 0
     for line in markdown.split("\n"):
         for segment in _SEGMENT.split(line):
@@ -507,6 +540,14 @@ def _figure_from(
     if not marked:
         return None
     written, precision = _written_value(number, language)
+    if percent:
+        kind = "percent"
+    elif currency:
+        kind = "currency"
+    elif groups["multiple"]:
+        kind = "multiple"
+    else:
+        kind = "quantity"
     sign = 0
     if groups["sign"]:
         sign = 1 if groups["sign"] == "+" else -1
@@ -522,23 +563,24 @@ def _figure_from(
         "precision": precision,
         "scale": _SCALE_FACTORS.get((groups["scale"] or "").strip().lower(), 1.0),
         "percent": percent,
+        "kind": kind,
         "sign": sign,
     }
 
 
 def _row_verifies(row: RetrievedRow, figure: dict[str, Any], words: set[str]) -> bool:
     subject = _subject_tokens(row)
-    if subject and not (subject & words):
+    if not subject or not (subject & words):
+        # A row that names no entity verifies nothing: the audit cannot tell
+        # whose figure it is, so it cannot vouch for anyone's.
         return False
     if figure["sign"] and (row.value == 0 or (row.value > 0) != (figure["sign"] > 0)):
         return False
-    unit = row.unit.strip().lower()
-    row_is_percent = any(mark in unit for mark in _PERCENT_UNITS)
-    row_is_ratio = any(mark in unit for mark in _RATIO_UNITS)
-    if figure["percent"] != (row_is_percent or row_is_ratio):
+    family = _unit_family(row.unit)
+    if family not in _COMPATIBLE_FAMILIES[figure["kind"]]:
         return False
     magnitude = abs(row.value)
-    if figure["percent"] and row_is_ratio and not row_is_percent:
+    if figure["percent"] and family == "ratio":
         magnitude *= 100
     candidate = magnitude / figure["scale"]
     tolerance = 0.5 * 10 ** (-figure["precision"]) + 1e-9
