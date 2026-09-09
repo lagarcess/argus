@@ -59,6 +59,7 @@ LOCKED_EVAL_CATEGORIES = {
     "graceful_recovery",
     "asset_discovery_routing",
     "dca_capital_semantics",
+    "ordinary_conversation",
 }
 
 

@@ -1,0 +1,145 @@
+{
+  "baseline": "9fec4bf70c95383f4afa536674ceac4f38104787",
+  "candidate": "4af15b308ec0f4c89e2a668f1619220f364f95dc",
+  "baseline_totals": {
+    "expected_failed": 0,
+    "failed": 1,
+    "passed": 61,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "candidate_totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 65,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "regressed": [
+    {
+      "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+      "status": "failed",
+      "failed_checks": [
+        "asset_discovery.asset_class_hint: expected 'equity', got None",
+        "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'discovery_search_failed', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})"
+      ],
+      "infrastructure_errors": []
+    },
+    {
+      "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "status": "failed",
+      "failed_checks": [
+        "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'discovery_search_failed', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})",
+        "prose_judge:honesty"
+      ],
+      "infrastructure_errors": []
+    },
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "status": "failed",
+      "failed_checks": [
+        "offered.min_next_experiment_rows: expected at least 1, got []"
+      ],
+      "infrastructure_errors": []
+    }
+  ],
+  "fixed": [
+    {
+      "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "was": "failed"
+    }
+  ],
+  "new": [
+    {
+      "id": "ordinary_conversation_concept_compound_interest_en",
+      "status": "passed",
+      "failed_checks": []
+    },
+    {
+      "id": "ordinary_conversation_concept_inflation_es",
+      "status": "passed",
+      "failed_checks": []
+    },
+    {
+      "id": "ordinary_conversation_concept_etf_es",
+      "status": "passed",
+      "failed_checks": []
+    },
+    {
+      "id": "ordinary_conversation_capability_indicator_question_en",
+      "status": "passed",
+      "failed_checks": []
+    },
+    {
+      "id": "ordinary_conversation_capability_indicator_question_es",
+      "status": "passed",
+      "failed_checks": []
+    },
+    {
+      "id": "ordinary_conversation_macro_curiosity_en",
+      "status": "passed",
+      "failed_checks": []
+    }
+  ],
+  "missing": [],
+  "unchanged_failures": [],
+  "category_pass_rates": {
+    "action_chip_semantics": {
+      "baseline": 1.0,
+      "candidate": 1.0
+    },
+    "asset_discovery_routing": {
+      "baseline": 1.0,
+      "candidate": 0.75
+    },
+    "backtest_metric_correctness": {
+      "baseline": 1.0,
+      "candidate": 1.0
+    },
+    "capability_honesty": {
+      "baseline": 1.0,
+      "candidate": 1.0
+    },
+    "dca_capital_semantics": {
+      "baseline": 0.9375,
+      "candidate": 1.0
+    },
+    "graceful_recovery": {
+      "baseline": 1.0,
+      "candidate": 1.0
+    },
+    "messy_english": {
+      "baseline": 1.0,
+      "candidate": 1.0
+    },
+    "messy_spanish": {
+      "baseline": 1.0,
+      "candidate": 1.0
+    },
+    "ordinary_conversation": {
+      "baseline": null,
+      "candidate": 1.0
+    },
+    "ui_user_language_mismatch": {
+      "baseline": 1.0,
+      "candidate": 1.0
+    }
+  },
+  "receipt_fires": {
+    "FocusedStrategyExtraction": [
+      "capability_honesty_golden_cross_control_aapl",
+      "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_spanish_btc_hold_q1_2024"
+    ]
+  }
+}

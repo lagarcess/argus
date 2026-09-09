@@ -780,23 +780,15 @@ async def test_llm_interpreter_repairs_standalone_movers_to_context_focus(
 
 
 @pytest.mark.asyncio
-async def test_llm_interpreter_lets_context_override_strategy_capability_label(
+async def test_llm_interpreter_keeps_primary_focus_on_educational_prose(
     monkeypatch,
 ) -> None:
+    # The primary read owns the focus on an educational turn; the context
+    # audit no longer re-reads it, so its prose and focus stand.
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     async def audit_stub(**kwargs):
-        if kwargs["schema_name"] == "CapabilitySideQuestionAudit":
-            return interpreter_module.CapabilitySideQuestionAudit(
-                is_capability_question=False,
-                confidence=0.8,
-            )
-        assert kwargs["schema_name"] == "ContextQuestionAudit"
-        return interpreter_module.ContextQuestionAudit(
-            is_context_question=True,
-            focus="market_movers",
-            confidence=0.9,
-        )
+        raise AssertionError(f"unexpected second read: {kwargs['schema_name']}")
 
     monkeypatch.setattr(
         interpreter_module,
@@ -826,10 +818,10 @@ async def test_llm_interpreter_lets_context_override_strategy_capability_label(
         request=request,
     )
 
-    assert ready_response.context_question_focus == "market_movers"
-    assert ready_response.capability_question_focus is None
-    assert ready_response.assistant_response is None
-    assert "context_question_audit" in ready_response.reason_codes
+    assert ready_response.context_question_focus is None
+    assert ready_response.capability_question_focus == "supported_strategies"
+    assert ready_response.assistant_response == response.assistant_response
+    assert "context_question_audit" not in ready_response.reason_codes
 
 
 @pytest.mark.asyncio
