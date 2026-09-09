@@ -21,6 +21,7 @@ fake = Faker()
 @pytest.fixture
 def source():
     owner, conversation, message, artifact = [str(uuid4()) for _ in range(4)]
+    email = fake.email()
     card = {
         "kind": "tool_result",
         "artifact_id": artifact,
@@ -29,11 +30,11 @@ def source():
     }
     with psycopg.connect(DSN) as connection:
         connection.execute(
-            "insert into auth.users(id,email) values (%s,%s)", (owner, fake.email())
+            "insert into auth.users(id,email) values (%s,%s)", (owner, email)
         )
         connection.execute(
             "insert into public.profiles(id,email,username) values (%s,%s,%s)",
-            (owner, fake.email(), owner[:8]),
+            (owner, email, owner[:8]),
         )
         connection.execute(
             "insert into public.conversations(id,user_id,title) values (%s,%s,%s)",

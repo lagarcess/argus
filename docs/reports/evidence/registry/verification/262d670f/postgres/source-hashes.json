@@ -1,0 +1,292 @@
+{
+  "source_sha": "262d670f6a595660b3f489535eb744201f81597b",
+  "fixture_before_sha256": "3f004255185fce731b48ff4951c1c5596faf6520029e9fa71f60735083af15e3",
+  "fixture_after_sha256": "d8fbb8db92fa5e1ec196b4e8303237debf104fb891904d6d380707b83aedbbe3",
+  "migration_count": 71,
+  "migrations": [
+    {
+      "file": "20260424000001_alpha_core.sql",
+      "sha256": "6551995af82258eb307dc147b1aba57bc5d1cd8798e6e07e7a49f8622c05c31b"
+    },
+    {
+      "file": "20260505000001_add_currency_pair_asset_class.sql",
+      "sha256": "2f128c0ba4ac1dd95d766bc6ecbfd8b7195cfd64e78e92607b35dcce319a3c8e"
+    },
+    {
+      "file": "20260519000001_add_context_packets_route_receipts.sql",
+      "sha256": "2813819a32d2a9874a1c37d27d41603a076a07f25000838909cd8fe631b9609a"
+    },
+    {
+      "file": "20260520000001_add_route_receipt_usage_context_ids.sql",
+      "sha256": "eaa79b398a96bbaa6eaec730bf60407c24313f3174d3bd0c41456d8ade55ddd4"
+    },
+    {
+      "file": "20260530000001_private_alpha_allowlist.sql",
+      "sha256": "fb1e7d0932a547993166b63e5b363c294534b0f11a880ce547d0e7009fff84f7"
+    },
+    {
+      "file": "20260530000002_simplify_private_alpha_allowlist.sql",
+      "sha256": "252f31dfd44206d1c70c91a831bee15707a5ebbfc4109f6b8fccc30ac417a5dd"
+    },
+    {
+      "file": "20260606000001_add_backtest_jobs.sql",
+      "sha256": "6833edfe87d5cb5407df446050c735e7a0b61f858f11cf7fb8c907a66c1b2be9"
+    },
+    {
+      "file": "20260607000001_add_account_deletion_feedback_type.sql",
+      "sha256": "3b61023f4a9e564763e0f5d44932fe10732515fa9e7a62ec777683e9c5f4d45c"
+    },
+    {
+      "file": "20260608041032_secure_checkpoint_rls.sql",
+      "sha256": "39b6750c4f8e5f5991da16f9e81f5f38075627bbf17443028129c4934b03ad95"
+    },
+    {
+      "file": "20260616091955_expand_usage_counter_resources.sql",
+      "sha256": "7c9e0f1dec7bf792bd292185c0513fe2699424341986df1a7a24dcc4c10ca91a"
+    },
+    {
+      "file": "20260619000001_p1_evidence_decision_spine.sql",
+      "sha256": "8f2f50e4305c2c53352d89291c20ccd0e4730e33ba54b5e68e33e914ad74ccf7"
+    },
+    {
+      "file": "20260621053126_enforce_p1_evidence_immutability.sql",
+      "sha256": "d9e0b99ee6c4b4204d6dfcecf5199e36cf2f66d6f3ed35322baedf36d428e2e7"
+    },
+    {
+      "file": "20260702000001_add_cost_ledger_entries.sql",
+      "sha256": "8df9a800e3a79b0ae0e6616f518cec0c8e7e469bf43ffcda6e13927c1e31de60"
+    },
+    {
+      "file": "20260713000001_finalize_backtest_completion.sql",
+      "sha256": "24d280d10e26e71b0f5e3ac301e29c177f544a9a11959e26f8167d05273251ec"
+    },
+    {
+      "file": "20260717000001_serialize_conversation_message_append.sql",
+      "sha256": "715286c29b20de67c258e96833ac8814bca6ed14440ddccf22774bd37c356f81"
+    },
+    {
+      "file": "20260722000001_settle_message_allowance.sql",
+      "sha256": "745347e5dac82aae232303c0dfac1176ea0803185bba1963fc1582b9b5841811"
+    },
+    {
+      "file": "20260722000002_atomic_backtest_admission.sql",
+      "sha256": "45e90bc61dfb09955108e86380605770981a30be6a1c0015386f8dfaed41c557"
+    },
+    {
+      "file": "20260722000003_replay_legacy_reservations.sql",
+      "sha256": "281a7621e1db67f7fd5efb6fcbc67114253dbd8710e8f0207122d0ec8a9e1c4d"
+    },
+    {
+      "file": "20260722000004_serialize_direct_success.sql",
+      "sha256": "a736166b85e37f84a68dbf163f946202831c85dbd193d00eb39048d3a197d869"
+    },
+    {
+      "file": "20260723000001_add_chat_turn_lifecycles.sql",
+      "sha256": "fd7fc7f5498c2ea641ffff99a9b7316ed30457bf98b3aacb40ec1bc553b33d6e"
+    },
+    {
+      "file": "20260723000002_chat_turn_acceptance_and_reconciliation.sql",
+      "sha256": "b0e7ade1d01b8c3290397b82dc76048f8c64477d4ef0f6eeea8a1b8c0b5dca3f"
+    },
+    {
+      "file": "20260723000003_chat_turn_option_acceptance_and_finalization.sql",
+      "sha256": "b7b9716c9ed50689ab32a264115dd9f7fe768f24c29ca85648313bfd458c5221"
+    },
+    {
+      "file": "20260724101324_add_guest_workspaces.sql",
+      "sha256": "6d9853082e84a674191eb443a5bd2ef69a638dc482636ae9a2ab04371643aeb6"
+    },
+    {
+      "file": "20260724102309_add_guest_session_allowances.sql",
+      "sha256": "17fd4482bcb635cb2754ca08acdd2ea4f1128099e9338123488e8057048476c3"
+    },
+    {
+      "file": "20260724102645_guest_conversation_and_cleanup.sql",
+      "sha256": "034b9e003ca8401e65c138a265ae2a7a8dd1dced77f840538cefd104938bbd6d"
+    },
+    {
+      "file": "20260724110000_restore_settle_only_usage.sql",
+      "sha256": "993506f8ac60cc3702909de87bc9d83c7c30f1c09c266bfe590fb0d3f3ce059f"
+    },
+    {
+      "file": "20260724110100_serialize_guest_feedback.sql",
+      "sha256": "57a28f34d6a4536b0b45a56f80f4d78b2a46673b91daa050eea90f5f013a1228"
+    },
+    {
+      "file": "20260724110200_align_guest_cleanup_candidates.sql",
+      "sha256": "b5234e2d3fe3c96c40e51d7a3944e2393541eddfbae1036e345986b324ee1de0"
+    },
+    {
+      "file": "20260724211312_guest_workspace_handoffs.sql",
+      "sha256": "effdaaf1d9186013763833911235ad4956aeff074c0257451893cabb75be2b91"
+    },
+    {
+      "file": "20260724214312_idempotent_chat_turn_finalization.sql",
+      "sha256": "b5301eb96b593615f89c7596c449672bc20c88295aa97517c3b0544c882058b4"
+    },
+    {
+      "file": "20260724223000_replace_guest_conversation.sql",
+      "sha256": "dd144a0f027f11555bae5e272bbc0d43e33df6b9e297c11571e8176409138916"
+    },
+    {
+      "file": "20260724230000_harden_guest_public_boundaries.sql",
+      "sha256": "b1e55a9ec0208982b296789ed7b8e7ae065caecb0758ea6f9e7afb9f91a0f1c3"
+    },
+    {
+      "file": "20260725220148_fix_expired_guest_complete_graph_cleanup.sql",
+      "sha256": "6404234e7b34d897084a5ebdca6a4244a32966118e3237ae316012b158c1318f"
+    },
+    {
+      "file": "20260726001954_isolate_guest_cleanup_candidates.sql",
+      "sha256": "8cb90ba156c2560e35b17f4c04afe95ac8aeba6d81045a490c13e8263d70eafe"
+    },
+    {
+      "file": "20260726001955_enforce_guest_terminal_message_limit.sql",
+      "sha256": "4bb33423a2584a287400daefad78743e65b5aaf01d8fab1aec8f23e73ef3334f"
+    },
+    {
+      "file": "20260726002158_respect_permanent_conversation_ownership.sql",
+      "sha256": "f32cfa5a910cecb071435a38d3ff62c5b9c8c131785724a1fba7e6063c3e6e31"
+    },
+    {
+      "file": "20260726014754_isolate_poisoned_guest_orphans.sql",
+      "sha256": "2863ae270688ffb4aac8bb5c97447e51f7b157cdfe090a5cdc51a0f859c4da0e"
+    },
+    {
+      "file": "20260726185021_harden_guest_lifecycle_ownership.sql",
+      "sha256": "8c4b61b5f753bc30b34d6dd3933189ab5e4da7913644f2790768967049281cb5"
+    },
+    {
+      "file": "20260727000001_add_bounded_read_indexes.sql",
+      "sha256": "f276c0299a80ca18f8f31509087b03c668d683f4acacd45ef337d6581dc1aeb8"
+    },
+    {
+      "file": "20260727144043_add_search_trigram_indexes.sql",
+      "sha256": "62b4a6027ec9ce6a5ca3f730c84a1b617f05b87c92fe6863b0216688da777058"
+    },
+    {
+      "file": "20260727161406_add_history_state_page_indexes.sql",
+      "sha256": "534e02fe0bc5a28c61472e0fd665d231306b9a596aa70689624f5874a979b6ee"
+    },
+    {
+      "file": "20260727230000_add_visitor_usage_counters.sql",
+      "sha256": "a805ddc998e3b1cf112a1d52217ecdeea3abf5b3022061521cb489bc2635c43e"
+    },
+    {
+      "file": "20260728120000_visitor_keyed_guest_settlement.sql",
+      "sha256": "537b735c9a1d43afea9f6e37e9baa2dbf26a1356afa635e6b57d79041efec34d"
+    },
+    {
+      "file": "20260729221458_add_message_recall_index.sql",
+      "sha256": "4f051fc867a1ff3bf43bb1381d3299c70b1220ab8b30e25e8e789b0a146dd933"
+    },
+    {
+      "file": "20260729225600_add_personalization_memory_persistence.sql",
+      "sha256": "1fd722a5c266611b16b2621dbdd5d804958a3698f593f4eedea0b65a29ec443a"
+    },
+    {
+      "file": "20260730042500_add_decision_recall_index.sql",
+      "sha256": "cbd22dd513bc21e2eb21607facccf264e56736ac7331135fc57d5da976cd5669"
+    },
+    {
+      "file": "20260730070000_add_asset_symbol_prefix_indexes.sql",
+      "sha256": "dfd2c16ca9b776dbb022c12a0cd805d4a63a4dfae80d7d8b32e6a81a010b2540"
+    },
+    {
+      "file": "20260731080154_add_requested_private_alpha_access.sql",
+      "sha256": "917772c9a654727c8f69720bd3b591b02156ed2bcc979c4b758866928810897e"
+    },
+    {
+      "file": "20260731093703_add_avatar_theme.sql",
+      "sha256": "f5b95f1a617994059ef1219a399db84ae48f07392c8b5c2632a8190bee80c683"
+    },
+    {
+      "file": "20260801000000_add_conversation_activity_read_states.sql",
+      "sha256": "0ebd82fa0bd88477322a666b9dc1e70b017ed2e385f4090606fcf7503fba4ad7"
+    },
+    {
+      "file": "20260802090000_raise_guest_simulation_allowance.sql",
+      "sha256": "5ecee7c21447e2f9936038b87e5379f8164ed78c8f3ae7506b768e22f290177b"
+    },
+    {
+      "file": "20260803110000_accept_simulation_limit_handoff_reason.sql",
+      "sha256": "55c29da773c56c2e12e2553fb91fe1569420a83327e0ba641c880e11385d019e"
+    },
+    {
+      "file": "20260805120000_enforce_memory_candidate_sensitivity_flags_require_restricted.sql",
+      "sha256": "020e9ca4bf750b664056f00962190d5581a88f44cf8ae6491be16c2b0edd197b"
+    },
+    {
+      "file": "20260807000001_add_research_operation_scope.sql",
+      "sha256": "1077dab9252e45a26a2a2fa36141d05c82ed56d12fd11a35154595850b65115d"
+    },
+    {
+      "file": "20260807120000_add_memory_semantic_recall_index.sql",
+      "sha256": "c65b3bf27aedfb8231a0e2ac1c135699d5c436d68c6dcca85fd11858d60c56ac"
+    },
+    {
+      "file": "20260807170000_allow_unproven_memory_projection.sql",
+      "sha256": "a0d8e225ff655495ea21b0edc9604b6acbf7abcb60c79d12e349e51bb97cf17a"
+    },
+    {
+      "file": "20260807190000_add_public_excerpt_snapshots.sql",
+      "sha256": "a15f6e45f746a2ee8c3528640ad445b7adf8b72a1b1f947ef6b8687fe594eec4"
+    },
+    {
+      "file": "20260808120000_add_guest_funnel_milestones.sql",
+      "sha256": "741fea24786ab91d313bd930357af4df2e596d26bee38196cf016e0604fc3b67"
+    },
+    {
+      "file": "20260809140000_add_preferred_name.sql",
+      "sha256": "f006ac815d4eb34c25b787877df89297ba0fd2be6fe2a0460a57d094eb717fca"
+    },
+    {
+      "file": "20260810150000_serialize_message_artifact_update.sql",
+      "sha256": "1ea74101f15f7413b7c6e75f15b3ce6a87afaeeec00db4e5b640972a4da4b90b"
+    },
+    {
+      "file": "20260811210000_delete_withheld_backtest_result.sql",
+      "sha256": "1c99c9d94cbaf9c450aa138cdab4c48af546c30179436752509cc65ff5f62eec"
+    },
+    {
+      "file": "20260812142717_add_access_welcome_deliveries.sql",
+      "sha256": "5c06f12586858b4e16d69805aab61cfa6fe6d4e64e482df336a53255149c1ab8"
+    },
+    {
+      "file": "20260812173805_claim_access_welcome_delivery.sql",
+      "sha256": "a59fc95194223314b2db6fbffd04527fc61f58286fae703ec8fffb3861939aea"
+    },
+    {
+      "file": "20260812183000_guest_account_signup_handoffs.sql",
+      "sha256": "25df8a10a1e6036fd7a0d7aeeb6be3c096ce0436acfc2402d467b75befeb5b7d"
+    },
+    {
+      "file": "20260816150000_scope_access_welcome_enforcement.sql",
+      "sha256": "1d7055d6ef26f78cd960c52bb66123409f49b0c96b1547ec306c6fb50948bed2"
+    },
+    {
+      "file": "20260822000000_research_job_activity_settles.sql",
+      "sha256": "a64b1c2e702109d3d5fb0340c43a14d4af4b554a453a3280bb5ab5d079d2b0e7"
+    },
+    {
+      "file": "20260903000000_claim_research_usage.sql",
+      "sha256": "ba47070ad1ca3eff0f0a1ef790376b0c2b522cca3b009e25fa7d08b3306cd298"
+    },
+    {
+      "file": "20260905000000_workflow_proof_jobs_leave_conversations.sql",
+      "sha256": "ffb79be4bed36fb343ae4e81830e120c2b6620f1944fa0099774890578134759"
+    },
+    {
+      "file": "20260908120000_decision_notes_attach_to_computations.sql",
+      "sha256": "85cf7c53c4296d9d2e9f4becaa76ec74873191a929fd76b373a4c5c4ff118a3a"
+    },
+    {
+      "file": "20260908205041_add_refusal_observations.sql",
+      "sha256": "f46b4d48d5470a3c200febbdf0fdcfb4c3bfaaa7c82b0267867921fa58a68f27"
+    },
+    {
+      "file": "20260909183409_add_tool_receipt_sources.sql",
+      "sha256": "7e05ce0709fe52bc3971b3679cacda56097a05858cb6ebb6056d9d5c1d1812ab"
+    }
+  ]
+}
