@@ -17,7 +17,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, cast
 
 from loguru import logger
 
@@ -29,9 +29,11 @@ from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENTS_ROW_CAP,
     NEXT_EXPERIMENTS_VERSION,
 )
+from argus.domain.market_data.assets import AssetClass, ResolvedAsset
 from argus.domain.research.contracts import (
     MAX_PEER_PAIRS,
     ResearchNamePair,
+    ResearchPacket,
     RetrievedRow,
 )
 
@@ -40,6 +42,70 @@ _MAX_VERIFIED_PEERS = 4
 # A label_key is required by the row parser; this one is deliberately absent
 # from the catalogs so the backend-localized label renders as supplied.
 _DYNAMIC_LABEL_KEY = "chat.next_experiments.labels.research_dynamic"
+
+
+def _identity_names(
+    pairs: Iterable[ResearchNamePair], rows: Iterable[RetrievedRow]
+) -> dict[str, list[str]]:
+    names: dict[str, list[str]] = {}
+    for pair in pairs:
+        names.setdefault(pair.symbol.strip().upper(), []).append(pair.name)
+    for row in rows:
+        if row.symbol:
+            names.setdefault(row.symbol.strip().upper(), []).append(row.subject)
+    return names
+
+
+def _names_corroborate_asset(resolved: ResolvedAsset, names: Iterable[str]) -> bool:
+    from argus.agent_runtime.discovery.validation import resolution_matches_named_asset
+
+    matches = all(
+        resolution_matches_named_asset(
+            display_name=name,
+            symbol_guess=resolved.canonical_symbol,
+            resolved=resolved,
+            asset_class=resolved.asset_class,
+            asset_class_hint=None,
+        )
+        for name in names
+    )
+    if not matches:
+        logger.info(
+            "Research action dropped: resolution does not match the named entity",
+            symbol=resolved.canonical_symbol,
+        )
+    return matches
+
+
+def research_action_assets(
+    *,
+    packet: ResearchPacket,
+    subjects: list[dict[str, str]],
+    peers: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Promote only identities corroborated by the packet, regardless of origin.
+
+    Subjects already resolved before retrieval and newly found peers pass
+    the same boundary. The returned identities own both actions and sidecars.
+    """
+    names = _identity_names(packet.name_pairs, packet.rows)
+
+    def corroborated(asset: dict[str, str]) -> bool:
+        resolved = ResolvedAsset(
+            canonical_symbol=asset["symbol"],
+            raw_symbol=asset["symbol"],
+            name=asset["name"],
+            asset_class=cast(AssetClass, asset["asset_class"]),
+        )
+        return _names_corroborate_asset(
+            resolved, names.get(resolved.canonical_symbol.upper(), ())
+        )
+
+    subjects = [asset for asset in subjects if corroborated(asset)]
+    peers = [asset for asset in peers if corroborated(asset)]
+    if not subjects and peers:
+        subjects, peers = peers[:1], peers[1:]
+    return subjects, peers
 
 
 def verified_peers(
@@ -62,21 +128,20 @@ def verified_peers(
     """
     peers: list[dict[str, str]] = []
     seen = {symbol.upper() for symbol in exclude}
-    names_by_symbol: dict[str, list[str]] = {}
-    for pair in name_pairs:
-        candidate = pair.symbol.strip().upper()
-        if not candidate or candidate in seen:
-            continue
-        names_by_symbol.setdefault(candidate, []).append(pair.name)
-    for row in identity_rows:
-        symbol = row.symbol.strip().upper() if row.symbol else ""
-        if symbol in names_by_symbol:
-            names_by_symbol[symbol].append(row.subject)
+    pairs = list(name_pairs)
+    names_by_symbol = _identity_names(pairs, identity_rows)
+    candidates = dict.fromkeys(
+        pair.symbol.strip().upper()
+        for pair in pairs
+        if pair.symbol.strip() and pair.symbol.strip().upper() not in seen
+    )
     # Every named identity for a symbol must corroborate. Resolving the first
     # pair and skipping duplicates would let bare ticker metadata erase a
     # richer, contradictory entity from the retrieved rows.
-    for candidate, names in list(names_by_symbol.items())[: max(scan_limit, 1)]:
-        resolved = _resolve_bounded(candidate, names=names, probe=probe)
+    for candidate in list(candidates)[: max(scan_limit, 1)]:
+        resolved = _resolve_bounded(
+            candidate, names=names_by_symbol[candidate], probe=probe
+        )
         if resolved is None:
             continue
         symbol = resolved["symbol"]
@@ -110,24 +175,7 @@ def _resolve_bounded(
             return None
         if resolved.canonical_symbol.upper() != candidate:
             return None
-        from argus.agent_runtime.discovery.validation import (
-            resolution_matches_named_asset,
-        )
-
-        if not all(
-            resolution_matches_named_asset(
-                display_name=name,
-                symbol_guess=candidate,
-                resolved=resolved,
-                asset_class=resolved.asset_class,
-                asset_class_hint=None,
-            )
-            for name in names
-        ):
-            logger.info(
-                "Peer dropped: resolution does not match the named entity",
-                symbol=candidate,
-            )
+        if not _names_corroborate_asset(resolved, names):
             return None
         symbol = resolved.canonical_symbol.upper()
         # A peer row is an offer. The resolver says the catalog lists it; the

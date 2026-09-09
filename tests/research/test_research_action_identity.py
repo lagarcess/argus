@@ -17,6 +17,7 @@ from argus.domain.tool_contracts import ToolCall, ToolResultCard
 
 from tests.research.conftest import (
     agent_response,
+    educational_interpretation,
     retrieved_row,
     typed_answer_text,
     wire_grounded_client,
@@ -207,3 +208,54 @@ def test_thorough_completion_keeps_cited_identity_without_a_collision_action(
     assert outcome.result["subjects"] == []
     assert outcome.result["peers"] == []
     assert not composed.get("next_experiments")
+
+
+@pytest.mark.parametrize("surface", ["fresh", "cached", "completion"])
+@pytest.mark.parametrize(
+    "source_subject,can_offer_test", [("Venice Token", False), ("Valvoline Inc.", True)]
+)
+def test_pre_resolved_subject_must_match_the_packet_before_a_test_offer(
+    valvoline_catalog, surface, source_subject, can_offer_test
+) -> None:
+    asset, _ = valvoline_catalog
+    subject = {
+        "symbol": asset.canonical_symbol,
+        "name": asset.name,
+        "asset_class": asset.asset_class,
+    }
+    packet = _packet(asset.canonical_symbol)
+    row = packet.rows[0].model_copy(update={"subject": source_subject})
+    answer = f"{row.subject} ({row.symbol}) is {row.value} {row.unit}."
+    packet = packet.model_copy(update={"answer_markdown": answer, "rows": (row,)})
+    if surface == "completion":
+        composed = grounded.compose_completed_research(
+            job_request={"capability_class": "thorough_research", "subjects": [subject]},
+            packet=packet,
+        )
+        patch = {**composed, "assistant_response": composed["answer"]}
+    else:
+        context = _context()
+        result = grounded._packet_stage_result(
+            packet=packet,
+            subjects=[subject],
+            shape="balanced",
+            capability_class="balanced_lookup",
+            language="en",
+            interpretation=educational_interpretation(),
+            user=context.user,
+            cache_status="hit" if surface == "cached" else "miss",
+        )
+        patch = result.stage_patch
+    outcome = research_outcome_from_patch(patch)
+
+    assert outcome.status == "succeeded"
+    assert outcome.result["answer"] == answer
+    assert outcome.result["rows"][0]["subject"] == source_subject
+    assert outcome.result["peers"] == []
+    assert outcome.result["subjects"] == (
+        [{"symbol": asset.canonical_symbol, "name": asset.name}] if can_offer_test else []
+    )
+    assert bool(patch.get("next_experiments")) is can_offer_test
+    assert patch["research"]["follow_up"]["subjects"] == (
+        [subject] if can_offer_test else []
+    )

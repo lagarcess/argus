@@ -38,6 +38,7 @@ from argus.agent_runtime.research_query import (
 )
 from argus.agent_runtime.research_rows import (
     honest_no_next_line,
+    research_action_assets,
     research_next_experiment_rows,
     verified_peers,
 )
@@ -462,12 +463,9 @@ def _packet_stage_result(
         peers = []
         if survey:
             subjects = []
-    if not subjects and peers:
-        # A survey names no subject: what the provider found, once the
-        # resolver verifies it, is what the user can test. Promoting the
-        # first verified name keeps every answer one tap from a test.
-        subjects = peers[:1]
-        peers = peers[1:]
+    subjects, peers = research_action_assets(
+        packet=packet, subjects=subjects, peers=peers
+    )
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
@@ -1454,12 +1452,9 @@ def compose_completed_research(
             identity_rows=packet.rows,
         )
     )
-    if not subjects and peers:
-        # A survey names no subject: what the provider found, once the
-        # resolver verifies it, is what the user can test. Promoting the
-        # first verified name keeps every answer one tap from a test.
-        subjects = peers[:1]
-        peers = peers[1:]
+    subjects, peers = research_action_assets(
+        packet=packet, subjects=subjects, peers=peers
+    )
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
