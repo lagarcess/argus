@@ -277,13 +277,6 @@ async def grounded_result(
                 decision=decision,
                 reason="missing_public_sources",
             )
-        ttl_seconds = _cache_ttl(
-            packet,
-            question_kind=query.question_kind,
-            closed_period=query.period_is_closed_window,
-        )
-        if ttl_seconds is not None:
-            cache_put(key, packet, ttl_seconds=ttl_seconds)
     if publisher_sources_required and not _packet_has_public_sources(
         packet,
         query=query,
@@ -298,7 +291,7 @@ async def grounded_result(
             decision=decision,
             reason="missing_public_sources",
         )
-    return _packet_stage_result(
+    result = _packet_stage_result(
         packet=packet,
         subjects=subjects,
         shape=shape,
@@ -313,6 +306,16 @@ async def grounded_result(
         question_as_of_date=question_as_of_date,
         decision=decision,
     )
+    if cache_status == "miss":
+        ttl_seconds = _cache_ttl(
+            packet,
+            withheld=_sidecar_withheld(result.stage_patch["research"]),
+            question_kind=query.question_kind,
+            closed_period=query.period_is_closed_window,
+        )
+        if ttl_seconds is not None:
+            cache_put(key, packet, ttl_seconds=ttl_seconds)
+    return result
 
 
 def _packet_stage_result(
@@ -888,18 +891,25 @@ def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     return None
 
 
+def _sidecar_withheld(sidecar: dict[str, Any]) -> bool:
+    """Whether the composed turn withheld its answer: the sidecar's typed
+    ``degraded`` state, the same fact the ledger and the client read."""
+    return bool(sidecar.get("degraded"))
+
+
 def _cache_ttl(
     packet: ResearchPacket,
     *,
+    withheld: bool,
     question_kind: str | None,
     closed_period: bool,
 ) -> float | None:
     """How long the shared cache serves this packet, or None to not store it.
 
-    One owner for both composition paths: a published packet serves for its
-    class TTL, a withheld packet that retrieved for that TTL capped at a day,
-    and a withheld packet that never retrieved is not stored."""
-    withheld = _withheld_code(packet, survey=is_market_survey(question_kind)) is not None
+    One owner for both composition paths, fed by what composition actually
+    produced: a published packet serves for its class TTL, a withheld packet
+    that retrieved for that TTL capped at a day, and a withheld packet that
+    never retrieved is not stored."""
     if withheld and not _retrieval_happened(packet):
         return None
     return ttl_for_packet(
@@ -1251,12 +1261,14 @@ def research_prompt_for_job(job_request: dict[str, Any]) -> str:
 def store_research_packet_for_job(
     job_request: dict[str, Any],
     packet: ResearchPacket,
+    composed: dict[str, Any],
 ) -> None:
     """Store a completed thorough packet in the shared cache so the same
     question answers inline for its class TTL, withheld or not, under the
-    one rule ``_cache_ttl`` owns. A packet lacking a required public source
-    is not stored: the inline hit path re-derives that requirement and the
-    thorough one does not. Both completion paths call this."""
+    one rule ``_cache_ttl`` owns, read from the answer composition produced.
+    A packet lacking a required public source is not stored: the inline hit
+    path re-derives that requirement and the thorough one does not. Both
+    completion paths call this after ``compose_completed_research``."""
     key = str(job_request.get("cache_key") or "")
     question_kind = str(job_request.get("question_kind") or "cross_company")
     if not key:
@@ -1270,6 +1282,7 @@ def store_research_packet_for_job(
         return
     ttl_seconds = _cache_ttl(
         packet,
+        withheld=_sidecar_withheld(composed["research"]),
         question_kind=question_kind,
         closed_period=bool(job_request.get("period_is_closed_window")),
     )

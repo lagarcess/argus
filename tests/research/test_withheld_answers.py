@@ -120,7 +120,7 @@ def test_a_rejected_row_withholds_the_thorough_answer_too(monkeypatch) -> None:
     }
 
     composed = grounded.compose_completed_research(job_request=job_request, packet=packet)
-    grounded.store_research_packet_for_job(job_request, packet)
+    grounded.store_research_packet_for_job(job_request, packet, composed)
 
     assert composed["research"]["degraded"] == {"code": "research_figures_unverified"}
     assert composed["research"]["rows"] == []
@@ -213,6 +213,63 @@ def test_a_survey_with_figures_but_no_verified_name_persists_no_rows(
     sidecar = result.stage_patch["research"]
     assert sidecar["degraded"] == {"code": "survey_synthesis_incomplete"}
     assert sidecar["rows"] == []
+
+
+def test_a_survey_withheld_for_want_of_a_verified_name_is_cached_as_withheld(
+    monkeypatch,
+) -> None:
+    """Codex round 1 on #568: a survey packet with cited rows whose prose
+    names no resolver-verified ticker is withheld by composition, not by the
+    row rule, so the cache must read the composed state. On a uniform
+    quarterly category the record serves for the day cap, never the class's
+    ninety days."""
+    from argus.domain.research import cache as research_cache
+    from argus.domain.research.cache import WITHHELD_TTL_SECONDS
+
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+    document = agent_response(
+        text=typed_answer_text(
+            "ZZZZFAKE led the gainers, up 9.1%.",
+            [
+                retrieved_row(
+                    subject="ZZZZFAKE", symbol="ZZZZFAKE", label="change today", value=9.1
+                )
+            ],
+        ),
+        tickers=["ZZZZFAKE"],
+        sources=[PROVIDER_PAGE],
+    )
+    for item in document["output"]:
+        if item.get("type") == "finance_results":
+            item["categories"] = ["financials"]
+            for result in item["results"]:
+                result["category"] = "financials"
+    transport = _wire(monkeypatch, [document, document])
+
+    result = _run("what is moving today")
+
+    assert result is not None
+    assert result.stage_patch["research"]["degraded"] == {
+        "code": "survey_synthesis_incomplete"
+    }
+    assert len(transport.requests) == 1
+
+    served = _run("what is moving today")
+    assert served is not None
+    assert len(transport.requests) == 1, "the withheld record serves the same survey"
+    assert served.stage_patch["research"]["usage"]["cache_status"] == "hit"
+    assert served.stage_patch["research"]["degraded"] == {
+        "code": "survey_synthesis_incomplete"
+    }
+
+    real_monotonic = time.monotonic
+    monkeypatch.setattr(
+        research_cache.time,
+        "monotonic",
+        lambda: real_monotonic() + WITHHELD_TTL_SECONDS + 1,
+    )
+    _run("what is moving today")
+    assert len(transport.requests) == 2, "the record outlives no day on any class"
 
 
 def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
