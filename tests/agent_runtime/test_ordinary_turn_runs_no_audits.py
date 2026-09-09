@@ -247,6 +247,45 @@ async def test_a_well_formed_empty_extraction_ends_the_repair_ladder(
 
 
 @pytest.mark.asyncio
+async def test_a_testable_but_empty_read_still_moves_to_the_next_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The model called the turn testable yet extracted nothing: a
+    # self-contradicting read, which the fallback model may still complete.
+    models_asked: list[str] = []
+
+    async def _testable_but_empty(**kwargs: Any) -> FocusedStrategyExtraction:
+        models_asked.append(str(kwargs["model_name"]))
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True, user_goal_summary="Buy Tesla after big drops."
+        )
+
+    monkeypatch.setattr(
+        interpreter_module, "invoke_openrouter_json_schema", _testable_but_empty
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_unique_repair_models",
+        lambda *_a, **_k: ["primary", "fallback"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_strategy_extraction_repair_is_allowed",
+        lambda *_a, **_k: True,
+    )
+    message = "What if I bought Tesla after big drops?"
+
+    repaired = await interpreter_module._repair_incomplete_strategy_extraction(
+        failed_response=_educational_response(message),
+        preferred_model="primary",
+        request=_request(message),
+    )
+
+    assert repaired is None
+    assert models_asked == ["primary", "fallback"]
+
+
+@pytest.mark.asyncio
 async def test_a_provider_failure_still_moves_to_the_next_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

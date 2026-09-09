@@ -3278,10 +3278,12 @@ async def _repair_incomplete_strategy_extraction(
             annotate_repair(after=failed_response, repair_applied=False, no_op_reason="invalid_provider_result")
             continue
         if not _focused_strategy_extraction_has_material_fields(extraction):
-            # A well-formed empty extraction is an answer; only failures move
-            # to the next model.
             annotate_repair(after=failed_response, repair_applied=False, no_op_reason="no_material_fields")
-            return None
+            if not extraction.is_testable_strategy:
+                # A clear "no strategy here" is an answer; only a read that
+                # calls the turn testable yet extracts nothing moves on.
+                return None
+            continue
         base_response = failed_response
         if _request_has_active_strategy_context(
             request

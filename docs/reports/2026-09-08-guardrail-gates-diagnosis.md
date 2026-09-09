@@ -267,3 +267,53 @@ test work, not model-facing text.
   receipt. Their hit rates are unknowable today. Annotating the surviving
   audits through the existing `annotate_latest_openrouter_route_receipt` seam
   is a follow-up, not part of this lane.
+
+## Round two: what changed
+
+The changes that survived round one, each a post-hoc gate narrowed so a turn
+with nothing to check runs no second read. Nothing decides ahead of the
+interpreter, no model-facing text moved (`tests/test_interpreter_prompt_freeze.py`
+passes unchanged), and `llm_interpreter.py` shrank by two lines.
+
+| Call | Change | Owner |
+| --- | --- | --- |
+| `CapabilitySideQuestionAudit` | the educational-prose admit is gone; pending-field, removed-asset and vague-start admits stay | `_response_needs_capability_side_question_audit` |
+| `ContextQuestionAudit` | the educational admit is gone; the unsupported strategy shape and the forced unsupported path stay | `_response_needs_context_question_audit` |
+| `FocusedAssetDiscoveryRead` | triggers only on a typed contradiction: the primary typed a fact-kind `research_query` but left the payload empty | `focused_discovery_read_applicable`, over `research_routing.primary_read_asks_a_fact_question`, which `primary_research_query` now shares |
+| `FocusedStrategyExtraction` | `educational_question` needs current-turn execution evidence, the precondition every strategy entry already had; a well-formed empty extraction ends the model ladder | `strategy_extraction_repair_is_allowed`; the ladder in `_repair_incomplete_strategy_extraction` |
+
+Two proposals from round one did not survive. The unsupported-path thesis
+clause stays: `test_extraction_cannot_invent_a_strategy_from_an_echo` pins
+that a model-asserted thesis distinct from the message is an idea to extract,
+a graded-routing decision this lane does not reopen. And the discovery read
+was narrowed rather than unplugged, because the typed contradiction it should
+resolve does exist, it just is not a concept question; the read stays wired,
+observable, and dead on plain turns.
+
+Tests: `tests/agent_runtime/test_ordinary_turn_runs_no_audits.py` proves a
+concept question reaches the runtime with zero provider calls after the
+primary read, that the strategy-flow shapes still earn their reads, that the
+evidence predicate sees a named asset but not a concept, and that the ladder
+stops on an empty extraction while still moving past a provider failure. The
+three tests that pinned the deleted admits became trust tests on the same
+shapes. The hermetic sweep (`tests/agent_runtime`, `tests/test_spine_guardrails.py`,
+`tests/perf`) passes 2056.
+
+## Round two: before and after
+
+The deployed API runs `main`, so the #563 HTTP harness cannot measure a
+branch before promotion, and the local QA backend needs a `DATABASE_URL` the
+canonical environment does not carry. `scripts/benchmarks/interpret_stage_ab.py`
+runs the same interpret node the API runs, in-process, under the same
+seven-call allowance, on the #563 cohort messages, and records wall time plus
+every receipt. It measures the #563 "interpret start to first outcome"
+interval, which is where the four calls live; the roughly 1.7s of HTTP,
+admission, persistence and SSE around it is untouched by this lane. Runs were
+interleaved head, base, head, base and pooled per label
+([evidence/565](evidence/565/README.md)).
+
+RESULTS_TABLE
+
+## Round two: the live scorecard
+
+LIVE_EVAL_PARAGRAPH

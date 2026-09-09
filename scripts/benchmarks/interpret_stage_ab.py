@@ -325,14 +325,21 @@ def main() -> None:
     if args.command == "run":
         run(args)
         return
-    label_summaries = []
-    payload = {}
+    # Files sharing a label are one sample: interleaved runs of the same code
+    # version are pooled so provider drift cannot masquerade as a change.
+    pooled: dict[str, list[dict]] = defaultdict(list)
+    provenances: dict[str, list[dict]] = defaultdict(list)
     for path in args.files:
         provenance, records = load_records(path)
         label = str(provenance.get("label") or path.stem)
+        pooled[label].extend(records)
+        provenances[label].append(provenance)
+    label_summaries = []
+    payload = {}
+    for label, records in pooled.items():
         summary = summarize(records)
         label_summaries.append((label, summary))
-        payload[label] = {"provenance": provenance, "summary": summary}
+        payload[label] = {"provenance": provenances[label], "summary": summary}
     if args.json is not None:
         args.json.write_text(json.dumps(payload, indent=2) + "\n")
     sys.stdout.write(render(label_summaries) + "\n")
