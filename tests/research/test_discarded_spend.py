@@ -312,6 +312,41 @@ def test_a_cache_hit_reports_the_packet_it_served_and_claims_no_new_call(
     assert _settle(second, ledger)["billable_quantity"] == 0
 
 
+def test_the_cache_stores_one_response_not_the_turn_that_retried(
+    monkeypatch, stepping_clock
+) -> None:
+    """A later question served from the record paid for the response that was
+    stored, not for the retry this turn happened to run."""
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="company_lookup",
+        symbols=["NFLX"],
+        requires_publisher_sources=True,
+    )
+    published = agent_response(
+        text="Netflix grew on membership and pricing.",
+        tickers=["NFLX"],
+        sources=["https://ir.netflix.net/financials/quarterly-earnings/"],
+    )
+    transport = wire_grounded_client(monkeypatch, [_provider_only_document(), published])
+
+    paid = run_research_turn("What were Netflix's main growth drivers?")
+    served = run_research_turn("What were Netflix's main growth drivers?")
+
+    assert paid is not None and served is not None
+    assert len(transport.requests) == 2, "the second turn made no call"
+    assert paid.stage_patch["research"]["usage"]["cost_usd"] == pytest.approx(
+        2 * ONE_RESPONSE_USD
+    )
+    assert served.stage_patch["research"]["usage"] == {
+        "invocations": 1,
+        "latency_ms": CALL_LATENCY_MS,
+        "cost_usd": pytest.approx(ONE_RESPONSE_USD),
+        "cache_status": "hit",
+    }
+
+
 def test_the_publisher_retry_still_drops_the_provider_only_channel(
     monkeypatch, stepping_clock
 ) -> None:

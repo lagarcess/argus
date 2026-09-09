@@ -346,6 +346,9 @@ async def grounded_result(
         decision=decision,
     )
     if cache_status == "miss":
+        # The response's own packet is what is stored, not the turn-total copy
+        # the sidecar reports: a later hit served from this record paid for one
+        # response, not for the retries this turn happened to run.
         ttl_seconds = _cache_ttl(
             packet,
             withheld=_sidecar_withheld(result.stage_patch["research"]),
