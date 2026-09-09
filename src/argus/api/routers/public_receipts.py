@@ -114,5 +114,6 @@ def record_receipt_funnel_stage(
         f"receipt_{payload.stage}",
         user_id=None,
         status=payload.stage,
+        attributes={"kind": payload.kind},
     )
     return Response(status_code=204)

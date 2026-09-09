@@ -992,6 +992,7 @@ GuestConversionReason = Literal[
     "new_conversation",
     "keep_history",
     "discovery_searches",
+    "share_result",
 ]
 
 
@@ -1003,12 +1004,20 @@ class GuestPendingAction(BaseModel):
     action_id: str = Field(min_length=1, max_length=128)
     artifact_id: str | None = Field(default=None, min_length=1, max_length=128)
 
+    message_id: str | None = Field(default=None, min_length=1, max_length=128)
+
     @model_validator(mode="after")
     def require_reason_specific_identity(self) -> "GuestPendingAction":
-        if self.reason == "save_decision" and self.artifact_id is None:
-            raise ValueError("save_decision_requires_artifact_id")
-        if self.reason != "save_decision" and self.artifact_id is not None:
-            raise ValueError("artifact_id_is_only_valid_for_save_decision")
+        from argus.domain.guest_pending_action_contract import (
+            GUEST_PENDING_ACTION_IDENTITIES,
+        )
+
+        for reason, field in GUEST_PENDING_ACTION_IDENTITIES.items():
+            value = getattr(self, field)
+            if self.reason == reason and value is None:
+                raise ValueError(f"{reason}_requires_{field}")
+            if self.reason != reason and value is not None:
+                raise ValueError(f"{field}_is_only_valid_for_{reason}")
         return self
 
 

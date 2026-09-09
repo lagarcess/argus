@@ -312,6 +312,7 @@ def test_login_reconciles_cookie_bound_handoff_before_returning_session() -> Non
             "conversation_id": CONVERSATION_ID,
             "action_id": "new-chat-1",
             "artifact_id": None,
+            "message_id": None,
         },
     }
     gateway.claim_guest_workspace_handoff.assert_called_once_with(
