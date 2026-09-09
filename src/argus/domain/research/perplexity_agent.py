@@ -324,6 +324,12 @@ def _cited_rows(
     its evidence in the tool result and loses the provider URL, the way
     every provider-host citation does. A rejected row is kept apart, its
     citation dropped, so the turn can name the figure it will not quote."""
+    if len(rows) > MAX_PACKET_ROWS:
+        # More figures than the packet carries: an answer whose evidence would
+        # be cut cannot be published whole, so it is not the contract.
+        raise ResearchUnavailableError(
+            "malformed_response", f"typed answer carries more than {MAX_PACKET_ROWS} rows"
+        )
     kept: list[RetrievedRow] = []
     rejected: list[RetrievedRow] = []
     for row in rows:
@@ -334,7 +340,7 @@ def _cited_rows(
         if _is_provider_host(urlparse(url).netloc.lower()):
             row = row.model_copy(update={"source_url": None})
         kept.append(row)
-    return kept[:MAX_PACKET_ROWS], rejected[:MAX_PACKET_ROWS]
+    return kept, rejected
 
 
 def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None:

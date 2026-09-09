@@ -702,3 +702,46 @@ def test_a_currency_row_without_a_code_is_not_the_schema() -> None:
         client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
 
     assert excinfo.value.reason == "malformed_response"
+
+
+@pytest.mark.parametrize("unit", ["EPS", "AAA", "usd", "US$", "dollars"])
+def test_a_currency_row_names_a_currency_that_exists(unit: str) -> None:
+    """Three capitals are not a currency; the ISO 4217 list is."""
+    from argus.domain.research.contracts import RetrievedRow
+
+    with pytest.raises(ValidationError):
+        RetrievedRow(
+            **retrieved_row(subject="Apple", kind="currency", unit=unit, value=5.0)
+        )
+    for code in ("USD", "DOP", "EUR"):
+        assert (
+            RetrievedRow(
+                **retrieved_row(subject="Apple", kind="currency", unit=code, value=5.0)
+            ).unit
+            == code
+        )
+
+
+def test_more_rows_than_the_packet_carries_fails_closed() -> None:
+    """An answer whose typed evidence would be cut cannot be published whole."""
+    from argus.domain.research.contracts import MAX_PACKET_ROWS
+
+    rows = [
+        retrieved_row(label=f"figure {i}", value=float(i), source_url=PROVIDER_PAGE)
+        for i in range(MAX_PACKET_ROWS + 1)
+    ]
+    client = PerplexityAgentClient(
+        "k",
+        transport=RecordingTransport(
+            [
+                agent_response(
+                    text=typed_answer_text("Many figures.", rows), sources=[PROVIDER_PAGE]
+                )
+            ]
+        ),
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["balanced"])
+
+    assert excinfo.value.reason == "malformed_response"
