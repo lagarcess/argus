@@ -499,6 +499,49 @@ on that file.
 
 ---
 
+### Subtract the guardrails  ·  ships in **The spine**
+
+**This is the subtractive thesis with a latency payoff nobody counted.** It is
+scheduled here because operating rule 2 promises that a cheap calculation
+answers first since it is instant, and on a 33-second spine that promise is
+false. The calculations lane would build on a runtime that cannot keep it, and
+the same audits would then fire on the new calculations too, turning a one-file
+change into a retrofit across five cards.
+
+**Nothing is built.** Every audit and repair already runs *after*
+`LLMInterpretationResponse` and takes it as input, so the shape is known by the
+time they fire, and each is already gated:
+`_response_needs_capability_side_question_audit`,
+`_response_needs_context_question_audit`,
+`_strategy_extraction_repair_is_allowed`. The gates are simply too loose. Narrow
+them to interpretations that are actually backtest-shaped.
+
+**Done means.** The backtest audits and the strategy repair no longer fire on
+turns with no backtest. Ordinary chat first token drops materially against the
+#563 baseline. No new machinery, no model-facing text, no fingerprint change.
+
+**The second lever, measure before acting.** The interpretation call itself is
+9.45s. At the tier model's 95 tokens per second that is roughly 900 output
+tokens, so the cost is the size of the structured response, not the model. Grok
+4.3 is already the right choice on this tier: 0.58s first-token latency and 95
+tok/s against Haiku 4.5's 0.67s and 48 tok/s at twice the output price, which
+would make this call take about 19s. **Do not switch models.** Measure what
+shrinking the response schema buys before changing it.
+
+**Surface.** `src/argus/agent_runtime/llm_interpreter.py` and
+`src/argus/agent_runtime/interpreter/`.
+
+**Do not touch.** Rule 7 stands: no shortcut routing before the LLM. Nothing here
+decides anything ahead of interpretation; it only stops running backtest checks
+on interpretations that are not backtests.
+
+**Proof.** The #563 harness re-run, same turn types, before and against the
+change. **And a live eval scorecard**, because tightening a gate trades latency
+for interpretation accuracy at the edges and that trade has to be shown, not
+asserted.
+
+---
+
 ### The registry  ·  ships in **The spine**
 
 **It is a tool catalog, not a question classifier.** Founder, 2026-09-08: the
@@ -983,6 +1026,23 @@ subject to what the measurement says: compute answers under one second to first
 token, grounded answers under four. A backtest is slow and tolerated because it
 is visibly working; a time-value answer that takes four seconds breaks the
 calculator promise.
+
+**Measured 2026-09-08, PR #563, 68 real turns. The target is unreachable on
+today's spine and the reason is the box.** Ordinary chat reaches first token at
+33.14s p50, against a target of one second. Grounded answers land between 12.55s
+and 26.17s, against four. Splitting provider time per turn into the two calls
+that are the product, the interpretation and the composer, and everything else:
+ordinary chat spends 15.60s of 30.13s on guardrails, 52 percent. Confirmation
+spends 48 percent, the compute-intent probe 43 percent. The research paths spend
+9 to 12 percent, which is why **asking Argus to research something reaches first
+token in 12.55s while talking to it takes 33.14s.**
+
+The guardrails are backtest guardrails firing on turns with no backtest:
+`CapabilitySideQuestionAudit` at 11.49s on 4 of 10 turns, `ContextQuestionAudit`
+at 5.11s on 7, `FocusedAssetDiscoveryRead` at 4.01s on 7, and the repair
+`FocusedStrategyExtraction`, whose trigger is `required_strategy_shape_missing`,
+16 times across 10 plain-conversation turns. Decision 3 is no longer blocked;
+what it now needs is the item below.
 
 **4. When Argus cannot ground something it returns a typed unverified state,
 never prose.** The answer shows the computation with the missing input named and
