@@ -72,6 +72,8 @@ from argus.domain.research.contracts import (
     ResearchNamePair,
     ResearchPacket,
     ResearchUnavailableError,
+    ResearchUsage,
+    combined_research_usage,
 )
 from argus.domain.research.source_selection import select_public_sources
 
@@ -130,6 +132,47 @@ def _cache_key_for(
     )
 
 
+class _TurnSpend:
+    """Every provider response one turn read, adopted, retried away, or
+    rejected unread.
+
+    Composition publishes at most one packet; the turn paid for all of them,
+    so the spend it reports is their sum. The single seam that calls the
+    provider records here, which is what keeps a later retry from losing its
+    invoice by forgetting to add itself.
+    """
+
+    def __init__(self) -> None:
+        self._usages: list[ResearchUsage] = []
+
+    async def run(
+        self, client: Any, prompt: str, spec: ResearchConfigSpec
+    ) -> ResearchPacket:
+        try:
+            packet = await asyncio.to_thread(client.run_research, prompt, spec)
+        except ResearchUnavailableError as exc:
+            if exc.usage is not None:
+                self._usages.append(exc.usage)
+            raise
+        self._usages.append(packet.usage)
+        return packet
+
+    @property
+    def total(self) -> ResearchUsage | None:
+        """What this turn paid, or None when it reached no provider."""
+        return combined_research_usage(self._usages) if self._usages else None
+
+    def reported(self, published: ResearchUsage) -> ResearchUsage:
+        """The usage a composed turn reports: what it paid, or the served
+        packet's own when it paid nothing, because a cache hit is free."""
+        total = self.total
+        if total is None:
+            return published
+        # The model names who produced the published answer; the numbers
+        # beside it are the turn's, not one response's.
+        return total.model_copy(update={"model": published.model or total.model})
+
+
 async def grounded_result(
     *,
     query: ResearchRequest,
@@ -171,6 +214,7 @@ async def grounded_result(
         language=language,
     )
     cache_status = "miss"
+    spend = _TurnSpend()
     packet = cache_get(key)
     if packet is not None:
         cache_status = "hit"
@@ -200,7 +244,7 @@ async def grounded_result(
         if not isinstance(query, ResearchOperationQuery):
             emit_substage("research_search", detail=shape)
         try:
-            packet = await asyncio.to_thread(client.run_research, prompt, spec)
+            packet = await spend.run(client, prompt, spec)
         except ResearchUnavailableError as exc:
             # The deployed log sink drops structured extras, so the reason and
             # detail must live in the message itself to be diagnosable.
@@ -216,6 +260,7 @@ async def grounded_result(
                 user=user,
                 decision=decision,
                 reason=exc.reason,
+                usage=spend.total,
             )
         retry_prompt: str | None = None
         if query_is_survey(query) and not _has_figures(packet):
@@ -238,11 +283,7 @@ async def grounded_result(
             )
         if retry_prompt is not None:
             try:
-                retried = await asyncio.to_thread(
-                    client.run_research,
-                    retry_prompt,
-                    spec,
-                )
+                retried = await spend.run(client, retry_prompt, spec)
             except ResearchUnavailableError:
                 retried = None
             if retried is not None and (
@@ -267,8 +308,8 @@ async def grounded_result(
                 }
             )
             try:
-                retried = await asyncio.to_thread(
-                    client.run_research,
+                retried = await spend.run(
+                    client,
                     _publisher_source_retry_prompt(prompt, language=language),
                     public_spec,
                 )
@@ -280,36 +321,36 @@ async def grounded_result(
                 question_as_of_date=question_as_of_date,
             ):
                 packet = retried
-        if publisher_sources_required and not _packet_has_public_sources(
-            packet,
-            query=query,
-            question_as_of_date=question_as_of_date,
-        ):
-            return unavailable_result(
-                query=query,
-                subjects=subjects,
-                interpretation=interpretation,
-                state=state,
-                user=user,
-                decision=decision,
-                reason="missing_public_sources",
-            )
     if publisher_sources_required and not _packet_has_public_sources(
         packet,
         query=query,
         question_as_of_date=question_as_of_date,
     ):
-        return unavailable_result(
-            query=query,
+        # The claim is not publishable, but the packet is real and was paid
+        # for: compose the honest note from it the way the thorough path
+        # does, so the spend it cost reaches the sidecar and the ledger. It
+        # is still never stored; a withheld-for-want-of-a-publisher packet
+        # has nothing a later identical question could be served from.
+        return _packet_stage_result(
+            packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
             subjects=subjects,
+            shape=shape,
+            capability_class=capability_class,
+            language=language,
             interpretation=interpretation,
-            state=state,
             user=user,
+            cache_status=cache_status,
+            period_of_interest=query.period_of_interest,
+            question_kind=query.question_kind,
+            period_start_date=_coerce_date(query.period_start_date),
+            question_as_of_date=question_as_of_date,
             decision=decision,
-            reason="missing_public_sources",
+            withheld_code="research_unavailable_missing_public_sources",
+            survey=query_is_survey(query),
+            require_typed_figures=isinstance(query, ResearchOperationQuery),
         )
     result = _packet_stage_result(
-        packet=packet,
+        packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
         subjects=subjects,
         shape=shape,
         capability_class=capability_class,
@@ -326,6 +367,9 @@ async def grounded_result(
         require_typed_figures=isinstance(query, ResearchOperationQuery),
     )
     if cache_status == "miss":
+        # The response's own packet is what is stored, not the turn-total copy
+        # the sidecar reports: a later hit served from this record paid for one
+        # response, not for the retries this turn happened to run.
         ttl_seconds = _cache_ttl(
             packet,
             withheld=_sidecar_withheld(result.stage_patch["research"]),
@@ -355,38 +399,50 @@ def _packet_stage_result(
     decision: InterpretDecision | None = None,
     survey: bool | None = None,
     require_typed_figures: bool = False,
+    withheld_code: str | None = None,
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
-    shared cache, for any shape."""
-    survey = is_market_survey(question_kind) if survey is None else survey
-    candidates = list(packet.name_pairs)
-    if survey:
-        # A survey's answer names its assets in the results, and often only
-        # in its own tables; the resolver still gates every one.
-        from argus.domain.research.perplexity_agent import symbols_from_answer_tables
+    shared cache, for any shape.
 
-        seen = {pair.symbol.upper() for pair in candidates}
-        for symbol in (
-            *packet.tickers,
-            *(row.symbol for row in packet.rows if row.symbol),
-            *symbols_from_answer_tables(packet.answer_markdown),
-        ):
-            if symbol.upper() in seen:
-                continue
-            seen.add(symbol.upper())
-            candidates.append(ResearchNamePair(symbol=symbol, name=symbol))
-    peers = verified_peers(
-        candidates,
-        exclude={s["symbol"] for s in subjects},
-        # Surveys name many assets and lead with whatever moved most, which
-        # is often untradable here; look past those before giving up.
-        scan_limit=SURVEY_CANDIDATE_SCAN_LIMIT if survey else MAX_PEER_PAIRS,
-    )
+    ``withheld_code`` is a reason the caller already established and the
+    packet cannot show for itself, such as a claim whose retrieval kept no
+    public publisher. It wins over what the packet says about itself."""
+    survey = is_market_survey(question_kind) if survey is None else survey
     answer = packet.answer_markdown
-    degraded_code = _withheld_code(
+    degraded_code = withheld_code or _withheld_code(
         packet, survey=survey, require_typed_figures=require_typed_figures
     )
+    peers: list[dict[str, str]] = []
+    if degraded_code is None:
+        # A withheld answer shows no peer, so a reason already established
+        # spares the resolver a pass over names nothing will render.
+        candidates = list(packet.name_pairs)
+        if survey:
+            # A survey's answer names its assets in the results, and often
+            # only in its own tables; the resolver still gates every one.
+            from argus.domain.research.perplexity_agent import (
+                symbols_from_answer_tables,
+            )
+
+            seen = {pair.symbol.upper() for pair in candidates}
+            for symbol in (
+                *packet.tickers,
+                *(row.symbol for row in packet.rows if row.symbol),
+                *symbols_from_answer_tables(packet.answer_markdown),
+            ):
+                if symbol.upper() in seen:
+                    continue
+                seen.add(symbol.upper())
+                candidates.append(ResearchNamePair(symbol=symbol, name=symbol))
+        peers = verified_peers(
+            candidates,
+            exclude={s["symbol"] for s in subjects},
+            # Surveys name many assets and lead with whatever moved most,
+            # which is often untradable here; look past those before giving
+            # up.
+            scan_limit=SURVEY_CANDIDATE_SCAN_LIMIT if survey else MAX_PEER_PAIRS,
+        )
     if degraded_code is None and survey:
         named_symbols = _named_verified_symbols(answer, [*subjects, *peers])
         if named_symbols:
@@ -655,18 +711,25 @@ def unavailable_result(
     user: UserState,
     reason: str,
     decision: InterpretDecision | None = None,
+    usage: ResearchUsage | None = None,
 ) -> StageResult | None:
+    """The honest note when no packet survived.
+
+    ``usage`` is the spend of the responses the turn read and rejected. There
+    is no packet to compose from, so the note's own carries it instead: a turn
+    that reached the provider is a miss that cost what it cost, and only a
+    turn that never called one bypasses the meter."""
     del state
     language = language_tag(user.language_preference)
-    note = (
-        _missing_public_source_note(language)
-        if reason == "missing_public_sources"
-        else _unavailable_note(language)
-    )
+    # No reason reaching here has a note of its own: a claim withheld for want
+    # of a publisher has a real packet and composes through _packet_stage_result.
+    note = _unavailable_note(language)
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     if not rows and subjects:
         note = f"{note}\n\n{honest_no_next_line(language)}"
-    packet = ResearchPacket(answer_markdown=note)
+    packet = ResearchPacket(
+        answer_markdown=note, usage=usage if usage is not None else ResearchUsage()
+    )
     shape = shape_for_query(query)
     return research_stage_result(
         answer=note,
@@ -678,7 +741,7 @@ def unavailable_result(
         peers=[],
         rows=rows,
         subjects=subjects,
-        cache_status="bypass",
+        cache_status="bypass" if usage is None else "miss",
         degraded_code=f"research_unavailable_{reason}",
         period_of_interest=query.period_of_interest,
         decision=decision,
@@ -1487,6 +1550,36 @@ def research_capacity_exhausted_for_job(
             degraded_code="research_capacity_exhausted",
         ),
     }
+
+
+def research_billed_failure_evidence(
+    job_request: dict[str, Any],
+    *,
+    reason: str,
+    usage: ResearchUsage,
+) -> dict[str, Any]:
+    """The cost ledger's view of a thorough run that was billed and whose
+    answer could not be read.
+
+    Not the turn's sidecar: the failure note carries none, and nothing here
+    reaches a reader. It exists so a run Argus paid for is recorded as spend
+    rather than disappearing with the answer nobody could parse."""
+    return build_research_sidecar(
+        capability_class=str(job_request.get("capability_class") or "thorough_research"),
+        shape="thorough",
+        sources=[],
+        retrieved_at=datetime.now(timezone.utc).isoformat(),
+        subjects=[],
+        peers=[],
+        usage={
+            "invocations": usage.invocations,
+            "latency_ms": usage.latency_ms,
+            "cost_usd": usage.cost_usd,
+            "cache_status": "miss",
+        },
+        period_of_interest=None,
+        degraded_code=f"research_unavailable_{reason}",
+    )
 
 
 def carried_decision(

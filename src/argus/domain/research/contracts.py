@@ -6,6 +6,7 @@ at parse time so every downstream consumer sees the same bounded shape.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Literal
@@ -151,12 +152,24 @@ def _strict_schema(node: Any, definitions: dict[str, Any]) -> Any:
 
 
 class ResearchUnavailableError(Exception):
-    """Raised when the research provider cannot serve a request."""
+    """Raised when the research provider cannot serve a request.
 
-    def __init__(self, reason: str, detail: str | None = None) -> None:
+    ``usage`` carries the invoice of a response that was read far enough to
+    establish one before being rejected. Argus paid for that response, so the
+    turn that discards it still records its spend.
+    """
+
+    def __init__(
+        self,
+        reason: str,
+        detail: str | None = None,
+        *,
+        usage: ResearchUsage | None = None,
+    ) -> None:
         super().__init__(reason)
         self.reason = reason
         self.detail = detail
+        self.usage = usage
 
 
 class ResearchPricingError(Exception):
@@ -199,6 +212,43 @@ class ResearchUsage(BaseModel):
     output_tokens: int | None = Field(default=None, ge=0)
     cache_creation_input_tokens: int | None = Field(default=None, ge=0)
     cache_read_input_tokens: int | None = Field(default=None, ge=0)
+
+
+def combined_research_usage(usages: Sequence[ResearchUsage]) -> ResearchUsage:
+    """The spend of every provider response one turn read, as one usage.
+
+    A turn that called the provider twice paid twice, whichever response it
+    published and whether or not it published any: counts, latency and cost
+    add up. A count or cost the invoices did not all establish is unknown for
+    the turn as a whole, never the part of it that was known, because half a
+    total understates the spend as confidently as a wrong one.
+    """
+    if not usages:
+        return ResearchUsage()
+    if len(usages) == 1:
+        return usages[0]
+
+    def _summed(field: str) -> int | None:
+        values = [getattr(usage, field) for usage in usages]
+        if any(value is None for value in values):
+            return None
+        return sum(values)
+
+    costs = [usage.cost_usd for usage in usages]
+    models = [usage.model for usage in usages if usage.model]
+    return ResearchUsage(
+        invocations=_summed("invocations"),
+        finance_search_invocations=_summed("finance_search_invocations"),
+        web_search_invocations=_summed("web_search_invocations"),
+        fetch_url_invocations=_summed("fetch_url_invocations"),
+        model=models[-1] if models else "",
+        latency_ms=sum(usage.latency_ms for usage in usages),
+        cost_usd=None if any(cost is None for cost in costs) else sum(costs),
+        input_tokens=_summed("input_tokens"),
+        output_tokens=_summed("output_tokens"),
+        cache_creation_input_tokens=_summed("cache_creation_input_tokens"),
+        cache_read_input_tokens=_summed("cache_read_input_tokens"),
+    )
 
 
 class ResearchNamePair(BaseModel):
@@ -259,6 +309,10 @@ class BackgroundPoll(BaseModel):
     ]
     packet: ResearchPacket | None = None
     failure_detail: str | None = None
+    # Why a completed run's answer could not be read, and the invoice it was
+    # billed at. The packet is gone; the spend it cost is not.
+    failure_reason: str | None = None
+    usage: ResearchUsage | None = None
 
     @property
     def terminal(self) -> bool:
