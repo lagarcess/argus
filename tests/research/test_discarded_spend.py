@@ -9,12 +9,14 @@ response is still billed and that a reader is never shown what it cost.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
 from argus.api import state as api_state
 from argus.api.chat import research_evidence as evidence
 from argus.domain.research.contracts import ResearchUsage, combined_research_usage
+from argus.domain.supabase_gateway import SupabaseGateway
 
 from tests.research.conftest import (
     PROVIDER_PAGE,
@@ -26,6 +28,7 @@ from tests.research.conftest import (
     typed_answer_text,
     wire_grounded_client,
 )
+from tests.test_supabase_gateway import _RecordingSupabaseClient
 
 # One response's recorded invoice, the fixture every canned document bills at.
 ONE_RESPONSE_USD = 0.05395
@@ -33,13 +36,15 @@ ONE_RESPONSE_USD = 0.05395
 CALL_LATENCY_MS = 250
 
 
-class _LedgerGateway:
+class _LedgerGateway(SupabaseGateway):
     def __init__(self) -> None:
+        super().__init__(client=_RecordingSupabaseClient())
         self.entries: list[dict[str, Any]] = []
 
     def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
-        self.entries.append(entry)
-        return entry
+        row = super().create_cost_ledger_entry(entry=entry)
+        self.entries.append(row)
+        return row
 
 
 class _SteppingClock:
@@ -73,6 +78,7 @@ def ledger(monkeypatch: pytest.MonkeyPatch) -> _LedgerGateway:
 
 def _settle(result, ledger: _LedgerGateway) -> dict[str, Any]:
     """Run the turn's sidecar through the same settlement the API calls."""
+    reader_bytes = json.dumps(result.stage_patch, sort_keys=True).encode()
     evidence.settle_research_turn(
         dict(result.stage_patch),
         user_id="user-569",
@@ -81,6 +87,11 @@ def _settle(result, ledger: _LedgerGateway) -> dict[str, Any]:
         request_id="r-569",
     )
     assert len(ledger.entries) == 1
+    assert ledger.entries[0]["status"] is None
+    assert ledger.entries[0]["metadata"] == {
+        "research_ledger_contract": "argus_research_ledger/v2"
+    }
+    assert json.dumps(result.stage_patch, sort_keys=True).encode() == reader_bytes
     return ledger.entries[0]
 
 
@@ -564,17 +575,13 @@ def test_one_response_is_reported_as_itself() -> None:
 # --- the thorough path: a run that was billed and could not be published
 
 
-class _FailingJobGateway:
+class _FailingJobGateway(_LedgerGateway):
     """Only what the failure path touches: the row it fails and the ledger it
     writes."""
 
     def __init__(self) -> None:
-        self.entries: list[dict[str, Any]] = []
+        super().__init__()
         self.failed: list[tuple[str, str]] = []
-
-    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
-        self.entries.append(entry)
-        return entry
 
     def mark_backtest_job_failed(
         self, *, user_id: str, job_id: str, failure_code: str, **_kw: Any
@@ -607,6 +614,8 @@ def test_a_thorough_run_billed_for_an_unreadable_answer_reaches_the_ledger(
     assert gateway.failed == [("job-569", "research_failed")]
     assert len(gateway.entries) == 1
     entry = gateway.entries[0]
+    assert entry["status"] is None
+    assert entry["metadata"] == {"research_ledger_contract": "argus_research_ledger/v2"}
     assert entry["task"] == "thorough_research"
     assert entry["billable_quantity"] == 1
     assert entry["cost_amount"] == pytest.approx(0.42)

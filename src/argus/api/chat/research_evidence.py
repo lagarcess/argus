@@ -299,10 +299,6 @@ def _append_ledger_row(
             else "unavailable"
         ),
         "latency_ms": usage.get("latency_ms") if paid else None,
-        # Uniform across every research row. The turn's outcome has one owner
-        # already, usage_metadata.degraded_code, and a coarser second copy of
-        # it here could only disagree with it.
-        "status": "succeeded",
     }
     try:
         gateway.create_cost_ledger_entry(entry=entry)
