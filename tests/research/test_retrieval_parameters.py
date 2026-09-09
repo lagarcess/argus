@@ -660,36 +660,152 @@ def test_json_that_is_not_the_answer_object_fails_closed(text: str) -> None:
     assert excinfo.value.reason == "malformed_response"
 
 
+def _row(label: str, value: float, unit: str = "USD", symbol: str | None = None):
+    from argus.domain.research.contracts import RetrievedRow
+
+    return RetrievedRow(
+        label=label, value=value, unit=unit, as_of=None, symbol=symbol, source_url=None
+    )
+
+
 @pytest.mark.parametrize(
-    ("prose", "values", "unverified"),
+    ("prose", "rows", "unverified", "language"),
     [
-        ("Apple trades at **$316.22**, as of September 8, 2026.", [316.22], 0),
-        ("AAPL is $200 today and up 5%.", [200.0], 1),
+        # value, subject and unit agree
         (
-            "A **$12.93 billion** deal; shares fell 2.01% to $225.73.",
-            [12930000000.0, -2.01, 225.73],
+            "Apple (AAPL) is trading at **$316.22 USD** as of September 8, 2026.",
+            [_row("Apple latest share price", 316.22, "USD", "AAPL")],
             0,
+            "en",
         ),
-        ("A $12.9 billion deal and a $13 billion headline.", [12930000000.0], 0),
-        ("Revenue rose 16%.", [0.16], 0),
-        ("La tasa es 8,25% y el mínimo RD$1.250,50 pesos.", [8.25, 1250.5], 0),
-        ("Trades at 1.5x sales; S&P 500 fell; a 52-week high; FY2025; Q2.", [1.5], 0),
-        ("Sold 3 million shares.", [3000000.0], 0),
-        ("| BLTE | $193.61 | +13.16% |", [193.61], 1),
-        ("I could not retrieve current figures.", [], 0),
+        (
+            "As of September 8, 2026, NVDA closed at **$225.73**, down **2.01%**.",
+            [
+                _row("NVIDIA closing stock price", 225.73, "USD", "NVDA"),
+                _row("NVIDIA daily stock-price change", -2.01, "percent", "NVDA"),
+            ],
+            0,
+            "en",
+        ),
+        # a scale word requires the plain scaled value, never the written one
+        (
+            "The planned **$12.93 billion** acquisition of Hugging Face.",
+            [_row("NVIDIA Hugging Face acquisition value", 12930000000.0, "USD", "NVDA")],
+            0,
+            "en",
+        ),
+        (
+            "The planned **$12.93 billion** acquisition of Hugging Face.",
+            [_row("NVIDIA Hugging Face acquisition value", 12.93, "USD", "NVDA")],
+            1,
+            "en",
+        ),
+        # sign: an explicit sign or a direction word must agree with the row
+        (
+            "MSFT rose +5.0% today.",
+            [_row("Apple daily change", -5.0, "percent", "AAPL")],
+            1,
+            "en",
+        ),
+        (
+            "AAPL rose 5% today.",
+            [_row("Apple daily change", -5.0, "percent", "AAPL")],
+            1,
+            "en",
+        ),
+        (
+            "AAPL fell 5% today.",
+            [_row("Apple daily change", -5.0, "percent", "AAPL")],
+            0,
+            "en",
+        ),
+        # unit family: a percent is never a price, a ratio row is a percent
+        ("AAPL is up 5% today.", [_row("Apple price", 5.0, "USD", "AAPL")], 1, "en"),
+        (
+            "Netflix revenue rose 16%.",
+            [_row("Netflix revenue growth", 0.16, "ratio", "NFLX")],
+            0,
+            "en",
+        ),
+        (
+            "Netflix revenue rose 16%.",
+            [_row("Netflix revenue", 0.16, "USD", "NFLX")],
+            1,
+            "en",
+        ),
+        # one number convention, chosen by the response language
+        (
+            "Apple trades at $316.22.",
+            [_row("Apple share price", 31622, "USD", "AAPL")],
+            1,
+            "en",
+        ),
+        (
+            "La tasa del Banco Popular es 8,25% y el mínimo RD$1.250,50.",
+            [
+                _row("Banco Popular tasa certificado", 8.25, "percent"),
+                _row("Banco Popular monto mínimo", 1250.5, "DOP"),
+            ],
+            0,
+            "es",
+        ),
+        # subject: the figure's own sentence or table line names the row's entity
+        (
+            "MSFT rose 5% today.",
+            [_row("Apple daily change", 5.0, "percent", "AAPL")],
+            1,
+            "en",
+        ),
+        (
+            "| Top gainer | BLTE | $193.61 | +13.16% |",
+            [
+                _row("BLTE close", 193.61, "USD", "BLTE"),
+                _row("BLTE daily move", 13.16, "percent", "BLTE"),
+            ],
+            0,
+            "en",
+        ),
+        (
+            "| Netflix | $33.72B | $39.00B |",
+            [
+                _row("Netflix total revenue FY2023", 33723297000.0, "USD", "NFLX"),
+                _row("Netflix total revenue FY2024", 39000966000.0, "USD", "NFLX"),
+            ],
+            0,
+            "en",
+        ),
+        # a label naming no entity cannot be checked for subject
+        ("Apple is at $200 today.", [_row("share price", 200.0, "USD")], 0, "en"),
+        # bare integers are not figures; multiples and counts are quantities
+        (
+            "Apple trades at 1.5x sales; the S&P 500 fell; a 52-week high; FY2025; Q2.",
+            [_row("Apple price to sales", 1.5, "x", "AAPL")],
+            0,
+            "en",
+        ),
+        (
+            "Sold 3 million Apple shares.",
+            [_row("Apple shares sold", 3000000.0, "shares", "AAPL")],
+            0,
+            "en",
+        ),
+        # a figure the model computed, with no row, is unverified
+        (
+            "Netflix's top line expanded, while Disney's grew about 6%.",
+            [_row("Disney revenue growth FY2025", 3.4, "percent", "DIS")],
+            1,
+            "en",
+        ),
+        ("I could not retrieve current figures.", [], 0, "en"),
     ],
 )
 def test_prose_figures_are_audited_against_the_rows(
-    prose: str, values: list[float], unverified: int
+    prose: str, rows: list, unverified: int, language: str
 ) -> None:
-    """Every figure a reader would take as a fact must be some row's value in
-    the written units at the written precision; bare integers such as years,
-    dates and index names are not figures."""
-    from argus.domain.research.contracts import RetrievedRow
+    """A figure is verified only by a row that agrees on every dimension the
+    prose exposes: value under the response language's number convention at
+    the written precision, scale, sign, unit family and subject. Bare
+    integers such as years, dates and index names are not figures."""
     from argus.domain.research.perplexity_agent import _unverified_figure_count
 
-    rows = [
-        RetrievedRow(**retrieved_row(label=f"row {i}", value=value))
-        for i, value in enumerate(values)
-    ]
-    assert _unverified_figure_count(prose, rows) == unverified
+    assert _unverified_figure_count(prose, rows, language=language) == unverified

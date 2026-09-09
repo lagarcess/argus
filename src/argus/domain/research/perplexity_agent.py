@@ -76,7 +76,10 @@ class PerplexityAgentClient:
         response = self._post(payload, timeout_seconds=spec.timeout_seconds)
         latency_ms = int((time.monotonic() - started) * 1000)
         packet = _packet_from_response(
-            response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
+            response,
+            latency_ms=latency_ms,
+            on_unpriced=self._record_unpriced,
+            language=spec.language or "en",
         )
         _observe_retrieval(packet, spec)
         return packet
@@ -113,7 +116,10 @@ class PerplexityAgentClient:
         latency_ms = int((time.monotonic() - started) * 1000)
         try:
             packet = _packet_from_response(
-                response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
+                response,
+                latency_ms=latency_ms,
+                on_unpriced=self._record_unpriced,
+                language=(spec.language if spec is not None else None) or "en",
             )
         except ResearchUnavailableError as exc:
             # The run is complete, so polling again cannot change its answer:
@@ -202,6 +208,7 @@ def _packet_from_response(
     *,
     latency_ms: int,
     on_unpriced: UnpricedSpendRecorder = record_unpriced_spend,
+    language: str = "en",
 ) -> ResearchPacket:
     output = document.get("output")
     if not isinstance(output, list):
@@ -240,7 +247,7 @@ def _packet_from_response(
     if typed is not None:
         rows, uncited_rows = _cited_rows(typed.rows, parsed)
         answer = _sanitize_answer(typed.answer_markdown)
-        unverified_figures = _unverified_figure_count(answer, rows)
+        unverified_figures = _unverified_figure_count(answer, rows, language=language)
     else:
         answer = _sanitize_answer("\n\n".join(text_blocks))
     if not answer:
@@ -341,17 +348,18 @@ def _cited_rows(
 
 # A figure a reader would take as a fact: a number carrying a currency mark,
 # a percent sign, a decimal part, a thousands separator, a scale word or a
-# multiple. Bare integers (years, dates, counts, index names such as S&P 500)
-# are not audited. Written in English or Spanish number style.
+# multiple, with the sign the prose wrote in front of it. Bare integers
+# (years, dates, counts, index names such as S&P 500) are not audited.
 _FIGURE = re.compile(
     r"(?<![\w.])"
-    r"(?P<currency>RD\$|US\$|[$€£])?\s?"
+    r"(?P<sign>[+\-\u2212])?"
+    r"(?P<currency>RD\$|US\$|[$\u20ac\u00a3])?\s?"
     r"(?P<number>\d{1,3}(?:[,.]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
     r"(?P<scale>\s?(?:mil millones|thousand|million|billion|trillion|millones|"
-    r"millón|mil|[KMBT]|[kmbt]n?)\b)?"
+    r"mill\u00f3n|mil|[KMBT]|[kmbt]n?)\b)?"
     r"(?P<multiple>\s?(?:x|veces)\b)?"
     r"(?P<percent>\s?(?:%|percent\b|por ciento\b))?"
-    r"(?P<currency_word>\s?(?:dollars|dólares|pesos|euros|USD|DOP|EUR)\b)?",
+    r"(?P<currency_word>\s?(?:dollars|d\u00f3lares|pesos|euros|USD|DOP|EUR)\b)?",
     re.IGNORECASE,
 )
 _SCALE_FACTORS = {
@@ -360,7 +368,7 @@ _SCALE_FACTORS = {
     "k": 1e3,
     "million": 1e6,
     "millones": 1e6,
-    "millón": 1e6,
+    "mill\u00f3n": 1e6,
     "m": 1e6,
     "mn": 1e6,
     "billion": 1e9,
@@ -371,76 +379,170 @@ _SCALE_FACTORS = {
     "t": 1e12,
     "tn": 1e12,
 }
+# A direction word within a few words before a percent figure fixes its sign:
+# "fell 2.01%" is negative, "rose 15.7%" positive. Levels ("fell to $225.73")
+# carry no sign, so direction words never apply to currency or quantity.
+_DIRECTION_WORDS = {
+    "up": 1,
+    "rose": 1,
+    "gained": 1,
+    "climbed": 1,
+    "jumped": 1,
+    "advanced": 1,
+    "higher": 1,
+    "increased": 1,
+    "grew": 1,
+    "subi\u00f3": 1,
+    "gan\u00f3": 1,
+    "avanz\u00f3": 1,
+    "creci\u00f3": 1,
+    "down": -1,
+    "fell": -1,
+    "lost": -1,
+    "dropped": -1,
+    "declined": -1,
+    "slid": -1,
+    "lower": -1,
+    "decreased": -1,
+    "shrank": -1,
+    "baj\u00f3": -1,
+    "cay\u00f3": -1,
+    "perdi\u00f3": -1,
+    "retrocedi\u00f3": -1,
+}
+_PERCENT_UNITS = (
+    "%",
+    "percent",
+    "pct",
+    "por ciento",
+    "porcentaje",
+    "puntos porcentuales",
+)
+_RATIO_UNITS = ("ratio", "fraction", "decimal")
+_SEGMENT = re.compile(r"(?<=[.!?])\s+")
 
 
-def _written_values(number: str) -> list[tuple[float, int]]:
-    """A written number under both conventions, with the precision it was
-    written at: 1,250 is twelve hundred fifty in English and 1.25 in Spanish,
-    and a figure matches if either reading matches a row."""
-    readings: list[tuple[float, int]] = []
-    for thousands, decimal in ((",", "."), (".", ",")):
-        candidate = number.replace(thousands, "")
-        if candidate.count(decimal) > 1:
-            continue
-        candidate = candidate.replace(decimal, ".")
-        try:
-            value = float(candidate)
-        except ValueError:
-            continue
-        precision = len(candidate.split(".", 1)[1]) if "." in candidate else 0
-        if (value, precision) not in readings:
-            readings.append((value, precision))
-    return readings
+def _written_value(number: str, language: str) -> tuple[float, int]:
+    """One reading of a written number under the response language, with the
+    precision it was written at. With both separators present the last one is
+    the decimal mark. Alone, a comma before exactly three digits is a
+    thousands mark and otherwise a decimal mark (8,25 in Spanish); a point is
+    a decimal mark in English and, before exactly three digits, a thousands
+    mark in Spanish (1.250)."""
+    spanish = language.startswith("es")
+    if "," in number and "." in number:
+        decimal = "," if number.rfind(",") > number.rfind(".") else "."
+    elif "," in number:
+        groups = number.split(",")
+        decimal = "." if all(len(group) == 3 for group in groups[1:]) else ","
+    elif "." in number:
+        groups = number.split(".")
+        decimal = "," if spanish and all(len(group) == 3 for group in groups[1:]) else "."
+    else:
+        decimal = "."
+    thousands = "," if decimal == "." else "."
+    normalized = number.replace(thousands, "").replace(decimal, ".")
+    precision = len(normalized.split(".", 1)[1]) if "." in normalized else 0
+    return float(normalized), precision
 
 
-def _unverified_figure_count(markdown: str, rows: list[RetrievedRow]) -> int:
+def _subject_tokens(row: RetrievedRow) -> set[str]:
+    """What names the row's entity: its symbol and the proper nouns of its
+    label (the schema asks the label to name the entity). Empty when the
+    label names none, in which case the subject cannot be checked."""
+    tokens = {row.symbol.lower()} if row.symbol else set()
+    for word in row.label.split():
+        cleaned = "".join(ch for ch in word if ch.isalnum())
+        if len(cleaned) >= 3 and (cleaned[0].isupper() or cleaned[0].isdigit()):
+            tokens.add(cleaned.lower())
+    return tokens
+
+
+def _unverified_figure_count(
+    markdown: str, rows: list[RetrievedRow], *, language: str = "en"
+) -> int:
     """Figures the prose states that no cited row carries.
 
     The schema cannot make the prose and the rows agree, and the model's word
     that its prose states only row figures is never trusted. A written figure
-    is verified when some row's value, in the written units and at the
-    written precision, is the written number: 12.93 billion against
-    12930000000, 4.3% against 4.3 or the ratio 0.043, RD$1.250,50 against
-    1250.5. Prose cannot be trimmed of one claim, so one unverified figure
-    withholds the answer at the composition seam."""
-    magnitudes = [abs(row.value) for row in rows]
+    is verified only by a row that agrees on every dimension the prose
+    exposes: the value under the response language's number convention at
+    the written precision, the scale word (12.93 billion is 12930000000, not
+    12.93), the sign when the prose writes one or a direction word fixes it,
+    the unit family (a percent is never a price), and the subject, which the
+    figure's own sentence or table line must name by the row's symbol or a
+    proper noun of its label. One unverified figure withholds the answer at
+    the composition seam."""
     unverified = 0
-    for match in _FIGURE.finditer(markdown):
-        groups = match.groupdict()
-        number = groups["number"]
-        marked = bool(
-            groups["currency"]
-            or groups["percent"]
-            or groups["scale"]
-            or groups["multiple"]
-            or groups["currency_word"]
-            or "." in number
-            or "," in number
-        )
-        if not marked:
-            continue
-        scale = _SCALE_FACTORS.get((groups["scale"] or "").strip().lower(), 1.0)
-        percent = bool(groups["percent"])
-        if not any(
-            _figure_matches(written, precision, magnitude, scale=scale, percent=percent)
-            for written, precision in _written_values(number)
-            for magnitude in magnitudes
-        ):
-            unverified += 1
+    for line in markdown.split("\n"):
+        for segment in _SEGMENT.split(line):
+            words = {
+                "".join(ch for ch in word if ch.isalnum()).lower()
+                for word in segment.split()
+            }
+            for match in _FIGURE.finditer(segment):
+                figure = _figure_from(match, segment, language)
+                if figure is None:
+                    continue
+                if not any(_row_verifies(row, figure, words) for row in rows):
+                    unverified += 1
     return unverified
 
 
-def _figure_matches(
-    written: float, precision: int, magnitude: float, *, scale: float, percent: bool
-) -> bool:
-    tolerance = 0.5 * 10 ** (-precision) + 1e-9
-    candidates = [magnitude, magnitude / scale] if scale != 1.0 else [magnitude]
-    if percent:
-        candidates.append(magnitude * 100)
-    return any(
-        abs(round(candidate, precision) - written) <= tolerance
-        for candidate in candidates
+def _figure_from(
+    match: re.Match[str], segment: str, language: str
+) -> dict[str, Any] | None:
+    groups = match.groupdict()
+    number = groups["number"]
+    percent = bool(groups["percent"])
+    currency = bool(groups["currency"] or groups["currency_word"])
+    marked = (
+        percent
+        or currency
+        or bool(groups["scale"])
+        or bool(groups["multiple"])
+        or "." in number
+        or "," in number
     )
+    if not marked:
+        return None
+    written, precision = _written_value(number, language)
+    sign = 0
+    if groups["sign"]:
+        sign = 1 if groups["sign"] == "+" else -1
+    elif percent:
+        preceding = segment[: match.start()].split()[-3:]
+        for word in reversed(preceding):
+            cleaned = "".join(ch for ch in word if ch.isalpha()).lower()
+            if cleaned in _DIRECTION_WORDS:
+                sign = _DIRECTION_WORDS[cleaned]
+                break
+    return {
+        "written": written,
+        "precision": precision,
+        "scale": _SCALE_FACTORS.get((groups["scale"] or "").strip().lower(), 1.0),
+        "percent": percent,
+        "sign": sign,
+    }
+
+
+def _row_verifies(row: RetrievedRow, figure: dict[str, Any], words: set[str]) -> bool:
+    subject = _subject_tokens(row)
+    if subject and not (subject & words):
+        return False
+    if figure["sign"] and (row.value == 0 or (row.value > 0) != (figure["sign"] > 0)):
+        return False
+    unit = row.unit.strip().lower()
+    row_is_percent = any(mark in unit for mark in _PERCENT_UNITS)
+    row_is_ratio = any(mark in unit for mark in _RATIO_UNITS)
+    if figure["percent"] != (row_is_percent or row_is_ratio):
+        return False
+    magnitude = abs(row.value)
+    if figure["percent"] and row_is_ratio and not row_is_percent:
+        magnitude *= 100
+    candidate = magnitude / figure["scale"]
+    tolerance = 0.5 * 10 ** (-figure["precision"]) + 1e-9
+    return abs(round(candidate, figure["precision"]) - figure["written"]) <= tolerance
 
 
 def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None:

@@ -147,12 +147,16 @@ changed here.
 ## The prose figure audit, measured on these recordings
 
 Codex round 5 pointed out that the schema cannot make the prose and the rows
-agree: a schema-valid answer can state a figure no row carries. Since
-`1f9a1eaf`'s successor, every figure the prose writes (a number with a
-currency mark, a percent sign, a decimal part, a thousands separator, a scale
-word or a multiple) must equal some row's value in the written units at the
-written precision, or the answer is withheld as `research_figures_unverified`.
-Re-parsed at head, the three typed recordings with figures come out as:
+agree: a schema-valid answer can state a figure no row carries. Every figure
+the prose writes (a number with a currency mark, a percent sign, a decimal
+part, a thousands separator, a scale word or a multiple) is now verified only
+by a row that agrees on every dimension the prose exposes: the value under
+the response language's number convention at the written precision, the
+scale word, the sign when written or fixed by a direction word, the unit
+family, and the subject, which the figure's own sentence or table line must
+name by the row's symbol or a proper noun of its label. One unverified figure
+withholds the answer as `research_figures_unverified`. Re-parsed at head, the
+three typed recordings with figures come out as:
 
 | Recording | Figures in prose | Verified by a row | Outcome |
 | --- | ---: | ---: | --- |
