@@ -299,6 +299,45 @@ def test_a_billed_response_the_parser_chokes_on_degrades_and_bills(
     assert _settle(result, ledger)["cost_amount"] == pytest.approx(ONE_RESPONSE_USD)
 
 
+def test_a_parser_failure_tells_the_operator_and_not_the_reader() -> None:
+    """Codex round 3: the wide catch also covers an Argus-side regression, so
+    the frames must reach the log. They must not reach the error'"'"'s detail,
+    which a failed research job serves to the reader as `failure_detail`."""
+    from argus.domain.research.contracts import ResearchUnavailableError
+    from argus.domain.research.perplexity_agent import _packet_from_response
+
+    nested_broken = agent_response()
+    nested_broken["output"] = [{"type": "message", "content": 1}]
+
+    with pytest.raises(ResearchUnavailableError) as raised:
+        _packet_from_response(nested_broken, latency_ms=10, on_unpriced=lambda _s: None)
+
+    error = raised.value
+    assert error.reason == "malformed_response"
+    assert error.usage is not None and error.usage.cost_usd == pytest.approx(
+        ONE_RESPONSE_USD
+    )
+    assert error.detail == "response shape not parseable"
+    for leaked in ("TypeError", "perplexity_agent", ".py", "Traceback", "/"):
+        assert leaked not in error.detail
+
+
+def test_the_operator_log_names_the_line_that_failed() -> None:
+    """A type and a message alone cannot locate a parser regression, and the
+    deployed sink drops structured extras, so the frames ride in the message."""
+    from argus.domain.research.perplexity_agent import _parser_failure_frames
+
+    try:
+        [] + 1  # noqa: B018
+    except TypeError as exc:
+        frames = _parser_failure_frames(exc)
+
+    assert "test_discarded_spend.py" in frames
+    assert "TypeError" in frames
+    assert len(frames) <= 400
+    assert "\n" not in frames, "one line, because the sink is line oriented"
+
+
 def test_a_response_with_no_invoice_at_all_bills_nothing(
     monkeypatch, ledger, stepping_clock
 ) -> None:
