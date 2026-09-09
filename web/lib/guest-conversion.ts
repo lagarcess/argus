@@ -1,12 +1,8 @@
-import type {
-  ChatActionOption,
-  ChatMention,
-} from "@/components/chat/types";
+import type { ChatActionOption } from "@/components/chat/types";
 import type { DecisionState } from "@/lib/run-dossier-contract";
 
 export type GuestConversionReason =
   | "simulation_limit"
-  | "message_limit"
   | "save_decision"
   | "new_conversation"
   | "keep_history"
@@ -48,11 +44,6 @@ export type GuestPendingAction =
   | (GuestPendingActionBase & {
       reason: "simulation_limit";
       action: ChatActionOption;
-    })
-  | (GuestPendingActionBase & {
-      reason: "message_limit";
-      text: string;
-      mentions: ChatMention[];
     })
   | (GuestPendingActionBase & {
       reason: "save_decision";

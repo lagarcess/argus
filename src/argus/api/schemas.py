@@ -176,7 +176,6 @@ class GuestAccountSummary(BaseModel):
     expires_at: datetime
     conversation_id: str | None
     conversation_limit: int = Field(ge=1, le=2_147_483_647)
-    message_limit: int = Field(ge=1, le=2_147_483_647)
     simulation_limit: int = Field(ge=1, le=2_147_483_647)
     feedback_limit: int = Field(ge=1, le=2_147_483_647)
 
@@ -230,40 +229,6 @@ class UserResponse(BaseModel):
         if self.account_kind == "guest" and isinstance(self.user, User):
             self.user = guest_safe_user(self.user)
         return self
-
-
-class UsageWindow(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    limit: int = Field(ge=0)
-    used: int = Field(ge=0)
-    remaining: int = Field(ge=0)
-    period_end: datetime
-
-
-class UsageAllowance(BaseModel):
-    """Backend-derived allowance truth for the account's active windows."""
-
-    model_config = ConfigDict(frozen=True)
-
-    hour: UsageWindow | None
-    day: UsageWindow | None
-    guest_session: UsageWindow | None
-    available_now: bool
-    limiting_window: Literal["hour", "day", "guest_session"]
-
-
-class UsageAllowances(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    messages: UsageAllowance
-    backtests: UsageAllowance
-
-
-class UsageAllowanceResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    allowances: UsageAllowances
 
 
 class ProfilePatch(BaseModel):
@@ -1117,6 +1082,9 @@ class GuestBootstrapRequest(BaseModel):
 GuestHandoffKind = Literal["existing_account", "new_account_signup"]
 
 
+# message_limit is legacy: no client creates it since conversation became
+# compute, but a handoff persisted by an earlier bundle can still carry it and
+# must claim cleanly until it expires.
 GuestConversionReason = Literal[
     "second_simulation",
     "simulation_limit",

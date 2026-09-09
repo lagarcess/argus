@@ -5,6 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
 import yaml
 from argus.api.guest_access import (
     AccountContext,
@@ -17,11 +18,9 @@ from argus.domain.backtest_admission_gateway import admit_backtest_job
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.usage_limits import (
     GUEST_FEEDBACK_ALLOWANCE,
-    GUEST_MESSAGE_ALLOWANCE,
     GUEST_SIMULATION_ALLOWANCE,
     SIMULATION_USAGE_RESOURCE,
     allowance_windows,
-    message_usage_settlement,
     settle_memory_usage,
 )
 
@@ -40,43 +39,40 @@ def test_guest_lifetime_windows_use_fixed_workspace_bounds() -> None:
     assert account.expires_at is not None
     expected_start = account.expires_at - timedelta(days=7)
 
-    assert allowance_windows(account, "chat_messages") == [
+    assert allowance_windows(account, "backtest_runs") == [
         {
             "period": "guest_session",
-            "limit": GUEST_MESSAGE_ALLOWANCE,
+            "limit": GUEST_SIMULATION_ALLOWANCE,
             "period_start": expected_start,
             "period_end": account.expires_at,
         }
     ]
-    assert allowance_windows(account, "backtest_runs")[0]["limit"] == (
-        GUEST_SIMULATION_ALLOWANCE
-    )
     assert allowance_windows(account, "feedback")[0]["limit"] == (
         GUEST_FEEDBACK_ALLOWANCE
     )
 
 
+def test_conversation_has_no_allowance_window() -> None:
+    # Conversation is compute: no account kind carries a window for it.
+    for account in (
+        _guest_context(),
+        registered_account_context("00000000-0000-0000-0000-000000000054"),
+    ):
+        with pytest.raises(ValueError, match="chat_messages"):
+            allowance_windows(account, "chat_messages")
+
+
 def test_registered_allowance_windows_remain_hour_and_day() -> None:
     account = registered_account_context("00000000-0000-0000-0000-000000000052")
 
-    assert allowance_windows(account, "chat_messages") == [
-        {"period": "hour", "limit": 60},
-        {"period": "day", "limit": 200},
-    ]
     assert allowance_windows(account, "backtest_runs") == [
         {"period": "hour", "limit": 10},
         {"period": "day", "limit": 50},
     ]
-
-
-def test_terminal_message_settlement_keys_guests_on_the_visitor() -> None:
-    settlement = message_usage_settlement(_guest_context())
-
-    assert settlement["resource"] == "chat_messages"
-    assert settlement["limits"] == [("day", 10)]
-    # No caller-supplied key still yields a visitor key: the shared
-    # fail-closed bucket, never a workspace-fresh allowance.
-    assert settlement["visitor_key"].startswith("visitor:")
+    assert allowance_windows(account, "feedback") == [
+        {"period": "day", "limit": 50},
+        {"period": "hour", "limit": 20},
+    ]
 
 
 def test_backtest_gateway_passes_guest_window_to_existing_atomic_owner() -> None:
@@ -114,22 +110,22 @@ def test_memory_settlement_accepts_guest_dict_window_with_fixed_bounds() -> None
     account = _guest_context()
     assert account.expires_at is not None
     counters: dict[tuple[str, str, str], dict[str, object]] = {}
-    windows = allowance_windows(account, "chat_messages")
+    windows = allowance_windows(account, "feedback")
 
     settle_memory_usage(
         counters,
         user_id=account.user_id,
-        resource="chat_messages",
+        resource="feedback",
         limits=windows,
         at=utcnow(),
     )
 
-    row = counters[(account.user_id, "chat_messages", "guest_session")]
+    row = counters[(account.user_id, "feedback", "guest_session")]
     assert row == {
         "period_start": account.expires_at - timedelta(days=7),
         "period_end": account.expires_at,
         "used_count": 1,
-        "limit_count": GUEST_MESSAGE_ALLOWANCE,
+        "limit_count": GUEST_FEEDBACK_ALLOWANCE,
     }
 
 
@@ -184,13 +180,13 @@ def test_memory_registered_dict_windows_keep_hour_and_day_accounting() -> None:
     settle_memory_usage(
         counters,
         user_id=account.user_id,
-        resource="chat_messages",
-        limits=allowance_windows(account, "chat_messages"),
+        resource="feedback",
+        limits=allowance_windows(account, "feedback"),
         at=now,
     )
 
-    assert counters[(account.user_id, "chat_messages", "hour")]["used_count"] == 1
-    assert counters[(account.user_id, "chat_messages", "day")]["used_count"] == 1
+    assert counters[(account.user_id, "feedback", "hour")]["used_count"] == 1
+    assert counters[(account.user_id, "feedback", "day")]["used_count"] == 1
 
 
 def test_guest_summary_policy_matches_python_openapi_typescript_and_sql() -> None:
@@ -201,13 +197,11 @@ def test_guest_summary_policy_matches_python_openapi_typescript_and_sql() -> Non
             "GUEST_CONVERSATION_ALLOWANCE",
             None,
         ),
-        "message_limit": usage_limits.GUEST_MESSAGE_ALLOWANCE,
         "simulation_limit": usage_limits.GUEST_SIMULATION_ALLOWANCE,
         "feedback_limit": usage_limits.GUEST_FEEDBACK_ALLOWANCE,
     }
     assert policy == {
         "conversation_limit": 1,
-        "message_limit": 10,
         "simulation_limit": 2,
         "feedback_limit": 5,
     }
@@ -234,15 +228,16 @@ def test_guest_summary_policy_matches_python_openapi_typescript_and_sql() -> Non
         / "migrations"
         / "20260802090000_raise_guest_simulation_allowance.sql"
     ).read_text(encoding="utf-8")
+    # The immutable migration still names chat_messages; that row is retired
+    # history now that conversation is compute and settles nothing.
     sql_policy = {
         resource: int(limit)
         for resource, limit in re.findall(
-            r"when '(chat_messages|backtest_runs|feedback)' then (\d+)",
+            r"when '(backtest_runs|feedback)' then (\d+)",
             migration,
         )
     }
     assert sql_policy == {
-        "chat_messages": usage_limits.GUEST_MESSAGE_ALLOWANCE,
         "backtest_runs": usage_limits.GUEST_SIMULATION_ALLOWANCE,
         "feedback": usage_limits.GUEST_FEEDBACK_ALLOWANCE,
     }

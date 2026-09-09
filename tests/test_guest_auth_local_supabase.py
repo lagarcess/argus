@@ -18,7 +18,6 @@ import psycopg
 import pytest
 from argus.agent_runtime.stages.confirm import _coverage_preflight
 from argus.api import state as api_state
-from argus.api.guest_access import AccountContext, guest_capabilities
 from argus.api.main import app
 from argus.api.routers import agent as agent_router
 from argus.api.routers import auth as auth_router
@@ -26,7 +25,6 @@ from argus.api.schemas import Message
 from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
-from argus.domain.usage_limits import message_usage_settlement
 from argus.domain.username_signup import serialized_username_signup
 from argus.domain.visitor_usage import visitor_key_for
 from fastapi.testclient import TestClient
@@ -308,15 +306,13 @@ def test_real_guest_terminal_message_settles_visitor_day_window(
                 created_at=utcnow(),
             )
             visitor_key = f"visitor-test:{turn_id[:8]}"
-            settlement = message_usage_settlement(
-                AccountContext(
-                    kind="guest",
-                    user_id=user_id,
-                    expires_at=workspace.expires_at,
-                    capabilities=guest_capabilities(),
-                ),
-                visitor_key=visitor_key,
-            )
+            # The terminal transaction's visitor-keyed settlement path, driven
+            # directly: no product path settles conversation any more.
+            settlement = {
+                "resource": "chat_messages",
+                "limits": [("day", 10)],
+                "visitor_key": visitor_key,
+            }
 
             first = gateway.finalize_chat_turn(
                 user_id=user_id,
@@ -539,7 +535,7 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
             )
             usage = client.get("/api/v1/me/usage")
             assert usage.status_code == 200
-            day_window = usage.json()["allowances"]["backtests"]["day"]
+            day_window = usage.json()["allowances"]["execution"]["day"]
 
             assert len(runs) == 1
             # The workspace-keyed reservation still owns replay identity; the

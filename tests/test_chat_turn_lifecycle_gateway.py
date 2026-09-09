@@ -6,14 +6,12 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from argus.api.guest_access import AccountContext, guest_capabilities
 from argus.api.schemas import Message
 from argus.domain.chat_turn_lifecycle import TransitionResult
 from argus.domain.chat_turn_lifecycle_gateway import (
     ChatTurnLifecycleGatewayMixin,
 )
 from argus.domain.supabase_gateway import SupabaseGateway
-from argus.domain.usage_limits import message_usage_settlement
 
 
 def _id() -> str:
@@ -271,7 +269,6 @@ def test_terminal_finalization_serializes_guest_visitor_window() -> None:
     user_id = _id()
     conversation_id = _id()
     turn_id = _id()
-    expires_at = datetime(2026, 8, 1, 8, 3, 9, 708198, tzinfo=timezone.utc)
     assistant = _assistant_message(
         message_id=_id(),
         conversation_id=conversation_id,
@@ -283,15 +280,13 @@ def test_terminal_finalization_serializes_guest_visitor_window() -> None:
         data=[{"message": assistant.model_dump(mode="json")}]
     )
     gateway = SupabaseGateway(client=client)
-    settlement = message_usage_settlement(
-        AccountContext(
-            kind="guest",
-            user_id=user_id,
-            expires_at=expires_at,
-            capabilities=guest_capabilities(),
-        ),
-        visitor_key="visitor:serialization-proof",
-    )
+    # A visitor-keyed settlement payload; the terminal transaction still
+    # accepts one even though no product path settles conversation now.
+    settlement = {
+        "resource": "chat_messages",
+        "limits": [("day", 10)],
+        "visitor_key": "visitor:serialization-proof",
+    }
 
     persisted = gateway.finalize_chat_turn(
         user_id=user_id,
