@@ -37,7 +37,11 @@ from argus.domain.research.config import (
     BACKGROUND_POLL_INTERVAL_SECONDS,
     background_deadline_seconds,
 )
-from argus.domain.research.contracts import ResearchPacket, ResearchUnavailableError
+from argus.domain.research.contracts import (
+    ResearchPacket,
+    ResearchUnavailableError,
+    ResearchUsage,
+)
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
@@ -313,6 +317,9 @@ async def _poll_and_finalize(
                         post_note=True,
                         job_request=job_request,
                         conversation_id=conversation_id,
+                        request_id=request_id,
+                        billed_reason=poll.failure_reason,
+                        billed_usage=poll.usage,
                     )
                 return
             if time.monotonic() > deadline:
@@ -436,6 +443,9 @@ def _fail_job(
     job_request: dict[str, Any] | None = None,
     conversation_id: str | None = None,
     result_message_id: str | None = None,
+    request_id: str | None = None,
+    billed_reason: str | None = None,
+    billed_usage: ResearchUsage | None = None,
 ) -> None:
     # The note is persisted first so the failed row can name it: a terminal
     # research row's message, answer or note, is served as the job's
@@ -447,6 +457,25 @@ def _fail_job(
             user_id=user_id,
             conversation_id=conversation_id,
             job_request=job_request,
+        )
+    if billed_usage is not None and job_request is not None:
+        # A completed run whose answer could not be read was still billed.
+        # The note carries no sidecar, so the ledger is told directly rather
+        # than through a turn that has none.
+        from argus.agent_runtime.research_answer import (
+            research_billed_failure_evidence,
+        )
+
+        record_research_turn_evidence(
+            research=research_billed_failure_evidence(
+                job_request,
+                reason=billed_reason or "malformed_response",
+                usage=billed_usage,
+            ),
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            request_id=request_id,
         )
     gateway = api_state.supabase_gateway
     if gateway is None:

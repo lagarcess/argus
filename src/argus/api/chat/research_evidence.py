@@ -260,6 +260,7 @@ def _append_ledger_row(
     if gateway is None:
         return
     capability_class = str(research.get("capability_class") or "unknown")
+    paid = cache_status_of(usage) == "miss"
     correlation_id = request_id or message_id or conversation_id or user_id
     degraded = research.get("degraded")
     entry = {
@@ -285,12 +286,22 @@ def _append_ledger_row(
             ),
         },
         "billable_unit": "request",
-        "billable_quantity": 1 if cache_status_of(usage) == "miss" else 0,
-        "cost_amount": usage.get("cost_usd"),
+        "billable_quantity": 1 if paid else 0,
+        # What this turn paid, not what the answer cost whoever retrieved it. A
+        # cache hit serves a record with an invoice on it and spends nothing, so
+        # its cost and latency belong to the miss that stored the record and are
+        # already on that row; repeating them here would let any report that
+        # sums the column charge one retrieval twice.
+        "cost_amount": usage.get("cost_usd") if paid else None,
         "cost_source": (
-            "provider_reported" if usage.get("cost_usd") is not None else "unavailable"
+            "provider_reported"
+            if paid and usage.get("cost_usd") is not None
+            else "unavailable"
         ),
-        "latency_ms": usage.get("latency_ms"),
+        "latency_ms": usage.get("latency_ms") if paid else None,
+        # Uniform across every research row. The turn's outcome has one owner
+        # already, usage_metadata.degraded_code, and a coarser second copy of
+        # it here could only disagree with it.
         "status": "succeeded",
     }
     try:

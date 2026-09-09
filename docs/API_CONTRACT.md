@@ -3709,15 +3709,34 @@ Contract rules:
   Unpriced calls carry the reported invoice, expected range and discrepancy
   in ledger metadata and emit an ERROR alert. Transport, malformed answer,
   empty answer and missing required source evidence still fail closed.
+- **A turn is billed for every response it read, not for the one it
+  published.** `usage` describes the turn's provider work: a turn that called
+  the provider twice reports both calls' `invocations`, `latency_ms` and
+  `cost_usd` added together, whether it published the first response, the
+  second, or neither. A count or cost the invoices did not all establish is
+  null for the turn, never the part of it that was known. So a retry the turn
+  discarded, a claim withheld for want of a public publisher, and a response
+  billed and then rejected as unreadable all reach the cost ledger at what
+  they cost; only a turn that reached no provider reports zero and
+  `cache_status: "bypass"`. A cache hit is the one turn whose `usage`
+  describes something other than its own work: it serves a stored record and
+  republishes that record's invocations, latency and cost as provenance, and
+  because it spent nothing, its ledger row carries `billable_quantity: 0` with
+  no cost and no latency. The retrieval is charged once, on the miss that
+  stored it. A completed thorough run whose answer cannot be
+  read posts no sidecar to a reader, so its spend is recorded on the ledger
+  directly. None of this is reader-facing: `usage` is server-side evidence,
+  and cost never appears on a public surface.
 - Retrieval evidence is independent of the invoice. The provider's returned
   output is the retrieval record: finance and web result items and the
   citations they carry. Survey grounding and the single survey retry read
   that record, plus any tool count the invoice did establish, so a usable
   answer whose invoice is missing or malformed is delivered without a second
-  paid request. `usage.invocations` is the invoice's finance_search count. It
-  is null when the invoice did not establish a count and is never spelled as
-  zero unless the provider reported zero; an Argus-built turn that ran no
-  provider call reports zero.
+  paid request. `usage.invocations` is the finance_search count the turn's
+  invoices established, summed over every response it read. It is null when an
+  invoice did not establish a count and is never spelled as zero unless the
+  provider reported zero; an Argus-built turn that ran no provider call
+  reports zero.
 - A pure quote or market-data number may use `fast`; its public source list may
   be empty because provider provenance belongs to the route receipt rather
   than a publisher link. A narrative, causal, or explanatory clause is typed
@@ -3809,10 +3828,11 @@ Contract rules:
   return. Two codes carry them, because they are the two that retrieved:
   `research_figures_unverified` and `survey_synthesis_incomplete`.
   `research_not_grounded` and `survey_not_grounded` never retrieved, the
-  `research_unavailable_*` codes have no packet, `research_capacity_exhausted`
-  and `asset_class_not_covered` ran no provider call, and
-  `research_unavailable_missing_public_sources` means no retrieved page
-  survived selection; all of those carry an empty list by construction.
+  other `research_unavailable_*` codes have no packet,
+  `research_capacity_exhausted` and `asset_class_not_covered` ran no provider
+  call, and `research_unavailable_missing_public_sources` composes from its
+  real packet but means no retrieved page survived selection; all of those
+  carry an empty list by construction.
   Clients render a degraded turn's sources as where Argus looked, never as
   the sources of an answer: the same drawer, framed by the typed
   `degraded.code`, so a page that yielded no figure is never presented as

@@ -28,6 +28,7 @@ from argus.agent_runtime.interpreter.research_routing import (
 from argus.agent_runtime.research_grounded import (  # noqa: F401
     RESEARCH_SCHEMA_VERSION,
     compose_completed_research,
+    research_billed_failure_evidence,
     research_capacity_exhausted_for_job,
     research_failure_note,
     research_prompt_for_job,
