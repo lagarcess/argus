@@ -79,6 +79,18 @@ def _job_sources(connection, *, user_id: str, conversation_id: str) -> list[dict
     return [source for source in row[0] if source["source_kind"] == "backtest_job"]
 
 
+def _parse_activity_timestamp(value: str) -> datetime:
+    """Postgres trims trailing zeros from microseconds; pad them back."""
+
+    match = re.fullmatch(r"(?P<base>.*?)\.(?P<fraction>\d{1,6})(?P<offset>\D.*)?", value)
+    if match is None:
+        return datetime.fromisoformat(value)
+    fraction = match.group("fraction").ljust(6, "0")
+    return datetime.fromisoformat(
+        f"{match.group('base')}.{fraction}{match.group('offset') or ''}"
+    )
+
+
 def _projected_operation(conversation_id: str, sources: list[dict]) -> str:
     activity = project_conversation_activity(
         conversation_id=conversation_id,
@@ -88,7 +100,7 @@ def _projected_operation(conversation_id: str, sources: list[dict]) -> str:
                 source_kind=source["source_kind"],
                 source_id=str(source["source_id"]),
                 status=str(source["status"]),
-                occurred_at=datetime.fromisoformat(source["occurred_at"]),
+                occurred_at=_parse_activity_timestamp(source["occurred_at"]),
                 stage_outcome=source.get("stage_outcome"),
                 result_hydrateable=source.get("result_hydrateable") is True,
             )
