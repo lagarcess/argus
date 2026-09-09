@@ -323,19 +323,29 @@ def test_a_parser_failure_tells_the_operator_and_not_the_reader() -> None:
 
 
 def test_the_operator_log_names_the_line_that_failed() -> None:
-    """A type and a message alone cannot locate a parser regression, and the
-    deployed sink drops structured extras, so the frames ride in the message."""
-    from argus.domain.research.perplexity_agent import _parser_failure_frames
+    """Codex round 4: the log has to be able to locate a parser regression,
+    so prove the traceback reaches a sink rather than asserting it."""
+    from argus.domain.research.contracts import ResearchUnavailableError
+    from argus.domain.research.perplexity_agent import _packet_from_response
+    from loguru import logger
 
+    nested_broken = agent_response()
+    nested_broken["output"] = [{"type": "message", "content": 1}]
+
+    records: list[str] = []
+    sink = logger.add(lambda message: records.append(str(message)), level="WARNING")
     try:
-        [] + 1  # noqa: B018
-    except TypeError as exc:
-        frames = _parser_failure_frames(exc)
+        with pytest.raises(ResearchUnavailableError):
+            _packet_from_response(
+                nested_broken, latency_ms=10, on_unpriced=lambda _s: None
+            )
+    finally:
+        logger.remove(sink)
 
-    assert "test_discarded_spend.py" in frames
-    assert "TypeError" in frames
-    assert len(frames) <= 400
-    assert "\n" not in frames, "one line, because the sink is line oriented"
+    logged = "\n".join(records)
+    assert "Research response could not be parsed" in logged
+    assert "perplexity_agent.py" in logged, "the frame that failed is named"
+    assert "TypeError" in logged
 
 
 def test_a_response_with_no_invoice_at_all_bills_nothing(

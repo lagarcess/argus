@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import re
 import time
-import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -221,26 +220,13 @@ def _packet_from_response(
         # Argus was billed for, not a crashed turn. Checking each nested shape
         # would only name the ones seen so far; the next one is already out
         # there. The catch is wide enough to cover an Argus-side regression in
-        # the parser too, so the frames go to the log: the deployed sink drops
-        # structured extras, and a type and a message alone cannot say which
-        # line failed. What leaves with the error stays generic, because a
-        # failed job serves its detail to the reader.
-        logger.opt(exception=True).warning(
-            f"Research response could not be parsed {_parser_failure_frames(exc)}"
-        )
+        # the parser too, so the traceback is attached: no sink is configured,
+        # and loguru's default renders it. What leaves with the error stays
+        # generic instead, because a failed job serves its detail to a reader.
+        logger.opt(exception=True).warning("Research response could not be parsed")
         raise ResearchUnavailableError(
             "malformed_response", "response shape not parseable", usage=usage
         ) from exc
-
-
-def _parser_failure_frames(exc: BaseException, *, limit: int = 400) -> str:
-    """The tail of the traceback, flattened into the log message itself.
-
-    Innermost frames come last, so the tail is the part naming the line that
-    failed. Never handed to a caller: this is for the operator reading logs,
-    not for the reader of a failed job."""
-    formatted = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    return " ".join(formatted.split())[-limit:]
 
 
 def _packet_from_priced_response(
