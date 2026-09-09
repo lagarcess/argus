@@ -13,6 +13,10 @@ import {
 } from "@/lib/chat-discovery-sidecar";
 import { replaceOrAppendFinalAssistantMessage } from "@/lib/chat-send-state";
 import { memoryRecallsFromMetadata } from "@/lib/memory-recalls";
+import {
+  decisionComputationFromMetadata,
+  decisionStateFromValue,
+} from "@/lib/decision-contract";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
@@ -233,11 +237,15 @@ export function messagesWithSavedDecisionState(
   messageId: string,
   decisionState: NonNullable<Message["result"]>["decisionState"],
 ): Message[] {
-  return messages.map((message) =>
-    message.id === messageId && message.result
-      ? { ...message, result: { ...message.result, decisionState } }
-      : message,
-  );
+  return messages.map((message) => {
+    if (message.id !== messageId) return message;
+    if (message.result) {
+      return { ...message, result: { ...message.result, decisionState } };
+    }
+    // A computed answer carries its decision on the message itself.
+    if (message.computation) return { ...message, decisionState };
+    return message;
+  });
 }
 
 export function markComposerActionsInactive(messages: Message[]): Message[] {
@@ -433,14 +441,25 @@ export function hydrateMessagesFromApi(
           ? null
           : nextExperimentRowsFromMetadata(metadata);
         const memoryRecalls = memoryRecallsFromMetadata(metadata);
+        // A computed answer declares its computation; the backend stamps
+        // the current decision beside it. Both are rendered, never inferred.
+        const computation = decisionComputationFromMetadata(metadata);
         if (
           discovery ||
           nextExperiments ||
           memoryRecalls ||
+          computation ||
           researchSources.length > 0
         ) {
           return {
             ...hydratedText,
+            ...(computation
+              ? {
+                  computation,
+                  decisionNoteId: stringOrNull(metadata.decision_note_id),
+                  decisionState: decisionStateFromValue(metadata.decision_state),
+                }
+              : {}),
             ...(discovery ? { discovery } : {}),
             // A discovery turn already renders its own sources panel; one
             // answer must never offer two source surfaces.

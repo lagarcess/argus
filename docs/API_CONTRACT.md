@@ -1370,6 +1370,9 @@ fixed day thresholds.
 never mutates Strategy records; Argus responds that the completed run remains
 available in conversation/history. Completed runs are captured automatically as
 evidence, while user commitment is represented by an explicit `DecisionNote`.
+A `DecisionNote` attaches to a computation: a backtest's evidence artifact, or
+the message that carried a computed answer (see "Decisions on computed
+answers" in section 15).
 
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
@@ -4363,6 +4366,8 @@ Completed chat-launched backtests auto-capture P1 evidence sidecars. The
 result-card metadata may include `idea_id`, `idea_version_id`,
 `evidence_artifact_id`, `evidence_lifecycle`, `artifact_type = "backtest"`,
 and after explicit decision capture, `decision_note_id` and `decision_state`.
+The two decision fields are derived on each transcript read from
+`decision_notes`, which owns them; the stored card copy is not the source.
 These are stable ids/enums and must not be localized.
 
 ## `POST /evidence-artifacts/{id}/decision`
@@ -4413,6 +4418,8 @@ or corrupt legacy user text.
     "idea_version_id": "uuid",
     "evidence_artifact_id": "uuid",
     "source_conversation_id": "uuid",
+    "source_message_id": null,
+    "computation": null,
     "decision_state": "promising",
     "note": "Worth revisiting after the next earnings cycle.",
     "created_at": "timestamp",
@@ -4446,6 +4453,106 @@ or corrupt legacy user text.
   validation. The response follows the standard RFC 9457 Problem Details shape
   with `code = "decision_capture_failed"`. Clients should show a retryable
   failure state and must not invent a saved decision locally.
+
+## Decisions on computed answers
+
+A decision attaches to a computation and carries what a re-run needs. Every
+`DecisionNote` has exactly one attachment:
+
+- A backtest decision attaches to its evidence artifact: `evidence_artifact_id`,
+  `idea_id`, and `idea_version_id` are set; `source_message_id` and
+  `computation` are `null`. Its computation is derived on read from the run
+  behind the artifact, `{"kind": "backtest", "inputs": {"source_run_id": "<run
+  id>"}}`, because that immutable run owns the inputs.
+- A computed-answer decision attaches to the assistant message that carried the
+  answer: `source_message_id` and `computation` are set; the three lineage ids
+  are `null`. The computation is stored on the decision, so the decision keeps
+  its inputs after the message is gone.
+
+A computed answer declares its computation in message metadata:
+`metadata.computation = {"kind": "<registered kind>", "inputs": {...}}`. `kind`
+is a lowercase slug of at most 80 characters; `inputs` is a JSON object of at
+most 32 keys that serializes to at most 8,192 characters. Only the backend
+writes this field. On every transcript read, the backend derives
+`decision_note_id` and `decision_state` for the message from `decision_notes`,
+the one owner of that fact, exactly as it does for a result card; a stored copy
+on the message is never trusted, and a decision the owner no longer holds is
+not shown. Clients render that state instead of inferring one. A message
+without a valid declaration offers no decision.
+
+### `POST /conversations/{conversation_id}/messages/{message_id}/decision`
+
+Create or update the current decision on an owned computed answer. Registered
+accounts only (`can_save_decision`); guests receive `403
+account_conversion_required` with `context.reason = "save_decision"`. The body
+is the same `DecisionNoteCreate` as the evidence-artifact route, with the same
+500-character note bound. One current decision exists per owned answer
+message; a repeated write updates its state and note and keeps the first stored
+computation and `created_at`.
+
+**Response:** `{"decision": DecisionNote}` with `source_message_id` and
+`computation` set and the lineage ids `null`.
+
+**Error rules:**
+- `404 Not Found`: the message is missing, not owned, not in the named
+  conversation, or not an assistant message. `code = "not_found"`.
+- `409 Decision Attachment Unsupported`: the message declares no valid
+  computation. `code = "decision_attachment_unsupported"`.
+- `500 Decision Capture Failed`: `code = "decision_capture_failed"`, same
+  client rule as the evidence route.
+
+### `GET /decisions/{decision_id}`
+
+Open an owned decision. The backend re-runs its computation from the stored
+inputs and returns the decision, the effective computation, and the outcome.
+The re-run happens only when the decision is opened; nothing reaches out.
+
+```json
+{
+  "decision": { "...": "DecisionNote" },
+  "computation": { "kind": "backtest", "inputs": { "source_run_id": "uuid" } },
+  "rerun": {
+    "kind": "backtest",
+    "inputs": { "source_run_id": "uuid" },
+    "status": "confirmation_required",
+    "result": null,
+    "retest": { "type": "retest_run", "source_run_id": "uuid", "...": "..." },
+    "reason_code": null
+  }
+}
+```
+
+`rerun.status`:
+- `computed`: `result` carries the kind's typed result; `retest` is `null`.
+- `confirmation_required`: the backtest kind. `retest` is the same typed
+  `retest_run` action the run dossier offers, because a backtest earns its
+  confirmation by cost and never executes on open.
+- `unavailable`: nothing ran, and `reason_code` says why, as a code and never
+  prose: `kernel_unavailable` (the kind is not registered),
+  `invalid_inputs` (the stored inputs no longer satisfy the kind),
+  `inputs_not_editable`, `run_unavailable`, or `retest_unavailable`.
+
+`404 Not Found` when the decision is missing or not owned.
+
+### `POST /decisions/{decision_id}/rerun`
+
+Re-run with changed inputs. Body: `{"inputs": {...}}`, overrides merged over
+the stored inputs under the same bounds as a declared computation. Returns
+`DecisionOpenResponse`. A re-run never changes the decision or its stored
+computation. Overrides that fail the kind's typed inputs return `422
+validation_error` with the field errors in `context.errors`. The backtest
+kind's inputs are not editable: overrides answer `unavailable` with
+`inputs_not_editable` rather than minting a run.
+
+### Search and dossiers
+
+A computed-answer decision joins the same decision index as a backtest
+decision. It matches by its note, its state, and the text of the answer it
+attaches to; the conversation carries its state in `decision_states`; the
+`decision_state` filter and ledger groups count it. `dossier` stays `null`
+unless the conversation also has an evidence-backed run, and
+`GET /conversations/{conversation_id}/run-dossiers` is unchanged: it projects
+runs, so only backtest decisions appear there.
 
 ---
 

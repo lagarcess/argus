@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
+import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
@@ -496,6 +497,14 @@ export default function ChatMessage({
 
           {!isUser && !isStreaming && message.memoryRecalls?.length ? (
             <MemoryRecallNote recalls={message.memoryRecalls} />
+          ) : null}
+          {/* Any computed answer offers a decision; guests resume on cards only. */}
+          {!isUser && !isStreaming && message.computation && canSaveDecision ? (
+            <ComputedAnswerDecision
+              message={message}
+              conversationId={conversationId}
+              onSaved={(decision) => onDecisionSaved?.(decision.decision_state)}
+            />
           ) : null}
           {!isUser && !isStreaming && message.discovery && (
             <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
