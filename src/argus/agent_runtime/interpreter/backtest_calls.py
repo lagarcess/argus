@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any, cast
 
 from argus.agent_runtime.backtest_input import BacktestStrategyInput
@@ -25,6 +24,10 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMAmbiguousField,
     LLMInterpretationResponse,
     LLMStrategyDraft,
+)
+from argus.agent_runtime.semantic_integrity import (
+    DECLARED_TOOL_INPUT_CONFLICT,
+    strategy_semantic_facts,
 )
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
@@ -113,27 +116,22 @@ async def prepare_backtest_tool_input(
         response = _merge_focused_repair_with_base(
             response=response, base_response=before
         )
-        conflicts = _preserve_known_input(
-            before, response, message=request.current_user_message
-        )
+        _declare_money_roles(response.candidate_strategy_draft)
+        conflicts = _known_input_conflicts(before, response, request=request)
+        if conflicts:
+            # A repair is one proposed replacement. Reject it atomically:
+            # restoring one carrier can leave another overriding the same fact.
+            response = before.model_copy(deep=True)
+            response.ambiguous_fields.extend(conflicts)
+            response.requires_clarification = True
+            response.assistant_response = None
         # Readiness owns input facts and blockers. It cannot reselect a tool,
         # change this call's context relation, or turn preparation into approval.
         response.intent = before.intent
         response.task_relation = before.task_relation
         response.semantic_turn_act = before.semantic_turn_act
         response.tool_calls = []
-        _declare_money_roles(response.candidate_strategy_draft)
         result = await _prepared_stage(response, request=request, state=state)
-        if conflicts:
-            result.outcome = "needs_clarification"
-            result.stage_patch.update(
-                requires_clarification=True,
-                assistant_response=None,
-                ambiguous_fields=[
-                    *result.patch.get("ambiguous_fields", []),
-                    *[item.model_dump(mode="python") for item in conflicts],
-                ],
-            )
     if result is None:
         result = await _prepared_stage(response, request=request, state=state)
     result.stage_patch["normalized_signals"] = {
@@ -248,56 +246,66 @@ def _call_source(
     return source
 
 
-def _preserve_known_input(
-    before: LLMInterpretationResponse, after: LLMInterpretationResponse, *, message: str
+def _known_input_conflicts(
+    before: LLMInterpretationResponse,
+    after: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
 ) -> list[LLMAmbiguousField]:
-    from argus.agent_runtime.llm_interpreter import _strategy_from_llm
-
-    base = before.candidate_strategy_draft
-    repaired = after.candidate_strategy_draft
-    canonical = [
-        _strategy_from_llm(draft.model_copy(deep=True), message).model_dump(mode="python")
-        for draft in (base, repaired)
+    facts = [
+        _draft_semantic_facts(response.candidate_strategy_draft, request=request)
+        for response in (before, after)
     ]
-    descriptive = {
-        "raw_user_phrasing",
-        "language",
-        "strategy_thesis",
-        "entry_logic",
-        "exit_logic",
-        "date_range_raw_text",
-        "assumptions",
-        "field_provenance",
-        "evidence_spans",
-        "extra_parameters",
-        "resolution_provenance",
-    }
-    conflicts = []
-    for name in type(base).model_fields:
-        value = getattr(base, name)
-        if name in descriptive or value is None or value in ("", [], {}):
-            continue
-        replacement = getattr(repaired, name)
-        if replacement == value:
-            continue
-        facts = [item.get(name, item["extra_parameters"].get(name)) for item in canonical]
-        if facts[0] is not None and facts[0] == facts[1]:
-            continue
-        setattr(repaired, name, deepcopy(value))
-        if name in repaired.extra_parameters:
-            if name in base.extra_parameters:
-                repaired.extra_parameters[name] = deepcopy(base.extra_parameters[name])
-            else:
-                repaired.extra_parameters.pop(name)
-        if replacement is not None and replacement not in ("", [], {}):
-            conflicts.append(
-                LLMAmbiguousField(
-                    field_name=name,
-                    raw_value=str(value),
-                    reason_code="declared_tool_input_conflict",
-                )
-            )
-    return conflicts
+    return [
+        LLMAmbiguousField(
+            field_name=name,
+            raw_value=str(value),
+            candidate_normalized_value=facts[1].get(name),
+            reason_code=DECLARED_TOOL_INPUT_CONFLICT,
+        )
+        for name, value in facts[0].items()
+        if not _preserves_supplied_fact(value, facts[1].get(name))
+    ]
+
+
+def _draft_semantic_facts(
+    draft: LLMStrategyDraft, *, request: InterpretationRequest
+) -> dict[str, Any]:
+    from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+        _canonical_draft_date_request,
+    )
+    from argus.agent_runtime.llm_interpreter import _strategy_from_llm
+    from argus.agent_runtime.stages.interpret import _supported_timeframes
+
+    facts = strategy_semantic_facts(
+        _strategy_from_llm(draft.model_copy(deep=True), request.current_user_message),
+        selected_thread_metadata=request.selected_thread_metadata,
+        supported_timeframes=_supported_timeframes(build_default_capability_contract()),
+    )
+    date_request = _canonical_draft_date_request(draft, request=request)
+    facts["date_range"] = (
+        {"kind": date_request[0], "value": date_request[1]}
+        if date_request is not None
+        else None
+    )
+    # Declared runtime extensions still carry supplied facts before evidence
+    # validation. Their declaration owns membership; this guard adds no slot map.
+    for name, field in type(draft).model_fields.items():
+        metadata = field.json_schema_extra
+        if isinstance(metadata, dict) and metadata.get("x-argus-runtime-extension"):
+            facts[name] = getattr(draft, name)
+    return facts
+
+
+def _preserves_supplied_fact(before: Any, after: Any) -> bool:
+    if before is None or before in ("", [], {}):
+        return True
+    if isinstance(before, dict):
+        return isinstance(after, dict) and all(
+            _preserves_supplied_fact(value, after.get(name))
+            for name, value in before.items()
+        )
+    return bool(before == after)
 
 
 def _declare_money_roles(draft: LLMStrategyDraft) -> None:

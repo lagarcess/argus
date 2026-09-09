@@ -71,7 +71,9 @@ from argus.agent_runtime.rule_specs import (
 from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,
     conserve_semantic_constraints,
+    declared_input_conflicts,
     filter_unsubstantiated_timeframe_constraints,
+    strategy_ambiguities_for_decision,
 )
 from argus.agent_runtime.stages.artifact_context import (
     RESULT_EXPLANATION_TARGET_INFERRED,
@@ -417,8 +419,11 @@ async def interpret_stage_async(
         failure_kind = getattr(structured_interpreter, "last_failure_kind", None)
         return await _unavailable(retryable=failure_kind != "contract_rejected")
     catalog_result = await catalog_stage_result(
-        interpretation, user=user, current_user_message=state.current_user_message,
-        contract=capability_contract, compose_capability_answer=_capability_answer_if_applicable,
+        interpretation,
+        user=user,
+        current_user_message=state.current_user_message,
+        contract=capability_contract,
+        compose_capability_answer=_capability_answer_if_applicable,
     )
     if catalog_result is not None:
         return catalog_result
@@ -485,6 +490,7 @@ async def _stage_result_from_interpretation(
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
     is_new_idea_interpretation = interpretation.semantic_turn_act == "new_idea"
+    input_conflicts = declared_input_conflicts(interpretation.ambiguous_fields)
     logger.debug(
         "Interpret stage post-LLM repair started",
         intent=interpretation.intent,
@@ -867,37 +873,20 @@ async def _stage_result_from_interpretation(
                 supported_timeframes=_supported_timeframes(capability_contract),
             )
         )
-    ambiguous_fields = list(interpretation.ambiguous_fields)
-    if requested_asset_answer_applied:
-        ambiguous_fields = []
-    elif pending_resolution_applied:
-        ambiguous_fields = [
-            field
-            for field in ambiguous_fields
-            if _field_base(field.field_name) != "asset_universe"
-        ]
-    if integrity_report.evidence.normalized_date_range is not None:
-        ambiguous_fields = [
-            field
-            for field in ambiguous_fields
-            if _field_base(field.field_name) != "date_range"
-        ]
     if expects_strategy_route:
         strategy.resolution_provenance = _dedupe_resolution_provenance(
             [*strategy.resolution_provenance, *state.context_hints]
         )
-        ambiguous_fields = _dedupe_ambiguous_fields(
-            [
-                *ambiguous_fields,
-                *_ambiguous_fields_from_resolution(strategy.resolution_provenance),
-            ]
-        )
-        ambiguous_fields, ambiguity_filter_reason_codes = (
-            _filter_resolved_strategy_ambiguities(
-                strategy=strategy,
-                fields=ambiguous_fields,
-            )
-        )
+    ambiguous_fields, ambiguity_filter_reason_codes = strategy_ambiguities_for_decision(
+        fields=interpretation.ambiguous_fields,
+        input_conflicts=input_conflicts,
+        strategy=strategy,
+        requested_asset_answer_applied=requested_asset_answer_applied,
+        pending_resolution_applied=pending_resolution_applied,
+        date_range_resolved=integrity_report.evidence.normalized_date_range is not None,
+        expects_strategy_route=expects_strategy_route,
+    )
+    if expects_strategy_route:
         unsupported_constraints = _dedupe_unsupported_constraints(
             [
                 *unsupported_constraints,
