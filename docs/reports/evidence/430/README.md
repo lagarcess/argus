@@ -128,3 +128,17 @@ Reconciliation to `7de65e26510e98cd211cab3134a741ce82b31f3d` adds only the board
 overnight-lane status. It changes no runtime owner, API/data contract, UI state,
 migration, environment variable or affected test. Existing behavioral evidence
 is retained subject to final-head revalidation.
+
+
+A later final refresh found founder-landed PR #567 at integration
+`8f39c5ff99cb48501044bda5172dd772621fca4f`. Its lazy template-contract import
+change overlaps the schema dependencies used by both edit adapters and lifecycle
+checkpoint projection. The lane inherits that import change through a normal
+integration merge; it does not edit the protected model classes. The sole textual
+conflict is the board's adjacent Lane B/registry status rows, resolved by preserving
+both current statuses. Eight generated JSON schemas, including `EditOperation`,
+`ArtifactAssumptionEditPlan`, both LLM draft/response schemas, `StrategySummary`,
+`ConfirmationPayload`, `RunState` and `BacktestRunRequest`, are byte-identical
+before and after reconciliation. Focused lifecycle/edit/import-boundary tests,
+mocked evals, browser replay and the merged-tree budget are rechecked on the new
+candidate; there is no model-facing change or paid evaluation to repeat.
