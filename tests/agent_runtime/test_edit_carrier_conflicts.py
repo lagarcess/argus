@@ -19,6 +19,127 @@ from tests.agent_runtime.test_recovery_edit_outcomes import _recover_and_confirm
 
 
 @pytest.mark.parametrize("route", ["main", "recovery"])
+@pytest.mark.parametrize(
+    "base,operations,flat,mode,expected,conflict",
+    [
+        pytest.param(
+            ["AAPL"],
+            [("replace", ["MSFT"])],
+            ["MSFT"],
+            "append",
+            ["MSFT"],
+            True,
+            id="replace-vs-append",
+        ),
+        pytest.param(
+            ["AAPL"],
+            [("replace", ["MSFT"])],
+            ["MSFT"],
+            "add",
+            ["MSFT"],
+            True,
+            id="replace-vs-add-alias",
+        ),
+        pytest.param(
+            ["AAPL", "MSFT"],
+            [("remove", ["MSFT"])],
+            ["AAPL"],
+            "append",
+            ["AAPL"],
+            True,
+            id="remove-vs-append",
+        ),
+        pytest.param(
+            ["AAPL"],
+            [("add", ["MSFT"])],
+            ["MSFT"],
+            "append",
+            ["AAPL", "MSFT"],
+            False,
+            id="equivalent-add-append",
+        ),
+        pytest.param(
+            ["AAPL"],
+            [("add", ["MSFT"])],
+            ["MSFT"],
+            "add",
+            ["AAPL", "MSFT"],
+            False,
+            id="equivalent-add-alias",
+        ),
+        pytest.param(
+            ["AAPL"],
+            [("replace", ["AAPL", "MSFT"])],
+            ["msft", "MSFT"],
+            "append",
+            ["AAPL", "MSFT"],
+            False,
+            id="equivalent-replace-append",
+        ),
+        pytest.param(
+            ["AAPL"],
+            [("add", ["MSFT"])],
+            ["MSFT", "AAPL"],
+            "replace",
+            ["AAPL", "MSFT"],
+            False,
+            id="equivalent-full-replacement",
+        ),
+        pytest.param(
+            ["AAPL"],
+            [("replace", ["MSFT"])],
+            ["MSFT"],
+            None,
+            ["MSFT"],
+            False,
+            id="legacy-default-replacement",
+        ),
+        pytest.param(
+            ["AAPL", "NVDA"],
+            [("remove", ["AAPL"]), ("add", ["MSFT"])],
+            ["NVDA", "MSFT"],
+            "append",
+            ["NVDA", "MSFT"],
+            True,
+            id="ordered-operations-vs-append",
+        ),
+    ],
+)
+def test_asset_carriers_compare_final_baskets(
+    monkeypatch, route, base, operations, flat, mode, expected, conflict
+):
+    request = _request("Change the assets", requested_field="assumption")
+    request.latest_task_snapshot.pending_strategy_summary.asset_universe = base
+    plan = {
+        "outcome": "ready_to_confirm",
+        "operations": [
+            {"op": op, "target": "asset", "symbols": symbols}
+            for op, symbols in operations
+        ],
+        "asset_universe": flat,
+        "asset_universe_operation": mode,
+    }
+    if route == "main":
+        outcome, card = asyncio.run(
+            card_for_edit_plan(monkeypatch, plan, request=request)
+        )
+        assert outcome == "await_approval"
+        actual = next(row["value"] for row in card["rows"] if row["key"] == "assets").split(
+            ", "
+        )
+    else:
+        card = asyncio.run(_recover_and_confirm(request, plan, monkeypatch))
+        actual = card["strategy"]["asset_universe"]
+    assert set(actual) == set(expected)
+    if conflict:
+        assert card["edit_disclosure"]["unapplied"] == [
+            {"op": "set", "target": "asset", "reason": "conflicting_edit_carriers"}
+        ]
+    else:
+        assert not card.get("edit_disclosure")
+
+
+@pytest.mark.parametrize("route", ["main", "recovery"])
 @pytest.mark.parametrize("same_value", [False, True])
 def test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed(
     monkeypatch, route, same_value
@@ -128,6 +249,7 @@ def test_explicit_empty_asset_carrier_cannot_hide_behind_a_typed_asset_target():
     )
     disclosure = artifact_edit_disclosure(
         plan,
+        current_asset_universe=assets,
         materialized_targets={"asset"},
         has_changes=False,
         resolved=ResolvedArtifactEdit(asset_universe=assets),

@@ -1491,6 +1491,7 @@ def _response_from_artifact_assumption_edit_plan(
     )
     return build_artifact_edit_response(
         plan=plan,
+        current_asset_universe=_current_artifact_asset_universe(request),
         draft=draft,
         field_provenance=field_provenance,
         extra_parameters=extra_parameters,

@@ -31,6 +31,7 @@ def build_artifact_edit_response(
     artifact_target: str | None,
     primary_draft: LLMStrategyDraft | None,
     resolved: ResolvedArtifactEdit | None,
+    current_asset_universe: list[str],
 ) -> LLMInterpretationResponse:
     if plan.outcome == "ready_to_confirm":
         if plan.operations and not field_provenance and not extra_parameters:
@@ -71,6 +72,7 @@ def build_artifact_edit_response(
                 )
     disclosure = artifact_edit_disclosure(
         plan,
+        current_asset_universe=current_asset_universe,
         materialized_targets=materialized_targets,
         has_changes=has_changes,
         existing=draft.extra_parameters.get("edit_disclosure"),

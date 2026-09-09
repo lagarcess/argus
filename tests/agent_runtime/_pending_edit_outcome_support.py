@@ -9,6 +9,7 @@ from argus.agent_runtime import llm_interpreter as interpreter
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.interpret import interpret_stage_async
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import RunState
 from argus.api.chat.confirmation import runtime_confirmation_card
 
@@ -22,8 +23,10 @@ async def card_for_edit_plan(
     *,
     language: str = "en",
     recurring: bool = False,
+    request: InterpretationRequest | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
-    request = _request("Apply these edits", requested_field="assumption")
+    if request is None:
+        request = _request("Apply these edits", requested_field="assumption")
     request.user.language_preference = language
     if recurring:
         strategy = request.latest_task_snapshot.pending_strategy_summary

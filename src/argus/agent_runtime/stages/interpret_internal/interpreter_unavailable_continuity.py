@@ -548,6 +548,7 @@ async def _planned_artifact_edit_interpretation(
     candidate.extra_parameters["field_provenance"] = field_provenance
     disclosure = artifact_edit_disclosure(
         original_plan,
+        current_asset_universe=prior_strategy.asset_universe,
         materialized_targets=materialized_targets,
         has_changes=artifact_edit_has_changes(
             materialized_targets=materialized_targets,

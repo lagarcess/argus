@@ -8,6 +8,7 @@ from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     ResolvedArtifactEdit,
 )
+from argus.agent_runtime.artifacts.asset_edits import apply_asset_universe_edit
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.semantic_integrity import _supported_timeframe_value
 from argus.domain.edit_contract import complete_edit_disclosure
@@ -135,6 +136,7 @@ def artifact_edit_has_changes(
 def artifact_edit_disclosure(
     plan: ArtifactAssumptionEditPlan,
     *,
+    current_asset_universe: list[str],
     materialized_targets: set[str],
     has_changes: bool,
     existing: dict[str, Any] | None = None,
@@ -156,7 +158,17 @@ def artifact_edit_disclosure(
             target = _LEGACY_PLAN_TARGETS[field]
             if target not in operation_targets or target in refused_targets:
                 continue
-            if _carrier_value(flat) != _carrier_value(getattr(resolved, field)):
+            # The typed resolver emits a final basket, while the legacy carrier
+            # may be an append patch. Compare outcomes from the same starting
+            # basket through the existing asset semantics owner.
+            legacy_value = (
+                apply_asset_universe_edit(
+                    current_asset_universe, flat, plan.asset_universe_operation
+                )
+                if field == "asset_universe"
+                else flat
+            )
+            if _carrier_value(legacy_value) != _carrier_value(getattr(resolved, field)):
                 unapplied.append(
                     {"op": "set", "target": target, "reason": "conflicting_edit_carriers"}
                 )
