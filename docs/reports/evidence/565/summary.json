@@ -1,0 +1,306 @@
+{
+  "base": {
+    "provenance": [
+      {
+        "schema_version": "argus_interpret_stage_ab/v1",
+        "label": "base",
+        "started_at": "2026-09-09T02:12:35.992388+00:00",
+        "source_sha": "a406b53ecc20077ca66b4de7ff31c35c34802f39",
+        "argus_module": "/Users/garces/Documents/projects/repos/argus-worktrees/subtract-guardrails-base/src/argus/__init__.py",
+        "manifest_sha256": "7a5d46dcb61c86803b07963b79dd62696c91bab5d70f3401572cfed7b50ce1c5",
+        "categories": [
+          "compute_intent_probe",
+          "confirmation",
+          "ordinary_chat"
+        ],
+        "iterations": 1,
+        "models": {
+          "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
+          "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
+          "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash"
+        },
+        "market_data_provider_mode": "live_provider",
+        "research_rail_enabled": "true",
+        "turn_call_allowance": "7"
+      },
+      {
+        "schema_version": "argus_interpret_stage_ab/v1",
+        "label": "base",
+        "started_at": "2026-09-09T02:41:53.022776+00:00",
+        "source_sha": "6bc3e0ee84fef9911230cec496734edc29f640a9",
+        "argus_module": "/Users/garces/Documents/projects/repos/argus-worktrees/subtract-guardrails-base/src/argus/__init__.py",
+        "manifest_sha256": "7a5d46dcb61c86803b07963b79dd62696c91bab5d70f3401572cfed7b50ce1c5",
+        "categories": [
+          "compute_intent_probe",
+          "confirmation",
+          "ordinary_chat"
+        ],
+        "iterations": 1,
+        "models": {
+          "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
+          "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
+          "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash"
+        },
+        "market_data_provider_mode": "live_provider",
+        "research_rail_enabled": "true",
+        "turn_call_allowance": "7"
+      }
+    ],
+    "summary": {
+      "compute_intent_probe": {
+        "turns": 20,
+        "errors": 0,
+        "elapsed_p50_s": 25.85,
+        "elapsed_p95_s": 45.42,
+        "provider_mean_s": 27.2,
+        "guardrail_mean_s": 11.89,
+        "other_calls_mean_s": 15.31,
+        "guardrail_share": 0.437,
+        "composer_skipped": 0,
+        "cost_usd": 0.301,
+        "calls": {
+          "FocusedAssetDiscoveryRead": {
+            "fires": 7,
+            "turns": 7,
+            "p50_s": 4.55
+          },
+          "CapabilitySideQuestionAudit": {
+            "fires": 7,
+            "turns": 7,
+            "p50_s": 7.72
+          },
+          "ContextQuestionAudit": {
+            "fires": 7,
+            "turns": 7,
+            "p50_s": 6.93
+          },
+          "FocusedStrategyExtraction": {
+            "fires": 36,
+            "turns": 20,
+            "p50_s": 2.42
+          }
+        }
+      },
+      "confirmation": {
+        "turns": 20,
+        "errors": 0,
+        "elapsed_p50_s": 32.08,
+        "elapsed_p95_s": 58.51,
+        "provider_mean_s": 38.13,
+        "guardrail_mean_s": 2.56,
+        "other_calls_mean_s": 35.57,
+        "guardrail_share": 0.067,
+        "composer_skipped": 0,
+        "cost_usd": 0.3828,
+        "calls": {
+          "FocusedAssetDiscoveryRead": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "CapabilitySideQuestionAudit": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "ContextQuestionAudit": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "FocusedStrategyExtraction": {
+            "fires": 4,
+            "turns": 3,
+            "p50_s": 7.17
+          }
+        }
+      },
+      "ordinary_chat": {
+        "turns": 20,
+        "errors": 0,
+        "elapsed_p50_s": 35.27,
+        "elapsed_p95_s": 63.75,
+        "provider_mean_s": 37.46,
+        "guardrail_mean_s": 16.56,
+        "other_calls_mean_s": 20.9,
+        "guardrail_share": 0.442,
+        "composer_skipped": 2,
+        "cost_usd": 0.3971,
+        "calls": {
+          "FocusedAssetDiscoveryRead": {
+            "fires": 15,
+            "turns": 15,
+            "p50_s": 3.95
+          },
+          "CapabilitySideQuestionAudit": {
+            "fires": 8,
+            "turns": 8,
+            "p50_s": 9.07
+          },
+          "ContextQuestionAudit": {
+            "fires": 13,
+            "turns": 13,
+            "p50_s": 5.93
+          },
+          "FocusedStrategyExtraction": {
+            "fires": 32,
+            "turns": 16,
+            "p50_s": 2.59
+          }
+        }
+      }
+    }
+  },
+  "head": {
+    "provenance": [
+      {
+        "schema_version": "argus_interpret_stage_ab/v1",
+        "label": "head",
+        "started_at": "2026-09-09T02:03:14.293150+00:00",
+        "source_sha": "a406b53ecc20077ca66b4de7ff31c35c34802f39",
+        "argus_module": "/Users/garces/Documents/projects/repos/argus/.claude/worktrees/scout-loop-extraction-cost-a90464/src/argus/__init__.py",
+        "manifest_sha256": "7a5d46dcb61c86803b07963b79dd62696c91bab5d70f3401572cfed7b50ce1c5",
+        "categories": [
+          "compute_intent_probe",
+          "confirmation",
+          "ordinary_chat"
+        ],
+        "iterations": 1,
+        "models": {
+          "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
+          "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
+          "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash"
+        },
+        "market_data_provider_mode": "live_provider",
+        "research_rail_enabled": "true",
+        "turn_call_allowance": "7"
+      },
+      {
+        "schema_version": "argus_interpret_stage_ab/v1",
+        "label": "head",
+        "started_at": "2026-09-09T02:28:51.865549+00:00",
+        "source_sha": "a406b53ecc20077ca66b4de7ff31c35c34802f39",
+        "argus_module": "/Users/garces/Documents/projects/repos/argus/.claude/worktrees/scout-loop-extraction-cost-a90464/src/argus/__init__.py",
+        "manifest_sha256": "7a5d46dcb61c86803b07963b79dd62696c91bab5d70f3401572cfed7b50ce1c5",
+        "categories": [
+          "compute_intent_probe",
+          "confirmation",
+          "ordinary_chat"
+        ],
+        "iterations": 1,
+        "models": {
+          "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
+          "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
+          "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash"
+        },
+        "market_data_provider_mode": "live_provider",
+        "research_rail_enabled": "true",
+        "turn_call_allowance": "7"
+      }
+    ],
+    "summary": {
+      "compute_intent_probe": {
+        "turns": 20,
+        "errors": 0,
+        "elapsed_p50_s": 16.14,
+        "elapsed_p95_s": 27.13,
+        "provider_mean_s": 17.73,
+        "guardrail_mean_s": 3.93,
+        "other_calls_mean_s": 13.8,
+        "guardrail_share": 0.222,
+        "composer_skipped": 0,
+        "cost_usd": 0.2285,
+        "calls": {
+          "FocusedAssetDiscoveryRead": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "CapabilitySideQuestionAudit": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "ContextQuestionAudit": {
+            "fires": 4,
+            "turns": 4,
+            "p50_s": 5.13
+          },
+          "FocusedStrategyExtraction": {
+            "fires": 20,
+            "turns": 20,
+            "p50_s": 2.61
+          }
+        }
+      },
+      "confirmation": {
+        "turns": 20,
+        "errors": 0,
+        "elapsed_p50_s": 29.8,
+        "elapsed_p95_s": 38.13,
+        "provider_mean_s": 27.66,
+        "guardrail_mean_s": 0.4,
+        "other_calls_mean_s": 27.26,
+        "guardrail_share": 0.014,
+        "composer_skipped": 0,
+        "cost_usd": 0.4589,
+        "calls": {
+          "FocusedAssetDiscoveryRead": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "CapabilitySideQuestionAudit": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "ContextQuestionAudit": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "FocusedStrategyExtraction": {
+            "fires": 2,
+            "turns": 2,
+            "p50_s": 3.28
+          }
+        }
+      },
+      "ordinary_chat": {
+        "turns": 20,
+        "errors": 0,
+        "elapsed_p50_s": 15.63,
+        "elapsed_p95_s": 35.39,
+        "provider_mean_s": 18.77,
+        "guardrail_mean_s": 0.44,
+        "other_calls_mean_s": 18.33,
+        "guardrail_share": 0.023,
+        "composer_skipped": 0,
+        "cost_usd": 0.1922,
+        "calls": {
+          "FocusedAssetDiscoveryRead": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "CapabilitySideQuestionAudit": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "ContextQuestionAudit": {
+            "fires": 0,
+            "turns": 0,
+            "p50_s": 0
+          },
+          "FocusedStrategyExtraction": {
+            "fires": 2,
+            "turns": 2,
+            "p50_s": 4.24
+          }
+        }
+      }
+    }
+  }
+}

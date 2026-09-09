@@ -1340,13 +1340,9 @@ def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
     assert result.candidate_strategy_draft.date_range == "past year"
 
 
-def test_default_interpreter_repairs_social_sentiment_trade_misroute(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime import llm_interpreter
-
-    seen_schema_names: list[str] = []
-
+def _sentiment_misroute_schema(
+    seen_schema_names: list[str], *, asset_universe: list[str]
+):
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
@@ -1359,41 +1355,81 @@ def test_default_interpreter_repairs_social_sentiment_trade_misroute(
                 semantic_turn_act="educational_question",
                 capability_question_focus="supported_indicators",
             )
-        assert schema_model is FocusedStrategyExtraction
-        return FocusedStrategyExtraction(
-            is_testable_strategy=True,
-            user_goal_summary="Trade based on Reddit sentiment.",
-            strategy_type="reddit_sentiment",
-            strategy_thesis="Use Reddit sentiment as the trade signal.",
-            entry_logic="Reddit sentiment turns positive",
-            assistant_response="Reddit sentiment is not executable yet.",
-        )
+        if schema_model is FocusedStrategyExtraction:
+            return FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                user_goal_summary="Trade based on Reddit sentiment.",
+                strategy_type="reddit_sentiment",
+                strategy_thesis="Use Reddit sentiment as the trade signal.",
+                asset_universe=asset_universe,
+                entry_logic="Reddit sentiment turns positive",
+                assistant_response="Reddit sentiment is not executable yet.",
+            )
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        assert neutral_response is not None, schema_model
+        return neutral_response
 
+    return fake_direct_schema
+
+
+def _interpret_sentiment_misroute(
+    monkeypatch, *, message: str, asset_universe: list[str]
+):
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
     monkeypatch.setattr(
         llm_interpreter,
         "invoke_openrouter_json_schema",
-        fake_direct_schema,
+        _sentiment_misroute_schema(seen_schema_names, asset_universe=asset_universe),
     )
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
         _structured_model_candidates,
     )
-
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
     )
     result = interpreter(
         InterpretationRequest(
-            current_user_message="trade based on Reddit sentiment",
+            current_user_message=message,
             recent_thread_history=[],
             latest_task_snapshot=None,
             user=UserState(user_id="u1"),
         )
     )
-
     assert result is not None
-    assert seen_schema_names == [
+    return result, seen_schema_names
+
+
+def test_default_interpreter_keeps_primary_read_on_factless_sentiment_misroute(
+    monkeypatch,
+) -> None:
+    # No asset and no number in the message: the focused strategy repair has
+    # nothing to work with, so the primary read's capability answer stands.
+    result, seen_schema_names = _interpret_sentiment_misroute(
+        monkeypatch, message="trade based on Reddit sentiment", asset_universe=[]
+    )
+
+    assert seen_schema_names == ["LLMInterpretationResponse"]
+    assert result.semantic_turn_act == "educational_question"
+    assert result.capability_question_focus == "supported_indicators"
+    assert result.unsupported_constraints == []
+
+
+def test_default_interpreter_repairs_social_sentiment_trade_misroute(
+    monkeypatch,
+) -> None:
+    # A named asset is a current-turn fact: the same misroute still repairs
+    # to a typed refusal that keeps the idea.
+    result, seen_schema_names = _interpret_sentiment_misroute(
+        monkeypatch,
+        message="trade Tesla based on Reddit sentiment",
+        asset_universe=["TSLA"],
+    )
+
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]

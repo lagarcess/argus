@@ -8,6 +8,7 @@ import {
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import {
   discoverySidecarFromMetadata,
+  researchDegradedCodeFromMetadata,
   researchSourcesForFinalPayload,
   researchSourcesFromMetadata,
 } from "@/lib/chat-discovery-sidecar";
@@ -432,6 +433,7 @@ export function hydrateMessagesFromApi(
       if (message.role !== "user") {
         const discovery = discoverySidecarFromMetadata(metadata);
         const researchSources = researchSourcesFromMetadata(metadata);
+        const researchDegradedCode = researchDegradedCodeFromMetadata(metadata);
         // Grounded knowledge answers carry Try next rows on a plain message;
         // a discovery sidecar owns its message and suppresses them. Memory
         // recalls overlay either shape independently.
@@ -462,7 +464,7 @@ export function hydrateMessagesFromApi(
             // A discovery turn already renders its own sources panel; one
             // answer must never offer two source surfaces.
             ...(!discovery && researchSources.length > 0
-              ? { researchSources }
+              ? { researchSources, researchDegradedCode }
               : {}),
             ...(nextExperiments ? { nextExperiments } : {}),
             ...(memoryRecalls ? { memoryRecalls } : {}),
@@ -603,6 +605,7 @@ export function applyEmptyFinalFallback(
         discovery: options.discovery,
         memoryRecalls: options.memoryRecalls,
         researchSources: researchSourcesForFinalPayload(options.finalPayload),
+        researchDegradedCode: researchDegradedCodeFromMetadata(options.finalPayload),
         nextExperiments:
           nextExperimentRowsFromMetadata(options.finalPayload) ?? undefined,
       }),

@@ -312,7 +312,8 @@ def test_thorough_cache_hit_answers_inline_without_a_job(monkeypatch) -> None:
         ),
         latency_ms=1200,
     )
-    ra.store_research_packet_for_job(job_request, packet)
+    composed = ra.compose_completed_research(job_request=job_request, packet=packet)
+    ra.store_research_packet_for_job(job_request, packet, composed)
 
     second = _run("Compare Netflix and Apple over three years", user=SPANISH_USER)
     assert second is not None

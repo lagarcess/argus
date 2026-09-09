@@ -3,10 +3,11 @@
 The primary interpreter sometimes answers a discovery request as a plain
 educational turn and leaves the asset_discovery payload empty (#344). This
 second read asks the one narrow question the primary collapsed away: does
-this turn ask Argus to find assets? It runs only on payloadless
-knowledge-shaped turns with no other surface claim, and every recovery is
-recorded with a reason code (AGENTS.md: redundancy over an LLM read must be
-observable).
+this turn ask Argus to find assets? It runs only on a typed contradiction:
+the primary read classed the message as a finance fact question, no route
+took it, and the discovery payload is empty. A concept question is the
+primary's own "no" and is never re-read. Every recovery is recorded with a
+reason code (AGENTS.md: redundancy over an LLM read must be observable).
 """
 
 from __future__ import annotations
@@ -18,6 +19,9 @@ from pydantic import BaseModel, Field
 
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     response_shape_open_to_discovery,
+)
+from argus.agent_runtime.interpreter.research_routing import (
+    primary_read_asks_a_fact_question,
 )
 from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 from argus.llm.openrouter import invoke_openrouter_json_schema
@@ -74,10 +78,12 @@ class FocusedAssetDiscoveryRead(BaseModel):
 
 
 def focused_discovery_read_applicable(response: Any) -> bool:
-    """Trigger only where a discovery request could be hiding: a payloadless
-    knowledge-shaped turn no other surface claims."""
+    """Trigger only where a discovery request could be hiding: the primary
+    typed a fact question, left the payload empty, and no other surface
+    claims the turn."""
     return (
-        response.asset_discovery is None
+        primary_read_asks_a_fact_question(response)
+        and response.asset_discovery is None
         and response.semantic_turn_act in _TRIGGER_ACTS
         and response_shape_open_to_discovery(response)
     )

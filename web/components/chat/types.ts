@@ -338,6 +338,12 @@ export type Message = {
   discovery?: DiscoverySidecar | null;
   /** Typed sources from a research turn; the one surface every shape uses. */
   researchSources?: DiscoverySource[] | null;
+  /**
+   * The research sidecar's typed degraded code. Sources under it are the
+   * pages Argus read and could not verify the answer with: where Argus
+   * looked, never the sources of an answer.
+   */
+  researchDegradedCode?: string | null;
   /** Backend post-turn saved-decision recalls; rendered as context only. */
   memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-declared computation behind a computed answer; it offers a decision. */

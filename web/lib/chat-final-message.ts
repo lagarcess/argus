@@ -20,6 +20,8 @@ type MergeFinalTextOptions = {
   discovery?: DiscoverySidecar | null;
   /** Typed citations for this turn; the panel's only input. */
   researchSources?: DiscoverySource[] | null;
+  /** The sidecar's degraded code; frames those citations as where Argus looked. */
+  researchDegradedCode?: string | null;
   memoryRecalls?: MemoryRecallItem[] | null;
   nextExperiments?: NextExperimentRow[] | null;
 };
@@ -37,6 +39,7 @@ export function mergeFinalTextMessage(
     assistantRecoveryCode,
     discovery,
     researchSources,
+    researchDegradedCode,
     memoryRecalls,
     nextExperiments,
   }: MergeFinalTextOptions,
@@ -57,6 +60,7 @@ export function mergeFinalTextMessage(
     assistantRecoveryCode: assistantRecoveryCode ?? message.assistantRecoveryCode,
     discovery: discovery ?? message.discovery,
     researchSources: researchSources ?? message.researchSources,
+    researchDegradedCode: researchDegradedCode ?? message.researchDegradedCode,
     memoryRecalls: memoryRecalls ?? message.memoryRecalls,
     nextExperiments: nextExperiments ?? message.nextExperiments,
   };

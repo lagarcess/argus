@@ -504,10 +504,10 @@ the web card stay untouched.
 - **`EditOperation.target` is model-facing schema the fingerprint does not
   see.** It must not widen. This is the one trap that would ship an unmeasured
   behavior change.
-- **`artifact_assumption_edit.py` had 72 of its 75 growth lines spent before
-  Lane B.** The budget config does watch it. PR #570 extracts the response and
-  shared edit outcome adapter, reducing it from 1,561 to 1,507 lines (57 left).
-  `llm_interpreter.py` and #565's interpreter files stay untouched by Lane B.
+- **`artifact_assumption_edit.py` was at 72 of its 75 growth lines before Lane
+  B, and the budget config does watch it**, which PR #570 verified rather than
+  assumed. That lane extracted the response path and the shared edit-outcome
+  adapter, taking it from 1,561 to 1,507 lines, so 57 lines are free again.
 - No universal input schema. No model-facing text.
 
 **Proof.** `.agent/interpreter_prompt_fingerprint.json` byte-identical before
@@ -964,10 +964,10 @@ integration and green there, not shipped to a user.
 
 | Lane | PR | Surface it owns |
 | --- | --- | --- |
-| Subtract the guardrails | #565, draft | `llm_interpreter.py`, four files under `agent_runtime/interpreter/` |
+| Subtract the guardrails | **LANDED** `695d9250`, PR #565 | done; surface released |
 | Cut the catalog import edge | **LANDED** `772aa276`, PR #567 | done; surface released |
 | Withheld answers keep their sources, and are not paid for twice | not yet pushed | `research_grounded.py`, `perplexity_agent.py`, research contracts |
-| Lift the edit contract, closing #430 | #570, draft | Shared lifecycle/edit outcome adapters, `interpreter/artifact_assumption_edit.py`, recovery, web card. Planner/prompt/schema unchanged. |
+| Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
 
 `llm_interpreter.py` has roughly 19 lines of modularity headroom and belongs to
 the guardrail lane alone; every other lane was told to stay out of it.
@@ -982,8 +982,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
-| Subtract the guardrails | The spine | **In flight**, PR #565. Round one diagnosed before touching code; the early head read shows ordinary chat running zero guardrail calls and the interpret stage at 15.6s p50, against 33.14s before. It also found two of ten turns had been losing their composer entirely to a seven-call allowance, which is a correctness finding, not a latency one. |
-| Lift the loop, Lane B | The spine | **In review**, PR #570, carrying #430. Shared lifecycle, canonical edit-outcome accounting and web card kind; bilingual browser evidence in the PR. CI and final review remain gates. Optional for the spine. |
+| Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
+| Lift the loop, Lane B | The spine | **Dispatched 2026-09-09**, carrying #430. Optional for the spine; run overnight because the capacity was idle, not because it blocks the goalpost. |
 | The registry | The spine | **First half landed** as PR #567, `772aa276`. The catalog edge is cut: `state/models.py` now takes `RegisteredStrategyTemplate` from a new `strategy_template_contract.py` that loads the catalog only inside the validator, so a general envelope imports without it. Lane C's probes went from three passing the catalog guard to seven. The rest of the registry, the tool declaration itself, is not started. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |

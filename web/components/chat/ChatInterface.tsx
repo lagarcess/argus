@@ -105,6 +105,7 @@ import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
   discoverySidecarFromMetadata,
+  researchDegradedCodeFromMetadata,
   researchSourcesForFinalPayload,
 } from "@/lib/chat-discovery-sidecar";
 import {
@@ -1436,6 +1437,8 @@ export default function ChatInterface() {
           const finalTextNextExperiments =
             nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
+          const finalResearchDegradedCode =
+            researchDegradedCodeFromMetadata(finalPayload);
           const finalTextPresentation =
             action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
@@ -1452,6 +1455,7 @@ export default function ChatInterface() {
                   discovery: finalDiscovery,
                   memoryRecalls: finalMemoryRecalls,
                   researchSources: finalResearchSources,
+                  researchDegradedCode: finalResearchDegradedCode,
                   nextExperiments: finalTextNextExperiments,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
@@ -1471,6 +1475,7 @@ export default function ChatInterface() {
                 discovery: finalDiscovery,
                 memoryRecalls: finalMemoryRecalls,
                 researchSources: finalResearchSources,
+                researchDegradedCode: finalResearchDegradedCode,
                 nextExperiments: finalTextNextExperiments,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,

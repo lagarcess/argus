@@ -10,6 +10,7 @@ import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
+import { researchSourcesDisplay } from "@/lib/research-sources-display";
 import MemoryRecallNote from "./MemoryRecallNote";
 import { RetestReceipt } from "./RetestReceipt";
 import { RETEST_ACTION_TYPE } from "@/lib/chat-retest";
@@ -282,6 +283,7 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  const researchSourcesOpen = researchSourcesDisplay(Boolean(message.researchDegradedCode));
   // Chips carry domains and the drawer owns the list; zero sources is the
   // ungrounded marker (derived, never asserted). Canon: DESIGN.md §11.
   const discoverySourcesLineText =
@@ -682,10 +684,10 @@ export default function ChatMessage({
                 data-testid="research-sources-open"
                 className="relative z-10 shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:min-w-11 after:-translate-y-1/2 after:content-[''] hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
               >
-                {t("chat.discovery_results.sources_panel_open", {
+                {t(researchSourcesOpen.openKey, {
                   count: message.researchSources?.length ?? 0,
-                  defaultValue: "{{count}} sources ›",
-                  defaultValue_one: "{{count}} source ›",
+                  defaultValue: researchSourcesOpen.openFallback,
+                  defaultValue_one: researchSourcesOpen.openFallbackOne,
                 })}
               </button>
             </div>
@@ -703,6 +705,7 @@ export default function ChatMessage({
                 sources: message.researchSources ?? [],
                 retrieved_at: "",
               }}
+              withheld={Boolean(message.researchDegradedCode)}
             />
           ) : null}
 

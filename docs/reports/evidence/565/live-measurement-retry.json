@@ -1,0 +1,317 @@
+{
+  "evidence_kind": "three_case_retry_after_chat_tier_provider_failures",
+  "why": "The full-suite scorecard at 4af15b30 failed three asset_discovery_routing cases after correct routing: two lost discovery_voicing on both chat-tier models and one lost its ResultFollowupDraft. Each was re-run once on this head and once on integration without this lane, forty minutes later.",
+  "runs": {
+    "head": {
+      "label": "head",
+      "started_at": "2026-09-09T04:44:31.400152+00:00",
+      "argus_module": "/Users/garces/Documents/projects/repos/argus/.claude/worktrees/scout-loop-extraction-cost-a90464/src/argus/__init__.py",
+      "source_sha": "4af15b308ec0f4c89e2a668f1619220f364f95dc",
+      "cases": [
+        {
+          "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+          "status": "passed",
+          "failed_checks": [],
+          "infrastructure_errors": [],
+          "semantic_turn_act": "asset_discovery",
+          "recovery_code": null,
+          "discovery_symbol_count": 5,
+          "next_experiment_kinds": [],
+          "receipts": [
+            {
+              "task": "asset_mention_preflight",
+              "schema_name": "LLMAssetMentionExtraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 935
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LLMInterpretationResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 8887
+            },
+            {
+              "task": "discovery_extraction",
+              "schema_name": "discovery_extraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 3222
+            },
+            {
+              "task": "discovery_voicing",
+              "schema_name": null,
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 4086
+            },
+            {
+              "task": "chat_composer",
+              "schema_name": "ArgusProseJudgeResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 4578
+            }
+          ]
+        },
+        {
+          "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "status": "passed",
+          "failed_checks": [],
+          "infrastructure_errors": [],
+          "semantic_turn_act": "asset_discovery",
+          "recovery_code": null,
+          "discovery_symbol_count": 5,
+          "next_experiment_kinds": [],
+          "receipts": [
+            {
+              "task": "asset_mention_preflight",
+              "schema_name": "LLMAssetMentionExtraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 739
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LLMInterpretationResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 7261
+            },
+            {
+              "task": "discovery_extraction",
+              "schema_name": "discovery_extraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 3621
+            },
+            {
+              "task": "discovery_voicing",
+              "schema_name": null,
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 4562
+            },
+            {
+              "task": "chat_composer",
+              "schema_name": "ArgusProseJudgeResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 2861
+            }
+          ]
+        },
+        {
+          "id": "asset_discovery_not_result_followup_issue_244",
+          "status": "failed",
+          "failed_checks": [
+            "offered.min_next_experiment_rows: expected at least 1, got []"
+          ],
+          "infrastructure_errors": [],
+          "semantic_turn_act": "result_followup",
+          "recovery_code": "latest_result_followup_unavailable",
+          "discovery_symbol_count": 0,
+          "next_experiment_kinds": [],
+          "receipts": [
+            {
+              "task": "asset_mention_preflight",
+              "schema_name": "LLMAssetMentionExtraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 963
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LLMInterpretationResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 8300
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LatestResultRoutingAudit",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 3790
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LatestResultSaveAudit",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 4073
+            },
+            {
+              "task": "result_summary",
+              "schema_name": "ResultFollowupDraft",
+              "outcome": "failed",
+              "failure_mode": "result_followup_timeout",
+              "latency_ms": 0
+            }
+          ]
+        }
+      ],
+      "finished_at": "2026-09-09T04:45:43.471875+00:00"
+    },
+    "integration_without_this_lane": {
+      "label": "base",
+      "started_at": "2026-09-09T04:45:44.276379+00:00",
+      "argus_module": "/Users/garces/Documents/projects/repos/argus-worktrees/subtract-guardrails-base/src/argus/__init__.py",
+      "source_sha": "7de65e26510e98cd211cab3134a741ce82b31f3d",
+      "cases": [
+        {
+          "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+          "status": "passed",
+          "failed_checks": [],
+          "infrastructure_errors": [],
+          "semantic_turn_act": "asset_discovery",
+          "recovery_code": null,
+          "discovery_symbol_count": 5,
+          "next_experiment_kinds": [],
+          "receipts": [
+            {
+              "task": "asset_mention_preflight",
+              "schema_name": "LLMAssetMentionExtraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 834
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LLMInterpretationResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 10628
+            },
+            {
+              "task": "discovery_extraction",
+              "schema_name": "discovery_extraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 4145
+            },
+            {
+              "task": "discovery_voicing",
+              "schema_name": null,
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 4743
+            },
+            {
+              "task": "chat_composer",
+              "schema_name": "ArgusProseJudgeResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 2940
+            }
+          ]
+        },
+        {
+          "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "status": "passed",
+          "failed_checks": [],
+          "infrastructure_errors": [],
+          "semantic_turn_act": "asset_discovery",
+          "recovery_code": null,
+          "discovery_symbol_count": 5,
+          "next_experiment_kinds": [],
+          "receipts": [
+            {
+              "task": "asset_mention_preflight",
+              "schema_name": "LLMAssetMentionExtraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 788
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LLMInterpretationResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 7663
+            },
+            {
+              "task": "discovery_extraction",
+              "schema_name": "discovery_extraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 3602
+            },
+            {
+              "task": "discovery_voicing",
+              "schema_name": null,
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 6570
+            },
+            {
+              "task": "chat_composer",
+              "schema_name": "ArgusProseJudgeResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 3076
+            }
+          ]
+        },
+        {
+          "id": "asset_discovery_not_result_followup_issue_244",
+          "status": "failed",
+          "failed_checks": [
+            "offered.min_next_experiment_rows: expected at least 1, got []"
+          ],
+          "infrastructure_errors": [],
+          "semantic_turn_act": "result_followup",
+          "recovery_code": "latest_result_followup_unavailable",
+          "discovery_symbol_count": 0,
+          "next_experiment_kinds": [],
+          "receipts": [
+            {
+              "task": "asset_mention_preflight",
+              "schema_name": "LLMAssetMentionExtraction",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 814
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LLMInterpretationResponse",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 9740
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LatestResultRoutingAudit",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 3832
+            },
+            {
+              "task": "interpretation",
+              "schema_name": "LatestResultSaveAudit",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 3751
+            },
+            {
+              "task": "result_summary",
+              "schema_name": "ResultFollowupDraft",
+              "outcome": "succeeded",
+              "failure_mode": null,
+              "latency_ms": 9102
+            },
+            {
+              "task": "result_summary",
+              "schema_name": "ResultFollowupDraft",
+              "outcome": "failed",
+              "failure_mode": "result_followup_draft_rejected",
+              "latency_ms": 0
+            }
+          ]
+        }
+      ],
+      "finished_at": "2026-09-09T04:46:59.569069+00:00"
+    }
+  }
+}

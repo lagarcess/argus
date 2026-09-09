@@ -277,18 +277,6 @@ async def grounded_result(
                 decision=decision,
                 reason="missing_public_sources",
             )
-        if _withheld_code(packet, survey=is_market_survey(query.question_kind)) is None:
-            # A packet whose prose will be withheld is not worth serving
-            # again; the next identical question earns a fresh attempt.
-            cache_put(
-                key,
-                packet,
-                ttl_seconds=ttl_for_packet(
-                    question_kind=query.question_kind,
-                    categories=packet.categories,
-                    closed_period=query.period_is_closed_window,
-                ),
-            )
     if publisher_sources_required and not _packet_has_public_sources(
         packet,
         query=query,
@@ -303,7 +291,7 @@ async def grounded_result(
             decision=decision,
             reason="missing_public_sources",
         )
-    return _packet_stage_result(
+    result = _packet_stage_result(
         packet=packet,
         subjects=subjects,
         shape=shape,
@@ -318,6 +306,16 @@ async def grounded_result(
         question_as_of_date=question_as_of_date,
         decision=decision,
     )
+    if cache_status == "miss":
+        ttl_seconds = _cache_ttl(
+            packet,
+            withheld=_sidecar_withheld(result.stage_patch["research"]),
+            question_kind=query.question_kind,
+            closed_period=query.period_is_closed_window,
+        )
+        if ttl_seconds is not None:
+            cache_put(key, packet, ttl_seconds=ttl_seconds)
+    return result
 
 
 def _packet_stage_result(
@@ -872,8 +870,9 @@ def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     shape and both composition paths. A typed answer is publishable only
     when it carries at least one cited row and no rejected one; the model's
     word that its prose states no figure is never trusted. Prose cannot be
-    trimmed of one claim, so a withheld packet is withheld whole, is never
-    cached, and the turn says why through its typed degraded code."""
+    trimmed of one claim, so a withheld packet is withheld whole and the
+    turn says why through its typed degraded code; the pages it retrieved
+    stay its sources, and ``_cache_ttl`` decides how long the record serves."""
     if not _retrieval_happened(packet):
         # Nothing was retrieved, so nothing in the answer can be verified,
         # whatever rows the model wrote: every one is uncited by
@@ -890,6 +889,35 @@ def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     if packet.typed_answer and not packet.rows:
         return "research_figures_unverified"
     return None
+
+
+def _sidecar_withheld(sidecar: dict[str, Any]) -> bool:
+    """Whether the composed turn withheld its answer: the sidecar's typed
+    ``degraded`` state, the same fact the ledger and the client read."""
+    return bool(sidecar.get("degraded"))
+
+
+def _cache_ttl(
+    packet: ResearchPacket,
+    *,
+    withheld: bool,
+    question_kind: str | None,
+    closed_period: bool,
+) -> float | None:
+    """How long the shared cache serves this packet, or None to not store it.
+
+    One owner for both composition paths, fed by what composition actually
+    produced: a published packet serves for its class TTL, a withheld packet
+    that retrieved for that TTL capped at a day, and a withheld packet that
+    never retrieved is not stored."""
+    if withheld and not _retrieval_happened(packet):
+        return None
+    return ttl_for_packet(
+        question_kind=question_kind,
+        categories=packet.categories,
+        closed_period=closed_period,
+        withheld=withheld,
+    )
 
 
 def _withheld_note(
@@ -1233,30 +1261,33 @@ def research_prompt_for_job(job_request: dict[str, Any]) -> str:
 def store_research_packet_for_job(
     job_request: dict[str, Any],
     packet: ResearchPacket,
+    composed: dict[str, Any],
 ) -> None:
     """Store a completed thorough packet in the shared cache so the same
-    question answers inline for the six-hour class TTL (30 days when the
-    asked-about window is closed). Both completion paths call this."""
+    question answers inline for its class TTL, withheld or not, under the
+    one rule ``_cache_ttl`` owns, read from the answer composition produced.
+    A packet lacking a required public source is not stored: the inline hit
+    path re-derives that requirement and the thorough one does not. Both
+    completion paths call this after ``compose_completed_research``."""
     key = str(job_request.get("cache_key") or "")
     question_kind = str(job_request.get("question_kind") or "cross_company")
-    if not key or _withheld_code(packet, survey=is_market_survey(question_kind)):
+    if not key:
         return
     if job_request.get("requires_publisher_sources") and not typed_sources(
         packet,
-        question_kind=str(job_request.get("question_kind") or "cross_company"),
+        question_kind=question_kind,
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     ):
         return
-    cache_put(
-        key,
+    ttl_seconds = _cache_ttl(
         packet,
-        ttl_seconds=ttl_for_packet(
-            question_kind=str(job_request.get("question_kind") or "cross_company"),
-            categories=packet.categories,
-            closed_period=bool(job_request.get("period_is_closed_window")),
-        ),
+        withheld=_sidecar_withheld(composed["research"]),
+        question_kind=question_kind,
+        closed_period=bool(job_request.get("period_is_closed_window")),
     )
+    if ttl_seconds is not None:
+        cache_put(key, packet, ttl_seconds=ttl_seconds)
 
 
 def compose_completed_research(

@@ -3788,9 +3788,10 @@ Contract rules:
   "research_figures_unverified"`, an honest note replaces the prose and
   names the figures it will not quote from the rejected rows' own typed
   subject and label, the subjects the user named stay testable, and the
-  packet is never cached. The prose is never matched against the rows by
-  heuristic: that shape leaks by construction, and rule 4 keeps prose from
-  being the carrier of facts at all. A typed answer with no row and
+  pages the response retrieved stay in `sources` (next bullet). The prose is
+  never matched against the rows by heuristic: that shape leaks by
+  construction, and rule 4 keeps prose from being the carrier of facts at
+  all. A typed answer with no row and
   no retrieval at all carries `research_not_grounded` with the unavailable
   note. Surveys keep their own codes below. `rows` is additive on the
   sidecar and may be empty; a degraded turn always carries an empty list,
@@ -3800,6 +3801,32 @@ Contract rules:
   `research_unavailable_malformed_response`, is never cached, and a
   completed background run carrying one fails its job. Genuine prose under a
   typed request is delivered and recorded as prose.
+- **A withheld answer keeps its retrieval record and is cached like an
+  answer.** Whatever withholds the prose, the turn's `sources` are the pages
+  the response actually retrieved, selected exactly as for a published
+  answer (period-plausible, one page per publisher, retrieval order, at most
+  five): no ranking, no content check, and nothing the packet did not
+  return. Two codes carry them, because they are the two that retrieved:
+  `research_figures_unverified` and `survey_synthesis_incomplete`.
+  `research_not_grounded` and `survey_not_grounded` never retrieved, the
+  `research_unavailable_*` codes have no packet, `research_capacity_exhausted`
+  and `asset_class_not_covered` ran no provider call, and
+  `research_unavailable_missing_public_sources` means no retrieved page
+  survived selection; all of those carry an empty list by construction.
+  Clients render a degraded turn's sources as where Argus looked, never as
+  the sources of an answer: the same drawer, framed by the typed
+  `degraded.code`, so a page that yielded no figure is never presented as
+  having informed one. A withheld packet that carries a retrieval record is
+  stored in the shared cache under the same key as a published one, for its
+  data class TTL capped at one day (`WITHHELD_TTL_SECONDS`): whether a figure
+  is published somewhere changes on the scale of days, not minutes, so an
+  identical question inside that window is answered from the record with
+  `cache_status: "hit"`, the same withheld note and sources, and no provider
+  spend or capacity claim. A packet without a retrieval record is never
+  stored, because a model that did not look is evidence about the model and
+  not about the world; a malformed or unavailable response has no packet to
+  store; and a packet withheld for want of a required public source is not
+  stored.
 - **Retrieval parameters are configuration per question shape.** Each call
   sends a model fallback chain (`models`, the primary and the other priced
   model, served in order; the invoice names the model that served), the
@@ -3869,9 +3896,9 @@ Contract rules:
   provider run. `operation_scope` rides every serialized job surface,
   including the polling payload; absent means an ordinary backtest.
 - Thorough answers join the shared research cache like every other shape:
-  the finalized packet is stored under the requesting turn's key, and an
-  identical question within the class TTL answers inline with
-  `cache_status: "hit"`, no job, and no provider spend.
+  the finalized packet is stored under the requesting turn's key, a withheld
+  one under the capped TTL above, and an identical question within the TTL
+  answers inline with `cache_status: "hit"`, no job, and no provider spend.
 - Runnable rows name assets in one vocabulary: a short display name derived
   from the resolver's own name (listing boilerplate like "Common Stock" or
   "Inc." stripped, share classes kept) plus the resolver-verified ticker.
