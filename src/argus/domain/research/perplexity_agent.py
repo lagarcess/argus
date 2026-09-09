@@ -117,9 +117,13 @@ class PerplexityAgentClient:
             )
         except ResearchUnavailableError as exc:
             # The run is complete, so polling again cannot change its answer:
-            # an answer that cannot be read is the job's terminal failure.
+            # an answer that cannot be read is the job's terminal failure. It
+            # was still billed, so the invoice leaves with the failure.
             return BackgroundPoll(
-                status="failed", failure_detail=f"{exc.reason}: {exc.detail or ''}"
+                status="failed",
+                failure_detail=f"{exc.reason}: {exc.detail or ''}",
+                failure_reason=exc.reason,
+                usage=exc.usage,
             )
         if spec is not None:
             _observe_retrieval(packet, spec)
@@ -233,16 +237,22 @@ def _packet_from_response(
                     if isinstance(annotation, dict):
                         _append_public_source(parsed, annotation)
     usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
-    typed = _typed_retrieval("\n\n".join(text_blocks))
-    rows: list[RetrievedRow] = []
-    rejected: list[RetrievedRow] = []
-    if typed is not None:
-        rows, rejected = _cited_rows(typed.rows, parsed)
-        answer = _sanitize_answer(typed.answer_markdown)
-    else:
-        answer = _sanitize_answer("\n\n".join(text_blocks))
-    if not answer:
-        raise ResearchUnavailableError("empty_answer")
+    # Past this line the invoice is established, so every rejection below is a
+    # response Argus paid for. One re-raise attaches that invoice to all of
+    # them, so a new rejection cannot lose its spend by forgetting to.
+    try:
+        typed = _typed_retrieval("\n\n".join(text_blocks))
+        rows: list[RetrievedRow] = []
+        rejected: list[RetrievedRow] = []
+        if typed is not None:
+            rows, rejected = _cited_rows(typed.rows, parsed)
+            answer = _sanitize_answer(typed.answer_markdown)
+        else:
+            answer = _sanitize_answer("\n\n".join(text_blocks))
+        if not answer:
+            raise ResearchUnavailableError("empty_answer")
+    except ResearchUnavailableError as exc:
+        raise ResearchUnavailableError(exc.reason, exc.detail, usage=usage) from exc
     seen: set[str] = set()
     unique_pairs = []
     for pair in parsed.pairs:
