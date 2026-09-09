@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { reportReceiptFunnelStage } from "@/lib/receipt-funnel";
+import type { ReceiptKind } from "@/lib/public-receipt-turns";
 
 /**
  * Reports one view, once, from the rendered page.
@@ -11,14 +12,14 @@ import { reportReceiptFunnelStage } from "@/lib/receipt-funnel";
  * chat would log several views before any person opened it. Reporting from here
  * means a view is a real browser that actually rendered the receipt.
  */
-export default function ReceiptViewBeacon() {
+export default function ReceiptViewBeacon({ kind = "backtest" }: { kind?: ReceiptKind }) {
   const reported = useRef(false);
 
   useEffect(() => {
     if (reported.current) return;
     reported.current = true;
-    reportReceiptFunnelStage("viewed");
-  }, []);
+    reportReceiptFunnelStage("viewed", kind);
+  }, [kind]);
 
   return null;
 }

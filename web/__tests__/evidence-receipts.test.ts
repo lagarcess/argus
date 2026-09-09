@@ -24,6 +24,7 @@ function source(path: string): string {
 }
 
 const RECEIPT: EvidenceReceipt = {
+  kind: "backtest",
   id: "receipt-1",
   public_id: "abcdefghijklmnopqrstuvwx",
   path: "/r/abcdefghijklmnopqrstuvwx",

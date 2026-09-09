@@ -33,6 +33,7 @@ import {
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
 import { randomId } from "@/lib/random-id";
+import type { ReceiptShareTarget } from "@/lib/receipt-selection";
 
 export type GuestResumeSend = (
   text: string,
@@ -108,6 +109,7 @@ export function useGuestExperience({
   const [isReplacingConversation, setIsReplacingConversation] = useState(false);
   const [resumeDecisionTarget, setResumeDecisionTarget] =
     useState<GuestDecisionResumeTarget | null>(null);
+  const [receiptShareTarget, setReceiptShareTarget] = useState<ReceiptShareTarget | null>(null);
   const pendingGuestAdmissionRef = useRef<AbortController | null>(null);
 
   useEffect(
@@ -129,6 +131,8 @@ export function useGuestExperience({
         );
       } else if (action.reason === "save_decision") {
         setResumeDecisionTarget(action.target);
+      } else if (action.reason === "share_result") {
+        setReceiptShareTarget({ conversationId: action.conversationId, messageId: action.messageId });
       } else if (action.reason === "new_conversation") {
         await startNewChat();
       }
@@ -376,11 +380,27 @@ export function useGuestExperience({
     [conversion],
   )
 
+  const requestReceiptShare = useCallback((sourceConversationId: string, messageId?: string) => {
+    if (sourceConversationId !== conversationId) return;
+    if (account?.account_kind === "guest") {
+      if (messageId) conversion.requestConversion("share_result", {
+        reason: "share_result", conversationId: sourceConversationId, messageId, actionId: randomId(),
+      }, "signup");
+      return;
+    }
+    setReceiptShareTarget({ conversationId: sourceConversationId, messageId });
+  }, [account?.account_kind, conversationId, conversion]);
+
   return {
     ...shell,
     admitSend,
     recoverGuestSimulationRejection,
     requestGuestSearchUpgrade,
+    receiptSharing: {
+      target: receiptShareTarget?.conversationId === conversationId ? receiptShareTarget : null,
+      request: requestReceiptShare,
+      close: () => setReceiptShareTarget(null),
+    },
     resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
