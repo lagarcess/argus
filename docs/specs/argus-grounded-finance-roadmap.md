@@ -963,7 +963,7 @@ integration and green there, not shipped to a user.
 | Lane | PR | Surface it owns |
 | --- | --- | --- |
 | Subtract the guardrails | #565, draft | `llm_interpreter.py`, four files under `agent_runtime/interpreter/` |
-| Cut the catalog import edge | not yet pushed | `state/models.py`, `api/schemas.py`, `capability_registry.py` |
+| Cut the catalog import edge | **LANDED** `772aa276`, PR #567 | done; surface released |
 | Withheld answers keep their sources, and are not paid for twice | not yet pushed | `research_grounded.py`, `perplexity_agent.py`, research contracts |
 | Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
 
@@ -982,7 +982,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **In flight**, PR #565. Round one diagnosed before touching code; the early head read shows ordinary chat running zero guardrail calls and the interpret stage at 15.6s p50, against 33.14s before. It also found two of ten turns had been losing their composer entirely to a seven-call allowance, which is a correctness finding, not a latency one. |
 | Lift the loop, Lane B | The spine | **Dispatched 2026-09-09**, carrying #430. Optional for the spine; run overnight because the capacity was idle, not because it blocks the goalpost. |
-| The registry | The spine | **Not started.** The largest remaining item, now specified by Lane C. |
+| The registry | The spine | **First half landed** as PR #567, `772aa276`. The catalog edge is cut: `state/models.py` now takes `RegisteredStrategyTemplate` from a new `strategy_template_contract.py` that loads the catalog only inside the validator, so a general envelope imports without it. Lane C's probes went from three passing the catalog guard to seven. The rest of the registry, the tool declaration itself, is not started. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |
 
