@@ -61,7 +61,7 @@ class RecordingHTTPTransport(httpx.HTTPTransport):
 def _packet_summary(packet: Any) -> dict[str, Any]:
     return {
         "typed_answer": packet.typed_answer,
-        "uncited_rows": packet.uncited_rows,
+        "rejected_rows": [row.model_dump() for row in packet.rejected_rows],
         "rows": [row.model_dump() for row in packet.rows],
         "sources": [source.model_dump() for source in packet.sources],
         "tool_results": list(packet.tool_results),
@@ -513,7 +513,7 @@ def main() -> None:
                     "error": record["error"],
                     "typed_answer": packet.get("typed_answer"),
                     "rows": len(packet.get("rows", [])),
-                    "uncited_rows": packet.get("uncited_rows"),
+                    "rejected_rows": len(packet.get("rejected_rows") or []),
                     "sources": [s["url"] for s in packet.get("sources", [])][:5],
                     "served_model": (packet.get("usage") or {}).get("model"),
                     "cost_usd": (packet.get("usage") or {}).get("cost_usd"),

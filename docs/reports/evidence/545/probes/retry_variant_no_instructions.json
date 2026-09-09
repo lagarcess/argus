@@ -1,9 +1,9 @@
 {
   "probe": "retry_variant_no_instructions",
   "purpose": "isolation: the strict schema without the instructions text",
-  "candidate_sha": "d87ef80e06525b90a3c46bd5d2a8a2f5b855d127",
-  "captured_at": "2026-09-08T21:37:19.675954+00:00",
-  "elapsed_s": 5.95,
+  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
+  "captured_at": "2026-09-09T01:23:20.526264+00:00",
+  "elapsed_s": 3.76,
   "request_overrides": {
     "instructions": null
   },
@@ -43,18 +43,43 @@
                 "rows": {
                   "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
                   "items": {
-                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
                       "label": {
-                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
                         "type": "string"
                       },
                       "value": {
                         "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
                         "type": "number"
                       },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
                       "unit": {
-                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
                         "type": "string"
                       },
                       "as_of": {
@@ -67,17 +92,6 @@
                           }
                         ],
                         "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
-                      },
-                      "symbol": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "description": "The exchange ticker of the security the figure describes, or null."
                       },
                       "source_url": {
                         "anyOf": [
@@ -92,11 +106,13 @@
                       }
                     },
                     "required": [
+                      "subject",
+                      "symbol",
                       "label",
                       "value",
+                      "kind",
                       "unit",
                       "as_of",
-                      "symbol",
                       "source_url"
                     ],
                     "type": "object",
@@ -118,11 +134,11 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1788903433,
-        "created_at": 1788903433,
+        "completed_at": 1788916996,
+        "created_at": 1788916996,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_5d1e4fbd-393c-4e13-a75e-1bb32e1b8e32",
+        "id": "resp_2efcb1d9-83d5-4c75-a5ef-a17573f8e92c",
         "incomplete_details": null,
         "instructions": null,
         "max_output_tokens": 2048,
@@ -143,7 +159,7 @@
                 "type": "output_text"
               }
             ],
-            "id": "msg_c99e6cc8-3c7f-446a-93d1-7eaff30c46b3",
+            "id": "msg_ac17b098-1a5c-4284-912d-9c5f3caf9877",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -178,24 +194,24 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.02635,
-            "cache_read_cost": 0.00177,
+            "cache_creation_cost": 0.02694,
+            "cache_read_cost": 0.00182,
             "currency": "USD",
             "input_cost": 2e-05,
-            "output_cost": 0.00244,
-            "total_cost": 0.03058
+            "output_cost": 0.00168,
+            "total_cost": 0.03046
           },
-          "input_tokens": 9695,
+          "input_tokens": 9934,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 5269,
-            "cache_read_input_tokens": 4420,
-            "cached_tokens": 4420
+            "cache_creation_input_tokens": 5388,
+            "cache_read_input_tokens": 4540,
+            "cached_tokens": 4540
           },
-          "output_tokens": 122,
+          "output_tokens": 84,
           "output_tokens_details": {
-            "reasoning_tokens": 72
+            "reasoning_tokens": 36
           },
-          "total_tokens": 9817
+          "total_tokens": 10018
         },
         "user": null
       }
@@ -216,10 +232,10 @@
       "model": "openai/gpt-5.6-sol",
       "latency_ms": 0,
       "cost_usd": null,
-      "input_tokens": 9695,
-      "output_tokens": 122,
-      "cache_creation_input_tokens": 5269,
-      "cache_read_input_tokens": 4420
+      "input_tokens": 9934,
+      "output_tokens": 84,
+      "cache_creation_input_tokens": 5388,
+      "cache_read_input_tokens": 4540
     },
     "answer_markdown": "I could not retrieve current figures."
   },

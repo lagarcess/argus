@@ -76,10 +76,7 @@ class PerplexityAgentClient:
         response = self._post(payload, timeout_seconds=spec.timeout_seconds)
         latency_ms = int((time.monotonic() - started) * 1000)
         packet = _packet_from_response(
-            response,
-            latency_ms=latency_ms,
-            on_unpriced=self._record_unpriced,
-            language=spec.language or "en",
+            response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
         )
         _observe_retrieval(packet, spec)
         return packet
@@ -116,10 +113,7 @@ class PerplexityAgentClient:
         latency_ms = int((time.monotonic() - started) * 1000)
         try:
             packet = _packet_from_response(
-                response,
-                latency_ms=latency_ms,
-                on_unpriced=self._record_unpriced,
-                language=(spec.language if spec is not None else None) or "en",
+                response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
             )
         except ResearchUnavailableError as exc:
             # The run is complete, so polling again cannot change its answer:
@@ -208,7 +202,6 @@ def _packet_from_response(
     *,
     latency_ms: int,
     on_unpriced: UnpricedSpendRecorder = record_unpriced_spend,
-    language: str = "en",
 ) -> ResearchPacket:
     output = document.get("output")
     if not isinstance(output, list):
@@ -242,12 +235,10 @@ def _packet_from_response(
     usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
     typed = _typed_retrieval("\n\n".join(text_blocks))
     rows: list[RetrievedRow] = []
-    uncited_rows = 0
-    unverified_figures = 0
+    rejected: list[RetrievedRow] = []
     if typed is not None:
-        rows, uncited_rows = _cited_rows(typed.rows, parsed)
+        rows, rejected = _cited_rows(typed.rows, parsed)
         answer = _sanitize_answer(typed.answer_markdown)
-        unverified_figures = _unverified_figure_count(answer, rows, language=language)
     else:
         answer = _sanitize_answer("\n\n".join(text_blocks))
     if not answer:
@@ -268,8 +259,7 @@ def _packet_from_response(
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
         rows=tuple(rows),
         typed_answer=typed is not None,
-        uncited_rows=uncited_rows,
-        unverified_figures=unverified_figures,
+        rejected_rows=tuple(rejected),
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
@@ -328,239 +318,23 @@ def _typed_retrieval(text: str) -> TypedRetrieval | None:
 
 def _cited_rows(
     rows: list[RetrievedRow], parsed: _ParsedToolResults
-) -> tuple[list[RetrievedRow], int]:
-    """Rows whose citation is a page this response retrieved, and the count
-    of rows that were not. A row read from the provider's own finance data
-    keeps its evidence in the tool result and loses the provider URL, the
-    way every provider-host citation does."""
+) -> tuple[list[RetrievedRow], list[RetrievedRow]]:
+    """Rows whose citation is a page this response retrieved, and the rows
+    that cited none. A row read from the provider's own finance data keeps
+    its evidence in the tool result and loses the provider URL, the way
+    every provider-host citation does. A rejected row is kept apart, its
+    citation dropped, so the turn can name the figure it will not quote."""
     kept: list[RetrievedRow] = []
-    uncited = 0
+    rejected: list[RetrievedRow] = []
     for row in rows:
         url = str(row.source_url or "").strip().rstrip("/")
         if not url or url not in parsed.retrieved_urls:
-            uncited += 1
+            rejected.append(row.model_copy(update={"source_url": None}))
             continue
         if _is_provider_host(urlparse(url).netloc.lower()):
             row = row.model_copy(update={"source_url": None})
         kept.append(row)
-    return kept[:MAX_PACKET_ROWS], uncited
-
-
-# A figure a reader would take as a fact: a number carrying a currency mark,
-# a percent sign, a decimal part, a thousands separator, a scale word or a
-# multiple, with the sign the prose wrote in front of it. Bare integers
-# (years, dates, counts, index names such as S&P 500) are not audited.
-_FIGURE = re.compile(
-    r"(?<![\w.])"
-    r"(?P<sign>[+\-\u2212])?"
-    r"(?P<currency>RD\$|US\$|[$\u20ac\u00a3])?\s?"
-    r"(?P<number>\d{1,3}(?:[,.]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
-    r"(?P<scale>\s?(?:mil millones|thousand|million|billion|trillion|millones|"
-    r"mill\u00f3n|mil|[KMBT]|[kmbt]n?)\b)?"
-    r"(?P<multiple>\s?(?:x|veces)\b)?"
-    r"(?P<percent>\s?(?:%|percent\b|por ciento\b))?"
-    r"(?P<currency_word>\s?(?:dollars|d\u00f3lares|pesos|euros|USD|DOP|EUR)\b)?",
-    re.IGNORECASE,
-)
-_SCALE_FACTORS = {
-    "thousand": 1e3,
-    "mil": 1e3,
-    "k": 1e3,
-    "million": 1e6,
-    "millones": 1e6,
-    "mill\u00f3n": 1e6,
-    "m": 1e6,
-    "mn": 1e6,
-    "billion": 1e9,
-    "mil millones": 1e9,
-    "b": 1e9,
-    "bn": 1e9,
-    "trillion": 1e12,
-    "t": 1e12,
-    "tn": 1e12,
-}
-# A direction word within a few words before a percent figure fixes its sign:
-# "fell 2.01%" is negative, "rose 15.7%" positive. Levels ("fell to $225.73")
-# carry no sign, so direction words never apply to currency or quantity.
-_DIRECTION_WORDS = {
-    "up": 1,
-    "rose": 1,
-    "gained": 1,
-    "climbed": 1,
-    "jumped": 1,
-    "advanced": 1,
-    "higher": 1,
-    "increased": 1,
-    "grew": 1,
-    "subi\u00f3": 1,
-    "gan\u00f3": 1,
-    "avanz\u00f3": 1,
-    "creci\u00f3": 1,
-    "down": -1,
-    "fell": -1,
-    "lost": -1,
-    "dropped": -1,
-    "declined": -1,
-    "slid": -1,
-    "lower": -1,
-    "decreased": -1,
-    "shrank": -1,
-    "baj\u00f3": -1,
-    "cay\u00f3": -1,
-    "perdi\u00f3": -1,
-    "retrocedi\u00f3": -1,
-}
-# A currency mark the prose writes that names one currency. A bare "$" or a
-# currency word such as pesos names a family, not a code, and is held only
-# against the row's kind.
-_CURRENCY_MARK_CODES = {"rd$": "DOP", "us$": "USD", "\u20ac": "EUR", "\u00a3": "GBP"}
-# The row kinds a written figure of each kind may be verified by. An unmarked
-# figure (a decimal, a separator or a scale word alone) is a plain quantity
-# and may name a money amount, a multiple or a count written without its
-# mark; a marked figure needs the matching kind.
-_COMPATIBLE_KINDS = {
-    "percent": {"percent"},
-    "currency": {"currency"},
-    "multiple": {"multiple"},
-    "quantity": {"count", "currency", "multiple"},
-}
-_SEGMENT = re.compile(r"(?<=[.!?])\s+")
-
-
-def _written_value(number: str, language: str) -> tuple[float, int]:
-    """One reading of a written number under the response language, with the
-    precision it was written at. With both separators present the last one is
-    the decimal mark. Alone, a comma before exactly three digits is a
-    thousands mark and otherwise a decimal mark (8,25 in Spanish); a point is
-    a decimal mark in English and, before exactly three digits, a thousands
-    mark in Spanish (1.250)."""
-    spanish = language.startswith("es")
-    if "," in number and "." in number:
-        decimal = "," if number.rfind(",") > number.rfind(".") else "."
-    elif "," in number:
-        groups = number.split(",")
-        decimal = "." if all(len(group) == 3 for group in groups[1:]) else ","
-    elif "." in number:
-        groups = number.split(".")
-        decimal = "," if spanish and all(len(group) == 3 for group in groups[1:]) else "."
-    else:
-        decimal = "."
-    thousands = "," if decimal == "." else "."
-    normalized = number.replace(thousands, "").replace(decimal, ".")
-    precision = len(normalized.split(".", 1)[1]) if "." in normalized else 0
-    return float(normalized), precision
-
-
-def _subject_tokens(row: RetrievedRow) -> set[str]:
-    """What names the row's entity: its symbol and the words of its typed
-    subject. Empty when the row names none, and such a row verifies
-    nothing."""
-    tokens = {row.symbol.strip().lower()} if row.symbol and row.symbol.strip() else set()
-    for word in row.subject.split():
-        cleaned = "".join(ch for ch in word if ch.isalnum()).lower()
-        if len(cleaned) >= 2:
-            tokens.add(cleaned)
-    return tokens
-
-
-def _unverified_figure_count(
-    markdown: str, rows: list[RetrievedRow], *, language: str = "en"
-) -> int:
-    """Figures the prose states that no cited row carries.
-
-    The schema cannot make the prose and the rows agree, and the model's word
-    that its prose states only row figures is never trusted. A written figure
-    is verified only by a row that agrees on every dimension the prose
-    exposes: the value under the response language's number convention at
-    the written precision, the scale word (12.93 billion is 12930000000, not
-    12.93), the sign when the prose writes one or a direction word fixes it,
-    the kind the row declares (a percent is never a price, a price is never
-    a share count, a multiple is never a currency, and a currency mark that
-    names a code must be the row's code), and the subject, which the
-    figure's own sentence or table line must name by the row's symbol or its
-    typed subject; a row naming no entity verifies nothing. Nothing is
-    inferred from the shape of a unit or a label. One
-    unverified figure withholds the answer at the composition seam."""
-    unverified = 0
-    for line in markdown.split("\n"):
-        for segment in _SEGMENT.split(line):
-            words = {
-                "".join(ch for ch in word if ch.isalnum()).lower()
-                for word in segment.split()
-            }
-            for match in _FIGURE.finditer(segment):
-                figure = _figure_from(match, segment, language)
-                if figure is None:
-                    continue
-                if not any(_row_verifies(row, figure, words) for row in rows):
-                    unverified += 1
-    return unverified
-
-
-def _figure_from(
-    match: re.Match[str], segment: str, language: str
-) -> dict[str, Any] | None:
-    groups = match.groupdict()
-    number = groups["number"]
-    percent = bool(groups["percent"])
-    currency = bool(groups["currency"] or groups["currency_word"])
-    marked = (
-        percent
-        or currency
-        or bool(groups["scale"])
-        or bool(groups["multiple"])
-        or "." in number
-        or "," in number
-    )
-    if not marked:
-        return None
-    written, precision = _written_value(number, language)
-    if percent:
-        kind = "percent"
-    elif currency:
-        kind = "currency"
-    elif groups["multiple"]:
-        kind = "multiple"
-    else:
-        kind = "quantity"
-    sign = 0
-    if groups["sign"]:
-        sign = 1 if groups["sign"] == "+" else -1
-    elif percent:
-        preceding = segment[: match.start()].split()[-3:]
-        for word in reversed(preceding):
-            cleaned = "".join(ch for ch in word if ch.isalpha()).lower()
-            if cleaned in _DIRECTION_WORDS:
-                sign = _DIRECTION_WORDS[cleaned]
-                break
-    mark = (groups["currency"] or "").strip().lower()
-    return {
-        "written": written,
-        "precision": precision,
-        "scale": _SCALE_FACTORS.get((groups["scale"] or "").strip().lower(), 1.0),
-        "percent": percent,
-        "kind": kind,
-        "currency_code": _CURRENCY_MARK_CODES.get(mark),
-        "sign": sign,
-    }
-
-
-def _row_verifies(row: RetrievedRow, figure: dict[str, Any], words: set[str]) -> bool:
-    subject = _subject_tokens(row)
-    if not subject or not (subject & words):
-        # A row that names no entity verifies nothing: the audit cannot tell
-        # whose figure it is, so it cannot vouch for anyone's.
-        return False
-    if figure["sign"] and (row.value == 0 or (row.value > 0) != (figure["sign"] > 0)):
-        return False
-    if row.kind not in _COMPATIBLE_KINDS[figure["kind"]]:
-        return False
-    if figure["currency_code"] and row.unit != figure["currency_code"]:
-        return False
-    magnitude = abs(row.value)
-    candidate = magnitude / figure["scale"]
-    tolerance = 0.5 * 10 ** (-figure["precision"]) + 1e-9
-    return abs(round(candidate, figure["precision"]) - figure["written"]) <= tolerance
+    return kept[:MAX_PACKET_ROWS], rejected[:MAX_PACKET_ROWS]
 
 
 def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None:
@@ -579,16 +353,11 @@ def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None
             "Research answer arrived as prose under a typed request"
             f" shape={spec.shape} model={served or 'unknown'}"
         )
-    if packet.uncited_rows:
+    if packet.rejected_rows:
         logger.warning(
-            "Research rows dropped for citing no retrieved page"
-            f" shape={spec.shape} dropped={packet.uncited_rows} kept={len(packet.rows)}"
-        )
-    if packet.unverified_figures:
-        logger.warning(
-            "Research prose states figures no cited row carries"
-            f" shape={spec.shape} unverified={packet.unverified_figures}"
-            f" rows={len(packet.rows)}"
+            "Research rows rejected for citing no retrieved page"
+            f" shape={spec.shape} rejected={len(packet.rejected_rows)}"
+            f" kept={len(packet.rows)}"
         )
 
 

@@ -1,9 +1,9 @@
 {
   "probe": "domain_filtered_local_source",
   "purpose": "domain-filtered call citing a local source, DO location, es",
-  "candidate_sha": "7ef0055b431e45be77a7213e415a6eeee0acd012",
-  "captured_at": "2026-09-08T21:30:48.375347+00:00",
-  "elapsed_s": 9.74,
+  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
+  "captured_at": "2026-09-09T01:21:48.336431+00:00",
+  "elapsed_s": 14.71,
   "request_overrides": {},
   "exchanges": [
     {
@@ -58,18 +58,43 @@
                 "rows": {
                   "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
                   "items": {
-                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
                       "label": {
-                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
                         "type": "string"
                       },
                       "value": {
                         "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
                         "type": "number"
                       },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
                       "unit": {
-                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
                         "type": "string"
                       },
                       "as_of": {
@@ -82,17 +107,6 @@
                           }
                         ],
                         "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
-                      },
-                      "symbol": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "description": "The exchange ticker of the security the figure describes, or null."
                       },
                       "source_url": {
                         "anyOf": [
@@ -107,11 +121,13 @@
                       }
                     },
                     "required": [
+                      "subject",
+                      "symbol",
                       "label",
                       "value",
+                      "kind",
                       "unit",
                       "as_of",
-                      "symbol",
                       "source_url"
                     ],
                     "type": "object",
@@ -133,11 +149,11 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1788903038,
-        "created_at": 1788903038,
+        "completed_at": 1788916893,
+        "created_at": 1788916893,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_2ef6c7c7-eb13-4133-be27-ea2d8b833e1b",
+        "id": "resp_f899eefb-bcbf-4b17-9a26-2b9f233d78e9",
         "incomplete_details": null,
         "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
         "max_output_tokens": 2048,
@@ -147,13 +163,18 @@
         "object": "response",
         "output": [
           {
+            "name": "finance",
+            "type": "skill_loaded"
+          },
+          {
             "queries": [
               "site:popularenlinea.com certificado financiero tasa 1 año pesos",
-              "Banco Popular Dominicano tarifario certificado financiero pesos 360 días"
+              "site:popularenlinea.com tasas certificados financieros pesos 360 días",
+              "Banco Popular Dominicano tarifario tasas pasivas certificado financiero"
             ],
             "results": [
               {
-                "date": "2026-09-03",
+                "date": "2026-09-04",
                 "id": 1,
                 "last_updated": "2026-08-26",
                 "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nPagos anticipados de Préstamos iguales o mayores al 20% del capital (a partir del 20 de julio): 2.5% 1 año, sobre el valor amortizado y 2.0% 1-2 años, sobre el valor amortizado.",
@@ -162,7 +183,7 @@
                 "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
               },
               {
-                "date": "2026-09-03",
+                "date": "2026-09-04",
                 "id": 2,
                 "last_updated": "2026-09-07",
                 "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
@@ -171,7 +192,7 @@
                 "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
               },
               {
-                "date": "2026-09-03",
+                "date": "2026-09-04",
                 "id": 3,
                 "last_updated": "2026-08-27",
                 "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
@@ -180,7 +201,7 @@
                 "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
               },
               {
-                "date": "2026-09-03",
+                "date": "2026-09-04",
                 "id": 4,
                 "last_updated": "2026-08-17",
                 "snippet": "### 1.\nEmpieza a planificar sin afectar tu presupuesto habitual\n...\nEl primer paso consiste en determinar con exactitud cuánto dinero se puede destinar al gasto escolar:\n- **Calcula tus ingresos disponibles:** Suma los recursos con los que cuentas para esta temporada.\n- **Resta los gastos fijos:** Asegura primero los compromisos de vivienda, alimentación, salud, transporte y servicios básicos.\n- **Establece un techo de gasto: ** El monto resultante será la referencia definitiva para fijar tu presupuesto escolar realista.\n...\n### 2.\nHaz un presupuesto detallado antes de salir de compras\nAntes de realizar cualquier gasto, revisa con atención la **lista de útiles escolares** proporcionada por el centro educativo.\nPara trabajar con mayor orden, agrupa los requerimientos por categorías estratégicas:\n- **Uniformes y calzado escolar **\n- **Libros de texto y cuadernos **\n- **Útiles de papelería y mochilas **\n- **Dispositivos de tecnología **\n- **Actividades extracurriculares **\n...\n### 3.\nLleva un control riguroso de cada gasto\n...\nPuedes apoyarte en diferentes herramientas según tu preferencia:\n- **Aplicaciones móviles** de finanzas personales o gestión familiar.\n- **Hojas de cálculo** digitales sincronizadas en tu teléfono.\n- **Una libreta de apuntes** exclusiva para el control del gasto escolar.\n...\n### 4.\nCompara precios en diferentes establecimientos\n...\n### 5.\nReutiliza todos los materiales que se encuentren en buen estado\nAntes de acudir a la papelería o a las tiendas por departamento, haz una auditoría en casa del material del año anterior.\n...\n### 6.\nConsidera la compra de libros de texto usados\n...\n### 7.\nEscalona tus compras en el tiempo\n...\n### 8. Aprovecha las ofertas y promociones de forma inteligente\n...\n### 9.\nEvalúa la opción de tecnología reacondicionada (refurbished)\n...\n### 10.\nOpta por libros y recursos educativos digitales\n...\nLa combinación más rentable consiste en planificar las compras con anticipación, definir un presupuesto cerrado por categorías, auditar en casa los materiales reutilizables de años anteriores y comparar precios entre comercios antes de comprar.",
@@ -193,30 +214,22 @@
           },
           {
             "queries": [
-              "site:popularenlinea.com tarifario tasas pasivas certificado financiero pesos",
-              "site:popularenlinea.com tasas de interés certificados financieros"
-            ],
-            "results": null,
-            "type": "search_results"
-          },
-          {
-            "queries": [
-              "Banco Popular Dominicano certificado financiero 360 días tasa",
-              "Banco Popular certificado financiero un año tasa pesos dominicanos",
-              "Popularenlinea certificado financiero pesos tasa anual"
+              "Banco Popular Dominicano certificado financiero pesos tasa de interés",
+              "Popular Dominicano certificado financiero 360 días tasa",
+              "site:popularenlinea.com Personas certificado financiero tasa interés"
             ],
             "results": [
               {
-                "date": "2026-09-03",
+                "date": "2026-09-04",
                 "id": 5,
                 "last_updated": "2026-08-26",
-                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nA partir del desembolso se producirán intereses calculados sobre saldos insolutos mensuales a ser pagados mensualmente por el deudor: Los intereses se calcularán sobre el capital por la tasa de interés, en base a un (1) año de trescientos sesenta (360) días y el resultado se multiplicará por los días calendario (365).\nEs decir: i=(capital x (tasa de interés porcentual/360) x días calendario 365.",
+                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nPagos anticipados de Préstamos iguales o mayores al 20% del capital (a partir del 20 de julio): 2.5% 1 año, sobre el valor amortizado y 2.0% 1-2 años, sobre el valor amortizado.\n...\nSegún las condiciones expresadas en este contrato, EL BANCO concede a EL CLIENTE un préstamo no reconductivo por la suma de ___________________________ PESOS DOMINICANOS CON 00/100 (RD$______.00) bajo la modalidad de Facilidad a Plazo contra pagaré a vencimiento\nde esta facilidad, generadora de intereses al ___________ por ciento (__.__%) anual, pagadero mediante ______ (__) cuotas mensuales, iguales y consecutivas, contentivas de capital e intereses por la suma de _________________________ PESOS DOMINICANOS CON __/100 (RD$__,____.__) cada una.\n...\nARTÍCULO CUARTO: Intereses.- EL CLIENTE pagará intereses sobre el crédito concedido, sin necesidad de requerimiento o formalidad previa, en el domicilio del EL BANCO, a razón de __________________ por ciento (__.__%) anual, sobre el saldo insoluto, cuyos intereses serán pagados mensualmente conjuntamente con la cuota de capital en la forma que se indica en el Artículo Primero (1º) del presente contrato, durante la vigencia del préstamo.",
                 "source": "web",
                 "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
                 "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
               },
               {
-                "date": "2026-09-03",
+                "date": "2026-09-04",
                 "id": 6,
                 "last_updated": "2026-08-27",
                 "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
@@ -225,8 +238,90 @@
                 "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
               },
               {
-                "date": "2026-09-03",
+                "date": "2026-09-04",
                 "id": 7,
+                "last_updated": "2026-09-07",
+                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
+                "source": "web",
+                "title": "Retiro Comercial - Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "Banco Popular certificado financiero un año tasa septiembre 2026 República Dominicana",
+              "Banco Popular Dominicano tasas pasivas septiembre 2026 certificados",
+              "certificado financiero Banco Popular RD tasa anual hoy"
+            ],
+            "results": [
+              {
+                "date": "2026-09-04",
+                "id": 8,
+                "last_updated": "2026-07-22",
+                "snippet": "De acuerdo con la Superintendencia de Bancos, el Popular registró una tasa de interés acumulada de 11.7% para el financiamiento a las mipymes a abril de 2026, ubicándose entre las entidades con las tasas más bajas para este segmento.\nSu cartera de mipymes presentó, además, un índice de morosidad de solo el 1.3%, según el informe.",
+                "source": "web",
+                "title": "Banco Popular destina el 41% de su cartera comercial al ...",
+                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destina-cartera-comercial-financiamiento-mipymes.aspx"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 9,
+                "last_updated": "2026-04-01",
+                "snippet": "Mantenimiento programado: Nuestros canales digitales estarán temporalmente fuera de servicio desde el sábado 11 de octubre a las 11:00 p.m. hasta el domingo 12 de octubre a las 5:00 a.m.",
+                "source": "web",
+                "title": "Personas calculadora de prestamos hipotecarios",
+                "url": "https://popularenlinea.com/Personas/Paginas/prestamos/calculadora-de-prestamos-hipotecarios.aspx"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 10,
+                "last_updated": "2025-11-04",
+                "snippet": "Mantenimiento programado: Nuestros canales digitales estarán temporalmente fuera de servicio desde el sábado 11 de octubre a las 11:00 p.m. hasta el domingo 12 de octubre a las 5:00 a.m.",
+                "source": "web",
+                "title": "Sanar una Nación | Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/Personas/Paginas/PROMOCIONES/sanar-una-nacion.aspx"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 11,
+                "last_updated": "2026-08-25",
+                "snippet": "El presidente ejecutivo destacó que el Banco Popular cerró 2025 con activos totales por valor de RD$929,748 millones, lo que representa un crecimiento de 9.4% respecto al año anterior.\n...\nEl señor Paniagua resaltó que el Popular logró mantener una de las tasas de morosidad más bajas del sistema, situándose en 1.55%, por debajo del promedio de la banca múltiple que fue de 1.72%, y del promedio regional latinoamericano estimado en 2.7%.\n...\nEn términos de solvencia, el índice del Popular se situó en 15.55%, superior en un 55% al requerimiento regulatorio de un 10%.",
+                "source": "web",
+                "title": "Banco Popular reafirma su liderazgo con excelentes resultados ...",
+                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-reafirma-su-liderazgo-con-excelentes-resultados-financieros-en-2025-.aspx"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 12,
+                "last_updated": "2026-08-26",
+                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nPagos anticipados de Préstamos iguales o mayores al 20% del capital (a partir del 20 de julio): 2.5% 1 año, sobre el valor amortizado y 2.0% 1-2 años, sobre el valor amortizado.\n...\nde esta facilidad, generadora de intereses al ___________ por ciento (__.__%) anual, pagadero mediante ______ (__) cuotas mensuales, iguales y consecutivas, contentivas de capital e intereses por la suma de _________________________ PESOS DOMINICANOS CON __/100 (RD$__,____.__) cada una.",
+                "source": "web",
+                "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 13,
+                "last_updated": "2026-07-09",
+                "snippet": "Santo Domingo, D.N.– El Banco Popular Dominicano, S.A. – Banco Múltiple informó que la calificadora de riesgo Feller Rate ratificó en febrero de 2026 sus calificaciones crediticias en los niveles más altos, manteniendo la evaluación de AAA para solvencia, bonos y depósitos de largo plazo, así como AA+ para bonos subordinados y C-1+ para depósitos de corto plazo, todas con perspectiva estable.",
+                "source": "web",
+                "title": "Feller Rate ratifica calificaciones AAA del Banco Popular con ...",
+                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Feller-Rate-ratifica-calificaciones-AAA-del-Banco-Popular-perspectiva-estable-2026.aspx"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 14,
+                "last_updated": "2026-08-27",
+                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
+                "source": "web",
+                "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
+                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 15,
                 "last_updated": "2026-09-07",
                 "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**\nBPD.Accessibility",
                 "source": "web",
@@ -234,22 +329,22 @@
                 "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
               },
               {
-                "date": "2026-09-03",
-                "id": 8,
-                "last_updated": "2026-03-15",
-                "snippet": "#### La forma más ágil\n...\nRealice sus transacciones en pesos, dólares y euros.",
+                "date": "2026-09-04",
+                "id": 16,
+                "last_updated": "2026-09-04",
+                "snippet": "Al incorporar la cartera turística de Popular Bank, filial del Grupo Popular con sede en Panamá y licencia internacional, el financiamiento total asciende a RD$73,418 millones.",
                 "source": "web",
-                "title": "internet-banking-empresarial - Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/empresarial/paginas/servicios/internet-banking-empresarial.aspx"
+                "title": "Banco Popular destaca sostenibilidad como factor de competitividad ...",
+                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destaca-sostenibilidad-como-factor-competitividad-turismo-dominicano.aspx"
               },
               {
-                "date": "2026-09-03",
-                "id": 9,
-                "last_updated": "2026-08-17",
-                "snippet": "### 1.\nEmpieza a planificar sin afectar tu presupuesto habitual\n...\nEl primer paso consiste en determinar con exactitud cuánto dinero se puede destinar al gasto escolar:\n- **Calcula tus ingresos disponibles:** Suma los recursos con los que cuentas para esta temporada.\n- **Resta los gastos fijos:** Asegura primero los compromisos de vivienda, alimentación, salud, transporte y servicios básicos.\n- **Establece un techo de gasto: ** El monto resultante será la referencia definitiva para fijar tu presupuesto escolar realista.\n...\n### 2.\nHaz un presupuesto detallado antes de salir de compras\nAntes de realizar cualquier gasto, revisa con atención la **lista de útiles escolares** proporcionada por el centro educativo.\nPara trabajar con mayor orden, agrupa los requerimientos por categorías estratégicas:\n- **Uniformes y calzado escolar **\n- **Libros de texto y cuadernos **\n- **Útiles de papelería y mochilas **\n- **Dispositivos de tecnología **\n- **Actividades extracurriculares **\n...\n### 3.\nLleva un control riguroso de cada gasto\n...\nPuedes apoyarte en diferentes herramientas según tu preferencia:\n- **Aplicaciones móviles** de finanzas personales o gestión familiar.\n- **Hojas de cálculo** digitales sincronizadas en tu teléfono.\n- **Una libreta de apuntes** exclusiva para el control del gasto escolar.\n...\n### 4.\nCompara precios en diferentes establecimientos\n...\n### 5.\nReutiliza todos los materiales que se encuentren en buen estado\nAntes de acudir a la papelería o a las tiendas por departamento, haz una auditoría en casa del material del año anterior.\n...\n### 6.\nConsidera la compra de libros de texto usados\n...\n### 7.\nEscalona tus compras en el tiempo\n...\nIdentifica con los profesores qué insumos son prioritarios para el inicio de las clases y cuáles se requerirán más adelante.\n...\n### 8. Aprovecha las ofertas y promociones de forma inteligente\n...\n### 9.\nEvalúa la opción de tecnología reacondicionada (refurbished)\n...\n### 10.\nOpta por libros y recursos educativos digitales\n...\nLa combinación más rentable consiste en planificar las compras con anticipación, definir un presupuesto cerrado por categorías, auditar en casa los materiales reutilizables de años anteriores y comparar precios entre comercios antes de comprar.",
+                "date": "2026-09-04",
+                "id": 17,
+                "last_updated": "2026-05-08",
+                "snippet": "Es un producto para guardar dinero de forma segura, con acceso cuando lo necesites y, en muchos casos, generación de intereses.",
                 "source": "web",
-                "title": "Como ahorrar en la vuelta a clases? 10 consejos para cuidar el ...",
-                "url": "https://popularenlinea.com/Personas/blog/Pages/Como-ahorrar-vuelta-clases-consejos-cuidar-presupuesto-familiar.aspx"
+                "title": "Cuenta de ahorros: qué es, para qué sirve y cuáles son sus beneficios",
+                "url": "https://popularenlinea.com/Personas/blog/Pages/cuenta-de-ahorros-que-es-para-que-sirve-y-beneficios.aspx"
               }
             ],
             "type": "search_results"
@@ -258,11 +353,11 @@
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"La tasa vigente no pudo verificarse en una página pública oficial del Banco Popular Dominicano.\",\"rows\":[]}",
+                "text": "{\"answer_markdown\":\"La tasa vigente no pudo verificarse en una página pública del Banco Popular Dominicano.\",\"rows\":[]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_093c1500-2c90-4767-ad8e-0b4792dae5ef",
+            "id": "msg_99337244-03a5-4b44-b7ff-7dd6ebdba84b",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -313,26 +408,26 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.03671,
-            "cache_read_cost": 0.00456,
+            "cache_creation_cost": 0.04595,
+            "cache_read_cost": 0.01049,
             "currency": "USD",
-            "input_cost": 4e-05,
-            "output_cost": 0.00682,
+            "input_cost": 6e-05,
+            "output_cost": 0.00852,
             "tool_calls_cost": 0.0075,
             "tool_calls_cost_details": {
               "search_web": 0.0075
             },
-            "total_cost": 0.05563
+            "total_cost": 0.07252
           },
-          "input_tokens": 18743,
+          "input_tokens": 35434,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 7342,
-            "cache_read_input_tokens": 11392,
-            "cached_tokens": 11392
+            "cache_creation_input_tokens": 9189,
+            "cache_read_input_tokens": 26230,
+            "cached_tokens": 26230
           },
-          "output_tokens": 341,
+          "output_tokens": 426,
           "output_tokens_details": {
-            "reasoning_tokens": 69
+            "reasoning_tokens": 112
           },
           "tool_calls_details": {
             "search_web": {
@@ -340,7 +435,7 @@
               "invocation": 3
             }
           },
-          "total_tokens": 19084
+          "total_tokens": 35860
         },
         "user": null
       }
@@ -354,27 +449,57 @@
       {
         "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx",
         "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
-        "source_date": "2026-09-03"
+        "source_date": "2026-09-04"
       },
       {
         "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx",
         "title": "Retiro Comercial - Banco Popular Dominicano",
-        "source_date": "2026-09-03"
+        "source_date": "2026-09-04"
       },
       {
         "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx",
         "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
-        "source_date": "2026-09-03"
+        "source_date": "2026-09-04"
       },
       {
         "url": "https://popularenlinea.com/Personas/blog/Pages/Como-ahorrar-vuelta-clases-consejos-cuidar-presupuesto-familiar.aspx",
         "title": "Como ahorrar en la vuelta a clases? 10 consejos para cuidar el ...",
-        "source_date": "2026-09-03"
+        "source_date": "2026-09-04"
       },
       {
-        "url": "https://popularenlinea.com/empresarial/paginas/servicios/internet-banking-empresarial.aspx",
-        "title": "internet-banking-empresarial - Banco Popular Dominicano",
-        "source_date": "2026-09-03"
+        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destina-cartera-comercial-financiamiento-mipymes.aspx",
+        "title": "Banco Popular destina el 41% de su cartera comercial al ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://popularenlinea.com/Personas/Paginas/prestamos/calculadora-de-prestamos-hipotecarios.aspx",
+        "title": "Personas calculadora de prestamos hipotecarios",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://popularenlinea.com/Personas/Paginas/PROMOCIONES/sanar-una-nacion.aspx",
+        "title": "Sanar una Nación | Banco Popular Dominicano",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-reafirma-su-liderazgo-con-excelentes-resultados-financieros-en-2025-.aspx",
+        "title": "Banco Popular reafirma su liderazgo con excelentes resultados ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Feller-Rate-ratifica-calificaciones-AAA-del-Banco-Popular-perspectiva-estable-2026.aspx",
+        "title": "Feller Rate ratifica calificaciones AAA del Banco Popular con ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destaca-sostenibilidad-como-factor-competitividad-turismo-dominicano.aspx",
+        "title": "Banco Popular destaca sostenibilidad como factor de competitividad ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://popularenlinea.com/Personas/blog/Pages/cuenta-de-ahorros-que-es-para-que-sirve-y-beneficios.aspx",
+        "title": "Cuenta de ahorros: qué es, para qué sirve y cuáles son sus beneficios",
+        "source_date": "2026-09-04"
       }
     ],
     "tool_results": [
@@ -389,14 +514,14 @@
       "web_search_invocations": 3,
       "fetch_url_invocations": 0,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 9735,
+      "latency_ms": 14707,
       "cost_usd": null,
-      "input_tokens": 18743,
-      "output_tokens": 341,
-      "cache_creation_input_tokens": 7342,
-      "cache_read_input_tokens": 11392
+      "input_tokens": 35434,
+      "output_tokens": 426,
+      "cache_creation_input_tokens": 9189,
+      "cache_read_input_tokens": 26230
     },
-    "answer_markdown": "La tasa vigente no pudo verificarse en una página pública oficial del Banco Popular Dominicano."
+    "answer_markdown": "La tasa vigente no pudo verificarse en una página pública del Banco Popular Dominicano."
   },
   "error": null
 }

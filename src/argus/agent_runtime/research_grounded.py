@@ -375,7 +375,9 @@ def _packet_stage_result(
     if degraded_code is not None:
         # The prose is withheld whole: it cannot be trimmed of one claim.
         # The subjects the user named stay testable; a survey named none.
-        answer = _withheld_note(language, code=degraded_code, question_kind=question_kind)
+        answer = _withheld_note(
+            language, code=degraded_code, question_kind=question_kind, packet=packet
+        )
         peers = []
         if survey:
             subjects = []
@@ -857,11 +859,10 @@ def _has_figures(packet: ResearchPacket) -> bool:
 
 
 def _rejected_figures(packet: ResearchPacket) -> bool:
-    """The typed answer stated a figure no cited row carries: a row the
-    parser dropped for citing no retrieved page, or a figure written in the
-    prose that matches no row. Either way the prose asserts what the record
-    cannot verify."""
-    return packet.uncited_rows > 0 or packet.unverified_figures > 0
+    """The typed answer stated a figure it could not cite to a retrieved page.
+    The parser keeps such rows apart and drops their citation; the prose
+    still states the figure, and prose cannot be trimmed of one claim."""
+    return bool(packet.rejected_rows)
 
 
 def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
@@ -891,10 +892,22 @@ def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     return None
 
 
-def _withheld_note(language: str, *, code: str, question_kind: str | None) -> str:
-    """The honest line for a withheld answer, keyed by its degraded code."""
+def _withheld_note(
+    language: str, *, code: str, question_kind: str | None, packet: ResearchPacket
+) -> str:
+    """The honest line for a withheld answer, keyed by its degraded code. A
+    rejected row names the figure the turn will not quote, from the row's
+    own typed subject and label."""
     if code == "research_figures_unverified":
-        return _unverified_figure_note(language)
+        return _unverified_figure_note(
+            language,
+            figures=[
+                " ".join(
+                    part for part in (row.subject.strip(), row.label.strip()) if part
+                )
+                for row in packet.rejected_rows
+            ],
+        )
     if code == "research_not_grounded":
         return _unavailable_note(language)
     if code == "research_unavailable_missing_public_sources":
@@ -1155,16 +1168,34 @@ def _missing_public_source_note(language: str) -> str:
     )
 
 
-def _unverified_figure_note(language: str) -> str:
+def _unverified_figure_note(language: str, *, figures: list[str]) -> str:
+    """Names the figures the turn will not quote when it knows them."""
+    named = [figure for figure in figures if figure]
     if language == "es-419":
+        if named:
+            return (
+                "Encontré fuentes, pero no pude verificar con ellas "
+                f"{_joined(named, 'ni')}, así que no citaré esa respuesta."
+            )
         return (
             "Encontré fuentes, pero no pude verificar con ellas las cifras de "
             "esa respuesta, así que no las citaré."
+        )
+    if named:
+        return (
+            f"I found sources, but couldn't verify {_joined(named, 'or')} against "
+            "them, so I won't quote that answer."
         )
     return (
         "I found sources, but couldn't verify the figures in that answer "
         "against them, so I won't quote them."
     )
+
+
+def _joined(items: list[str], conjunction: str) -> str:
+    if len(items) == 1:
+        return items[0]
+    return f"{', '.join(items[:-1])} {conjunction} {items[-1]}"
 
 
 def retrieval_spec_for_job(job_request: dict[str, Any]) -> ResearchConfigSpec:
@@ -1275,7 +1306,9 @@ def compose_completed_research(
         subjects=subjects, peers=peers, language=language
     )
     answer = (
-        _withheld_note(language, code=degraded_code, question_kind=question_kind)
+        _withheld_note(
+            language, code=degraded_code, question_kind=question_kind, packet=packet
+        )
         if degraded_code is not None
         else packet.answer_markdown
     )

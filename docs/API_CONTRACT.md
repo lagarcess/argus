@@ -3698,25 +3698,15 @@ Contract rules:
   read from the provider's own finance data keeps its evidence in the tool
   result and carries `source_url: null`, the way every provider-host citation
   is scrubbed. **A typed answer is publishable only with at least one cited
-  row, no rejected one, and no figure in its prose that no row carries.** The
-  model's word that its prose states only row figures is never trusted: every
-  figure the prose writes (a number with a currency mark, a percent sign, a
-  decimal part, a thousands separator, a scale word or a multiple) is
-  verified only by a row that agrees on every dimension the prose exposes:
-  the value under the response language's number convention at the written
-  precision, the scale word (12.93 billion is 12930000000, never 12.93), the
-  sign when the prose writes one or a direction word fixes it, the kind the
-  row declares (a percent figure needs a percent row, a currency-marked
-  figure a currency row whose code matches a mark that names one, a
-  multiple a multiple row), and the subject the row declares, which the
-  figure's own sentence or table line must name by symbol or subject; a row
-  that names no entity verifies nothing, and nothing is inferred from the
-  shape of a unit or a label. Bare integers such as years, dates and index
-  names are not audited. Prose cannot be trimmed of one claim, so a rejected
-  row, an unverified prose figure, or a typed answer that retrieved and wrote
-  no row, withholds the whole answer: the turn carries `degraded.code = "research_figures_unverified"`,
-  an honest note replaces the prose, the subjects the user named stay
-  testable, and the packet is never cached. A typed answer with no row and
+  row and no rejected one.** Prose cannot be trimmed of one claim, so a
+  rejected row, or a typed answer that retrieved and wrote no row, withholds
+  the whole answer: the turn carries `degraded.code =
+  "research_figures_unverified"`, an honest note replaces the prose and
+  names the figures it will not quote from the rejected rows' own typed
+  subject and label, the subjects the user named stay testable, and the
+  packet is never cached. The prose is never matched against the rows by
+  heuristic: that shape leaks by construction, and rule 4 keeps prose from
+  being the carrier of facts at all. A typed answer with no row and
   no retrieval at all carries `research_not_grounded` with the unavailable
   note. Surveys keep their own codes below. `rows` is additive on the
   sidecar and may be empty; a degraded turn always carries an empty list,

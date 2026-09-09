@@ -56,7 +56,9 @@ def test_a_rejected_row_withholds_the_whole_answer(monkeypatch) -> None:
     assert sidecar["degraded"] == {"code": "research_figures_unverified"}
     answer = result.stage_patch["assistant_response"]
     assert "250" not in answer and "4.3" not in answer
-    assert answer.startswith("I found sources, but couldn't verify the figures")
+    assert answer.startswith(
+        "I found sources, but couldn't verify NVIDIA analyst target price against them"
+    )
     assert sidecar["rows"] == []
     assert [source["url"] for source in sidecar["sources"]] == [PUBLISHER]
     # The subject the user named stays testable; nothing else is offered.
@@ -80,7 +82,7 @@ def test_a_rejected_row_withholds_the_thorough_answer_too() -> None:
         latency_ms=1,
         on_unpriced=lambda _: None,
     )
-    assert packet.uncited_rows == 1
+    assert [row.label for row in packet.rejected_rows] == ["analyst target price"]
     key = research_cache_key(
         capability_class="thorough_research",
         shape="thorough",
@@ -104,7 +106,9 @@ def test_a_rejected_row_withholds_the_thorough_answer_too() -> None:
     assert composed["research"]["degraded"] == {"code": "research_figures_unverified"}
     assert composed["research"]["rows"] == []
     assert "250" not in composed["answer"] and "4.3" not in composed["answer"]
-    assert composed["answer"].startswith("Encontré fuentes, pero no pude verificar")
+    assert composed["answer"].startswith(
+        "Encontré fuentes, pero no pude verificar con ellas NVIDIA analyst target price"
+    )
     assert cache_get(key) is None, "a withheld packet is never stored for the job"
 
 
@@ -473,44 +477,6 @@ def test_a_broken_typed_answer_never_reaches_the_reader(monkeypatch) -> None:
 
     _run("What is Apple at?")
     assert len(transport.requests) == 2, "a broken answer is never served from cache"
-
-
-def test_a_prose_figure_no_row_carries_withholds_the_answer(monkeypatch) -> None:
-    """Round 5: the schema cannot make the prose and the rows agree, so a
-    schema-valid answer stating a figure beyond its rows is withheld."""
-    set_research_query(
-        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
-    )
-    partial = agent_response(
-        text=typed_answer_text(
-            "AAPL is **$200** today and up **5%** this week.",
-            [
-                retrieved_row(
-                    subject="Apple",
-                    symbol="AAPL",
-                    label="price",
-                    value=200.0,
-                    kind="currency",
-                    unit="USD",
-                    source_url="https://www.perplexity.ai/finance/AAPL",
-                )
-            ],
-        ),
-        sources=["https://www.perplexity.ai/finance/AAPL"],
-    )
-    transport = _wire(monkeypatch, [partial, partial])
-
-    result = _run("What is Apple at?")
-
-    assert result is not None
-    sidecar = result.stage_patch["research"]
-    assert sidecar["degraded"] == {"code": "research_figures_unverified"}
-    answer = result.stage_patch["assistant_response"]
-    assert "5%" not in answer and "200" not in answer
-    assert sidecar["rows"] == []
-
-    _run("What is Apple at?")
-    assert len(transport.requests) == 2, "never served from cache"
 
 
 def test_prose_whose_every_figure_is_a_row_is_published(monkeypatch) -> None:

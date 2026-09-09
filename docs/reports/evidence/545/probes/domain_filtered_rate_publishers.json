@@ -1,9 +1,9 @@
 {
   "probe": "domain_filtered_rate_publishers",
   "purpose": "mechanism demonstration with candidate rate publishers, not the seed list: does a local rate arrive as a cited row",
-  "candidate_sha": "7ef0055b431e45be77a7213e415a6eeee0acd012",
-  "captured_at": "2026-09-08T21:31:07.757565+00:00",
-  "elapsed_s": 19.38,
+  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
+  "captured_at": "2026-09-09T01:22:15.195650+00:00",
+  "elapsed_s": 26.85,
   "request_overrides": {},
   "exchanges": [
     {
@@ -60,18 +60,43 @@
                 "rows": {
                   "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
                   "items": {
-                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
                       "label": {
-                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
                         "type": "string"
                       },
                       "value": {
                         "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
                         "type": "number"
                       },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
                       "unit": {
-                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
                         "type": "string"
                       },
                       "as_of": {
@@ -84,17 +109,6 @@
                           }
                         ],
                         "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
-                      },
-                      "symbol": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "description": "The exchange ticker of the security the figure describes, or null."
                       },
                       "source_url": {
                         "anyOf": [
@@ -109,11 +123,13 @@
                       }
                     },
                     "required": [
+                      "subject",
+                      "symbol",
                       "label",
                       "value",
+                      "kind",
                       "unit",
                       "as_of",
-                      "symbol",
                       "source_url"
                     ],
                     "type": "object",
@@ -135,11 +151,11 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1788903048,
-        "created_at": 1788903048,
+        "completed_at": 1788916908,
+        "created_at": 1788916908,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_30247135-10ac-41e3-b3c0-40ebe7632a4e",
+        "id": "resp_8a43c362-f073-4d1d-a76f-a94888fc4fed",
         "incomplete_details": null,
         "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
         "max_output_tokens": 2048,
@@ -155,26 +171,45 @@
           {
             "queries": [
               "site:bancentral.gov.do tasas de interés pasivas certificados financieros 360 días septiembre 2026",
-              "site:sb.gob.do tasa pasiva promedio certificado financiero un año pesos septiembre 2026",
-              "Banco Central República Dominicana tasas interés pasivas por plazo 360 días"
+              "Banco Central República Dominicana tasa pasiva promedio certificados financieros un año pesos",
+              "Superintendencia Bancos República Dominicana tasas certificados financieros 360 días"
+            ],
+            "results": [
+              {
+                "date": "2026-09-04",
+                "id": 1,
+                "last_updated": "2026-08-26",
+                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.",
+                "source": "web",
+                "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
+                "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "BCRD tasas de interés pasivas moneda nacional por plazo 360 días",
+              "site:bancentral.gov.do estadisticas tasa interes pasiva bancos múltiples certificados financieros",
+              "site:sb.gob.do tasa interés pasiva promedio ponderada certificados financieros"
             ],
             "results": null,
             "type": "search_results"
           },
           {
             "queries": [
-              "tasas de interés pasivas 360 días bancos múltiples República Dominicana",
-              "certificados financieros tasa promedio ponderada 360 días República Dominicana",
-              "BCRD tasas de interés pasivas bancos múltiples moneda nacional plazo"
+              "comparador tasas certificados financieros República Dominicana 12 meses",
+              "ProUsuario compara tasas certificados financieros",
+              "certificado financiero 12 meses tasa bancos dominicanos septiembre 2026"
             ],
             "results": null,
             "type": "search_results"
           },
           {
             "queries": [
-              "tasa promedio certificado financiero 1 año pesos dominicanos",
-              "tasa certificado financiero 360 días República Dominicana promedio bancos",
-              "estadísticas tasas pasivas bancos múltiples septiembre 2026 República Dominicana"
+              "Banco Central República Dominicana tasas pasivas certificados financieros 2026",
+              "BCRD tasa interés pasiva promedio ponderada 2026",
+              "BCRD certificados financieros tasa pasiva 360"
             ],
             "results": null,
             "type": "search_results"
@@ -183,11 +218,11 @@
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"La tasa pasiva promedio vigente para un certificado financiero a un año en pesos dominicanos no pudo ser verificada en una publicación pública actual. Por eso, no es posible dar una cifra confiable sin estimarla.\",\"rows\":[]}",
+                "text": "{\"answer_markdown\":\"La tasa pasiva promedio vigente que pagan los bancos dominicanos por un certificado financiero en pesos a un año no pudo verificarse en una publicación pública disponible. No sería responsable estimarla como si fuera una cifra actual.\",\"rows\":[]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_089e376a-b3d4-4389-ac82-ac478dd26a07",
+            "id": "msg_5e9d5982-d724-4953-94b9-60a6175eacb1",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -240,34 +275,34 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.03204,
-            "cache_read_cost": 0.00945,
+            "cache_creation_cost": 0.0413,
+            "cache_read_cost": 0.01171,
             "currency": "USD",
-            "input_cost": 6e-05,
-            "output_cost": 0.01056,
-            "tool_calls_cost": 0.0075,
+            "input_cost": 0.00036,
+            "output_cost": 0.01228,
+            "tool_calls_cost": 0.01,
             "tool_calls_cost_details": {
-              "search_web": 0.0075
+              "search_web": 0.01
             },
-            "total_cost": 0.05961
+            "total_cost": 0.07565
           },
-          "input_tokens": 30036,
+          "input_tokens": 37616,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 6407,
-            "cache_read_input_tokens": 23614,
-            "cached_tokens": 23614
+            "cache_creation_input_tokens": 8259,
+            "cache_read_input_tokens": 29267,
+            "cached_tokens": 29267
           },
-          "output_tokens": 528,
+          "output_tokens": 614,
           "output_tokens_details": {
             "reasoning_tokens": 160
           },
           "tool_calls_details": {
             "search_web": {
-              "cost_usd": 0.0075,
-              "invocation": 3
+              "cost_usd": 0.01,
+              "invocation": 4
             }
           },
-          "total_tokens": 30564
+          "total_tokens": 38230
         },
         "user": null
       }
@@ -277,8 +312,15 @@
     "typed_answer": true,
     "uncited_rows": 0,
     "rows": [],
-    "sources": [],
+    "sources": [
+      {
+        "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx",
+        "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
+        "source_date": "2026-09-04"
+      }
+    ],
     "tool_results": [
+      "search_results",
       "search_results",
       "search_results",
       "search_results"
@@ -287,17 +329,17 @@
     "usage": {
       "invocations": 0,
       "finance_search_invocations": 0,
-      "web_search_invocations": 3,
+      "web_search_invocations": 4,
       "fetch_url_invocations": 0,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 19377,
+      "latency_ms": 26846,
       "cost_usd": null,
-      "input_tokens": 30036,
-      "output_tokens": 528,
-      "cache_creation_input_tokens": 6407,
-      "cache_read_input_tokens": 23614
+      "input_tokens": 37616,
+      "output_tokens": 614,
+      "cache_creation_input_tokens": 8259,
+      "cache_read_input_tokens": 29267
     },
-    "answer_markdown": "La tasa pasiva promedio vigente para un certificado financiero a un año en pesos dominicanos no pudo ser verificada en una publicación pública actual. Por eso, no es posible dar una cifra confiable sin estimarla."
+    "answer_markdown": "La tasa pasiva promedio vigente que pagan los bancos dominicanos por un certificado financiero en pesos a un año no pudo verificarse en una publicación pública disponible. No sería responsable estimarla como si fuera una cifra actual."
   },
   "error": null
 }

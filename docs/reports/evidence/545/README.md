@@ -10,43 +10,45 @@ Every recording went through the repository's own client, prompt builder and
 spec derivation (`probe_retrieval_parameters.py`), so each `request` is byte
 for byte what production sends. Files hold the request body, HTTP status, raw
 response, the parsed packet and the candidate SHA. No credentials, no user
-data. Recordings vouch for runtime head `7ef0055b`; the later heads in the
-table only added probes to the script.
+data. Every recording was re-captured at runtime head `ca517e45`, the commit
+that typed the row's subject and kind, because the strict schema they freeze
+changed there; the first capture at `7ef0055b` is in the PR history.
 
-Captured 2026-09-08 between 20:20 and 21:00 UTC, after the US close. Total
-provider-reported spend for the fourteen files on disk: $1.40; earlier
-overwritten runs bring the lane's spend to roughly $2.
+Captured 2026-09-09 between 01:20 and 01:24 UTC, after the US close. Total
+provider-reported spend for the fourteen files on disk: $1.07; the earlier
+captures and the isolation probes bring the lane's spend to roughly $3.5.
 
 ## Recordings
 
-| Probe | Head | Shape | Exchanges | Status | Typed | Rows kept | Rows dropped | Tool results | Public sources | Served model | Cost USD | Seconds |
+| Probe | Head | Shape | Exchanges | Status | Typed | Rows kept | Rows rejected | Tool results | Public sources | Served model | Cost USD | Seconds |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- | ---: | --- | ---: | ---: |
-| `fast_quote_typed` | `7ef0055b` | fast | 1 | 200 | yes | 1 | 0 | finance_results | 0 | openai/gpt-5.6-sol | 0.047 | 6.17 |
-| `typed_rows_current_external` | `7ef0055b` | balanced | 1 | 200 | yes | 3 | 0 | fetch_url_results,finance_results,search_results | 41 | openai/gpt-5.6-sol | 0.182 | 29.99 |
-| `domain_filtered_local_source` | `7ef0055b` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 5 | openai/gpt-5.6-sol | 0.056 | 9.74 |
-| `domain_filtered_rate_publishers` | `7ef0055b` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 0 | openai/gpt-5.6-sol | 0.060 | 19.38 |
-| `domain_filtered_rate_publishers_no_recency` | `b7174ef4` | balanced | 1 | 200 | yes | 0 | 0 | fetch_url_results,search_results | 29 | openai/gpt-5.6-sol | 0.151 | 32.73 |
-| `market_pulse_vaguest` | `7ef0055b` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 38 | openai/gpt-5.6-sol | 0.078 | 12.89 |
-| `market_pulse_vaguest_rail` | `503db34d` | balanced | 2 | 200 | yes | 0 | 0 | fetch_url_results,search_results | 5 | openai/gpt-5.6-sol | 0.350 | 45.48 |
-| `market_pulse_retry_finance_only` | `d7ef00fa` | balanced | 1 | 200 | yes | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.024 | 2.28 |
-| `retry_variant_prose` | `d87ef80e` | balanced | 1 | 200 | prose | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.028 | 3.75 |
-| `retry_variant_no_instructions` | `d87ef80e` | balanced | 1 | 200 | yes | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.031 | 5.95 |
-| `retry_variant_instructions_v2` | `d87ef80e` | balanced | 1 | 200 | yes | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.031 | 3.77 |
-| `tool_choice_required` | `7ef0055b` | balanced | 1 | 200 | yes | 0 | 0 | fetch_url_results,search_results | 36 | openai/gpt-5.6-sol | 0.247 | 40.23 |
-| `models_fallback_forced` | `7ef0055b` | fast | 1 | 400 | - | 0 | 0 | none | 0 | - | 0.000 | 0.15 |
-| `thorough_typed_background` | `7ef0055b` | thorough | 2 | 200 | yes | 10 | 0 | finance_results | 0 | anthropic/claude-opus-4-7 | 0.117 | 21.23 |
+| `fast_quote_typed` | `ca517e45` | fast | 1 | 200 | yes | 1 | 0 | finance_results | 0 | openai/gpt-5.6-sol | 0.049 | 8.46 |
+| `typed_rows_current_external` | `ca517e45` | balanced | 1 | 200 | yes | 3 | 0 | finance_results,search_results | 43 | openai/gpt-5.6-sol | 0.109 | 34.23 |
+| `domain_filtered_local_source` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 11 | openai/gpt-5.6-sol | 0.073 | 14.71 |
+| `domain_filtered_rate_publishers` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 1 | openai/gpt-5.6-sol | 0.076 | 26.85 |
+| `domain_filtered_rate_publishers_no_recency` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | fetch_url_results,search_results | 23 | openai/gpt-5.6-sol | 0.095 | 17.64 |
+| `market_pulse_vaguest` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 37 | openai/gpt-5.6-sol | 0.079 | 9.56 |
+| `market_pulse_vaguest_rail` | `ca517e45` | balanced | 2 | 200 | yes | 0 | 0 | fetch_url_results,search_results | 0 | openai/gpt-5.6-sol | 0.214 | 26.53 |
+| `market_pulse_retry_finance_only` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.025 | 3.46 |
+| `retry_variant_prose` | `ca517e45` | balanced | 1 | 200 | prose | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.028 | 4.32 |
+| `retry_variant_no_instructions` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.030 | 3.76 |
+| `retry_variant_instructions_v2` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | none | 0 | openai/gpt-5.6-sol | 0.031 | 4.68 |
+| `tool_choice_required` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 37 | openai/gpt-5.6-sol | 0.076 | 10.29 |
+| `models_fallback_forced` | `ca517e45` | fast | 1 | 400 | - | 0 | 0 | none | 0 | - | 0.000 | 0.13 |
+| `thorough_typed_background` | `ca517e45` | thorough | 2 | 200 | yes | 10 | 0 | finance_results | 0 | anthropic/claude-opus-4-7 | 0.185 | 26.33 |
 
 "Public sources" is the bounded pool the parser retains (up to 64); the
-drawer shows at most five. "Rows dropped" counts rows whose citation matched
-no page the same response retrieved.
+drawer shows at most five. "Rows rejected" counts rows whose citation matched
+no page the same response retrieved; one rejected row withholds the answer
+and the turn names the figure it will not quote.
 
 ## The two proofs
 
 **Typed rows under a strict schema.** `typed_rows_current_external` asks "Why
 is NVIDIA stock moving this week?" through the balanced shape. The answer
-arrived as the schema: prose plus three rows (the Hugging Face acquisition
-value cited to a Reuters page, the closing price and the daily change cited
-to the provider's finance data). Every web citation carries the publisher's
+arrived as the schema: prose plus three rows, each with its subject and
+kind (the closing price and the daily change in USD and percent, cited to the
+provider's finance data, and the Hugging Face acquisition value). Every web citation carries the publisher's
 date and every date falls inside the one-week recency window; the
 fourteen-month-old article #545 documented cannot enter. `fast_quote_typed`
 and `thorough_typed_background` show the same schema honored on the fast
@@ -144,49 +146,42 @@ same anomaly on both of its heads before this lane; answers are delivered and
 the invoice is recorded as unpriced, per the pricing-delivery rule. Not
 changed here.
 
-## The prose figure audit, measured on these recordings
+## Prose is never matched against the rows
 
-Codex round 5 pointed out that the schema cannot make the prose and the rows
-agree: a schema-valid answer can state a figure no row carries. Every figure
-the prose writes (a number with a currency mark, a percent sign, a decimal
-part, a thousands separator, a scale word or a multiple) is now verified only
-by a row that agrees on every dimension the prose exposes: the value under
-the response language's number convention at the written precision, the
-scale word, the sign when written or fixed by a direction word, the unit
-kind (currency, multiple, percent or ratio, plain quantity), and the subject,
-which the figure's own sentence or table line must name by the row's symbol
-or a proper noun of its label; a row naming no entity verifies nothing. One unverified figure
-withholds the answer as `research_figures_unverified`. Re-parsed at head, the
-three typed recordings with figures come out as:
+Codex rounds 5 to 8 kept finding the next hole in a prose figure verifier
+this lane had added: a heuristic that tried to confirm every figure the
+prose writes against the typed rows. Each round widened it (sign, scale,
+number convention, unit kind, subject) and each round found two more
+leaks, because matching prose claims against typed rows with string rules
+leaks by construction. The founder stopped it on 2026-09-09: that shape is
+what operating rule 4 exists to prevent, and the option that cannot leak is
+to degrade the answer when a cited row is rejected.
 
-| Recording | Figures in prose | Verified by a row | Outcome |
-| --- | ---: | ---: | --- |
-| `fast_quote_typed` | 1 | 1 | published |
-| `typed_rows_current_external` | 3 | 3 | published |
-| `thorough_typed_background` | 8 | 6 | withheld |
+So the verifier is gone. What remains is typed and deterministic: a row is
+kept only when its citation is a page the same response retrieved; a
+rejected row withholds the whole answer, and the degraded note names the
+figure the turn will not quote from the row's own typed `subject` and
+`label`; a typed answer with no row at all is withheld; JSON that is not
+the schema is a malformed response. Whether the prose states a figure its
+rows do not carry is not verified mechanically. Under rule 4 the rows are
+the facts and the prose is not their carrier; the board's registry lane
+renders answers from rows, which closes that gap by construction rather
+than by a matcher that is right most of the time.
 
-The thorough comparison states the three fiscal-year revenues per company,
-all rows, and then annual and cumulative growth rates it computed from them.
-Two of those rates match no row, so the answer is withheld. That is the
-honesty line doing what the board says it should: the model routes and
-phrases, it never computes, and growth over revenues is arithmetic that
-belongs in this repository (operating rule 6). The registry lane's compute
-kernels are where that answer comes back, from the rows.
+The schema change that round 8 made stays: a row declares its `subject` and
+its `kind` (currency, percent, multiple, count), and a currency row names
+its unit by ISO code or the answer fails the schema. Those are typed facts
+the calculations will consume, not heuristics.
 
 ## Heads after the recordings
 
-Runtime head `7ef0055b` is what the requests and responses vouch for, and
-every later commit was re-validated against them rather than re-recorded:
+The recordings vouch for runtime head `ca517e45`. Every later commit is
+re-validated against them rather than re-recorded:
 `tests/research/test_retrieval_contract_probe.py` rebuilds each recorded
 request from the code at head and re-parses each recorded response with the
-parser at head. The review-round fixes after `7ef0055b` changed only the
-composition seam (a typed answer is publishable only with at least one
-cited row and no rejected one, on every shape; a degraded sidecar carries no
-rows). The `turn` inside
-`market_pulse_vaguest_rail.json` was composed at `503db34d`; the same two
-exchanges compose to the same degraded outcome under the fix, which the
-hermetic tests in `tests/research/test_retrieval_parameters.py` pin, so it
-was not re-recorded.
+parser at head. The commit that removed the prose verifier changed only how
+a rejected row is carried (the rows themselves, for the note, instead of a
+count) and the composition seam; the requests are byte-identical.
 
 ## Re-recording
 

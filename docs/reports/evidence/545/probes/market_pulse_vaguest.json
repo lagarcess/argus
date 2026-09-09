@@ -1,9 +1,9 @@
 {
   "probe": "market_pulse_vaguest",
   "purpose": "#404: the vaguest market pulse under instructions and the schema",
-  "candidate_sha": "7ef0055b431e45be77a7213e415a6eeee0acd012",
-  "captured_at": "2026-09-08T21:31:20.649872+00:00",
-  "elapsed_s": 12.89,
+  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
+  "captured_at": "2026-09-09T01:22:42.417177+00:00",
+  "elapsed_s": 9.56,
   "request_overrides": {},
   "exchanges": [
     {
@@ -52,18 +52,43 @@
                 "rows": {
                   "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
                   "items": {
-                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
                       "label": {
-                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
                         "type": "string"
                       },
                       "value": {
                         "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
                         "type": "number"
                       },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
                       "unit": {
-                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
                         "type": "string"
                       },
                       "as_of": {
@@ -76,17 +101,6 @@
                           }
                         ],
                         "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
-                      },
-                      "symbol": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "description": "The exchange ticker of the security the figure describes, or null."
                       },
                       "source_url": {
                         "anyOf": [
@@ -101,11 +115,13 @@
                       }
                     },
                     "required": [
+                      "subject",
+                      "symbol",
                       "label",
                       "value",
+                      "kind",
                       "unit",
                       "as_of",
-                      "symbol",
                       "source_url"
                     ],
                     "type": "object",
@@ -127,11 +143,11 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1788903067,
-        "created_at": 1788903067,
+        "completed_at": 1788916953,
+        "created_at": 1788916953,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_137a3d70-d86a-4ad3-b5de-eb344bcd1ee3",
+        "id": "resp_d2036ba4-21d5-46aa-8f74-4c55c829e2f2",
         "incomplete_details": null,
         "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
         "max_output_tokens": 2048,
@@ -146,120 +162,66 @@
           },
           {
             "queries": [
-              "US stock market top gainers September 8 2026 live"
+              "US stock market top gainers today September 9 2026"
             ],
             "results": [
               {
-                "date": "2026-09-08",
-                "id": 31,
-                "last_updated": "2026-09-08",
-                "snippet": "Futures on the Dow Jones Industrial Average (YM=F) declined by 0.7%, while those on the S&P 500 (ES=F) fell 0.2%.",
-                "source": "web",
-                "title": "Stock market today: Dow, S&P 500, Nasdaq futures slip amid rising oil prices",
-                "url": "https://finance.yahoo.com/markets/live/stock-market-today-tuesday-september-8-dow-sp-500-nasdaq-080440338.html"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 32,
-                "last_updated": "2026-09-08",
-                "snippet": "Live pre-market data — updates every 60 seconds.\n50 stocks gained in pre-market trading.\nTop gainer: IonQ, Inc.\n(IONQ) at +5.82%.\n...\n|Ticker|Company|Sector|Price|% Change|\n...\n|IONQ|IonQ, Inc.|Technology|$41.82|+5.82%|\n|ORCL|Oracle Corp|Technology|$166.10|+4.61%|\n|INTC|Intel Corp|Technology|$99.55|+3.91%|\n|NOK|Nokia Corporation|Other|$10.40|+3.69%|",
-                "source": "web",
-                "title": "Premarket Gainers for Tuesday, September 8, 2026",
-                "url": "https://premarketprice.com/premarket-gainers/2026-09-08"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 33,
-                "last_updated": "2026-09-08",
-                "snippet": "Anavex Life Sciences to Host Investor Call on Wednesday, September 9, 2026, at 4:00 PM ET",
-                "source": "web",
-                "title": "Stock Market News Today — NYSE, NASDAQ & OTC Headlines",
-                "url": "https://www.stocktitan.net/news/2026-09-08/"
-              },
-              {
                 "date": "2026-09-04",
-                "id": 34,
+                "id": 31,
                 "last_updated": "2026-09-07",
-                "snippet": "Rank\nSymbol\nCompany Name\nSep Gain\nMarket Cap\nPrice\nCountry\n...\nCHPT Chargepoint Holdings Inc +86.60%\n...\nBNR Burning Rock Biotech Ltd +30.04%\n$126.45M\n$11.99\nChina\nHealthcare\n...\nThe biggest gainers in September 2026 were: CHPT (+87%), AOUT (+45%), KPLT (+44%), CYPH (+42%), GPRO (+38%).",
+                "snippet": "Symbol\nCompany Name\n...\nThe biggest gainers in September 2026 were: CHPT (+87%), AOUT (+45%), KPLT (+44%), CYPH (+42%), GPRO (+38%).",
                 "source": "web",
                 "title": "Top Stock Gainers September 2026 - Monthly Performance Ranked",
                 "url": "https://www.stocktitan.net/rankings/stock-gains-monthly/2026/september?page=1"
               },
               {
-                "date": "2026-09-02",
-                "id": 35,
+                "date": "2026-09-03",
+                "id": 32,
                 "last_updated": "2026-09-08",
-                "snippet": "Al\ntop\ntra i\ngiganti di Wall Street\nNvidia\n(+4,21%),\nWalt Disney\n(+2,21%),\nBoeing\n(+2,02%) e\nVisa\n(+1,69%).\n...\nTra i\nprotagonisti del Nasdaq 100\nAlnylam Pharmaceuticals\n(+8,24%),\nCharter Communications\n(+7,48%),\nNvidia\n(+4,21%) e\nPaypal\n(+3,28%).",
+                "snippet": "## Thursday's Russell 1000 Top Gainers\n|Name|% change|\n...\n|**Snowflake Inc.**|+21.91%|\n|**Robinhood Markets, Inc.**|+14.92%|\n|**Circle Internet Group, Inc.**|+14.85%|\n|**Summit Therapeutics Inc.**|+14.47%|\n|**Strategy Inc**|+13.66%|",
                 "source": "web",
-                "title": "Wall Street in rialzo trainata da Nvidia",
-                "url": "https://www.teleborsa.it/News/2026/09/02/wall-street-in-rialzo-trainata-da-nvidia-177.html"
+                "title": "Wall Street Rallies as Fed's Waller Hints at September ...",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/wall-street-rallies-fed-waller-174745209.html"
               },
               {
                 "date": "2026-09-08",
-                "id": 36,
-                "last_updated": "2026-09-08",
-                "snippet": "For the week, the S&P 500 and the Nasdaq rose 0.1% and 0.4%, respectively, while the Dow fell 0.3%.",
+                "id": 33,
+                "last_updated": "2026-09-09",
+                "snippet": "#### Today's Top Gainers\nBajaj Auto\n...\n(+0.68%)\nApollo Hospitals\n...\n(+0.93%)",
                 "source": "web",
-                "title": "Stock Market News for Sep 8, 2026",
-                "url": "https://www.zacks.com/stock/news/2986120/stock-market-news-for-sep-8-2026"
+                "title": "Casey's Q1 EPS beats at $7.37, revenue $5.68 billion; stock falls",
+                "url": "https://scanx.trade/stock-market-news/companies/casey-s-q1-earnings-preview-eps-expected-6-81-revenue-5-56-billion/50049947"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 34,
+                "last_updated": "2026-09-08",
+                "snippet": "Top Gainers\n...\nSymbol\n...\nNUR\nNuran Wireless\n+78%",
+                "source": "web",
+                "title": "Regular Session Stock Movers — Top Gainers & Losers",
+                "url": "https://www.stocktitan.net/rankings/stock-movers-today/regular"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 35,
+                "last_updated": "2026-09-03",
+                "snippet": "## S&P 500 Top Gainers\nRobinhood Markets**123.90** *(15.80%)*\nCoinbase Global**192.01** *(9.75%)*\nPalantir Technologies**182.99** *(7.98%)*\nServiceNow**146.16** *(6.90%)*",
+                "source": "web",
+                "title": "US stocks today: Dow soars 600 pts, S&P, Nasdaq over 1% as Fed governor Waller's remarks ease rate hike fears",
+                "url": "https://economictimes.indiatimes.com/markets/us-stocks/wall-street-guide/us-stocks-today-us-stocks-jump-as-waller-comments-ease-rate-hike-fears/articleshow/133745833.cms"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 36,
+                "last_updated": "2026-09-04",
+                "snippet": "Astera Labs Inc.\n(NASDAQ:ALAB) topped the Russell 1000 with a 12% surge to $316.86, riding a broad AI-connectivity bid that has analysts carrying an average price target near $390 on the stock.",
+                "source": "web",
+                "title": "SanDisk Jumps 10%, Lululemon Crashes 17%: Stock Market Today",
+                "url": "https://www.benzinga.com/trading-ideas/movers/26/09/61636492/sandisk-jumps-10-lululemon-crashes-17-stock-market-today"
               },
               {
                 "date": "2026-09-08",
                 "id": 37,
-                "last_updated": "2026-09-08",
-                "snippet": "Tuesday pre-market moves included:\nIntel: approximately +2.47%\nAMD: approximately +1.30%\nNvidia: approximately +0.20%\n...\nOccidental Petroleum: approximately +2.03%\nMarathon Petroleum: approximately +1.62%",
-                "source": "web",
-                "title": "u.s. stock market, global news review — 08 september 2026 - Moomoo",
-                "url": "https://www.moomoo.com/community/feed/u-s-stock-market-global-news-review-08-september-2026-117235591020550"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 38,
-                "last_updated": "2026-09-08",
-                "snippet": "1. Cramer says these 2 stocks are big winners from OpenAI’s new model release",
-                "source": "web",
-                "title": "Jim Cramer's top 10 things to watch in the stock market Tuesday",
-                "url": "https://www.cnbc.com/2026/09/08/jim-cramers-top-10-things-to-watch-in-the-stock-market-tuesday.html"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 39,
-                "last_updated": "2026-09-08",
-                "snippet": "Top Gainers\n#\nSymbol\nChange %\nNews near the move\nRel Vol\nPrice\nDay Range\nVolume\n1\nNUR\nNuran Wireless\n+78%\n...\n2\nBNC\nCEA Industries\n+50%\n...\nMOBX\nMobix Labs Inc\n+43%",
-                "source": "web",
-                "title": "After-Hours Stock Movers — Top Gainers & Losers, Sep 4 | StockTitan",
-                "url": "https://www.stocktitan.net/rankings/stock-movers-today/after-hours"
-              },
-              {
-                "date": "2026-09-02",
-                "id": 40,
-                "last_updated": "2026-09-05",
-                "snippet": "|Rank|Symbol|close to close|Session|Catalyst|Announcement|from the pre-news close|",
-                "source": "web",
-                "title": "September 2026 Stock Gainers on News, MTD: 100 Moves",
-                "url": "https://www.stocktitan.net/rankings/top-news/gainers/2026-09"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 41,
-                "last_updated": "2026-09-08",
-                "snippet": "Gainers were led by Meta (META), up 1.0% to $616.77, and NVIDIA (NVDA), which rose 0.8% to $230.36.\nHome Depot (HD) and Wells Fargo (WFC) each advanced 0.9%, to $321.05 and $89.97 respectively.",
-                "source": "web",
-                "title": "Stock Market Today: Trade Wars, Earnings, and Key Movers ...",
-                "url": "https://finobird.com/news/roundup/stock-trade-tensions-escalate-as-earnings-season-looms-market-roundup-for-september-8-2026-2026-09-08/"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 42,
-                "last_updated": "2026-09-08",
-                "snippet": "• $Tesla (TSLA.US)$TSLA: Net fund inflows for four consecutive weeks; ranked among the top 20 in overall U.S. stock market buzz.",
-                "source": "web",
-                "title": "[Today's U.S. Stock Market Signals] September 8, 2026 - Moomoo",
-                "url": "https://www.moomoo.com/community/feed/today-s-u-s-stock-market-signals-september-8-2026-117234517475734"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 43,
                 "last_updated": "2026-09-08",
                 "snippet": "Energy shares rose in premarket trading, with Marathon Petroleum and Occidental Petroleum gaining 1.57% and 1.63%, respectively.",
                 "source": "web",
@@ -267,52 +229,97 @@
                 "url": "https://economictimes.indiatimes.com/markets/us-stocks/news/dow-jones-stock-market-live-updates-nasdaq-sp-500-us-iran-israel-war-hormuz-deal-brent-crude-oil-earnings-forecast-nvidia-intel-coinbase-stock-price-news-8th-september-2026/liveblog/133925001.cms"
               },
               {
-                "date": "2026-09-08",
-                "id": 44,
+                "date": "2026-09-03",
+                "id": 38,
                 "last_updated": "2026-09-08",
-                "snippet": "|Futures|Up/Down|%|Last|\n...\n|**S&P 500**|-19.25|0.25%|7,702|",
+                "snippet": "The best performers of the session on the Dow Jones Industrial Average were Goldman Sachs Group Inc (NYSE:GS), which rose 3.34% or 33.51 points to trade at 1,037.93 at the close.",
                 "source": "web",
-                "title": "Morning Preview: September 08, 2026 - Investrade",
-                "url": "https://investrade.com/morning-preview-september-08-2026/"
+                "title": "U.S. stocks higher at close of trade; Dow Jones Industrial ...",
+                "url": "https://www.investing.com/news/stock-market-news/us-stocks-higher-at-close-of-trade-dow-jones-industrial-average-up-118-4888539"
               },
               {
                 "date": "2026-09-04",
-                "id": 45,
-                "last_updated": "2026-09-07",
-                "snippet": "Strategy (MSTR) jumped 17.56% after a price target hike and fresh bitcoin focused research coverage.\nRobinhood Markets (HOOD) gained 16.57% as fresh analyst coverage and price target increases highlighted newer business lines.\nSnowflake (SNOW) climbed 16.55% after strong Q2 results and a wave of analyst price target increases.",
+                "id": 39,
+                "last_updated": "2026-09-04",
+                "snippet": "|#|Ticker|Price|Change %|\n...\n|1|JONE|$9.84|+358.69%|\n|2|QUMSR|$0.09|+113.07%|\n|3|CHPT|$9.08|+82.66%|\n|4|BIAFW|$0.39|+77.76%|\n|5|MRNOW|$0.01|+76.13%|\n|6|TANH|$0.38|+70.03%|\n|7|ASTLW|$0.01|+66.83%|\n|8|BBBYW|$0.75|+61.29%|",
                 "source": "web",
-                "title": "US Stock Market Today: S&P 500 Futures Edge Higher As Yields Ease Before Jobs",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/us-stock-market-today-p-081915564.html"
+                "title": "GainBot.ai — Free Real-Time US Stock Market Data & Analytics",
+                "url": "https://www.gainbot.ai/"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 40,
+                "last_updated": "2026-09-03",
+                "snippet": "US Stock Market Today: Top Gainers\nStock Price Gain ServiceNow $145.23 +6.31% Intuit $357.60 +4.27% Adobe $291.16 +4.06% Tesla $370.38 +3.74% Meta $613.59 +3.50%\nServiceNow recorded the biggest gain among the listed S&P 500 movers at 6.31%.",
+                "source": "web",
+                "title": "US Stock Market Today: Dow Jones Rises 0.78%, S&P 500 Climbs 0.58% & Nasdaq Gains 0.80% as Oil Prices Surges, Fed Rate Hike Bets Rise and Bond Yields Hit Wall Street – Check What Investors Should Know",
+                "url": "https://sundayguardianlive.com/business/us-stock-market-today-dow-jones-rises-078-sp-500-climbs-058-nasdaq-gains-080-as-oil-prices-surges-fed-rate-hike-bets-rise-and-bond-yields-hit-wall-street-check-what-investors-should-know-276344/"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 41,
+                "last_updated": "2026-09-06",
+                "snippet": "Seagate Technology Hldgs**849.28** *(6.34%)*\n...\nWestern Digital**467.46** *(5.86%)*",
+                "source": "web",
+                "title": "US stocks today: NaS&P 500 rise as Fed's Waller signals openness to holding rates steady",
+                "url": "https://economictimes.indiatimes.com/markets/us-stocks/wall-street-guide/us-stocks-today-us-stocks-open-higher-after-feds-waller-signals-patience-on-rate-policy/articleshow/133737976.cms"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 42,
+                "last_updated": "2026-09-04",
+                "snippet": "Industrials was the top-performing sector as investors rotated out of high-growth sectors and into more defensive areas of the market.\n...\nSeveral industrial stocks led the sector's gains, including:\nVertiv (VRTV)\nHoneywell Aerospace (HONA)\nEaton (ETN)\nFerguson Enterprises (FERG)\nJ.B.\nHunt (JBHT)",
+                "source": "web",
+                "title": "S&P 500 Top Stock Gainers Today, 9/4/26",
+                "url": "https://www.tipranks.com/news/sp-500-top-stock-gainers-today-9-4-26"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 43,
+                "last_updated": "2026-09-08",
+                "snippet": "Top Gainers\n...\nSymbol\n...\nSUNation Energy Inc\n+35%",
+                "source": "web",
+                "title": "Pre-Market Stock Movers — Top Gainers & Losers | StockTitan",
+                "url": "https://www.stocktitan.net/rankings/stock-movers-today/premarket"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 44,
+                "last_updated": "2026-09-08",
+                "snippet": "The Nasdaq Composite rose 1.4%.\n...\nThe Dow Jones Industrial Average added 1.2%, or 623 points.",
+                "source": "web",
+                "title": "Dow, S&P 500, Nasdaq Rise as Bond Yields Fall",
+                "url": "https://www.barrons.com/livecoverage/stock-market-news-today-090326"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 45,
+                "last_updated": "2026-09-03",
+                "snippet": "Consumer discretionary was the top-performing sector with three automakers, Tesla (TSLA), General Motors (GM), and Ford (F), topping the list.\n...\nTesla (TSLA)\nAptiv (APTV)\nGeneral Motors (GM)\nRalph Lauren (RL)\nFord (F)",
+                "source": "web",
+                "title": "S&amp;P 500 Top Stock Gainers Today, 9/3/26",
+                "url": "https://www.tipranks.com/news/sp-500-top-stock-gainers-today-9-3-26"
               }
             ],
             "type": "search_results"
           },
           {
             "queries": [
-              "US stock market top losers September 8 2026 live"
+              "US stock market top losers today September 9 2026"
             ],
             "results": [
               {
-                "date": "2026-09-08",
-                "id": 16,
+                "date": "2026-09-04",
+                "id": 1,
                 "last_updated": "2026-09-08",
-                "snippet": "Dow 30 52,876.56-537.69-1.01%",
+                "snippet": "|Rank|Symbol|close to close|Session|Catalyst|Announcement|from the pre-news close|",
                 "source": "web",
-                "title": "Stock Market Today (Sept. 8, 2026): S&P 500 edges lower as oil ...",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/stock-market-today-sept-8-133744027.html"
+                "title": "September 2026 Stock Losers on News, MTD: 100 Moves | StockTitan",
+                "url": "https://www.stocktitan.net/rankings/top-news/losers/2026-09"
               },
               {
                 "date": "2026-09-08",
-                "id": 17,
-                "last_updated": "2026-09-08",
-                "snippet": "Twenty components of the 30-stock index ended in negative territory, and 10 ended in positive territory.The major loser of the Dow was Apple Inc.\n(AAPL Quick QuoteAAPL - Free Report) . The stock price of this technology hardware company fell 2.5%.",
-                "source": "web",
-                "title": "Stock Market News for Sep 8, 2026",
-                "url": "https://www.zacks.com/stock/news/2986120/stock-market-news-for-sep-8-2026"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 18,
+                "id": 2,
                 "last_updated": "2026-09-08",
                 "snippet": "Dow Jones| Nasdaq | S&P 500 | US Stock Market Today |Highlights: US stocks fell on Tuesday, with the S&P 500 declining 0.58% as Salesforce, ServiceNow and Intuit slid on renewed concerns that AI could disrupt software companies.",
                 "source": "web",
@@ -320,178 +327,187 @@
                 "url": "https://economictimes.indiatimes.com/markets/us-stocks/news/dow-jones-stock-market-live-updates-nasdaq-sp-500-us-iran-israel-war-hormuz-deal-brent-crude-oil-earnings-forecast-nvidia-intel-coinbase-stock-price-news-8th-september-2026/liveblog/133925001.cms"
               },
               {
-                "date": "2026-09-06",
-                "id": 19,
-                "last_updated": "2026-09-08",
-                "snippet": "Active Gainers Losers Price Change % Change Volume 52-week range\n...\nNVIDIA Corporation\n...\n0.39%",
-                "source": "web",
-                "title": "After-Hours Stock Quotes | CNN",
-                "url": "https://www.cnn.com/markets/after-hours"
-              },
-              {
-                "date": "2026-09-03",
-                "id": 20,
-                "last_updated": "2026-09-05",
-                "snippet": "|Rank|Symbol|close to close|Session|Catalyst|Announcement|from the pre-news close|",
-                "source": "web",
-                "title": "September 2026 Stock Losers on News, MTD: 100 Moves | StockTitan",
-                "url": "https://www.stocktitan.net/rankings/top-news/losers/2026-09"
-              },
-              {
-                "date": "2026-09-07",
-                "id": 21,
-                "last_updated": "2026-09-08",
-                "snippet": "The S&P 500 declined 0.4% to close at 7,718.60, while the Dow Jones Industrial Average fell 0.5% to 53,414.25.\nThe Nasdaq Composite slipped 0.3% to 26,506.99.",
-                "source": "web",
-                "title": "US Stock Market Closed for Labour Day: S&P 500 at 7,718.60, Nasdaq at 26,506.99 as Trading Halts - HDFCSky",
-                "url": "https://hdfcsky.com/news/us-stock-market-closed-for-labour-day-sp-500-at-7718-60-nasdaq-at-26506-99-as-trading-halts"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 22,
-                "last_updated": "2026-09-08",
-                "snippet": "The worst performers were Lululemon Athletica Inc (NASDAQ:LULU) which was down 17.39% to 100.60 in late trade, Fair Isaac Corporation (NYSE:FICO) which lost 16.68% to settle at 932.26 and Autodesk Inc (NASDAQ:ADSK) which was down 8.26% to 217.90 at the close.",
-                "source": "web",
-                "title": "U.S. stocks lower at close of trade; Dow Jones Industrial Average down 0.51% By Investing.com",
-                "url": "https://www.investing.com/news/stock-market-news/us-stocks-lower-at-close-of-trade-dow-jones-industrial-average-down-051-4890007"
-              },
-              {
                 "date": "2026-09-08",
-                "id": 23,
-                "last_updated": "2026-09-05",
-                "snippet": "|Name|Latest Price Previous Close|Low High|+/- %|Trade Time Date|3 Mo.\n...\n## S&P 500 - Top Losers\n...\n|Name|Latest Price Previous Close|Low High|+/- %|Trade Time Date|3 Mo.\n+/- %|6 Mo.\n+/- %|1 Year +/- %|",
-                "source": "web",
-                "title": "S&P 500 Market Movers | S&P 500 Gainers and Losers",
-                "url": "https://markets.businessinsider.com/index/market-movers/s&p_500"
-              },
-              {
-                "date": "2026-09-02",
-                "id": 24,
-                "last_updated": "2026-09-02",
-                "snippet": "The Dow Jones Industrial Average fell 418.97 points, or 0.79 per cent, to 52,766.93, the S&P 500 lost 54.67 points, or 0.71 per cent, to 7,631.47 and the Nasdaq Composite dropped 271.11 points, or 1.03 per cent, to 26,099.77.",
-                "source": "web",
-                "title": "Wall Street ends lower as higher yields, rising oil prices mark shaky start to September",
-                "url": "https://www.nst.com.my/business/corporate/2026/09/1523910/wall-street-ends-lower-higher-yields-rising-oil-prices-mark"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 25,
+                "id": 3,
                 "last_updated": "2026-09-08",
-                "snippet": "At the close, the Dow Jones Industrial Average fell 0.51% to 53,414.25; the Nasdaq Composite Index dropped 0.29% to 26,506.99; and the S&P 500 Index fell 0.38% to 7,718.60.",
-                "source": "web",
-                "title": "US Stocks Fall, Dow Drops 270 Points; SOX Bucks Trend to Gain Over 3% Led by Memory, Optical Communication Stocks; SanDisk Rises Nearly 12%, Tesla Drops Almost 6%",
-                "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262152205-us-stock-close-dow-nasdaq-philadelphia-semiconductor-rise-sandisk-tesla-tradingkey"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 26,
-                "last_updated": "2026-09-08",
-                "snippet": "## S&P 500 Top Losers\nAmgen**396.51** *(-9.31%)*\nCoterra Energy**32.56** *(-8.62%)*\nStryker**278.82** *(-8.02%)*\nGoDaddy**94.03** *(-7.19%)*\nLosers»",
+                "snippet": "## S&P 500 Top Losers\nAmgen**396.51** *(-9.31%)*\nCoterra Energy**32.56** *(-8.62%)*\nStryker**278.82** *(-8.02%)*\nGoDaddy**94.03** *(-7.19%)*",
                 "source": "web",
                 "title": "Why US stocks are falling today: Dow Jones crashes 600 points on Trump threat to intensify US-Canada trade war amid oil price rise",
                 "url": "https://economictimes.indiatimes.com/markets/us-stocks/wall-street-guide/why-us-stocks-are-falling-today-dow-jones-crashes-600-points-on-trump-threat-to-intensify-us-canada-trade-war-amid-oil-price-rise/articleshow/133930253.cms"
               },
               {
-                "date": "2026-09-08",
-                "id": 27,
-                "last_updated": "2026-09-08",
-                "snippet": "|Futures|Up/Down|%|Last|\n|--|--|--|--|\n|**Dow**|-389.00|0.73%|53,051|\n|**S&P 500**|-19.25|0.25%|7,702|\n|**Nasdaq**|21.25|0.07%|29,586|",
+                "date": "2026-09-04",
+                "id": 4,
+                "last_updated": "2026-09-04",
+                "snippet": "## S&P 500 Top Losers\nLululemon Athletica**98.99** *(-18.71%)*\nFair Isaac**923.05** *(-17.51%)*\nCoterra Energy**32.56** *(-8.62%)*\nAutodesk**217.50** *(-8.43%)*\nLosers»",
                 "source": "web",
-                "title": "Morning Preview: September 08, 2026 - Investrade",
-                "url": "https://investrade.com/morning-preview-september-08-2026/"
+                "title": "US stocks subdued after jobs report fuels rate-hike bets",
+                "url": "https://economictimes.indiatimes.com/markets/us-stocks/wall-street-guide/us-stocks-today-us-stocks-subdued-after-jobs-report-fuels-rate-hike-bets/articleshow/133765227.cms"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 5,
+                "last_updated": "2026-09-09",
+                "snippet": "Om du vill anpassa dina val klickar du på **Hantera integritetsinställningar**.",
+                "source": "web",
+                "title": "Stock Splits Calendar - Yahoo Finance",
+                "url": "https://finance.yahoo.com/calendar/splits?day=2026-09-09"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 6,
+                "last_updated": "2026-09-09",
+                "snippet": "UltraTech Cement\n11,009.00\n(-1.49%)\nMaruti Suzuki\n...\n(-1.32%)",
+                "source": "web",
+                "title": "Casey's Q1 EPS beats at $7.37, revenue $5.68 billion; stock falls",
+                "url": "https://scanx.trade/stock-market-news/companies/casey-s-q1-earnings-preview-eps-expected-6-81-revenue-5-56-billion/50049947"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 7,
+                "last_updated": "2026-09-08",
+                "snippet": "Active Gainers Losers Price Change % Change Volume 52-week range",
+                "source": "web",
+                "title": "After-Hours Stock Quotes | CNN",
+                "url": "https://www.cnn.com/markets/after-hours"
               },
               {
                 "date": "2026-09-04",
-                "id": 28,
+                "id": 8,
                 "last_updated": "2026-09-08",
-                "snippet": "Stocks on Friday closed out the week with modest losses after a stronger-than-expected August jobs report spooked investors hoping the Federal Reserve will hold its key interest rate steady in September.",
+                "snippet": "The worst performers of the session were Apple Inc (NASDAQ:AAPL), which fell 2.51% or 8.24 points to trade at 319.97 at the close.",
                 "source": "web",
-                "title": "Stock Market Today: Dow Sinks Amid Rate Fears",
-                "url": "https://www.investors.com/market-trend/stock-market-today/dow-jones-sp500-nasdaq-august-jobs-report-lululemon-lulu/"
+                "title": "U.S. stocks lower at close of trade; Dow Jones Industrial ...",
+                "url": "https://www.investing.com/news/stock-market-news/us-stocks-lower-at-close-of-trade-dow-jones-industrial-average-down-051-4890007"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 9,
+                "last_updated": "2026-09-08",
+                "snippet": "The S&P 500 was down by 0.58% to 7,673.52, while the Nasdaq Composite was lower by 0.32% to 26,421.41 — each also notching back-to-back losses.",
+                "source": "web",
+                "title": "Dow closes 600 points lower in back-to-back losses as oil prices gain",
+                "url": "https://www.cnbc.com/2026/09/07/stock-market-tuesday-live-updates.html"
               },
               {
                 "date": "2026-09-03",
-                "id": 29,
+                "id": 10,
+                "last_updated": "2026-09-05",
+                "snippet": "**Thursday’s Russell 1000 Top Losers**\n|Name|% change|\n|--|--|\n|**Ciena Corporation**|-10.39%|\n|**The Campbell’s Company**|-9.74%|\n|**Planet Labs PBC**|-8.32%|\n|**Tyson Foods, Inc.**|-6.89%|\n|**The Toro Company**|-6.85%|",
+                "source": "web",
+                "title": "Wall Street Rallies as Fed’s Waller Hints at September Rate Hold: Stock Market Today",
+                "url": "https://www.tradingview.com/news/benzinga:9a8b8fc69094b:0-wall-street-rallies-as-fed-s-waller-hints-at-september-rate-hold-stock-market-today/"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 11,
                 "last_updated": "2026-09-08",
-                "snippet": "## Top Losers\n- **Credo Technology Group Holding (CRDO)** fell 20.04% after several brokers cut price targets despite strong Q1 earnings and guidance.\n- **MongoDB (MDB)** declined 13.54% as slower Atlas growth and softer guidance disappointed investors despite a beat.\n- **Palo Alto Networks (PANW)** dropped 9.28% following Q4 results and guidance that drew mixed reactions across multiple analyst reports.",
+                "snippet": "- **Credo Technology Group Holding (CRDO)** fell 20.04% after several brokers cut price targets despite strong Q1 earnings and guidance.\n- **MongoDB (MDB)** declined 13.54% as slower Atlas growth and softer guidance disappointed investors despite a beat.\n- **Palo Alto Networks (PANW)** dropped 9.28% following Q4 results and guidance that drew mixed reactions across multiple analyst reports.",
                 "source": "web",
                 "title": "US Stock Market Today: S&P 500 Futures Edge Lower As Investors ...",
                 "url": "https://finance.yahoo.com/markets/stocks/articles/us-stock-market-today-p-081707803.html"
               },
               {
                 "date": "2026-09-08",
-                "id": 30,
+                "id": 12,
                 "last_updated": "2026-09-08",
-                "snippet": "Top Losers\n...\nSymbol\n...\nFCUV\nFocus Unvl Inc\n-64%",
+                "snippet": "Futures on the Dow Jones Industrial Average (YM=F) declined by 0.7%, while those on the S&P 500 (ES=F) fell 0.2%.",
                 "source": "web",
-                "title": "After-Hours Stock Movers — Top Gainers & Losers, Sep 4 | StockTitan",
-                "url": "https://www.stocktitan.net/rankings/stock-movers-today/after-hours"
+                "title": "Stock market today: Dow, S&P 500, Nasdaq fall as oil prices rise, US ...",
+                "url": "https://finance.yahoo.com/markets/live/stock-market-today-tuesday-september-8-dow-sp-500-nasdaq-080440338.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 13,
+                "last_updated": "2026-09-08",
+                "snippet": "The Dow Jones Industrial Average lost 271.86 points, or 0.51%, to 53,414.25.",
+                "source": "web",
+                "title": "Dow tumbles more than 260 points after strong jobs report ... - CNBC",
+                "url": "https://www.cnbc.com/2026/09/03/stock-market-today-live-updates.html"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 14,
+                "last_updated": "2026-09-08",
+                "snippet": "The S&P 500 lost 0.4% Friday.\n...\nThe S&P 500 fell 29.11 points, or 0.4%, to 7,718.60.\nThe Dow Jones Industrial Average fell 271.86 points, or 0.5%, to 53,414.25.\nThe Nasdaq composite fell 77.07 points, or 0.3%, to 26,506.99.",
+                "source": "web",
+                "title": "How major US stock indexes fared Friday 9/4/2026",
+                "url": "https://wtop.com/national/2026/09/how-major-us-stock-indexes-fared-friday-9-4-2026/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 15,
+                "last_updated": "2026-09-08",
+                "snippet": "Stocks finished lower Friday after an unexpectedly strong jobs report boosted investors' expectations for a September rate hike by the Federal Reserve, sending Treasury yields higher.",
+                "source": "web",
+                "title": "Stock Market Today (Sept. 8, 2026): Dow, S&P 500 dip as oil prices ...",
+                "url": "https://www.thestreet.com/stock-market-today/stock-market-today-dow-jones-sp-500-nasdaq-updates-sept-08-2026"
               }
             ],
             "type": "search_results"
           },
           {
             "queries": [
-              "US stocks most active volume September 8 2026 live"
+              "US stock market most active stocks today September 9 2026"
             ],
             "results": [
               {
-                "date": "2026-09-08",
-                "id": 1,
-                "last_updated": "2026-09-07",
-                "snippet": "Edit in screener View all screeners |Symbol|Name|Price|Change|Change %|Volume|Avg Vol (3M)|Market Cap|P/E Ratio (TTM)|52 Wk Change %|52 Wk Range|",
-                "source": "web",
-                "title": "Most Active Stocks: US stocks with the highest trading volume today",
-                "url": "https://finance.yahoo.com/markets/stocks/most-active/"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 2,
-                "last_updated": "2026-09-07",
-                "snippet": "Ranks stocks by the highest Daily Volume.\nLast Updated: 09/04/2026 19:42 ET",
-                "source": "web",
-                "title": "All US Exchanges Volume Leaders - Barchart.com",
-                "url": "https://www.barchart.com/stocks/most-active/daily-volume-leaders"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 3,
-                "last_updated": "2026-09-08",
-                "snippet": "Edit in screener View all screeners |Symbol|Name|Price|Change|Change %|Volume|Avg Vol (3M)|Market Cap|P/E Ratio (TTM)|52 Wk Change %|52 Wk Range|\n...\n|MU|Micron Technology, Inc.|1,016.59 +58.43(+6.10%)|+58.43|+6.10%|35.25M|43.04M|1.148T|22.99|+651.69%|131.56 1,255.00|",
-                "source": "web",
-                "title": "Top Trending Stocks: US stocks with the highest interest today",
-                "url": "https://finance.yahoo.com/markets/stocks/trending/"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 4,
-                "last_updated": "2026-09-08",
-                "snippet": "Symbol\nChange %\nNews near the move\nRel Vol\nPrice",
-                "source": "web",
-                "title": "After-Hours Stock Movers — Top Gainers & Losers, Sep 4 | StockTitan",
-                "url": "https://www.stocktitan.net/rankings/stock-movers-today/after-hours"
-              },
-              {
                 "date": "2026-09-04",
-                "id": 5,
+                "id": 16,
                 "last_updated": "2026-09-06",
-                "snippet": "|Stock Name|Volume|High|Low|Last|Change|\n|Stock Name|Volume|High|Low|Last|Change|\n...\n|UiPath Inc.|89,824,433|16.71|14.77|15.385|-2.835|",
+                "snippet": "|Stock Name|Volume|High|Low|Last|Change|\n...\n## NYSE most active stocks:\n|Stock Name|Volume|High|Low|Last|Change|\n|--|--|--|--|--|--|\n|UiPath Inc.|89,824,433|16.71|14.77|15.385|-2.835|\n...\n## NYSE American most active stocks:\n|Stock Name|Volume|High|Low|Last|Change|\n...\n|HYPERSCALE DATA INC.\nCOMMON STOCK|40,910,881|0.19|0.1722|0.1819|-0.0093|",
                 "source": "web",
                 "title": "BC-Most Active Stocks",
                 "url": "https://finance.yahoo.com/markets/stocks/articles/bc-most-active-stocks-143018979.html"
               },
               {
-                "date": "2026-09-02",
-                "id": 6,
+                "date": "2026-09-04",
+                "id": 17,
                 "last_updated": "2026-09-04",
-                "snippet": "|UiPath Inc.|49,709,640|18.43|17.715|18.025|-0.115|",
+                "snippet": "## Most Active by Volume\nSPWR+36.95%\n$0.40\nVol: 292.83M\nMIMI+45.11%\n$0.96\nVol: 147.51M\n...\n$0.34\nVol: 136.63M\n...\n$0.52\nVol: 124.27M\nDSS+53.99%\n$0.85",
+                "source": "web",
+                "title": "GainBot.ai — Free Real-Time US Stock Market Data & Analytics",
+                "url": "https://www.gainbot.ai/"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 18,
+                "last_updated": "2026-09-06",
+                "snippet": "## NYSE most active stocks:\n|Stock Name|Volume|High|Low|Last|Change|\n...\n|Nu Holdings Ltd.|80,674,874|15.84|15.34|15.68|+0.28|\n|Hewlett Packard Enterprise Co.|71,789,967|54.88|45.70|54.44|+2.61|\n|BitMine Immersion Techno.\nInc.|65,799,677|26.60|23.79|26.45|+3.39|\n|PG & E Corp.|65,392,596|14.11|13.30|13.96|+0.63|\n|UiPath Inc.|57,592,182|18.83|17.90|18.22|+0.23|\n|ChargePoint Holdings Inc.|42,952,185|9.35|6.71|9.08|+3.89|",
                 "source": "web",
                 "title": "BC-Most Active Stocks - Yahoo Finance",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/bc-most-active-stocks-143017957.html"
+                "url": "https://finance.yahoo.com/markets/stocks/articles/bc-most-active-stocks-143018358.html"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 19,
+                "last_updated": "2026-09-08",
+                "snippet": "Symbol\nChange %\n...\nGCDT leads this board with a move of 91%, followed by NUR and BNC.",
+                "source": "web",
+                "title": "Regular Session Stock Movers — Top Gainers & Losers",
+                "url": "https://www.stocktitan.net/rankings/stock-movers-today/regular"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 20,
+                "last_updated": "2026-09-07",
+                "snippet": "Symbol\nCompany Name\n...\nThe biggest gainers in September 2026 were: CHPT (+87%), AOUT (+45%), KPLT (+44%), CYPH (+42%), GPRO (+38%).",
+                "source": "web",
+                "title": "Top Stock Gainers September 2026 - Monthly Performance Ranked",
+                "url": "https://www.stocktitan.net/rankings/stock-gains-monthly/2026/september?page=1"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 21,
+                "last_updated": "2026-09-08",
+                "snippet": "The table below lists the ten most actively traded stocks in the latest market.",
+                "source": "web",
+                "title": "Today’s Market Recap: Nonfarm Payrolls Far Exceed Expectations, Fed Rate Hike Expectations Heat Up, Micron Surges 6% Against the Trend, SanDisk Jumps Over 10%",
+                "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262153097-nfp-data-exceed-expectations-fuel-fed-rate-hike-mu-surges-6-sndk-rises-10-tradingkey"
               },
               {
                 "date": "2026-09-08",
-                "id": 7,
+                "id": 22,
                 "last_updated": "2026-09-08",
                 "snippet": "S&P 500 lost 44.66 points, or 0.58%, to end at 7,673.94 points, while the Nasdaq Composite lost 83.30 points, or 0.31%, to 26,423.69.",
                 "source": "web",
@@ -499,76 +515,76 @@
                 "url": "https://economictimes.indiatimes.com/markets/us-stocks/news/dow-jones-stock-market-live-updates-nasdaq-sp-500-us-iran-israel-war-hormuz-deal-brent-crude-oil-earnings-forecast-nvidia-intel-coinbase-stock-price-news-8th-september-2026/liveblog/133925001.cms"
               },
               {
-                "date": "2026-09-01",
-                "id": 8,
-                "last_updated": "2026-08-24",
-                "snippet": "|Date|Open|High|Low|Close|Volume|\n...\n|August 17, 2026|$97.28|$97.75|$96.47|$96.68|2,139,910|",
+                "date": "2026-09-07",
+                "id": 23,
+                "last_updated": "2026-09-08",
+                "snippet": "Nasdaq 26,421.41-85.58-0.32%",
                 "source": "web",
-                "title": "Historic Stock Lookup | Nasdaq, Inc. - Investor Relations",
-                "url": "https://ir.nasdaq.com/stock-information/historic-stock-lookup"
+                "title": "Apple's Sept. 9 Event Could Change Everything",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/apple-sept-9-event-could-125501364.html"
               },
               {
                 "date": "2026-09-03",
-                "id": 9,
-                "last_updated": "2026-09-06",
-                "snippet": "|Stock Name|Volume|High|Low|Last|Change|\n|Stock Name|Volume|High|Low|Last|Change|\n|Stock Name|Volume|High|Low|Last|Change|",
+                "id": 24,
+                "last_updated": "2026-09-05",
+                "snippet": "Within Magnificent Seven stocks, **Tesla Inc.\n(NASDAQ:TSLA)** jumped 7.4%, **Meta Platforms Inc.\n(NASDAQ:META)** added 3.8% and **Microsoft Corp.\n(NASDAQ:MSFT) ** rose 3.3%, while **Alphabet Inc.\n(NASDAQ:GOOGL)** gained 1.7%.",
                 "source": "web",
-                "title": "BC-Most Active Stocks - Yahoo Finance",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/bc-most-active-stocks-143018358.html"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 10,
-                "last_updated": "2026-09-08",
-                "snippet": "|Ticker|Company|Sector|Price|% Change|\n...\n|IONQ|IonQ, Inc.|Technology|$41.82|+5.82%|",
-                "source": "web",
-                "title": "Premarket Gainers for Tuesday, September 8, 2026",
-                "url": "https://premarketprice.com/premarket-gainers/2026-09-08"
+                "title": "Wall Street Rallies as Fed’s Waller Hints at September Rate Hold: Stock Market Today",
+                "url": "https://www.tradingview.com/news/benzinga:9a8b8fc69094b:0-wall-street-rallies-as-fed-s-waller-hints-at-september-rate-hold-stock-market-today/"
               },
               {
                 "date": "2026-09-03",
-                "id": 11,
+                "id": 25,
                 "last_updated": "2026-09-08",
-                "snippet": "Trading volume was above average on Thursday in stocks like Robinhood Markets, Palantir Technologies and Elon Musk giants Tesla and SpaceX — which were the top- and fourth-most traded stocks by options volume respectively.",
+                "snippet": "- **Reddit (RDDT)** rose 9.31%.",
                 "source": "web",
-                "title": "Options volume erupts in retail trading favorites as Robinhood, Tesla ...",
-                "url": "https://www.cnbc.com/2026/09/03/options-volume-erupts-in-retail-trading-favorites-as-robinhood-tesla-surge.html"
+                "title": "US Stock Market Today: S&P 500 Futures Edge Lower As Investors ...",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/us-stock-market-today-p-081707803.html"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 26,
+                "last_updated": "2026-09-08",
+                "snippet": "Sandisk’s stock was up more than 8% on the day, while shares of KLA climbed 7%.",
+                "source": "web",
+                "title": "Stocks making the biggest moves midday: Sandisk, Tesla, Lululemon, Quanex, AMC & more",
+                "url": "https://www.cnbc.com/2026/09/04/stocks-making-the-biggest-moves-midday-sndk-tsla-nx-amc.html"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 27,
+                "last_updated": "2026-09-08",
+                "snippet": "Stocks making the biggest moves premarket: Snowflake, Moderna, Broadcom & moreDarla Mercado, CFP®,Davis Giangiulio",
+                "source": "web",
+                "title": "Stocks making the biggest moves premarket: AMC, USA ...",
+                "url": "https://www.cnbc.com/2026/09/04/stocks-making-the-biggest-moves-premarket-.html"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 28,
+                "last_updated": "2026-09-08",
+                "snippet": "NASDAQ: META\n...\nMcDonald's\nNYSE: MCD\n...\nNASDAQ: NFLX",
+                "source": "web",
+                "title": "My Top 10 Stocks to Buy Right Now in September | The Motley Fool",
+                "url": "https://www.fool.com/investing/2026/09/03/my-top-10-stocks-to-buy-right-now-in-september/"
               },
               {
                 "date": "2026-09-02",
-                "id": 12,
-                "last_updated": "2026-09-02",
-                "snippet": "MoneyDJ新聞 2026-09-03 01:05:36 數位內容中心 發佈Wingstop（WING.US）：成交價117.82美元，上漲7.5%，開盤110.25美元，盤中高點119.03美元，盤中低點110.25美元，均價117.1美元，成交量8.24萬股。",
+                "id": 29,
+                "last_updated": "2026-09-03",
+                "snippet": "Stocks In Focus\nDell Technologies\n...\nPalo Alto Networks\n...\nBroadcom",
                 "source": "web",
-                "title": "《強勢美股特報》WING,EEFT,CNM,CRUS等10檔",
-                "url": "https://www.ttv.com.tw/finance/view/0920260301053D7F199EFD3042A497BF764DBEDD97CC5AA4/587"
+                "title": "Stock Market Today: Dow Jones, S&P 500 Futures Rise, Nasdaq 100 Falls as US-Iran Tensions Escalate— DELL, PANW, MDB, AVGO in Focus (UPDATED)",
+                "url": "https://www.benzinga.com/markets/equities/26/09/61568360/stock-market-today-nasdaq-100-sp-500-futures-fall-as-us-iran-tensions-escalate-dell-panw-mdb-avgo-in-focus"
               },
               {
-                "date": "2026-09-08",
-                "id": 13,
-                "last_updated": "2023-12-08",
-                "snippet": "You can withdraw your consent or change your choices at any time by clicking on the 'Privacy and Cookie settings' or 'Privacy dashboard' links on our sites and apps.",
+                "date": "2026-09-03",
+                "id": 30,
+                "last_updated": "2026-09-05",
+                "snippet": "Dell (Round Rock) +4.9%, second day after a $47B quarter with EPS of $7.04 against $4.97 expected.",
                 "source": "web",
-                "title": "Most Active Stocks Today - Yahoo Finance UK",
-                "url": "https://uk.finance.yahoo.com/screener/predefined/most_actives"
-              },
-              {
-                "date": "2026-09-02",
-                "id": 14,
-                "last_updated": "2026-09-02",
-                "snippet": "MoneyDJ新聞 2026-09-03 01:05:36 數位內容中心 發佈Wingstop（WING.US）：成交價117.82美元，上漲7.5%，開盤110.25美元，盤中高點119.03美元，盤中低點110.25美元，均價117.1美元，成交量8.24萬股。",
-                "source": "web",
-                "title": "《強勢美股特報》WING,EEFT,CNM,CRUS等10檔 - 台視財經",
-                "url": "https://www.ttv.com.tw/finance/view/?i=0920260301053D7F199EFD3042A497BF764DBEDD97CC5AA4&from=587"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 15,
-                "last_updated": "2026-09-08",
-                "snippet": "ASIA: https://www.wsj.com/market-data/stocks/asiaVolume$112End DateSep 8, 2026Market OpenedSep 4, 2026, 8:00 AM ET",
-                "source": "web",
-                "title": "Nikkei 225 (NIK) Up or Down on September 8?",
-                "url": "https://polymarket.com/event/nik-up-or-down-on-september-8-2026"
+                "title": "CNBC on X",
+                "url": "https://x.com/CNBC/status/2095605431183831143/photo/2"
               }
             ],
             "type": "search_results"
@@ -581,7 +597,7 @@
                 "type": "output_text"
               }
             ],
-            "id": "msg_fd525f6a-3fb5-4ce5-8aa3-027443e8353c",
+            "id": "msg_dc3beb15-32bc-424f-b53c-d56548c2b040",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -626,26 +642,26 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.05759,
-            "cache_read_cost": 0.00448,
+            "cache_creation_cost": 0.05946,
+            "cache_read_cost": 0.00458,
             "currency": "USD",
             "input_cost": 4e-05,
-            "output_cost": 0.0079,
+            "output_cost": 0.00738,
             "tool_calls_cost": 0.0075,
             "tool_calls_cost_details": {
               "search_web": 0.0075
             },
-            "total_cost": 0.07751
+            "total_cost": 0.07896
           },
-          "input_tokens": 22732,
+          "input_tokens": 23348,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 11518,
-            "cache_read_input_tokens": 11205,
-            "cached_tokens": 11205
+            "cache_creation_input_tokens": 11892,
+            "cache_read_input_tokens": 11447,
+            "cached_tokens": 11447
           },
-          "output_tokens": 395,
+          "output_tokens": 369,
           "output_tokens_details": {
-            "reasoning_tokens": 145
+            "reasoning_tokens": 125
           },
           "tool_calls_details": {
             "search_web": {
@@ -653,7 +669,7 @@
               "invocation": 3
             }
           },
-          "total_tokens": 23127
+          "total_tokens": 23717
         },
         "user": null
       }
@@ -665,64 +681,34 @@
     "rows": [],
     "sources": [
       {
-        "url": "https://finance.yahoo.com/markets/live/stock-market-today-tuesday-september-8-dow-sp-500-nasdaq-080440338.html",
-        "title": "Stock market today: Dow, S&P 500, Nasdaq futures slip amid rising oil prices",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://premarketprice.com/premarket-gainers/2026-09-08",
-        "title": "Premarket Gainers for Tuesday, September 8, 2026",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://www.stocktitan.net/news/2026-09-08/",
-        "title": "Stock Market News Today — NYSE, NASDAQ & OTC Headlines",
-        "source_date": "2026-09-08"
-      },
-      {
         "url": "https://www.stocktitan.net/rankings/stock-gains-monthly/2026/september?page=1",
         "title": "Top Stock Gainers September 2026 - Monthly Performance Ranked",
         "source_date": "2026-09-04"
       },
       {
-        "url": "https://www.teleborsa.it/News/2026/09/02/wall-street-in-rialzo-trainata-da-nvidia-177.html",
-        "title": "Wall Street in rialzo trainata da Nvidia",
-        "source_date": "2026-09-02"
+        "url": "https://finance.yahoo.com/markets/stocks/articles/wall-street-rallies-fed-waller-174745209.html",
+        "title": "Wall Street Rallies as Fed's Waller Hints at September ...",
+        "source_date": "2026-09-03"
       },
       {
-        "url": "https://www.zacks.com/stock/news/2986120/stock-market-news-for-sep-8-2026",
-        "title": "Stock Market News for Sep 8, 2026",
+        "url": "https://scanx.trade/stock-market-news/companies/casey-s-q1-earnings-preview-eps-expected-6-81-revenue-5-56-billion/50049947",
+        "title": "Casey's Q1 EPS beats at $7.37, revenue $5.68 billion; stock falls",
         "source_date": "2026-09-08"
       },
       {
-        "url": "https://www.moomoo.com/community/feed/u-s-stock-market-global-news-review-08-september-2026-117235591020550",
-        "title": "u.s. stock market, global news review — 08 september 2026 - Moomoo",
-        "source_date": "2026-09-08"
+        "url": "https://www.stocktitan.net/rankings/stock-movers-today/regular",
+        "title": "Regular Session Stock Movers — Top Gainers & Losers",
+        "source_date": "2026-09-04"
       },
       {
-        "url": "https://www.cnbc.com/2026/09/08/jim-cramers-top-10-things-to-watch-in-the-stock-market-tuesday.html",
-        "title": "Jim Cramer's top 10 things to watch in the stock market Tuesday",
-        "source_date": "2026-09-08"
+        "url": "https://economictimes.indiatimes.com/markets/us-stocks/wall-street-guide/us-stocks-today-us-stocks-jump-as-waller-comments-ease-rate-hike-fears/articleshow/133745833.cms",
+        "title": "US stocks today: Dow soars 600 pts, S&P, Nasdaq over 1% as Fed governor Waller's remarks ease rate hike fears",
+        "source_date": "2026-09-04"
       },
       {
-        "url": "https://www.stocktitan.net/rankings/stock-movers-today/after-hours",
-        "title": "After-Hours Stock Movers — Top Gainers & Losers, Sep 4 | StockTitan",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://www.stocktitan.net/rankings/top-news/gainers/2026-09",
-        "title": "September 2026 Stock Gainers on News, MTD: 100 Moves",
-        "source_date": "2026-09-02"
-      },
-      {
-        "url": "https://finobird.com/news/roundup/stock-trade-tensions-escalate-as-earnings-season-looms-market-roundup-for-september-8-2026-2026-09-08/",
-        "title": "Stock Market Today: Trade Wars, Earnings, and Key Movers ...",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://www.moomoo.com/community/feed/today-s-u-s-stock-market-signals-september-8-2026-117234517475734",
-        "title": "[Today's U.S. Stock Market Signals] September 8, 2026 - Moomoo",
-        "source_date": "2026-09-08"
+        "url": "https://www.benzinga.com/trading-ideas/movers/26/09/61636492/sandisk-jumps-10-lululemon-crashes-17-stock-market-today",
+        "title": "SanDisk Jumps 10%, Lululemon Crashes 17%: Stock Market Today",
+        "source_date": "2026-09-04"
       },
       {
         "url": "https://economictimes.indiatimes.com/markets/us-stocks/news/dow-jones-stock-market-live-updates-nasdaq-sp-500-us-iran-israel-war-hormuz-deal-brent-crude-oil-earnings-forecast-nvidia-intel-coinbase-stock-price-news-8th-september-2026/liveblog/133925001.cms",
@@ -730,53 +716,48 @@
         "source_date": "2026-09-08"
       },
       {
-        "url": "https://investrade.com/morning-preview-september-08-2026/",
-        "title": "Morning Preview: September 08, 2026 - Investrade",
-        "source_date": "2026-09-08"
+        "url": "https://www.investing.com/news/stock-market-news/us-stocks-higher-at-close-of-trade-dow-jones-industrial-average-up-118-4888539",
+        "title": "U.S. stocks higher at close of trade; Dow Jones Industrial ...",
+        "source_date": "2026-09-03"
       },
       {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/us-stock-market-today-p-081915564.html",
-        "title": "US Stock Market Today: S&P 500 Futures Edge Higher As Yields Ease Before Jobs",
+        "url": "https://www.gainbot.ai/",
+        "title": "GainBot.ai — Free Real-Time US Stock Market Data & Analytics",
         "source_date": "2026-09-04"
       },
       {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/stock-market-today-sept-8-133744027.html",
-        "title": "Stock Market Today (Sept. 8, 2026): S&P 500 edges lower as oil ...",
+        "url": "https://sundayguardianlive.com/business/us-stock-market-today-dow-jones-rises-078-sp-500-climbs-058-nasdaq-gains-080-as-oil-prices-surges-fed-rate-hike-bets-rise-and-bond-yields-hit-wall-street-check-what-investors-should-know-276344/",
+        "title": "US Stock Market Today: Dow Jones Rises 0.78%, S&P 500 Climbs 0.58% & Nasdaq Gains 0.80% as Oil Prices Surges, Fed Rate Hike Bets Rise and Bond Yields Hit Wall Street – Check What Investors Should Know",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://economictimes.indiatimes.com/markets/us-stocks/wall-street-guide/us-stocks-today-us-stocks-open-higher-after-feds-waller-signals-patience-on-rate-policy/articleshow/133737976.cms",
+        "title": "US stocks today: NaS&P 500 rise as Fed's Waller signals openness to holding rates steady",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.tipranks.com/news/sp-500-top-stock-gainers-today-9-4-26",
+        "title": "S&P 500 Top Stock Gainers Today, 9/4/26",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.stocktitan.net/rankings/stock-movers-today/premarket",
+        "title": "Pre-Market Stock Movers — Top Gainers & Losers | StockTitan",
         "source_date": "2026-09-08"
       },
       {
-        "url": "https://www.cnn.com/markets/after-hours",
-        "title": "After-Hours Stock Quotes | CNN",
-        "source_date": "2026-09-06"
+        "url": "https://www.barrons.com/livecoverage/stock-market-news-today-090326",
+        "title": "Dow, S&P 500, Nasdaq Rise as Bond Yields Fall",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.tipranks.com/news/sp-500-top-stock-gainers-today-9-3-26",
+        "title": "S&amp;P 500 Top Stock Gainers Today, 9/3/26",
+        "source_date": "2026-09-03"
       },
       {
         "url": "https://www.stocktitan.net/rankings/top-news/losers/2026-09",
         "title": "September 2026 Stock Losers on News, MTD: 100 Moves | StockTitan",
-        "source_date": "2026-09-03"
-      },
-      {
-        "url": "https://hdfcsky.com/news/us-stock-market-closed-for-labour-day-sp-500-at-7718-60-nasdaq-at-26506-99-as-trading-halts",
-        "title": "US Stock Market Closed for Labour Day: S&P 500 at 7,718.60, Nasdaq at 26,506.99 as Trading Halts - HDFCSky",
-        "source_date": "2026-09-07"
-      },
-      {
-        "url": "https://www.investing.com/news/stock-market-news/us-stocks-lower-at-close-of-trade-dow-jones-industrial-average-down-051-4890007",
-        "title": "U.S. stocks lower at close of trade; Dow Jones Industrial Average down 0.51% By Investing.com",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://markets.businessinsider.com/index/market-movers/s&p_500",
-        "title": "S&P 500 Market Movers | S&P 500 Gainers and Losers",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://www.nst.com.my/business/corporate/2026/09/1523910/wall-street-ends-lower-higher-yields-rising-oil-prices-mark",
-        "title": "Wall Street ends lower as higher yields, rising oil prices mark shaky start to September",
-        "source_date": "2026-09-02"
-      },
-      {
-        "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262152205-us-stock-close-dow-nasdaq-philadelphia-semiconductor-rise-sandisk-tesla-tradingkey",
-        "title": "US Stocks Fall, Dow Drops 270 Points; SOX Bucks Trend to Gain Over 3% Led by Memory, Optical Communication Stocks; SanDisk Rises Nearly 12%, Tesla Drops Almost 6%",
         "source_date": "2026-09-04"
       },
       {
@@ -785,9 +766,34 @@
         "source_date": "2026-09-08"
       },
       {
-        "url": "https://www.investors.com/market-trend/stock-market-today/dow-jones-sp500-nasdaq-august-jobs-report-lululemon-lulu/",
-        "title": "Stock Market Today: Dow Sinks Amid Rate Fears",
+        "url": "https://economictimes.indiatimes.com/markets/us-stocks/wall-street-guide/us-stocks-today-us-stocks-subdued-after-jobs-report-fuels-rate-hike-bets/articleshow/133765227.cms",
+        "title": "US stocks subdued after jobs report fuels rate-hike bets",
         "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://finance.yahoo.com/calendar/splits?day=2026-09-09",
+        "title": "Stock Splits Calendar - Yahoo Finance",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://www.cnn.com/markets/after-hours",
+        "title": "After-Hours Stock Quotes | CNN",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://www.investing.com/news/stock-market-news/us-stocks-lower-at-close-of-trade-dow-jones-industrial-average-down-051-4890007",
+        "title": "U.S. stocks lower at close of trade; Dow Jones Industrial ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.cnbc.com/2026/09/07/stock-market-tuesday-live-updates.html",
+        "title": "Dow closes 600 points lower in back-to-back losses as oil prices gain",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://www.tradingview.com/news/benzinga:9a8b8fc69094b:0-wall-street-rallies-as-fed-s-waller-hints-at-september-rate-hold-stock-market-today/",
+        "title": "Wall Street Rallies as Fed’s Waller Hints at September Rate Hold: Stock Market Today",
+        "source_date": "2026-09-03"
       },
       {
         "url": "https://finance.yahoo.com/markets/stocks/articles/us-stock-market-today-p-081707803.html",
@@ -795,18 +801,23 @@
         "source_date": "2026-09-03"
       },
       {
-        "url": "https://finance.yahoo.com/markets/stocks/most-active/",
-        "title": "Most Active Stocks: US stocks with the highest trading volume today",
+        "url": "https://finance.yahoo.com/markets/live/stock-market-today-tuesday-september-8-dow-sp-500-nasdaq-080440338.html",
+        "title": "Stock market today: Dow, S&P 500, Nasdaq fall as oil prices rise, US ...",
         "source_date": "2026-09-08"
       },
       {
-        "url": "https://www.barchart.com/stocks/most-active/daily-volume-leaders",
-        "title": "All US Exchanges Volume Leaders - Barchart.com",
-        "source_date": "2026-09-08"
+        "url": "https://www.cnbc.com/2026/09/03/stock-market-today-live-updates.html",
+        "title": "Dow tumbles more than 260 points after strong jobs report ... - CNBC",
+        "source_date": "2026-09-03"
       },
       {
-        "url": "https://finance.yahoo.com/markets/stocks/trending/",
-        "title": "Top Trending Stocks: US stocks with the highest interest today",
+        "url": "https://wtop.com/national/2026/09/how-major-us-stock-indexes-fared-friday-9-4-2026/",
+        "title": "How major US stock indexes fared Friday 9/4/2026",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.thestreet.com/stock-market-today/stock-market-today-dow-jones-sp-500-nasdaq-updates-sept-08-2026",
+        "title": "Stock Market Today (Sept. 8, 2026): Dow, S&P 500 dip as oil prices ...",
         "source_date": "2026-09-08"
       },
       {
@@ -815,44 +826,44 @@
         "source_date": "2026-09-04"
       },
       {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/bc-most-active-stocks-143017957.html",
-        "title": "BC-Most Active Stocks - Yahoo Finance",
-        "source_date": "2026-09-02"
-      },
-      {
-        "url": "https://ir.nasdaq.com/stock-information/historic-stock-lookup",
-        "title": "Historic Stock Lookup | Nasdaq, Inc. - Investor Relations",
-        "source_date": "2026-09-01"
-      },
-      {
         "url": "https://finance.yahoo.com/markets/stocks/articles/bc-most-active-stocks-143018358.html",
         "title": "BC-Most Active Stocks - Yahoo Finance",
         "source_date": "2026-09-03"
       },
       {
-        "url": "https://www.cnbc.com/2026/09/03/options-volume-erupts-in-retail-trading-favorites-as-robinhood-tesla-surge.html",
-        "title": "Options volume erupts in retail trading favorites as Robinhood, Tesla ...",
+        "url": "https://www.tradingkey.com/analysis/stocks/us-stocks/262153097-nfp-data-exceed-expectations-fuel-fed-rate-hike-mu-surges-6-sndk-rises-10-tradingkey",
+        "title": "Today’s Market Recap: Nonfarm Payrolls Far Exceed Expectations, Fed Rate Hike Expectations Heat Up, Micron Surges 6% Against the Trend, SanDisk Jumps Over 10%",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/apple-sept-9-event-could-125501364.html",
+        "title": "Apple's Sept. 9 Event Could Change Everything",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://www.cnbc.com/2026/09/04/stocks-making-the-biggest-moves-midday-sndk-tsla-nx-amc.html",
+        "title": "Stocks making the biggest moves midday: Sandisk, Tesla, Lululemon, Quanex, AMC & more",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.cnbc.com/2026/09/04/stocks-making-the-biggest-moves-premarket-.html",
+        "title": "Stocks making the biggest moves premarket: AMC, USA ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.fool.com/investing/2026/09/03/my-top-10-stocks-to-buy-right-now-in-september/",
+        "title": "My Top 10 Stocks to Buy Right Now in September | The Motley Fool",
         "source_date": "2026-09-03"
       },
       {
-        "url": "https://www.ttv.com.tw/finance/view/0920260301053D7F199EFD3042A497BF764DBEDD97CC5AA4/587",
-        "title": "《強勢美股特報》WING,EEFT,CNM,CRUS等10檔",
+        "url": "https://www.benzinga.com/markets/equities/26/09/61568360/stock-market-today-nasdaq-100-sp-500-futures-fall-as-us-iran-tensions-escalate-dell-panw-mdb-avgo-in-focus",
+        "title": "Stock Market Today: Dow Jones, S&P 500 Futures Rise, Nasdaq 100 Falls as US-Iran Tensions Escalate— DELL, PANW, MDB, AVGO in Focus (UPDATED)",
         "source_date": "2026-09-02"
       },
       {
-        "url": "https://uk.finance.yahoo.com/screener/predefined/most_actives",
-        "title": "Most Active Stocks Today - Yahoo Finance UK",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://www.ttv.com.tw/finance/view/?i=0920260301053D7F199EFD3042A497BF764DBEDD97CC5AA4&from=587",
-        "title": "《強勢美股特報》WING,EEFT,CNM,CRUS等10檔 - 台視財經",
-        "source_date": "2026-09-02"
-      },
-      {
-        "url": "https://polymarket.com/event/nik-up-or-down-on-september-8-2026",
-        "title": "Nikkei 225 (NIK) Up or Down on September 8?",
-        "source_date": "2026-09-08"
+        "url": "https://x.com/CNBC/status/2095605431183831143/photo/2",
+        "title": "CNBC on X",
+        "source_date": "2026-09-03"
       }
     ],
     "tool_results": [
@@ -867,12 +878,12 @@
       "web_search_invocations": 3,
       "fetch_url_invocations": 0,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 12882,
+      "latency_ms": 9557,
       "cost_usd": null,
-      "input_tokens": 22732,
-      "output_tokens": 395,
-      "cache_creation_input_tokens": 11518,
-      "cache_read_input_tokens": 11205
+      "input_tokens": 23348,
+      "output_tokens": 369,
+      "cache_creation_input_tokens": 11892,
+      "cache_read_input_tokens": 11447
     },
     "answer_markdown": "I could not retrieve current figures."
   },

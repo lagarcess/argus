@@ -1,9 +1,9 @@
 {
   "probe": "retry_variant_instructions_v2",
   "purpose": "isolation: the strict schema with retrieval-first instructions",
-  "candidate_sha": "d87ef80e06525b90a3c46bd5d2a8a2f5b855d127",
-  "captured_at": "2026-09-08T21:37:23.451607+00:00",
-  "elapsed_s": 3.77,
+  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
+  "captured_at": "2026-09-09T01:23:25.210256+00:00",
+  "elapsed_s": 4.68,
   "request_overrides": {
     "instructions": "You are the retrieval service of a finance calculator. Call the available tools before answering: every current figure you state must come from a tool result in this response, never from memory. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the tool result or page it was read from. Only when the tools return no figure at all, say so in one sentence."
   },
@@ -44,18 +44,43 @@
                 "rows": {
                   "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
                   "items": {
-                    "description": "One figure read from a retrieved page: a number, its unit, its date and its citation.",
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
                       "label": {
-                        "description": "What the figure is, in a few words, naming the entity it describes.",
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
                         "type": "string"
                       },
                       "value": {
                         "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
                         "type": "number"
                       },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
                       "unit": {
-                        "description": "The unit of value: a currency code such as USD or DOP, percent, x, or shares.",
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
                         "type": "string"
                       },
                       "as_of": {
@@ -68,17 +93,6 @@
                           }
                         ],
                         "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
-                      },
-                      "symbol": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "description": "The exchange ticker of the security the figure describes, or null."
                       },
                       "source_url": {
                         "anyOf": [
@@ -93,11 +107,13 @@
                       }
                     },
                     "required": [
+                      "subject",
+                      "symbol",
                       "label",
                       "value",
+                      "kind",
                       "unit",
                       "as_of",
-                      "symbol",
                       "source_url"
                     ],
                     "type": "object",
@@ -119,11 +135,11 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1788903439,
-        "created_at": 1788903439,
+        "completed_at": 1788917000,
+        "created_at": 1788917000,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_79b8dcc1-731b-41c5-9586-0b7ee937e60f",
+        "id": "resp_53185475-8247-4f87-a625-3fc32eb99724",
         "incomplete_details": null,
         "instructions": "You are the retrieval service of a finance calculator. Call the available tools before answering: every current figure you state must come from a tool result in this response, never from memory. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the tool result or page it was read from. Only when the tools return no figure at all, say so in one sentence.",
         "max_output_tokens": 2048,
@@ -144,7 +160,7 @@
                 "type": "output_text"
               }
             ],
-            "id": "msg_e6f8820a-79b0-4e27-a531-a321fa96d631",
+            "id": "msg_6ecdd3aa-4878-4382-a638-a25e93a79107",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -179,24 +195,24 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.02687,
-            "cache_read_cost": 0.00181,
+            "cache_creation_cost": 0.02739,
+            "cache_read_cost": 0.00186,
             "currency": "USD",
             "input_cost": 2e-05,
-            "output_cost": 0.0022,
-            "total_cost": 0.0309
+            "output_cost": 0.0019,
+            "total_cost": 0.03117
           },
-          "input_tokens": 9909,
+          "input_tokens": 10133,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 5373,
-            "cache_read_input_tokens": 4530,
-            "cached_tokens": 4530
+            "cache_creation_input_tokens": 5477,
+            "cache_read_input_tokens": 4650,
+            "cached_tokens": 4650
           },
-          "output_tokens": 110,
+          "output_tokens": 95,
           "output_tokens_details": {
-            "reasoning_tokens": 60
+            "reasoning_tokens": 45
           },
-          "total_tokens": 10019
+          "total_tokens": 10228
         },
         "user": null
       }
@@ -217,10 +233,10 @@
       "model": "openai/gpt-5.6-sol",
       "latency_ms": 0,
       "cost_usd": null,
-      "input_tokens": 9909,
-      "output_tokens": 110,
-      "cache_creation_input_tokens": 5373,
-      "cache_read_input_tokens": 4530
+      "input_tokens": 10133,
+      "output_tokens": 95,
+      "cache_creation_input_tokens": 5477,
+      "cache_read_input_tokens": 4650
     },
     "answer_markdown": "I could not retrieve current figures."
   },

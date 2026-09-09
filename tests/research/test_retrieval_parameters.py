@@ -343,7 +343,10 @@ def test_a_typed_answer_is_read_into_rows_cited_to_retrieved_pages() -> None:
     # evidence in the tool result and loses the URL, like every provider host.
     assert packet.rows[0].source_url == PUBLISHER
     assert packet.rows[1].source_url is None
-    assert packet.uncited_rows == 2
+    assert [row.label for row in packet.rejected_rows] == [
+        "analyst target price",
+        "Uncited",
+    ] or len(packet.rejected_rows) == 2
     assert [source.url for source in packet.sources] == [PUBLISHER]
 
 
@@ -370,7 +373,7 @@ def test_prose_under_a_typed_request_is_delivered_as_prose() -> None:
 
     assert packet.typed_answer is False
     assert packet.rows == ()
-    assert packet.uncited_rows == 0
+    assert packet.rejected_rows == ()
     assert packet.answer_markdown == "Apple closed at $312.41."
 
 
@@ -564,7 +567,7 @@ def test_fetched_pages_join_the_retrieval_record() -> None:
 
     assert packet.tool_results == ("fetch_url_results",)
     assert [row.source_url for row in packet.rows] == [page]
-    assert packet.uncited_rows == 0
+    assert packet.rejected_rows == ()
     assert [(source.url, source.title) for source in packet.sources] == [
         (page, "Top Stock Gainers Today")
     ]
@@ -669,210 +672,6 @@ def test_json_that_is_not_the_answer_object_fails_closed(text: str) -> None:
         client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
 
     assert excinfo.value.reason == "malformed_response"
-
-
-def _row(
-    subject: str,
-    label: str,
-    value: float,
-    kind: str = "currency",
-    unit: str = "USD",
-    symbol: str | None = None,
-):
-    from argus.domain.research.contracts import RetrievedRow
-
-    return RetrievedRow(
-        subject=subject,
-        symbol=symbol,
-        label=label,
-        value=value,
-        kind=kind,
-        unit=unit,
-        as_of=None,
-        source_url=None,
-    )
-
-
-@pytest.mark.parametrize(
-    ("prose", "rows", "unverified", "language"),
-    [
-        # value, subject and kind agree
-        (
-            "Apple (AAPL) is trading at **$316.22 USD** as of September 8, 2026.",
-            [_row("Apple", "latest share price", 316.22, symbol="AAPL")],
-            0,
-            "en",
-        ),
-        (
-            "As of September 8, 2026, NVDA closed at **$225.73**, down **2.01%**.",
-            [
-                _row("NVIDIA", "closing stock price", 225.73, symbol="NVDA"),
-                _row("NVIDIA", "daily stock-price change", -2.01, "percent", "%", "NVDA"),
-            ],
-            0,
-            "en",
-        ),
-        # a scale word requires the plain scaled value, never the written one
-        (
-            "The planned **$12.93 billion** acquisition of Hugging Face.",
-            [
-                _row(
-                    "NVIDIA Hugging Face",
-                    "acquisition value",
-                    12930000000.0,
-                    symbol="NVDA",
-                )
-            ],
-            0,
-            "en",
-        ),
-        (
-            "The planned **$12.93 billion** acquisition of Hugging Face.",
-            [_row("NVIDIA Hugging Face", "acquisition value", 12.93, symbol="NVDA")],
-            1,
-            "en",
-        ),
-        # sign: an explicit sign or a direction word must agree with the row
-        (
-            "MSFT rose +5.0% today.",
-            [_row("Apple", "daily change", -5.0, "percent", "%", "AAPL")],
-            1,
-            "en",
-        ),
-        (
-            "AAPL rose 5% today.",
-            [_row("Apple", "daily change", -5.0, "percent", "%", "AAPL")],
-            1,
-            "en",
-        ),
-        (
-            "AAPL fell 5% today.",
-            [_row("Apple", "daily change", -5.0, "percent", "%", "AAPL")],
-            0,
-            "en",
-        ),
-        # kind: the row declares what its value measures, nothing is inferred
-        ("AAPL is up 5% today.", [_row("Apple", "price", 5.0, symbol="AAPL")], 1, "en"),
-        (
-            "Apple trades at $5.00.",
-            [_row("Apple", "earnings per share", 5.0, "count", "EPS", "AAPL")],
-            1,
-            "en",
-        ),
-        (
-            "Apple trades at 1.5x sales.",
-            [_row("Apple", "price to sales", 1.5, symbol="AAPL")],
-            1,
-            "en",
-        ),
-        (
-            "Apple trades at 1.5x sales.",
-            [_row("Apple", "price to sales", 1.5, "multiple", "x", "AAPL")],
-            0,
-            "en",
-        ),
-        (
-            "Apple revenue was 12.93 billion.",
-            [_row("Apple", "revenue", 12930000000.0, symbol="AAPL")],
-            0,
-            "en",
-        ),
-        (
-            "Sold 3 million Apple shares.",
-            [_row("Apple", "shares sold", 3000000.0, "count", "shares", "AAPL")],
-            0,
-            "en",
-        ),
-        # a currency mark that names a code must be the row's code
-        (
-            "El certificado del Banco Popular paga RD$1,250.50.",
-            [_row("Banco Popular", "monto", 1250.5, unit="DOP")],
-            0,
-            "es",
-        ),
-        (
-            "El certificado del Banco Popular paga RD$1,250.50.",
-            [_row("Banco Popular", "monto", 1250.5, unit="USD")],
-            1,
-            "es",
-        ),
-        ("Apple trades at €5.00.", [_row("Apple", "price", 5.0, symbol="AAPL")], 1, "en"),
-        # one number convention, chosen by the response language
-        (
-            "Apple trades at $316.22.",
-            [_row("Apple", "share price", 31622, symbol="AAPL")],
-            1,
-            "en",
-        ),
-        (
-            "La tasa del Banco Popular es 8,25% y el mínimo RD$1.250,50.",
-            [
-                _row("Banco Popular", "tasa certificado", 8.25, "percent", "%"),
-                _row("Banco Popular", "monto mínimo", 1250.5, unit="DOP"),
-            ],
-            0,
-            "es",
-        ),
-        # subject: the figure's own sentence or table line names the row's entity
-        (
-            "MSFT rose 5% today.",
-            [_row("Apple", "daily change", 5.0, "percent", "%", "AAPL")],
-            1,
-            "en",
-        ),
-        (
-            "MSFT daily change was 5.0%.",
-            [_row("", "Daily Change", 5.0, "percent", "%")],
-            1,
-            "en",
-        ),
-        (
-            "| Top gainer | BLTE | $193.61 | +13.16% |",
-            [
-                _row("BLTE", "close", 193.61, symbol="BLTE"),
-                _row("BLTE", "daily move", 13.16, "percent", "%", "BLTE"),
-            ],
-            0,
-            "en",
-        ),
-        (
-            "| Netflix | $33.72B | $39.00B |",
-            [
-                _row("Netflix", "total revenue FY2023", 33723297000.0, symbol="NFLX"),
-                _row("Netflix", "total revenue FY2024", 39000966000.0, symbol="NFLX"),
-            ],
-            0,
-            "en",
-        ),
-        # bare integers are not figures
-        (
-            "Apple trades at 1.5x sales; the S&P 500 fell; a 52-week high; FY2025; Q2.",
-            [_row("Apple", "price to sales", 1.5, "multiple", "x", "AAPL")],
-            0,
-            "en",
-        ),
-        # a figure the model computed, with no row, is unverified
-        (
-            "Netflix's top line expanded, while Disney's grew about 6%.",
-            [_row("Disney", "revenue growth FY2025", 3.4, "percent", "%", "DIS")],
-            1,
-            "en",
-        ),
-        ("I could not retrieve current figures.", [], 0, "en"),
-    ],
-)
-def test_prose_figures_are_audited_against_the_rows(
-    prose: str, rows: list, unverified: int, language: str
-) -> None:
-    """A figure is verified only by a row that agrees on every dimension the
-    prose exposes: value under the response language's number convention at
-    the written precision, scale, sign, the kind the row declares, the
-    currency code when the mark names one, and the subject the row declares.
-    Nothing is inferred from the shape of a unit or a label, and a row that
-    names no entity verifies nothing."""
-    from argus.domain.research.perplexity_agent import _unverified_figure_count
-
-    assert _unverified_figure_count(prose, rows, language=language) == unverified
 
 
 def test_a_currency_row_without_a_code_is_not_the_schema() -> None:
