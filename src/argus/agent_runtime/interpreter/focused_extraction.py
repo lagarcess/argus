@@ -26,6 +26,7 @@ from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_e
 from argus.agent_runtime.interpreter.shared import _llm_value_is_empty
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
+    LLMAmbiguousField,
     LLMInterpretationResponse,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
@@ -215,12 +216,12 @@ def _focused_extraction_field_provenance(
         provenance["comparison_baseline"] = "explicit_user"
     if extraction.recurring_contribution is not None:
         provenance["recurring_contribution"] = "explicit_user"
-        provenance["capital_amount"] = "recurring_contribution"
+        provenance.setdefault("capital_amount", "recurring_contribution")
     elif extraction.capital_amount is not None:
         if canonical_strategy_type(resolved_strategy_type) == "dca_accumulation":
-            provenance["capital_amount"] = "recurring_contribution"
+            provenance.setdefault("capital_amount", "recurring_contribution")
         else:
-            provenance["capital_amount"] = "starting_capital"
+            provenance.setdefault("capital_amount", "starting_capital")
     if extraction.cadence:
         provenance["cadence"] = "explicit_user"
     return provenance
@@ -232,6 +233,82 @@ def _focused_extraction_field_provenance(
 _REPAIR_MERGE_CLASSIFICATION_KEYS = frozenset({"raw_strategy_type", "template"})
 
 _REPAIR_MERGE_DICT_CHANNELS = ("extra_parameters", "field_provenance", "evidence_spans")
+
+
+def _capital_role_records(
+    draft: FocusedStrategyExtraction | LLMStrategyDraft, roles: dict[str, str]
+) -> list[tuple[str, Any, str | None]]:
+    records: list[tuple[str, Any, str | None]] = []
+    for name in type(draft).model_fields:
+        role = roles.get(name, draft.field_provenance.get(name))
+        value = getattr(draft, name)
+        if value is None:
+            value = draft.extra_parameters.get(name)
+        if isinstance(role, str) and role in roles.values() and value is not None:
+            records.append((role, value, draft.evidence_spans.get(name)))
+    return records
+
+
+def _accept_focused_capital_roles(
+    extraction: FocusedStrategyExtraction,
+    *,
+    base_response: LLMInterpretationResponse | None,
+    current_message: str,
+) -> tuple[FocusedStrategyExtraction, list[LLMAmbiguousField]]:
+    """A repair may retain a known role or ground a new one in its own quote.
+
+    Containment establishes evidence provenance, not the semantic meaning of
+    arbitrary text. A number already assigned to another role is not evidence
+    for a new role, even when the two values happen to be equal.
+    """
+    roles: dict[str, str] = {}
+    for name, field in type(extraction).model_fields.items():
+        metadata = field.json_schema_extra
+        role = (
+            metadata.get("x-argus-capital-role") if isinstance(metadata, dict) else None
+        )
+        if isinstance(role, str):
+            roles[name] = role
+    known = (
+        _capital_role_records(base_response.candidate_strategy_draft, roles)
+        if base_response is not None
+        else []
+    )
+    proposed = _capital_role_records(extraction, roles)
+
+    accepted = extraction.model_copy(deep=True)
+    unresolved: list[LLMAmbiguousField] = []
+    for name, role in roles.items():
+        value = getattr(extraction, name)
+        if value is None or any(
+            known_role == role and known_value == value
+            for known_role, known_value, _ in known
+        ):
+            continue
+        if any(
+            proposed_role == role
+            and proposed_value == value
+            and span
+            and span.strip()
+            and span.strip() in current_message
+            and not any(
+                known_role != role and known_span and span.strip() in known_span
+                for known_role, _, known_span in known
+            )
+            for proposed_role, proposed_value, span in proposed
+        ):
+            continue
+        setattr(accepted, name, None)
+        for channel in _REPAIR_MERGE_DICT_CHANNELS:
+            getattr(accepted, channel).pop(name, None)
+        unresolved.append(
+            LLMAmbiguousField(
+                field_name=name,
+                raw_value=str(value),
+                reason_code="financial_role_evidence_unresolved",
+            )
+        )
+    return accepted, unresolved
 
 
 def _merge_focused_repair_with_base(
@@ -477,6 +554,11 @@ def response_from_focused_strategy_extraction(
     base_response: LLMInterpretationResponse | None = None,
     resolve_asset_candidate: ResolveAssetCandidate,
 ) -> LLMInterpretationResponse:
+    extraction, capital_ambiguities = _accept_focused_capital_roles(
+        extraction,
+        base_response=base_response,
+        current_message=request.current_user_message,
+    )
     snapshot = request.latest_task_snapshot
     is_pending_strategy_answer = bool(
         snapshot
@@ -550,6 +632,7 @@ def response_from_focused_strategy_extraction(
             requires_clarification=True,
             user_goal_summary=extraction.user_goal_summary,
             candidate_strategy_draft=draft,
+            ambiguous_fields=capital_ambiguities,
             unsupported_constraints=[
                 LLMUnsupportedConstraint(
                     category="unsupported_strategy_logic",
@@ -578,6 +661,7 @@ def response_from_focused_strategy_extraction(
         requires_clarification=extraction.requires_clarification,
         user_goal_summary=extraction.user_goal_summary,
         candidate_strategy_draft=draft,
+        ambiguous_fields=capital_ambiguities,
         missing_required_fields=list(extraction.missing_required_fields),
         assistant_response=extraction.assistant_response,
         confidence=extraction.confidence,

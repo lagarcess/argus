@@ -9757,6 +9757,9 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
                 cadence="biweekly",
                 capital_amount=500,
                 recurring_contribution=500,
+                evidence_spans={
+                    "recurring_contribution": "recurrent biweekly buys of 500 bucks"
+                },
             )
         return LLMInterpretationResponse(
             intent="strategy_drafting",

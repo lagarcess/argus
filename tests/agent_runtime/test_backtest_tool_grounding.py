@@ -298,7 +298,14 @@ def test_focused_repair_preserves_seed_contribution_and_ceiling_separately() -> 
     extraction = FocusedStrategyExtraction.model_validate(
         {
             **_dca_input(
-                initial_capital=0, recurring_contribution=200, total_capital=5000
+                initial_capital=0,
+                recurring_contribution=200,
+                total_capital=5000,
+                evidence_spans={
+                    "initial_capital": "Start from zero",
+                    "recurring_contribution": "contribute $200 monthly",
+                    "total_capital": "up to $5,000 total",
+                },
             ),
             "is_testable_strategy": True,
             "user_goal_summary": "A recurring plan with three different money roles.",
