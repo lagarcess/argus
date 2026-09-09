@@ -3694,10 +3694,15 @@ Contract rules:
   read from the provider's own finance data keeps its evidence in the tool
   result and carries `source_url: null`, the way every provider-host citation
   is scrubbed. **A typed answer is publishable only with at least one cited
-  row and no rejected one.** The model's word that its prose states no figure
-  is never trusted, and prose cannot be trimmed of one claim, so a rejected
-  row, or a typed answer that retrieved and wrote no row, withholds the whole
-  answer: the turn carries `degraded.code = "research_figures_unverified"`,
+  row, no rejected one, and no figure in its prose that no row carries.** The
+  model's word that its prose states only row figures is never trusted: every
+  figure the prose writes (a number with a currency mark, a percent sign, a
+  decimal part, a thousands separator, a scale word or a multiple, in English
+  or Spanish number style) must equal some row's value in the written units
+  at the written precision; bare integers such as years, dates and index
+  names are not audited. Prose cannot be trimmed of one claim, so a rejected
+  row, an unverified prose figure, or a typed answer that retrieved and wrote
+  no row, withholds the whole answer: the turn carries `degraded.code = "research_figures_unverified"`,
   an honest note replaces the prose, the subjects the user named stay
   testable, and the packet is never cached. A typed answer with no row and
   no retrieval at all carries `research_not_grounded` with the unavailable

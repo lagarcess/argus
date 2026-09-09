@@ -236,9 +236,11 @@ def _packet_from_response(
     typed = _typed_retrieval("\n\n".join(text_blocks))
     rows: list[RetrievedRow] = []
     uncited_rows = 0
+    unverified_figures = 0
     if typed is not None:
         rows, uncited_rows = _cited_rows(typed.rows, parsed)
         answer = _sanitize_answer(typed.answer_markdown)
+        unverified_figures = _unverified_figure_count(answer, rows)
     else:
         answer = _sanitize_answer("\n\n".join(text_blocks))
     if not answer:
@@ -260,6 +262,7 @@ def _packet_from_response(
         rows=tuple(rows),
         typed_answer=typed is not None,
         uncited_rows=uncited_rows,
+        unverified_figures=unverified_figures,
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
@@ -293,11 +296,23 @@ def _typed_retrieval(text: str) -> TypedRetrieval | None:
     if body.startswith("```"):
         body = body.split("\n", 1)[1] if "\n" in body else ""
         body = body.rsplit("```", 1)[0].strip()
-    if not body.startswith("{"):
-        return None
     try:
-        return TypedRetrieval.model_validate(json.loads(body))
-    except (ValueError, ValidationError) as exc:
+        parsed = json.loads(body)
+    except ValueError as exc:
+        if body.startswith(("{", "[")):
+            raise ResearchUnavailableError(
+                "malformed_response", "typed answer is not valid JSON"
+            ) from exc
+        return None
+    if not isinstance(parsed, dict):
+        # Any JSON value that is not the answer object: an array, a string,
+        # a number. The model answered in JSON and not in the schema.
+        raise ResearchUnavailableError(
+            "malformed_response", "typed answer is not the answer object"
+        )
+    try:
+        return TypedRetrieval.model_validate(parsed)
+    except ValidationError as exc:
         raise ResearchUnavailableError(
             "malformed_response",
             f"typed answer did not match the schema: {type(exc).__name__}",
@@ -324,6 +339,110 @@ def _cited_rows(
     return kept[:MAX_PACKET_ROWS], uncited
 
 
+# A figure a reader would take as a fact: a number carrying a currency mark,
+# a percent sign, a decimal part, a thousands separator, a scale word or a
+# multiple. Bare integers (years, dates, counts, index names such as S&P 500)
+# are not audited. Written in English or Spanish number style.
+_FIGURE = re.compile(
+    r"(?<![\w.])"
+    r"(?P<currency>RD\$|US\$|[$€£])?\s?"
+    r"(?P<number>\d{1,3}(?:[,.]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
+    r"(?P<scale>\s?(?:mil millones|thousand|million|billion|trillion|millones|"
+    r"millón|mil|[KMBT]|[kmbt]n?)\b)?"
+    r"(?P<multiple>\s?(?:x|veces)\b)?"
+    r"(?P<percent>\s?(?:%|percent\b|por ciento\b))?"
+    r"(?P<currency_word>\s?(?:dollars|dólares|pesos|euros|USD|DOP|EUR)\b)?",
+    re.IGNORECASE,
+)
+_SCALE_FACTORS = {
+    "thousand": 1e3,
+    "mil": 1e3,
+    "k": 1e3,
+    "million": 1e6,
+    "millones": 1e6,
+    "millón": 1e6,
+    "m": 1e6,
+    "mn": 1e6,
+    "billion": 1e9,
+    "mil millones": 1e9,
+    "b": 1e9,
+    "bn": 1e9,
+    "trillion": 1e12,
+    "t": 1e12,
+    "tn": 1e12,
+}
+
+
+def _written_values(number: str) -> list[tuple[float, int]]:
+    """A written number under both conventions, with the precision it was
+    written at: 1,250 is twelve hundred fifty in English and 1.25 in Spanish,
+    and a figure matches if either reading matches a row."""
+    readings: list[tuple[float, int]] = []
+    for thousands, decimal in ((",", "."), (".", ",")):
+        candidate = number.replace(thousands, "")
+        if candidate.count(decimal) > 1:
+            continue
+        candidate = candidate.replace(decimal, ".")
+        try:
+            value = float(candidate)
+        except ValueError:
+            continue
+        precision = len(candidate.split(".", 1)[1]) if "." in candidate else 0
+        if (value, precision) not in readings:
+            readings.append((value, precision))
+    return readings
+
+
+def _unverified_figure_count(markdown: str, rows: list[RetrievedRow]) -> int:
+    """Figures the prose states that no cited row carries.
+
+    The schema cannot make the prose and the rows agree, and the model's word
+    that its prose states only row figures is never trusted. A written figure
+    is verified when some row's value, in the written units and at the
+    written precision, is the written number: 12.93 billion against
+    12930000000, 4.3% against 4.3 or the ratio 0.043, RD$1.250,50 against
+    1250.5. Prose cannot be trimmed of one claim, so one unverified figure
+    withholds the answer at the composition seam."""
+    magnitudes = [abs(row.value) for row in rows]
+    unverified = 0
+    for match in _FIGURE.finditer(markdown):
+        groups = match.groupdict()
+        number = groups["number"]
+        marked = bool(
+            groups["currency"]
+            or groups["percent"]
+            or groups["scale"]
+            or groups["multiple"]
+            or groups["currency_word"]
+            or "." in number
+            or "," in number
+        )
+        if not marked:
+            continue
+        scale = _SCALE_FACTORS.get((groups["scale"] or "").strip().lower(), 1.0)
+        percent = bool(groups["percent"])
+        if not any(
+            _figure_matches(written, precision, magnitude, scale=scale, percent=percent)
+            for written, precision in _written_values(number)
+            for magnitude in magnitudes
+        ):
+            unverified += 1
+    return unverified
+
+
+def _figure_matches(
+    written: float, precision: int, magnitude: float, *, scale: float, percent: bool
+) -> bool:
+    tolerance = 0.5 * 10 ** (-precision) + 1e-9
+    candidates = [magnitude, magnitude / scale] if scale != 1.0 else [magnitude]
+    if percent:
+        candidates.append(magnitude * 100)
+    return any(
+        abs(round(candidate, precision) - written) <= tolerance
+        for candidate in candidates
+    )
+
+
 def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None:
     """Record the compensations, so a decaying provider read is visible.
 
@@ -344,6 +463,12 @@ def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None
         logger.warning(
             "Research rows dropped for citing no retrieved page"
             f" shape={spec.shape} dropped={packet.uncited_rows} kept={len(packet.rows)}"
+        )
+    if packet.unverified_figures:
+        logger.warning(
+            "Research prose states figures no cited row carries"
+            f" shape={spec.shape} unverified={packet.unverified_figures}"
+            f" rows={len(packet.rows)}"
         )
 
 

@@ -215,6 +215,9 @@ class ResearchPacket(BaseModel):
     # Rows whose citation matched no page retrieved in the same response:
     # dropped, counted, never asserted.
     uncited_rows: int = Field(default=0, ge=0)
+    # Figures the prose states that no cited row carries. Counted at parse
+    # time; the composition seam withholds the answer on any.
+    unverified_figures: int = Field(default=0, ge=0)
     # Tool result items in the provider's output, by item type and in order.
     # This is the retrieval record; the invoice's tool counts are billing.
     tool_results: tuple[str, ...] = ()

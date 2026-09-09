@@ -447,3 +447,80 @@ def test_a_broken_typed_answer_never_reaches_the_reader(monkeypatch) -> None:
 
     _run("What is Apple at?")
     assert len(transport.requests) == 2, "a broken answer is never served from cache"
+
+
+def test_a_prose_figure_no_row_carries_withholds_the_answer(monkeypatch) -> None:
+    """Round 5: the schema cannot make the prose and the rows agree, so a
+    schema-valid answer stating a figure beyond its rows is withheld."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    partial = agent_response(
+        text=typed_answer_text(
+            "AAPL is **$200** today and up **5%** this week.",
+            [
+                retrieved_row(
+                    label="AAPL price",
+                    value=200.0,
+                    unit="USD",
+                    symbol="AAPL",
+                    source_url="https://www.perplexity.ai/finance/AAPL",
+                )
+            ],
+        ),
+        sources=["https://www.perplexity.ai/finance/AAPL"],
+    )
+    transport = _wire(monkeypatch, [partial, partial])
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_figures_unverified"}
+    answer = result.stage_patch["assistant_response"]
+    assert "5%" not in answer and "200" not in answer
+    assert sidecar["rows"] == []
+
+    _run("What is Apple at?")
+    assert len(transport.requests) == 2, "never served from cache"
+
+
+def test_prose_whose_every_figure_is_a_row_is_published(monkeypatch) -> None:
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    _wire(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "AAPL is **$200** today, up **5%** this week, as of September 8, 2026.",
+                    [
+                        retrieved_row(
+                            label="AAPL price",
+                            value=200.0,
+                            unit="USD",
+                            symbol="AAPL",
+                            source_url="https://www.perplexity.ai/finance/AAPL",
+                        ),
+                        retrieved_row(
+                            label="AAPL weekly change",
+                            value=5.0,
+                            unit="percent",
+                            symbol="AAPL",
+                            source_url="https://www.perplexity.ai/finance/AAPL",
+                        ),
+                    ],
+                ),
+                sources=["https://www.perplexity.ai/finance/AAPL"],
+            )
+        ],
+    )
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert "degraded" not in sidecar
+    assert len(sidecar["rows"]) == 2
+    assert "200" in result.stage_patch["assistant_response"]

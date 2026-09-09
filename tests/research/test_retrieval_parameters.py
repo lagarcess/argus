@@ -636,3 +636,60 @@ def test_a_survey_with_figures_is_not_retried(monkeypatch) -> None:
 
     assert result is not None
     assert len(transport.requests) == 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '[{"answer_markdown": "AAPL is $200", "rows": []}]',
+        '```json\n[{"answer_markdown": "AAPL is $200", "rows": []}]\n```',
+        '"AAPL is $200"',
+        "42",
+    ],
+)
+def test_json_that_is_not_the_answer_object_fails_closed(text: str) -> None:
+    """Round 5: an array, a string or a number root is the model answering
+    in JSON and not in the schema, never prose."""
+    client = PerplexityAgentClient(
+        "k", transport=RecordingTransport([agent_response(text=text)])
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+@pytest.mark.parametrize(
+    ("prose", "values", "unverified"),
+    [
+        ("Apple trades at **$316.22**, as of September 8, 2026.", [316.22], 0),
+        ("AAPL is $200 today and up 5%.", [200.0], 1),
+        (
+            "A **$12.93 billion** deal; shares fell 2.01% to $225.73.",
+            [12930000000.0, -2.01, 225.73],
+            0,
+        ),
+        ("A $12.9 billion deal and a $13 billion headline.", [12930000000.0], 0),
+        ("Revenue rose 16%.", [0.16], 0),
+        ("La tasa es 8,25% y el mínimo RD$1.250,50 pesos.", [8.25, 1250.5], 0),
+        ("Trades at 1.5x sales; S&P 500 fell; a 52-week high; FY2025; Q2.", [1.5], 0),
+        ("Sold 3 million shares.", [3000000.0], 0),
+        ("| BLTE | $193.61 | +13.16% |", [193.61], 1),
+        ("I could not retrieve current figures.", [], 0),
+    ],
+)
+def test_prose_figures_are_audited_against_the_rows(
+    prose: str, values: list[float], unverified: int
+) -> None:
+    """Every figure a reader would take as a fact must be some row's value in
+    the written units at the written precision; bare integers such as years,
+    dates and index names are not figures."""
+    from argus.domain.research.contracts import RetrievedRow
+    from argus.domain.research.perplexity_agent import _unverified_figure_count
+
+    rows = [
+        RetrievedRow(**retrieved_row(label=f"row {i}", value=value))
+        for i, value in enumerate(values)
+    ]
+    assert _unverified_figure_count(prose, rows) == unverified

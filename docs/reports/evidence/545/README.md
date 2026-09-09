@@ -144,6 +144,30 @@ same anomaly on both of its heads before this lane; answers are delivered and
 the invoice is recorded as unpriced, per the pricing-delivery rule. Not
 changed here.
 
+## The prose figure audit, measured on these recordings
+
+Codex round 5 pointed out that the schema cannot make the prose and the rows
+agree: a schema-valid answer can state a figure no row carries. Since
+`1f9a1eaf`'s successor, every figure the prose writes (a number with a
+currency mark, a percent sign, a decimal part, a thousands separator, a scale
+word or a multiple) must equal some row's value in the written units at the
+written precision, or the answer is withheld as `research_figures_unverified`.
+Re-parsed at head, the three typed recordings with figures come out as:
+
+| Recording | Figures in prose | Verified by a row | Outcome |
+| --- | ---: | ---: | --- |
+| `fast_quote_typed` | 1 | 1 | published |
+| `typed_rows_current_external` | 3 | 3 | published |
+| `thorough_typed_background` | 8 | 6 | withheld |
+
+The thorough comparison states the three fiscal-year revenues per company,
+all rows, and then annual and cumulative growth rates it computed from them.
+Two of those rates match no row, so the answer is withheld. That is the
+honesty line doing what the board says it should: the model routes and
+phrases, it never computes, and growth over revenues is arithmetic that
+belongs in this repository (operating rule 6). The registry lane's compute
+kernels are where that answer comes back, from the rows.
+
 ## Heads after the recordings
 
 Runtime head `7ef0055b` is what the requests and responses vouch for, and

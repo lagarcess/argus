@@ -857,10 +857,11 @@ def _has_figures(packet: ResearchPacket) -> bool:
 
 
 def _rejected_figures(packet: ResearchPacket) -> bool:
-    """The typed answer stated a figure it could not cite to a retrieved page.
-    The parser drops such rows and counts them; the prose still states the
-    figure."""
-    return packet.uncited_rows > 0
+    """The typed answer stated a figure no cited row carries: a row the
+    parser dropped for citing no retrieved page, or a figure written in the
+    prose that matches no row. Either way the prose asserts what the record
+    cannot verify."""
+    return packet.uncited_rows > 0 or packet.unverified_figures > 0
 
 
 def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
