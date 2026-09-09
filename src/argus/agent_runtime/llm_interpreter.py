@@ -30,7 +30,7 @@ from argus.agent_runtime.interpreter.discovery_focused_read import (
 from argus.agent_runtime.interpreter.research_routing import primary_research_query
 from argus.agent_runtime.interpreter.tool_calls import catalog_standalone_response, runtime_catalog_interpretation
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
-from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS
+from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.interpreter.repair_observability import (
     repair_effect_metadata,
 )
@@ -4980,7 +4980,9 @@ def _structured_interpretation_has_required_shape(
         return False
     if response.semantic_turn_act == "retry_failed_action":
         return _request_has_failed_action_launch_payload(request)
-    if response.intent not in {"calculate"}:
+    if not strategy_route_expected(
+        intent=response.intent, semantic_turn_act=response.semantic_turn_act
+    ):
         return True
     if response.semantic_turn_act == "approval":
         return True
@@ -5053,17 +5055,9 @@ def _normalize_response_for_runtime_context(
         response,
         request=request,
     )
-    response = provider_context_assets.response_with_runtime_context_assets(
-        response,
-        request=request,
-        asset_resolution_context=asset_resolution_context,
-    )
-    response = _response_with_canonical_interpreter_assets(response)
-    response = response_with_recovery_intent_window_materialized(response)
-    if _request_has_latest_result(request):
-        return response
     if (
-        response.intent in {"calculate"}
+        not _request_has_latest_result(request)
+        and response.intent in {"calculate"}
         and response.semantic_turn_act is None
         and not _request_has_active_strategy_context(request)
         and (
@@ -5084,6 +5078,15 @@ def _normalize_response_for_runtime_context(
                 ),
             }
         )
+    response = provider_context_assets.response_with_runtime_context_assets(
+        response,
+        request=request,
+        asset_resolution_context=asset_resolution_context,
+    )
+    response = _response_with_canonical_interpreter_assets(response)
+    response = response_with_recovery_intent_window_materialized(response)
+    if _request_has_latest_result(request):
+        return response
     if response.semantic_turn_act != "result_followup":
         return response
     if (
@@ -5115,17 +5118,10 @@ def _normalize_response_for_runtime_context(
         )
     if not _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
         return response
-    semantic_turn_act = response.semantic_turn_act
-    if semantic_turn_act not in {
-        "new_idea",
-        "refine_current_idea",
-        "answer_pending_need",
-    }:
-        semantic_turn_act = "new_idea"
     return response.model_copy(
         update={
             "intent": "calculate",
-            "semantic_turn_act": semantic_turn_act,
+            "semantic_turn_act": "new_idea",
             "assistant_response": None,
             "uses_latest_result_context": False,
             "reason_codes": [

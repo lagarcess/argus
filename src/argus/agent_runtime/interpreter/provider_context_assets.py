@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from argus.agent_runtime.interpreter import unsupported_request_context
+from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.llm_interpreter_types import (
     LLMAmbiguousField,
     LLMInterpretationResponse,
@@ -68,8 +69,9 @@ def carry_incomplete_asset_blocker(
     """
 
     if (
-        response.intent not in {"calculate", "follow_up"}
-        or response.semantic_turn_act == "unsupported_request"
+        not strategy_route_expected(
+            intent=response.intent, semantic_turn_act=response.semantic_turn_act
+        )
         or _all_traded_asset_mentions_accounted_for(asset_resolution_context) is not False
     ):
         return response
@@ -107,18 +109,19 @@ def response_with_provider_context_assets(
     include_unsupported_request: bool = False,
 ) -> LLMInterpretationResponse:
     response = _response_without_model_authored_provider_records(response)
-    supported_intents = {"calculate"}
-    if include_unsupported_request:
-        supported_intents.add("cannot")
-    if response.intent not in supported_intents:
+    expects_strategy_route = strategy_route_expected(
+        intent=response.intent, semantic_turn_act=response.semantic_turn_act
+    )
+    if not expects_strategy_route and not (
+        include_unsupported_request and response.intent == "cannot"
+    ):
         return response
     rows = _asset_context_rows(asset_resolution_context)
     all_traded_asset_mentions_accounted_for = _all_traded_asset_mentions_accounted_for(
         asset_resolution_context
     )
     incomplete_asset_context = (
-        response.intent in {"calculate"}
-        and all_traded_asset_mentions_accounted_for is False
+        expects_strategy_route and all_traded_asset_mentions_accounted_for is False
     )
     candidate_rows = [
         row
@@ -244,7 +247,7 @@ def response_with_provider_context_assets(
             )
         )
     resolved_missing_asset = (
-        response.intent in {"calculate"}
+        expects_strategy_route
         and "asset_universe" in response.missing_required_fields
         and bool(traded_symbols)
         and not ambiguous_fields
@@ -491,7 +494,9 @@ def response_with_canonical_interpreter_assets(
     resolve_asset_candidate: Callable[..., AssetResolution],
 ) -> LLMInterpretationResponse:
     draft = response.candidate_strategy_draft
-    if response.intent not in {"calculate"}:
+    if not strategy_route_expected(
+        intent=response.intent, semantic_turn_act=response.semantic_turn_act
+    ):
         return response
     if not draft.asset_universe:
         return response

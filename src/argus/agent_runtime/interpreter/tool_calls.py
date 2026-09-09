@@ -7,7 +7,7 @@ from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.interpreter import provider_context_assets
-from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS
+from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
@@ -27,12 +27,14 @@ def catalog_standalone_response(
     return (
         response.uses_tool_catalog
         and response.candidate_strategy_draft == type(response.candidate_strategy_draft)()
-        and response.semantic_turn_act
-        not in {
-            *STRATEGY_TURN_ACTS,
-            "result_followup",
-            "retry_failed_action",
-        }
+        and not response.requires_clarification
+        and not response.missing_required_fields
+        and not response.ambiguous_fields
+        and not response.unsupported_constraints
+        and not strategy_route_expected(
+            intent=response.intent, semantic_turn_act=response.semantic_turn_act
+        )
+        and response.semantic_turn_act not in {"result_followup", "retry_failed_action"}
     )
 
 
