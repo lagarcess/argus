@@ -37,6 +37,7 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.turn_execution import turn_execution_scope
 from argus.context.providers import build_alpaca_market_movers_packet
 from argus.domain.indicators import EXECUTABLE_INDICATORS
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import parse_date_text, shift_months
 
 
@@ -1213,7 +1214,7 @@ def test_supported_strategy_capability_uses_chat_tier_for_natural_language(
     assert "Dollar cost averaging" in answer
     assert "Executable strategy families" not in answer
     assert captured["task"] == "chat_composer"
-    assert "recurring buys/DCA" in captured["messages"][1]["content"]
+    assert STRATEGY_CAPABILITIES["dca_accumulation"].display_name in captured["messages"][1]["content"]
 
 
 def test_general_capability_education_uses_chat_tier_for_natural_language(
@@ -1432,7 +1433,7 @@ def test_standalone_event_context_uses_context_fact_bank_not_limits(
     assert expected_fact in fact_packet.lower()
     live_packet = captured["messages"][2]["content"]
     supported_packet = captured["messages"][3]["content"]
-    assert "buy and hold" in supported_packet
+    assert STRATEGY_CAPABILITIES["buy_and_hold"].display_name in supported_packet
     assert "Bollinger Band" in supported_packet
     assert "unregistered triggers" in supported_packet
     if focus == "market_movers":
@@ -1711,7 +1712,7 @@ def test_unanchored_strategy_route_uses_chat_tier_without_pending_draft(
     assert "buy and hold" in result.patch["assistant_response"]
     assert captured["task"] == "chat_composer"
     assert "Supported-strategy facts" in captured["messages"][1]["content"]
-    assert result.decision.intent == "conversation_followup"
+    assert result.decision.intent == 'follow_up'
     assert result.decision.missing_required_fields == []
     assert result.decision.candidate_strategy_draft.asset_universe == []
     assert "unanchored_strategy_route_suppressed" in result.decision.reason_codes
@@ -9610,7 +9611,7 @@ def test_active_artifact_rule_answer_repairs_and_preserves_prior_asset(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert calls[:2] == ["LLMInterpretationResponse", "FocusedStrategyExtraction"]
+    assert calls[:2] == ["LLMToolInterpretationResponse", "FocusedStrategyExtraction"]
     assert set(calls[2:]).issubset(
         {
             "LLMInterpretationResponse",
@@ -9795,7 +9796,7 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert calls[:2] == ["LLMInterpretationResponse", "LLMInterpretationResponse"]
+    assert calls[:2] == ["LLMToolInterpretationResponse", "LLMInterpretationResponse"]
     assert set(calls[2:]).issubset(
         {
             "FocusedStrategyExtraction",

@@ -96,8 +96,10 @@ envelope imports; this lane supplies the declaration and its real consumers.
   shared stamper with its explicit historical layout fixture, preserve the
   original evidence JSON, and record new observations separately.
 - Intent/catalog changes are broad: run all 68 live cases after deterministic
-  checks. Estimated reported provider cost is $1–2 for one run, based on PR
-  #565's $1.11 reported cost with some missing receipt prices; this is not a
+  checks. The initial $1–2 estimate was revised, before spending, to $1.50–$3
+  for one run after measuring the larger catalog and real dispatch topology.
+  PR #565 reported $1.11 with some missing receipt prices; its same ten
+  research-required cases reported about $0.11. The revised estimate is not a
   hard cap. State any additional paid rerun cost before running it.
 - Before readiness: fetch/reconcile integration one-way, assess semantic
   overlap, run modularity on the would-be merged tree, retain/revalidate exact

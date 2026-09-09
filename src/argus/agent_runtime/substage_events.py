@@ -14,31 +14,67 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from argus.domain.tool_contracts import ToolProgress
 
 MergeItem = tuple[str, Any]
 
-_substage_queue: contextvars.ContextVar[asyncio.Queue[MergeItem] | None] = (
-    contextvars.ContextVar("argus_substage_queue", default=None)
+
+@dataclass
+class _SubstageChannel:
+    queue: asyncio.Queue[MergeItem]
+    loop: asyncio.AbstractEventLoop
+    active: bool = True
+
+
+_substage_queue: contextvars.ContextVar[_SubstageChannel | None] = contextvars.ContextVar(
+    "argus_substage_queue", default=None
 )
 
 
-def bind_substage_channel(queue: asyncio.Queue[MergeItem]) -> contextvars.Token:
+def bind_substage_channel(
+    queue: asyncio.Queue[MergeItem],
+) -> contextvars.Token[_SubstageChannel | None]:
     """Bind for the current task and everything it starts afterwards."""
-    return _substage_queue.set(queue)
+    return _substage_queue.set(_SubstageChannel(queue, asyncio.get_running_loop()))
 
 
-def close_substage_channel(token: contextvars.Token) -> None:
+def close_substage_channel(token: contextvars.Token[_SubstageChannel | None]) -> None:
     """Reset in the same task that bound; the binding dies with its context."""
+    channel = _substage_queue.get()
+    if channel is not None:
+        channel.active = False
     _substage_queue.reset(token)
 
 
 def emit_substage(stage: str, detail: str | None = None) -> None:
     """No-op outside a bound channel, so stages never need to know the caller."""
-    queue = _substage_queue.get()
-    if queue is None:
-        return
     payload: dict[str, str] = {"stage": stage}
     if detail:
         payload["detail"] = detail
-    queue.put_nowait(("substage", payload))
+    _emit(payload)
+
+
+def emit_tool_progress(progress: ToolProgress) -> None:
+    """Publish declared facts only when the corresponding callable is invoked."""
+    _emit({"stage": "execute", "tool_progress": progress.model_dump(mode="json")})
+
+
+def _emit(payload: dict[str, Any]) -> None:
+    channel = _substage_queue.get()
+    if channel is None or not channel.active:
+        return
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+    item = ("substage", payload)
+    if current_loop is channel.loop:
+        channel.queue.put_nowait(item)
+    else:
+        # Sync backtest handlers run in a worker thread. Queue.put_nowait is
+        # not thread-safe and cannot wake an awaiting SSE consumer by itself.
+        channel.loop.call_soon_threadsafe(channel.queue.put_nowait, item)

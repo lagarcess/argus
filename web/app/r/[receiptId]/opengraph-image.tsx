@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
-import { receiptCopy } from "@/lib/receipt-copy";
+import { receiptCopy, toolReceiptSummary } from "@/lib/receipt-copy";
 import { benchmarkVerdict } from "@/lib/receipt-plan";
 import {
   readPublicReceipt,
@@ -39,6 +39,8 @@ export const alt = "Tested with Argus";
 export const PREVIEW_FIELDS = [
   "headline_metric.value",
   "benchmark_verdict",
+  "presentation.answer.value",
+  "presentation.answer.label",
 ] as const;
 
 // The card is a public artifact too: never indexed, and never cached by Argus so
@@ -69,6 +71,10 @@ function cardCopy(language: "en" | "es-419") {
 }
 
 function previewFacts(payload: PublicReceiptPayload, language: "en" | "es-419") {
+  if (payload.schema_version === 2) {
+    const summary = toolReceiptSummary(payload, language);
+    return { metricValue: summary.answer, verdict: summary.label };
+  }
   return {
     metricValue: headlineReceiptMetric(payload)?.value ?? "",
     verdict: benchmarkVerdict(payload, receiptCopy(language)) ?? "",
@@ -163,6 +169,11 @@ export default async function Image({
   }
 
   const copy = cardCopy(result.payload.content_language);
+  if (result.payload.schema_version === 2) {
+    const summary = toolReceiptSummary(result.payload, result.payload.content_language);
+    copy.provenance = summary.provenance;
+    copy.framing = summary.framing;
+  }
   const facts = previewFacts(result.payload, result.payload.content_language);
   const negative = facts.metricValue.trim().startsWith("-");
   return new ImageResponse(

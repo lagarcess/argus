@@ -1,3 +1,4 @@
+import { toolCardsFromMetadata, hasUnavailableToolCards } from "./tool-result-card";
 import {
   getConversationMessages,
   type ApiMessage,
@@ -516,6 +517,8 @@ export function hydrateTextMessageFromApi(
     role: message.role === "user" ? "user" : "ai",
     kind: "text",
     content: message.content,
+    toolResultCards: isAssistant ? toolCardsFromMetadata(metadata) : undefined,
+    hasUnavailableToolResults: isAssistant && hasUnavailableToolCards(metadata),
     mentions: mentions.length > 0 ? mentions : undefined,
     actions: actions.length > 0 ? actions : undefined,
     contentPresentation: isAssistant

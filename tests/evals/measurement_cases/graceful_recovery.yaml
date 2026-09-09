@@ -9,7 +9,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: unsupported_or_out_of_scope
+      intent: cannot
       capability_verdict: unsupported
       assets: ["AAPL"]
       asset_class: equity
@@ -31,7 +31,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: unsupported_or_out_of_scope
+      intent: cannot
       capability_verdict: unsupported
       assets: ["AAPL"]
       asset_class: equity
@@ -54,7 +54,7 @@ cases:
       offered:
         response: true
         clarification_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: needs_clarification
       assets: ["AAPL"]
       asset_class: equity

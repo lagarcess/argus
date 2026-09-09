@@ -178,6 +178,20 @@ def apply_result_link_outcome(
         dev_memory_fallback_enabled=dev_memory_fallback_enabled,
     )
     if not link_outcome.publishable:
+        # The declared card is another projection of this same withheld run.
+        # Other calls on this turn keep their own independent results.
+        bound = getattr(run, "conversation_result_card", {}).get("tool_result_cards", [])
+        call_ids = {
+            card["call_id"]
+            for card in bound
+            if isinstance(card, dict) and "call_id" in card
+        }
+        for document in (metadata, runtime_result):
+            cards = document.get("tool_result_cards")
+            if isinstance(cards, list):
+                document["tool_result_cards"] = [
+                    card for card in cards if card.get("call_id") not in call_ids
+                ]
         return ResultPublication(
             publishable=False,
             assistant_text=_withhold_refused_result_publication(

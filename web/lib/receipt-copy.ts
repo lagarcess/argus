@@ -1,3 +1,6 @@
+import { createInstance } from "i18next";
+import { localizedToolText, toolFactValue, type ToolTranslator } from "./tool-result-card";
+import type { PublicToolReceiptPayload } from "./public-receipt-contract";
 import enCommon from "@/public/locales/en/common.json";
 import esCommon from "@/public/locales/es-419/common.json";
 import { SPANISH_ENABLED, type ArgusLanguage } from "./language-features";
@@ -119,4 +122,24 @@ export function interpolate(
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) =>
     key in values ? String(values[key]) : match,
   );
+}
+
+/** The server receipt and client card resolve the same locale keys and values. */
+export function receiptToolTranslator(language: ArgusLanguage): ToolTranslator {
+  const instance = createInstance();
+  void instance.init({ lng: language, initAsync: false, fallbackLng: "en",
+    resources: { en: { translation: enCommon }, "es-419": { translation: esCommon } },
+    interpolation: { escapeValue: false },
+  });
+  return (key, values) => instance.t(key, values);
+}
+
+export function toolReceiptSummary(payload: PublicToolReceiptPayload, language: ArgusLanguage) {
+  const t = receiptToolTranslator(language);
+  return {
+    title: localizedToolText(payload.presentation.title, t),
+    answer: payload.presentation.answer ? toolFactValue(payload.presentation.answer, t, language) : "",
+    label: payload.presentation.answer ? localizedToolText(payload.presentation.answer.label, t) : "",
+    provenance: t("tools.receipt.provenance"), framing: t("tools.receipt.framing"),
+  };
 }

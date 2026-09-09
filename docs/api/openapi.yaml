@@ -5,8 +5,9 @@ openapi: 3.1.0
 info:
   title: Argus Alpha API
   version: 1.0.0-alpha
-  description: Contract-first Alpha API for chat-first investing idea validation. Durable
-    results persist as backtest_runs; result cards render as conversation_result_card artifacts.
+  description: Contract-first Alpha API for chat-first investing idea validation. Declared
+    tool answers persist as conversation artifacts; completed backtests also own immutable
+    backtest_runs.
 paths:
   /api/v1/analytics/guest-events:
     post:
@@ -1069,6 +1070,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/tool-results/{artifact_id}/public-excerpt:
+    post:
+      tags:
+      - evidence-receipts
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicToolExcerptCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptCreateResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/tool-results/{artifact_id}/recompute:
+    post:
+      tags:
+      - tool-results
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolResultRecomputeRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResultRecomputeResponse'
         '422':
           description: Validation Error
           content:
@@ -3574,6 +3663,26 @@ components:
       - created_at
       - conversation_id
       - expires_at
+    JsonValue: {}
+    LocalizedText:
+      properties:
+        locale_key:
+          type: string
+          maxLength: 160
+          minLength: 1
+        interpolation_args:
+          additionalProperties:
+            anyOf:
+            - type: boolean
+            - type: integer
+            - type: number
+            - type: string
+            - type: 'null'
+          type: object
+      additionalProperties: false
+      type: object
+      required:
+      - locale_key
     LoginRequest:
       properties:
         email:
@@ -4393,7 +4502,13 @@ components:
             type: string
           type: array
         date_range:
-          $ref: '#/components/schemas/PublicExcerptDateRange'
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptDateRange'
+          - type: 'null'
+        title_facts:
+          anyOf:
+          - $ref: '#/components/schemas/LocalizedText'
+          - type: 'null'
         created_at:
           type: string
           format: date-time
@@ -4416,7 +4531,6 @@ components:
       - public_id
       - path
       - title
-      - date_range
       - created_at
       description: One row of the owner's receipt list in Data Controls.
     PublicExcerptListResponse:
@@ -4598,7 +4712,14 @@ components:
           - type: 'null'
         payload:
           anyOf:
-          - $ref: '#/components/schemas/PublicExcerptPayload'
+          - oneOf:
+            - $ref: '#/components/schemas/PublicExcerptPayload'
+            - $ref: '#/components/schemas/PublicToolExcerptPayload'
+            discriminator:
+              propertyName: schema_version
+              mapping:
+                '1': '#/components/schemas/PublicExcerptPayload'
+                '2': '#/components/schemas/PublicToolExcerptPayload'
           - type: 'null'
       additionalProperties: false
       type: object
@@ -4628,7 +4749,7 @@ components:
       required:
       - kind
       - series
-      description: Frozen visual evidence. No series is fetched at view time.
+      description: Frozen visual evidence shared by cards and receipts, without a later fetch.
     PublicExcerptVisualPoint:
       properties:
         time:
@@ -4640,6 +4761,84 @@ components:
       required:
       - time
       - value
+    PublicToolExcerptCreate:
+      properties:
+        owner_note:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+        message_id:
+          type: string
+          format: uuid
+        input_revision:
+          type: integer
+          minimum: 0.0
+      additionalProperties: false
+      type: object
+      required:
+      - message_id
+      - input_revision
+    PublicToolExcerptPayload:
+      properties:
+        schema_version:
+          type: integer
+          const: 2
+          default: 2
+        card_type:
+          type: string
+        card_version:
+          type: integer
+          minimum: 1.0
+        presentation:
+          $ref: '#/components/schemas/ToolCardPresentation'
+        owner_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        content_language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        framing:
+          type: string
+          const: computed_result_not_advice
+          default: computed_result_not_advice
+        provenance_mark:
+          type: string
+          const: computed_with_argus
+          default: computed_with_argus
+      additionalProperties: false
+      type: object
+      required:
+      - card_type
+      - card_version
+      - presentation
+      description: Version two freezes the same card facts, never private execution inputs.
+    ResearchSource:
+      properties:
+        url:
+          type: string
+        title:
+          type: string
+          default: ''
+        source_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - url
+      description: 'One citation the packet actually returned.
+
+
+        Web search citations arrive in their own output items and, for some
+
+        models, as annotations on the answer chunk. Both are the same evidence
+
+        and both land here; provider-identity URLs never do.'
     RetrievedMemoryOut:
       properties:
         record:
@@ -5089,6 +5288,136 @@ components:
       type: object
       required:
       - success
+    ToolCardPresentation:
+      properties:
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        answer:
+          anyOf:
+          - $ref: '#/components/schemas/ToolFact'
+          - type: 'null'
+        narrative:
+          anyOf:
+          - type: string
+          - type: 'null'
+        sources:
+          items:
+            $ref: '#/components/schemas/ResearchSource'
+          type: array
+        visual:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptVisual'
+          - type: 'null'
+        rows:
+          items:
+            $ref: '#/components/schemas/ToolFact'
+          type: array
+        inputs:
+          items:
+            $ref: '#/components/schemas/ToolInputFact'
+          type: array
+        notes:
+          items:
+            $ref: '#/components/schemas/LocalizedText'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - title
+    ToolFact:
+      properties:
+        name:
+          type: string
+        label:
+          $ref: '#/components/schemas/LocalizedText'
+        value:
+          anyOf:
+          - type: boolean
+          - type: integer
+          - type: number
+          - type: string
+          - type: 'null'
+        value_text:
+          anyOf:
+          - $ref: '#/components/schemas/LocalizedText'
+          - type: 'null'
+        unit:
+          anyOf:
+          - $ref: '#/components/schemas/LocalizedText'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - label
+      - value
+    ToolInputFact:
+      properties:
+        name:
+          type: string
+        label:
+          $ref: '#/components/schemas/LocalizedText'
+        value:
+          anyOf:
+          - type: boolean
+          - type: integer
+          - type: number
+          - type: string
+          - type: 'null'
+        value_text:
+          anyOf:
+          - $ref: '#/components/schemas/LocalizedText'
+          - type: 'null'
+        unit:
+          anyOf:
+          - $ref: '#/components/schemas/LocalizedText'
+          - type: 'null'
+        editable:
+          type: boolean
+          default: false
+        unknown:
+          type: boolean
+          default: false
+        visibility:
+          type: string
+          enum:
+          - public
+          - private
+          default: private
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - label
+      - value
+    ToolResultRecomputeRequest:
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        input_revision:
+          type: integer
+          minimum: 0.0
+        arguments:
+          additionalProperties:
+            $ref: '#/components/schemas/JsonValue'
+          type: object
+          maxProperties: 32
+          minProperties: 1
+      additionalProperties: false
+      type: object
+      required:
+      - message_id
+      - input_revision
+      - arguments
+    ToolResultRecomputeResponse:
+      properties:
+        message:
+          $ref: '#/components/schemas/Message'
+      additionalProperties: false
+      type: object
+      required:
+      - message
     UnboundedAllowance:
       properties:
         hour:

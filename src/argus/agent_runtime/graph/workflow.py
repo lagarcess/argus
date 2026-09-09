@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from enum import Enum
-from typing import Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
+
+if TYPE_CHECKING:
+    from argus.domain.tool_declaration import ToolCatalog
 
 from argus.agent_runtime.artifacts.lifecycle import (
     RetryLifecycleDecision,
@@ -94,6 +97,7 @@ class WorkflowState(TypedDict, total=False):
     next_experiments: dict[str, Any]
     research: dict[str, Any]
     research_job_request: dict[str, Any]
+    tool_effects: list[dict[str, Any]]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -124,6 +128,7 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "next_experiments",
         "research",
         "research_job_request",
+        "tool_effects",
     }
 )
 
@@ -154,6 +159,7 @@ def build_workflow(
     structured_interpreter: StructuredInterpreter | None = None,
     clarification_generator: StructuredClarificationGenerator | None = None,
     checkpointer: Any | None = None,
+    tool_catalog: ToolCatalog | None = None,
 ):
     active_contract = contract or build_default_capability_contract()
     active_tool = tool or DefaultBacktestTool()
@@ -176,6 +182,7 @@ def build_workflow(
             state,
             tool=active_tool,
             max_retries=max_retries,
+            catalog=tool_catalog,
         )
 
     graph = StateGraph(WorkflowState)
@@ -251,16 +258,37 @@ async def _interpret_node_async(
     *,
     structured_interpreter: StructuredInterpreter | None,
 ) -> WorkflowState:
-    return _apply_stage_result(
-        state,
-        await interpret_stage_async(
-            state=_run_state(state),
-            user=_user(state),
-            latest_task_snapshot=state.get("latest_task_snapshot"),
-            selected_thread_metadata=state.get("selected_thread_metadata", {}),
-            structured_interpreter=structured_interpreter,
-        ),
+    result = await interpret_stage_async(
+        state=_run_state(state),
+        user=_user(state),
+        latest_task_snapshot=state.get("latest_task_snapshot"),
+        selected_thread_metadata=state.get("selected_thread_metadata", {}),
+        structured_interpreter=structured_interpreter,
     )
+    snapshot = state.get("latest_task_snapshot")
+    action = _run_state(state).structured_action
+    if (
+        result.outcome == "approved_for_execution"
+        and not result.patch.get("tool_calls")
+        and action is not None
+        and action.type == "run_backtest"
+        and snapshot is not None
+        and snapshot.pending_tool_calls
+    ):
+        calls = list(snapshot.pending_tool_calls)
+        if calls[0].tool_name == "backtest":
+            strategy = StrategySummary.model_validate(
+                result.patch.get(
+                    "candidate_strategy_draft", _run_state(state).candidate_strategy_draft
+                )
+            )
+            # Confirmation may materialize defaults or an executable data window.
+            # Its canonical strategy replaces only the call just approved.
+            calls[0] = calls[0].model_copy(
+                update={"arguments": {"strategy": strategy.model_dump(mode="json")}}
+            )
+            result.stage_patch["tool_calls"] = calls
+    return _apply_stage_result(state, result)
 
 
 async def _clarify_node_async(
@@ -286,6 +314,7 @@ async def _execute_node_async(
     *,
     tool: Any,
     max_retries: int,
+    catalog: ToolCatalog | None = None,
 ) -> WorkflowState:
     run_state = _run_state(state)
     launch_payload = state.get("confirmation_payload")
@@ -299,6 +328,8 @@ async def _execute_node_async(
             tool=tool,
             max_retries=max_retries,
             language=_user(state).language_preference,
+            catalog=catalog,
+            user=_user(state),
         ),
     )
 
@@ -330,6 +361,17 @@ def _apply_stage_result(
         patch=result.patch,
     )
     cleared_output_keys = set(_TURN_SCOPED_OUTPUT_KEYS)
+    effects = state.get("tool_effects")
+    current_call_ids = {record.call_id for record in _run_state(state).tool_call_records}
+    if (
+        "tool_effects" not in result.patch
+        and isinstance(effects, list)
+        and effects
+        and all(effect.get("call_id") in current_call_ids for effect in effects)
+    ):
+        # Explain and confirm may follow execution. Effects must reach the one
+        # publication boundary, but a new RunState cannot replay the prior turn.
+        cleared_output_keys.discard("tool_effects")
     if (
         outcome is WorkflowStageOutcome.END_RUN
         and "assistant_response" not in result.patch
@@ -484,6 +526,13 @@ def _build_task_snapshot(
     )
     return TaskSnapshot(
         latest_task_type=run_state.intent,
+        pending_tool_calls=(
+            list(run_state.tool_calls)
+            if run_state.tool_calls
+            else list(prior_task_snapshot.pending_tool_calls)
+            if preserve_pending_strategy and prior_task_snapshot is not None
+            else []
+        ),
         completed=completed,
         pending_strategy_summary=pending_strategy_summary,
         confirmed_strategy_summary=(
@@ -622,16 +671,18 @@ def _current_failed_action_reference(
     current_failed = latest_failed_action_reference or prior_failed
     if current_failed is None:
         return None
-    decision = retry_lifecycle_after_artifact_event(
-        retry_artifact_id=current_failed.artifact_id,
-        latest_failed_artifact_id=current_failed.artifact_id,
-        new_artifact_kind=_latest_artifact_kind_after(
-            artifact_references=artifact_references,
-            index=latest_failed_index,
-        ),
-    )
-    if decision is not RetryLifecycleDecision.ACTIVE:
-        return None
+    subsequent = artifact_references[
+        0 if latest_failed_index is None else latest_failed_index + 1 :
+    ]
+    for reference in subsequent:
+        decision = retry_lifecycle_after_artifact_event(
+            retry_artifact_id=current_failed.artifact_id,
+            latest_failed_artifact_id=current_failed.artifact_id,
+            new_artifact_kind=reference.artifact_kind,
+            new_tool_result=reference.metadata,
+        )
+        if decision is not RetryLifecycleDecision.ACTIVE:
+            return None
     return current_failed
 
 
@@ -644,20 +695,6 @@ def _latest_artifact_index(
         if artifact_references[index].artifact_kind == artifact_kind:
             return index
     return None
-
-
-def _latest_artifact_kind_after(
-    *,
-    artifact_references: list[ArtifactReference],
-    index: int | None,
-) -> str | None:
-    if not artifact_references:
-        return None
-    if index is None:
-        return artifact_references[-1].artifact_kind
-    if index >= len(artifact_references) - 1:
-        return None
-    return artifact_references[-1].artifact_kind
 
 
 def _strategy_summary_has_content(strategy: StrategySummary) -> bool:

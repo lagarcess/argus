@@ -17,13 +17,14 @@ from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_requirements import (
     valid_rule_spec_from_strategy as _valid_rule_spec_from_strategy,
 )
-from argus.domain.indicators import executable_indicator_spec
+from argus.domain.indicators import EXECUTABLE_INDICATORS, executable_indicator_spec
 
 
 def _supported_experiment_fact_packet() -> str:
     families = "; ".join(EXECUTABLE_STRATEGY_FAMILIES)
+    indicators = ", ".join(spec.label for spec in EXECUTABLE_INDICATORS.values())
     return (
-        f"{families}. Macro, news, corporate-action, and movers context may frame "
+        f"{families}. Signal rules may use registered indicators: {indicators}. Macro, news, corporate-action, and movers context may frame "
         "a question or explain backdrop, but cannot alter simulation truth or become "
         "the executable rule. Suggested next experiments must stay inside these "
         "families instead of inventing unregistered triggers or holding-period rules."

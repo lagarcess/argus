@@ -77,7 +77,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: approved_for_execution
       assets: ["AAPL"]
       asset_class: equity
@@ -150,7 +150,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
       asset_class: equity
@@ -229,7 +229,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA", "TSLA"]
       asset_class: equity
@@ -308,7 +308,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT", "NVDA", "TSLA", "GOOGL"]
       asset_class: equity
@@ -387,7 +387,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA"]
       asset_class: equity
@@ -429,7 +429,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
       asset_class: equity
@@ -471,7 +471,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
       asset_class: equity
@@ -512,7 +512,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT", "TSLA", "AMD"]
       asset_class: equity
@@ -554,7 +554,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT", "NVDA"]
       asset_class: equity
@@ -596,7 +596,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: [strategy_drafting, backtest_execution]
+      intent: calculate
       capability_verdict: executable
       assets: ["TSLA"]
       asset_class: equity
@@ -620,7 +620,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: [strategy_drafting, backtest_execution]
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT"]
       asset_class: equity
@@ -730,7 +730,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["MSFT", "AAPL"]
       asset_class: equity
@@ -816,7 +816,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: backtest_execution
+      intent: calculate
       capability_verdict: executable
       assets: ["LOW", "HD"]
       asset_class: equity
@@ -1045,7 +1045,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: [strategy_drafting, backtest_execution]
+      intent: calculate
       capability_verdict: executable
       assets: ["NVDA"]
       asset_class: equity
@@ -1309,7 +1309,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: [strategy_drafting, backtest_execution]
+      intent: calculate
       capability_verdict: executable
       assets: ["NVDA"]
       asset_class: equity

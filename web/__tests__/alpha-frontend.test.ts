@@ -1034,9 +1034,9 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(chat).toContain('event.event === "stage_start"');
-    expect(chat).toContain("chat.status.${event.data.stage}");
-    expect(locale).toContain('"interpret": "Understanding your idea..."');
-    expect(locale).toContain('"execute": "Running backtest..."');
+    expect(chat).toContain("toolProgressText(event.data.tool_progress ?? null, t)");
+    expect(locale).not.toContain('"interpret": "Understanding your idea..."');
+    expect(locale).not.toContain('"execute": "Running backtest..."');
   });
 
   test("latest pending assistant response hides feedback before stage_start arrives", () => {

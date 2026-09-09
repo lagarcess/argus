@@ -24,6 +24,7 @@ Run the mocked harness checks with:
 
 ```bash
 poetry run pytest tests/evals/test_measurement_eval_harness.py \
+  tests/evals/test_measurement_registry_dispatch.py \
   tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
@@ -38,6 +39,23 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py \
 
 This run is free. It does not call the LLM, does not spend provider tokens, and
 is safe to run anywhere.
+
+The measurement harness follows declared calls through the production execute
+stage. A fresh backtest call reaches its real confirmation and stops there;
+Run-button fixtures still stop at validated approval. Research calls execute
+through their existing provider owners in a sanctioned live run. Mocked tests
+cover zero calls, repeated calls, composed calls, the confirmation handoff, and
+bounded or unavailable results without contacting a provider.
+
+Scorecards retain the full `execution_trace`, raw `stage_outcomes`, selected
+`tool_calls`, arguments, records, and result cards. `acceptance_stage_outcomes`
+keeps the older fixture milestones comparable: it removes the interpreter's
+new dispatch-scheduling edge only after an actual registered execute stage
+returns, retaining that stage's outcome. Intent expectations use the four
+canonical names; historical fixtures and scorecard labels normalize through
+the same state-model compatibility owner. Discovery's original typed facts
+are checked against actual peer-expansion arguments, and its original delivery
+checks remain unchanged. No prompt-to-tool-name expectation is added.
 
 ## Search Provider Evaluation (Issue #244)
 

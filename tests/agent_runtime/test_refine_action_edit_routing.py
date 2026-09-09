@@ -132,7 +132,7 @@ async def test_refine_reply_routes_to_edit_planner_and_applies_asset_edit(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",
@@ -211,7 +211,7 @@ async def test_refine_reply_reaches_edit_planner_when_general_model_fails(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             raise ValueError("general interpreter returned unusable JSON")
         return _replace_asset_plan_stub(schema_model)
 
@@ -233,7 +233,7 @@ async def test_refine_reply_reaches_edit_planner_when_general_model_fails(
         _refine_state_request("change the asset to NVDA")
     )
 
-    assert calls[0] == "LLMInterpretationResponse"
+    assert calls[0] == "LLMToolInterpretationResponse"
     assert "ArtifactAssumptionEditPlan" in calls
     assert result is not None
     assert "artifact_assumption_edit_planned" in result.reason_codes
@@ -510,7 +510,7 @@ async def test_refine_date_window_reply_routes_to_edit_planner(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",
@@ -570,7 +570,7 @@ async def test_refine_date_window_reply_routes_to_edit_planner(
 
     assert result is not None
     # Direct readiness route: no fallback or repair detours.
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert "artifact_assumption_edit_planned" in result.reason_codes
     assert result.candidate_strategy_draft.date_range == {
         "start": "2021-01-01",
@@ -605,7 +605,7 @@ async def test_refine_cadence_reply_routes_to_edit_planner(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",
@@ -653,7 +653,7 @@ async def test_refine_cadence_reply_routes_to_edit_planner(
 
     assert result is not None
     # Direct readiness route: no fallback or repair detours.
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert "artifact_assumption_edit_planned" in result.reason_codes
     assert result.candidate_strategy_draft.cadence == "weekly"
 
@@ -684,7 +684,7 @@ async def test_refine_same_period_planner_edit_binds_latest_result_window(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="continue",

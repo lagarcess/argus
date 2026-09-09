@@ -662,8 +662,10 @@ def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
     prompt = interpreter._system_prompt()
 
     assert "currency pairs" in prompt
-    assert "currency pair benchmark is the tested pair itself" in prompt
-    assert "Kraken" in prompt
+    declaration = interpreter.tool_catalog.get("backtest")
+    assert declaration is not None
+    assert "Default benchmark for currency_pair: first_tested_symbol." in declaration.domain
+    assert interpreter.tool_catalog.capability_text() in prompt
 
 def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus() -> None:
     interpreter = OpenRouterStructuredInterpreter(
@@ -1566,7 +1568,7 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             raise ValueError("general interpreter returned unusable JSON")
         return schema_model(
             outcome="ready_to_confirm",
@@ -1610,10 +1612,10 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
         )
     )
 
-    assert calls[0] == "LLMInterpretationResponse"
+    assert calls[0] == "LLMToolInterpretationResponse"
     assert "ArtifactAssumptionEditPlan" in calls
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.capital_amount == 5000
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
@@ -1653,7 +1655,7 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_after_prose_only_
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="conversation_followup",
                 task_relation="continue",
@@ -1714,9 +1716,9 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_after_prose_only_
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.assistant_response is None
     assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
@@ -1748,7 +1750,7 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="continue",
@@ -1805,10 +1807,10 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
         )
     )
 
-    assert calls[0] == "LLMInterpretationResponse"
+    assert calls[0] == "LLMToolInterpretationResponse"
     assert "ArtifactAssumptionEditPlan" in calls
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.candidate_strategy_draft.capital_amount == 5000
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
         "capital_amount": "starting_capital",
@@ -1840,7 +1842,7 @@ async def test_llm_interpreter_plans_active_artifact_asset_append_after_model_fa
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             raise TimeoutError("general interpreter timed out")
         return schema_model(
             outcome="ready_to_confirm",
@@ -1890,10 +1892,10 @@ async def test_llm_interpreter_plans_active_artifact_asset_append_after_model_fa
         )
     )
 
-    assert calls[0] == "LLMInterpretationResponse"
+    assert calls[0] == "LLMToolInterpretationResponse"
     assert "ArtifactAssumptionEditPlan" in calls
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
     assert result.candidate_strategy_draft.extra_parameters[
@@ -1950,7 +1952,7 @@ async def test_llm_interpreter_routes_active_confirmation_compound_asset_edit_to
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="continue",
@@ -2069,9 +2071,9 @@ async def test_llm_interpreter_routes_active_confirmation_compound_asset_edit_to
         )
     )
 
-    assert calls[:2] == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls[:2] == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.candidate_strategy_draft.asset_universe == [
         "AAPL",
         "TSLA",
@@ -2144,7 +2146,7 @@ async def test_llm_interpreter_routes_messy_scalar_asset_edit_to_planner(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="continue",
@@ -2260,9 +2262,9 @@ async def test_llm_interpreter_routes_messy_scalar_asset_edit_to_planner(
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.candidate_strategy_draft.asset_universe == [
         "AAPL",
         "TSLA",
@@ -2320,7 +2322,7 @@ async def test_llm_interpreter_routes_lowercase_ticker_asset_edit_to_planner(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="continue",
@@ -2417,9 +2419,9 @@ async def test_llm_interpreter_routes_lowercase_ticker_asset_edit_to_planner(
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.candidate_strategy_draft.asset_universe == [
         "AAPL",
         "TSLA",
@@ -2452,7 +2454,7 @@ async def test_llm_interpreter_allows_rsi_threshold_edit_from_active_confirmatio
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="conversation_followup",
                 task_relation="continue",
@@ -2552,9 +2554,9 @@ async def test_llm_interpreter_allows_rsi_threshold_edit_from_active_confirmatio
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     parameters = result.candidate_strategy_draft.extra_parameters[
         "indicator_parameters"
     ]
@@ -2592,7 +2594,7 @@ async def test_llm_interpreter_rejects_rsi_threshold_edit_on_buy_hold_card(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="conversation_followup",
                 task_relation="continue",
@@ -2670,9 +2672,9 @@ async def test_llm_interpreter_rejects_rsi_threshold_edit_on_buy_hold_card(
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent != "backtest_execution"
+    assert result.intent != 'calculate'
     assert result.requires_clarification
     assert result.candidate_strategy_draft.strategy_type != "indicator_threshold"
     assert "indicator_parameters" not in result.candidate_strategy_draft.extra_parameters
@@ -2701,7 +2703,7 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_edit_after_model_
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="conversation_followup",
                 task_relation="continue",
@@ -2764,10 +2766,10 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_edit_after_model_
         )
     )
 
-    assert calls[0] == "LLMInterpretationResponse"
+    assert calls[0] == "LLMToolInterpretationResponse"
     assert "ArtifactAssumptionEditPlan" in calls
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.asset_universe == []
     assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
@@ -2800,7 +2802,7 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_edit_when_model_r
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="continue",
@@ -2868,9 +2870,9 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_edit_when_model_r
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.asset_universe == []
     assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
@@ -2903,7 +2905,7 @@ async def test_llm_interpreter_plans_active_artifact_asset_operation_when_model_
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="refine",
@@ -2970,9 +2972,9 @@ async def test_llm_interpreter_plans_active_artifact_asset_operation_when_model_
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.asset_universe == ["GOOGL", "NVDA"]
     assert result.candidate_strategy_draft.extra_parameters[
@@ -3454,7 +3456,7 @@ def test_signal_rule_plan_promotes_macd_crossover_to_ready_rule_spec() -> None:
         ),
     )
 
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.requires_clarification is False
     assert repaired.assistant_response is None
     assert repaired.candidate_strategy_draft.rule_spec == rule_spec
@@ -3508,7 +3510,7 @@ def test_signal_rule_plan_ready_drops_unplanned_risk_rules() -> None:
         ),
     )
 
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.candidate_strategy_draft.rule_spec == rule_spec
     assert repaired.candidate_strategy_draft.risk_rules == []
 
@@ -3536,7 +3538,7 @@ def test_signal_rule_plan_draft_only_routes_to_unsupported_recovery() -> None:
         ),
     )
 
-    assert repaired.intent == "unsupported_or_out_of_scope"
+    assert repaired.intent == 'cannot'
     assert repaired.semantic_turn_act == "unsupported_request"
     assert repaired.missing_required_fields == []
     assert repaired.candidate_strategy_draft.strategy_type is None
@@ -3638,7 +3640,7 @@ async def test_supported_signal_rule_recovery_rescues_underfilled_ma_crossover(
     )
 
     assert repaired is not None
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.requires_clarification is False
     assert repaired.unsupported_constraints == []
     assert repaired.candidate_strategy_draft.strategy_type == "signal_strategy"
@@ -3748,7 +3750,7 @@ async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
     )
 
     draft = repaired.candidate_strategy_draft
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.requires_clarification is False
     assert "focused_strategy_extraction_repair" in repaired.reason_codes
     assert draft.asset_universe == ["TSLA"]
@@ -3856,7 +3858,7 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     )
 
     draft = repaired.candidate_strategy_draft
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.requires_clarification is False
     assert repaired.assistant_response is None
     assert "focused_strategy_extraction_repair" in repaired.reason_codes
@@ -3963,7 +3965,7 @@ async def test_structured_signal_draft_canonicalizes_interpreter_asset(
     )
 
     draft = repaired.candidate_strategy_draft
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.requires_clarification is False
     assert repaired.assistant_response is None
     assert repaired.missing_required_fields == []
@@ -4144,7 +4146,7 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
 
     draft = repaired.candidate_strategy_draft
     assert calls == ["signal_rule_plan", "field_fidelity_audit"]
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.requires_clarification is False
     assert repaired.unsupported_constraints == []
     assert draft.strategy_type == "signal_strategy"
@@ -4343,7 +4345,7 @@ async def test_vague_valuation_idea_is_audited_before_buy_hold_confirmation(
         assert response.candidate_strategy_draft.strategy_type == "buy_and_hold"
         assert "looked cheap" in request.current_user_message
         repaired = response.model_copy(deep=True)
-        repaired.intent = "strategy_drafting"
+        repaired.intent = "calculate"
         repaired.requires_clarification = True
         repaired.assistant_response = (
             "Cheap can mean valuation, but I need a testable proxy before running it."
@@ -4395,7 +4397,7 @@ async def test_vague_valuation_idea_is_audited_before_buy_hold_confirmation(
     )
 
     assert calls == ["strategy_grounding_audit"]
-    assert repaired.intent == "strategy_drafting"
+    assert repaired.intent == 'calculate'
     assert repaired.requires_clarification is True
     assert repaired.assistant_response
     assert "entry_logic" in repaired.missing_required_fields

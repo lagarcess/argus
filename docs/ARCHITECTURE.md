@@ -446,9 +446,9 @@ HTTP POST /api/v1/chat/stream (SSE)
     │
     ▼
 [LangGraph: astream_events()]
-    ├── [interpret]  LLM classifies intent, extracts strategy fields, detects semantic_turn_act.
-    │                Post-LLM validation only: symbol resolution, asset parity, date limits,
-    │                missing required fields. → streams stage_start event immediately.
+    ├── [interpret]  LLM reads the executable catalog and produces zero or more typed calls,
+    │                a response, or an incomplete strategy draft. Post-LLM validation owns
+    │                argument/domain rules, symbol resolution, parity and date limits.
     │
     ├── [clarify]    if needs_clarification → LLM generates context-aware question.
     │                No hardcoded prompt templates. → streams question tokens.
@@ -456,10 +456,12 @@ HTTP POST /api/v1/chat/stream (SSE)
     ├── [confirm]    if ready_for_confirmation → deterministic confirmation card assembly.
     │                → streams stage_outcome event; frontend renders card.
     │
-    ├── [execute]    if approved_for_execution → RealBacktestTool call.
-    │                → streams stage_start event; frontend shows "Running backtest..."
+    ├── [execute]    declaration policy gates the actual callable before any launch payload.
+    │                Local calls return immediately; backtests retain confirmation and jobs.
+    │                → streams declaration-owned tool_progress with typed argument facts.
     │
-    ├── [explain]    if execution_succeeded → LLM generates result narrative from metrics.
+    ├── [explain]    backtest success → LLM generates result narrative from metrics.
+    │                Direct tool answers use their typed result/card binding without this call.
     │                → streams explanation tokens.
     │
     └── [next_step]  LLM suggests follow-up actions. → streams next-step chips.
@@ -470,6 +472,47 @@ HTTP POST /api/v1/chat/stream (SSE)
     ▼
 SSE stream: done event with final payload
 ```
+
+### Executable tool declarations
+
+`domain/capability_registry.py:get_tool_catalog` is the catalog assembly point.
+Each declaration binds a real callable's typed argument and return models to its
+description, cross-argument rules, domain and units, failure semantics, execution
+cost, confirmation callback, progress template, and versioned card presenter.
+The model-facing schema, capability text, runtime dispatch and result projection
+derive from those declarations. Availability derives from the same feature-flag
+owner that guards execution. Strategy templates retain their existing registry
+and strategy-specific unsupported-admission checks.
+
+The four task intents are `explain`, `calculate`, `follow_up`, and `cannot`.
+Compatibility readers normalize older persisted spellings. An intent is not a
+question-to-tool classifier: the model may request no calls, different tools, or
+the same tool repeatedly, each with its own call identity and typed arguments.
+No-call catalog responses do not fall into the legacy research classifier.
+Incomplete backtest drafting still uses its structured strategy draft; a response
+with tool calls cannot carry a competing top-level strategy draft.
+
+Neutral `domain/tool_contracts.py` transports never import the catalog or a
+backtest implementation. The serializer-pinned runtime model class paths remain
+unchanged. Declaration validation and invocation distinguish `succeeded`,
+`invalid`, `ambiguous`, `bounded`, and `unavailable`; unsuccessful outcomes cannot
+carry a result or present an answer. Cross-argument null rules count `None`;
+zero remains a known value. This lane registers existing operations and creates
+no production financial calculator.
+
+`tool_result_cards` and per-call `tool_jobs` retain each call's identity through
+streaming, publication, worker completion and reload. Existing worker, quota,
+cost-ledger and backtest persistence owners remain authoritative. The shared card
+presenter owns display facts and units, while the callable owns the typed result.
+Local editable tools recompute through the existing guarded message-artifact
+writer; the original unknown remains blank and the input revision advances with
+the result. Public receipt v2 freezes a sanitized projection of that same card
+binding, with private narrative and request input excluded.
+
+Progress is a declaration locale key with typed argument interpolation emitted
+when its call executes. Graph-stage events retain operational meaning and cannot
+select product status prose. A stage without tool progress renders only a neutral
+loading indicator. Progress requires no extra model invocation.
 
 ### NLU Ownership Rule
 

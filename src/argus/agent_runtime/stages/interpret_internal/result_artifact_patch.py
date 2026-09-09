@@ -258,14 +258,14 @@ def _decision_allows_deterministic_result_patch(
         return False
     if decision.context_question_focus is not None:
         return False
-    if decision.intent == "unsupported_or_out_of_scope" or (
+    if decision.intent == "cannot" or (
         decision.semantic_turn_act == "unsupported_request"
     ):
         return not strategy_has_structured_non_patch_evidence(
             strategy=decision.candidate_strategy_draft,
             patch_fields=patch_fields,
         )
-    if decision.intent in {"beginner_guidance", "collection_management"}:
+    if decision.intent in {"explain", "cannot"}:
         return False
     if decision.semantic_turn_act in {
         "approval",
@@ -277,7 +277,7 @@ def _decision_allows_deterministic_result_patch(
     if decision.artifact_target == "latest_result":
         return True
     return (
-        decision.intent in {"backtest_execution", "strategy_drafting"}
+        decision.intent in {"calculate"}
         or decision.task_relation == "refine"
         or decision.semantic_turn_act
         in {"answer_pending_need", "refine_current_idea", "result_followup"}
@@ -308,7 +308,7 @@ def _stage_result_from_result_artifact_patch(
     )
     refined_decision = decision.model_copy(
         update={
-            "intent": "backtest_execution",
+            "intent": "calculate",
             "task_relation": "refine",
             "requires_clarification": has_blocking_validation,
             "candidate_strategy_draft": patched,

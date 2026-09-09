@@ -12,7 +12,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["SPY"]
       asset_class: equity
@@ -41,7 +41,7 @@ cases:
       offered:
         response: true
         clarification_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: needs_clarification
       assets: ["SPY"]
       asset_class: equity
@@ -61,7 +61,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: unsupported
       assets: ["VOO"]
       asset_class: equity
@@ -82,7 +82,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: unsupported
       assets: ["VOO"]
       asset_class: equity
@@ -102,7 +102,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["SPY"]
       asset_class: equity
@@ -133,7 +133,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["SPY"]
       asset_class: equity
@@ -164,7 +164,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: unsupported
       assets: ["AAPL"]
       asset_class: equity
@@ -186,7 +186,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: unsupported
       assets: ["SPY"]
       asset_class: equity
@@ -208,7 +208,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["AAPL"]
       asset_class: equity
@@ -237,7 +237,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA"]
       asset_class: equity
@@ -265,7 +265,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["BTC"]
       asset_class: crypto
@@ -294,7 +294,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: unsupported
       assets: ["RDDT"]
       asset_class: equity
@@ -313,7 +313,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["SPY"]
       asset_class: equity
@@ -343,7 +343,7 @@ cases:
         response: true
         clarification_matches_expected: true
         min_recovery_options: 1
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: unsupported
       assets: ["AAPL"]
       asset_class: equity
@@ -381,7 +381,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["KO"]
       asset_class: equity
@@ -414,7 +414,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: ["backtest_execution", "strategy_drafting"]
+      intent: calculate
       capability_verdict: executable
       assets: ["KO"]
       asset_class: equity

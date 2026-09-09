@@ -348,7 +348,7 @@ def _reconcile_repaired_assets_with_provider_grounding(
 
 def _base_response_was_unsupported(response: LLMInterpretationResponse) -> bool:
     return bool(
-        response.intent == "unsupported_or_out_of_scope"
+        response.intent == "cannot"
         or response.semantic_turn_act == "unsupported_request"
         or response.unsupported_constraints
     )
@@ -519,7 +519,7 @@ def response_from_focused_strategy_extraction(
             extraction_date_range = resolved_date_intent.payload
     if strategy_type is None:
         return LLMInterpretationResponse(
-            intent="unsupported_or_out_of_scope",
+            intent="cannot",
             task_relation="new_task",
             requires_clarification=True,
             user_goal_summary=extraction.user_goal_summary,
@@ -579,9 +579,9 @@ def response_from_focused_strategy_extraction(
             semantic_turn_act="unsupported_request",
         )
     response = LLMInterpretationResponse(
-        intent="strategy_drafting"
+        intent="calculate"
         if extraction.requires_clarification
-        else "backtest_execution",
+        else "calculate",
         task_relation="continue" if is_pending_strategy_answer else "new_task",
         requires_clarification=extraction.requires_clarification,
         user_goal_summary=extraction.user_goal_summary,
@@ -637,7 +637,7 @@ def response_from_focused_strategy_extraction(
         )
     )
     if response.missing_required_fields or response.ambiguous_fields:
-        response.intent = "strategy_drafting"
+        response.intent = "calculate"
         response.requires_clarification = True
         response.assistant_response = None
     return response
@@ -671,9 +671,9 @@ def strategy_extraction_repair_is_allowed(
         if noncanonical_text_needs_repair(response=response, request=request):
             return True
         if response.intent not in {
-            "unsupported_or_out_of_scope",
-            "beginner_guidance",
-            "conversation_followup",
+            "cannot",
+            "explain",
+            "follow_up",
         }:
             return False
         if not response.unsupported_constraints:

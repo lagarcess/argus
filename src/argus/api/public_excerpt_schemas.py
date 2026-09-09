@@ -9,11 +9,17 @@ change and the review that comes with it.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_serializer
 
 from argus.api.schemas import AssetClass, Language
+from argus.domain.tool_contracts import LocalizedText, ToolCardPresentation
+from argus.domain.tool_contracts import PublicExcerptVisual as PublicExcerptVisual
+from argus.domain.tool_contracts import (
+    PublicExcerptVisualPoint as PublicExcerptVisualPoint,
+)
 
 PUBLIC_EXCERPT_SCHEMA_VERSION = 1
 PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH = 280
@@ -148,24 +154,6 @@ class PublicExcerptAssumption(BaseModel):
     value: str | None = None
 
 
-class PublicExcerptVisualPoint(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    time: str
-    value: float
-
-
-class PublicExcerptVisual(BaseModel):
-    """Frozen visual evidence. No series is fetched at view time."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    kind: Literal["portfolio_equity"]
-    currency: str | None = None
-    base_value: float | None = None
-    series: list[PublicExcerptVisualPoint]
-
-
 class PublicExcerptPayload(BaseModel):
     """The closed receipt payload. Adding a field here is a product decision."""
 
@@ -192,6 +180,30 @@ class PublicExcerptPayload(BaseModel):
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
 
+class PublicToolExcerptPayload(BaseModel):
+    """Version two freezes the same card facts, never private execution inputs."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: Literal[2] = 2
+    card_type: str
+    card_version: int = Field(ge=1)
+    presentation: ToolCardPresentation
+    owner_note: str | None = None
+    content_language: Language = "en"
+    framing: Literal["computed_result_not_advice"] = "computed_result_not_advice"
+    provenance_mark: Literal["computed_with_argus"] = "computed_with_argus"
+
+
+PublicReceiptPayload = Annotated[
+    PublicExcerptPayload | PublicToolExcerptPayload, Field(discriminator="schema_version")
+]
+
+
+def parse_public_receipt_payload(value: object) -> PublicReceiptPayload:
+    return TypeAdapter(PublicReceiptPayload).validate_python(value)
+
+
 class PublicExcerptSnapshot(BaseModel):
     """The owner-visible record. ``owner_id`` and the source ids stay private."""
 
@@ -203,12 +215,33 @@ class PublicExcerptSnapshot(BaseModel):
     evidence_artifact_id: str | None = None
     source_conversation_id: str | None = None
     source_run_id: str | None = None
+    source_message_id: str | None = None
+    source_artifact_id: str | None = None
+    source_input_revision: int | None = Field(default=None, ge=0)
     title: str
-    payload: PublicExcerptPayload
+    payload: PublicReceiptPayload
     payload_digest: str
     created_at: datetime
     revoked_at: datetime | None = None
     revocation_reason: RevocationReason | None = None
+
+    @property
+    def tool_source(self) -> tuple[str, str, str, int] | None:
+        """Resolve a complete message source; deleted-message tombstones have none."""
+        if self.source_message_id is None:
+            return None
+        if (
+            self.source_conversation_id is None
+            or self.source_artifact_id is None
+            or self.source_input_revision is None
+        ):
+            raise ValueError("A tool receipt needs its complete source identity")
+        return (
+            self.source_conversation_id,
+            self.source_message_id,
+            self.source_artifact_id,
+            self.source_input_revision,
+        )
 
 
 class PublicExcerptListItem(BaseModel):
@@ -221,10 +254,18 @@ class PublicExcerptListItem(BaseModel):
     path: str
     title: str
     symbols: list[str] = Field(default_factory=list)
-    date_range: PublicExcerptDateRange
+    date_range: PublicExcerptDateRange | None = None
+    title_facts: LocalizedText | None = None
     created_at: datetime
     revoked_at: datetime | None = None
     revocation_reason: RevocationReason | None = None
+
+    @model_serializer(mode="wrap")
+    def omit_absent_title_facts(self, handler):
+        payload = handler(self)
+        if self.title_facts is None:
+            payload.pop("title_facts", None)
+        return payload
 
 
 class PublicExcerptCreate(BaseModel):
@@ -240,6 +281,11 @@ class PublicExcerptCreateResponse(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     receipt: PublicExcerptListItem
+
+
+class PublicToolExcerptCreate(PublicExcerptCreate):
+    message_id: UUID
+    input_revision: int = Field(ge=0, strict=True)
 
 
 class PublicExcerptListResponse(BaseModel):
@@ -276,4 +322,4 @@ class PublicExcerptView(BaseModel):
     status: PublicExcerptStatus
     indexing: Literal["noindex, nofollow"] = PUBLIC_EXCERPT_ROBOTS_DIRECTIVE
     created_at: datetime | None = None
-    payload: PublicExcerptPayload | None = None
+    payload: PublicReceiptPayload | None = None

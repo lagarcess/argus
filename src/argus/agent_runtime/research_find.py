@@ -12,6 +12,7 @@ unchanged; the user-visible experience is the same or better.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -64,15 +65,17 @@ async def find_assets_stage_result(
     decision: InterpretDecision | None,
     state: RunState,
     user: UserState,
+    capability_class: CapabilityClass | None = None,
 ) -> StageResult | None:
     """Run the find operation and attach the rail's typed instrumentation."""
     from argus.agent_runtime.discovery.composer import discovery_operation_result
 
-    capability_class: CapabilityClass = (
-        "peer_expansion"
-        if request is not None and request.anchor_symbols
-        else "screening"
-    )
+    if capability_class is None:
+        capability_class = (
+            "peer_expansion"
+            if request is not None and request.anchor_symbols
+            else "screening"
+        )
     language = (
         getattr(interpretation, "detected_user_language", None)
         or user.language_preference
@@ -91,7 +94,13 @@ async def find_assets_stage_result(
             shape="find",
             symbols=anchors,
             period_key="current",
-            question_fingerprint=" ".join(state.current_user_message.lower().split()),
+            question_fingerprint=json.dumps(
+                {
+                    "request": " ".join(state.current_user_message.lower().split()),
+                    "discovery": request.model_dump(mode="json"),
+                },
+                sort_keys=True,
+            ),
             language=grounded.language_tag(user.language_preference),
         )
         packet_cache = _FindPacketCache(key)

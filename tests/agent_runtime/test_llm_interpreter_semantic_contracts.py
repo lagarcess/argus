@@ -113,9 +113,9 @@ async def test_missing_discovery_act_does_not_override_a_backtest_response(
     )
 
     assert audited is True
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.semantic_turn_act == "new_idea"
-    assert "coerced_missing_turn_act_to_new_idea" in repaired.reason_codes
+    assert "legacy_strategy_intent_migrated" in repaired.reason_codes
 
 
 def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
@@ -506,7 +506,7 @@ def test_unsupported_request_preserves_provider_asset_and_explicit_window(
     )
 
     draft = normalized.candidate_strategy_draft
-    assert normalized.intent == "unsupported_or_out_of_scope"
+    assert normalized.intent == 'cannot'
     assert normalized.semantic_turn_act == "unsupported_request"
     if with_unsupported_constraint:
         assert normalized.unsupported_constraints[0].category == (
@@ -629,7 +629,7 @@ def test_unsupported_recovery_calendar_year_intent_survives_without_bare_year_pr
         "assets": draft.asset_universe,
         "date_range": draft.date_range,
     }
-    assert normalized.intent == "unsupported_or_out_of_scope"
+    assert normalized.intent == 'cannot'
     assert draft.asset_class == "equity"
     assert draft.comparison_baseline == "SPY"
     assert observed == {
@@ -748,7 +748,7 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
 
     strategy = interpretation.candidate_strategy_draft
     ready_for_confirmation = (
-        interpretation.intent in {"strategy_drafting", "backtest_execution"}
+        interpretation.intent in {'calculate'}
         and interpretation.requires_clarification is False
         and interpretation.unsupported_constraints == []
         and strategy.strategy_type == "buy_and_hold"
@@ -1168,7 +1168,7 @@ def test_unsupported_turn_with_partial_provider_context_drops_ungrounded_assets(
         include_unsupported_request=True,
     )
 
-    assert normalized.intent == "unsupported_or_out_of_scope"
+    assert normalized.intent == 'cannot'
     assert normalized.candidate_strategy_draft.asset_universe == ["TGT"]
     assert (
         "provider_context_partial_preserved_fuller_draft"
@@ -1838,7 +1838,7 @@ async def test_dca_contribution_role_audit_preserves_recurring_amount_with_cap(
 
     draft = audited.candidate_strategy_draft
     assert audited.requires_clarification is False
-    assert audited.intent == "backtest_execution"
+    assert audited.intent == 'calculate'
     assert draft.capital_amount == 125
     assert draft.recurring_contribution == 125
     assert draft.cadence == "biweekly"
@@ -1969,7 +1969,7 @@ async def test_pending_response_option_selection_applies_structured_payload(
     )
 
     draft = audited.candidate_strategy_draft
-    assert audited.intent == "backtest_execution"
+    assert audited.intent == 'calculate'
     assert audited.requires_clarification is False
     assert audited.assistant_response is None
     assert audited.unsupported_constraints == []
@@ -2076,7 +2076,7 @@ async def test_pending_response_option_selection_wins_over_generic_asset_parse(
     )
 
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.requires_clarification is False
     assert result.assistant_response is None
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
@@ -2172,7 +2172,7 @@ async def test_pending_response_option_selection_handles_approval_like_answer(
     )
 
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.requires_clarification is False
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
     assert "total_budget" not in result.candidate_strategy_draft.extra_parameters
@@ -2359,7 +2359,7 @@ async def test_dca_contract_audit_recovers_recurring_buy_shape_before_capability
 
     draft = repaired.candidate_strategy_draft
     assert "DcaContractAudit" in calls
-    assert repaired.intent == "backtest_execution"
+    assert repaired.intent == 'calculate'
     assert repaired.semantic_turn_act == "new_idea"
     assert repaired.capability_question_focus is None
     assert repaired.assistant_response is None
@@ -4330,7 +4330,7 @@ async def test_missing_turn_act_underfilled_strategy_repairs_before_baseline_aud
 
     assert calls[0] == "FocusedStrategyExtraction"
     assert ready_response.semantic_turn_act == "new_idea"
-    assert "coerced_missing_turn_act_to_new_idea" in ready_response.reason_codes
+    assert "legacy_strategy_intent_migrated" in ready_response.reason_codes
     assert ready_response.candidate_strategy_draft.date_range == {
         "start": "2025-01-01",
         "end": "2026-06-05",
@@ -4557,7 +4557,7 @@ async def test_dca_repair_uses_focused_date_audit_from_bounded_evidence_span(
         "FocusedDateWindowExtraction"
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.unsupported_constraints == []
     assert ready_response.missing_required_fields == []
     assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
@@ -4665,7 +4665,7 @@ async def test_counterfactual_bitcoin_ytd_starter_gets_focused_repair(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -4800,7 +4800,7 @@ async def test_weekly_nvidia_dca_starter_gets_focused_repair(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -4951,7 +4951,7 @@ async def test_dca_capability_conflict_repair_does_not_stop_underfilled(
     assert calls.index("SupportedStrategyCapabilityConflictAudit") < calls.index(
         "FocusedStrategyExtraction"
     )
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -5057,7 +5057,7 @@ async def test_vague_guidance_does_not_preempt_focused_strategy_extraction(
 
     assert "FocusedStrategyExtraction" in calls
     assert "vague_strategy_start_guidance" not in ready_response.reason_codes
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     draft = ready_response.candidate_strategy_draft
     assert draft.strategy_type == "dca_accumulation"
     assert draft.asset_universe == ["NVDA"]
@@ -5171,7 +5171,7 @@ async def test_explicit_model_timeout_churn_uses_focused_strategy_repair(
     assert "FocusedStrategyExtraction" in repair_calls
     assert result is not None
     assert interpreter.last_status == "fallback_used"
-    assert result.intent == "backtest_execution"
+    assert result.intent == 'calculate'
     assert result.candidate_strategy_draft.strategy_type == "dca_accumulation"
     assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
     assert result.candidate_strategy_draft.capital_amount == 250

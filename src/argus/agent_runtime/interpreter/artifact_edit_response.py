@@ -53,7 +53,7 @@ def build_artifact_edit_response(
             )
             if not discloses_impossible_change:
                 return LLMInterpretationResponse(
-                    intent="conversation_followup",
+                    intent="follow_up",
                     task_relation="continue",
                     requires_clarification=True,
                     user_goal_summary=(
@@ -90,7 +90,7 @@ def build_artifact_edit_response(
             # Turn-correlated receipt: the exclusions-outrank override fired.
             applied_reason_codes.append("asset_exclusions_outranked_universe_copy")
         return LLMInterpretationResponse(
-            intent="backtest_execution",
+            intent="calculate",
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary=(
@@ -107,9 +107,9 @@ def build_artifact_edit_response(
 
     return LLMInterpretationResponse(
         intent=(
-            "unsupported_or_out_of_scope"
+            "cannot"
             if plan.outcome == "unsupported"
-            else "conversation_followup"
+            else "follow_up"
         ),
         task_relation="continue",
         requires_clarification=True,

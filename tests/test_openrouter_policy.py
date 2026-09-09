@@ -847,7 +847,7 @@ def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
 
     assert result is not None
     assert calls[0]["task"] == "interpretation"
-    assert calls[0]["schema_model"] is LLMInterpretationResponse
+    assert calls[0]["schema_model"] is interpreter.response_model
     assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
     assert result.candidate_strategy_draft.extra_parameters["indicator"] == "rsi"
     assert (
@@ -880,7 +880,7 @@ def test_requested_asset_answer_uses_semantic_candidate_audit_before_provider_va
     async def fake_direct_schema(**kwargs: Any):
         schema_model = kwargs["schema_model"]
         calls.append(schema_model.__name__)
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent=(
                     "unsupported_or_out_of_scope"
@@ -958,7 +958,7 @@ def test_default_interpreter_retries_configured_structured_model_when_first_is_i
         model_name = str(kwargs.get("model_name", "<task-default>"))
         schema_model = kwargs["schema_model"]
         calls.append(model_name)
-        if schema_model is not LLMInterpretationResponse:
+        if not issubclass(schema_model, LLMInterpretationResponse):
             neutral_response = _neutral_repair_schema_response(schema_model)
             if neutral_response is not None:
                 return neutral_response
@@ -1034,7 +1034,7 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="new_task",
@@ -1121,7 +1121,7 @@ def test_default_interpreter_repairs_underfilled_new_signal_idea(
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="new_task",
@@ -1203,7 +1203,7 @@ def test_default_interpreter_repairs_partial_signal_idea_without_rule_payload(
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="new_task",
@@ -1283,7 +1283,7 @@ def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent="unsupported_or_out_of_scope",
                 task_relation="new_task",
@@ -1346,7 +1346,7 @@ def _sentiment_misroute_schema(
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent="conversation_followup",
                 task_relation="new_task",
@@ -1448,7 +1448,7 @@ def test_default_interpreter_repairs_empty_unsupported_request_into_contract_rec
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent="unsupported_or_out_of_scope",
                 task_relation="new_task",
@@ -1526,7 +1526,7 @@ def test_default_interpreter_uses_focused_repair_after_structured_candidate_fail
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             raise ValueError("general schema failed")
         if schema_model is StatedRunFieldFidelityAudit:
             return StatedRunFieldFidelityAudit()
@@ -1609,7 +1609,7 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             raise ValueError("general schema failed")
         if schema_model is FocusedStrategyExtraction:
             return FocusedStrategyExtraction(
@@ -1689,7 +1689,7 @@ def test_default_interpreter_blocks_auto_simplified_buy_hold_for_ambiguous_rule(
     from argus.agent_runtime import llm_interpreter
 
     async def fake_direct_schema(**kwargs: Any) -> object:
-        assert kwargs["schema_model"] is LLMInterpretationResponse
+        assert issubclass(kwargs["schema_model"], LLMInterpretationResponse)
         return LLMInterpretationResponse(
             intent="strategy_drafting",
             task_relation="new_task",
@@ -1857,7 +1857,7 @@ def test_default_interpreter_keeps_artifact_context_for_vague_signal_clarificati
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(str(kwargs["schema_name"]))
         schema_model = kwargs["schema_model"]
-        if schema_model is LLMInterpretationResponse:
+        if issubclass(schema_model, LLMInterpretationResponse):
             return LLMInterpretationResponse(
                 intent="unsupported_or_out_of_scope",
                 task_relation="new_task",
@@ -2161,7 +2161,7 @@ def test_explicit_model_interpreter_plans_result_refinement_before_accepting_pro
     async def fake_direct_schema(**kwargs: Any) -> object:
         schema_model = kwargs["schema_model"]
         calls.append(str(kwargs.get("model_name", "<task-default>")))
-        if schema_model is not LLMInterpretationResponse:
+        if not issubclass(schema_model, LLMInterpretationResponse):
             neutral_response = _neutral_repair_schema_response(schema_model)
             if neutral_response is not None:
                 return neutral_response
@@ -2452,11 +2452,12 @@ def test_default_interpreter_rejects_result_explanation_without_latest_result(
 
     assert calls[:3] == [
         ("primary/model", "LLMInterpretationResponse"),
-        ("primary/model", "FocusedStrategyExtraction"),
-        ("<task-default>", "StatedRunFieldFidelityAudit"),
+        ("primary/model", "LLMInterpretationResponse"),
+        ("fallback/model", "LLMInterpretationResponse"),
     ]
     assert result is not None
-    assert result.intent == "backtest_execution"
+    assert result.intent == "calculate"
+    assert result.assistant_response is None
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
     assert result.candidate_strategy_draft.comparison_baseline == "SPY"
 
@@ -2505,7 +2506,7 @@ def test_default_interpreter_coerces_strategy_draft_mislabeled_as_result_context
     )
 
     assert result is not None
-    assert result.intent == "strategy_drafting"
+    assert result.intent == "calculate"
     assert result.semantic_turn_act == "new_idea"
     assert "coerced_result_explanation_to_strategy_draft" in result.reason_codes
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
@@ -3286,6 +3287,12 @@ def test_openrouter_failure_log_reports_raising_origin(monkeypatch) -> None:
         raise ValueError(
             "OpenRouter interpretation returned an incomplete strategy draft"
         )
+
+    # The logger selects Argus frames; a checkout's directory name is incidental.
+    # Give this isolated raising fixture a module path inside that package.
+    _raise_local_rejection.__code__ = _raise_local_rejection.__code__.replace(
+        co_filename="/fixture/argus/test_openrouter_policy.py"
+    )
 
     try:
         _raise_local_rejection()

@@ -1,3 +1,4 @@
+import { parseToolProgress, type ToolProgress, type ToolResultCard, type ToolScalar } from "./tool-result-card";
 import { getSupabaseClient } from "./supabase-client";
 import i18next from "i18next";
 import { localizeArtifactFinalPayload } from "./artifact-response-transport";
@@ -9,6 +10,7 @@ import type { DecisionState as RunDossierDecisionState } from "./run-dossier-con
 import type {
   ChatActionOption,
   ChatMention,
+  ToolJob,
   ExecutionCostEvidence,
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
@@ -334,7 +336,7 @@ export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
-  | { event: "stage_start"; data: { stage: string; detail?: string } }
+  | { event: "stage_start"; data: { stage: string; detail?: string; tool_progress?: ToolProgress } }
   | { event: "stage_outcome"; data: { outcome: string } }
   | { event: "final"; data: ChatFinalPayload }
   | {
@@ -364,6 +366,8 @@ export type ChatFinalPayload = {
   confirmation?: StrategyConfirmationPayload | null;
   confirmation_cancelled?: { confirmation_id?: string | null } | null;
   confirmation_payload?: Record<string, unknown> | null;
+  tool_result_cards?: ToolResultCard[];
+  tool_jobs?: ToolJob[];
   pending_strategy?: {
     strategy: Record<string, unknown>;
     requested_field?: string | null;
@@ -781,6 +785,14 @@ export async function restoreConfirmationAssets(
   return response.message;
 }
 
+export async function recomputeToolResult(conversationId: string, messageId: string, card: ToolResultCard, changes: Record<string, ToolScalar>): Promise<ApiMessage> {
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${encodeURIComponent(conversationId)}/tool-results/${encodeURIComponent(card.artifact_id)}/recompute`,
+    { method: "POST", body: JSON.stringify({ message_id: messageId, input_revision: card.input_revision, arguments: changes }) },
+  );
+  return response.message;
+}
+
 export async function directEditConfirmation(
   conversationId: string,
   confirmationId: string,
@@ -1103,10 +1115,12 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
 
   const type = payload.type;
   if (type === "stage_start") {
+    const progress = parseToolProgress(payload.tool_progress);
     return {
       event: "stage_start",
       data: {
         stage: String(payload.stage ?? ""),
+        ...(progress ? { tool_progress: progress } : {}),
         ...(typeof payload.detail === "string" && payload.detail
           ? { detail: payload.detail }
           : {}),

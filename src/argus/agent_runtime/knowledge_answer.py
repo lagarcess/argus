@@ -52,9 +52,7 @@ from argus.llm.openrouter import (
     openrouter_structured_model_candidates,
 )
 
-_KNOWLEDGE_INTENTS = frozenset(
-    {"unsupported_or_out_of_scope", "conversation_followup", "beginner_guidance"}
-)
+_KNOWLEDGE_INTENTS = frozenset({"cannot", "follow_up", "explain"})
 # Acts owned by other surfaces (discovery, results, cards) never route here.
 _KNOWLEDGE_ACTS = frozenset({"educational_question", "unsupported_request"})
 # Routes on the typed payload, not the act label: an unsupported_request turn
@@ -183,6 +181,8 @@ async def knowledge_answer_stage_result(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
+    if interpretation.uses_tool_catalog or interpretation.tool_calls:
+        return None
     if selected_thread_metadata.get("last_stage_outcome") == "await_user_reply":
         # A reply to a pending question belongs to whoever asked it.
         return None
@@ -613,7 +613,7 @@ def _stage_result(
         )
     else:
         decision = InterpretDecision(
-            intent="conversation_followup",
+            intent="follow_up",
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary=interpretation.user_goal_summary,

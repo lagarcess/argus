@@ -31,6 +31,7 @@ from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
 )
 from argus.agent_runtime.extraction import detect_unsupported_constraints
+from argus.agent_runtime.interpreter.tool_calls import catalog_stage_result
 from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter.unsupported_request_context import (
     materialized_unsupported_request_constraint,
@@ -415,6 +416,12 @@ async def interpret_stage_async(
         logger.debug("Interpret stage structured interpreter returned no result")
         failure_kind = getattr(structured_interpreter, "last_failure_kind", None)
         return await _unavailable(retryable=failure_kind != "contract_rejected")
+    catalog_result = await catalog_stage_result(
+        interpretation, user=user, current_user_message=state.current_user_message,
+        contract=capability_contract, compose_capability_answer=_capability_answer_if_applicable,
+    )
+    if catalog_result is not None:
+        return catalog_result
     pending_response_option_interpretation = (
         _pending_response_option_interpretation_from_typed_selection(
             state=state,
@@ -534,7 +541,7 @@ async def _stage_result_from_interpretation(
         route_suppression_reason_codes.append("educational_strategy_route_suppressed")
         interpretation = interpretation.model_copy(
             update={
-                "intent": "conversation_followup",
+                "intent": "follow_up",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "candidate_strategy_draft": StrategySummary(),
@@ -605,7 +612,7 @@ async def _stage_result_from_interpretation(
     if supported_indicator_simplification_applied:
         interpretation = interpretation.model_copy(
             update={
-                "intent": "strategy_drafting",
+                "intent": "calculate",
                 "task_relation": "refine",
                 "requires_clarification": False,
                 "assistant_response": None,
@@ -654,7 +661,7 @@ async def _stage_result_from_interpretation(
         expects_strategy_route = True
         interpretation = interpretation.model_copy(
             update={
-                "intent": "backtest_execution",
+                "intent": "calculate",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "assistant_response": None,
@@ -723,7 +730,7 @@ async def _stage_result_from_interpretation(
         route_suppression_reason_codes.append("unanchored_strategy_route_suppressed")
         interpretation = interpretation.model_copy(
             update={
-                "intent": "conversation_followup",
+                "intent": "follow_up",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "assistant_response": interpretation.assistant_response,
@@ -1026,6 +1033,7 @@ async def _stage_result_from_interpretation(
         ),
     ]
     decision = InterpretDecision(
+        tool_calls=interpretation.tool_calls,
         intent=interpretation.intent,
         task_relation=interpretation.task_relation,
         requires_clarification=requires_clarification,
@@ -2245,7 +2253,7 @@ def _multi_asset_chip_answer_operation_clarification_result(
         explicit_overrides=interpretation.response_profile_overrides,
     )
     decision = InterpretDecision(
-        intent="conversation_followup",
+        intent="follow_up",
         task_relation="continue",
         requires_clarification=True,
         user_goal_summary=interpretation.user_goal_summary,
@@ -2724,7 +2732,7 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
         explicit_overrides=None,
     )
     decision = InterpretDecision(
-        intent="conversation_followup",
+        intent="follow_up",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary=(
@@ -2779,7 +2787,7 @@ async def _latest_result_followup_when_interpreter_unavailable(
         explicit_overrides=None,
     )
     decision = InterpretDecision(
-        intent="conversation_followup",
+        intent="follow_up",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary=(
@@ -2891,7 +2899,7 @@ async def _latest_result_followup_recovery_if_applicable(
         outcome="ready_to_respond",
         decision=decision.model_copy(
             update={
-                "intent": "conversation_followup",
+                "intent": "follow_up",
                 "requires_clarification": False,
                 "missing_required_fields": [],
                 "effective_response_profile": effective_profile,
@@ -2935,7 +2943,7 @@ async def _private_alpha_save_request_result_if_applicable(
         outcome="ready_to_respond",
         decision=decision.model_copy(
             update={
-                "intent": "conversation_followup",
+                "intent": "follow_up",
                 "requires_clarification": False,
                 "missing_required_fields": [],
                 "semantic_turn_act": "result_followup",

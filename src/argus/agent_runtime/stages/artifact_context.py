@@ -51,7 +51,7 @@ def decision_targets_result_artifact(
         return decision.artifact_target == "latest_result"
     if decision.semantic_turn_act == "result_followup":
         return True
-    return decision.intent == "results_explanation"
+    return decision.semantic_turn_act == "result_followup"
 
 
 def decision_allows_result_artifact_patch(
@@ -134,7 +134,11 @@ def newer_message_supersedes_confirmation(metadata: dict[str, Any]) -> bool:
     markers. New writers must stamp the card row; this clause exists so old
     transcripts and turn-based supersession read identically everywhere.
     """
+    from argus.agent_runtime.artifacts.lifecycle import has_completed_tool_answer
+
     if metadata.get("result_card"):
+        return True
+    if not metadata.get("confirmation_card") and has_completed_tool_answer(metadata):
         return True
     if metadata.get("result_run_id") and not _metadata_is_latest_result_fact_reply_marker(
         metadata

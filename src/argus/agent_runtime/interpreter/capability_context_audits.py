@@ -101,7 +101,7 @@ def _response_needs_context_question_audit(
     # A plain educational turn keeps the primary's typed focus; only the
     # unsupported strategy shape earns a second read.
     return (
-        response.intent == "strategy_drafting"
+        response.intent == "calculate"
         and response.semantic_turn_act == "unsupported_request"
         and response.requires_clarification
         and not response.missing_required_fields

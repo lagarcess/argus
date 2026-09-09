@@ -264,6 +264,13 @@ def _payload_from_run(run: BacktestRun, *, digest: str) -> dict[str, Any]:
         )
         if key in card
     }
+    if "tool_result_cards" in card:
+        from argus.domain.tool_contracts import ToolResultCard
+
+        safe_card["tool_result_cards"] = [
+            ToolResultCard.model_validate(item).model_dump(mode="json")
+            for item in card["tool_result_cards"]
+        ]
     quick_take = _safe_preview_text(card.get("quick_take"))
     breakdown = _safe_breakdown(card.get("breakdown"))
     assumptions = _safe_text_list(card.get("assumptions"))

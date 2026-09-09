@@ -1,6 +1,8 @@
+import { parseToolPresentation, type ToolCardPresentation } from "./tool-result-card";
 import { cache } from "react";
 import type { AssetClass } from "./argus-types";
 import { ARGUS_API_BASE_URL } from "./argus-api-transport";
+import type { EvidenceVisual, EvidenceVisualPoint } from "./evidence-visual";
 
 /**
  * Mirrors src/argus/api/public_excerpt_schemas.py. The payload is closed: this
@@ -86,19 +88,10 @@ export type PublicReceiptMetric = {
   value: string;
 };
 
-export type PublicReceiptVisualPoint = {
-  time: string;
-  value: number;
-};
+export type PublicReceiptVisualPoint = EvidenceVisualPoint;
+export type PublicReceiptVisual = EvidenceVisual;
 
-export type PublicReceiptVisual = {
-  kind: "portfolio_equity";
-  currency?: string | null;
-  base_value?: number | null;
-  series: PublicReceiptVisualPoint[];
-};
-
-export type PublicReceiptPayload = {
+export type PublicBacktestReceiptPayload = {
   schema_version: 1;
   idea_title: string;
   asset_class?: AssetClass | null;
@@ -114,6 +107,19 @@ export type PublicReceiptPayload = {
   framing: "historical_simulation_not_advice";
   provenance_mark: "tested_with_argus";
 };
+
+export type PublicToolReceiptPayload = {
+  schema_version: 2;
+  card_type: string;
+  card_version: 1;
+  presentation: ToolCardPresentation;
+  owner_note?: string | null;
+  content_language: "en" | "es-419";
+  framing: "computed_result_not_advice";
+  provenance_mark: "computed_with_argus";
+};
+
+export type PublicReceiptPayload = PublicBacktestReceiptPayload | PublicToolReceiptPayload;
 
 export type PublicReceiptView = {
   public_id: string;
@@ -186,9 +192,14 @@ export async function fetchPublicReceipt(
       // A shape we do not recognise is not evidence that anything was revoked.
       return { kind: "unavailable" };
     }
+    const payload = view.payload;
+    if (payload.schema_version !== 1 && (payload.schema_version !== 2 ||
+      payload.card_version !== 1 || !payload.card_type || !parseToolPresentation(payload.presentation))) {
+      return { kind: "unavailable" };
+    }
     return {
       kind: "available",
-      payload: view.payload,
+      payload,
       createdAt: view.created_at ?? null,
     };
   } catch {
@@ -199,6 +210,7 @@ export async function fetchPublicReceipt(
 export function headlineReceiptMetric(
   payload: PublicReceiptPayload,
 ): PublicReceiptMetric | null {
+  if (payload.schema_version !== 1) return null;
   // A run freezes exactly one of these: total_return_pct for one-bankroll
   // templates, contribution_return_pct for recurring plans.
   const preferred: PublicReceiptMetricKey[] = [

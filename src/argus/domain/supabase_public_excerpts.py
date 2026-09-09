@@ -16,9 +16,9 @@ from loguru import logger
 from pydantic import ValidationError
 
 from argus.api.public_excerpt_schemas import (
-    PublicExcerptPayload,
     PublicExcerptSnapshot,
     PublicExcerptView,
+    parse_public_receipt_payload,
 )
 from argus.domain.public_excerpts import (
     PublicExcerptUnreadableError,
@@ -38,6 +38,9 @@ OWNER_COLUMNS = (
     "evidence_artifact_id",
     "source_conversation_id",
     "source_run_id",
+    "source_message_id",
+    "source_artifact_id",
+    "source_input_revision",
     "title",
     "payload",
     "payload_digest",
@@ -83,10 +86,7 @@ class SupabasePublicExcerptMixin:
         same result twice is deliberately idempotent, and counting the second call
         as a creation would inflate the acquisition funnel.
         """
-        existing = self.get_live_public_excerpt_for_artifact(
-            owner_id=snapshot.owner_id,
-            evidence_artifact_id=snapshot.evidence_artifact_id,
-        )
+        existing = self._live_receipt_for_source(snapshot)
         if existing is not None:
             return existing, False
         payload = snapshot.model_dump(mode="json")
@@ -97,10 +97,7 @@ class SupabasePublicExcerptMixin:
             # unique index lets one in and rejects the other. The loser reads the
             # winner's row rather than surfacing a 500, because the contract says
             # re-sharing a result returns its existing link.
-            raced = self.get_live_public_excerpt_for_artifact(
-                owner_id=snapshot.owner_id,
-                evidence_artifact_id=snapshot.evidence_artifact_id,
-            )
+            raced = self._live_receipt_for_source(snapshot)
             if raced is not None:
                 return raced, False
             raise
@@ -108,6 +105,43 @@ class SupabasePublicExcerptMixin:
         if not rows:
             raise PublicExcerptConflictError("The receipt was not recorded.")
         return _snapshot_from_row(rows[0]), True
+
+    def _live_receipt_for_source(
+        self, snapshot: PublicExcerptSnapshot
+    ) -> PublicExcerptSnapshot | None:
+        source = snapshot.tool_source
+        if source is not None:
+            return self.get_live_public_excerpt_for_tool_result(
+                owner_id=snapshot.owner_id,
+                source_message_id=source[1],
+                source_artifact_id=source[2],
+                source_input_revision=source[3],
+            )
+        return self.get_live_public_excerpt_for_artifact(
+            owner_id=snapshot.owner_id, evidence_artifact_id=snapshot.evidence_artifact_id
+        )
+
+    def get_live_public_excerpt_for_tool_result(
+        self,
+        *,
+        owner_id: str,
+        source_message_id: str,
+        source_artifact_id: str,
+        source_input_revision: int,
+    ) -> PublicExcerptSnapshot | None:
+        result = (
+            self.client.table(TABLE)
+            .select(",".join(OWNER_COLUMNS))
+            .eq("owner_id", owner_id)
+            .eq("source_message_id", source_message_id)
+            .eq("source_artifact_id", source_artifact_id)
+            .eq("source_input_revision", source_input_revision)
+            .is_("revoked_at", "null")
+            .limit(1)
+            .execute()
+        )
+        rows = _rows(result)
+        return _snapshot_from_row(rows[0]) if rows else None
 
     def get_live_public_excerpt_for_artifact(
         self, *, owner_id: str, evidence_artifact_id: str | None
@@ -252,7 +286,7 @@ def _public_view_from_row(public_id: str, row: dict[str, Any]) -> PublicExcerptV
     if row.get("revoked_at") is not None:
         return revoked_public_view(public_id)
     try:
-        payload = PublicExcerptPayload.model_validate(row.get("payload") or {})
+        payload = parse_public_receipt_payload(row.get("payload") or {})
     except ValidationError as error:
         # A stored payload this build cannot read is a deployment problem, not a
         # statement about the receipt. Raising would answer a stranger's request

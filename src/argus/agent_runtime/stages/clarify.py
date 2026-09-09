@@ -766,11 +766,11 @@ def _simplification_options(
 
 
 def _needs_ambiguity_clarification(state: RunState) -> bool:
-    return state.task_relation == "ambiguous" and state.intent != "beginner_guidance"
+    return state.task_relation == "ambiguous" and state.intent != "explain"
 
 
 def _is_beginner_guidance_turn(state: RunState) -> bool:
-    return state.intent == "beginner_guidance"
+    return state.intent == "explain"
 
 
 def _first_missing_required_field(

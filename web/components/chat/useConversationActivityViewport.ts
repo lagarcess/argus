@@ -1,5 +1,7 @@
 "use client";
 
+import { toolJobsFromMetadata } from "@/lib/chat-backtest-jobs";
+import { toolCardsFromMetadata } from "@/lib/tool-result-card";
 import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 
 import type { ChatFinalPayload } from "@/lib/argus-api";
@@ -134,6 +136,8 @@ export const chatFinalPayloadOwnsVisibleTerminalArtifact = (
     payload.confirmation != null ||
     payload.confirmation_cancelled != null ||
     payload.run != null ||
+    toolCardsFromMetadata(payload).length > 0 ||
+    toolJobsFromMetadata(payload).length > 0 ||
     (persistedMessage && hasNonEmptyFinalValue(payload.stage_outcome)) ||
     (persistedMessage && payload.recovery != null) ||
     hasNonEmptyFinalValue(savedStrategyId)

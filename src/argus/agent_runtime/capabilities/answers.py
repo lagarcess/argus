@@ -1,23 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from argus.domain.tool_declaration import ToolCatalog
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.stages.interpret_types import CapabilityQuestionFocus
 from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.capability_registry import indicator_template
 from argus.domain.indicators import EXECUTABLE_INDICATORS
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
-# NOTE(P2.1.b): hand-maintained user-facing strategy families, also consumed by the
-# interpreter prompt (agent_runtime/stages/interpret.py). Single-sourcing these from the
-# capability registry (EXECUTABLE_TEMPLATES) belongs to the interpreter-tooling sub-slice
-# (P2.1.b); kept explicit here to avoid editing the interpreter prompt in P2.1.a. Keep in
-# sync with the registry's executable set until then.
-EXECUTABLE_STRATEGY_FAMILIES: tuple[str, ...] = (
-    "buy and hold",
-    "recurring buys/DCA",
-    "indicator threshold rules",
-    "signal rules such as moving-average, MACD, price/indicator, and Bollinger Band conditions",
+EXECUTABLE_STRATEGY_FAMILIES: tuple[str, ...] = tuple(
+    capability.display_name
+    for capability in STRATEGY_CAPABILITIES.values()
+    if capability.status == "executable"
 )
 
 
@@ -25,6 +24,7 @@ def capability_fact_packet(
     *,
     focus: CapabilityQuestionFocus | None,
     contract: CapabilityContract,
+    tool_catalog: ToolCatalog | None = None,
 ) -> str:
     if focus == "supported_indicators":
         return _supported_indicators_answer()
@@ -34,7 +34,11 @@ def capability_fact_packet(
         return _limits_answer(contract)
     if focus == "assets":
         return _assets_answer()
-    return _general_answer(contract)
+    if tool_catalog is None:
+        from argus.domain.capability_registry import get_tool_catalog
+
+        tool_catalog = get_tool_catalog()
+    return f"Declared tools: {tool_catalog.capability_text()} {_general_answer(contract)}"
 
 
 def _supported_indicators_answer() -> str:

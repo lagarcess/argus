@@ -26,8 +26,8 @@ _TOP_LEVEL_TAGS = [
 
 _DESCRIPTION = (
     "Contract-first Alpha API for chat-first investing idea validation. "
-    "Durable results persist as backtest_runs; result cards render as "
-    "conversation_result_card artifacts."
+    "Declared tool answers persist as conversation artifacts; completed "
+    "backtests also own immutable backtest_runs."
 )
 
 _METHOD_ORDER = ("get", "post", "put", "patch", "delete", "head", "options", "trace")

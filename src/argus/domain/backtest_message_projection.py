@@ -95,6 +95,20 @@ def hydrate_completed_backtest_job_messages(
                 "result_fact_bank": result_fact_bank(run),
             }
         )
+        bound_cards = run.conversation_result_card.get("tool_result_cards")
+        if isinstance(bound_cards, list) and bound_cards:
+            from argus.domain.tool_contracts import ToolResultCard
+
+            completed_cards = [
+                ToolResultCard.model_validate(card).model_dump(mode="json")
+                for card in bound_cards
+            ]
+            completed_call_ids = {card["call_id"] for card in completed_cards}
+            next_metadata["tool_result_cards"] = [
+                card
+                for card in metadata.get("tool_result_cards", [])
+                if card.get("call_id") not in completed_call_ids
+            ] + completed_cards
         readout = _result_readout(job)
         next_experiments = _job_next_experiments(job)
         if next_experiments is not None:

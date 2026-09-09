@@ -71,7 +71,7 @@ def response_shape_open_to_discovery(response: Any) -> bool:
     """No conflicting surface claims the turn: no draft, clarification,
     result focus, or capability answer. Shared by the payload gate and the
     focused discovery read's trigger."""
-    if response.intent != "conversation_followup":
+    if response.intent != "follow_up":
         return False
     if response.requires_clarification or _llm_strategy_draft_has_extractable_fields(
         response.candidate_strategy_draft
@@ -114,7 +114,7 @@ def preserve_typed_discovery_act(
     update: dict[str, Any] = {
         "semantic_turn_act": "asset_discovery",
         "asset_discovery": primary_discovery,
-        "intent": "conversation_followup",
+        "intent": "follow_up",
         "requires_clarification": False,
         "missing_required_fields": [],
         "reason_codes": list(dict.fromkeys([*audited.reason_codes, reason_code])),

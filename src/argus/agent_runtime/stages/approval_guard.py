@@ -198,7 +198,7 @@ def decision_replays_visible_confirmation_without_material_change(
         if interpretation is not None
         else decision.unsupported_constraints
     )
-    if intent not in {"strategy_drafting", "backtest_execution"}:
+    if intent not in {"calculate"}:
         return False
     if semantic_turn_act in {
         "answer_pending_need",

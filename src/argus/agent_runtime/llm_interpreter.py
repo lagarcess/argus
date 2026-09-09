@@ -19,7 +19,6 @@ from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
     _edit_plan_reshapes_non_recurring_strategy,
     plan_artifact_assumption_edit,
 )
-from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     discovery_response_ready_for_runtime,
     preserve_typed_discovery_act,
@@ -29,6 +28,9 @@ from argus.agent_runtime.interpreter.discovery_focused_read import (
     focused_discovery_payload_response,
 )
 from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.agent_runtime.interpreter.tool_calls import catalog_standalone_response, runtime_catalog_interpretation
+from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS
 from argus.agent_runtime.interpreter.repair_observability import (
     repair_effect_metadata,
 )
@@ -135,7 +137,6 @@ from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
 from argus.agent_runtime.interpreter.draft_shape import (  # noqa: F401
     _elapsed_ms,
     _refinement_reply_needs_full_interpretation,
-    strategy_has_execution_evidence,
     _llm_signal_strategy_is_underfilled,
     _llm_strategy_draft_has_executable_shape,
     _llm_strategy_draft_has_structural_execution_fields,
@@ -352,6 +353,7 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMAmbiguousField,
     LLMDateRangeIntent,
     LLMInterpretationResponse,
+    interpretation_response_model,
     LLMRiskRule,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
@@ -463,7 +465,14 @@ class OpenRouterStructuredInterpreter:
         *,
         contract: CapabilityContract,
         model_name: str | None = None,
+        tool_catalog: Any | None = None,
     ) -> None:
+        if tool_catalog is None:
+            from argus.domain.capability_registry import get_tool_catalog
+
+            tool_catalog = get_tool_catalog()
+        self.tool_catalog = tool_catalog
+        self.response_model = interpretation_response_model(tool_catalog)
         self.contract = contract
         self.model_name = model_name
         self.last_status: str | None = None
@@ -506,7 +515,7 @@ class OpenRouterStructuredInterpreter:
                     response = await invoke_openrouter_json_schema(
                         task="interpretation",
                         messages=_openrouter_wire_messages(messages),
-                        schema_model=LLMInterpretationResponse,
+                        schema_model=self.response_model,
                         schema_name="LLMInterpretationResponse",
                         model_name=candidate_model,
                     )
@@ -572,7 +581,7 @@ class OpenRouterStructuredInterpreter:
         if model:
             started_at = time.perf_counter()
             try:
-                structured = model.with_structured_output(LLMInterpretationResponse)
+                structured = model.with_structured_output(self.response_model)
                 response = await asyncio.wait_for(
                     structured.ainvoke(messages),
                     timeout=openrouter_task_timeout_seconds("interpretation"),
@@ -634,9 +643,7 @@ class OpenRouterStructuredInterpreter:
         if fallback_model:
             started_at = time.perf_counter()
             try:
-                structured = fallback_model.with_structured_output(
-                    LLMInterpretationResponse
-                )
+                structured = fallback_model.with_structured_output(self.response_model)
                 response = await asyncio.wait_for(
                     structured.ainvoke(messages),
                     timeout=openrouter_task_timeout_seconds("interpretation"),
@@ -821,7 +828,25 @@ class OpenRouterStructuredInterpreter:
             "Do not invent support. Preserve the user's raw phrasing and normalized "
             "meaning. Use prior strategy state for corrections like 'weekly instead', "
             "'use Nvidia instead', 'keep everything else', and 'sell all'.\n\n"
-            "Language-agnostic contract: users may speak English, Spanish, or another "
+            "Task intent describes the response: explain for an explanation, calculate "
+            "for work with tools, follow_up for conversation continuity, and cannot "
+            "for an actual unsupported boundary. Read the declared tool catalog and "
+            "call the operations the question needs. Use zero, multiple, or repeated "
+            "calls with distinct call IDs. Never match a question to a named "
+            "calculation form. Use only known facts in arguments; never calculate "
+            "a numerical answer in prose. If a fact is missing, ask for it or call "
+            "a declared retrieval tool. Only declared tools are available. "
+            "A tool call owns all its inputs. Keep candidate_strategy_draft empty "
+            "when tool_calls is nonempty; that field is only a pending backtest "
+            "draft when more inputs are needed before any call can be made. "
+            "The backtest call uses the declared StrategySummary structure. "
+            "Its richer extraction facts, including temporal intent, indicator "
+            "overrides and field evidence, belong in strategy.extra_parameters "
+            "when they are absent from the declared strategy properties. "
+            "Non-backtest tools never inherit strategy fields. A cannot response "
+            "must name only the requested capability that is actually unavailable.\n\n"
+            + "Declared tool catalog: " + self.tool_catalog.capability_text() + "\n\n"
+            + "Language-agnostic contract: users may speak English, Spanish, or another "
             "language. Always return canonical internal values for executable fields "
             "such as strategy_type, asset_class, cadence, timeframe, indicator, "
             "semantic_turn_act, artifact_target, and result_followup_focus; do not "
@@ -859,20 +884,6 @@ class OpenRouterStructuredInterpreter:
             "malformed requests; extract supported strategy intent, asset evidence, "
             "date/window intent, and language when those facts are visible.\n\n"
             + requested_strategy_template_capability_clause()
-            + "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
-            "dca_accumulation, registry-backed indicator threshold rules, and "
-            "schema-backed signal strategies are executable. RSI is executable with "
-            "user-specified thresholds from 0 to 100, a default period of 14, a "
-            "default entry threshold of 30, and a default exit threshold of 55 when "
-            "the user leaves one side unspecified. SMA and EMA crossovers, MACD "
-            "crossing signal, price versus SMA/EMA/Bollinger Bands, and simple "
-            "volume-above-volume-SMA confirmations are executable when you provide a "
-            "complete rule_spec. Incomplete indicator ideas and indicators without an "
-            "executable registry spec can be understood and drafted, but are not "
-            "runnable until the missing entry and exit semantics are supplied. "
-            "Same asset class only; max 5 symbols; equity benchmark is SPY; crypto benchmark is BTC; "
-            "currency pairs are supported through Kraken; currency pair benchmark is the tested "
-            "pair itself. "
             + execution_cost_capability_clause()
             + BENCHMARK_LANGUAGE_GUIDANCE
             + "When the user gives exact start/end dates, "
@@ -923,12 +934,12 @@ class OpenRouterStructuredInterpreter:
             "do not collapse a same-class basket to only the last or most familiar "
             "name. This applies to buy_and_hold, recurring buys, indicator ideas, "
             "and supported signal strategies. "
-            "For any strategy_drafting or backtest_execution request, always include "
-            "candidate_strategy_draft and fill the extractable fields you can see: "
+            "When a backtest request still needs input, populate its pending "
+            "candidate_strategy_draft with the extractable fields you can see: "
             "strategy_type, strategy_thesis, asset_universe, date_range, entry_logic, "
             "exit_logic, and structured indicator or rule fields when present. "
-            "Do not return an empty candidate_strategy_draft for a testable investing "
-            "idea. Normal curiosity such as 'what if I bought/held/owned a company, "
+            "For an incomplete no-call backtest, preserve the extracted pending "
+            "draft. Normal curiosity such as 'what if I bought/held/owned a company, "
             "ticker, crypto asset, or currency pair' is a testable investing idea, "
             "not a capability or education question; classify it as new_idea and "
             "extract the asset and strategy draft before asking only for truly missing "
@@ -1011,16 +1022,15 @@ class OpenRouterStructuredInterpreter:
             "intent, explain the limitation, and offer executable simplifications. "
             "For simplification choices, put executable meaning in canonical "
             "replacement_values; labels are display-only.\n\n"
-            "semantic_turn_act is the routing source of truth. Use approval when the "
+            "For existing strategy artifacts, semantic_turn_act is the routing source of truth. Use approval when the "
             "user clearly approves a pending confirmation; in that case set intent to "
-            "backtest_execution, task_relation to continue, requires_clarification to "
+            "calculate, task_relation to continue, requires_clarification to "
             "false, and preserve the prior strategy. Use refine_current_idea when the "
             "user asks to change dates, assets, assumptions, timeframe, capital, or "
             "strategy details, and ask only for the changed missing detail. Use new_idea "
             "for a fresh testable idea, answer_pending_need when the user answers the "
             "latest missing fact, educational_question for product or investing concept "
             "questions, result_followup for questions about the latest completed run, "
-            + DISCOVERY_ACT_GUIDANCE
             + "When semantic_turn_act is result_followup, set result_followup_focus to "
             "the closest value: why_underperformed, max_drawdown, drawdown_date, "
             "peak_date, peak_value, result_card_fact, what_tested, "
@@ -1077,17 +1087,9 @@ class OpenRouterStructuredInterpreter:
             "education about an investing concept or a strategy family, such as what "
             "dollar cost averaging means; answer those with natural prose and connect "
             "the concept to the closest runnable Argus experiment when useful. "
-            "For standalone macro, market-event, or market-context curiosity that is "
-            "not asking for live feed output and is not tied to the latest result, set "
-            "context_question_focus instead of capability_question_focus. Use "
-            "macro_context for inflation, rates, Fed, recession, risk-on/off, or broad "
-            "macro backdrop; corporate_events for splits, dividends, corporate actions, "
-            "or earnings/event context; and market_movers for broad movers, most-active, "
-            "or unusual-move curiosity. Keep artifact_target=none unless the user "
-            "clearly targets a visible result or current confirmation. "
             "Retry turns should preserve the failed action payload; do "
             "not reinterpret the original investing idea from scratch. "
-            "Social turns are conversation_followup with assistant_response and no "
+            "Social turns are follow_up with assistant_response and no "
             "strategy draft unless they also contain a real investing idea. "
             "When the user explicitly asks for response style, verbosity, or expertise "
             "for this turn, set response_profile_overrides; do not rely on backend "
@@ -1115,7 +1117,7 @@ class OpenRouterStructuredInterpreter:
             "about the latest run/result, such as metrics, return, benchmark, drawdown, assumptions "
             "in the backtest, underperformance, or what exactly was tested. If the user asks for "
             "beginner onboarding, product help, a concept explanation, or a new idea, set it false "
-            "and do not classify as results_explanation just because a completed run exists."
+            "and do not select result_followup just because a completed run exists."
         )
 
     def _to_runtime_interpretation(
@@ -1124,6 +1126,11 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
+        if response.tool_calls or catalog_standalone_response(response):
+            return runtime_catalog_interpretation(
+                response, current_user_message=request.current_user_message,
+                normalize_strategy=_strategy_from_llm,
+            )
         strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)  # fmt: skip
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
@@ -1140,6 +1147,8 @@ class OpenRouterStructuredInterpreter:
             for item in response.ambiguous_fields
         ]
         return StructuredInterpretation(
+            uses_tool_catalog=True,
+            tool_calls=[call.model_dump(mode="json") for call in response.tool_calls],
             intent=response.intent,
             task_relation=response.task_relation,
             requires_clarification=response.requires_clarification,
@@ -1736,7 +1745,7 @@ async def _capability_side_question_audited_response(
         return response
     return response.model_copy(
         update={
-            "intent": "conversation_followup",
+            "intent": "follow_up",
             "task_relation": "continue",
             "requires_clarification": False,
             "candidate_strategy_draft": LLMStrategyDraft(
@@ -1810,7 +1819,7 @@ def _capability_audit_unavailable_response_if_safe(
         return None
     return response.model_copy(
         update={
-            "intent": "conversation_followup",
+            "intent": "follow_up",
             "task_relation": "continue",
             "requires_clarification": False,
             "candidate_strategy_draft": LLMStrategyDraft(
@@ -1875,7 +1884,7 @@ async def _context_question_audited_response(
         return response
     return response.model_copy(
         update={
-            "intent": "conversation_followup",
+            "intent": "follow_up",
             "task_relation": "continue",
             "requires_clarification": False,
             "candidate_strategy_draft": LLMStrategyDraft(
@@ -1909,7 +1918,7 @@ async def _unsupported_context_question_audited_response(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
     if (
-        response.intent != "unsupported_or_out_of_scope"
+        response.intent != "cannot"
         or response.semantic_turn_act != "unsupported_request"
         or response.missing_required_fields
         or response.context_question_focus is not None
@@ -1986,7 +1995,7 @@ async def _strategy_family_continuity_audited_response(
             requires_clarification = True
     return response.model_copy(
         update={
-            "intent": "strategy_drafting" if requires_clarification else response.intent,
+            "intent": "calculate" if requires_clarification else response.intent,
             "task_relation": "continue",
             "requires_clarification": requires_clarification,
             "candidate_strategy_draft": draft,
@@ -2054,9 +2063,8 @@ def _response_needs_dca_contract_audit(
     }:
         return False
     if response.intent not in {
-        "strategy_drafting",
-        "backtest_execution",
-        "unsupported_or_out_of_scope",
+        "calculate",
+        "cannot",
     }:
         return False
     if not request.current_user_message.strip():
@@ -2099,7 +2107,7 @@ def _current_message_has_dca_contract_shape(
         return _draft_contains_structured_capital_context(draft)
     if not _request_current_turn_has_material_execution_evidence(request):
         return False
-    if response.intent == "unsupported_or_out_of_scope":
+    if response.intent == "cannot":
         return _llm_strategy_draft_has_extractable_fields(draft)
     if response.capability_question_focus is not None:
         return _llm_strategy_draft_has_extractable_fields(draft)
@@ -2267,6 +2275,12 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
+    if response.tool_calls:
+        return response
+    if catalog_standalone_response(response):
+        if response.assistant_response or response.capability_question_focus:
+            return response
+        raise contract_recovery.incomplete_response_error(response=response, request=request)
     if (
         research_rail_enabled()
         and primary_research_query(response) is not None
@@ -2301,6 +2315,7 @@ async def _response_ready_for_runtime(
         request=request,
         asset_resolution_context=asset_resolution_context,
     )
+
 
 
 async def _audited_response_ready_for_runtime(
@@ -2908,7 +2923,7 @@ def _optional_runtime_readiness_audit_blocker(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> str | None:
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    if response.intent not in {"calculate"}:
         return "unsupported_intent"
     if response.semantic_turn_act != "new_idea":
         return "not_new_idea"
@@ -3435,7 +3450,7 @@ def _response_needs_focused_date_window_intent_repair(
         return True
     pending_date_answer = _request_has_pending_date_answer_context(request)
     if (
-        response.intent not in {"strategy_drafting", "backtest_execution"}
+        response.intent not in {"calculate"}
         and not pending_date_answer
     ):
         return False
@@ -3875,7 +3890,7 @@ def _response_needs_testable_idea_repair(
     ):
         return True
     if (
-        response.intent == "unsupported_or_out_of_scope"
+        response.intent == "cannot"
         and response.semantic_turn_act == "unsupported_request"
         and any(
             item.category == "unsupported_strategy_logic"
@@ -3887,22 +3902,22 @@ def _response_needs_testable_idea_repair(
     if _llm_strategy_draft_has_semantic_execution_anchor(draft):
         return False
     if (
-        response.intent in {"strategy_drafting", "backtest_execution"}
+        response.intent in {"calculate"}
         and response.requires_clarification
         and bool(response.assistant_response)
         and bool(draft.raw_user_phrasing or draft.strategy_thesis)
     ):
         return True
     if (
-        response.intent == "unsupported_or_out_of_scope"
+        response.intent == "cannot"
         and response.semantic_turn_act == "unsupported_request"
     ):
         return True
-    if response.intent in {"beginner_guidance", "conversation_followup"} and (
+    if response.intent in {"explain", "follow_up"} and (
         response.semantic_turn_act == "unsupported_request"
     ):
         return True
-    if response.intent in {"beginner_guidance", "conversation_followup"} and (
+    if response.intent in {"explain", "follow_up"} and (
         response.semantic_turn_act in {None, "educational_question", "new_idea"}
     ):
         return True
@@ -3915,7 +3930,7 @@ def _supported_anchor_needs_focused_run_window_repair(
     request: InterpretationRequest,
 ) -> bool:
     if not (
-        response.intent in {"strategy_drafting", "backtest_execution"}
+        response.intent in {"calculate"}
         and response.requires_clarification
         and bool(response.assistant_response)
     ):
@@ -3955,7 +3970,7 @@ def _supported_partial_strategy_needs_focused_schema_repair(
     request: InterpretationRequest,
 ) -> bool:
     if not (
-        response.intent in {"strategy_drafting", "backtest_execution"}
+        response.intent in {"calculate"}
         and response.requires_clarification
         and bool(response.assistant_response)
     ):
@@ -4022,11 +4037,10 @@ def _noncanonical_strategy_text_needs_focused_schema_repair(
     request: InterpretationRequest,
 ) -> bool:
     if response.intent not in {
-        "backtest_execution",
-        "beginner_guidance",
-        "conversation_followup",
-        "strategy_drafting",
-        "unsupported_or_out_of_scope",
+        "calculate",
+        "explain",
+        "follow_up",
+        "cannot",
     }:
         return False
     if not (
@@ -4090,7 +4104,7 @@ def _response_needs_material_evidence_strategy_repair(
 ) -> bool:
     if not _request_current_turn_has_material_execution_evidence(request):
         return False
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    if response.intent not in {"calculate"}:
         return False
     if not response.requires_clarification or not response.assistant_response:
         return False
@@ -4107,7 +4121,7 @@ def _response_needs_pre_guidance_focused_strategy_extraction(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    if response.intent not in {"calculate"}:
         return False
     if response.semantic_turn_act not in {None, "new_idea"}:
         return False
@@ -4285,7 +4299,7 @@ def _response_needs_stated_run_field_fidelity_audit(
         )
     ):
         return False
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    if response.intent not in {"calculate"}:
         return False
     if response.semantic_turn_act in {
         "approval",
@@ -4660,7 +4674,7 @@ async def _latest_result_routing_audited_response(
         reason_codes.append("latest_result_save_requested")
     return response.model_copy(
         update={
-            "intent": "conversation_followup",
+            "intent": "follow_up",
             "requires_clarification": False,
             "missing_required_fields": [],
             "assistant_response": None,
@@ -4877,7 +4891,7 @@ async def _focused_strategy_repair_after_candidate_failures(
     ) and not _request_current_turn_has_material_execution_evidence(request):
         return None
     seed_response = LLMInterpretationResponse(
-        intent="strategy_drafting",
+        intent="calculate",
         task_relation="new_task",
         requires_clarification=True,
         user_goal_summary=request.current_user_message,
@@ -4924,7 +4938,7 @@ def _structured_interpretation_has_required_shape(
     *,
     request: InterpretationRequest,
 ) -> bool:
-    if response.intent == "results_explanation" and not _request_has_latest_result(
+    if response.semantic_turn_act == "result_followup" and not _request_has_latest_result(
         request
     ):
         return False
@@ -4937,7 +4951,7 @@ def _structured_interpretation_has_required_shape(
     ):
         return False
     if (
-        response.intent == "unsupported_or_out_of_scope"
+        response.intent == "cannot"
         and response.semantic_turn_act == "unsupported_request"
         and _request_has_active_strategy_context(request)
         and _selected_requested_field_base(request)
@@ -4946,7 +4960,7 @@ def _structured_interpretation_has_required_shape(
     ):
         return False
     if (
-        response.intent == "unsupported_or_out_of_scope"
+        response.intent == "cannot"
         and response.requires_clarification
         and not response.unsupported_constraints
         # A reference-only draft (resolved asset, date) is not an answer; fail
@@ -4961,7 +4975,7 @@ def _structured_interpretation_has_required_shape(
         return False
     if response.semantic_turn_act == "retry_failed_action":
         return _request_has_failed_action_launch_payload(request)
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    if response.intent not in {"calculate"}:
         return True
     if response.semantic_turn_act == "approval":
         return True
@@ -5044,7 +5058,7 @@ def _normalize_response_for_runtime_context(
     if _request_has_latest_result(request):
         return response
     if (
-        response.intent in {"strategy_drafting", "backtest_execution"}
+        response.intent in {"calculate"}
         and response.semantic_turn_act is None
         and not _request_has_active_strategy_context(request)
         and (
@@ -5065,7 +5079,7 @@ def _normalize_response_for_runtime_context(
                 ),
             }
         )
-    if response.intent != "results_explanation":
+    if response.semantic_turn_act != "result_followup":
         return response
     if (
         response.semantic_turn_act == "result_followup"
@@ -5074,7 +5088,7 @@ def _normalize_response_for_runtime_context(
     ):
         return response.model_copy(
             update={
-                "intent": "conversation_followup",
+                "intent": "follow_up",
                 "assistant_response": None,
                 "uses_latest_result_context": False,
                 "reason_codes": [
@@ -5086,7 +5100,7 @@ def _normalize_response_for_runtime_context(
     if response.semantic_turn_act == "educational_question":
         return response.model_copy(
             update={
-                "intent": "conversation_followup",
+                "intent": "follow_up",
                 "uses_latest_result_context": False,
                 "reason_codes": [
                     *response.reason_codes,
@@ -5105,7 +5119,7 @@ def _normalize_response_for_runtime_context(
         semantic_turn_act = "new_idea"
     return response.model_copy(
         update={
-            "intent": "strategy_drafting",
+            "intent": "calculate",
             "semantic_turn_act": semantic_turn_act,
             "assistant_response": None,
             "uses_latest_result_context": False,

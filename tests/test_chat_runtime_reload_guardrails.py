@@ -2144,7 +2144,7 @@ def test_response_option_action_accepts_the_current_recovery_message_identity(
     snapshot = captured["fallback_latest_task_snapshot"]
     assert snapshot.pending_strategy_summary.asset_universe == ["NVDA"]
     assert captured["fallback_selected_thread_metadata"] == {
-        "latest_task_type": "backtest_execution",
+        "latest_task_type": "calculate",
         "last_stage_outcome": "await_user_reply",
             "fallback_source": "validated_response_option_source",
             "validated_source_assistant_id": current_recovery.id,
@@ -4542,7 +4542,7 @@ def test_spanish_structured_retry_prefers_failed_action_over_stale_confirmation(
         "failed_action_id": "failed-aapl-es"
     }
     assert captured["fallback_selected_thread_metadata"] == {
-        "latest_task_type": "backtest_execution",
+        "latest_task_type": "calculate",
         "last_stage_outcome": "execution_failed_recoverably",
         "fallback_source": "failed_action_metadata",
     }

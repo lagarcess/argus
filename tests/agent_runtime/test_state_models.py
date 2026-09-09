@@ -283,7 +283,7 @@ def test_capability_contract_exposes_required_and_optional_fields() -> None:
     contract = build_default_capability_contract()
 
     assert contract.version == "1.0"
-    assert "backtest_execution" in contract.supported_intents
+    assert 'calculate' in contract.supported_intents
     assert "backtest_tools" in contract.supported_tool_families
     assert contract.required_fields == [
         "strategy_thesis",

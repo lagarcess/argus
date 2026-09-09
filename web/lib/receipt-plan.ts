@@ -1,7 +1,7 @@
 import type {
   PublicReceiptAssumptionKey,
   PublicReceiptMetricKey,
-  PublicReceiptPayload,
+  PublicBacktestReceiptPayload,
   PublicReceiptStrategyFactKey,
 } from "./public-receipt-contract";
 import {
@@ -47,7 +47,7 @@ function joinExact(...parts: (string | undefined)[]): string | null {
 }
 
 export function receiptPlan(
-  payload: PublicReceiptPayload,
+  payload: PublicBacktestReceiptPayload,
   copy: ReceiptCopy,
 ): ReceiptPlan {
   const facts = new Map<string, string>(
@@ -169,7 +169,7 @@ export function receiptPlan(
  * about money is worse on this page than one fewer line.
  */
 export function receiptAssumptions(
-  payload: PublicReceiptPayload,
+  payload: PublicBacktestReceiptPayload,
   copy: ReceiptCopy,
   language: ArgusLanguage,
 ): string[] {
@@ -255,7 +255,7 @@ export function receiptAssumptions(
  * says nothing rather than guessing when either will not parse.
  */
 export function benchmarkVerdict(
-  payload: PublicReceiptPayload,
+  payload: PublicBacktestReceiptPayload,
   copy: ReceiptCopy,
 ): string | null {
   const symbol = payload.benchmark_symbol;
@@ -294,7 +294,7 @@ export function benchmarkVerdict(
 }
 
 /** What the benchmark itself did, for the line beside the headline number. */
-export function benchmarkReturn(payload: PublicReceiptPayload): string | null {
+export function benchmarkReturn(payload: PublicBacktestReceiptPayload): string | null {
   if (!payload.benchmark_symbol) return null;
   return (
     payload.metrics.find((metric) => metric.key === "benchmark_return_pct")

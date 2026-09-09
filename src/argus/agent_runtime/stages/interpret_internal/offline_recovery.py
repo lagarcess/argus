@@ -60,7 +60,7 @@ def _offline_interpreter_unavailable_result(
         explicit_overrides=None,
     )
     decision = InterpretDecision(
-        intent="conversation_followup",
+        intent="follow_up",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary="Structured interpretation was unavailable for this turn.",
@@ -121,7 +121,7 @@ def _offline_pending_no_progress_result(
 
     candidate = snapshot.pending_strategy_summary.model_copy(deep=True)
     decision = InterpretDecision(
-        intent="strategy_drafting",
+        intent="calculate",
         task_relation="continue",
         requires_clarification=True,
         user_goal_summary=(

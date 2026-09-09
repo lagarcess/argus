@@ -2,94 +2,38 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInstance } from "i18next";
-
 import { parseChatStreamFrame } from "@/lib/argus-api";
+import { toolProgressText } from "@/lib/tool-result-card";
+import en from "../public/locales/en/common.json";
+import es from "../public/locales/es-419/common.json";
 
 const root = join(import.meta.dir, "..");
-const en = JSON.parse(
-  readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
-);
-const es = JSON.parse(
-  readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
-);
 
-async function appLikeT(resources: Record<string, unknown>) {
-  const instance = createInstance();
-  await instance.init({
-    lng: "cimode-off",
-    fallbackLng: false,
-    resources: { "cimode-off": { translation: resources } },
-    interpolation: { escapeValue: false },
-    // Mirrors web/lib/i18n.ts: missing keys resolve falsy so || fallbacks fire.
-    parseMissingKeyHandler: () => "",
+describe("actual tool-call progress", () => {
+  test("legacy detail remains transport metadata without selecting user copy", () => {
+    expect(parseChatStreamFrame('data: {"type":"stage_start","stage":"discovery_search","detail":"cybersecurity stocks"}')).toEqual({ event: "stage_start", data: { stage: "discovery_search", detail: "cybersecurity stocks" } });
+    expect(parseChatStreamFrame('data: {"type":"stage_start","stage":"discovery_verify","detail":""}')).toEqual({ event: "stage_start", data: { stage: "discovery_verify" } });
   });
-  return instance.t.bind(instance);
-}
 
-describe("sub-stage progress events", () => {
-  test("parser carries detail on stage_start and drops empty detail", () => {
-    expect(
-      parseChatStreamFrame(
-        'data: {"type":"stage_start","stage":"discovery_search","detail":"cybersecurity stocks"}',
-      ),
-    ).toEqual({
-      event: "stage_start",
-      data: { stage: "discovery_search", detail: "cybersecurity stocks" },
+  for (const [locale, copy] of [["en", en], ["es-419", es]] as const) {
+    test(`typed call arguments render in ${locale} without a model call`, async () => {
+      const instance = createInstance();
+      await instance.init({ lng: locale, fallbackLng: false, resources: { [locale]: { translation: copy } }, interpolation: { escapeValue: false } });
+      const t = instance.t.bind(instance);
+      const progress = { locale_key: "chat.tools.progress.backtest", interpolation_args: { asset_universe: "AAPL" }, call_id: "call-1", tool_name: "run_backtest" };
+      expect(toolProgressText(progress, t)).toContain("AAPL");
+      expect(toolProgressText(progress, t)).toBe(copy.chat.tools.progress.backtest.replace("{{asset_universe}}", "AAPL"));
+      expect(toolProgressText(null, t)).toBe(copy.chat.status.working);
+      expect(toolProgressText({ ...progress, locale_key: "future_unknown" }, t)).toBe(copy.chat.status.working);
+      for (const old of ["interpret", "clarify", "confirm", "execute", "explain", "next_step", "extracting_strategy", "running_backtest", "calculating_metrics", "discovery_search"]) {
+        expect(Object.keys(copy.chat.status)).not.toContain(old);
+      }
     });
-    expect(
-      parseChatStreamFrame(
-        'data: {"type":"stage_start","stage":"discovery_verify"}',
-      ),
-    ).toEqual({ event: "stage_start", data: { stage: "discovery_verify" } });
-    expect(
-      parseChatStreamFrame(
-        'data: {"type":"stage_start","stage":"discovery_search","detail":""}',
-      ),
-    ).toEqual({ event: "stage_start", data: { stage: "discovery_search" } });
-  });
+  }
 
-  test("both locales carry the discovery status keys with interpolation", () => {
-    for (const locale of [en, es]) {
-      const status = locale.chat.status;
-      expect(status.discovery_search).toBeTruthy();
-      expect(status.discovery_search_detail).toContain("{{detail}}");
-      expect(status.discovery_verify).toBeTruthy();
-    }
-  });
-
-  test("status label cascade: detail, detail-less, then neutral fallback", async () => {
-    const t = await appLikeT(en);
-    const label = (stage: string, detail?: string) =>
-      (detail
-        ? t(`chat.status.${stage}_detail`, { detail }) ||
-          t(`chat.status.${stage}`)
-        : t(`chat.status.${stage}`)) || t("chat.status.preparing");
-
-    expect(label("discovery_search", "cybersecurity stocks")).toBe(
-      "Searching the web: cybersecurity stocks",
-    );
-    expect(label("discovery_search")).toBe("Searching the web...");
-    expect(label("discovery_verify")).toBe(
-      "Verifying candidates against supported markets...",
-    );
-    // Unknown stage from a newer backend: neutral label, never the raw key.
-    expect(label("future_unknown_stage")).toBe("Preparing results");
-    expect(label("future_unknown_stage", "with detail")).toBe(
-      "Preparing results",
-    );
-  });
-
-  test("app i18n config resolves missing keys falsy", () => {
-    const i18nSource = readFileSync(join(root, "lib/i18n.ts"), "utf-8");
-    expect(i18nSource).toContain("parseMissingKeyHandler: () => ''");
-  });
-
-  test("ChatInterface passes detail through the label cascade", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
-    expect(chat).toContain("t(`${stageKey}_detail`, { detail })");
-    expect(chat).toContain('t("chat.status.preparing")');
+  test("graph stage names never select a localized status", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf8");
+    expect(chat).toContain("toolProgressText(event.data.tool_progress ?? null, t)");
+    expect(chat).not.toContain("chat.status.${event.data.stage}");
   });
 });

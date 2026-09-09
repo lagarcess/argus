@@ -96,7 +96,7 @@ async def test_same_period_reference_binds_latest_result_window(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return _same_period_new_idea_response()
         raise ValueError(f"unexpected schema request: {schema_model.__name__}")
 
@@ -164,7 +164,7 @@ async def test_pending_date_answer_with_period_reference_materializes_window(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="continue",
@@ -338,7 +338,7 @@ async def test_post_result_dateless_draft_inherits_run_window_one_shot(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",

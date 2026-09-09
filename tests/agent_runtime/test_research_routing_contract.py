@@ -1,4 +1,4 @@
-"""Issue #411: the primary interpretation owns research intent and shape."""
+"""Legacy research ownership survives canonical task-intent normalization."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from argus.agent_runtime.interpreter.research_routing import (
     primary_research_query,
     research_turn_has_conflicting_owner,
 )
+from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
@@ -202,14 +203,30 @@ def test_thin_strategy_request_owns_default_draft_despite_research_query(
     assert primary_research_query(interpretation) is None
 
 
-def test_default_draft_does_not_claim_a_genuine_research_question():
+@pytest.mark.parametrize("intent", ["follow_up", "calculate"])
+def test_default_draft_does_not_claim_a_genuine_research_question(intent):
     interpretation = _interpretation(
+        intent=intent,
         candidate_strategy_draft={
             "strategy_type": "buy_and_hold",
             "extra_parameters": {"field_provenance": {"strategy_type": "default"}},
-        }
+        },
     )
     assert primary_research_query(interpretation) == interpretation.research_query
+
+
+@pytest.mark.parametrize("legacy_intent", ["strategy_drafting", "backtest_execution"])
+@pytest.mark.parametrize("semantic_turn_act", sorted(STRATEGY_TURN_ACTS))
+def test_legacy_strategy_intent_preserves_the_existing_action(
+    legacy_intent, semantic_turn_act
+):
+    interpretation = _interpretation(
+        intent=legacy_intent,
+        semantic_turn_act=semantic_turn_act,
+    )
+    assert interpretation.intent == "calculate"
+    assert interpretation.semantic_turn_act == semantic_turn_act
+    assert primary_research_query(interpretation) is None
 
 
 def test_results_explanation_intent_owns_turn_without_auxiliary_result_fields():

@@ -110,7 +110,7 @@ def _response_underfills_pending_result_refinement(
         and response.semantic_turn_act == "result_followup"
     ):
         return False
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    if response.intent not in {"calculate"}:
         return True
     return not _llm_strategy_draft_has_extractable_fields(
         response.candidate_strategy_draft
@@ -166,7 +166,7 @@ def _response_underfills_active_artifact_assumption_edit(
         return False
     if response.requires_clarification and response.assistant_response:
         return False
-    return bool(response.intent in {"strategy_drafting", "backtest_execution"})
+    return bool(response.intent in {"calculate"})
 
 
 def _refinement_reply_needs_full_interpretation(

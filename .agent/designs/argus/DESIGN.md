@@ -199,21 +199,22 @@ _Design targets below are intentional for this system; if implementation keeps T
 - **Persistent Input**: The chat input must remain highly visible and ergonomic (especially on mobile).
 - **Starter Prompts**: Displayed as polished, high-contrast chips or cards to reduce "blank page" friction.
 - **Streaming States**: AI responses support real-time token streaming to feel alive.
-- **Calm Progress States**: When simulating, use human-centric status language and subtle motion (pulse dots, progress shimmers).
-  - Progress states are driven by **`stage_start` server-sent events from the agent runtime pipeline**, not local frontend timers.
-  - The frontend must map `stage` values from the backend to these display labels:
-
-    | Backend `stage` | User-facing label |
-    |---|---|
-    | `interpret` | "Understanding your idea..." |
-    | `clarify` | "I have a question..." |
-    | `confirm` | "Here's what I found..." |
-    | `execute` | "Running backtest..." |
-    | `explain` | "Reviewing results..." |
-    | `next_step` | "What's next..." |
-
-  - The frontend must **never fake these states with timers**. If no `stage_start` event has been received, show a neutral loading indicator only.
+- **Calm Progress States**: Use subtle motion and status text that names the
+  actual executing call. A tool declaration supplies its progress locale key
+  and typed argument facts through `stage_start.tool_progress`; the client
+  interpolates them in English or Spanish without another model call.
+  Graph stage names never select user-facing copy. A stage with no declared
+  tool progress shows only a neutral loading indicator. Never invent progress
+  with timers or label a general question as a backtest.
 - **Inline Results**: Backtest result cards appear directly in the flow of conversation.
+- **Declared Tool Results**: Lead with the answer and its unit, then supporting
+  facts and inputs. The tool's versioned presenter owns this structure for both
+  chat and sanitized receipts. Failure, ambiguity and bounds remain visibly
+  distinct from answers. A retained unknown is blank and read-only; zero is a
+  known input. Editable local inputs recompute the same card without adding a
+  conversational turn. Repeated calls remain separate cards through edits and
+  reloads. Research cards preserve their public source citations; public
+  receipts omit private narrative and the original request.
 - **Minimal Actions**: Follow-up actions should be clear but few. Under
   private-alpha defaults, examples are "Explain result", "Refine idea", and
   "Add decision". "Save Strategy" and "Add to Collection" must not appear while

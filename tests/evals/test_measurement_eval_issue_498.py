@@ -40,7 +40,7 @@ def _issue_498_wiring(
     plan: Any,
     effective_range: dict[str, str] | None,
     adjustment_reason: str | None,
-) -> None:
+) -> list[type]:
     """Wire the REAL structured interpreter with canned LLM outputs.
 
     Unlike interpreter-level mocks, this exercises the whole deterministic
@@ -48,6 +48,7 @@ def _issue_498_wiring(
     the stage merge — only the two LLM reads are canned."""
     from argus.agent_runtime import artifact_edit_planner
     from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
     from argus.agent_runtime.stages import interpret as interpret_module
     from argus.domain.backtesting import coverage as coverage_module
     from argus.domain.backtesting.coverage import (
@@ -55,10 +56,18 @@ def _issue_498_wiring(
         PreparedMarketData,
     )
 
+    served_primary_schemas: list[type] = []
+
     async def dispatcher(*, schema_model: Any = None, **kwargs: Any):
         name = getattr(schema_model, "__name__", "")
-        if name == "LLMInterpretationResponse":
-            return primary()
+        if isinstance(schema_model, type) and issubclass(
+            schema_model, LLMInterpretationResponse
+        ):
+            # The catalog specializes this class. Exercise the exact supplied
+            # schema instead of rejecting it and silently entering fallback.
+            response = schema_model.model_validate(primary().model_dump(mode="python"))
+            served_primary_schemas.append(schema_model)
+            return response
         if name == "ArtifactAssumptionEditPlan":
             return plan()
         raise RuntimeError(f"no canned response for schema {name}")
@@ -95,6 +104,7 @@ def _issue_498_wiring(
     monkeypatch.setattr(interpreter_module, "resolve_asset", _issue_498_resolve_stub)
     monkeypatch.setattr(interpret_module, "resolve_asset", _issue_498_resolve_stub)
     monkeypatch.setattr(coverage_module, "prepare_market_data", prepared_coverage)
+    return served_primary_schemas
 
 
 def _issue_498_primary(**draft_fields: Any):
@@ -220,7 +230,7 @@ def test_issue_498_compound_edits_apply_every_operation(
     completed from the primary read and applied in full; the eval cases from
     the live scorecard are the acceptance bar."""
     case = {case.id: case for case in load_eval_cases()}[case_id]
-    _issue_498_wiring(
+    served_primary_schemas = _issue_498_wiring(
         monkeypatch,
         primary=primary,
         plan=plan,
@@ -230,7 +240,8 @@ def test_issue_498_compound_edits_apply_every_operation(
 
     result = harness.run_eval_case(case, run_prose_judge=False)
 
+    assert served_primary_schemas
+    assert all(schema.uses_tool_catalog for schema in served_primary_schemas)
     assert result["failed_checks"] == []
     assert result["status"] == "passed"
-
 

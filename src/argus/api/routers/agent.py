@@ -105,7 +105,6 @@ from argus.api.chat.runtime_worker import (
     threaded_runtime_event_source,
 )
 from argus.api.chat.streaming import (
-    runtime_result_card,
     runtime_result_envelope,
     runtime_result_message,
     runtime_stage_status,
@@ -114,6 +113,10 @@ from argus.api.chat.streaming import (
     sse_keepalive,
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
+from argus.api.chat.tool_results import (
+    prepare_runtime_tool_publication,
+    runtime_tool_result_cards,
+)
 from argus.api.chat.turn_metering import settle_metered_turn
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.guest_access import account_context, client_identity
@@ -919,33 +922,20 @@ async def chat_stream(
                     assistant_text = None
                     runtime_result.pop("assistant_response", None)
                     runtime_result.pop("assistant_prompt", None)
-                result_card = runtime_result_card(runtime_result)
+                tool_publication = prepare_runtime_tool_publication(
+                    runtime_result,
+                    runtime_event.get("_tool_effects"),
+                    assistant_text=assistant_text,
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                    request_message_id=lifecycle_hooks.turn_id,
+                    request_id=request.state.request_id,
+                )
+                tool_result_cards = tool_publication.cards
+                assistant_text = tool_publication.assistant_text
+                result_card = tool_publication.result_card
                 envelope = runtime_result_envelope(runtime_result)
-                backtest_job = None
-                raw_backtest_job = runtime_result.get("backtest_job")
-                if isinstance(raw_backtest_job, dict):
-                    backtest_job = dict(raw_backtest_job)
-                final_response_payload = runtime_result.get("final_response_payload")
-                if (
-                    backtest_job is None
-                    and isinstance(final_response_payload, dict)
-                    and isinstance(final_response_payload.get("backtest_job"), dict)
-                ):
-                    backtest_job = dict(final_response_payload["backtest_job"])
-                if backtest_job is None and "research_job_request" in runtime_result:
-                    from argus.api.chat.research_jobs import (
-                        apply_research_job_request,
-                    )
-
-                    backtest_job = apply_research_job_request(
-                        runtime_result,
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                        request_message_id=lifecycle_hooks.turn_id,
-                        request_id=request.state.request_id,
-                    )
-                    if backtest_job is None:
-                        assistant_text = runtime_result.get("assistant_response")
+                backtest_job = tool_publication.backtest_job
                 run = None
                 result_action_run = validated_result_action_run
                 result_action_type = result_action_request_type(runtime_result)
@@ -1111,6 +1101,10 @@ async def chat_stream(
                     )
                 if result_card is not None:
                     metadata["result_card"] = result_card
+                if tool_result_cards:
+                    metadata["tool_result_cards"] = tool_result_cards
+                if runtime_result.get("tool_jobs"):
+                    metadata["tool_jobs"] = runtime_result["tool_jobs"]
                 if backtest_job is not None:
                     metadata["backtest_job"] = backtest_job
                     metadata["backtest_job_id"] = backtest_job.get("id")
@@ -1151,6 +1145,7 @@ async def chat_stream(
                         result_card = publication.result_card
                     else:
                         assistant_text = publication.assistant_text
+                        tool_result_cards = runtime_tool_result_cards(runtime_result)
                         run = None
 
                 streamed_text = "".join(streamed_text_parts).strip()
@@ -1169,7 +1164,7 @@ async def chat_stream(
                 typed_artifact_answer = artifact_presentation_kind(metadata) in {
                     "assumptions",
                     "breakdown",
-                }
+                } or bool(tool_result_cards)
                 if not (
                     persisted_text
                     or confirmation_card is not None
@@ -1258,10 +1253,11 @@ async def chat_stream(
                     is_guest=turn_is_guest,
                     client_identity=turn_client_identity,
                     conversation_id=conversation.id,
-                    message_id=(
-                        assistant_message.id if assistant_message is not None else None
-                    ),
+                    message_id=assistant_message.id
+                    if assistant_message is not None
+                    else None,
                     request_id=request.state.request_id,
+                    tool_effects=tool_publication.effects,
                 )
                 receipt_metadata = {
                     "request_id": request.state.request_id,

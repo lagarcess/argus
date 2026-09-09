@@ -11,6 +11,7 @@ import {
 import {
   formatReceiptDateRange,
   receiptCopy,
+  toolReceiptSummary,
   receiptLanguageFromAcceptLanguage,
 } from "@/lib/receipt-copy";
 import { notFound } from "next/navigation";
@@ -74,6 +75,14 @@ export async function generateMetadata({
       robots: RECEIPT_ROBOTS,
       metadataBase: metadataBase(),
     };
+  }
+  if (result.payload.schema_version === 2) {
+    const summary = toolReceiptSummary(result.payload, language);
+    const description = [summary.label, summary.answer, summary.framing].filter(Boolean).join(" · ");
+    return { title: `${summary.title} · ${summary.provenance}`, description,
+      robots: RECEIPT_ROBOTS, metadataBase: metadataBase(),
+      openGraph: { type: "article", title: summary.title, description, siteName: "Argus" },
+      twitter: { card: "summary_large_image", title: summary.title, description } };
   }
   const headline = headlineReceiptMetric(result.payload);
   // Description is built from the frozen payload only, so the card shows the

@@ -164,3 +164,16 @@ export function researchSourcesForFinalPayload(
   const sources = researchSourcesFromMetadata(payload);
   return sources.length > 0 ? sources : undefined;
 }
+
+/** Canonical research sources carry a URL; the existing source validator owns safety. */
+export function researchSourcesFromFacts(value: unknown): DiscoverySource[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object") return null;
+    const source = entry as Record<string, unknown>;
+    try {
+      const url = new URL(stringOr(source.url));
+      return sourceOrNull({ ...source, domain: url.hostname });
+    } catch { return null; }
+  }).filter((source): source is DiscoverySource => source !== null);
+}

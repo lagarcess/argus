@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 from copy import deepcopy
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from argus.agent_runtime.state.models import UserState
+    from argus.domain.tool_declaration import ToolCatalog
 
 from argus.agent_runtime.coverage_recovery import (
     approved_window_reconfirmation_patch,
@@ -335,13 +338,18 @@ async def execute_stage_async(
     tool: Any,
     max_retries: int = 2,
     language: str = "en",
+    catalog: ToolCatalog | None = None,
+    user: UserState | None = None,
 ) -> StageResult:
-    return await asyncio.to_thread(
-        execute_stage,
+    from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
+
+    return await execute_tool_calls_async(
         state=state,
         tool=tool,
+        catalog=catalog,
         max_retries=max_retries,
         language=language,
+        user=user,
     )
 
 

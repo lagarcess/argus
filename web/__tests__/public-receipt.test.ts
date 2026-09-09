@@ -6,7 +6,7 @@ import {
   headlineReceiptMetric,
   isPublicReceiptId,
   publicReceiptPath,
-  type PublicReceiptPayload,
+  type PublicBacktestReceiptPayload as PublicReceiptPayload,
   type PublicReceiptView,
 } from "../lib/public-receipt-contract";
 import {
@@ -351,7 +351,7 @@ describe("the rendered page", () => {
     const referenced = [...body.matchAll(/payload\.(\w+)/g)].map(
       (match) => match[1],
     );
-    const closed = new Set(Object.keys(PAYLOAD));
+    const closed = new Set([...Object.keys(PAYLOAD), "presentation"]);
     expect([...new Set(referenced)].filter((key) => !closed.has(key))).toEqual([]);
   });
 

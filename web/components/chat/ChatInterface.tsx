@@ -101,6 +101,8 @@ import {
   POST_TURN_TITLE_REFRESH_DELAYS_MS,
 } from "@/lib/chat-conversation-view-helpers";
 import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
+import { toolResultRecomputeHandler } from "@/lib/tool-result-recompute";
+import { toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
@@ -131,6 +133,7 @@ import {
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
+  toolJobsFromMetadata,
   backtestJobMessage,
 } from "@/lib/chat-backtest-jobs";
 import {
@@ -1214,12 +1217,7 @@ export default function ChatInterface() {
         );
         clearNeutralGuestSubmission();
         if (!canApplyVisibleStreamUpdate()) return;
-        const stageKey = `chat.status.${event.data.stage}`;
-        const detail = event.data.detail;
-        setStreamStatus(
-          (detail ? t(`${stageKey}_detail`, { detail }) || t(stageKey) : t(stageKey)) ||
-            t("chat.status.preparing"),
-        );
+        setStreamStatus(toolProgressText(event.data.tool_progress ?? null, t));
       }
       if (event.event === "token") {
         if (!requestSessions.authorize(requestSession, "token")) return;
@@ -1326,6 +1324,9 @@ export default function ChatInterface() {
           finalPayload.recovery,
         );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
+        const finalToolCards = toolCardsFromMetadata(finalPayload);
+        const finalToolCardsUnavailable = hasUnavailableToolCards(finalPayload);
+        const finalToolJobs = toolJobsFromMetadata(finalPayload);
         const finalMemoryRecalls = memoryRecallsFromFinalPayload(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
@@ -1368,6 +1369,7 @@ export default function ChatInterface() {
                   id: finalAssistantId,
                   role: "ai",
                   kind: "strategy_confirmation",
+                  toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                   content: undefined,
                   confirmation,
                   strategyPathContext: finalStrategyPathContext,
@@ -1399,6 +1401,7 @@ export default function ChatInterface() {
                   id: finalAssistantId,
                   role: "ai",
                   kind: "strategy_result",
+                  toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                   content: finalText || undefined,
                   result: card,
                   actions: resultActions,
@@ -1411,12 +1414,12 @@ export default function ChatInterface() {
           );
         } else if (finalBacktestJob) {
           const finalAssistantId = finalMessageId ?? assistantId;
-          const finalBacktestJobMessage = backtestJobMessage({
+          const finalBacktestJobMessage = { ...backtestJobMessage({
             id: finalAssistantId,
             content: finalText || undefined,
             job: finalBacktestJob,
             metadata: finalPayload,
-          });
+          }), toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs };
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1431,7 +1434,7 @@ export default function ChatInterface() {
               ),
             ),
           );
-        } else if (finalText) {
+        } else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {
           const finalFactHeadingKey =
             resultFactHeadingKeyFromMetadata(finalPayload);
           const finalTextNextExperiments =
@@ -1448,6 +1451,7 @@ export default function ChatInterface() {
                 mergeFinalTextMessage(m, {
                   assistantId,
                   finalText,
+                  toolResultCards: finalToolCards,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
                   strategyPathContext: finalStrategyPathContext,
@@ -1467,6 +1471,7 @@ export default function ChatInterface() {
                 role: "ai",
                 kind: "text",
                 content: finalText,
+                toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                 actions:
                   finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
@@ -1964,6 +1969,11 @@ export default function ChatInterface() {
     t,
   }));
 
+  const handleToolRecompute = toolResultRecomputeHandler(() => ({
+    source: () => ({ conversationId: activeConversationIdRef.current, latestMessageId: latestMessagesRef.current.at(-1)?.id, busy: sendAdmissionInFlightRef.current || conversationActivity.isConversationLocked(activeConversationIdRef.current) }),
+    setMessages, invalidate: (id) => invalidateTranscriptForMutation(id, "durable_result_action"), reload: loadConversation,
+  }));
+
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
     loadConversation,
@@ -2457,11 +2467,12 @@ export default function ChatInterface() {
                             message={msg}
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
+                            onToolRecompute={(card, changes) => handleToolRecompute(msg.id, card, changes)}
                             onFeedback={(type, context, rating) => {
                               void handleMessageFeedback(type, context, rating);
                             }}
                             onToast={showToast}
-                            isLatest={isLatestAi}
+                            isLatest={isLatestAi} latestMessageId={messages.at(-1)?.id}
                             isStreaming={isWorkingMessage}
                             conversationId={conversationId}
                             memoryProposalEnabled={memoryChrome.proposalEnabled}

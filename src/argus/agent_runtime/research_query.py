@@ -5,7 +5,10 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from argus.domain.research.cache import DataClass
+from argus.domain.research.contracts import CapabilityClass, QuestionShape
 
 
 class ResearchQueryExtraction(BaseModel):
@@ -82,3 +85,36 @@ class ResearchQueryExtraction(BaseModel):
     sector_of_interest: str | None = Field(
         default=None, description="The industry, sector or theme named by the user."
     )
+
+
+class ResearchOperationQuery(BaseModel):
+    """Validated operation facts passed to the existing retrieval machinery.
+
+    This internal request is never a model-facing tool input. A registered
+    handler supplies its execution policy directly; legacy question-kind
+    consumers receive no classifier value from it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    shape: QuestionShape
+    capability_class: CapabilityClass
+    data_class: DataClass
+    symbols: list[str] = Field(default_factory=list)
+    asset_class_hint: Literal["equity", "crypto", "currency_pair"] | None = None
+    period_of_interest: str | None = None
+    period_is_closed_window: bool = False
+    period_start_date: date | None = None
+    requires_publisher_sources: bool = False
+    survey: bool = False
+    screening_criteria: list[str] = Field(default_factory=list)
+    sector_of_interest: str | None = None
+
+    @property
+    def question_kind(self) -> None:
+        """Compatibility readers get no question classifier on this path."""
+        return None
+
+    @property
+    def date_range_raw_text(self) -> str | None:
+        return self.period_of_interest

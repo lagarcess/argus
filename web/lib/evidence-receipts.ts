@@ -1,3 +1,4 @@
+import type { LocalizedToolText } from "./tool-result-card";
 import { apiFetch } from "./argus-api-transport";
 import {
   publicReceiptPath,
@@ -13,7 +14,8 @@ export type EvidenceReceipt = {
   symbols: string[];
   // Two dates, not a rendered string: the owner reads this row in whatever
   // language the app is in, which need not be the one the run was made in.
-  date_range: PublicReceiptDateRange;
+  date_range: PublicReceiptDateRange | null;
+  title_facts?: LocalizedToolText | null;
   created_at: string;
   revoked_at?: string | null;
   revocation_reason?: "owner_revoked" | "source_deleted" | null;
@@ -50,6 +52,18 @@ export async function createEvidenceReceipt(
       method: "POST",
       body: JSON.stringify({ owner_note: ownerNote || null }),
     },
+  );
+  return response.receipt;
+}
+
+export type ToolReceiptSource = {
+  conversationId: string; messageId: string; artifactId: string; inputRevision: number;
+};
+
+export async function createToolReceipt(source: ToolReceiptSource, ownerNote: string | null): Promise<EvidenceReceipt> {
+  const response = await apiFetch<{ receipt: EvidenceReceipt }>(
+    `/conversations/${encodeURIComponent(source.conversationId)}/tool-results/${encodeURIComponent(source.artifactId)}/public-excerpt`,
+    { method: "POST", body: JSON.stringify({ message_id: source.messageId, input_revision: source.inputRevision, owner_note: ownerNote }) },
   );
   return response.receipt;
 }

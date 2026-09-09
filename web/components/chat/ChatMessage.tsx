@@ -6,6 +6,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
+import ToolResultCard from "./ToolResultCard";
+import { toolCardCopyText, type ToolRecompute } from "@/lib/tool-result-card";
 import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
@@ -63,12 +65,14 @@ import { confirmationEditDisclosureText } from "@/lib/confirmation-edit-disclosu
 import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
 import { EntityToken } from "./entity-token";
+import { toolRecomputeEligible } from "@/lib/tool-result-recompute";
 import { messageMentionPieces } from "./mention-rendering";
 
 
 type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
+  onToolRecompute?: ToolRecompute;
   onDirectEdit?: (
     confirmationId: string,
     edit: ConfirmationDirectEditPayload,
@@ -76,6 +80,7 @@ type ChatMessageProps = {
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
+  latestMessageId?: string | null;
   isStreaming?: boolean;
   conversationId?: string | null;
   nextMovesEnabled?: boolean;
@@ -97,9 +102,11 @@ export default function ChatMessage({
   message,
   onAction,
   onDirectEdit,
+  onToolRecompute,
   onFeedback,
   onToast,
   isLatest,
+  latestMessageId,
   isStreaming,
   conversationId,
   nextMovesEnabled = true,
@@ -223,7 +230,7 @@ export default function ChatMessage({
     if (message.contentPresentation === "result_breakdown") {
       return resultBreakdownText(null, t, locale);
     }
-    return normalizeCopyText(message.content ?? "");
+    return normalizeCopyText([message.content ?? "", ...(message.toolResultCards ?? []).map((card) => toolCardCopyText(card, t, locale))].filter(Boolean).join("\n\n"));
   };
 
   const handleCopy = async (text = getCopyText()) => {
@@ -498,6 +505,17 @@ export default function ChatMessage({
               </ReactMarkdown>
             </div>
           )}
+
+          {!isUser && message.toolJobs?.map((pending) => <div key={pending.call_id} className="mt-3 w-full max-w-[min(100%,660px)]">
+            <BacktestJobCard job={pending.job} canRetry={false} />
+          </div>)}
+          {!isUser && message.hasUnavailableToolResults ? <p role="status" className="mt-3 text-sm text-black/60 dark:text-white/60">{t("tools.card.unavailable")}</p> : null}
+          {!isUser && message.toolResultCards?.filter((card) => !(card.card_type === "backtest" && message.result) && !message.toolJobs?.some((pending) => pending.artifact_id === card.artifact_id && pending.call_id === card.call_id)).map((card) => (
+            <div key={`${card.artifact_id}-${card.input_revision}`} className="mt-3 w-full max-w-[min(100%,660px)]">
+              <ToolResultCard card={card} onRecompute={onToolRecompute} disabled={!toolRecomputeEligible(message.id, latestMessageId, turnInFlight || Boolean(isStreaming))}
+                shareSource={canSaveDecision && !isGuest && conversationId ? { conversationId, messageId: message.id, artifactId: card.artifact_id, inputRevision: card.input_revision } : undefined} />
+            </div>
+          ))}
 
           {!isUser && !isStreaming && message.memoryRecalls?.length ? (
             <MemoryRecallNote recalls={message.memoryRecalls} />

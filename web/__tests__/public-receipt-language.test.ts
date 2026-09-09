@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PublicReceiptPayload } from "../lib/public-receipt-contract";
+import type { PublicBacktestReceiptPayload as PublicReceiptPayload } from "../lib/public-receipt-contract";
 import {
   formatReceiptDateRange,
   formatReceiptNumber,

@@ -13,15 +13,13 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from faker import Faker
 
 from tests.evals import measurement_eval_harness as harness
 from tests.evals.measurement_outcome import offered_to_user
 
-SWEEP_CASES = [
-    case
-    for case in harness.load_eval_cases()
-    if case.expected.semantic_turn_act != "asset_discovery"
-]
+SWEEP_CASES = harness.load_eval_cases()
+fake = Faker()
 
 
 def _correct_routing(case: harness.EvalCase) -> dict[str, Any]:
@@ -33,6 +31,19 @@ def _correct_routing(case: harness.EvalCase) -> dict[str, Any]:
             outcome[key] = list(value)
     if isinstance(outcome["intent"], list):
         outcome["intent"] = outcome["intent"][0]
+    discovery = outcome.get("asset_discovery")
+    if isinstance(discovery, dict):
+        terms = discovery.pop("category_description_includes_any", [])
+        if terms:
+            discovery["category_description"] = terms[0]
+    if case.expected.tool_dispatch:
+        # Authored routing facts isolate the delivery mutation. Actual
+        # declaration invocation is proven in test_measurement_registry_dispatch.
+        call_id = fake.uuid4()
+        outcome["tool_calls"] = [
+            {"call_id": call_id, "tool_name": "synthetic_measured_call", "arguments": {}}
+        ]
+        outcome["tool_call_records"] = [{"call_id": call_id, "outcome": "succeeded"}]
     return outcome
 
 

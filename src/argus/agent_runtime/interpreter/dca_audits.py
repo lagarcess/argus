@@ -47,7 +47,7 @@ def _response_needs_strategy_family_continuity_audit(
         return False
     if response.task_relation == "refine":
         return False
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    if response.intent not in {"calculate"}:
         return False
     if not request.recent_thread_history:
         return False
@@ -112,9 +112,9 @@ def _response_from_dca_contract_audit(
     )
     return response.model_copy(
         update={
-            "intent": "strategy_drafting"
+            "intent": "calculate"
             if missing_required_fields
-            else "backtest_execution",
+            else "calculate",
             "task_relation": "new_task",
             "requires_clarification": bool(missing_required_fields),
             "candidate_strategy_draft": draft,
@@ -482,7 +482,7 @@ def _budget_clarification_response(
 ) -> LLMInterpretationResponse:
     return response.model_copy(
         update={
-            "intent": "strategy_drafting",
+            "intent": "calculate",
             "requires_clarification": True,
             "candidate_strategy_draft": draft,
             "missing_required_fields": list(

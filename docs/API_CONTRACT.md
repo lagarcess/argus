@@ -641,6 +641,7 @@ Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
 | Method   | Path                                               | Purpose |
 | :------- | :------------------------------------------------- | :------ |
 | `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Freeze a receipt from an owned completed backtest |
+| `POST`   | `/conversations/{conversation_id}/tool-results/{artifact_id}/public-excerpt` | Freeze an owned successful tool-card revision |
 | `GET`    | `/public-excerpts`                                 | The owner's receipt list for Data Controls |
 | `DELETE` | `/public-excerpts/{snapshot_id}`                   | Revoke, immediately and irreversibly |
 
@@ -664,9 +665,21 @@ when two concurrent requests race on the insert. Only a real insert emits the
 `receipt_created` funnel event, so a retry or a reload cannot inflate the
 acquisition funnel's creation stage.
 
+The tool-result create route takes `{message_id, input_revision, owner_note}`.
+It verifies the owned assistant message and exact successful card revision.
+Concurrent creation for that same source revision returns one live receipt;
+recomputation cannot silently change an existing frozen receipt. Receipt v2
+contains `{schema_version: 2, card_type, card_version, presentation, owner_note,
+content_language, framing, provenance_mark}`. Its presentation uses the same
+versioned card facts as chat after the public sanitizer removes private narrative
+and request inputs. Call identities, raw arguments and execution outcomes remain
+private. Receipt v1 and its existing backtest endpoint remain readable.
+
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range,
-created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
-as ISO dates. It carries no source conversation, run, or artifact id. Clients
+created_at, revoked_at, revocation_reason}` with optional `title_facts` for a
+localized tool-card title. `date_range` is `{start, end}` as ISO dates or `null`
+when the result has no historical window. It carries no source conversation,
+run, message, or artifact id. Clients
 compose the shareable url as `origin + path`, so the backend owns no origin
 configuration.
 
@@ -3012,6 +3025,56 @@ stores nothing and makes no LLM, provider, or market-data call.
 ---
 
 # 12. Chat Streaming Endpoint
+
+### Declared tool calls and results
+
+The model-facing task intents are `explain`, `calculate`, `follow_up`, and
+`cannot`. Each declared callable supplies its own typed argument and return
+schema. The neutral transport `ToolCall` is `{tool_name, call_id, arguments}`;
+the generated model schema constrains `arguments` by the selected declaration.
+Calls are ordered, bounded by `MAX_TOOL_CALLS`, and have distinct call IDs.
+Zero calls, different tools, and repeated calls are valid. No separate question
+category selects a tool. Existing persisted intent spellings remain readable.
+
+An actual invocation emits `stage_start.tool_progress` containing
+`{locale_key, interpolation_args, call_id, tool_name}`. Interpolation values are
+typed argument facts; the client selects localized copy from `locale_key`.
+Stage-only events carry operational state and display a neutral loader. They do
+not imply strategy extraction, backtest execution, or metric calculation.
+
+Final payloads and persisted assistant metadata carry `tool_result_cards` as a
+list. Each card is `{kind: "tool_result", schema_version: 1, tool_name, call_id,
+artifact_id, input_revision, card_type, card_version, arguments, outcome,
+presentation, artifact_state}`. The outcome status is `succeeded`, `invalid`,
+`ambiguous`, `bounded`, or `unavailable`. Only success has a typed result;
+unsuccessful outcomes contain a failure code and affected field names and cannot
+present an answer. The declaration validates the result before projecting it.
+`presentation` contains a localized title, answer, supporting rows, inputs,
+notes, and optional narrative, public source citations and a typed visual.
+Facts retain their raw value; optional `value_text` supplies localized display
+for typed tokens. Input facts preserve units, editability and the retained
+unknown. Their `visibility` defaults to `private`; a declaration explicitly
+marks shareable input facts `public`. This display contract does not
+replace any tool's argument or result model.
+
+`tool_jobs` retains asynchronous work as
+`[{call_id, tool_name, artifact_id, job}]`. Existing job polling and result-message
+publication resolve each entry independently, including repeated calls and
+out-of-order completions. The legacy `result_card` still identifies a backtest;
+general tools never manufacture runs or use that key to force publication.
+
+`POST /conversations/{conversation_id}/tool-results/{artifact_id}/recompute`
+takes `{message_id, input_revision, arguments}`, where `arguments` is a nonempty
+partial edit. Only a declared local, unconfirmed, editable tool is eligible.
+The endpoint verifies ownership, current message/card liveness and revision,
+retains the original unknown, validates all cross-argument rules, and invokes
+the same callable. Zero remains a known input. It returns `{message}` after a
+guarded update of the same artifact with its next revision; it adds no chat turn.
+Missing/foreign results return 404, dead artifacts return
+`409 artifact_action_invalid_state`, stale revisions or racing writes return
+`409 tool_result_changed`, and rejected inputs return
+`422 tool_arguments_invalid`. A missing or incompatible declaration binding
+returns `422 tool_inputs_not_editable`.
 
 ### Structured Action Semantics
 

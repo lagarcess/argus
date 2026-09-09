@@ -135,9 +135,8 @@ def _response_needs_supported_strategy_capability_conflict_audit(
     response: LLMInterpretationResponse,
 ) -> bool:
     if response.intent not in {
-        "strategy_drafting",
-        "backtest_execution",
-        "unsupported_or_out_of_scope",
+        "calculate",
+        "cannot",
     }:
         return False
     has_unsupported_strategy_logic = any(
@@ -223,7 +222,7 @@ def _response_with_supported_strategy_capability_conflict_removed(
             draft=repaired.candidate_strategy_draft,
         )
     )
-    repaired.intent = "strategy_drafting"
+    repaired.intent = "calculate"
     repaired.semantic_turn_act = "new_idea"
     repaired.requires_clarification = bool(
         repaired.missing_required_fields
@@ -249,7 +248,7 @@ def _response_with_supported_strategy_capability_conflict_removed(
             repaired.candidate_strategy_draft
         )
     ):
-        repaired.intent = "backtest_execution"
+        repaired.intent = "calculate"
         repaired.requires_clarification = False
         repaired.assistant_response = None
         repaired.semantic_turn_act = "new_idea"
@@ -279,8 +278,7 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
         and response.assistant_response
         and response.intent
         in {
-            "strategy_drafting",
-            "backtest_execution",
+            "calculate",
         }
         and response.semantic_turn_act
         not in {
@@ -306,7 +304,7 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
         return response
     return response.model_copy(
         update={
-            "intent": "backtest_execution",
+            "intent": "calculate",
             "requires_clarification": False,
             "assistant_response": None,
             "semantic_turn_act": "new_idea",
@@ -392,7 +390,7 @@ def _response_from_current_message_run_field_contract(
         and not repaired.unsupported_constraints
         and _llm_strategy_draft_has_concrete_execution_target(draft)
     ):
-        repaired.intent = "backtest_execution"
+        repaired.intent = "calculate"
         repaired.semantic_turn_act = "new_idea"
 
     if not changed:
@@ -865,7 +863,7 @@ def _response_needs_latest_result_routing_audit(
         return False
     if response.semantic_turn_act == "result_followup":
         return True
-    if response.intent == "results_explanation":
+    if response.semantic_turn_act == "result_followup":
         return True
     if _llm_strategy_draft_has_executable_shape(response.candidate_strategy_draft):
         return True

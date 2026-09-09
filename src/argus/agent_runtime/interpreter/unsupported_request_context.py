@@ -28,7 +28,7 @@ def response_with_unsupported_request_runtime_facts(
     *,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    if response.intent != "unsupported_or_out_of_scope":
+    if response.intent != "cannot":
         return response
     if response.semantic_turn_act != "unsupported_request":
         return response
@@ -71,7 +71,7 @@ def materialized_unsupported_request_constraint(
     if existing_constraints or has_future_horizon:
         return None
     if (
-        interpretation.intent != "unsupported_or_out_of_scope"
+        interpretation.intent != "cannot"
         and interpretation.semantic_turn_act != "unsupported_request"
     ):
         return None

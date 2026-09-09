@@ -35,7 +35,7 @@ class RecordingClarifier:
 
 def test_clarify_uses_generator_for_missing_required_fields() -> None:
     state = RunState.new(current_user_message="Backtest Tesla", recent_thread_history=[])
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["asset_universe", "date_range"]
     state.candidate_strategy_draft = StrategySummary(strategy_type="buy_and_hold")
     clarifier = RecordingClarifier("Which asset and period should I use?")
@@ -65,7 +65,7 @@ def test_clarify_uses_generator_for_missing_required_fields() -> None:
 
 def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
     state = RunState.new(current_user_message="Cambiar fechas", recent_thread_history=[])
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.requested_field = "date_range"
     state.missing_required_fields = ["date_range"]
     state.candidate_strategy_draft = StrategySummary(
@@ -98,7 +98,7 @@ def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
 
 def test_clarify_offline_fallback_uses_product_language() -> None:
     state = RunState.new(current_user_message="Cambiar fechas", recent_thread_history=[])
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.requested_field = "date_range"
     state.missing_required_fields = ["date_range"]
     state.candidate_strategy_draft = StrategySummary(
@@ -131,7 +131,7 @@ def test_clarify_offline_fallback_uses_product_language() -> None:
 
 def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
     state = RunState.new(current_user_message="Change dates", recent_thread_history=[])
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.requested_field = "date_range"
     state.missing_required_fields = ["date_range"]
     state.candidate_strategy_draft = StrategySummary(
@@ -168,7 +168,7 @@ def test_clarify_dca_total_budget_expands_to_execution_details() -> None:
         ),
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["capital_amount"]
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="dca_accumulation",
@@ -207,7 +207,7 @@ def test_clarify_dca_missing_execution_fields_win_over_total_budget_constraint()
         ),
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["capital_amount", "cadence"]
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="dca_accumulation",
@@ -258,7 +258,7 @@ def test_clarify_dca_missing_period_wins_over_total_budget_constraint() -> None:
         current_user_message="I want to DCA $100 into ETH with a $5,000 cap.",
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["date_range"]
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="dca_accumulation",
@@ -307,7 +307,7 @@ def test_dca_amount_and_cadence_contract_routes_total_budget_context_to_llm() ->
         ),
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["cadence", "capital_amount"]
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="dca_accumulation",
@@ -340,7 +340,7 @@ def test_dca_amount_and_cadence_contract_routes_total_budget_context_to_llm() ->
 
 def test_ambiguous_asset_clarification_preserves_requested_field_context() -> None:
     state = RunState.new(current_user_message="google", recent_thread_history=[])
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.requested_field = "asset_universe"
     state.missing_required_fields = []
     state.candidate_strategy_draft = StrategySummary(
@@ -379,7 +379,7 @@ def test_dca_full_setup_uses_llm_clarifier_with_all_missing_fields() -> None:
         current_user_message="Walk me through a DCA",
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = [
         "asset_universe",
         "date_range",
@@ -418,7 +418,7 @@ def test_clarify_uses_generator_for_unsupported_recovery() -> None:
         current_user_message="Backtest Tesla and Bitcoin together",
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
@@ -452,7 +452,7 @@ def test_clarify_unsupported_recovery_llm_failure_uses_structured_fallback() -> 
         current_user_message="Test TSLA with an ATR 14 trading rule",
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="signal_strategy",
         asset_universe=["TSLA"],
@@ -535,7 +535,7 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
         current_user_message="Prueba TSLA con una regla ATR 14",
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="signal_strategy",
         asset_universe=["TSLA"],
@@ -610,7 +610,7 @@ def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_
         ),
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="dca_accumulation",
         asset_universe=["BTC"],
@@ -666,7 +666,7 @@ def test_clarify_routes_interpreter_prefill_through_target_aware_generator() -> 
         current_user_message="Run the MACD part only",
         recent_thread_history=[],
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["entry_logic"]
     assistant_prompt = (
         "I can run the MACD crossover now, but the volume jump needs a definition."
@@ -697,7 +697,7 @@ def test_beginner_guidance_uses_interpreter_prefill_without_second_llm() -> None
         current_user_message="I want to create a new strategy.",
         recent_thread_history=[],
     )
-    state.intent = "beginner_guidance"
+    state.intent = 'explain'
     assistant_prompt = (
         "Happy to start there. Pick an asset and a rough timeframe, or choose "
         "buy-and-hold, recurring buys, RSI, or a moving-average crossover."
@@ -722,7 +722,7 @@ def test_beginner_guidance_without_prefill_uses_llm_clarifier() -> None:
         current_user_message="I want to create a new strategy.",
         recent_thread_history=[],
     )
-    state.intent = "beginner_guidance"
+    state.intent = 'explain'
     clarifier = RecordingClarifier(
         "Start with an asset and a rough window, and I can shape it into a test."
     )
@@ -753,7 +753,7 @@ def test_rule_clarification_preserves_known_asset_context() -> None:
         asset_class="equity",
         entry_logic="MACD, RSI, and volume confirmation",
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["entry_logic"]
     state.candidate_strategy_draft = strategy
     clarifier = RecordingClarifier(
@@ -782,7 +782,7 @@ def test_multi_field_signal_clarification_uses_plain_language() -> None:
         strategy_thesis="Buy when the 50-day moving average crosses the 200-day.",
         entry_logic="50 crosses 200",
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.missing_required_fields = ["asset_universe", "date_range"]
     state.candidate_strategy_draft = strategy
     clarifier = RecordingClarifier("What asset and date range should I use?")
@@ -805,7 +805,7 @@ def test_confirmation_action_assumption_uses_llm_voice_in_spanish() -> None:
     state = RunState.new(
         current_user_message="Ajustar supuestos", recent_thread_history=[]
     )
-    state.intent = "strategy_drafting"
+    state.intent = 'calculate'
     state.requested_field = "assumption"
     state.missing_required_fields = ["assumption"]
     state.candidate_strategy_draft = StrategySummary(
@@ -833,7 +833,7 @@ def test_clarify_unsupported_recovery_uses_user_facing_clarifier_voice() -> None
         current_user_message="Test Apple when news sentiment turns positive.",
         recent_thread_history=[],
     )
-    state.intent = "unsupported_or_out_of_scope"
+    state.intent = 'cannot'
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
@@ -906,7 +906,7 @@ def test_clarify_unsupported_timeframe_persists_typed_actions_with_llm_voice() -
         current_user_message="Use five-minute bars.",
         recent_thread_history=[],
     )
-    state.intent = "unsupported_or_out_of_scope"
+    state.intent = 'cannot'
     state.requested_field = "timeframe"
     state.missing_required_fields = ["timeframe"]
     state.optional_parameter_status = {
@@ -990,7 +990,7 @@ def test_clarify_unsupported_timeframe_degraded_fallback_is_typed_and_truthful(
         current_user_message="Use five-minute bars.",
         recent_thread_history=[],
     )
-    state.intent = "unsupported_or_out_of_scope"
+    state.intent = 'cannot'
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="buy_and_hold",
         asset_universe=["AAPL"],

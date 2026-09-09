@@ -483,8 +483,8 @@ Represents individual messages within a conversation.
   row, inserts the message, and updates `last_message_preview` in one
   transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
   function or mutate `messages` directly.
-- The one sanctioned in-place rewrite, a non-turn edit of a pending
-  confirmation card, uses the service-role-only
+- Sanctioned non-turn edits of a pending confirmation card or an editable local
+  tool result use the service-role-only
   `update_conversation_message_artifact` RPC on the same serialized spine: it
   locks the owned conversation row and applies only while the caller's read
   still holds, comparing both the row's `metadata` and the conversation's
@@ -492,6 +492,16 @@ Represents individual messages within a conversation.
   last-writer win). When the rewritten row is the conversation's latest
   message it carries `last_message_preview` with it while leaving
   `updated_at` untouched, so a non-turn change never reorders recents.
+- `metadata.tool_result_cards` owns ordered general tool artifacts. Each card
+  stores call/artifact identity, input revision, declaration card type/version,
+  arguments, typed outcome, presentation and lifecycle state together. A local
+  recompute retains the unknown, treats zero as known, and increments the
+  revision through the same guarded writer. Sibling cards remain unchanged.
+  Tool outcomes do not require a Strategy, Idea, EvidenceArtifact or backtest
+  run. `metadata.tool_jobs` associates each asynchronous job with its call and
+  artifact identity; repeated calls remain independent through completion and
+  reload. The message remains the durable owner after direct edits, rather than
+  writing a competing checkpoint copy.
 - A confirmation card's liveness truth lives on its own row:
   `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
   `cancelled`, `superseded`). Run admission stamps `consumed` through the
@@ -1312,10 +1322,13 @@ Cost model notes:
 ## 12.1.3 public_excerpt_snapshots
 
 A public evidence receipt: an immutable, sanitized snapshot of one completed
-backtest, created by its owner and revocable by its owner. Behind the default-off
+backtest or successful declared tool result, created by its owner and revocable
+by its owner. Behind the default-off
 `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
 
-The pipeline is `EvidenceArtifact -> PublicExcerptSnapshot -> PublicExcerptView`.
+Backtest v1 follows `EvidenceArtifact -> PublicExcerptSnapshot -> PublicExcerptView`.
+Tool v2 follows the owned message's exact tool-card revision into the same
+snapshot and view; it creates no placeholder run or evidence artifact.
 The snapshot is frozen at creation and the public read never queries the source
 conversation. Immutable means the numbers never move: re-running the idea later
 produces a new artifact and leaves the receipt showing what it showed the day it
@@ -1332,6 +1345,11 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
+- `source_message_id`: `uuid` (Nullable, references `messages.id`
+  ON DELETE SET NULL; tool v2 only)
+- `source_artifact_id`: `uuid` (Nullable; the tool card identity)
+- `source_input_revision`: `integer` (Nullable, nonnegative; paired with the
+  source artifact identity)
 - `title`: `text`
 - `payload`: `jsonb` (the closed public payload; see below)
 - `payload_digest`: `text` (`^[0-9a-f]{64}$`, sha256 over the canonical payload)
@@ -1345,11 +1363,23 @@ audit list; the public read never selects them.
 
 ### Closed payload
 
-`payload` carries exactly these keys and no others, enforced by `extra="forbid"`
+Version 1 `payload` carries exactly these keys and no others, enforced by `extra="forbid"`
 on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
 `idea_title`, `asset_class`, `symbols`, `strategy_facts`, `assumptions`,
 `date_range`, `metrics`, `benchmark_symbol`, `visual`, `owner_note`,
 `content_language`, `framing`, `provenance_mark`.
+
+Version 2 contains `schema_version`, `card_type`, `card_version`, `presentation`,
+`owner_note`, `content_language`, `framing`, and `provenance_mark`. Presentation
+comes from the same declaration-bound projection as chat, with private narrative
+and private input facts removed by the public sanitizer. Input visibility is
+declared and defaults to private. Validated public citations and the existing
+typed visual remain attached to its facts. Raw tool arguments/outcomes and call identities
+are never public. A unique partial index permits one live receipt per owner,
+source message, artifact and input revision. Insert guards lock the conversation
+and source message, verify ownership and the successful current revision, and
+reject deletion/recompute races. Source identity and revision are immutable;
+source deletion revokes the receipt before foreign-key cleanup.
 
 Source conversation ids, route receipts, provider or model metadata, retry
 payloads, raw transcripts, broker or account data, and user-private memory are
@@ -1360,7 +1390,7 @@ cannot be proven clean is never stored.
 ### Nothing rendered is frozen
 
 A receipt is read by strangers, so the payload freezes facts and never sentences.
-`strategy_facts`, `assumptions`, and `metrics` are each a list of `{key, value}`
+For v1, `strategy_facts`, `assumptions`, and `metrics` are each a list of `{key, value}`
 under a closed key enum (`StrategyFactKey`, `AssumptionKey`, `MetricKey`), where
 `value` is the bare scalar the run reported, and `date_range` is `{start, end}` as
 ISO dates. Labels, sentences, thousands separators, and date formats are all

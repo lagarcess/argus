@@ -16,8 +16,10 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
     dedupe_resolution_provenance_items,
+    normalize_legacy_interpretation,
 )
-from pydantic import BaseModel, Field
+from argus.domain.tool_contracts import MAX_TOOL_CALLS, ToolCall
+from pydantic import BaseModel, Field, model_validator
 
 StageOutcome = Literal[
     "needs_clarification",
@@ -106,6 +108,9 @@ class AssetDiscoveryRequest(BaseModel):
 
 
 class InterpretDecision(BaseModel):
+    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
+    _read_legacy_intent = model_validator(mode="before")(normalize_legacy_interpretation)
+
     intent: IntentName
     task_relation: TaskRelation
     requires_clarification: bool
@@ -141,6 +146,7 @@ class InterpretDecision(BaseModel):
             for item in dedupe_resolution_provenance_items(self.resolution_provenance)
         ]
         return {
+            "tool_calls": [call.model_dump(mode="json") for call in self.tool_calls],
             "normalized_signals": self.normalized_signals,
             "intent": self.intent,
             "task_relation": self.task_relation,
@@ -201,6 +207,10 @@ class StageResult(BaseModel):
 
 
 class StructuredInterpretation(BaseModel):
+    uses_tool_catalog: bool = False
+    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
+    _read_legacy_intent = model_validator(mode="before")(normalize_legacy_interpretation)
+
     research_query: ResearchQueryExtraction | None = None
     intent: IntentName
     task_relation: TaskRelation

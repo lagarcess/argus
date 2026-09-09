@@ -17,6 +17,7 @@ from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.domain.strategy_template_contract import (  # noqa: F401
     RegisteredStrategyTemplate,
 )
+from argus.domain.tool_declaration import ToolCatalog
 
 # --- Strategy derivations -------------------------------------------------------------
 
@@ -66,3 +67,24 @@ INDICATOR_TEMPLATE_REACHABILITY: dict[str, str] = {
 def indicator_template(key: str) -> str | None:
     """The named supported template that consumes this indicator, if any (else None)."""
     return INDICATOR_TEMPLATE_REACHABILITY.get(key)
+
+
+def get_tool_catalog(*, include_unavailable: bool = False) -> ToolCatalog:
+    """Assemble real declarations only when a catalog consumer asks for them.
+
+    Each declaration lives beside its typed callable and card presenter. This
+    is the sole catalog assembly point: schemas, execution, discovery and
+    capability answers consume the same immutable declarations. Completion and
+    receipt readers may resolve an already admitted binding with
+    ``include_unavailable``; new calls always use the effective catalog.
+    """
+    from argus.agent_runtime.research_tools import get_research_declarations
+    from argus.agent_runtime.tools.registered_backtest import get_backtest_declaration
+    from argus.domain.research.config import research_rail_enabled
+
+    research = (
+        get_research_declarations()
+        if include_unavailable or research_rail_enabled()
+        else ()
+    )
+    return ToolCatalog((get_backtest_declaration(), *research))

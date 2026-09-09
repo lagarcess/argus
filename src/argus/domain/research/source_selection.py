@@ -23,6 +23,7 @@ def select_public_sources(
     question_kind: str | None = None,
     period_start: date | None = None,
     question_as_of: date | None = None,
+    current_survey: bool = False,
 ) -> tuple[ResearchSource, ...]:
     """Return period-plausible, publisher-unique sources for the drawer.
 
@@ -33,7 +34,9 @@ def select_public_sources(
     freshness bound.
     """
     effective_start = period_start
-    if effective_start is None and question_kind in _CURRENT_SURVEY_KINDS:
+    if effective_start is None and (
+        current_survey or question_kind in _CURRENT_SURVEY_KINDS
+    ):
         effective_start = question_as_of
 
     selected: list[ResearchSource] = []

@@ -204,6 +204,7 @@ def settle_research_turn(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
 ) -> None:
     """Post-terminal evidence for a turn that may carry a research sidecar."""
     research = runtime_result.get("research")
@@ -215,6 +216,7 @@ def settle_research_turn(
         conversation_id=conversation_id,
         message_id=message_id,
         request_id=request_id,
+        tool_call_id=tool_call_id,
     )
 
 
@@ -225,6 +227,7 @@ def record_research_turn_evidence(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
 ) -> None:
     """Append one capability-classed ledger row for every research turn."""
     if not isinstance(research, dict):
@@ -238,6 +241,7 @@ def record_research_turn_evidence(
         conversation_id=conversation_id,
         message_id=message_id,
         request_id=request_id,
+        tool_call_id=tool_call_id,
     )
     capture_research_turn_event(
         research=research,
@@ -255,12 +259,15 @@ def _append_ledger_row(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
 ) -> None:
     gateway = api_state.supabase_gateway
     if gateway is None:
         return
     capability_class = str(research.get("capability_class") or "unknown")
     correlation_id = request_id or message_id or conversation_id or user_id
+    if tool_call_id is not None:
+        correlation_id = f"{correlation_id}:{tool_call_id}"
     degraded = research.get("degraded")
     entry = {
         "source": "research",
@@ -278,6 +285,7 @@ def _append_ledger_row(
             "shape": research.get("shape"),
             "cache_status": cache_status_of(usage),
             "invocations": usage.get("invocations"),
+            **({"tool_call_id": tool_call_id} if tool_call_id is not None else {}),
             **(
                 {"degraded_code": degraded.get("code")}
                 if isinstance(degraded, dict) and degraded.get("code")

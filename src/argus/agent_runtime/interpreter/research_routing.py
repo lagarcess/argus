@@ -12,7 +12,9 @@ from argus.agent_runtime.research_query import ResearchQueryExtraction
 def research_turn_has_conflicting_owner(interpretation: Any) -> bool:
     """A question payload cannot take execution, refusal or artifact ownership."""
     return bool(
-        route_owner(
+        getattr(interpretation, "uses_tool_catalog", False)
+        or getattr(interpretation, "tool_calls", None)
+        or route_owner(
             intent=interpretation.intent,
             semantic_turn_act=interpretation.semantic_turn_act,
         )
@@ -36,7 +38,11 @@ def research_turn_has_conflicting_owner(interpretation: Any) -> bool:
 
 
 def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
-    """The primary read typed the message as a finance fact question."""
+    """Read research payloads only for historical, noncatalog interpretations."""
+    if getattr(interpretation, "uses_tool_catalog", False) or getattr(
+        interpretation, "tool_calls", None
+    ):
+        return False
     query = getattr(interpretation, "research_query", None)
     return query is not None and query.question_kind not in ("concept", "none")
 

@@ -1,9 +1,27 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Union
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    create_model,
+    model_validator,
+)
+from pydantic.json_schema import SkipJsonSchema
 
+from argus.agent_runtime.state.models import (
+    CanonicalIntentName,
+    IntentName,
+    normalize_legacy_interpretation,
+)
+from argus.domain.tool_contracts import MAX_TOOL_CALLS, ToolCall
+
+if TYPE_CHECKING:
+    from argus.domain.tool_declaration import ToolCatalog, ToolDeclaration
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
@@ -298,15 +316,24 @@ class LLMAmbiguousField(BaseModel):
 
 
 class LLMInterpretationResponse(BaseModel):
-    intent: Literal[
-        "beginner_guidance",
-        "strategy_drafting",
-        "backtest_execution",
-        "results_explanation",
-        "collection_management",
-        "conversation_followup",
-        "unsupported_or_out_of_scope",
-    ]
+    uses_tool_catalog: ClassVar[bool] = False
+    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
+    _read_legacy_intent = model_validator(mode="before")(normalize_legacy_interpretation)
+
+    @model_validator(mode="after")
+    def tool_call_ids_are_distinct(self) -> LLMInterpretationResponse:
+        call_ids = [call.call_id for call in self.tool_calls]
+        if len(call_ids) != len(set(call_ids)):
+            raise ValueError("Tool calls in a turn must have distinct call_id values")
+        if self.tool_calls and self.candidate_strategy_draft.model_dump(
+            exclude_defaults=True
+        ):
+            raise ValueError(
+                "A tool call owns its arguments; a second strategy draft is not allowed"
+            )
+        return self
+
+    intent: IntentName
     task_relation: Literal["new_task", "continue", "refine", "ambiguous"]
     requires_clarification: bool = False
     user_goal_summary: str
@@ -555,4 +582,100 @@ class FocusedDateWindowExtraction(BaseModel):
     evidence: str | None = Field(
         default=None,
         description="Short user-message span supporting the temporal extraction.",
+    )
+
+
+class _CatalogInterpretationResponse(LLMInterpretationResponse):
+    """The schema owner, rather than model-authored data, marks catalog selection."""
+
+    uses_tool_catalog: ClassVar[bool] = True
+
+
+def interpretation_response_model(
+    tool_catalog: ToolCatalog | None = None,
+) -> type[LLMInterpretationResponse]:
+    """Derive every call's argument schema from its callable declaration.
+
+    The list remains open to zero, multiple and repeated calls. The old research
+    shape fields remain readable on the compatibility model, never model-facing.
+    """
+    if tool_catalog is None:
+        from argus.domain.capability_registry import get_tool_catalog
+
+        tool_catalog = get_tool_catalog()
+    call_models = tuple(
+        _declared_call_model(declaration) for declaration in tool_catalog.declarations
+    )
+    if not call_models:
+        call_type = ToolCall
+        calls = Field(default_factory=list, max_length=0)
+    else:
+        call_type = (
+            call_models[0]
+            if len(call_models) == 1
+            else Annotated[Union[call_models], Field(discriminator="tool_name")]
+        )
+        calls = Field(
+            default_factory=list,
+            max_length=MAX_TOOL_CALLS,
+            description=(
+                "Ordered calls to declared tools, using only facts available now. "
+                "Use an empty list when no tool is needed. A tool may be called "
+                "more than once with distinct call_id values. Do not force a "
+                "question into one named calculation. Unknown arguments remain "
+                "null only where the tool schema permits them; zero is a value."
+            ),
+        )
+    return create_model(
+        "LLMToolInterpretationResponse",
+        __base__=_CatalogInterpretationResponse,
+        __config__=ConfigDict(
+            json_schema_extra={
+                "allOf": [
+                    {
+                        "if": {
+                            "properties": {"tool_calls": {"minItems": 1}},
+                            "required": ["tool_calls"],
+                        },
+                        "then": {
+                            "properties": {
+                                "candidate_strategy_draft": {"maxProperties": 0}
+                            }
+                        },
+                    }
+                ],
+            }
+        ),
+        intent=(CanonicalIntentName, ...),
+        tool_calls=(list[call_type], calls),
+        research_query=(SkipJsonSchema[None], None),
+        asset_discovery=(SkipJsonSchema[None], None),
+        context_question_focus=(SkipJsonSchema[None], None),
+    )
+
+
+def _declared_call_model(declaration: ToolDeclaration) -> type[BaseModel]:
+    title = declaration.name.title().replace("_", "")
+    parameters = declaration.tool_schema()["parameters"]
+    arguments_type = create_model(
+        f"{title}ToolArguments",
+        __base__=declaration.arguments_type,
+        __config__=ConfigDict(
+            extra="forbid",
+            json_schema_extra={"allOf": parameters["allOf"]}
+            if "allOf" in parameters
+            else {},
+        ),
+    )
+
+    def validate_rules(arguments: BaseModel) -> BaseModel:
+        declaration.validate_arguments(arguments)
+        return arguments
+
+    return create_model(
+        f"{title}ToolCall",
+        __config__=ConfigDict(extra="forbid"),
+        tool_name=(Literal[declaration.name], ...),
+        call_id=(str, Field(min_length=1, max_length=128)),
+        arguments=(Annotated[arguments_type, AfterValidator(validate_rules)], ...),
     )

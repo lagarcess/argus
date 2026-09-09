@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Check, Copy, Link2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   RECEIPT_OWNER_NOTE_MAX_LENGTH,
   copyReceiptLink,
   createEvidenceReceipt,
+  createToolReceipt,
+  type ToolReceiptSource,
   receiptFailureReason,
   receiptUrl,
   type EvidenceReceipt,
 } from "@/lib/evidence-receipts";
 
-type ShareReceiptActionProps = {
-  evidenceArtifactId: string;
-};
+type ShareReceiptActionProps =
+  | { evidenceArtifactId: string; toolSource?: never }
+  | { evidenceArtifactId?: never; toolSource: ToolReceiptSource };
 
 type Phase = "idle" | "composing" | "creating" | "created";
 
@@ -31,9 +33,10 @@ const SOLID_BUTTON =
  * owner types into it rather than after.
  */
 export default function ShareReceiptAction({
-  evidenceArtifactId,
+  evidenceArtifactId, toolSource,
 }: ShareReceiptActionProps) {
   const { t } = useTranslation();
+  const noteId = useId();
   const [phase, setPhase] = useState<Phase>("idle");
   const [note, setNote] = useState("");
   const [receipt, setReceipt] = useState<EvidenceReceipt | null>(null);
@@ -44,10 +47,9 @@ export default function ShareReceiptAction({
     setPhase("creating");
     setError(null);
     try {
-      const created = await createEvidenceReceipt(
-        evidenceArtifactId,
-        note.trim() || null,
-      );
+      const created = toolSource
+        ? await createToolReceipt(toolSource, note.trim() || null)
+        : await createEvidenceReceipt(evidenceArtifactId!, note.trim() || null);
       setReceipt(created);
       setPhase("created");
     } catch (failure) {
@@ -145,13 +147,13 @@ export default function ShareReceiptAction({
         )}
       </p>
       <label
-        htmlFor="receipt-owner-note"
+        htmlFor={noteId}
         className="mt-3 block text-[12px] font-medium text-black/70 dark:text-white/70"
       >
         {t("receipt.owner.note_label", "Add a note if you want")}
       </label>
       <textarea
-        id="receipt-owner-note"
+        id={noteId}
         value={note}
         rows={2}
         maxLength={RECEIPT_OWNER_NOTE_MAX_LENGTH}

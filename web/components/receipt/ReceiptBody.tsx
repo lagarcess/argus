@@ -1,3 +1,5 @@
+import ToolCardPresentation from "@/components/chat/ToolCardPresentation";
+import { receiptToolTranslator } from "@/lib/receipt-copy";
 import type { PublicReceiptPayload } from "@/lib/public-receipt-contract";
 import { type ReceiptCopy } from "@/lib/receipt-copy";
 import {
@@ -51,6 +53,19 @@ export default function ReceiptBody({
   language,
 }: ReceiptBodyProps) {
   const stamped = formatReceiptDate(createdAt, language);
+  if (payload.schema_version === 2) {
+    const t = receiptToolTranslator(language);
+    return <>
+      <main className={`dark mx-auto flex w-full max-w-[620px] flex-col px-5 pt-5 text-white sm:px-8 sm:pt-9 ${RECEIPT_ACTION_BAR_CLEARANCE}`}>
+        <ReceiptViewBeacon />
+        <div className="mb-6 flex items-center justify-between gap-3"><ProvenanceMark label={t("tools.receipt.provenance")} />{stamped ? <span className={LABEL}>{stamped}</span> : null}</div>
+        <ToolCardPresentation presentation={payload.presentation} t={t} locale={language} />
+        {payload.owner_note ? <blockquote lang={payload.content_language} className="mt-6 border-l-2 border-white/15 pl-4 text-sm text-white/70">{payload.owner_note}</blockquote> : null}
+        <p className="mt-5 border-t border-white/10 pt-4 text-xs text-white/50">{t("tools.receipt.framing")}</p>
+      </main>
+      <ReceiptActionBar framing={t("tools.receipt.framing")} action={copy.cta.action} />
+    </>;
+  }
   const frozenLang = payload.content_language;
   const plan = receiptPlan(payload, copy);
   const assumptions = receiptAssumptions(payload, copy, language);

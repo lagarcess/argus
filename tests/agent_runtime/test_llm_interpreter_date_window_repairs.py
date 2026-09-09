@@ -518,7 +518,7 @@ async def test_llm_interpreter_does_not_repair_vague_strategy_start(
         request=request,
     )
 
-    assert ready_response.intent == "beginner_guidance"
+    assert ready_response.intent == 'explain'
     assert ready_response.semantic_turn_act == "new_idea"
     assert ready_response.artifact_target == "none"
     assert "vague_strategy_start_guidance" in ready_response.reason_codes
@@ -577,7 +577,7 @@ async def test_llm_interpreter_treats_empty_strategy_shell_as_guidance(
         request=request,
     )
 
-    assert ready_response.intent == "beginner_guidance"
+    assert ready_response.intent == 'explain'
     assert ready_response.requires_clarification is True
     assert ready_response.missing_required_fields == []
     assert "vague_strategy_start_guidance" in ready_response.reason_codes
@@ -609,7 +609,7 @@ async def test_llm_interpreter_does_not_convert_capability_question_to_guidance(
         request=request,
     )
 
-    assert ready_response.intent == "strategy_drafting"
+    assert ready_response.intent == 'calculate'
     assert ready_response.capability_question_focus == "supported_indicators"
     assert "vague_strategy_start_guidance" not in ready_response.reason_codes
 
@@ -762,7 +762,7 @@ async def test_material_execution_evidence_routes_to_structured_repair_before_ca
 
     assert "FocusedStrategyExtraction" in calls
     assert "CapabilitySideQuestionAudit" not in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.capability_question_focus is None
     assert ready_response.assistant_response is None
@@ -861,7 +861,7 @@ async def test_underfilled_nonclarifying_execution_repairs_before_capability(
 
     assert calls[0] == "FocusedStrategyExtraction"
     assert "CapabilitySideQuestionAudit" not in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.candidate_strategy_draft.asset_universe == [
         "AAPL",
@@ -985,7 +985,7 @@ async def test_noncanonical_strategy_text_with_material_evidence_gets_repaired(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -1111,7 +1111,7 @@ async def test_anchored_supported_draft_without_date_evidence_gets_schema_repair
 
     assert "FocusedDateWindowExtraction" in calls
     assert "FocusedStrategyExtraction" not in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.candidate_strategy_draft.strategy_type == "buy_and_hold"
@@ -1230,7 +1230,7 @@ async def test_llm_evidence_span_triggers_date_intent_repair_without_text_gate(
 
     assert calls[0] == "FocusedDateWindowExtraction"
     assert "FocusedStrategyExtraction" not in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.candidate_strategy_draft.date_range_intent is not None
@@ -1337,7 +1337,7 @@ async def test_canonical_supported_fields_trigger_date_intent_repair_without_tex
 
     assert calls[0] == "FocusedDateWindowExtraction"
     assert "FocusedStrategyExtraction" not in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     expected_range = interpreter_module.resolve_date_range_intent(
@@ -1442,7 +1442,7 @@ async def test_raw_canonical_strategy_metadata_triggers_date_intent_repair(
 
     assert calls[0] == "FocusedDateWindowExtraction"
     assert "FocusedStrategyExtraction" not in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     expected_range = interpreter_module.resolve_date_range_intent(
@@ -1544,7 +1544,7 @@ async def test_supported_shape_recovers_date_intent_without_capital_gate(
     assert calls.index("FocusedDateWindowExtraction") < calls.index(
         "StatedRunFieldFidelityAudit"
     )
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -2206,7 +2206,7 @@ async def test_unsupported_recovery_preserves_dropped_user_date_window(
     draft = ready_response.candidate_strategy_draft
     assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
     # Recovering the window must not promote the refusal to executable.
-    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.intent == 'cannot'
 
 
 @pytest.mark.asyncio
@@ -2292,7 +2292,7 @@ async def test_constraint_carrying_refusal_recovers_dropped_date_window(
 
     draft = ready_response.candidate_strategy_draft
     assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
-    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.intent == 'cannot'
     assert ready_response.unsupported_constraints != []
 
 
@@ -2358,7 +2358,7 @@ async def test_unsupported_recovery_unparseable_date_does_not_trailing_default(
     draft = ready_response.candidate_strategy_draft
     # Unrecoverable window is left unresolved for clarification, never trailing-defaulted.
     assert not draft.date_range
-    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.intent == 'cannot'
 
 
 @pytest.mark.asyncio
@@ -2427,7 +2427,7 @@ async def test_dateless_refusal_recovery_stops_after_one_focused_extraction(
         ),
     )
 
-    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.intent == 'cannot'
     assert len(focused_calls) == 1
 
 
@@ -2520,7 +2520,7 @@ async def test_unsupported_pivot_during_pending_date_answer_stays_refused(
         ),
     )
 
-    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.intent == 'cannot'
     assert ready_response.semantic_turn_act != "answer_pending_need"
     assert ready_response.artifact_target != "active_confirmation"
     draft = ready_response.candidate_strategy_draft
@@ -2647,7 +2647,7 @@ async def test_missing_date_clarification_uses_focused_date_window_intent(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -2776,7 +2776,7 @@ async def test_supported_compare_shape_without_capital_gets_date_window_repair(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -2902,7 +2902,7 @@ async def test_pending_supported_chip_shape_gets_focused_date_and_benchmark_audi
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -3020,7 +3020,7 @@ async def test_fresh_supported_chip_shape_repairs_dotted_date_field_path(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -3138,7 +3138,7 @@ async def test_fresh_supported_chip_shape_audits_current_turn_for_omitted_date(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -3259,7 +3259,7 @@ async def test_live_chip_shape_recovers_omitted_window_and_benchmark(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -3398,7 +3398,7 @@ async def test_supported_clarification_gets_strategy_repair_after_empty_date_aud
 
     assert "FocusedDateWindowExtraction" in calls
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -3539,7 +3539,7 @@ async def test_supported_pending_need_label_allows_strategy_repair_after_date_ti
 
     assert "FocusedDateWindowExtraction" in calls
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -3671,7 +3671,7 @@ async def test_live_evidence_spans_window_and_benchmark_repair_to_canonical_fiel
     assert expected_range is not None
     assert "FocusedDateWindowExtraction" in calls
     assert "StatedRunFieldFidelityAudit" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -3773,7 +3773,7 @@ async def test_extra_evidence_spans_window_resolve_after_empty_date_audit(
     assert expected_range is not None
     assert "FocusedDateWindowExtraction" in calls
     assert "StatedRunFieldFidelityAudit" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -3887,7 +3887,7 @@ async def test_fresh_supported_pending_need_uses_natural_time_after_empty_date_a
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -4029,7 +4029,7 @@ async def test_supported_compare_recovery_normalizes_to_buy_and_hold_contract(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -4136,7 +4136,7 @@ async def test_supported_compare_recovery_uses_structured_fallback_when_audit_un
     )
 
     assert "SupportedStrategyCapabilityConflictAudit" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -4256,7 +4256,7 @@ async def test_fresh_answer_pending_need_with_missing_date_gets_date_repair(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -4369,7 +4369,7 @@ async def test_fresh_supported_pending_need_uses_current_turn_window_and_benchma
     assert expected_range is not None
     assert "FocusedDateWindowExtraction" in calls
     assert "StatedRunFieldFidelityAudit" in calls
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []
@@ -4678,7 +4678,7 @@ async def test_supported_partial_date_clarification_gets_direct_date_audit(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == "backtest_execution"
+    assert ready_response.intent == 'calculate'
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.missing_required_fields == []

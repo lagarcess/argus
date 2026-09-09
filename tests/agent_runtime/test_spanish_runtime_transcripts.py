@@ -108,7 +108,7 @@ def test_spanish_dca_runtime_canonicalizes_localized_llm_cadence(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -203,7 +203,7 @@ async def test_spanish_dca_missing_amount_clarifies_through_workflow(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -313,7 +313,7 @@ def test_spanish_buy_and_hold_runtime_uses_bounded_date_evidence(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -400,7 +400,7 @@ def test_spanish_mixed_asset_request_stays_blocked_by_guardrails(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -475,7 +475,7 @@ def test_spanish_approval_routes_by_llm_semantics_not_text_matching(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -537,7 +537,7 @@ def test_spanish_result_followup_anchors_to_latest_result(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ == "LLMInterpretationResponse":
+        if schema_model.__name__ == "LLMToolInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="results_explanation",
                 task_relation="continue",
@@ -651,7 +651,7 @@ def test_spanish_benchmark_comparison_keeps_benchmark_out_of_asset_universe(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -729,7 +729,7 @@ def test_spanish_rsi_threshold_relative_window_reaches_confirmation(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -841,7 +841,7 @@ def test_spanish_moving_average_crossover_reaches_confirmation(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -968,7 +968,7 @@ def test_spanish_currency_pair_timeframe_reaches_confirmation(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -1078,7 +1078,7 @@ def test_spanish_pending_setup_asset_edit_preserves_existing_fields(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="strategy_drafting",
@@ -1138,7 +1138,7 @@ def test_spanish_unsupported_valuation_request_stays_non_executable(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ != "LLMInterpretationResponse":
+        if schema_model.__name__ != "LLMToolInterpretationResponse":
             return None
         return LLMInterpretationResponse(
             intent="unsupported_or_out_of_scope",

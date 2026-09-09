@@ -87,7 +87,7 @@ def _asset_universe_operation_clarification_response(
     )
     return response.model_copy(
         update={
-            "intent": "conversation_followup",
+            "intent": "follow_up",
             "task_relation": "continue",
             "requires_clarification": True,
             "assistant_response": asset_universe_operation_clarification_message(
