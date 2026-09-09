@@ -181,10 +181,10 @@ def test_a_survey_that_names_a_ticker_but_states_no_figure_is_degraded(
     assert served.stage_patch["research"]["sources"] == sidecar["sources"]
 
 
-def test_a_survey_with_figures_but_no_verified_name_persists_no_rows(
+def test_a_cited_survey_without_a_testable_identity_keeps_its_figures(
     monkeypatch,
 ) -> None:
-    """A degraded sidecar carries no rows, whatever the packet parsed."""
+    """A verified figure does not promise an executable asset identity."""
     set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     _wire(
         monkeypatch,
@@ -211,20 +211,20 @@ def test_a_survey_with_figures_but_no_verified_name_persists_no_rows(
 
     assert result is not None
     sidecar = result.stage_patch["research"]
-    assert sidecar["degraded"] == {"code": "survey_synthesis_incomplete"}
-    assert sidecar["rows"] == []
+    assert "degraded" not in sidecar
+    assert sidecar["rows"][0]["value"] == 9.1
+    assert sidecar["anchor_symbols"] == []
+    assert sidecar["peers"] == []
+    assert "next_experiments" not in result.stage_patch
 
 
-def test_a_survey_withheld_for_want_of_a_verified_name_is_cached_as_withheld(
+def test_a_cited_survey_without_a_testable_identity_is_cached_as_an_answer(
     monkeypatch,
 ) -> None:
-    """Codex round 1 on #568: a survey packet with cited rows whose prose
-    names no resolver-verified ticker is withheld by composition, not by the
-    row rule, so the cache must read the composed state. On a uniform
-    quarterly category the record serves for the day cap, never the class's
-    ninety days."""
+    """The cached packet preserves cited figures without inventing an offer;
+    the existing data-class owner still determines its freshness."""
     from argus.domain.research import cache as research_cache
-    from argus.domain.research.cache import WITHHELD_TTL_SECONDS
+    from argus.domain.research.cache import ttl_for_packet
 
     set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     document = agent_response(
@@ -239,37 +239,35 @@ def test_a_survey_withheld_for_want_of_a_verified_name_is_cached_as_withheld(
         tickers=["ZZZZFAKE"],
         sources=[PROVIDER_PAGE],
     )
-    for item in document["output"]:
-        if item.get("type") == "finance_results":
-            item["categories"] = ["financials"]
-            for result in item["results"]:
-                result["category"] = "financials"
     transport = _wire(monkeypatch, [document, document])
 
     result = _run("what is moving today")
 
     assert result is not None
-    assert result.stage_patch["research"]["degraded"] == {
-        "code": "survey_synthesis_incomplete"
-    }
+    assert "degraded" not in result.stage_patch["research"]
+    assert result.stage_patch["research"]["rows"][0]["value"] == 9.1
+    assert "next_experiments" not in result.stage_patch
     assert len(transport.requests) == 1
 
     served = _run("what is moving today")
     assert served is not None
-    assert len(transport.requests) == 1, "the withheld record serves the same survey"
+    assert len(transport.requests) == 1, "the record serves the same survey"
     assert served.stage_patch["research"]["usage"]["cache_status"] == "hit"
-    assert served.stage_patch["research"]["degraded"] == {
-        "code": "survey_synthesis_incomplete"
-    }
+    assert "degraded" not in served.stage_patch["research"]
+    assert (
+        served.stage_patch["research"]["rows"] == result.stage_patch["research"]["rows"]
+    )
+    assert "next_experiments" not in served.stage_patch
 
     real_monotonic = time.monotonic
+    ttl = ttl_for_packet(question_kind="market_pulse", categories=("quote",))
     monkeypatch.setattr(
         research_cache.time,
         "monotonic",
-        lambda: real_monotonic() + WITHHELD_TTL_SECONDS + 1,
+        lambda: real_monotonic() + ttl + 1,
     )
     _run("what is moving today")
-    assert len(transport.requests) == 2, "the record outlives no day on any class"
+    assert len(transport.requests) == 2, "the record expires at its data-class TTL"
 
 
 def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
@@ -307,26 +305,6 @@ def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
                 ),
                 agent_response(
                     text=typed_answer_text("NVDA (NVDA) fell **4.3%**.", []),
-                    sources=[PROVIDER_PAGE],
-                ),
-            ],
-        ),
-        (
-            "market_pulse",
-            lambda: [
-                agent_response(
-                    text=typed_answer_text(
-                        "ZZZZFAKE fell **4.3%**.",
-                        [
-                            retrieved_row(
-                                subject="ZZZZFAKE",
-                                symbol="ZZZZFAKE",
-                                label="change",
-                                value=-4.3,
-                            )
-                        ],
-                    ),
-                    tickers=["ZZZZFAKE"],
                     sources=[PROVIDER_PAGE],
                 ),
             ],

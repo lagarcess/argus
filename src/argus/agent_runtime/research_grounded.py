@@ -438,6 +438,7 @@ def _packet_stage_result(
         peers = verified_peers(
             candidates,
             exclude={s["symbol"] for s in subjects},
+            identity_rows=packet.rows,
             # Surveys name many assets and lead with whatever moved most,
             # which is often untradable here; look past those before giving
             # up.
@@ -445,10 +446,12 @@ def _packet_stage_result(
         )
     if degraded_code is None and survey:
         named_symbols = _named_verified_symbols(answer, [*subjects, *peers])
-        if named_symbols:
-            subjects = [s for s in subjects if s["symbol"] in named_symbols]
-            peers = [p for p in peers if p["symbol"] in named_symbols]
-        else:
+        subjects = [s for s in subjects if s["symbol"] in named_symbols]
+        peers = [p for p in peers if p["symbol"] in named_symbols]
+        # Citation/figure validation above owns whether the answer can be
+        # shown. A missing executable identity only removes the test offer.
+        # Legacy prose carries no typed figures to establish that distinction.
+        if not named_symbols and not packet.typed_answer:
             degraded_code = "survey_synthesis_incomplete"
     if degraded_code is not None:
         # The prose is withheld whole: it cannot be trimmed of one claim.
@@ -1445,7 +1448,11 @@ def compose_completed_research(
     peers = (
         []
         if degraded_code is not None
-        else verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
+        else verified_peers(
+            packet.name_pairs,
+            exclude={s["symbol"] for s in subjects},
+            identity_rows=packet.rows,
+        )
     )
     if not subjects and peers:
         # A survey names no subject: what the provider found, once the

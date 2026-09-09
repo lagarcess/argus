@@ -29,7 +29,11 @@ from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENTS_ROW_CAP,
     NEXT_EXPERIMENTS_VERSION,
 )
-from argus.domain.research.contracts import MAX_PEER_PAIRS, ResearchNamePair
+from argus.domain.research.contracts import (
+    MAX_PEER_PAIRS,
+    ResearchNamePair,
+    RetrievedRow,
+)
 
 _PEER_VERIFY_BUDGET_SECONDS = 2.0
 _MAX_VERIFIED_PEERS = 4
@@ -44,6 +48,7 @@ def verified_peers(
     exclude: set[str],
     probe: Callable[[str], bool] | None = None,
     scan_limit: int = MAX_PEER_PAIRS,
+    identity_rows: Iterable[RetrievedRow] = (),
 ) -> list[dict[str, str]]:
     """Resolver, asset-class, and coverage gates over provider name pairs.
 
@@ -57,11 +62,21 @@ def verified_peers(
     """
     peers: list[dict[str, str]] = []
     seen = {symbol.upper() for symbol in exclude}
-    for pair in list(name_pairs)[: max(scan_limit, 1)]:
+    names_by_symbol: dict[str, list[str]] = {}
+    for pair in name_pairs:
         candidate = pair.symbol.strip().upper()
         if not candidate or candidate in seen:
             continue
-        resolved = _resolve_bounded(candidate, probe=probe)
+        names_by_symbol.setdefault(candidate, []).append(pair.name)
+    for row in identity_rows:
+        symbol = row.symbol.strip().upper() if row.symbol else ""
+        if symbol in names_by_symbol:
+            names_by_symbol[symbol].append(row.subject)
+    # Every named identity for a symbol must corroborate. Resolving the first
+    # pair and skipping duplicates would let bare ticker metadata erase a
+    # richer, contradictory entity from the retrieved rows.
+    for candidate, names in list(names_by_symbol.items())[: max(scan_limit, 1)]:
+        resolved = _resolve_bounded(candidate, names=names, probe=probe)
         if resolved is None:
             continue
         symbol = resolved["symbol"]
@@ -76,7 +91,7 @@ def verified_peers(
 
 
 def _resolve_bounded(
-    candidate: str, *, probe: Callable[[str], bool] | None
+    candidate: str, *, names: list[str], probe: Callable[[str], bool] | None
 ) -> dict[str, str] | None:
     """Answer-paints-first: peer verification runs under a hard budget and
     degrades to fewer rows when the provider is slow."""
@@ -94,6 +109,25 @@ def _resolve_bounded(
         if resolved is None:
             return None
         if resolved.canonical_symbol.upper() != candidate:
+            return None
+        from argus.agent_runtime.discovery.validation import (
+            resolution_matches_named_asset,
+        )
+
+        if not all(
+            resolution_matches_named_asset(
+                display_name=name,
+                symbol_guess=candidate,
+                resolved=resolved,
+                asset_class=resolved.asset_class,
+                asset_class_hint=None,
+            )
+            for name in names
+        ):
+            logger.info(
+                "Peer dropped: resolution does not match the named entity",
+                symbol=candidate,
+            )
             return None
         symbol = resolved.canonical_symbol.upper()
         # A peer row is an offer. The resolver says the catalog lists it; the
