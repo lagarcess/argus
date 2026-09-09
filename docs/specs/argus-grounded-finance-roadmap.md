@@ -967,7 +967,7 @@ integration and green there, not shipped to a user.
 | Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. |
 | Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
-| Lift the loop, Lane C | The spine | **Ran**, draft PR #566, never a product change. Its finding is that Lane A did not make the loop reusable. |
+| Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **In flight**, PR #565, draft, no review round yet. |
 | Lift the loop, Lane B | The spine | **Not started.** Optional for the spine. Carries #430. |
 | The registry | The spine | **Not started.** The largest remaining item, now specified by Lane C. |
