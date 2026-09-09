@@ -3767,8 +3767,8 @@ Contract rules:
   each `{subject, symbol, label, value, kind, unit, as_of, source_url}` with
   `value` a plain number, `subject` the entity the figure describes, and
   `kind` one of `currency`, `percent`, `multiple`, `count`; a currency row
-  names its unit by an ISO 4217 code from the standard's list or the answer
-  is malformed, and an answer carrying more rows than the packet holds
+  names its unit by an ISO 4217 code known to the maintained currency data
+  Babel ships, never a copied list, or the answer is malformed, and an answer carrying more rows than the packet holds
   (64) is malformed rather than cut. A row survives parsing only when its `source_url` is a page the
   same response retrieved (a finance or web tool result, a fetched page, or
   an annotation); a row citing anything else is dropped and counted, never

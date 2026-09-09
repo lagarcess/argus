@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Literal
 
+from babel.numbers import list_currencies
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 QuestionShape = Literal["fast", "balanced", "thorough"]
@@ -17,22 +18,11 @@ QuestionShape = Literal["fast", "balanced", "thorough"]
 # schema, never inferred from the shape of its unit.
 RowKind = Literal["currency", "percent", "multiple", "count"]
 
-# ISO 4217 active alphabetic codes: the standard's list, so a currency row
-# can name only a currency that exists. Not a product choice.
-ISO_4217_CODES = frozenset(
-    """
-    AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND
-    BOB BOV BRL BSD BTN BWP BYN BZD CAD CDF CHE CHF CHW CLF CLP CNY COP COU
-    CRC CUC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS
-    GIP GMD GNF GTQ GYD HKD HNL HTG HUF IDR ILS INR IQD IRR ISK JMD JOD JPY
-    KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD MDL MGA
-    MKD MMK MNT MOP MRU MUR MVR MWK MXN MXV MYR MZN NAD NGN NIO NOK NPR NZD
-    OMR PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK
-    SGD SHP SLE SLL SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD
-    TWD TZS UAH UGX USD USN UYI UYU UYW UZS VED VES VND VUV WST XAF XAG XAU
-    XBA XBB XBC XBD XCD XDR XOF XPD XPF XPT XSU XTS XUA XXX YER ZAR ZMW ZWG
-    """.split()
-)
+# The currency codes a currency row may name: the CLDR data Babel ships and
+# keeps current (XCG arrived there with the 2025 release), not a copied
+# snapshot of ISO 4217 that goes stale the next time the standard moves.
+CURRENCY_CODES = frozenset(list_currencies())
+
 CapabilityClass = Literal[
     "fast_quote",
     "balanced_lookup",
@@ -82,7 +72,7 @@ class RetrievedRow(BaseModel):
     """The exchange ticker of the security the figure describes, or null."""
     label: str
     """What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025."""
-    value: float
+    value: float = Field(strict=True, allow_inf_nan=False)
     """The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000."""
     kind: RowKind
     """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares."""
@@ -100,9 +90,9 @@ class RetrievedRow(BaseModel):
 
     @model_validator(mode="after")
     def _currency_unit_is_a_code(self) -> "RetrievedRow":
-        # A money amount names a currency that exists, by its ISO 4217 code:
-        # the one shape a deterministic reader can hold against the standard.
-        if self.kind == "currency" and self.unit not in ISO_4217_CODES:
+        # A money amount names a currency that exists, by its ISO 4217 code,
+        # held against maintained currency data rather than a copied list.
+        if self.kind == "currency" and self.unit not in CURRENCY_CODES:
             raise ValueError("a currency row names its unit by ISO 4217 code")
         return self
 

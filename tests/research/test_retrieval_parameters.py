@@ -706,14 +706,16 @@ def test_a_currency_row_without_a_code_is_not_the_schema() -> None:
 
 @pytest.mark.parametrize("unit", ["EPS", "AAA", "usd", "US$", "dollars"])
 def test_a_currency_row_names_a_currency_that_exists(unit: str) -> None:
-    """Three capitals are not a currency; the ISO 4217 list is."""
+    """Three capitals are not a currency; a code in maintained currency data is."""
     from argus.domain.research.contracts import RetrievedRow
 
     with pytest.raises(ValidationError):
         RetrievedRow(
             **retrieved_row(subject="Apple", kind="currency", unit=unit, value=5.0)
         )
-    for code in ("USD", "DOP", "EUR"):
+    # Derived from maintained data, so a code the standard added after any
+    # copied list, the Caribbean guilder, is a currency here.
+    for code in ("USD", "DOP", "EUR", "XCG"):
         assert (
             RetrievedRow(
                 **retrieved_row(subject="Apple", kind="currency", unit=code, value=5.0)
@@ -743,5 +745,37 @@ def test_more_rows_than_the_packet_carries_fails_closed() -> None:
 
     with pytest.raises(ResearchUnavailableError) as excinfo:
         client.run_research("q", RESEARCH_CONFIG_SPECS["balanced"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+@pytest.mark.parametrize("value", ["5", True, None, float("inf"), float("nan")])
+def test_a_row_value_is_a_finite_number_or_the_answer_is_malformed(value: object) -> None:
+    """A string, a boolean, a null or a number JSON cannot carry (1e309 parses
+    to infinity) is not the schema; the answer fails closed rather than
+    reaching the reader or the sidecar as a value JSON cannot serialize."""
+    row = retrieved_row(value=0.0)
+    row["value"] = value
+    client = PerplexityAgentClient(
+        "k",
+        transport=RecordingTransport(
+            [agent_response(text=typed_answer_text("NVIDIA moved.", [row]))]
+        ),
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_an_overflowing_json_number_is_malformed_not_infinite() -> None:
+    text = '{"answer_markdown": "NVIDIA moved.", "rows": [{"subject": "NVIDIA", "symbol": "NVDA", "label": "x", "value": 1e309, "kind": "count", "unit": "shares", "as_of": null, "source_url": null}]}'
+    client = PerplexityAgentClient(
+        "k", transport=RecordingTransport([agent_response(text=text)])
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
 
     assert excinfo.value.reason == "malformed_response"
