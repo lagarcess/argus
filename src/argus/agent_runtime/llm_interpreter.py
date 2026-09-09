@@ -1794,12 +1794,8 @@ def _response_needs_capability_side_question_audit(
         return False
     if pending_field:
         return True
-    if (
-        response.intent == "conversation_followup"
-        and response.semantic_turn_act == "educational_question"
-        and bool(response.assistant_response)
-    ):
-        return True
+    # A plain educational turn keeps the primary's typed focus; only a
+    # strategy-flow shape earns a second read.
     return _is_vague_strategy_start(response)
 
 
@@ -3283,6 +3279,10 @@ async def _repair_incomplete_strategy_extraction(
             continue
         if not _focused_strategy_extraction_has_material_fields(extraction):
             annotate_repair(after=failed_response, repair_applied=False, no_op_reason="no_material_fields")
+            if not extraction.is_testable_strategy:
+                # A clear "no strategy here" is an answer; only a read that
+                # calls the turn testable yet extracts nothing moves on.
+                return None
             continue
         base_response = failed_response
         if _request_has_active_strategy_context(

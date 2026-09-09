@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from argus.agent_runtime.interpreter import discovery_focused_read as dfr
 from argus.agent_runtime.llm_interpreter import LLMInterpretationResponse
+from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     AssetDiscoveryRequest,
     InterpretationRequest,
@@ -21,6 +22,9 @@ def _educational_response(**overrides: Any) -> LLMInterpretationResponse:
         "task_relation": "new_task",
         "user_goal_summary": "find trending cryptos",
         "semantic_turn_act": "educational_question",
+        # The primary typed a fact question but left the payload empty: the
+        # one contradiction the read exists to resolve.
+        "research_query": ResearchQueryExtraction(question_kind="find_assets"),
     }
     fields.update(overrides)
     return LLMInterpretationResponse(**fields)
@@ -35,7 +39,9 @@ def _request(message: str = "find me cryptos that are trending") -> Interpretati
     )
 
 
-def _wire_read(monkeypatch: pytest.MonkeyPatch, read: dfr.FocusedAssetDiscoveryRead | Exception):
+def _wire_read(
+    monkeypatch: pytest.MonkeyPatch, read: dfr.FocusedAssetDiscoveryRead | Exception
+):
     calls: list[list[dict[str, str]]] = []
 
     async def _fake_invoke(**kwargs: Any):
@@ -55,6 +61,18 @@ class TestTrigger:
     def test_fires_on_missing_act_too(self) -> None:
         assert dfr.focused_discovery_read_applicable(
             _educational_response(semantic_turn_act=None)
+        )
+
+    def test_never_fires_without_a_fact_question(self) -> None:
+        # A concept question is the primary's own "no"; there is nothing to
+        # re-read.
+        assert not dfr.focused_discovery_read_applicable(
+            _educational_response(research_query=None)
+        )
+        assert not dfr.focused_discovery_read_applicable(
+            _educational_response(
+                research_query=ResearchQueryExtraction(question_kind="concept")
+            )
         )
 
     def test_never_fires_when_a_payload_exists(self) -> None:
@@ -99,9 +117,7 @@ class TestRecovery:
         assert recovered is not None
         assert recovered.asset_discovery is not None
         assert recovered.asset_discovery.needs_current_facts is True
-        assert (
-            "discovery_payload_recovered_by_focused_read" in recovered.reason_codes
-        )
+        assert "discovery_payload_recovered_by_focused_read" in recovered.reason_codes
 
     def test_history_reaches_the_read_for_chip_followups(
         self, monkeypatch: pytest.MonkeyPatch
@@ -119,7 +135,10 @@ class TestRecovery:
             current_user_message="Search current sources for: pharmaceutical sector",
             recent_thread_history=[
                 {"role": "user", "content": "find me pharmaceutical stocks"},
-                {"role": "assistant", "content": "Here are candidates from general knowledge."},
+                {
+                    "role": "assistant",
+                    "content": "Here are candidates from general knowledge.",
+                },
             ],
             latest_task_snapshot=None,
             user=UserState(user_id="u1"),
@@ -135,9 +154,7 @@ class TestRecovery:
         ]
         assert history_blocks and "general knowledge" in history_blocks[0]
 
-    def test_a_no_answer_changes_nothing(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_a_no_answer_changes_nothing(self, monkeypatch: pytest.MonkeyPatch) -> None:
         _wire_read(
             monkeypatch,
             dfr.FocusedAssetDiscoveryRead(asks_argus_to_find_assets=False),
@@ -169,9 +186,7 @@ class TestRecovery:
             is None
         )
 
-    def test_provider_failure_is_silent(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_provider_failure_is_silent(self, monkeypatch: pytest.MonkeyPatch) -> None:
         _wire_read(monkeypatch, RuntimeError("provider down"))
         assert (
             asyncio.run(
@@ -220,7 +235,7 @@ async def test_recovered_payload_promotes_through_the_interpreter_guard(
     )
 
     repaired = await interpreter_module._response_ready_for_runtime(
-        response=_educational_response(),
+        response=_educational_response(research_query=None),
         preferred_model="test-model",
         request=_request(),
     )

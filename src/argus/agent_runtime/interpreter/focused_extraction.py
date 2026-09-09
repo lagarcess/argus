@@ -700,6 +700,10 @@ def strategy_extraction_repair_is_allowed(
         )
     if response.semantic_turn_act == "answer_pending_need":
         return current_turn_has_material_execution_evidence(request)
+    if response.semantic_turn_act == "educational_question":
+        # A strategy-only re-read needs current-turn facts; a concept
+        # question carries none and the primary already answered it.
+        return current_turn_has_material_execution_evidence(request)
     return response.semantic_turn_act not in {
         "refine_current_idea",
         "approval",
