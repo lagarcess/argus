@@ -210,12 +210,12 @@ export type StrategyConfirmationBenchmarkAdjustment = {
 };
 
 /** §3.2: requested changes the edit turn could not apply, with reasons. */
-export type StrategyConfirmationEditDisclosure = {
-  unapplied: { op: string; target: string; reason: string }[];
-  note?: string | null;
-};
+export type StrategyConfirmationEditDisclosure =
+  import("@/lib/artifact-edit-disclosure").ArtifactEditDisclosure;
 
 export type StrategyConfirmationPayload = {
+  /** Legacy wire cards may omit kind; the shared boundary normalizes them. */
+  kind?: "backtest";
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
   asset_class?: AssetClass | null;

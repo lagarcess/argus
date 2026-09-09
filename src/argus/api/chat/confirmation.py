@@ -259,6 +259,7 @@ def runtime_confirmation_card(
             },
         )
     card: dict[str, Any] = {
+        "kind": "backtest",
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
         "launch_payload_hash": stable_payload_hash(execution_validation.launch_payload),

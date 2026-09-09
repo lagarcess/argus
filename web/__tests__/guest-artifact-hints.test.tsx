@@ -5,23 +5,8 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 
 describe("guest artifact education", () => {
-  test("anchors each hint to a typed backend artifact branch", () => {
-    const hintPath = join(root, "components/guest/GuestArtifactHint.tsx");
-    const message = readFileSync(
-      join(root, "components/chat/ChatMessage.tsx"),
-      "utf-8",
-    );
-
-    expect(existsSync(hintPath)).toBe(true);
-    expect(message).toMatch(
-      /message\.kind === "strategy_confirmation" && message\.confirmation[\s\S]{0,1500}<GuestArtifactHint/,
-    );
-    expect(message).toMatch(
-      /message\.kind === "strategy_result" && message\.result[\s\S]{0,900}<GuestArtifactHint/,
-    );
-    expect(message).toContain("isGuest");
-  });
-
+  // Visible hint ownership is exercised by the real browser in
+  // e2e/lift-edit-contract.spec.ts, including an unknown card kind.
   test("persists dismissal only in browser-local presentation state", () => {
     const hintPath = join(root, "components/guest/GuestArtifactHint.tsx");
     expect(existsSync(hintPath)).toBe(true);

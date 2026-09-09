@@ -8,13 +8,20 @@ reads and stamps; nothing in this module composes card content.
 from __future__ import annotations
 
 import threading
+from functools import partial
 from typing import Any
 
 from loguru import logger
 
+from argus.domain.pending_artifacts import (
+    DeadPendingArtifactError,
+    PendingArtifactUpdate,
+    apply_pending_artifact_update,
+    consume_pending_artifact,
+    restore_pending_artifact,
+)
 
-class DeadConfirmationCardError(ValueError):
-    """The card is no longer a live pending confirmation; nothing was written."""
+DeadConfirmationCardError = DeadPendingArtifactError
 
 
 def _card_message_for_state(
@@ -40,55 +47,24 @@ def _card_message_for_state(
     )
 
 
-def _stamped_card_metadata(metadata: dict[str, Any], state: str) -> dict[str, Any]:
-    """A copy of the card message metadata carrying the liveness state."""
-    import copy as _copy
-
-    stamped = _copy.deepcopy(metadata)
-    card = stamped.get("confirmation_card")
-    if isinstance(card, dict):
-        card["confirmation_state"] = state
-    reference = stamped.get("active_confirmation_reference")
-    if isinstance(reference, dict):
-        reference["artifact_status"] = state
-    references = stamped.get("artifact_references")
-    if isinstance(references, list):
-        for item in references:
-            if isinstance(item, dict) and item.get("artifact_type") == "confirmation":
-                item["artifact_status"] = state
-    return stamped
-
-
-def _write_card_state(
+def _write_card_artifact(
     *,
     user_id: str,
     conversation_id: str,
-    message: Any,
-    state: str,
     gateway: Any | None,
-) -> None:
+    **values: Any,
+) -> Any:
     from argus.api.message_store import update_message_artifact
 
-    stamped = _stamped_card_metadata(message.metadata, state)
-    if gateway is not None:
-        gateway.update_message_artifact(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            message_id=message.id,
-            content=message.content,
-            metadata=stamped,
-            expected_source_metadata=message.metadata,
-            expected_latest_message_id=None,
-        )
-        return
-    update_message_artifact(
+    writer = (
+        gateway.update_message_artifact
+        if gateway is not None
+        else update_message_artifact
+    )
+    return writer(
         user_id=user_id,
         conversation_id=conversation_id,
-        message_id=message.id,
-        content=message.content,
-        metadata=stamped,
-        expected_source_metadata=message.metadata,
-        expected_latest_message_id=None,
+        **values,
     )
 
 
@@ -115,59 +91,43 @@ def consume_pending_card_for_run(
     edit and a consumption can never both win the row.
     """
     from argus.agent_runtime.stages.artifact_context import (
-        CONSUMED_CONFIRMATION_STATE,
-        confirmation_card_is_dead,
+        CONFIRMATION_ARTIFACT_LAYOUT,
     )
     from argus.domain.supabase_conversation_messages import (
         StaleMessageArtifactError,
     )
 
-    for _ in range(2):
-        message = _card_message_for_state(
+    def _matches_launch_basis(metadata: dict[str, Any]) -> bool:
+        if not expected_launch_payload_hash:
+            return True
+        reference = metadata.get("active_confirmation_reference")
+        reference_metadata = (
+            reference.get("metadata") if isinstance(reference, dict) else None
+        )
+        current_hash = str(
+            (reference_metadata or {}).get("launch_payload_hash") or ""
+        ).strip()
+        return not current_hash or current_hash == expected_launch_payload_hash
+
+    outcome = consume_pending_artifact(
+        layout=CONFIRMATION_ARTIFACT_LAYOUT,
+        load=partial(
+            _card_message_for_state,
             user_id=user_id,
             conversation_id=conversation_id,
             message_id=message_id,
             gateway=gateway,
-        )
-        if message is None or not isinstance(message.metadata, dict):
-            return "unstamped"
-        if confirmation_card_is_dead(message.metadata):
-            return "already_consumed"
-        if expected_launch_payload_hash:
-            reference = message.metadata.get("active_confirmation_reference")
-            reference_metadata = (
-                reference.get("metadata") if isinstance(reference, dict) else None
-            )
-            current_hash = str(
-                (reference_metadata or {}).get("launch_payload_hash") or ""
-            ).strip()
-            if current_hash and current_hash != expected_launch_payload_hash:
-                # The click's basis is gone: an edit rewrote the card after
-                # the run was requested, so the run refuses as stale rather
-                # than executing values the card no longer shows.
-                return "stale_card"
-        try:
-            _write_card_state(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                message=message,
-                state=CONSUMED_CONFIRMATION_STATE,
-                gateway=gateway,
-            )
-            return "consumed"
-        except StaleMessageArtifactError:
-            continue
-        except Exception:  # noqa: BLE001
-            # The stamp is protective; a store that cannot write it must
-            # degrade to the legacy behaviour, never fail the run.
-            logger.opt(exception=True).warning(
-                "Run consumption stamp could not be written; proceeding "
-                "unstamped with legacy liveness",
-                conversation_id=conversation_id,
-                message_id=message_id,
-            )
-            return "unstamped"
-    return "stale_card"
+        ),
+        write=partial(
+            _write_card_artifact,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            gateway=gateway,
+        ),
+        conflict_error=StaleMessageArtifactError,
+        can_consume=_matches_launch_basis,
+    )
+    return "stale_card" if outcome == "stale_artifact" else outcome
 
 
 def restore_pending_card_after_run(
@@ -185,47 +145,29 @@ def restore_pending_card_after_run(
     row, and the next turn's metadata fallback carries the restored card.
     """
     from argus.agent_runtime.stages.artifact_context import (
-        ACTIVE_CONFIRMATION_STATE,
-        CONSUMED_CONFIRMATION_STATE,
+        CONFIRMATION_ARTIFACT_LAYOUT,
     )
     from argus.domain.supabase_conversation_messages import (
         StaleMessageArtifactError,
     )
 
-    for _ in range(2):
-        message = _card_message_for_state(
+    return restore_pending_artifact(
+        layout=CONFIRMATION_ARTIFACT_LAYOUT,
+        load=partial(
+            _card_message_for_state,
             user_id=user_id,
             conversation_id=conversation_id,
             message_id=message_id,
             gateway=gateway,
-        )
-        if message is None or not isinstance(message.metadata, dict):
-            return False
-        card = message.metadata.get("confirmation_card")
-        state = str((card or {}).get("confirmation_state") or "").strip().casefold()
-        if state == ACTIVE_CONFIRMATION_STATE:
-            return True
-        if state != CONSUMED_CONFIRMATION_STATE:
-            return False
-        try:
-            _write_card_state(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                message=message,
-                state=ACTIVE_CONFIRMATION_STATE,
-                gateway=gateway,
-            )
-            return True
-        except StaleMessageArtifactError:
-            continue
-        except Exception:  # noqa: BLE001
-            break
-    logger.warning(
-        "A failed run could not restore its consumed card to active",
-        conversation_id=conversation_id,
-        message_id=message_id,
+        ),
+        write=partial(
+            _write_card_artifact,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            gateway=gateway,
+        ),
+        conflict_error=StaleMessageArtifactError,
     )
-    return False
 
 
 def consume_confirmation_for_admitted_run(
@@ -393,71 +335,60 @@ def apply_pending_card_update(
     from argus.agent_runtime.confirmation_artifacts import (
         confirmation_artifact_reference,
     )
-    from argus.agent_runtime.stages.artifact_context import confirmation_card_is_dead
+    from argus.agent_runtime.stages.artifact_context import CONFIRMATION_ARTIFACT_LAYOUT
 
     # Imported here, not at module scope: the card builder re-exports this
     # module, so a top-level import would close the cycle.
     from argus.api.chat.confirmation import runtime_confirmation_card
     from argus.api.message_store import message_preview, update_message_artifact
 
-    # The write-path invariant: no confirmation card is mutated after its
-    # run has been admitted (or it was cancelled or superseded). Enforced
-    # here so every producer, present or future, inherits it; the guarded
-    # write's metadata compare keeps this check honest against races.
-    if confirmation_card_is_dead(source_message.metadata) or (
-        expected_source_metadata is not None
-        and confirmation_card_is_dead(expected_source_metadata)
-    ):
-        raise DeadConfirmationCardError(
-            "The confirmation is no longer pending; nothing was written."
+    reference = None
+
+    def _prepare() -> PendingArtifactUpdate | None:
+        nonlocal reference
+        confirmation_payload["confirmation_id"] = confirmation_id
+        confirmation_payload["artifact_id"] = confirmation_id
+        card = runtime_confirmation_card(
+            {
+                "stage_outcome": "await_approval",
+                "confirmation_payload": confirmation_payload,
+            },
+            confirmation_id=confirmation_id,
+            conversation_id=conversation_id,
+            language=language,
+        )
+        if card is None:
+            return None
+        reference = confirmation_artifact_reference(
+            confirmation_id=confirmation_id,
+            confirmation_payload=confirmation_payload,
+            confirmation_card=card,
+        )
+        return PendingArtifactUpdate(
+            content=str(card.get("summary") or ""),
+            metadata={
+                "conversation_mode": "confirm",
+                "agent_runtime_stage_outcome": "await_approval",
+                "confirmation_card": card,
+                "confirmation_payload": confirmation_payload,
+                "active_confirmation_reference": reference.model_dump(mode="python"),
+                "artifact_references": [reference.model_dump(mode="python")],
+            },
         )
 
-    confirmation_payload["confirmation_id"] = confirmation_id
-    confirmation_payload["artifact_id"] = confirmation_id
-    card = runtime_confirmation_card(
-        {
-            "stage_outcome": "await_approval",
-            "confirmation_payload": confirmation_payload,
-        },
-        confirmation_id=confirmation_id,
-        conversation_id=conversation_id,
-        language=language,
-    )
-    if card is None:
-        return None
-    reference = confirmation_artifact_reference(
-        confirmation_id=confirmation_id,
-        confirmation_payload=confirmation_payload,
-        confirmation_card=card,
-    )
-    metadata: dict[str, Any] = {
-        **source_message.metadata,
-        "conversation_mode": "confirm",
-        "agent_runtime_stage_outcome": "await_approval",
-        "confirmation_card": card,
-        "confirmation_payload": confirmation_payload,
-        "active_confirmation_reference": reference.model_dump(mode="python"),
-        "artifact_references": [reference.model_dump(mode="python")],
-    }
-    for key, value in (metadata_extra or {}).items():
-        if value is None:
-            metadata.pop(key, None)
-        else:
-            metadata[key] = value
-    content = str(card.get("summary") or "")
-    updated = update_message_artifact(
-        user_id=user_id,
-        conversation_id=conversation_id,
-        message_id=source_message.id,
-        content=content,
-        metadata=metadata,
-        expected_source_metadata=expected_source_metadata,
-        expected_latest_message_id=expected_latest_message_id,
-        preview=message_preview(
-            content, role=str(source_message.role), metadata=metadata
-        ),
-    )
-    if runtime_workflow is not None:
+    def _write(**values: Any) -> Any:
+        return update_message_artifact(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            **values,
+            preview=message_preview(
+                values["content"],
+                role=str(source_message.role),
+                metadata=values["metadata"],
+            ),
+        )
+
+    def _sync() -> None:
         _sync_runtime_checkpoint_with_card(
             workflow=runtime_workflow,
             user_id=user_id,
@@ -466,7 +397,17 @@ def apply_pending_card_update(
             confirmation_payload=confirmation_payload,
             reference=reference,
         )
-    return updated
+
+    return apply_pending_artifact_update(
+        layout=CONFIRMATION_ARTIFACT_LAYOUT,
+        source_message=source_message,
+        expected_source_metadata=expected_source_metadata,
+        expected_latest_message_id=expected_latest_message_id,
+        prepare=_prepare,
+        write=_write,
+        metadata_extra=metadata_extra,
+        after_write=_sync if runtime_workflow is not None else None,
+    )
 
 
 def _persisted_card_message(

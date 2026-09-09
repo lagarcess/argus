@@ -60,6 +60,7 @@ import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
 import { confirmationEditDisclosureText } from "@/lib/confirmation-edit-disclosure";
+import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
 import { EntityToken } from "./entity-token";
 import { messageMentionPieces } from "./mention-rendering";
@@ -116,6 +117,7 @@ export default function ChatMessage({
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const { isBelowTablet } = useResponsiveLayout();
   const isUser = message.role === "user";
+  const confirmation = pendingArtifactCardFromPayload(message.confirmation);
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showSources, setShowSources] = useState(false);
@@ -209,10 +211,10 @@ export default function ChatMessage({
         ),
       );
     }
-    if (message.kind === "strategy_confirmation" && message.confirmation) {
+    if (message.kind === "strategy_confirmation" && confirmation?.kind === "backtest") {
       return normalizeCopyText(
         confirmationCardCopyText(
-          confirmationCardViewModel(message.confirmation, t, locale),
+          confirmationCardViewModel(confirmation, t, locale),
           t,
           locale,
         ),
@@ -298,16 +300,16 @@ export default function ChatMessage({
     ? t(`chat.result_followup.headings.${message.resultFactHeadingKey}`, "")
     : "";
   const confirmationPeriodLeadIn = confirmationPeriodAdjustmentText(
-    message.confirmation?.period_adjustment,
+    confirmation?.period_adjustment,
     (key, options) => t(key, options),
     i18n.resolvedLanguage ?? i18n.language ?? "en",
   );
   const confirmationBenchmarkLeadIn = confirmationBenchmarkAdjustmentText(
-    message.confirmation?.benchmark_adjustment,
+    confirmation?.benchmark_adjustment,
     (key, options) => t(key, options),
   );
   const confirmationEditDisclosureLeadIn = confirmationEditDisclosureText(
-    message.confirmation?.edit_disclosure,
+    confirmation?.edit_disclosure,
     t,
   );
 
@@ -407,7 +409,7 @@ export default function ChatMessage({
                 retryLabel={retryAction ? actionLabel(retryAction) : undefined}
               />
             </div>
-          ) : message.kind === "strategy_confirmation" && message.confirmation ? (
+          ) : message.kind === "strategy_confirmation" && confirmation?.kind === "backtest" ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-3">
               {confirmationPeriodLeadIn ? (
                 <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
@@ -428,13 +430,13 @@ export default function ChatMessage({
                 </p>
               ) : null}
               <StrategyConfirmationCard
-                confirmation={message.confirmation}
+                confirmation={confirmation}
                 disabled={turnInFlight}
                 onAction={onAction}
                 onDirectEdit={
-                  onDirectEdit && message.confirmation.confirmation_id
+                  onDirectEdit && confirmation.confirmation_id
                     ? (edit) =>
-                        onDirectEdit(message.confirmation!.confirmation_id!, edit)
+                        onDirectEdit(confirmation.confirmation_id!, edit)
                     : undefined
                 }
               />

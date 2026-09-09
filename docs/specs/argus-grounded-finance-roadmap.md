@@ -504,8 +504,10 @@ the web card stay untouched.
 - **`EditOperation.target` is model-facing schema the fingerprint does not
   see.** It must not widen. This is the one trap that would ship an unmeasured
   behavior change.
-- **`artifact_assumption_edit.py` has 72 of its 75 growth lines spent.** Leave
-  it alone.
+- **`artifact_assumption_edit.py` was at 72 of its 75 growth lines before Lane
+  B, and the budget config does watch it**, which PR #570 verified rather than
+  assumed. That lane extracted the response path and the shared edit-outcome
+  adapter, taking it from 1,561 to 1,507 lines, so 57 lines are free again.
 - No universal input schema. No model-facing text.
 
 **Proof.** `.agent/interpreter_prompt_fingerprint.json` byte-identical before

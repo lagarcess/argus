@@ -958,6 +958,9 @@ can execute. Older legacy cards without that identity are transcript history
 and cannot execute. Confirmation cards should include stable
 machine-readable fields alongside display labels:
 
+- `kind`: new cards emit `"backtest"`. The web intake boundary normalizes only
+  an absent legacy kind to backtest; an explicit unknown kind cannot render a
+  backtest card or its execution actions.
 - `status`: stable confirmation status code such as `ready_to_run`, `running`,
   `run_complete`, or `could_not_run`.
 - `statusLabel`: legacy/user-facing fallback label for old clients and old
@@ -4124,6 +4127,12 @@ nothing.
   `edit_disclosure` (`{"unapplied": [{"op", "target", "reason"}], "note"?}`)
   and clients render it as a lead-in above the card. The disclosure
   describes one transition and never persists onto later cards.
+- Shared artifact edit accounting owns this guarantee for normal and recovery
+  card paths. A requested target that does not materialize carries
+  `reason: "not_materialized"`. When nothing changes and there is no specific
+  refusal, the receipt is `{"op": "edit", "target": "requested_change",
+  "reason": "no_change_applied"}`. Clients localize that receipt and prioritize
+  it over planner prose; they never guess which unextracted change was intended.
 
 ---
 

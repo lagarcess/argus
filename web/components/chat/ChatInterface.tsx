@@ -168,10 +168,10 @@ import ConversationRetrievalState, {
 } from "./ConversationRetrievalState";
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import { feedbackContextForSubmission } from "@/lib/feedback-context";
+import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import {
   type ChatActionOption,
   type Message,
-  type StrategyConfirmationPayload,
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
@@ -1354,9 +1354,8 @@ export default function ChatInterface() {
         }
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
-        if (event.data.confirmation) {
-          const confirmation = event.data
-            .confirmation as StrategyConfirmationPayload;
+        const confirmation = pendingArtifactCardFromPayload(event.data.confirmation);
+        if (confirmation) {
           const finalAssistantId = finalMessageId ?? assistantId;
           // Researched peer adds ride the ordinary Try-next surface below
           // the card's turn (research rail, spec section 6).

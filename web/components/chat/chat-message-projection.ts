@@ -19,6 +19,7 @@ import {
   decisionStateFromValue,
 } from "@/lib/decision-contract";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
+import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
@@ -66,7 +67,6 @@ import {
 import type {
   ChatActionOption,
   Message,
-  StrategyConfirmationPayload,
 } from "./types";
 
 export type HydratedMessages = {
@@ -299,9 +299,7 @@ export function hydrateMessagesFromApi(
     .map((message) => {
       const metadata = message.metadata ?? {};
       const chatAction = metadata.chat_action as ChatActionOption | undefined;
-      const confirmation = metadata.confirmation_card as
-        | StrategyConfirmationPayload
-        | undefined;
+      const confirmation = pendingArtifactCardFromPayload(metadata.confirmation_card);
       const projectedJob =
         message.role === "user" ? backtestJobMessageFromApi(message) : null;
       if (projectedJob) return projectedJob;
