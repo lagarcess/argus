@@ -467,6 +467,33 @@ first expensive non-backtest calculation.
   harness, never merged, run before the registry lane so the registry is
   designed from what the throwaway actually needed. One round.
 
+**Lane C ran 2026-09-08 against `6bc3e0ee`, draft PR #566, never to merge.**
+Report and evidence under `docs/reports/lift-loop-lane-c/`. Time value of money
+solved for any one of five blanks, 93 tests, 31 fresh-process import probes with
+guards that refuse backtest imports rather than stubbing them. Three findings
+change this board.
+
+**Relocation did not make the loop reusable.** The open containers hold the five
+inputs through real Pydantic round trips with no strategy, symbol, date range or
+run id. But `state/models.py:16` imports `capability_registry`, which imports
+`STRATEGY_CAPABILITIES`, and `api/schemas.py:30` imports it independently, so the
+message envelope cannot be reached without loading the strategy catalog. Lane A
+moved code; it did not cut that edge. **Verified independently at the head.**
+
+**The four-artifact bar is unproven, not passed.** Lane C produced four runnable
+artifacts, and says plainly that counting them as a passing calculation would
+conceal the absent work: no product card, no dispatch, no recompute. Rule 3's
+stop condition stays live and this spike does not waive it.
+
+**The bill in the registry is now itemized.** Using the loop as it stands needs
+changes at six existing owners: dispatch, pending-card assembly and update, edit
+application and disclosure, fact projection and localization, result selection
+and hydration, and retry and continuity semantics. The sharpest single blocker
+is that nothing dispatches to a cheap calculation at all: the graph has one
+backtest tool and `stages/execute.py:50-71` always builds a launch payload
+first, so answering first without a confirm card has no path today. That is
+operating rule 2 with no runtime behind it.
+
 **Almost nothing moves.** `models.py`, `confirm.py`, `contextual_merge.py` and
 the web card stay untouched.
 

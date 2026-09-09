@@ -8,11 +8,21 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from babel.numbers import list_currencies
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 QuestionShape = Literal["fast", "balanced", "thorough"]
+# What a row's value measures. Declared by the provider under the strict
+# schema, never inferred from the shape of its unit.
+RowKind = Literal["currency", "percent", "multiple", "count"]
+
+# The currency codes a currency row may name: the CLDR data Babel ships and
+# keeps current (XCG arrived there with the 2025 release), not a copied
+# snapshot of ISO 4217 that goes stale the next time the standard moves.
+CURRENCY_CODES = frozenset(list_currencies())
+
 CapabilityClass = Literal[
     "fast_quote",
     "balanced_lookup",
@@ -32,10 +42,112 @@ MAX_PEER_PAIRS = 12
 # still find one the user can test.
 MAX_PACKET_TICKERS = 32
 MAX_URL_CHARS = 512
+MAX_PACKET_ROWS = 64
 
 # Perplexity-owned hosts never appear in user-facing output: route receipts and
 # the cost ledger own provider provenance, not prose or sidecars.
 PROVIDER_HOSTS = ("perplexity.ai",)
+
+# The provider-side name of the strict response schema every research answer
+# is requested in. It identifies the schema in the provider's cache, so a
+# schema change must travel with a new recorded probe under it.
+TYPED_RETRIEVAL_SCHEMA_NAME = "argus_typed_retrieval"
+
+
+# Operating rule 4 of the grounded-finance board: retrieval produces typed
+# rows, never prose. The strict request schema the provider fills is derived
+# from these two models, so the shape the model writes and the shape Argus
+# reads share one owner. Class and attribute docstrings are the schema
+# descriptions the provider reads: they steer Perplexity, not the
+# interpreter, and are frozen by the recorded probe in tests/research rather
+# than by the interpreter fingerprint.
+class RetrievedRow(BaseModel):
+    """One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation."""
+
+    model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
+
+    subject: str
+    """The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix."""
+    symbol: str | None
+    """The exchange ticker of the security the figure describes, or null."""
+    label: str
+    """What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025."""
+    value: float = Field(strict=True, allow_inf_nan=False)
+    """The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000."""
+    kind: RowKind
+    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares."""
+    unit: str
+    """The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count."""
+    as_of: str | None
+    """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
+    source_url: str | None
+    """The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."""
+
+    @field_validator("unit")
+    @classmethod
+    def _stripped(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def _currency_unit_is_a_code(self) -> "RetrievedRow":
+        # A money amount names a currency that exists, by its ISO 4217 code,
+        # held against maintained currency data rather than a copied list.
+        if self.kind == "currency" and self.unit not in CURRENCY_CODES:
+            raise ValueError("a currency row names its unit by ISO 4217 code")
+        return self
+
+
+class TypedRetrieval(BaseModel):
+    """A grounded answer: prose for the reader, plus every figure it states as a cited row."""
+
+    model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
+
+    answer_markdown: str
+    """The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models."""
+    rows: list[RetrievedRow]
+    """Every figure answer_markdown states, one row each, with the retrieved page it was read from."""
+
+
+def typed_retrieval_json_schema() -> dict[str, Any]:
+    """The strict request schema, derived from the model the parser validates.
+
+    Provider strict mode requires every object to close additional
+    properties, every property to be required and every definition to be
+    inline; Pydantic's schema carries titles, defaults and ``$defs`` instead.
+    """
+    schema = TypedRetrieval.model_json_schema()
+    definitions = schema.pop("$defs", {})
+    return _strict_schema(schema, definitions)
+
+
+def typed_response_format() -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": TYPED_RETRIEVAL_SCHEMA_NAME,
+            "strict": True,
+            "schema": typed_retrieval_json_schema(),
+        },
+    }
+
+
+def _strict_schema(node: Any, definitions: dict[str, Any]) -> Any:
+    if isinstance(node, dict):
+        if "$ref" in node:
+            name = str(node["$ref"]).rsplit("/", 1)[-1]
+            return _strict_schema(definitions[name], definitions)
+        strict = {
+            key: _strict_schema(value, definitions)
+            for key, value in node.items()
+            if key not in ("title", "default")
+        }
+        if strict.get("type") == "object" and isinstance(strict.get("properties"), dict):
+            strict["additionalProperties"] = False
+            strict["required"] = list(strict["properties"])
+        return strict
+    if isinstance(node, list):
+        return [_strict_schema(item, definitions) for item in node]
+    return node
 
 
 class ResearchUnavailableError(Exception):
@@ -122,6 +234,15 @@ class ResearchPacket(BaseModel):
     tickers: tuple[str, ...] = ()
     sources: tuple[ResearchSource, ...] = ()
     name_pairs: tuple[ResearchNamePair, ...] = ()
+    # Figures the answer states, each cited to a page this response retrieved.
+    rows: tuple[RetrievedRow, ...] = ()
+    # True when the answer arrived in the typed retrieval shape. Prose under a
+    # typed request is still delivered, and recorded as prose.
+    typed_answer: bool = False
+    # Rows whose citation matched no page retrieved in the same response,
+    # their citation dropped. Never published: the turn names the figures it
+    # will not quote and withholds the answer.
+    rejected_rows: tuple[RetrievedRow, ...] = ()
     # Tool result items in the provider's output, by item type and in order.
     # This is the retrieval record; the invoice's tool counts are billing.
     tool_results: tuple[str, ...] = ()

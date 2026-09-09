@@ -1370,6 +1370,9 @@ fixed day thresholds.
 never mutates Strategy records; Argus responds that the completed run remains
 available in conversation/history. Completed runs are captured automatically as
 evidence, while user commitment is represented by an explicit `DecisionNote`.
+A `DecisionNote` attaches to a computation: a backtest's evidence artifact, or
+the message that carried a computed answer (see "Decisions on computed
+answers" in section 15).
 
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
@@ -3638,6 +3641,18 @@ final payload and persisted metadata:
         "source_date": "2026-07-16"
       }
     ],
+    "rows": [
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Q2 2026 revenue",
+        "value": 11079000000,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-07-16",
+        "source_url": "https://example.com/filing"
+      }
+    ],
     "retrieved_at": "2026-08-07T15:04:05Z",
     "anchor_symbols": ["NFLX"],
     "peers": [
@@ -3727,11 +3742,13 @@ Contract rules:
   reading returned tool output first and invoice counts second. A
   survey with no retrieval carries `degraded.code = "survey_not_grounded"`
   and replaces unsupported prose with the precise retrieval failure. A survey
-  that retrieved but names no resolver-verified ticker carries
+  that retrieved but names no resolver-verified ticker, or whose typed
+  answer states no cited figure at all, carries
   `degraded.code = "survey_synthesis_incomplete"` and says that sources were
-  found but the requested assets could not be extracted. Neither failure
-  renders subject-dependent figure or asset copy, and neither emits a
-  runnable row.
+  found but the requested assets could not be extracted; a survey is
+  accepted only with a figure and a verified name, on the first attempt or
+  after the one concrete retry. Neither failure renders subject-dependent
+  figure or asset copy, and neither emits a runnable row.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
@@ -3747,6 +3764,58 @@ Contract rules:
   the question date is its freshness lower bound. Classifier-supplied period
   lower bounds are ISO-date typed; a malformed value is rejected instead of
   turning a bounded question into an unbounded one.
+- **Retrieval produces typed rows, never prose** (grounded-finance board,
+  operating rule 4). Every provider call requests a strict `json_schema`
+  response: the answer prose plus `rows`, one per figure the answer states,
+  each `{subject, symbol, label, value, kind, unit, as_of, source_url}` with
+  `value` a plain number, `subject` the entity the figure describes, and
+  `kind` one of `currency`, `percent`, `multiple`, `count`; a currency row
+  names its unit by an ISO 4217 code known to the maintained currency data
+  Babel ships, never a copied list, or the answer is malformed, and an answer carrying more rows than the packet holds
+  (64) is malformed rather than cut. A row survives parsing only when its `source_url` is a page the
+  same response retrieved (a finance or web tool result, a fetched page, or
+  an annotation); a row citing anything else is dropped and counted, never
+  asserted. Fetched pages are typed sources too, without a publisher date. A row
+  read from the provider's own finance data keeps its evidence in the tool
+  result and carries `source_url: null`, the way every provider-host citation
+  is scrubbed. **A typed answer is publishable only with at least one cited
+  row and no rejected one.** Prose cannot be trimmed of one claim, so a
+  rejected row, or a typed answer that retrieved and wrote no row, withholds
+  the whole answer: the turn carries `degraded.code =
+  "research_figures_unverified"`, an honest note replaces the prose and
+  names the figures it will not quote from the rejected rows' own typed
+  subject and label, the subjects the user named stay testable, and the
+  packet is never cached. The prose is never matched against the rows by
+  heuristic: that shape leaks by construction, and rule 4 keeps prose from
+  being the carrier of facts at all. A typed answer with no row and
+  no retrieval at all carries `research_not_grounded` with the unavailable
+  note. Surveys keep their own codes below. `rows` is additive on the
+  sidecar and may be empty; a degraded turn always carries an empty list,
+  enforced by the sidecar builder. A JSON-shaped answer that is not the
+  schema (an invalid row, an answer the output budget truncated) is a broken
+  contract, never prose: it fails closed as
+  `research_unavailable_malformed_response`, is never cached, and a
+  completed background run carrying one fails its job. Genuine prose under a
+  typed request is delivered and recorded as prose.
+- **Retrieval parameters are configuration per question shape.** Each call
+  sends a model fallback chain (`models`, the primary and the other priced
+  model, served in order; the invoice names the model that served), the
+  reader's language (`language_preference`, ISO 639-1 from the profile
+  language), the shape's web search context size, a recency filter derived
+  from the question's section 7 data class (current classes a week, analyst
+  estimates a month, quarterly and closed classes none, so a closed window is
+  never filtered to the past week), the deployment's home market as the
+  reader's location (`ARGUS_RESEARCH_HOME_COUNTRY`, ISO 3166-1 alpha-2;
+  unset sends none, and Argus holds no per-user country yet), and, for a
+  local question, that market's curated publisher list as the domain filter
+  (at most twenty domains, the provider's ceiling). No rail shape today is
+  local; the list is seeded from the bank users actually named and is
+  consumed by the first local calculation.
+- Current external facts ("why is NVDA moving this week") are claim-shaped:
+  they ground through the balanced shape with publisher sources required and
+  a one-week recency filter, and persist the ordinary `research` sidecar with
+  typed, dated `sources`. Publisher URLs are never written into the prose
+  (#545). Flag off, the pre-rail search-and-voice path is unchanged.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around
@@ -4363,6 +4432,8 @@ Completed chat-launched backtests auto-capture P1 evidence sidecars. The
 result-card metadata may include `idea_id`, `idea_version_id`,
 `evidence_artifact_id`, `evidence_lifecycle`, `artifact_type = "backtest"`,
 and after explicit decision capture, `decision_note_id` and `decision_state`.
+The two decision fields are derived on each transcript read from
+`decision_notes`, which owns them; the stored card copy is not the source.
 These are stable ids/enums and must not be localized.
 
 ## `POST /evidence-artifacts/{id}/decision`
@@ -4413,6 +4484,8 @@ or corrupt legacy user text.
     "idea_version_id": "uuid",
     "evidence_artifact_id": "uuid",
     "source_conversation_id": "uuid",
+    "source_message_id": null,
+    "computation": null,
     "decision_state": "promising",
     "note": "Worth revisiting after the next earnings cycle.",
     "created_at": "timestamp",
@@ -4446,6 +4519,106 @@ or corrupt legacy user text.
   validation. The response follows the standard RFC 9457 Problem Details shape
   with `code = "decision_capture_failed"`. Clients should show a retryable
   failure state and must not invent a saved decision locally.
+
+## Decisions on computed answers
+
+A decision attaches to a computation and carries what a re-run needs. Every
+`DecisionNote` has exactly one attachment:
+
+- A backtest decision attaches to its evidence artifact: `evidence_artifact_id`,
+  `idea_id`, and `idea_version_id` are set; `source_message_id` and
+  `computation` are `null`. Its computation is derived on read from the run
+  behind the artifact, `{"kind": "backtest", "inputs": {"source_run_id": "<run
+  id>"}}`, because that immutable run owns the inputs.
+- A computed-answer decision attaches to the assistant message that carried the
+  answer: `source_message_id` and `computation` are set; the three lineage ids
+  are `null`. The computation is stored on the decision, so the decision keeps
+  its inputs after the message is gone.
+
+A computed answer declares its computation in message metadata:
+`metadata.computation = {"kind": "<registered kind>", "inputs": {...}}`. `kind`
+is a lowercase slug of at most 80 characters; `inputs` is a JSON object of at
+most 32 keys that serializes to at most 8,192 characters. Only the backend
+writes this field. On every transcript read, the backend derives
+`decision_note_id` and `decision_state` for the message from `decision_notes`,
+the one owner of that fact, exactly as it does for a result card; a stored copy
+on the message is never trusted, and a decision the owner no longer holds is
+not shown. Clients render that state instead of inferring one. A message
+without a valid declaration offers no decision.
+
+### `POST /conversations/{conversation_id}/messages/{message_id}/decision`
+
+Create or update the current decision on an owned computed answer. Registered
+accounts only (`can_save_decision`); guests receive `403
+account_conversion_required` with `context.reason = "save_decision"`. The body
+is the same `DecisionNoteCreate` as the evidence-artifact route, with the same
+500-character note bound. One current decision exists per owned answer
+message; a repeated write updates its state and note and keeps the first stored
+computation and `created_at`.
+
+**Response:** `{"decision": DecisionNote}` with `source_message_id` and
+`computation` set and the lineage ids `null`.
+
+**Error rules:**
+- `404 Not Found`: the message is missing, not owned, not in the named
+  conversation, or not an assistant message. `code = "not_found"`.
+- `409 Decision Attachment Unsupported`: the message declares no valid
+  computation. `code = "decision_attachment_unsupported"`.
+- `500 Decision Capture Failed`: `code = "decision_capture_failed"`, same
+  client rule as the evidence route.
+
+### `GET /decisions/{decision_id}`
+
+Open an owned decision. The backend re-runs its computation from the stored
+inputs and returns the decision, the effective computation, and the outcome.
+The re-run happens only when the decision is opened; nothing reaches out.
+
+```json
+{
+  "decision": { "...": "DecisionNote" },
+  "computation": { "kind": "backtest", "inputs": { "source_run_id": "uuid" } },
+  "rerun": {
+    "kind": "backtest",
+    "inputs": { "source_run_id": "uuid" },
+    "status": "confirmation_required",
+    "result": null,
+    "retest": { "type": "retest_run", "source_run_id": "uuid", "...": "..." },
+    "reason_code": null
+  }
+}
+```
+
+`rerun.status`:
+- `computed`: `result` carries the kind's typed result; `retest` is `null`.
+- `confirmation_required`: the backtest kind. `retest` is the same typed
+  `retest_run` action the run dossier offers, because a backtest earns its
+  confirmation by cost and never executes on open.
+- `unavailable`: nothing ran, and `reason_code` says why, as a code and never
+  prose: `kernel_unavailable` (the kind is not registered),
+  `invalid_inputs` (the stored inputs no longer satisfy the kind),
+  `inputs_not_editable`, `run_unavailable`, or `retest_unavailable`.
+
+`404 Not Found` when the decision is missing or not owned.
+
+### `POST /decisions/{decision_id}/rerun`
+
+Re-run with changed inputs. Body: `{"inputs": {...}}`, overrides merged over
+the stored inputs under the same bounds as a declared computation. Returns
+`DecisionOpenResponse`. A re-run never changes the decision or its stored
+computation. Overrides that fail the kind's typed inputs return `422
+validation_error` with the field errors in `context.errors`. The backtest
+kind's inputs are not editable: overrides answer `unavailable` with
+`inputs_not_editable` rather than minting a run.
+
+### Search and dossiers
+
+A computed-answer decision joins the same decision index as a backtest
+decision. It matches by its note, its state, and the text of the answer it
+attaches to; the conversation carries its state in `decision_states`; the
+`decision_state` filter and ledger groups count it. `dossier` stays `null`
+unless the conversation also has an evidence-backed run, and
+`GET /conversations/{conversation_id}/run-dossiers` is unchanged: it projects
+runs, so only backtest decisions appear there.
 
 ---
 

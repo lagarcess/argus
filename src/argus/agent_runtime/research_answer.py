@@ -31,6 +31,7 @@ from argus.agent_runtime.research_grounded import (  # noqa: F401
     research_capacity_exhausted_for_job,
     research_failure_note,
     research_prompt_for_job,
+    retrieval_spec_for_job,
     store_research_packet_for_job,
 )
 from argus.agent_runtime.research_query import ResearchQueryExtraction
@@ -163,7 +164,11 @@ async def _dispatch(
     if ka.refusal_route_survives_classification(interpretation):
         ka.note_refusal_route_kept(interpretation)
         return None
-    if query.question_kind in ("market_stats", "current_external"):
+    # Current external facts ("why is it moving") take the grounded balanced
+    # path like every other claim: typed, dated sources in the sidecar, never
+    # publisher URLs written into prose (#545). Statistics stay on Argus's
+    # own data.
+    if query.question_kind == "market_stats":
         return await _legacy_kind_result(
             query=query,
             interpretation=interpretation,

@@ -446,6 +446,173 @@ _EVIDENCE_INDEX_HAYSTACK = """
 _DECISION_INDEX_HAYSTACK = """
     decision.decision_state || ' ' || coalesce(decision.note, '')
 """
+
+
+@dataclass(frozen=True)
+class _DecisionAttachment:
+    """One owner a decision can attach to, and the text it carries."""
+
+    alias: str
+    table: str
+    decision_key: str
+    conversation_column: str
+    text: str
+    index_text: str
+
+
+# A decision attaches to exactly one owner: the evidence artifact of a
+# backtest, or the assistant message that carried a computed answer. Every
+# decision-level read derives its joins, its searchable text, and its anchor
+# discovery from this tuple, so an attachment is added here and nowhere else.
+# Run-scoped counts (decided runs, asset rollups) stay on evidence lineage by
+# contract: a run is decided only through its artifact.
+_DECISION_ATTACHMENTS = (
+    _DecisionAttachment(
+        alias="evidence",
+        table="public.evidence_artifacts",
+        decision_key="evidence_artifact_id",
+        conversation_column="source_conversation_id",
+        text="concat_ws(' ', nullif(evidence.title, ''), nullif(evidence.digest, ''))",
+        index_text=_EVIDENCE_INDEX_HAYSTACK,
+    ),
+    _DecisionAttachment(
+        alias="decision_message",
+        table="public.messages",
+        decision_key="source_message_id",
+        conversation_column="conversation_id",
+        text="nullif(decision_message.content, '')",
+        index_text="decision_message.content",
+    ),
+)
+
+
+def _decision_attachment_joins(
+    *, user_expression: str, exclude: str | None = None
+) -> str:
+    """Left joins to every attachment a decision may carry."""
+    return "\n".join(
+        f"""
+        left join {attachment.table} as {attachment.alias}
+          on {attachment.alias}.id = decision.{attachment.decision_key}
+         and {attachment.alias}.user_id = {user_expression}
+         and {attachment.alias}.{attachment.conversation_column}
+             = decision.source_conversation_id
+        """
+        for attachment in _DECISION_ATTACHMENTS
+        if attachment.alias != exclude
+    )
+
+
+def _decision_attachment_text() -> str:
+    """The searchable text a decision carries through its attachment."""
+    return "concat_ws(' ', " + ", ".join(a.text for a in _DECISION_ATTACHMENTS) + ")"
+
+
+def _decision_haystack_text() -> str:
+    return f"{_DECISION_INDEX_HAYSTACK} || ' ' || {_decision_attachment_text()}"
+
+
+def _decision_matched_text() -> str:
+    return (
+        "concat_ws(' ', nullif(decision.note, ''), decision.decision_state, "
+        + ", ".join(a.text for a in _DECISION_ATTACHMENTS)
+        + ")"
+    )
+
+
+def _decision_match_sources(
+    *,
+    has_anchor: bool,
+    select_list: sql.Composable,
+    conversation_join: sql.Composable,
+    all_tokens: sql.Composable,
+) -> list[sql.Composed]:
+    """One decision-match source per index a decision is discovered through.
+
+    Without an anchor there is one scan over decisions with every attachment
+    left-joined. With an anchor, the decision's own note and state and each
+    attachment's indexed text discover candidates independently, and every
+    branch still left-joins the other attachments so the token recheck sees
+    the whole haystack.
+    """
+    body = sql.SQL(
+        """
+        select {select_list}
+        from input
+        {discovery}
+        {conversation_join}
+        where input.text_search_enabled
+          and input.normalized_query <> ''
+          and ({all_tokens})
+        """
+    )
+
+    def source(discovery: sql.Composable) -> sql.Composed:
+        return body.format(
+            select_list=select_list,
+            discovery=discovery,
+            conversation_join=conversation_join,
+            all_tokens=all_tokens,
+        )
+
+    decision_scan = sql.SQL(
+        """
+        join public.decision_notes as decision
+          on decision.user_id = input.user_id
+        """
+    )
+    every_attachment = sql.SQL(
+        _decision_attachment_joins(user_expression="input.user_id")
+    )
+    if not has_anchor:
+        return [source(sql.SQL("\n").join([decision_scan, every_attachment]))]
+    sources = [
+        source(
+            sql.SQL("\n").join(
+                [
+                    sql.SQL(
+                        """
+        join public.decision_notes as decision
+          on decision.user_id = input.user_id
+         and {decision_index} like %(anchor_pattern)s
+        """
+                    ).format(decision_index=_normalized(_DECISION_INDEX_HAYSTACK)),
+                    every_attachment,
+                ]
+            )
+        )
+    ]
+    for attachment in _DECISION_ATTACHMENTS:
+        discovery = sql.SQL(
+            f"""
+        join {attachment.table} as {attachment.alias}
+          on {attachment.alias}.user_id = input.user_id
+         and {{index_text}} like %(anchor_pattern)s
+        join public.decision_notes as decision
+          on decision.{attachment.decision_key} = {attachment.alias}.id
+         and decision.user_id = input.user_id
+         and decision.source_conversation_id
+             = {attachment.alias}.{attachment.conversation_column}
+        """
+        ).format(index_text=_normalized(attachment.index_text))
+        sources.append(
+            source(
+                sql.SQL("\n").join(
+                    [
+                        discovery,
+                        sql.SQL(
+                            _decision_attachment_joins(
+                                user_expression="input.user_id",
+                                exclude=attachment.alias,
+                            )
+                        ),
+                    ]
+                )
+            )
+        )
+    return sources
+
+
 _LATE_EVIDENCE = _LateSource(
     name="evidence",
     source_type="evidence",
@@ -526,35 +693,20 @@ _LATE_DECISION = _LateSource(
              not input.guest_scope
              or decision.source_conversation_id = input.guest_conversation_id
          )
-        left join public.evidence_artifacts as decision_evidence
-          on decision_evidence.id = decision.evidence_artifact_id
-         and decision_evidence.user_id = input.user_id
-    """,
+    """
+    + _decision_attachment_joins(user_expression="input.user_id"),
     filters="true",
-    title_expression="""
-        coalesce(
-            nullif(decision_evidence.title, ''),
-            nullif(decision_evidence.digest, ''),
-            decision.id::text
-        )
-    """,
-    matched_expression="""
-        concat_ws(
-            ' ',
-            decision.decision_state,
-            decision.note,
-            decision_evidence.digest
-        )
-    """,
-    haystack_expression="""
-        concat_ws(
-            ' ',
-            decision.decision_state,
-            decision.note,
-            decision_evidence.title,
-            decision_evidence.digest
-        )
-    """,
+    title_expression=(
+        f"coalesce(nullif({_decision_attachment_text()}, ''), decision.id::text)"
+    ),
+    matched_expression=(
+        f"concat_ws(' ', decision.decision_state, decision.note, "
+        f"{_decision_attachment_text()})"
+    ),
+    haystack_expression=(
+        f"concat_ws(' ', decision.decision_state, decision.note, "
+        f"{_decision_attachment_text()})"
+    ),
     candidate_haystack_expression=None,
     symbol_rank_expression="false",
     type_rank_expression="5",
@@ -575,6 +727,8 @@ _LATE_DECISION = _LateSource(
             'note', decision.note,
             'evidence_artifact_id', decision.evidence_artifact_id,
             'source_conversation_id', decision.source_conversation_id,
+            'source_message_id', decision.source_message_id,
+            'computation', decision.computation,
             'updated_at', decision.updated_at
         )
     """,
@@ -1271,12 +1425,7 @@ def _conversation_match_ctes(
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
     )
-    decision_haystack = _normalized(
-        f"""
-        {_DECISION_INDEX_HAYSTACK} || ' '
-        || evidence.title || ' ' || coalesce(evidence.digest, '')
-        """
-    )
+    decision_haystack = _normalized(_decision_haystack_text())
     decision_all_tokens = _all_token_recheck(decision_haystack)
     conversation_exact_rank = sql.SQL(
         """
@@ -1534,17 +1683,7 @@ def _conversation_match_ctes(
     evidence_matched_text = sql.SQL(
         "concat_ws(' ', evidence.title, nullif(evidence.digest, ''))"
     )
-    decision_matched_text = sql.SQL(
-        """
-        concat_ws(
-            ' ',
-            nullif(decision.note, ''),
-            decision.decision_state,
-            nullif(evidence.title, ''),
-            nullif(evidence.digest, '')
-        )
-        """
-    )
+    decision_matched_text = sql.SQL(_decision_matched_text())
 
     conversation_source = sql.SQL(
         """
@@ -1712,18 +1851,20 @@ def _conversation_match_ctes(
         decision_filter=_CONVERSATION_DECISION_FILTER,
     )
 
-    def decision_source(indexed_joins: sql.Composable) -> sql.Composed:
-        return sql.SQL(
+    decision_sources = _decision_match_sources(
+        has_anchor=has_anchor,
+        select_list=sql.SQL(
             """
-            select
-                conversation.id as conversation_id,
-                decision.id as source_id,
-                decision.updated_at as candidate_at,
-                {matched_text_sql} as matched_text,
-                6::integer as layer_rank,
-                'decision'::text as layer
-            from input
-            {indexed_joins}
+            conversation.id as conversation_id,
+            decision.id as source_id,
+            decision.updated_at as candidate_at,
+            {matched_text_sql} as matched_text,
+            6::integer as layer_rank,
+            'decision'::text as layer
+            """
+        ).format(matched_text_sql=decision_matched_text),
+        conversation_join=sql.SQL(
+            """
             join public.conversations as conversation
               on conversation.id = decision.source_conversation_id
              and conversation.user_id = input.user_id
@@ -1733,69 +1874,10 @@ def _conversation_match_ctes(
                  or conversation.id = input.guest_conversation_id
              )
              {decision_filter}
-            where input.text_search_enabled
-              and input.normalized_query <> ''
-              and ({all_tokens})
             """
-        ).format(
-            indexed_joins=indexed_joins,
-            matched_text_sql=decision_matched_text,
-            decision_filter=_CONVERSATION_DECISION_FILTER,
-            all_tokens=decision_all_tokens,
-        )
-
-    if has_anchor:
-        decision_sources = (
-            decision_source(
-                sql.SQL(
-                    """
-                    join public.decision_notes as decision
-                      on decision.user_id = input.user_id
-                     and {decision_index} like %(anchor_pattern)s
-                    join public.evidence_artifacts as evidence
-                      on evidence.id = decision.evidence_artifact_id
-                     and evidence.user_id = input.user_id
-                     and evidence.source_conversation_id =
-                         decision.source_conversation_id
-                    """
-                ).format(
-                    decision_index=_normalized(_DECISION_INDEX_HAYSTACK),
-                )
-            ),
-            decision_source(
-                sql.SQL(
-                    """
-                    join public.evidence_artifacts as evidence
-                      on evidence.user_id = input.user_id
-                     and {evidence_index} like %(anchor_pattern)s
-                    join public.decision_notes as decision
-                      on decision.evidence_artifact_id = evidence.id
-                     and decision.user_id = input.user_id
-                     and decision.source_conversation_id =
-                         evidence.source_conversation_id
-                    """
-                ).format(
-                    evidence_index=_normalized(_EVIDENCE_INDEX_HAYSTACK),
-                )
-            ),
-        )
-    else:
-        decision_sources = (
-            decision_source(
-                sql.SQL(
-                    """
-                    join public.decision_notes as decision
-                      on decision.user_id = input.user_id
-                    join public.evidence_artifacts as evidence
-                      on evidence.id = decision.evidence_artifact_id
-                     and evidence.user_id = input.user_id
-                     and evidence.source_conversation_id =
-                         decision.source_conversation_id
-                    """
-                )
-            ),
-        )
-
+        ).format(decision_filter=_CONVERSATION_DECISION_FILTER),
+        all_tokens=decision_all_tokens,
+    )
     decision_candidates = (
         sql.SQL(
             """
@@ -1824,7 +1906,7 @@ def _conversation_match_ctes(
         ).format(
             candidate_sources=sql.SQL("\nunion all\n").join(decision_sources),
         )
-        if has_anchor
+        if len(decision_sources) > 1
         else sql.SQL(
             """
             decision_candidates as (
@@ -2359,12 +2441,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
     evidence_haystack = _normalized(
         "evidence.title || ' ' || coalesce(evidence.digest, '')"
     )
-    decision_haystack = _normalized(
-        f"""
-        {_DECISION_INDEX_HAYSTACK} || ' '
-        || evidence.title || ' ' || coalesce(evidence.digest, '')
-        """
-    )
+    decision_haystack = _normalized(_decision_haystack_text())
 
     def token_predicate(
         haystack: sql.Composable,
@@ -2377,81 +2454,30 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
         )
 
     decision_all_tokens = _all_token_recheck(decision_haystack)
-    if has_anchor:
-        decision_matches = sql.SQL(
-            """
-            decision_matching_conversations as (
-                (
-                select conversation.id as conversation_id
-                from input
-                join public.decision_notes as decision
-                  on decision.user_id = input.user_id
-                 and {decision_index} like %(anchor_pattern)s
-                join public.evidence_artifacts as evidence
-                  on evidence.id = decision.evidence_artifact_id
-                 and evidence.user_id = input.user_id
-                 and evidence.source_conversation_id =
-                     decision.source_conversation_id
-                join public.conversations as conversation
-                  on conversation.id = decision.source_conversation_id
-                 and conversation.user_id = input.user_id
-                 and conversation.deleted_at is null
-                where input.text_search_enabled
-                  and input.normalized_query <> ''
-                  and ({all_tokens})
-                )
-
-                union
-
-                (
-                select conversation.id
-                from input
-                join public.evidence_artifacts as evidence
-                  on evidence.user_id = input.user_id
-                 and {evidence_index} like %(anchor_pattern)s
-                join public.decision_notes as decision
-                  on decision.evidence_artifact_id = evidence.id
-                 and decision.user_id = input.user_id
-                 and decision.source_conversation_id =
-                     evidence.source_conversation_id
-                join public.conversations as conversation
-                  on conversation.id = decision.source_conversation_id
-                 and conversation.user_id = input.user_id
-                 and conversation.deleted_at is null
-                where input.text_search_enabled
-                  and input.normalized_query <> ''
-                  and ({all_tokens})
-                )
-            )
-            """
-        ).format(
-            decision_index=_normalized(_DECISION_INDEX_HAYSTACK),
-            evidence_index=_normalized(_EVIDENCE_INDEX_HAYSTACK),
-            all_tokens=decision_all_tokens,
+    decision_matches = sql.SQL(
+        """
+        decision_matching_conversations as (
+            {sources}
         )
-    else:
-        decision_matches = sql.SQL(
-            """
-            decision_matching_conversations as (
-                select conversation.id as conversation_id
-                from input
-                join public.decision_notes as decision
-                  on decision.user_id = input.user_id
-                join public.evidence_artifacts as evidence
-                  on evidence.id = decision.evidence_artifact_id
-                 and evidence.user_id = input.user_id
-                 and evidence.source_conversation_id =
-                     decision.source_conversation_id
-                join public.conversations as conversation
-                  on conversation.id = decision.source_conversation_id
-                 and conversation.user_id = input.user_id
-                 and conversation.deleted_at is null
-                where input.text_search_enabled
-                  and input.normalized_query <> ''
-                  and ({all_tokens})
+        """
+    ).format(
+        sources=sql.SQL("\nunion\n").join(
+            sql.SQL("({})").format(source)
+            for source in _decision_match_sources(
+                has_anchor=has_anchor,
+                select_list=sql.SQL("conversation.id as conversation_id"),
+                conversation_join=sql.SQL(
+                    """
+                    join public.conversations as conversation
+                      on conversation.id = decision.source_conversation_id
+                     and conversation.user_id = input.user_id
+                     and conversation.deleted_at is null
+                    """
+                ),
+                all_tokens=decision_all_tokens,
             )
-            """
-        ).format(all_tokens=decision_all_tokens)
+        )
+    )
 
     return sql.SQL(
         """
@@ -2586,7 +2612,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
     )
 
 
-_CONVERSATION_HYDRATION_SQL = """
+_CONVERSATION_HYDRATION_TEMPLATE = """
 select
     jsonb_build_object(
         'id', conversation.id,
@@ -2805,12 +2831,13 @@ left join lateral (
         'source_run_id', evidence.source_run_id,
         'artifact_title', evidence.title,
         'artifact_digest', evidence.digest,
-        'artifact_payload', evidence.payload
+        'artifact_payload', evidence.payload,
+        'source_message_id', decision.source_message_id,
+        'computation', decision.computation,
+        'attachment_text', __DECISION_ATTACHMENT_TEXT__
     ) as payload
     from public.decision_notes as decision
-    left join public.evidence_artifacts as evidence
-      on evidence.id = decision.evidence_artifact_id
-     and evidence.user_id = %(user_id)s
+    __DECISION_ATTACHMENT_JOINS__
     where decision.user_id = %(user_id)s
       and decision.source_conversation_id = conversation.id
     order by decision.updated_at desc, decision.id desc
@@ -2923,6 +2950,15 @@ where conversation.user_id = %(user_id)s
   and conversation.id = any(%(conversation_ids)s::uuid[])
 order by array_position(%(conversation_ids)s::uuid[], conversation.id)
 """
+# The decision block derives its joins and text from the attachment
+# declaration; a plain replace keeps the jsonb braces in the template intact.
+_CONVERSATION_HYDRATION_SQL = _CONVERSATION_HYDRATION_TEMPLATE.replace(
+    "__DECISION_ATTACHMENT_JOINS__",
+    _decision_attachment_joins(user_expression="%(user_id)s"),
+).replace(
+    "__DECISION_ATTACHMENT_TEXT__",
+    _decision_attachment_text(),
+)
 
 
 def _ledger_sql(*, has_anchor: bool) -> sql.Composed:

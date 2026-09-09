@@ -975,6 +975,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/messages/{message_id}/decision:
+    post:
+      tags:
+      - decisions
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionNoteCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageDecisionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/run-dossiers:
     get:
       tags:
@@ -1027,6 +1069,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/decisions/{decision_id}:
+    get:
+      tags:
+      - decisions
+      parameters:
+      - name: decision_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionOpenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/decisions/{decision_id}/rerun:
+    post:
+      tags:
+      - decisions
+      parameters:
+      - name: decision_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRerunRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionOpenResponse'
         '422':
           description: Validation Error
           content:
@@ -2844,19 +2954,47 @@ components:
       type: object
       required:
       - conversation
+    DecisionComputation:
+      properties:
+        kind:
+          type: string
+          maxLength: 80
+          minLength: 1
+          pattern: ^[a-z][a-z0-9_]*$
+        inputs:
+          additionalProperties: true
+          type: object
+      type: object
+      required:
+      - kind
+      description: 'What a decision can re-run: a registered kind and its typed inputs.'
     DecisionNote:
       properties:
         id:
           type: string
         idea_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
         idea_version_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
         evidence_artifact_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
         source_conversation_id:
           anyOf:
           - type: string
+          - type: 'null'
+        source_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        computation:
+          anyOf:
+          - $ref: '#/components/schemas/DecisionComputation'
           - type: 'null'
         decision_state:
           type: string
@@ -2878,9 +3016,6 @@ components:
       type: object
       required:
       - id
-      - idea_id
-      - idea_version_id
-      - evidence_artifact_id
       - decision_state
       - created_at
       - updated_at
@@ -2911,6 +3046,74 @@ components:
       required:
       - decision
       - evidence_artifact
+    DecisionOpenResponse:
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionNote'
+        computation:
+          $ref: '#/components/schemas/DecisionComputation'
+        rerun:
+          $ref: '#/components/schemas/DecisionRerun'
+      type: object
+      required:
+      - decision
+      - computation
+      - rerun
+    DecisionRerun:
+      properties:
+        kind:
+          type: string
+        inputs:
+          additionalProperties: true
+          type: object
+        status:
+          type: string
+          enum:
+          - computed
+          - confirmation_required
+          - unavailable
+        result:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        retest:
+          anyOf:
+          - $ref: '#/components/schemas/SearchRetestAction'
+          - type: 'null'
+        reason_code:
+          anyOf:
+          - type: string
+            enum:
+            - kernel_unavailable
+            - invalid_inputs
+            - inputs_not_editable
+            - run_unavailable
+            - retest_unavailable
+          - type: 'null'
+      type: object
+      required:
+      - kind
+      - inputs
+      - status
+      description: 'The outcome of opening or re-running a decision''s computation.
+
+
+        ``computed`` carries the kernel''s typed result. ``confirmation_required``
+
+        carries the typed retest action for a backtest, which earns its
+
+        confirmation by cost and never executes here. ``unavailable`` names why
+
+        nothing ran, as a code, never prose.'
+    DecisionRerunRequest:
+      properties:
+        inputs:
+          additionalProperties: true
+          type: object
+      additionalProperties: false
+      type: object
+      description: Input overrides merged over the stored inputs; the decision is unchanged.
     DiscoveryItem:
       properties:
         id:
@@ -3905,6 +4108,13 @@ components:
       - role
       - content
       - created_at
+    MessageDecisionResponse:
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionNote'
+      type: object
+      required:
+      - decision
     OnboardingState:
       properties:
         completed:

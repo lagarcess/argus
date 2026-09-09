@@ -160,10 +160,148 @@ def set_research_query(monkeypatch, namespace, **fields):
     """Supply the primary interpretation at the router test boundary."""
     from argus.agent_runtime.research_query import ResearchQueryExtraction
 
-    original = namespace["_interpretation"]
+    # A test module with its own interpretation builder is patched there; a
+    # module that runs turns through run_research_turn is patched here.
+    target = namespace if "_interpretation" in namespace else globals()
+    original = target["_interpretation"]
     query = ResearchQueryExtraction(**fields)
 
     def interpreted(*args, **kwargs):
         return original(*args, **kwargs).model_copy(update={"research_query": query})
 
-    monkeypatch.setitem(namespace, "_interpretation", interpreted)
+    monkeypatch.setitem(target, "_interpretation", interpreted)
+
+
+def typed_answer_text(answer: str, rows: list[dict[str, Any]]) -> str:
+    """The provider's message text under the strict typed retrieval schema."""
+    return json.dumps({"answer_markdown": answer, "rows": rows})
+
+
+def retrieved_row(
+    *,
+    subject: str = "NVIDIA",
+    symbol: str | None = "NVDA",
+    label: str = "share price change today",
+    value: float = -4.3,
+    kind: str = "percent",
+    unit: str = "%",
+    as_of: str | None = "2026-09-04",
+    source_url: str | None = "https://www.perplexity.ai/finance/NVDA",
+) -> dict[str, Any]:
+    """One row in the shape the schema requires: every field present."""
+    return {
+        "subject": subject,
+        "symbol": symbol,
+        "label": label,
+        "value": value,
+        "kind": kind,
+        "unit": unit,
+        "as_of": as_of,
+        "source_url": source_url,
+    }
+
+
+def search_results_item(*results: dict[str, Any]) -> dict[str, Any]:
+    """A web search output item carrying the given publisher results."""
+    return {"type": "search_results", "results": list(results)}
+
+
+def fetch_url_results_item(*contents: dict[str, Any]) -> dict[str, Any]:
+    """A fetched-pages output item: title, url and an excerpt per page."""
+    return {"type": "fetch_url_results", "contents": list(contents)}
+
+
+# --- grounded-turn builders shared by the retrieval and withheld-answer suites
+
+PUBLISHER = "https://www.barrons.com/articles/nvidia-nvda-stock-price"
+PROVIDER_PAGE = "https://www.perplexity.ai/finance/NVDA"
+RESEARCH_USER_ID = "retrieval"
+
+
+@pytest.fixture(autouse=True)
+def no_home_market(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The deployment's market is a per-test decision, never inherited."""
+    monkeypatch.delenv("ARGUS_RESEARCH_HOME_COUNTRY", raising=False)
+
+
+def educational_interpretation():
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+    from argus.agent_runtime.state.models import StrategySummary
+
+    return StructuredInterpretation(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        user_goal_summary="question",
+        semantic_turn_act="educational_question",
+        requires_clarification=False,
+        candidate_strategy_draft=StrategySummary(),
+    )
+
+
+def wire_grounded_client(
+    monkeypatch, documents: list[dict[str, Any]]
+) -> RecordingTransport:
+    """The rail's provider client answers from canned documents."""
+    from argus.agent_runtime import research_grounded as grounded
+    from argus.domain.research.perplexity_agent import PerplexityAgentClient
+
+    transport = RecordingTransport(documents)
+    monkeypatch.setattr(
+        grounded, "_client", lambda: PerplexityAgentClient("k", transport=transport)
+    )
+    return transport
+
+
+def run_research_turn(message: str, *, language: str = "en"):
+    """One research turn through the rail's own entry, as an English or
+    Spanish user."""
+    import asyncio
+
+    from argus.agent_runtime import research_answer as ra
+    from argus.agent_runtime.state.models import RunState, UserState
+
+    return asyncio.run(
+        ra.research_answer_stage_result(
+            interpretation=_interpretation(),
+            state=RunState.new(current_user_message=message, recent_thread_history=[]),
+            user=UserState(user_id=RESEARCH_USER_ID, language_preference=language),
+        )
+    )
+
+
+# The builder run_research_turn reads at call time, so set_research_query can
+# supply the primary question payload for modules that share the runner.
+_interpretation = educational_interpretation
+
+
+def typed_document(rows: list[dict[str, Any]], *, answer: str) -> dict[str, Any]:
+    """A typed NVDA answer that retrieved one publisher page and the
+    provider's finance data."""
+    document = agent_response(
+        text=typed_answer_text(answer, rows),
+        tickers=["NVDA"],
+        sources=[PROVIDER_PAGE],
+        web_search_invocations=1,
+    )
+    document["output"].insert(
+        1,
+        search_results_item(
+            {"url": PUBLISHER, "title": "Nvidia stock falls", "date": "2026-09-04"}
+        ),
+    )
+    return document
+
+
+def rows_with_one_rejected() -> list[dict[str, Any]]:
+    """Two rows, one cited to the publisher page and one to a page nothing
+    retrieved."""
+    return [
+        retrieved_row(source_url=PUBLISHER),
+        retrieved_row(
+            label="analyst target price",
+            value=250.0,
+            kind="currency",
+            unit="USD",
+            source_url="https://invented.example/target",
+        ),
+    ]

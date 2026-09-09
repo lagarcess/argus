@@ -21,6 +21,27 @@ from typing_extensions import NotRequired, TypedDict
 
 from argus.api.artifact_presentation import ReaderJobResponse, reader_run
 from argus.api.conversation_preview_contract import ConversationPreview
+
+# Re-exported: the decision contract owns these shapes; readers keep
+# importing them from here.
+from argus.api.decision_contract import (  # noqa: F401
+    DECISION_NOTE_WRITE_MAX_LENGTH,
+    DecisionActionAvailability,
+    DecisionComputation,
+    DecisionNote,
+    DecisionNoteCreate,
+    DecisionOpenResponse,
+    DecisionRerun,
+    DecisionRerunRequest,
+    DecisionState,
+    MessageDecisionResponse,
+    RetestDossierState,
+    RetestWindowViolationCode,
+    SearchDecisionAction,
+    SearchDossierDecision,
+    SearchRetestAction,
+    SearchRetestRepair,
+)
 from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_DEPTH,
     MAX_FEEDBACK_CONTEXT_KEYS,
@@ -47,11 +68,6 @@ ArtifactLifecycle = Literal[
     "discarded",
 ]
 EvidenceArtifactType = Literal["backtest"]
-DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
-DecisionActionAvailability = Literal[
-    "available",
-    "account_conversion_required",
-]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 ConversationOperationStatus = Literal["idle", "queued", "running", "checking"]
@@ -63,8 +79,6 @@ ConversationAttentionStatus = Literal[
     "needs_input",
     "needs_attention",
 ]
-
-DECISION_NOTE_WRITE_MAX_LENGTH = 500
 
 CHAT_STREAM_MAX_BODY_BYTES = 65_536
 CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH = 128
@@ -489,34 +503,6 @@ class EvidenceArtifact(BaseModel):
     updated_at: datetime
 
 
-class DecisionNote(BaseModel):
-    id: str
-    idea_id: str
-    idea_version_id: str
-    evidence_artifact_id: str
-    source_conversation_id: str | None = None
-    decision_state: DecisionState
-    note: str | None = None
-    created_at: datetime
-    updated_at: datetime
-
-
-class DecisionNoteCreate(BaseModel):
-    decision_state: DecisionState
-    note: str | None = Field(
-        default=None,
-        max_length=DECISION_NOTE_WRITE_MAX_LENGTH,
-    )
-
-    @field_validator("note")
-    @classmethod
-    def normalize_note(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        cleaned = value.strip()
-        return cleaned or None
-
-
 class DecisionNoteResponse(BaseModel):
     decision: DecisionNote
     evidence_artifact: EvidenceArtifact
@@ -578,12 +564,6 @@ class PaginatedHistory(BaseModel):
     next_cursor: str | None = None
 
 
-class SearchDossierDecision(BaseModel):
-    state: DecisionState
-    note: str | None = Field(default=None, max_length=2000)
-    run_label: str | None = Field(default=None, max_length=160)
-
-
 class SearchDossierMetric(BaseModel):
     name: str = Field(max_length=80)
     value: str | int | float
@@ -595,65 +575,6 @@ class SearchDossierOutcome(BaseModel):
     benchmark_symbol: str | None = Field(default=None, max_length=24)
     result_fact_bank: dict[str, Any] | None = None
     metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
-
-
-RetestDossierState = Literal["new_data_available", "no_new_data", "cant_do_it"]
-RetestWindowViolationCode = Literal[
-    "provider_history_start_unavailable",
-    "kraken_ohlc_window_exceeded",
-    "provider_timeframe_unavailable",
-]
-
-
-class SearchRetestRepair(BaseModel):
-    kind: Literal["clamp_start"] = "clamp_start"
-    start_date: date
-    end_date: date
-
-
-class SearchRetestAction(BaseModel):
-    """Bounded typed retest envelope (spec 2.2).
-
-    Carries identity and policy only. The executable setup is reloaded
-    server-side from the owner-scoped source run, so no client value can
-    reach canonical state.
-    """
-
-    type: Literal["retest_run"] = "retest_run"
-    source_run_id: str
-    run_label: str = Field(max_length=160)
-    window_policy: Literal["preserve_start_ending_latest_available"] = (
-        "preserve_start_ending_latest_available"
-    )
-    contract_version: Literal["argus_retest_run/v2"] = "argus_retest_run/v2"
-    state: RetestDossierState
-    reason_code: RetestWindowViolationCode | None = None
-    repair: SearchRetestRepair | None = None
-
-    @model_validator(mode="after")
-    def validate_state_shape(self) -> SearchRetestAction:
-        if self.state != "cant_do_it":
-            if self.reason_code is not None or self.repair is not None:
-                raise ValueError("Only cant_do_it may carry a reason or repair")
-            return self
-        if self.reason_code is None:
-            raise ValueError("cant_do_it requires a reason_code")
-        repairable = self.reason_code in {
-            "provider_history_start_unavailable",
-            "kraken_ohlc_window_exceeded",
-        }
-        if repairable != (self.repair is not None):
-            raise ValueError("Retest repair must match the reason_code")
-        return self
-
-
-class SearchDecisionAction(BaseModel):
-    type: Literal["decision"] = "decision"
-    availability: DecisionActionAvailability
-    evidence_artifact_id: str
-    decision_state: DecisionState | None = None
-    note: str | None = Field(default=None, max_length=2000)
-    run_label: str = Field(max_length=160)
 
 
 SearchDossierAction = Annotated[

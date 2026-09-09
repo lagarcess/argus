@@ -1526,20 +1526,28 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const decisionsApi = readFileSync(join(root, "lib/decisions-api.ts"), "utf-8");
+    const affordance = readFileSync(
+      join(root, "components/chat/DecisionAffordance.tsx"),
+      "utf-8",
+    );
 
     expect(api).toContain("export async function createEvidenceDecision");
     expect(api).toContain("decision_state: DecisionState");
-    expect(card).toContain("const response = await createEvidenceDecision");
-    expect(card).toContain("result.evidenceArtifactId");
-    expect(card).toContain(
-      "setSavedDecisionState(response.decision.decision_state)",
-    );
-    expect(card).toContain("decisionChipClassName");
-    expect(card).toContain("border-[#5ba897]/18 bg-transparent");
-    expect(card).toContain("selectedDecisionState === state");
-    expect(card).toContain("DECISION_NOTE_MAX_LENGTH");
-    expect(card).toContain("nextDecisionNoteValue(");
-    expect(card).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
+    // One affordance owns capture; the route follows the typed attachment.
+    expect(decisionsApi).toContain("export async function saveDecision");
+    expect(decisionsApi).toContain("export async function createMessageDecision");
+    expect(decisionsApi).toContain('attachment.kind === "evidence_artifact"');
+    expect(affordance).toContain("await saveDecision(attachment, {");
+    expect(card).toContain('kind: "evidence_artifact", artifactId: result.evidenceArtifactId');
+    expect(card).toContain("setSavedDecisionState(decision.decision_state)");
+    expect(card).not.toContain("createEvidenceDecision");
+    expect(affordance).toContain("decisionChipClassName");
+    expect(affordance).toContain("border-[#5ba897]/18 bg-transparent");
+    expect(affordance).toContain("draft.selectedState === state");
+    expect(affordance).toContain("DECISION_NOTE_MAX_LENGTH");
+    expect(affordance).toContain("nextDecisionNoteValue(");
+    expect(affordance).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
   });
 
   test("omnisearch dossier verbs reuse ordinary send and owner-checked decision paths", () => {
