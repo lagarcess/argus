@@ -1,0 +1,183 @@
+{
+  "candidate_sha": "070aab20be941980391e5dde90117ab814553324",
+  "new_provider_calls": 0,
+  "writes": 0,
+  "results": [
+    {
+      "language": "en",
+      "source": "Saved real rail turn, in-memory adversarial copies",
+      "source_sha": "bd420a63065b6cbb8f7f2139e887e201c4f10beb",
+      "sources": 2,
+      "answer_preserved": true,
+      "sources_preserved": true,
+      "private_metadata_does_not_expand_payload": true,
+      "refusals": [
+        {
+          "case": "no_typed_sources",
+          "reason": "missing_sources",
+          "field": "sources"
+        },
+        {
+          "case": "unlisted_url",
+          "reason": "unlisted_url",
+          "field": "answer"
+        },
+        {
+          "case": "memory",
+          "reason": "memory_used",
+          "field": null
+        },
+        {
+          "case": "degraded",
+          "reason": "degraded",
+          "field": null
+        },
+        {
+          "case": "fast",
+          "reason": "unsupported_shape",
+          "field": null
+        },
+        {
+          "case": "find",
+          "reason": "unsupported_shape",
+          "field": null
+        },
+        {
+          "case": "question",
+          "reason": "unsafe_text",
+          "field": "question"
+        },
+        {
+          "case": "answer",
+          "reason": "unsafe_text",
+          "field": "answer"
+        },
+        {
+          "case": "owner_note",
+          "reason": "unsafe_text",
+          "field": "owner_note"
+        }
+      ],
+      "integration_usage_checks": [
+        {
+          "case": "summed",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "unknown",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "cache_hit",
+          "payload_and_digest_unchanged": true
+        }
+      ],
+      "integration_failure_checks": [
+        {
+          "case": "research_unavailable_missing_public_sources",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_empty_answer",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_malformed_response",
+          "reason": "degraded"
+        },
+        {
+          "case": "billed_thorough_failure",
+          "reason": "not_completed"
+        }
+      ]
+    },
+    {
+      "language": "es-419",
+      "source": "Saved real rail turn, in-memory adversarial copies",
+      "source_sha": "bd420a63065b6cbb8f7f2139e887e201c4f10beb",
+      "sources": 5,
+      "answer_preserved": true,
+      "sources_preserved": true,
+      "private_metadata_does_not_expand_payload": true,
+      "refusals": [
+        {
+          "case": "no_typed_sources",
+          "reason": "missing_sources",
+          "field": "sources"
+        },
+        {
+          "case": "unlisted_url",
+          "reason": "unlisted_url",
+          "field": "answer"
+        },
+        {
+          "case": "memory",
+          "reason": "memory_used",
+          "field": null
+        },
+        {
+          "case": "degraded",
+          "reason": "degraded",
+          "field": null
+        },
+        {
+          "case": "fast",
+          "reason": "unsupported_shape",
+          "field": null
+        },
+        {
+          "case": "find",
+          "reason": "unsupported_shape",
+          "field": null
+        },
+        {
+          "case": "question",
+          "reason": "unsafe_text",
+          "field": "question"
+        },
+        {
+          "case": "answer",
+          "reason": "unsafe_text",
+          "field": "answer"
+        },
+        {
+          "case": "owner_note",
+          "reason": "unsafe_text",
+          "field": "owner_note"
+        }
+      ],
+      "integration_usage_checks": [
+        {
+          "case": "summed",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "unknown",
+          "payload_and_digest_unchanged": true
+        },
+        {
+          "case": "cache_hit",
+          "payload_and_digest_unchanged": true
+        }
+      ],
+      "integration_failure_checks": [
+        {
+          "case": "research_unavailable_missing_public_sources",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_empty_answer",
+          "reason": "degraded"
+        },
+        {
+          "case": "research_unavailable_malformed_response",
+          "reason": "degraded"
+        },
+        {
+          "case": "billed_thorough_failure",
+          "reason": "not_completed"
+        }
+      ]
+    }
+  ]
+}

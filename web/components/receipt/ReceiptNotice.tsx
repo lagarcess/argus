@@ -2,7 +2,6 @@ import type { ReceiptCopy } from "@/lib/receipt-copy";
 import { RECEIPT_ACTION_BAR_CLEARANCE } from "@/lib/receipt-layout";
 import ProvenanceMark from "./ProvenanceMark";
 import ReceiptActionBar from "./ReceiptActionBar";
-import ReceiptViewBeacon from "./ReceiptViewBeacon";
 
 type ReceiptNoticeProps = {
   kind: "revoked" | "unavailable";
@@ -33,9 +32,7 @@ export default function ReceiptNotice({ kind, copy }: ReceiptNoticeProps) {
       <main
         className={`mx-auto flex w-full max-w-[560px] flex-col gap-5 px-4 pt-7 sm:px-6 sm:pt-10 ${RECEIPT_ACTION_BAR_CLEARANCE}`}
       >
-      {/* A revoked receipt is a real answer someone saw, so it counts. An outage
-          displayed nothing, so counting it would inflate the view stage. */}
-      {kind === "revoked" ? <ReceiptViewBeacon /> : null}
+      {/* No payload means no known kind. Do not invent funnel attribution. */}
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] font-medium uppercase tracking-[0.07em] text-white/40">
           {copy.eyebrow}
@@ -59,6 +56,7 @@ export default function ReceiptNotice({ kind, copy }: ReceiptNoticeProps) {
       {/* A tombstone gets the bar too. Someone who followed a link has already
           shown intent, and the caveat is as true of a dead link as a live one. */}
       <ReceiptActionBar
+        kind={null}
         framing={copy.framing.headline}
         action={copy.cta.action}
       />

@@ -9,17 +9,19 @@ change and the review that comes with it.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 
+from argus.api.public_excerpt_fact_schemas import PublicExcerptFactBank
 from argus.api.schemas import AssetClass, Language
 
 PUBLIC_EXCERPT_SCHEMA_VERSION = 1
 PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH = 280
 PUBLIC_EXCERPT_ROBOTS_DIRECTIVE = "noindex, nofollow"
 
-RevocationReason = Literal["owner_revoked", "source_deleted"]
+RevocationReason = Literal["owner_revoked", "source_deleted", "removed_by_argus"]
 PublicExcerptStatus = Literal["available", "revoked"]
 
 
@@ -192,6 +194,89 @@ class PublicExcerptPayload(BaseModel):
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
 
+PUBLIC_EXCERPT_MAX_TURNS = 4
+PublicExcerptKind = Literal["backtest", "research_answer", "mixed"]
+PublicExcerptRefusalReason = Literal[
+    "not_completed",
+    "unsupported_turn",
+    "unsupported_shape",
+    "missing_sources",
+    "degraded",
+    "memory_used",
+    "missing_question",
+    "text_too_long",
+    "unsafe_text",
+    "unlisted_url",
+    "invalid_selection",
+    "preview_changed",
+    "invalid_source",
+    "unsupported_backtest",
+]
+PublicExcerptRefusalField = Literal["question", "answer", "owner_note", "sources"]
+
+
+class PublicExcerptResearchSource(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    title: str
+    domain: str
+    url: str
+    source_date: str | None = None
+
+
+class PublicExcerptOfferedNextStep(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["research_test_single", "research_test_versus"]
+    symbols: list[str] = Field(min_length=1, max_length=5)
+
+
+class PublicExcerptResearchTurn(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["research_answer"] = "research_answer"
+    question: str = Field(min_length=1, max_length=500)
+    answer: str = Field(min_length=1, max_length=4000)
+    sources: list[PublicExcerptResearchSource] = Field(min_length=1, max_length=5)
+    retrieved_at: datetime
+    anchor_symbols: list[str] = Field(default_factory=list, max_length=5)
+    asset_class: AssetClass | None = None
+    offered_next_step: PublicExcerptOfferedNextStep | None = None
+    owner_note: str | None = Field(default=None, max_length=280)
+    content_language: Language = "en"
+    framing: Literal["research_snapshot_not_advice"] = "research_snapshot_not_advice"
+    provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
+
+class PublicExcerptBacktestTurn(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["backtest"] = "backtest"
+    idea_title: str
+    fact_bank: PublicExcerptFactBank
+    visual: PublicExcerptVisual | None = None
+    owner_note: str | None = Field(default=None, max_length=280)
+    content_language: Language = "en"
+    framing: Literal["historical_simulation_not_advice"] = (
+        "historical_simulation_not_advice"
+    )
+    provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
+
+PublicExcerptTurn = Annotated[
+    PublicExcerptResearchTurn | PublicExcerptBacktestTurn, Field(discriminator="kind")
+]
+
+
+class PublicExcerptTurnsPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    schema_version: Literal[2] = 2
+    kind: Literal["turns"] = "turns"
+    turns: list[PublicExcerptTurn] = Field(
+        min_length=1, max_length=PUBLIC_EXCERPT_MAX_TURNS
+    )
+
+
+PublicExcerptDocument = PublicExcerptPayload | PublicExcerptTurnsPayload
+PUBLIC_EXCERPT_DOCUMENT_ADAPTER = TypeAdapter(PublicExcerptDocument)
+
+
 class PublicExcerptSnapshot(BaseModel):
     """The owner-visible record. ``owner_id`` and the source ids stay private."""
 
@@ -203,8 +288,13 @@ class PublicExcerptSnapshot(BaseModel):
     evidence_artifact_id: str | None = None
     source_conversation_id: str | None = None
     source_run_id: str | None = None
+    source_message_ids: list[str] = Field(default_factory=list)
+    source_run_ids: list[str] = Field(default_factory=list)
+    source_artifact_ids: list[str] = Field(default_factory=list)
+    selection_key: str | None = None
+    kind: PublicExcerptKind = "backtest"
     title: str
-    payload: PublicExcerptPayload
+    payload: PublicExcerptDocument
     payload_digest: str
     created_at: datetime
     revoked_at: datetime | None = None
@@ -221,7 +311,8 @@ class PublicExcerptListItem(BaseModel):
     path: str
     title: str
     symbols: list[str] = Field(default_factory=list)
-    date_range: PublicExcerptDateRange
+    date_range: PublicExcerptDateRange | None = None
+    kind: PublicExcerptKind = "backtest"
     created_at: datetime
     revoked_at: datetime | None = None
     revocation_reason: RevocationReason | None = None
@@ -265,6 +356,7 @@ class PublicExcerptFunnelStage(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     stage: Literal["viewed", "try_argus"]
+    kind: PublicExcerptKind = "backtest"
 
 
 class PublicExcerptView(BaseModel):
@@ -274,6 +366,48 @@ class PublicExcerptView(BaseModel):
 
     public_id: str
     status: PublicExcerptStatus
+    kind: PublicExcerptKind | None = None
     indexing: Literal["noindex, nofollow"] = PUBLIC_EXCERPT_ROBOTS_DIRECTIVE
     created_at: datetime | None = None
-    payload: PublicExcerptPayload | None = None
+    payload: PublicExcerptDocument | None = None
+
+
+class PublicExcerptSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message_ids: list[UUID] = Field(min_length=1, max_length=PUBLIC_EXCERPT_MAX_TURNS)
+    owner_note: str | None = None
+
+    @field_validator("message_ids")
+    @classmethod
+    def distinct_messages(cls, values: list[UUID]) -> list[UUID]:
+        if len(set(values)) != len(values):
+            raise ValueError("message_ids must be distinct")
+        return values
+
+
+class PublicExcerptSelectionCreate(PublicExcerptSelection):
+    payload_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class PublicExcerptCandidate(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    message_id: str
+    question: str | None = None
+    kind: Literal["backtest", "research_answer"] | None = None
+    eligible: bool
+    reason: PublicExcerptRefusalReason | None = None
+    field: PublicExcerptRefusalField | None = None
+
+
+class PublicExcerptCandidates(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    items: list[PublicExcerptCandidate]
+    max_turns: Literal[4] = PUBLIC_EXCERPT_MAX_TURNS
+
+
+class PublicExcerptPreview(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    payload: PublicExcerptDocument
+    payload_digest: str
+    kind: PublicExcerptKind
+    existing_receipt: PublicExcerptListItem | None = None

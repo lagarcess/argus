@@ -63,10 +63,11 @@ export async function apiFetch<T>(
 
     const error = new Error(
       (errorMsg as string) ?? `API error ${response.status}`,
-    ) as Error & { status: number; code: string };
+    ) as Error & { status: number; code: string; context?: unknown };
     error.status = response.status;
     error.code =
       ((body as Record<string, unknown>).code as string) ?? "unknown";
+    error.context = (body as Record<string, unknown>).context;
     throw error;
   }
   return response.json() as Promise<T>;

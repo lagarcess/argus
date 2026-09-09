@@ -36,11 +36,7 @@ export function resultQuickTakeText(facts: ResultReadoutFacts | null | undefined
 export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string {
   const readout = resultQuickTakeText(facts, t, locale);
   if (!facts) return readout;
-  const details: string[] = resultReadoutRuleDetails(facts, t, locale).map((rule) => `${rule.label}: ${rule.value}`);
-  if (facts.startingCapital !== undefined) details.push(t("chat.result_readout.starting_capital", { value: formatCurrency(facts.startingCapital, locale) }));
-  if (facts.recurringContribution !== undefined) details.push(t("chat.result_readout.contribution", {
-    value: contributionPhrase(formatCurrency(facts.recurringContribution, locale), facts.contributionPeriod, t),
-  }));
+  const details = resultReadoutPlanDetails(facts, t, locale);
   if (facts.benchmarkSymbol && facts.benchmarkReturnPct !== undefined) details.push(t("chat.result_readout.benchmark_return", {
     symbol: facts.benchmarkSymbol, value: signedPercentText(facts.benchmarkReturnPct, locale),
   }));
@@ -51,6 +47,17 @@ export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined
   if (costs?.gross_total_return_pct != null) details.push(t("chat.result_readout.gross_return", { value: signedPercentText(costs.gross_total_return_pct, locale) }));
   if (costs?.net_total_return_pct != null) details.push(t("chat.result_readout.net_return", { value: signedPercentText(costs.net_total_return_pct, locale) }));
   return [readout, ...details, t("chat.result_readout.historical")].join("\n\n");
+}
+
+/** The typed plan read is shared by the breakdown and frozen public receipts. */
+export function resultReadoutPlanDetails(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string[] {
+  if (!facts) return [];
+  const details = resultReadoutRuleDetails(facts, t, locale).map((rule) => `${rule.label}: ${rule.value}`);
+  if (facts.startingCapital !== undefined) details.push(t("chat.result_readout.starting_capital", { value: formatCurrency(facts.startingCapital, locale) }));
+  if (facts.recurringContribution !== undefined) details.push(t("chat.result_readout.contribution", {
+    value: contributionPhrase(formatCurrency(facts.recurringContribution, locale), facts.contributionPeriod, t),
+  }));
+  return details;
 }
 
 export function resultReadoutRuleDetails(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): { label: string; value: string }[] {

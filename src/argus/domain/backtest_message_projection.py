@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from argus.api.schemas import BacktestRun, Message
+from argus.domain.result_readout_facts import result_readout_config
 
 _PUBLIC_BACKTEST_JOB_KEYS = (
     "id",
@@ -38,7 +39,7 @@ def result_fact_bank(run: BacktestRun) -> dict[str, Any]:
         "symbols": list(run.symbols),
         "benchmark_symbol": run.benchmark_symbol,
         "metrics": deepcopy(run.metrics),
-        "config_snapshot": deepcopy(run.config_snapshot),
+        "config_snapshot": result_readout_config(run.config_snapshot),
         "result_card": deepcopy(run.conversation_result_card),
         "context_packets": deepcopy(context_packets)
         if isinstance(context_packets, list)

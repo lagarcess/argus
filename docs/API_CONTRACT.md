@@ -629,6 +629,34 @@ persisted solely to represent abandonment.
 
 ### Public evidence receipts
 
+#### Approved answer-sharing extension
+
+The Share the answer lane extends this same API and snapshot lifecycle under
+[`conversation-sharing.md`](specs/conversation-sharing.md) section 4.5, including
+the founder's 2026-09-09 four-turn decision. It does not introduce a second sharing
+system. Version 1 receipts retain their payload and rendering. Version 2 introduces
+typed receipt kinds and a closed `turns` wrapper, with one through four turns from
+one owned conversation in conversation order. The research payload is exactly the
+closed field list in that spec's section 4.2.
+
+The owner can read share candidates, preview a selection, and create its receipt
+under `/conversations/{conversation_id}/public-excerpt-candidates`,
+`/conversations/{conversation_id}/public-excerpt-preview`, and
+`/conversations/{conversation_id}/public-excerpt`. Candidate reads supply typed
+eligibility reasons and field identities for localization; the frontend never
+classifies prose. Preview and creation share the same validation, with final
+creation checking every source and the previewed payload digest again. One refused
+turn refuses the entire selection. All owner endpoints require
+`can_save_decision`, and the artifact endpoint becomes an adapter through the same
+turn eligibility and receipt identity. The existing public route, owner list,
+revoke, tombstone, rate limits, and flag-off byte identity continue to apply.
+
+The reader receives only a frozen snapshot. No live source reads, fork, prompt
+seed, history copy, refresh, or rerun are part of this extension. The public action
+is Continue with Argus and lands at guest entry without carried state. Selection
+preview and the four-turn cap bound but do not eliminate the cross-turn inference
+risk explicitly accepted in section 4.5.
+
 Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
 off, every path below answers exactly as a route that does not exist: status 404
 with body `{"detail":"Not Found"}`, produced by the same handler an unmatched path
@@ -640,7 +668,10 @@ Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
 
 | Method   | Path                                               | Purpose |
 | :------- | :------------------------------------------------- | :------ |
-| `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Freeze a receipt from an owned completed backtest |
+| `GET`    | `/conversations/{conversation_id}/public-excerpt-candidates` | List all assistant turns with server-owned eligibility |
+| `POST`   | `/conversations/{conversation_id}/public-excerpt-preview` | Validate selected turns and return their exact public rendering payload |
+| `POST`   | `/conversations/{conversation_id}/public-excerpt` | Recheck and freeze the previewed selection |
+| `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Compatibility adapter to the same single-message receipt |
 | `GET`    | `/public-excerpts`                                 | The owner's receipt list for Data Controls |
 | `DELETE` | `/public-excerpts/{snapshot_id}`                   | Revoke, immediately and irreversibly |
 
@@ -656,6 +687,28 @@ A result whose conversation has been deleted is no longer shareable: creation an
 if the deletion lands mid-request. Revoking is idempotent, and only the state
 transition emits `receipt_revoked`.
 
+Candidate reads return `{items, max_turns}`, where `max_turns` is four and each
+item is `{message_id, question, kind, eligible, reason, field}`. Unsupported turns
+remain in the list with `eligible: false`. The reason is a closed language-neutral
+enum, and the client displays it in the owner's language. The private message id
+is a selection input only; it never reaches a public snapshot payload.
+
+Preview takes `{message_ids: UUID[], owner_note?: string | null}`. There must be
+one to four distinct assistant message ids from this owned conversation. The
+server puts them in conversation order and returns
+`{payload, payload_digest, kind, existing_receipt}`. Every turn passes the same
+eligibility and privacy checks independently. No snapshot or funnel creation
+event is written by preview. When this selection already has a live receipt,
+preview returns that receipt's frozen payload and note.
+
+Creation takes the same selection plus the required `payload_digest`. It repeats
+the source checks and refuses with `409 receipt_preview_changed` if the public
+content no longer matches the preview. A successful call returns
+`{receipt: PublicExcerptListItem}`. Selection identity depends on the canonical
+message selection, not the payload digest or owner note. Concurrent creation and
+the artifact compatibility endpoint resolve the same live record. One refused turn means
+no receipt is created for any part of the selection.
+
 `POST /evidence-artifacts/{artifact_id}/public-excerpt` takes
 `{"owner_note": string | null}`, bounded at 280 characters, and returns
 `{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already
@@ -664,9 +717,11 @@ when two concurrent requests race on the insert. Only a real insert emits the
 `receipt_created` funnel event, so a retry or a reload cannot inflate the
 acquisition funnel's creation stage.
 
-`PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range,
+`PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
 created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
-as ISO dates. It carries no source conversation, run, or artifact id. Clients
+as ISO dates or null for research. `kind` is `backtest`, `research_answer`, or
+`mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
+`removed_by_argus`. It carries no source conversation, message, run, or artifact id. Clients
 compose the shareable url as `origin + path`, so the backend owns no origin
 configuration.
 
@@ -678,7 +733,7 @@ cannot take down. The cursor is keyset on `(created_at, id)` so identical
 timestamps cannot drop or repeat a row across pages.
 
 `GET /public/receipts/{public_id}` returns
-`{public_id, status, indexing, created_at, payload}`:
+`{public_id, status, kind, indexing, created_at, payload}`:
 
 - `status` is `available` or `revoked`; `indexing` is always `noindex, nofollow`.
 - A revoked receipt returns `200` with `status: "revoked"`, `payload: null`, and
@@ -690,6 +745,8 @@ timestamps cannot drop or repeat a row across pages.
   one.
 - The request carries no credentials, and `payload` is the closed set documented in
   `docs/DATA_MODEL.md` section 12.1.3.
+- `kind` derives from the frozen payload. A revoked or unknown receipt carries no
+  kind or source information; both render the same tombstone.
 - A stored payload this build cannot parse answers `503` with `Retry-After` and
   code `receipt_unavailable`, which the viewer's page reads as temporarily
   unavailable. It is not a tombstone: the row is intact, and telling a viewer their
@@ -697,13 +754,18 @@ timestamps cannot drop or repeat a row across pages.
   an uncaught error, because this is the one Argus surface a stranger arrives at
   from a message.
 
-`POST /public/receipt-funnel` takes `{"stage": "viewed" | "try_argus"}` and returns
+`POST /public/receipt-funnel` takes
+`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "mixed"}`
+(kind defaults to `backtest` for compatible callers) and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
 rendered page rather than counted when the receipt is read, because that read also
 answers the metadata pass and the preview image; a link pasted into a chat would
 otherwise log views nobody caused. It exists because the Try Argus tap
 happens on a page nobody is signed in to, and the alternative, a marker on the
 guest entry url, is ruled out: sharing adds no new parameter to that surface.
+An owner preview reports no view, and a four-turn public page reports one view.
+Tombstones and unavailable pages with no known kind do not emit kind-attributed
+events; they never guess that the missing document was a backtest.
 
 Rate limits: receipt creation is 10 per hour and 30 per day, keyed by both user id
 and client identity, answering `429` with `Retry-After`. The funnel endpoint is 60
@@ -711,20 +773,23 @@ per hour per client identity.
 
 Error codes specific to this surface: `receipt_note_rejected` (422, the note carries
 an identifier, a credential-shaped value, or a value assigned to something that names
-a credential), `receipt_source_unsupported` (422, not a completed backtest result, or
-a strategy the public projection cannot describe completely), and
+a credential), `receipt_source_unsupported` (422, an ineligible turn or source),
+`receipt_preview_changed` (409, the exact preview must be shown again), and
 `receipt_sanitization_failed` (500, the payload could not be proven free of
 never-expose data, so nothing was published).
 
-A receipt either states the strategy that ran, in full, or it is not created. The
-projection covers buy and hold, recurring contributions, indicator thresholds, buy
-the dip, moving average crossovers (including a crossover whose exit windows differ
-from its entry windows, which the rule compiler allows), and MACD crossovers. A
-generic `rule_spec` condition tree, or any shape added later without a projection,
-answers `receipt_source_unsupported` rather than publishing a page that names a
-strategy without describing it.
+Selection refusals retain `context.reason` and `context.field` in Problem Details.
+Field is `question`, `answer`, `owner_note`, or `sources` where applicable. The
+backend sends typed facts, and the owner UI supplies localized explanations. It
+never repairs a refused field by redacting or truncating it.
 
-The payload freezes no rendered prose. A link is opened by people whose language
+A receipt either states the strategy that ran, in full, or it is not created. The
+version 2 projection reads the same typed config, figures, costs and rules as the
+result card, through a closed public fact-bank subset. A source that cannot project
+fully answers `receipt_source_unsupported`; the receipt never invents missing
+facts from the result prose.
+
+The version 1 backtest payload remains unchanged. A link is opened by people whose language
 has nothing to do with the author's, so `assumptions`, `strategy_facts`, `metrics`,
 and `date_range` all carry closed keys and bare scalars, and every sentence, label,
 number format, and date format is composed by the reader's client in the reader's
@@ -733,6 +798,21 @@ that remain, `idea_title` and `owner_note`. A run whose assumptions, numbers, or
 tested window will not project into that form answers
 `receipt_source_unsupported`; there is no passthrough string field, because one
 would reopen this defect under a new name.
+
+Version 2 uses the closed `turns` wrapper, including for new singleton shares.
+Research leaves freeze exactly the question, answer, typed sources and dates,
+retrieval date, symbols, asset class, typed offered next step, note, content
+language, framing and provenance listed in section 4.2 of the sharing spec. These
+audited author fields remain in the author's language. Labels, date and number
+formats remain in the reader's language. No usage, raw card, provider, model,
+memory, executable action text or private id is included.
+
+The sole header entry belongs to registered owners. The former per-turn guest
+conversion entry is dormant. The compatible `share_result` pending action carries
+`conversation_id`, `action_id` and a required `message_id`; `artifact_id` remains
+exclusive to `save_decision`. If a compatibility caller resumes that action after
+claim, the same panel opens on its verified message. No anonymous owner can
+create a receipt. See conversation-sharing.md section 6 for the final placement.
 
 The same rule cuts the other way: a projection that cannot describe something
 refuses rather than dropping it silently. An unknown metric key is refused, and a

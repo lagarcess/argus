@@ -160,6 +160,8 @@ import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
 import SettingsView from "../views/SettingsView";
 import ChatHeaderMenu from "./ChatHeaderMenu";
+import { ShareReceiptPanel } from "./ShareReceiptAction";
+import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -2363,6 +2365,8 @@ export default function ChatInterface() {
                 conversationId &&
                 canManageConversation ? (
                 <ChatHeaderMenu
+                  conversationId={conversationId}
+                  onShare={guestExperience.receiptSharing.request}
                   isOpen={showChatOptions}
                   onToggleOpen={() => setShowChatOptions(!showChatOptions)}
                   onRequestClose={closeChatOptions}
@@ -2574,6 +2578,7 @@ export default function ChatInterface() {
         context={feedbackState.context}
       />
       <GuestExperienceSurfaces experience={guestExperience} />
+      {evidenceReceiptSharingEnabled && guestExperience.receiptSharing.target && <ShareReceiptPanel key={guestExperience.receiptSharing.target.conversationId} {...guestExperience.receiptSharing.target} onClose={guestExperience.receiptSharing.close} />}
       {isSidebarPreferenceModalOpen && (
         <SidebarPreferenceModal
           mode={sidebarMode}

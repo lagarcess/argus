@@ -16,7 +16,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from argus.api.public_excerpt_schemas import (
-    PublicExcerptPayload,
+    PUBLIC_EXCERPT_DOCUMENT_ADAPTER,
     PublicExcerptSnapshot,
     PublicExcerptView,
 )
@@ -38,6 +38,11 @@ OWNER_COLUMNS = (
     "evidence_artifact_id",
     "source_conversation_id",
     "source_run_id",
+    "source_message_ids",
+    "source_run_ids",
+    "source_artifact_ids",
+    "selection_key",
+    "kind",
     "title",
     "payload",
     "payload_digest",
@@ -86,6 +91,8 @@ class SupabasePublicExcerptMixin:
         existing = self.get_live_public_excerpt_for_artifact(
             owner_id=snapshot.owner_id,
             evidence_artifact_id=snapshot.evidence_artifact_id,
+        ) or self.get_live_public_excerpt_for_selection(
+            owner_id=snapshot.owner_id, selection_key=snapshot.selection_key
         )
         if existing is not None:
             return existing, False
@@ -100,6 +107,8 @@ class SupabasePublicExcerptMixin:
             raced = self.get_live_public_excerpt_for_artifact(
                 owner_id=snapshot.owner_id,
                 evidence_artifact_id=snapshot.evidence_artifact_id,
+            ) or self.get_live_public_excerpt_for_selection(
+                owner_id=snapshot.owner_id, selection_key=snapshot.selection_key
             )
             if raced is not None:
                 return raced, False
@@ -125,6 +134,49 @@ class SupabasePublicExcerptMixin:
         )
         rows = _rows(result)
         return _snapshot_from_row(rows[0]) if rows else None
+
+    def get_live_public_excerpt_for_selection(
+        self, *, owner_id: str, selection_key: str | None
+    ) -> PublicExcerptSnapshot | None:
+        if selection_key is None:
+            return None
+        result = (
+            self.client.table(TABLE)
+            .select(",".join(OWNER_COLUMNS))
+            .eq("owner_id", owner_id)
+            .eq("selection_key", selection_key)
+            .is_("revoked_at", "null")
+            .limit(1)
+            .execute()
+        )
+        rows = _rows(result)
+        return _snapshot_from_row(rows[0]) if rows else None
+
+    def public_excerpt_source_records(
+        self, *, owner_id: str, conversation_id: str
+    ) -> tuple[list[dict[str, Any]], list[Any]]:
+        from argus.api.schemas import EvidenceArtifact
+
+        def all_rows(table: str, conversation_field: str) -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            while True:
+                page = _rows(
+                    self.client.table(table)
+                    .select("*")
+                    .eq("user_id", owner_id)
+                    .eq(conversation_field, conversation_id)
+                    .order("id")
+                    .range(len(rows), len(rows) + 499)
+                    .execute()
+                )
+                rows.extend(page)
+                if len(page) < 500:
+                    return rows
+
+        return all_rows("backtest_jobs", "conversation_id"), [
+            EvidenceArtifact.model_validate(row)
+            for row in all_rows("evidence_artifacts", "source_conversation_id")
+        ]
 
     def list_public_excerpt_snapshots(
         self,
@@ -252,7 +304,9 @@ def _public_view_from_row(public_id: str, row: dict[str, Any]) -> PublicExcerptV
     if row.get("revoked_at") is not None:
         return revoked_public_view(public_id)
     try:
-        payload = PublicExcerptPayload.model_validate(row.get("payload") or {})
+        payload = PUBLIC_EXCERPT_DOCUMENT_ADAPTER.validate_python(
+            row.get("payload") or {}
+        )
     except ValidationError as error:
         # A stored payload this build cannot read is a deployment problem, not a
         # statement about the receipt. Raising would answer a stranger's request
@@ -269,9 +323,12 @@ def _public_view_from_row(public_id: str, row: dict[str, Any]) -> PublicExcerptV
         raise PublicExcerptUnreadableError(
             "That receipt could not be read right now."
         ) from error
+    from argus.domain.public_excerpt_kinds import document_kind
+
     return PublicExcerptView(
         public_id=public_id,
         status="available",
+        kind=document_kind(payload),
         created_at=row.get("created_at"),
         payload=payload,
     )

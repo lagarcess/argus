@@ -1,0 +1,205 @@
+{
+  "head": "070aab20be941980391e5dde90117ab814553324",
+  "checks": [
+    {
+      "case": "research-en-focused",
+      "language": "en",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "research-en-focused",
+      "language": "en",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "research-en-focused",
+      "language": "es-419",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "research-en-focused",
+      "language": "es-419",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "research-es-419",
+      "language": "en",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "research-es-419",
+      "language": "en",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "research-es-419",
+      "language": "es-419",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "research-es-419",
+      "language": "es-419",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "mixed",
+      "language": "en",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "mixed",
+      "language": "en",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "mixed",
+      "language": "es-419",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "mixed",
+      "language": "es-419",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "tombstone",
+      "language": "en",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "tombstone",
+      "language": "en",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "tombstone",
+      "language": "es-419",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "tombstone",
+      "language": "es-419",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "v1",
+      "language": "en",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "v1",
+      "language": "en",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "v1",
+      "language": "es-419",
+      "width": 390,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    },
+    {
+      "case": "v1",
+      "language": "es-419",
+      "width": 1280,
+      "status": 200,
+      "textExact": true,
+      "cookiesEmpty": true,
+      "noOverflow": true,
+      "noindex": true
+    }
+  ]
+}

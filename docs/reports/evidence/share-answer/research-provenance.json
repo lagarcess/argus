@@ -1,0 +1,40 @@
+[
+  {
+    "case": "en",
+    "source_sha": "bd420a63065b6cbb8f7f2139e887e201c4f10beb",
+    "language": "en",
+    "elapsed_seconds": 131.85,
+    "answer_characters": 136,
+    "typed_source_count": 0,
+    "shape": "balanced",
+    "degraded": {
+      "code": "research_unavailable_timeout"
+    },
+    "eligible": false,
+    "provenance": "Real configured research rail against disposable local persistence; no provider retry"
+  },
+  {
+    "case": "en-focused",
+    "source_sha": "bd420a63065b6cbb8f7f2139e887e201c4f10beb",
+    "language": "en",
+    "elapsed_seconds": 58.47,
+    "answer_characters": 534,
+    "typed_source_count": 2,
+    "shape": "balanced",
+    "degraded": null,
+    "eligible": true,
+    "provenance": "Real configured research rail against disposable local persistence; no provider retry"
+  },
+  {
+    "case": "es-419",
+    "source_sha": "bd420a63065b6cbb8f7f2139e887e201c4f10beb",
+    "language": "es-419",
+    "elapsed_seconds": 45.77,
+    "answer_characters": 866,
+    "typed_source_count": 5,
+    "shape": "balanced",
+    "degraded": null,
+    "eligible": true,
+    "provenance": "Real configured research rail against disposable local persistence; no provider retry"
+  }
+]

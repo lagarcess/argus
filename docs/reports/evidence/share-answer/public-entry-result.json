@@ -1,0 +1,15 @@
+{
+  "href": "/",
+  "entry": {
+    "path": "/chat",
+    "query": "",
+    "fragment": "",
+    "assistantTurns": 0,
+    "composer": [
+      ""
+    ]
+  },
+  "eventRequestsBeforeClick": 1,
+  "eventRequestsAfterClick": 2,
+  "note": "The browser bridge omits sendBeacon Blob bodies. Typed event payloads are covered by focused tests; these are observed request counts."
+}
