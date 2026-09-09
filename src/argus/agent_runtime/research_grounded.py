@@ -896,12 +896,9 @@ def _cache_ttl(
 ) -> float | None:
     """How long the shared cache serves this packet, or None to not store it.
 
-    One owner for both composition paths. A published packet serves for its
-    class TTL. A withheld packet that retrieved is a record of where Argus
-    looked and what it could not cite, and serving that record again asserts
-    nothing, so it serves for the class TTL capped at a day. A withheld
-    packet that never retrieved is evidence about the model, not the world,
-    and the next identical question earns a fresh attempt."""
+    One owner for both composition paths: a published packet serves for its
+    class TTL, a withheld packet that retrieved for that TTL capped at a day,
+    and a withheld packet that never retrieved is not stored."""
     withheld = _withheld_code(packet, survey=is_market_survey(question_kind)) is not None
     if withheld and not _retrieval_happened(packet):
         return None

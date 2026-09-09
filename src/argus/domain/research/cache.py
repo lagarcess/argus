@@ -27,12 +27,10 @@ was), and from the question's dominant data need otherwise; the most volatile
 ingredient of a genuinely current ask (a live quote) keeps its short
 tolerance because the question kind carries it there.
 
-A withheld packet, one whose prose composition will not publish, is a
-retrieval record (these pages, no citable figure) and is stored under the
-same key for its class TTL capped at ``WITHHELD_TTL_SECONDS``, one day. The
-class bound keeps a withhold on a volatile class, where the figure is always
-published and the model is the likely fault, to minutes; the day bound keeps
-an absence on a quarterly class from outliving the day a page can appear.
+A withheld packet, one whose prose composition will not publish, is stored
+under the same key for its class TTL capped at ``WITHHELD_TTL_SECONDS`` (one
+day) when it carries a retrieval record; one that never retrieved is not
+stored.
 
 The closed-period rule stands: a question about an entirely closed window is
 ``closed_ohlcv`` regardless of anything else. The cache key includes the
