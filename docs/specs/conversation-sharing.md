@@ -253,6 +253,21 @@ says it shares the conversation rather than that it creates a link, because the
 click opens selection and no link exists until turns are chosen. Selecting
 turns, then one link, is the DeepSeek shape and it is the one we want.
 
+**Selection within one conversation supersedes section 9's deferral. Founder,
+2026-09-09.** Section 4.2 defines one question and answer pair and section 9
+defers composition; this resolves that conflict rather than leaving it to the
+implementation. A shared thread is **a closed outer `turns` wrapper over
+payloads that are exactly what 4.2 specifies**, which is section 9's own design
+and not a new shape. Every turn passes 4.1 independently at creation and one
+refusal refuses the thread, so a thread can never carry what a single receipt
+could not. **Capped at four turns.** Section 9 stays deferred for everything
+beyond selection inside one conversation.
+
+**The risk this accepts, named rather than waved at:** three turns that are each
+individually safe can identify someone together, and no per-turn audit catches
+that. The cap bounds it and the owner sees exactly what they are publishing
+before confirming; it is not eliminated.
+
 **Selection is where Argus differs from every competitor, and it is the work.**
 They can offer "select all" because every turn is shareable. Ours are not:
 section 4.1 refuses clarifications, confirmations, degraded turns, turns shaped
