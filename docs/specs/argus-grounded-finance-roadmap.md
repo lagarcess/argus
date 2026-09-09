@@ -1025,6 +1025,13 @@ integration and green there, not shipped to a user.
 
 **The overnight batch, 2026-09-09. Three of four landed; one is in review.**
 
+**The deployed log sink renders tracebacks; the note about it is narrower than
+it reads.** PR #571 checked and nothing in this repository calls `logger.add`
+outside tests, so production runs loguru's default sink. The note repeated
+across the codebase, that the deployed sink drops structured extras, is about
+**kwargs, not exceptions**: `logger.opt(exception=True)` reaches the log intact
+and flattening a traceback by hand duplicates what the sink already does.
+
 **A second CI flake exists and is not the `fromisoformat` one.**
 `tests/test_private_alpha_canary_split.py::test_session_tool_provisions_only_a_safe_dedicated_identity`
 shells out to `bun e2e/support/private-alpha-canary-session.ts provision`, which
