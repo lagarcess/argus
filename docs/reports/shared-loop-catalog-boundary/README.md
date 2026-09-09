@@ -131,7 +131,8 @@ Observed locally on Python 3.10.20:
   display-fact and lifecycle-write bodies remain blocked as expected.
 - Existing backtest/domain/runtime/API-import tests plus the mocked eval harness:
   **962 passed, 9 skipped**. The skips are existing Postgres integration tests
-  gated by `ARGUS_TEST_POSTGRES_DSN`. No existing backtest test was edited.
+  gated by `ARGUS_DISPOSABLE_DATABASE_URL` and local Supabase configuration.
+  No existing backtest test was edited.
 - Legacy Strategy API read: **1 passed**, 95 unrelated tests deselected.
 - All API, state and interpreter-type JSON schemas compared byte-for-byte with
   the original base: identical. The interpreter fingerprint checks passed; the
