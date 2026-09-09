@@ -161,6 +161,11 @@ def test_the_missing_public_sources_reader_sees_the_same_honest_turn(
     sidecar = result.stage_patch["research"]
     assert sidecar["sources"] == [] and sidecar["rows"] == []
     assert sidecar["peers"] == []
+    # The turn is classed and shaped exactly as the fabricated packet was.
+    assert sidecar["shape"] == "balanced"
+    assert sidecar["capability_class"] == "balanced_lookup"
+    assert sidecar["anchor_symbols"] == ["NFLX"]
+    assert result.decision.reason_codes == ["research_answer_balanced_lookup"]
     # Nothing the reader is handed names the invoice.
     for key in ("cost", "usd", "$0.0", "latency"):
         assert key not in answer.lower()
