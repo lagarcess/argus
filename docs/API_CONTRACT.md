@@ -3641,6 +3641,18 @@ final payload and persisted metadata:
         "source_date": "2026-07-16"
       }
     ],
+    "rows": [
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Q2 2026 revenue",
+        "value": 11079000000,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-07-16",
+        "source_url": "https://example.com/filing"
+      }
+    ],
     "retrieved_at": "2026-08-07T15:04:05Z",
     "anchor_symbols": ["NFLX"],
     "peers": [
@@ -3730,11 +3742,13 @@ Contract rules:
   reading returned tool output first and invoice counts second. A
   survey with no retrieval carries `degraded.code = "survey_not_grounded"`
   and replaces unsupported prose with the precise retrieval failure. A survey
-  that retrieved but names no resolver-verified ticker carries
+  that retrieved but names no resolver-verified ticker, or whose typed
+  answer states no cited figure at all, carries
   `degraded.code = "survey_synthesis_incomplete"` and says that sources were
-  found but the requested assets could not be extracted. Neither failure
-  renders subject-dependent figure or asset copy, and neither emits a
-  runnable row.
+  found but the requested assets could not be extracted; a survey is
+  accepted only with a figure and a verified name, on the first attempt or
+  after the one concrete retry. Neither failure renders subject-dependent
+  figure or asset copy, and neither emits a runnable row.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
@@ -3750,6 +3764,58 @@ Contract rules:
   the question date is its freshness lower bound. Classifier-supplied period
   lower bounds are ISO-date typed; a malformed value is rejected instead of
   turning a bounded question into an unbounded one.
+- **Retrieval produces typed rows, never prose** (grounded-finance board,
+  operating rule 4). Every provider call requests a strict `json_schema`
+  response: the answer prose plus `rows`, one per figure the answer states,
+  each `{subject, symbol, label, value, kind, unit, as_of, source_url}` with
+  `value` a plain number, `subject` the entity the figure describes, and
+  `kind` one of `currency`, `percent`, `multiple`, `count`; a currency row
+  names its unit by an ISO 4217 code known to the maintained currency data
+  Babel ships, never a copied list, or the answer is malformed, and an answer carrying more rows than the packet holds
+  (64) is malformed rather than cut. A row survives parsing only when its `source_url` is a page the
+  same response retrieved (a finance or web tool result, a fetched page, or
+  an annotation); a row citing anything else is dropped and counted, never
+  asserted. Fetched pages are typed sources too, without a publisher date. A row
+  read from the provider's own finance data keeps its evidence in the tool
+  result and carries `source_url: null`, the way every provider-host citation
+  is scrubbed. **A typed answer is publishable only with at least one cited
+  row and no rejected one.** Prose cannot be trimmed of one claim, so a
+  rejected row, or a typed answer that retrieved and wrote no row, withholds
+  the whole answer: the turn carries `degraded.code =
+  "research_figures_unverified"`, an honest note replaces the prose and
+  names the figures it will not quote from the rejected rows' own typed
+  subject and label, the subjects the user named stay testable, and the
+  packet is never cached. The prose is never matched against the rows by
+  heuristic: that shape leaks by construction, and rule 4 keeps prose from
+  being the carrier of facts at all. A typed answer with no row and
+  no retrieval at all carries `research_not_grounded` with the unavailable
+  note. Surveys keep their own codes below. `rows` is additive on the
+  sidecar and may be empty; a degraded turn always carries an empty list,
+  enforced by the sidecar builder. A JSON-shaped answer that is not the
+  schema (an invalid row, an answer the output budget truncated) is a broken
+  contract, never prose: it fails closed as
+  `research_unavailable_malformed_response`, is never cached, and a
+  completed background run carrying one fails its job. Genuine prose under a
+  typed request is delivered and recorded as prose.
+- **Retrieval parameters are configuration per question shape.** Each call
+  sends a model fallback chain (`models`, the primary and the other priced
+  model, served in order; the invoice names the model that served), the
+  reader's language (`language_preference`, ISO 639-1 from the profile
+  language), the shape's web search context size, a recency filter derived
+  from the question's section 7 data class (current classes a week, analyst
+  estimates a month, quarterly and closed classes none, so a closed window is
+  never filtered to the past week), the deployment's home market as the
+  reader's location (`ARGUS_RESEARCH_HOME_COUNTRY`, ISO 3166-1 alpha-2;
+  unset sends none, and Argus holds no per-user country yet), and, for a
+  local question, that market's curated publisher list as the domain filter
+  (at most twenty domains, the provider's ceiling). No rail shape today is
+  local; the list is seeded from the bank users actually named and is
+  consumed by the first local calculation.
+- Current external facts ("why is NVDA moving this week") are claim-shaped:
+  they ground through the balanced shape with publisher sources required and
+  a one-week recency filter, and persist the ordinary `research` sidecar with
+  typed, dated `sources`. Publisher URLs are never written into the prose
+  (#545). Flag off, the pre-rail search-and-voice path is unchanged.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around

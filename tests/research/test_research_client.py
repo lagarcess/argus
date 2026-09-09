@@ -44,7 +44,8 @@ def test_run_research_builds_documented_request_and_parses_packet() -> None:
     packet = client.run_research("What is Apple at?", RESEARCH_CONFIG_SPECS["fast"])
 
     body = request_body(transport.requests[0])
-    assert body["model"] == "openai/gpt-5.6-sol"
+    assert body["models"] == ["openai/gpt-5.6-sol", "anthropic/claude-opus-4-7"]
+    assert "model" not in body, "the fallback chain replaces the single model"
     assert body["tools"] == [{"type": "finance_search"}]
     assert body["max_steps"] == RESEARCH_CONFIG_SPECS["fast"].max_steps
     assert body["max_output_tokens"] == 1024
@@ -94,7 +95,8 @@ def test_usage_cost_uses_served_model_tokens_and_every_tool_count() -> None:
 
     packet = client.run_research("compare", RESEARCH_CONFIG_SPECS["fast"])
 
-    assert request_body(transport.requests[0])["model"] == "openai/gpt-5.6-sol"
+    assert request_body(transport.requests[0])["models"][0] == "openai/gpt-5.6-sol"
+    # The invoice names the model that served; a fallback is priced as itself.
     assert packet.usage.model == "anthropic/claude-opus-4-7"
     assert packet.usage.input_tokens == 20_000
     assert packet.usage.output_tokens == 4_000
@@ -363,7 +365,7 @@ def test_balanced_spec_sends_reasoning_and_all_three_tools() -> None:
     body = request_body(transport.requests[0])
     assert body["reasoning"] == {"effort": "low"}
     assert body["tools"] == [
-        {"type": "web_search"},
+        {"type": "web_search", "search_context_size": "medium"},
         {"type": "finance_search"},
         {"type": "fetch_url"},
     ]
