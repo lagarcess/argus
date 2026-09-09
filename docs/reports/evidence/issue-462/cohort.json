@@ -1,0 +1,344 @@
+{
+  "purpose": "Issue #462 fixed authored cohort, real provider requests, no synthetic timing evidence",
+  "repetitions": 10,
+  "sampling": "Sequential interleaved categories; EN/ES versions share question subjects; caches left natural. Include every attempt. No latency pass/fail gates.",
+  "compute_note": "Compute intent only: the calculator registry is absent on this base. Never relabel an LLM-only answer as a computed answer.",
+  "categories": [
+    {
+      "category": "ordinary_chat",
+      "run_backtest": false,
+      "cases": [
+        {
+          "id": "ordinary_chat-1-en",
+          "message": "What is compound interest?",
+          "language": "en"
+        },
+        {
+          "id": "ordinary_chat-1-es-419",
+          "message": "¿Qué es el interés compuesto?",
+          "language": "es-419"
+        },
+        {
+          "id": "ordinary_chat-2-en",
+          "message": "Explain the difference between a stock and a bond.",
+          "language": "en"
+        },
+        {
+          "id": "ordinary_chat-2-es-419",
+          "message": "Explica la diferencia entre una acción y un bono.",
+          "language": "es-419"
+        },
+        {
+          "id": "ordinary_chat-3-en",
+          "message": "What does diversification mean?",
+          "language": "en"
+        },
+        {
+          "id": "ordinary_chat-3-es-419",
+          "message": "¿Qué significa diversificación?",
+          "language": "es-419"
+        },
+        {
+          "id": "ordinary_chat-4-en",
+          "message": "What is an ETF?",
+          "language": "en"
+        },
+        {
+          "id": "ordinary_chat-4-es-419",
+          "message": "¿Qué es un ETF?",
+          "language": "es-419"
+        },
+        {
+          "id": "ordinary_chat-5-en",
+          "message": "What does inflation mean?",
+          "language": "en"
+        },
+        {
+          "id": "ordinary_chat-5-es-419",
+          "message": "¿Qué significa inflación?",
+          "language": "es-419"
+        }
+      ]
+    },
+    {
+      "category": "compute_intent_probe",
+      "run_backtest": false,
+      "cases": [
+        {
+          "id": "compute_intent_probe-1-en",
+          "message": "What is 15 percent of 2400?",
+          "language": "en"
+        },
+        {
+          "id": "compute_intent_probe-1-es-419",
+          "message": "¿Cuánto es el 15 por ciento de 2400?",
+          "language": "es-419"
+        },
+        {
+          "id": "compute_intent_probe-2-en",
+          "message": "If I save 500 a month for 12 months with no interest, how much will I have?",
+          "language": "en"
+        },
+        {
+          "id": "compute_intent_probe-2-es-419",
+          "message": "Si ahorro 500 al mes durante 12 meses sin intereses, ¿cuánto tendré?",
+          "language": "es-419"
+        },
+        {
+          "id": "compute_intent_probe-3-en",
+          "message": "Calculate the value of 1000 after two years at 5 percent annual compound interest.",
+          "language": "en"
+        },
+        {
+          "id": "compute_intent_probe-3-es-419",
+          "message": "Calcula el valor de 1000 después de dos años con un interés compuesto anual del 5 por ciento.",
+          "language": "es-419"
+        },
+        {
+          "id": "compute_intent_probe-4-en",
+          "message": "If something costs 120 and is discounted 20 percent, what is the final price?",
+          "language": "en"
+        },
+        {
+          "id": "compute_intent_probe-4-es-419",
+          "message": "Si algo cuesta 120 y tiene un descuento del 20 por ciento, ¿cuál es el precio final?",
+          "language": "es-419"
+        },
+        {
+          "id": "compute_intent_probe-5-en",
+          "message": "Convert a nominal annual interest rate of 12 percent compounded monthly to its effective annual rate.",
+          "language": "en"
+        },
+        {
+          "id": "compute_intent_probe-5-es-419",
+          "message": "Convierte una tasa de interés nominal anual del 12 por ciento capitalizada mensualmente a su tasa efectiva anual.",
+          "language": "es-419"
+        }
+      ]
+    },
+    {
+      "category": "confirmation",
+      "run_backtest": true,
+      "cases": [
+        {
+          "id": "confirmation-1-en",
+          "message": "Backtest buying and holding AAPL with $10000 from January 2, 2024 through December 31, 2024, daily bars.",
+          "language": "en"
+        },
+        {
+          "id": "confirmation-1-es-419",
+          "message": "Prueba comprar y mantener AAPL con 10000 dólares del 2 de enero al 31 de diciembre de 2024, con velas diarias.",
+          "language": "es-419"
+        },
+        {
+          "id": "confirmation-2-en",
+          "message": "Backtest investing $200 into SPY monthly with $1000 starting capital from January 2, 2024 through December 31, 2024, daily bars.",
+          "language": "en"
+        },
+        {
+          "id": "confirmation-2-es-419",
+          "message": "Prueba invertir 200 dólares mensuales en SPY con 1000 dólares iniciales del 2 de enero al 31 de diciembre de 2024, con velas diarias.",
+          "language": "es-419"
+        },
+        {
+          "id": "confirmation-3-en",
+          "message": "Backtest buying and holding MSFT with $5000 from January 2, 2024 through December 31, 2024, daily bars.",
+          "language": "en"
+        },
+        {
+          "id": "confirmation-3-es-419",
+          "message": "Prueba comprar y mantener MSFT con 5000 dólares del 2 de enero al 31 de diciembre de 2024, con velas diarias.",
+          "language": "es-419"
+        },
+        {
+          "id": "confirmation-4-en",
+          "message": "Backtest investing $150 into QQQ monthly with $2000 starting capital from January 2, 2024 through December 31, 2024, daily bars.",
+          "language": "en"
+        },
+        {
+          "id": "confirmation-4-es-419",
+          "message": "Prueba invertir 150 dólares mensuales en QQQ con 2000 dólares iniciales del 2 de enero al 31 de diciembre de 2024, con velas diarias.",
+          "language": "es-419"
+        },
+        {
+          "id": "confirmation-5-en",
+          "message": "Backtest buying and holding NVDA with $8000 from January 2, 2024 through December 31, 2024, daily bars.",
+          "language": "en"
+        },
+        {
+          "id": "confirmation-5-es-419",
+          "message": "Prueba comprar y mantener NVDA con 8000 dólares del 2 de enero al 31 de diciembre de 2024, con velas diarias.",
+          "language": "es-419"
+        }
+      ]
+    },
+    {
+      "category": "research_fast",
+      "run_backtest": false,
+      "cases": [
+        {
+          "id": "research_fast-1-en",
+          "message": "What is the current share price of AAPL?",
+          "language": "en"
+        },
+        {
+          "id": "research_fast-1-es-419",
+          "message": "¿Cuál es el precio actual de la acción de AAPL?",
+          "language": "es-419"
+        },
+        {
+          "id": "research_fast-2-en",
+          "message": "What is the current share price of MSFT?",
+          "language": "en"
+        },
+        {
+          "id": "research_fast-2-es-419",
+          "message": "¿Cuál es el precio actual de la acción de MSFT?",
+          "language": "es-419"
+        },
+        {
+          "id": "research_fast-3-en",
+          "message": "What is the current share price of NVDA?",
+          "language": "en"
+        },
+        {
+          "id": "research_fast-3-es-419",
+          "message": "¿Cuál es el precio actual de la acción de NVDA?",
+          "language": "es-419"
+        },
+        {
+          "id": "research_fast-4-en",
+          "message": "What is the current share price of AMZN?",
+          "language": "en"
+        },
+        {
+          "id": "research_fast-4-es-419",
+          "message": "¿Cuál es el precio actual de la acción de AMZN?",
+          "language": "es-419"
+        },
+        {
+          "id": "research_fast-5-en",
+          "message": "What is the current share price of META?",
+          "language": "en"
+        },
+        {
+          "id": "research_fast-5-es-419",
+          "message": "¿Cuál es el precio actual de la acción de META?",
+          "language": "es-419"
+        }
+      ]
+    },
+    {
+      "category": "research_balanced",
+      "run_backtest": false,
+      "cases": [
+        {
+          "id": "research_balanced-1-en",
+          "message": "What was Apple's latest quarterly revenue? Cite the company's earnings release.",
+          "language": "en"
+        },
+        {
+          "id": "research_balanced-1-es-419",
+          "message": "¿Cuáles fueron los ingresos trimestrales más recientes de Apple? Cita su comunicado de resultados.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_balanced-2-en",
+          "message": "What was Microsoft's latest quarterly revenue? Cite the company's earnings release.",
+          "language": "en"
+        },
+        {
+          "id": "research_balanced-2-es-419",
+          "message": "¿Cuáles fueron los ingresos trimestrales más recientes de Microsoft? Cita su comunicado de resultados.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_balanced-3-en",
+          "message": "What was Nvidia's latest quarterly revenue? Cite the company's earnings release.",
+          "language": "en"
+        },
+        {
+          "id": "research_balanced-3-es-419",
+          "message": "¿Cuáles fueron los ingresos trimestrales más recientes de Nvidia? Cita su comunicado de resultados.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_balanced-4-en",
+          "message": "What was Amazon's latest quarterly revenue? Cite the company's earnings release.",
+          "language": "en"
+        },
+        {
+          "id": "research_balanced-4-es-419",
+          "message": "¿Cuáles fueron los ingresos trimestrales más recientes de Amazon? Cita su comunicado de resultados.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_balanced-5-en",
+          "message": "What was Meta's latest quarterly revenue? Cite the company's earnings release.",
+          "language": "en"
+        },
+        {
+          "id": "research_balanced-5-es-419",
+          "message": "¿Cuáles fueron los ingresos trimestrales más recientes de Meta? Cita su comunicado de resultados.",
+          "language": "es-419"
+        }
+      ]
+    },
+    {
+      "category": "research_thorough",
+      "run_backtest": false,
+      "cases": [
+        {
+          "id": "research_thorough-1-en",
+          "message": "Compare AAPL and MSFT on revenue growth and profit margin over their last three fiscal years. Cite sources.",
+          "language": "en"
+        },
+        {
+          "id": "research_thorough-1-es-419",
+          "message": "Compara AAPL y MSFT en crecimiento de ingresos y margen de beneficio durante sus últimos tres años fiscales. Cita fuentes.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_thorough-2-en",
+          "message": "Compare NVDA and AMD on revenue growth and profit margin over their last three fiscal years. Cite sources.",
+          "language": "en"
+        },
+        {
+          "id": "research_thorough-2-es-419",
+          "message": "Compara NVDA y AMD en crecimiento de ingresos y margen de beneficio durante sus últimos tres años fiscales. Cita fuentes.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_thorough-3-en",
+          "message": "Compare KO and PEP on revenue growth and profit margin over their last three fiscal years. Cite sources.",
+          "language": "en"
+        },
+        {
+          "id": "research_thorough-3-es-419",
+          "message": "Compara KO y PEP en crecimiento de ingresos y margen de beneficio durante sus últimos tres años fiscales. Cita fuentes.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_thorough-4-en",
+          "message": "Compare V and MA on revenue growth and profit margin over their last three fiscal years. Cite sources.",
+          "language": "en"
+        },
+        {
+          "id": "research_thorough-4-es-419",
+          "message": "Compara V y MA en crecimiento de ingresos y margen de beneficio durante sus últimos tres años fiscales. Cita fuentes.",
+          "language": "es-419"
+        },
+        {
+          "id": "research_thorough-5-en",
+          "message": "Compare WMT and COST on revenue growth and profit margin over their last three fiscal years. Cite sources.",
+          "language": "en"
+        },
+        {
+          "id": "research_thorough-5-es-419",
+          "message": "Compara WMT y COST en crecimiento de ingresos y margen de beneficio durante sus últimos tres años fiscales. Cita fuentes.",
+          "language": "es-419"
+        }
+      ]
+    }
+  ]
+}

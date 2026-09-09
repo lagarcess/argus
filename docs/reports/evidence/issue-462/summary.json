@@ -1,0 +1,1424 @@
+{
+  "groups": {
+    "backtest_run": {
+      "languages": {
+        "en": 3,
+        "es-419": 5
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 60985.772,
+          "min": 13934.296,
+          "missing": 0,
+          "n": 8,
+          "p50": 16266.167,
+          "p95": 60985.772
+        },
+        "done_ms": {
+          "max": 3877.119,
+          "min": 1827.264,
+          "missing": 0,
+          "n": 8,
+          "p50": 2556.099,
+          "p95": 3877.119
+        },
+        "first_grounded_answer_ms": {
+          "missing": 8,
+          "n": 0
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 1525.196,
+          "min": 927.3319999999999,
+          "missing": 0,
+          "n": 8,
+          "p50": 1038.235,
+          "p95": 1525.196
+        },
+        "first_stage_ms": {
+          "max": 2346.437,
+          "min": 897.321,
+          "missing": 0,
+          "n": 8,
+          "p50": 1079.022,
+          "p95": 2346.437
+        },
+        "first_token_ms": {
+          "max": 3874.903,
+          "min": 1824.812,
+          "missing": 0,
+          "n": 8,
+          "p50": 2554.218,
+          "p95": 3874.903
+        },
+        "first_visible_ms": {
+          "max": 3874.903,
+          "min": 1824.812,
+          "missing": 0,
+          "n": 8,
+          "p50": 2554.218,
+          "p95": 3874.903
+        },
+        "headers_ms": {
+          "max": 1997.848958000759,
+          "min": 689.4273750003777,
+          "missing": 0,
+          "n": 8,
+          "p50": 872.139541001161,
+          "p95": 1997.848958000759
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 7.292999999999893,
+          "min": 0.1390000000001237,
+          "missing": 0,
+          "n": 8,
+          "p50": 2.98700000000008,
+          "p95": 7.292999999999893
+        }
+      },
+      "n": 8,
+      "provider_task_ms_when_present": {},
+      "receipt_rows_by_tier": {},
+      "requested_categories": {
+        "backtest_run": 8
+      },
+      "research_cache_and_degradation": [],
+      "statuses": {
+        "succeeded": 8
+      },
+      "successful_receipt_rows_by_tier": {},
+      "token_event_counts": {
+        "1": 8
+      },
+      "turns_with_positive_latency_tier": {},
+      "turns_with_successful_tier": {}
+    },
+    "clarification": {
+      "languages": {
+        "en": 2
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 57105.083,
+          "min": 38835.621,
+          "missing": 0,
+          "n": 2,
+          "p50": 38835.621,
+          "p95": 57105.083
+        },
+        "done_ms": {
+          "max": 57105.083,
+          "min": 38835.621,
+          "missing": 0,
+          "n": 2,
+          "p50": 38835.621,
+          "p95": 57105.083
+        },
+        "first_grounded_answer_ms": {
+          "missing": 2,
+          "n": 0
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 3013.559000000001,
+          "min": 2240.747000000003,
+          "missing": 0,
+          "n": 2,
+          "p50": 2240.747000000003,
+          "p95": 3013.559000000001
+        },
+        "first_stage_ms": {
+          "max": 1433.503,
+          "min": 1109.986,
+          "missing": 0,
+          "n": 2,
+          "p50": 1109.986,
+          "p95": 1433.503
+        },
+        "first_token_ms": {
+          "max": 53197.981,
+          "min": 37614.862,
+          "missing": 0,
+          "n": 2,
+          "p50": 37614.862,
+          "p95": 53197.981
+        },
+        "first_visible_ms": {
+          "max": 53197.981,
+          "min": 37614.862,
+          "missing": 0,
+          "n": 2,
+          "p50": 37614.862,
+          "p95": 53197.981
+        },
+        "headers_ms": {
+          "max": 1215.1142080001591,
+          "min": 907.3147920007614,
+          "missing": 0,
+          "n": 2,
+          "p50": 907.3147920007614,
+          "p95": 1215.1142080001591
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 49523.731,
+          "min": 33491.317,
+          "missing": 0,
+          "n": 2,
+          "p50": 33491.317,
+          "p95": 49523.731
+        }
+      },
+      "n": 2,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 970.0,
+          "min": 773.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 773.0,
+          "p95": 970.0
+        },
+        "clarification/ClarificationResponse": {
+          "max": 2149.0,
+          "min": 1740.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 1740.0,
+          "p95": 2149.0
+        },
+        "field_fidelity/StatedRunFieldFidelityAudit": {
+          "max": 1154.0,
+          "min": 1154.0,
+          "missing": 0,
+          "n": 1,
+          "p50": 1154.0,
+          "p95": 1154.0
+        },
+        "interpretation/DcaContractAudit": {
+          "max": 5966.0,
+          "min": 5934.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 5934.0,
+          "p95": 5966.0
+        },
+        "interpretation/DcaContributionRoleAudit": {
+          "max": 12585.0,
+          "min": 8245.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 8245.0,
+          "p95": 12585.0
+        },
+        "interpretation/ExecutableStrategyGroundingAudit": {
+          "max": 5755.0,
+          "min": 5755.0,
+          "missing": 0,
+          "n": 1,
+          "p50": 5755.0,
+          "p95": 5755.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 16074.0,
+          "min": 9334.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 9334.0,
+          "p95": 16074.0
+        },
+        "interpretation_repair/FocusedDateWindowExtraction": {
+          "max": 1172.0,
+          "min": 1068.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 1068.0,
+          "p95": 1172.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "chat": 2,
+        "structured": 12
+      },
+      "requested_categories": {
+        "confirmation": 2
+      },
+      "research_cache_and_degradation": [],
+      "statuses": {
+        "stream_complete": 2
+      },
+      "successful_receipt_rows_by_tier": {
+        "chat": 2,
+        "structured": 12
+      },
+      "token_event_counts": {
+        "1": 2
+      },
+      "turns_with_positive_latency_tier": {
+        "chat": 2,
+        "structured": 2
+      },
+      "turns_with_successful_tier": {
+        "chat": 2,
+        "structured": 2
+      }
+    },
+    "compute_intent_probe__clarification": {
+      "languages": {
+        "en": 1,
+        "es-419": 1
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 34022.732,
+          "min": 16348.204,
+          "missing": 0,
+          "n": 2,
+          "p50": 16348.204,
+          "p95": 34022.732
+        },
+        "done_ms": {
+          "max": 34022.732,
+          "min": 16348.204,
+          "missing": 0,
+          "n": 2,
+          "p50": 16348.204,
+          "p95": 34022.732
+        },
+        "first_grounded_answer_ms": {
+          "missing": 2,
+          "n": 0
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 3577.0759999999973,
+          "min": 1675.1209999999992,
+          "missing": 0,
+          "n": 2,
+          "p50": 1675.1209999999992,
+          "p95": 3577.0759999999973
+        },
+        "first_stage_ms": {
+          "max": 1195.737,
+          "min": 1109.019,
+          "missing": 0,
+          "n": 2,
+          "p50": 1109.019,
+          "p95": 1195.737
+        },
+        "first_token_ms": {
+          "max": 32974.509,
+          "min": 15733.809,
+          "missing": 0,
+          "n": 2,
+          "p50": 15733.809,
+          "p95": 32974.509
+        },
+        "first_visible_ms": {
+          "max": 32974.509,
+          "min": 15733.809,
+          "missing": 0,
+          "n": 2,
+          "p50": 15733.809,
+          "p95": 32974.509
+        },
+        "headers_ms": {
+          "max": 959.8200420005014,
+          "min": 901.34874999967,
+          "missing": 0,
+          "n": 2,
+          "p50": 901.34874999967,
+          "p95": 959.8200420005014
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 28288.414,
+          "min": 12862.951000000001,
+          "missing": 0,
+          "n": 2,
+          "p50": 12862.951000000001,
+          "p95": 28288.414
+        }
+      },
+      "n": 2,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 770.0,
+          "min": 753.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 753.0,
+          "p95": 770.0
+        },
+        "clarification/ClarificationResponse": {
+          "max": 2080.0,
+          "min": 1429.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 1429.0,
+          "p95": 2080.0
+        },
+        "interpretation/CapabilitySideQuestionAudit": {
+          "max": 5883.0,
+          "min": 5883.0,
+          "missing": 0,
+          "n": 1,
+          "p50": 5883.0,
+          "p95": 5883.0
+        },
+        "interpretation/ContextQuestionAudit": {
+          "max": 6166.0,
+          "min": 6166.0,
+          "missing": 0,
+          "n": 1,
+          "p50": 6166.0,
+          "p95": 6166.0
+        },
+        "interpretation/FocusedAssetDiscoveryRead": {
+          "max": 4523.0,
+          "min": 4523.0,
+          "missing": 0,
+          "n": 1,
+          "p50": 4523.0,
+          "p95": 4523.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 7941.0,
+          "min": 7567.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 7567.0,
+          "p95": 7941.0
+        },
+        "interpretation_repair/FocusedDateWindowExtraction": {
+          "max": 1164.0,
+          "min": 1164.0,
+          "missing": 0,
+          "n": 1,
+          "p50": 1164.0,
+          "p95": 1164.0
+        },
+        "interpretation_repair/FocusedStrategyExtraction": {
+          "max": 2966.0,
+          "min": 2679.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 2679.0,
+          "p95": 2966.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "chat": 2,
+        "structured": 10
+      },
+      "requested_categories": {
+        "compute_intent_probe": 2
+      },
+      "research_cache_and_degradation": [],
+      "statuses": {
+        "stream_complete": 2
+      },
+      "successful_receipt_rows_by_tier": {
+        "chat": 2,
+        "structured": 10
+      },
+      "token_event_counts": {
+        "1": 2
+      },
+      "turns_with_positive_latency_tier": {
+        "chat": 2,
+        "structured": 2
+      },
+      "turns_with_successful_tier": {
+        "chat": 2,
+        "structured": 2
+      }
+    },
+    "compute_intent_probe__ordinary_chat": {
+      "languages": {
+        "en": 4,
+        "es-419": 4
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 37177.322,
+          "min": 13987.997,
+          "missing": 0,
+          "n": 8,
+          "p50": 19582.833,
+          "p95": 37177.322
+        },
+        "done_ms": {
+          "max": 37177.322,
+          "min": 13987.997,
+          "missing": 0,
+          "n": 8,
+          "p50": 19582.833,
+          "p95": 37177.322
+        },
+        "first_grounded_answer_ms": {
+          "missing": 8,
+          "n": 0
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 967.5159999999996,
+          "min": 25.748999999999796,
+          "missing": 0,
+          "n": 8,
+          "p50": 191.14600000000064,
+          "p95": 967.5159999999996
+        },
+        "first_stage_ms": {
+          "max": 1552.069,
+          "min": 1084.183,
+          "missing": 0,
+          "n": 8,
+          "p50": 1334.362,
+          "p95": 1552.069
+        },
+        "first_token_ms": {
+          "max": 36346.335,
+          "min": 13576.856,
+          "missing": 0,
+          "n": 8,
+          "p50": 19074.818,
+          "p95": 36346.335
+        },
+        "first_visible_ms": {
+          "max": 36346.335,
+          "min": 13576.856,
+          "missing": 0,
+          "n": 8,
+          "p50": 19074.818,
+          "p95": 36346.335
+        },
+        "headers_ms": {
+          "max": 1172.6097090013354,
+          "min": 833.5192919985275,
+          "missing": 0,
+          "n": 8,
+          "p50": 1097.7819170002476,
+          "p95": 1172.6097090013354
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 34615.369,
+          "min": 12301.720000000001,
+          "missing": 0,
+          "n": 8,
+          "p50": 17355.854,
+          "p95": 34615.369
+        }
+      },
+      "n": 8,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 1083.0,
+          "min": 662.0,
+          "missing": 0,
+          "n": 8,
+          "p50": 748.0,
+          "p95": 1083.0
+        },
+        "chat_composer/chat_model": {
+          "max": 13816.0,
+          "min": 4411.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 4411.0,
+          "p95": 13816.0
+        },
+        "interpretation/CapabilitySideQuestionAudit": {
+          "max": 6600.0,
+          "min": 4645.0,
+          "missing": 0,
+          "n": 3,
+          "p50": 5741.0,
+          "p95": 6600.0
+        },
+        "interpretation/ContextQuestionAudit": {
+          "max": 8700.0,
+          "min": 4350.0,
+          "missing": 0,
+          "n": 5,
+          "p50": 5845.0,
+          "p95": 8700.0
+        },
+        "interpretation/FocusedAssetDiscoveryRead": {
+          "max": 5083.0,
+          "min": 2957.0,
+          "missing": 0,
+          "n": 3,
+          "p50": 4167.0,
+          "p95": 5083.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 11588.0,
+          "min": 4764.0,
+          "missing": 0,
+          "n": 8,
+          "p50": 8532.0,
+          "p95": 11588.0
+        },
+        "interpretation_repair/FocusedStrategyExtraction": {
+          "max": 5799.0,
+          "min": 3168.0,
+          "missing": 0,
+          "n": 8,
+          "p50": 3995.0,
+          "p95": 5799.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "chat": 2,
+        "structured": 43
+      },
+      "requested_categories": {
+        "compute_intent_probe": 8
+      },
+      "research_cache_and_degradation": [],
+      "statuses": {
+        "stream_complete": 8
+      },
+      "successful_receipt_rows_by_tier": {
+        "chat": 2,
+        "structured": 43
+      },
+      "token_event_counts": {
+        "1": 8
+      },
+      "turns_with_positive_latency_tier": {
+        "chat": 2,
+        "structured": 8
+      },
+      "turns_with_successful_tier": {
+        "chat": 2,
+        "structured": 8
+      }
+    },
+    "confirmation": {
+      "languages": {
+        "en": 3,
+        "es-419": 5
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 35189.834,
+          "min": 24349.739,
+          "missing": 0,
+          "n": 8,
+          "p50": 27439.721,
+          "p95": 35189.834
+        },
+        "done_ms": {
+          "max": 35189.834,
+          "min": 24349.739,
+          "missing": 0,
+          "n": 8,
+          "p50": 27439.721,
+          "p95": 35189.834
+        },
+        "first_grounded_answer_ms": {
+          "missing": 8,
+          "n": 0
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 3265.0120000000024,
+          "min": 632.6930000000029,
+          "missing": 0,
+          "n": 8,
+          "p50": 970.6880000000019,
+          "p95": 3265.0120000000024
+        },
+        "first_stage_ms": {
+          "max": 2294.829,
+          "min": 1152.11,
+          "missing": 0,
+          "n": 8,
+          "p50": 1264.126,
+          "p95": 2294.829
+        },
+        "first_token_ms": {
+          "missing": 8,
+          "n": 0
+        },
+        "first_visible_ms": {
+          "max": 35189.834,
+          "min": 24349.739,
+          "missing": 0,
+          "n": 8,
+          "p50": 27439.721,
+          "p95": 35189.834
+        },
+        "headers_ms": {
+          "max": 1995.9648339990963,
+          "min": 919.1081249991839,
+          "missing": 0,
+          "n": 8,
+          "p50": 1023.7455829992541,
+          "p95": 1995.9648339990963
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 32781.263,
+          "min": 22108.078,
+          "missing": 0,
+          "n": 8,
+          "p50": 25332.141,
+          "p95": 32781.263
+        }
+      },
+      "n": 8,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 1161.0,
+          "min": 760.0,
+          "missing": 0,
+          "n": 8,
+          "p50": 875.0,
+          "p95": 1161.0
+        },
+        "field_fidelity/StatedRunFieldFidelityAudit": {
+          "max": 1508.0,
+          "min": 1093.0,
+          "missing": 0,
+          "n": 8,
+          "p50": 1190.0,
+          "p95": 1508.0
+        },
+        "interpretation/DcaContributionRoleAudit": {
+          "max": 5174.0,
+          "min": 3688.0,
+          "missing": 0,
+          "n": 2,
+          "p50": 3688.0,
+          "p95": 5174.0
+        },
+        "interpretation/ExecutableStrategyGroundingAudit": {
+          "max": 7225.0,
+          "min": 3140.0,
+          "missing": 0,
+          "n": 6,
+          "p50": 4946.0,
+          "p95": 7225.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 16575.0,
+          "min": 9442.0,
+          "missing": 0,
+          "n": 8,
+          "p50": 11082.0,
+          "p95": 16575.0
+        },
+        "interpretation_repair/FocusedDateWindowExtraction": {
+          "max": 1485.0,
+          "min": 986.0,
+          "missing": 0,
+          "n": 6,
+          "p50": 1197.0,
+          "p95": 1485.0
+        },
+        "interpretation_repair/FocusedStrategyExtraction": {
+          "max": 3459.0,
+          "min": 3459.0,
+          "missing": 0,
+          "n": 1,
+          "p50": 3459.0,
+          "p95": 3459.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "structured": 39
+      },
+      "requested_categories": {
+        "confirmation": 8
+      },
+      "research_cache_and_degradation": [],
+      "statuses": {
+        "stream_complete": 8
+      },
+      "successful_receipt_rows_by_tier": {
+        "structured": 39
+      },
+      "token_event_counts": {
+        "0": 8
+      },
+      "turns_with_positive_latency_tier": {
+        "structured": 8
+      },
+      "turns_with_successful_tier": {
+        "structured": 8
+      }
+    },
+    "ordinary_chat": {
+      "languages": {
+        "en": 5,
+        "es-419": 5
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 49439.259,
+          "min": 21623.082,
+          "missing": 0,
+          "n": 10,
+          "p50": 34004.432,
+          "p95": 49439.259
+        },
+        "done_ms": {
+          "max": 49439.259,
+          "min": 21623.082,
+          "missing": 0,
+          "n": 10,
+          "p50": 34004.432,
+          "p95": 49439.259
+        },
+        "first_grounded_answer_ms": {
+          "missing": 10,
+          "n": 0
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 618.0709999999999,
+          "min": 223.75299999999697,
+          "missing": 0,
+          "n": 10,
+          "p50": 356.8349999999991,
+          "p95": 618.0709999999999
+        },
+        "first_stage_ms": {
+          "max": 1828.941,
+          "min": 989.624,
+          "missing": 0,
+          "n": 10,
+          "p50": 1324.977,
+          "p95": 1828.941
+        },
+        "first_token_ms": {
+          "max": 48206.413,
+          "min": 20977.244,
+          "missing": 0,
+          "n": 10,
+          "p50": 33143.002,
+          "p95": 48206.413
+        },
+        "first_visible_ms": {
+          "max": 48206.413,
+          "min": 20977.244,
+          "missing": 0,
+          "n": 10,
+          "p50": 33143.002,
+          "p95": 48206.413
+        },
+        "headers_ms": {
+          "max": 1628.4866249989136,
+          "min": 762.4994999987393,
+          "missing": 0,
+          "n": 10,
+          "p50": 958.7460000002466,
+          "p95": 1628.4866249989136
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 46371.066,
+          "min": 18893.788,
+          "missing": 0,
+          "n": 10,
+          "p50": 31234.195,
+          "p95": 46371.066
+        }
+      },
+      "n": 10,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 1201.0,
+          "min": 678.0,
+          "missing": 0,
+          "n": 10,
+          "p50": 810.0,
+          "p95": 1201.0
+        },
+        "chat_composer/chat_model": {
+          "max": 9994.0,
+          "min": 4370.0,
+          "missing": 0,
+          "n": 6,
+          "p50": 7611.0,
+          "p95": 9994.0
+        },
+        "interpretation/CapabilitySideQuestionAudit": {
+          "max": 12763.0,
+          "min": 8058.0,
+          "missing": 0,
+          "n": 4,
+          "p50": 11222.0,
+          "p95": 12763.0
+        },
+        "interpretation/ContextQuestionAudit": {
+          "max": 7977.0,
+          "min": 3028.0,
+          "missing": 0,
+          "n": 7,
+          "p50": 5109.0,
+          "p95": 7977.0
+        },
+        "interpretation/FocusedAssetDiscoveryRead": {
+          "max": 5630.0,
+          "min": 2226.0,
+          "missing": 0,
+          "n": 7,
+          "p50": 4013.0,
+          "p95": 5630.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 13628.0,
+          "min": 7625.0,
+          "missing": 0,
+          "n": 10,
+          "p50": 9204.0,
+          "p95": 13628.0
+        },
+        "interpretation_repair/FocusedStrategyExtraction": {
+          "max": 7105.0,
+          "min": 3210.0,
+          "missing": 0,
+          "n": 8,
+          "p50": 5389.0,
+          "p95": 7105.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "chat": 7,
+        "structured": 54
+      },
+      "requested_categories": {
+        "ordinary_chat": 10
+      },
+      "research_cache_and_degradation": [],
+      "statuses": {
+        "stream_complete": 10
+      },
+      "successful_receipt_rows_by_tier": {
+        "chat": 6,
+        "structured": 54
+      },
+      "token_event_counts": {
+        "1": 10
+      },
+      "turns_with_positive_latency_tier": {
+        "chat": 6,
+        "structured": 10
+      },
+      "turns_with_successful_tier": {
+        "chat": 6,
+        "structured": 10
+      }
+    },
+    "research_balanced": {
+      "languages": {
+        "en": 5,
+        "es-419": 5
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 43576.848,
+          "min": 11100.758,
+          "missing": 0,
+          "n": 10,
+          "p50": 26178.89,
+          "p95": 43576.848
+        },
+        "done_ms": {
+          "max": 43576.848,
+          "min": 11100.758,
+          "missing": 0,
+          "n": 10,
+          "p50": 26178.89,
+          "p95": 43576.848
+        },
+        "first_grounded_answer_ms": {
+          "max": 43102.793,
+          "min": 10775.48,
+          "missing": 0,
+          "n": 10,
+          "p50": 25952.981,
+          "p95": 43102.793
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 759.900999999998,
+          "min": 171.57500000000073,
+          "missing": 0,
+          "n": 10,
+          "p50": 232.96199999999953,
+          "p95": 759.900999999998
+        },
+        "first_stage_ms": {
+          "max": 2246.799,
+          "min": 958.977,
+          "missing": 0,
+          "n": 10,
+          "p50": 1306.407,
+          "p95": 2246.799
+        },
+        "first_token_ms": {
+          "max": 43102.793,
+          "min": 10775.48,
+          "missing": 0,
+          "n": 10,
+          "p50": 25952.981,
+          "p95": 43102.793
+        },
+        "first_visible_ms": {
+          "max": 43102.793,
+          "min": 10775.48,
+          "missing": 0,
+          "n": 10,
+          "p50": 25952.981,
+          "p95": 43102.793
+        },
+        "headers_ms": {
+          "max": 1981.4895409999735,
+          "min": 741.498417000912,
+          "missing": 0,
+          "n": 10,
+          "p50": 1075.3078750003624,
+          "p95": 1981.4895409999735
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 40096.093,
+          "min": 9252.853,
+          "missing": 0,
+          "n": 10,
+          "p50": 24056.748,
+          "p95": 40096.093
+        }
+      },
+      "n": 10,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 2231.0,
+          "min": 806.0,
+          "missing": 0,
+          "n": 10,
+          "p50": 952.0,
+          "p95": 2231.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 29806.0,
+          "min": 5290.0,
+          "missing": 0,
+          "n": 10,
+          "p50": 9080.0,
+          "p95": 29806.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "structured": 21
+      },
+      "requested_categories": {
+        "research_balanced": 10
+      },
+      "research_cache_and_degradation": [
+        {
+          "cache": "hit",
+          "degraded": null,
+          "n": 1
+        },
+        {
+          "cache": "miss",
+          "degraded": null,
+          "n": 9
+        }
+      ],
+      "statuses": {
+        "stream_complete": 10
+      },
+      "successful_receipt_rows_by_tier": {
+        "structured": 20
+      },
+      "token_event_counts": {
+        "1": 10
+      },
+      "turns_with_positive_latency_tier": {
+        "structured": 10
+      },
+      "turns_with_successful_tier": {
+        "structured": 10
+      }
+    },
+    "research_fast": {
+      "languages": {
+        "en": 5,
+        "es-419": 5
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 23860.77,
+          "min": 13998.776,
+          "missing": 0,
+          "n": 10,
+          "p50": 16209.85,
+          "p95": 23860.77
+        },
+        "done_ms": {
+          "max": 23860.77,
+          "min": 13998.776,
+          "missing": 0,
+          "n": 10,
+          "p50": 16209.85,
+          "p95": 23860.77
+        },
+        "first_grounded_answer_ms": {
+          "max": 23644.461,
+          "min": 13573.421,
+          "missing": 0,
+          "n": 10,
+          "p50": 15957.105,
+          "p95": 23644.461
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 642.0360000000001,
+          "min": 161.72200000000157,
+          "missing": 0,
+          "n": 10,
+          "p50": 201.07200000000012,
+          "p95": 642.0360000000001
+        },
+        "first_stage_ms": {
+          "max": 1924.202,
+          "min": 990.108,
+          "missing": 0,
+          "n": 10,
+          "p50": 1125.135,
+          "p95": 1924.202
+        },
+        "first_token_ms": {
+          "max": 23644.461,
+          "min": 13573.421,
+          "missing": 0,
+          "n": 10,
+          "p50": 15957.105,
+          "p95": 23644.461
+        },
+        "first_visible_ms": {
+          "max": 23644.461,
+          "min": 13573.421,
+          "missing": 0,
+          "n": 10,
+          "p50": 15957.105,
+          "p95": 23644.461
+        },
+        "headers_ms": {
+          "max": 1686.9182909995288,
+          "min": 751.9910840001103,
+          "missing": 0,
+          "n": 10,
+          "p50": 906.5634580001642,
+          "p95": 1686.9182909995288
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 21960.022999999997,
+          "min": 11497.412,
+          "missing": 0,
+          "n": 10,
+          "p50": 14623.925,
+          "p95": 21960.022999999997
+        }
+      },
+      "n": 10,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 2914.0,
+          "min": 722.0,
+          "missing": 0,
+          "n": 10,
+          "p50": 857.0,
+          "p95": 2914.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 14200.0,
+          "min": 4409.0,
+          "missing": 0,
+          "n": 10,
+          "p50": 6874.0,
+          "p95": 14200.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "structured": 20
+      },
+      "requested_categories": {
+        "research_fast": 10
+      },
+      "research_cache_and_degradation": [
+        {
+          "cache": "miss",
+          "degraded": null,
+          "n": 10
+        }
+      ],
+      "statuses": {
+        "stream_complete": 10
+      },
+      "successful_receipt_rows_by_tier": {
+        "structured": 20
+      },
+      "token_event_counts": {
+        "1": 10
+      },
+      "turns_with_positive_latency_tier": {
+        "structured": 10
+      },
+      "turns_with_successful_tier": {
+        "structured": 10
+      }
+    },
+    "research_thorough": {
+      "languages": {
+        "en": 5,
+        "es-419": 2
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 61746.739,
+          "min": 11298.25,
+          "missing": 0,
+          "n": 7,
+          "p50": 45750.203,
+          "p95": 61746.739
+        },
+        "done_ms": {
+          "max": 13947.666,
+          "min": 10155.468,
+          "missing": 0,
+          "n": 7,
+          "p50": 12132.154,
+          "p95": 13947.666
+        },
+        "first_grounded_answer_ms": {
+          "max": 61746.739,
+          "min": 11107.316,
+          "missing": 0,
+          "n": 7,
+          "p50": 45750.203,
+          "p95": 61746.739
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 813.5770000000011,
+          "min": 239.8780000000006,
+          "missing": 0,
+          "n": 7,
+          "p50": 675.3430000000008,
+          "p95": 813.5770000000011
+        },
+        "first_stage_ms": {
+          "max": 2749.406,
+          "min": 1064.969,
+          "missing": 0,
+          "n": 7,
+          "p50": 1159.299,
+          "p95": 2749.406
+        },
+        "first_token_ms": {
+          "max": 13655.333,
+          "min": 9938.057,
+          "missing": 0,
+          "n": 7,
+          "p50": 11842.107,
+          "p95": 13655.333
+        },
+        "first_visible_ms": {
+          "max": 13655.333,
+          "min": 9938.057,
+          "missing": 0,
+          "n": 7,
+          "p50": 11842.107,
+          "p95": 13655.333
+        },
+        "headers_ms": {
+          "max": 2496.640458000911,
+          "min": 862.6251250007044,
+          "missing": 0,
+          "n": 7,
+          "p50": 942.7462080002442,
+          "p95": 2496.640458000911
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 11246.173999999999,
+          "min": 7985.931,
+          "missing": 0,
+          "n": 7,
+          "p50": 9851.279999999999,
+          "p95": 11246.173999999999
+        }
+      },
+      "n": 7,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 1463.0,
+          "min": 947.0,
+          "missing": 0,
+          "n": 7,
+          "p50": 1011.0,
+          "p95": 1463.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 10303.0,
+          "min": 6656.0,
+          "missing": 0,
+          "n": 7,
+          "p50": 8631.0,
+          "p95": 10303.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "structured": 14
+      },
+      "requested_categories": {
+        "research_thorough": 7
+      },
+      "research_cache_and_degradation": [
+        {
+          "cache": "hit",
+          "degraded": null,
+          "n": 1
+        },
+        {
+          "cache": "miss",
+          "degraded": null,
+          "n": 6
+        }
+      ],
+      "statuses": {
+        "stream_complete": 1,
+        "succeeded": 6
+      },
+      "successful_receipt_rows_by_tier": {
+        "structured": 14
+      },
+      "token_event_counts": {
+        "1": 7
+      },
+      "turns_with_positive_latency_tier": {
+        "structured": 7
+      },
+      "turns_with_successful_tier": {
+        "structured": 7
+      }
+    },
+    "research_thorough__degraded": {
+      "languages": {
+        "es-419": 3
+      },
+      "metrics": {
+        "completion_ms": {
+          "max": 54286.713,
+          "min": 39339.372,
+          "missing": 0,
+          "n": 3,
+          "p50": 41690.016,
+          "p95": 54286.713
+        },
+        "done_ms": {
+          "max": 22647.7,
+          "min": 13039.663,
+          "missing": 0,
+          "n": 3,
+          "p50": 15339.454,
+          "p95": 22647.7
+        },
+        "first_grounded_answer_ms": {
+          "missing": 3,
+          "n": 0
+        },
+        "first_outcome_to_visible_ms": {
+          "max": 1285.0460000000003,
+          "min": 572.4670000000006,
+          "missing": 0,
+          "n": 3,
+          "p50": 696.6219999999994,
+          "p95": 1285.0460000000003
+        },
+        "first_stage_ms": {
+          "max": 1828.573,
+          "min": 1289.471,
+          "missing": 0,
+          "n": 3,
+          "p50": 1307.56,
+          "p95": 1828.573
+        },
+        "first_token_ms": {
+          "max": 22453.384,
+          "min": 12781.545,
+          "missing": 0,
+          "n": 3,
+          "p50": 15105.111,
+          "p95": 22453.384
+        },
+        "first_visible_ms": {
+          "max": 22453.384,
+          "min": 12781.545,
+          "missing": 0,
+          "n": 3,
+          "p50": 15105.111,
+          "p95": 22453.384
+        },
+        "headers_ms": {
+          "max": 1450.5610000014713,
+          "min": 1076.1097089998657,
+          "missing": 0,
+          "n": 3,
+          "p50": 1087.767207998695,
+          "p95": 1450.5610000014713
+        },
+        "interpret_to_first_outcome_ms": {
+          "max": 19928.189,
+          "min": 10207.028,
+          "missing": 0,
+          "n": 3,
+          "p50": 13225.084,
+          "p95": 19928.189
+        }
+      },
+      "n": 3,
+      "provider_task_ms_when_present": {
+        "asset_mention_preflight/LLMAssetMentionExtraction": {
+          "max": 1734.0,
+          "min": 1229.0,
+          "missing": 0,
+          "n": 3,
+          "p50": 1235.0,
+          "p95": 1734.0
+        },
+        "interpretation/LLMInterpretationResponse": {
+          "max": 18824.0,
+          "min": 8998.0,
+          "missing": 0,
+          "n": 3,
+          "p50": 11531.0,
+          "p95": 18824.0
+        }
+      },
+      "receipt_rows_by_tier": {
+        "structured": 6
+      },
+      "requested_categories": {
+        "research_thorough": 3
+      },
+      "research_cache_and_degradation": [
+        {
+          "cache": "miss",
+          "degraded": "research_unavailable_missing_public_sources",
+          "n": 3
+        }
+      ],
+      "statuses": {
+        "succeeded": 3
+      },
+      "successful_receipt_rows_by_tier": {
+        "structured": 6
+      },
+      "token_event_counts": {
+        "1": 3
+      },
+      "turns_with_positive_latency_tier": {
+        "structured": 3
+      },
+      "turns_with_successful_tier": {
+        "structured": 3
+      }
+    }
+  },
+  "observations": 68,
+  "quantile_method": "nearest_rank"
+}

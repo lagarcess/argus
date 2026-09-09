@@ -12,6 +12,7 @@ from argus.domain.usage_limits import (
     GLOBAL_DISCOVERY_CEILING_SUBJECT,
     GUEST_DISCOVERY_ALLOWANCE_LIMITS,
     QuotaExceededError,
+    UsageMeter,
     global_discovery_daily_ceiling,
     read_memory_usage,
     settle_memory_usage,
@@ -44,6 +45,15 @@ def discovery_usage_limits(*, is_guest: bool = False) -> list[tuple[str, int]]:
     return [("hour", config.hourly_limit), ("day", config.daily_limit)]
 
 
+def discovery_meter(*, is_guest: bool = False) -> UsageMeter:
+    """The per-subject discovery counter; read, charge, and the allowance
+    projection all take it from here."""
+    return UsageMeter(
+        resource=DISCOVERY_USAGE_RESOURCE,
+        limits=discovery_usage_limits(is_guest=is_guest),
+    )
+
+
 def discovery_counter_subject(
     *,
     user_id: str,
@@ -64,23 +74,29 @@ def _visitor_within_limits(
     visitor_key: str,
     limits: list[tuple[str, int]],
     now: datetime,
+    resource: str = DISCOVERY_USAGE_RESOURCE,
 ) -> bool:
     """Visitor allowances live outside usage_counters: its user_id FKs to
     profiles, and a visitor has no profile."""
     return visitor_within_limits(
         api_state.supabase_gateway.client,
         visitor_key=visitor_key,
-        resource=DISCOVERY_USAGE_RESOURCE,
+        resource=resource,
         limits=limits,
         now=now,
     )
 
 
-def _charge_visitor(*, visitor_key: str, limits: list[tuple[str, int]]) -> None:
+def _charge_visitor(
+    *,
+    visitor_key: str,
+    limits: list[tuple[str, int]],
+    resource: str = DISCOVERY_USAGE_RESOURCE,
+) -> None:
     settle_visitor_usage(
         api_state.supabase_gateway.client,
         visitor_key=visitor_key,
-        resource=DISCOVERY_USAGE_RESOURCE,
+        resource=resource,
         limits=limits,
     )
 
@@ -118,6 +134,7 @@ def _subject_within_limits(
     subject: str,
     limits: list[tuple[str, int]],
     now: datetime,
+    resource: str = DISCOVERY_USAGE_RESOURCE,
 ) -> bool:
     if api_state.supabase_gateway is not None:
         reader = UsageCounterReader()
@@ -125,7 +142,7 @@ def _subject_within_limits(
         for period, limit_count in limits:
             rows = reader.list_current_usage_counters(
                 user_id=subject,
-                resources=(DISCOVERY_USAGE_RESOURCE,),
+                resources=(resource,),
                 period=period,
                 at=now,
             )
@@ -138,7 +155,7 @@ def _subject_within_limits(
         row = read_memory_usage(
             api_state.store.usage_counters,
             user_id=subject,
-            resource=DISCOVERY_USAGE_RESOURCE,
+            resource=resource,
             period=period,
         )
         if (
@@ -180,10 +197,17 @@ def discovery_allowance_available(
         subject = discovery_counter_subject(
             user_id=user_id, is_guest=is_guest, client_identity=client_identity
         )
-        limits = discovery_usage_limits(is_guest=is_guest)
+        meter = discovery_meter(is_guest=is_guest)
         if is_guest and api_state.supabase_gateway is not None:
-            return _visitor_within_limits(visitor_key=subject, limits=limits, now=now)
-        return _subject_within_limits(subject=subject, limits=limits, now=now)
+            return _visitor_within_limits(
+                visitor_key=subject,
+                limits=meter.limits,
+                now=now,
+                resource=meter.resource,
+            )
+        return _subject_within_limits(
+            subject=subject, limits=meter.limits, now=now, resource=meter.resource
+        )
     except Exception as exc:
         # Fail closed: without readable allowance truth, no spend is allowed.
         logger.warning(
@@ -290,10 +314,12 @@ def _charge_discovery_attempt(
     subject = discovery_counter_subject(
         user_id=user_id, is_guest=is_guest, client_identity=client_identity
     )
-    limits = discovery_usage_limits(is_guest=is_guest)
+    meter = discovery_meter(is_guest=is_guest)
     if is_guest and api_state.supabase_gateway is not None:
         try:
-            _charge_visitor(visitor_key=subject, limits=limits)
+            _charge_visitor(
+                visitor_key=subject, limits=meter.limits, resource=meter.resource
+            )
         except Exception as exc:
             logger.warning(
                 "Visitor discovery settlement failed",
@@ -301,22 +327,27 @@ def _charge_discovery_attempt(
                 failure_classification="telemetry_only",
             )
         return
-    _charge_subject(subject=subject, limits=limits)
+    _charge_subject(subject=subject, limits=meter.limits, resource=meter.resource)
 
 
-def _charge_subject(*, subject: str, limits: list[tuple[str, int]]) -> None:
+def _charge_subject(
+    *,
+    subject: str,
+    limits: list[tuple[str, int]],
+    resource: str = DISCOVERY_USAGE_RESOURCE,
+) -> None:
     try:
         if api_state.supabase_gateway is not None:
             api_state.supabase_gateway.check_and_increment_usage_limits(
                 user_id=subject,
-                resource=DISCOVERY_USAGE_RESOURCE,
+                resource=resource,
                 limits=limits,
             )
         else:
             settle_memory_usage(
                 api_state.store.usage_counters,
                 user_id=subject,
-                resource=DISCOVERY_USAGE_RESOURCE,
+                resource=resource,
                 limits=limits,
             )
     except QuotaExceededError:
@@ -324,7 +355,7 @@ def _charge_subject(*, subject: str, limits: list[tuple[str, int]]) -> None:
         # unit. The attempt already happened; the counter stays clamped.
         logger.info(
             "Discovery attempt settled at the allowance ceiling",
-            resource=DISCOVERY_USAGE_RESOURCE,
+            resource=resource,
         )
     except Exception as exc:
         logger.warning(

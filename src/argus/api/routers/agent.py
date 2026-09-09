@@ -44,10 +44,6 @@ from argus.api.chat.actions import (
     run_for_result_action,
     stale_confirmation_action_message,
 )
-from argus.api.chat.allowance import (
-    check_message_allowance,
-    ordinary_turn_settlement,
-)
 from argus.api.chat.artifacts import (
     ensure_unspent_confirmation_identity,
     result_fact_bank,
@@ -64,6 +60,10 @@ from argus.api.chat.cancellation import (
     prepare_confirmation_cancellation,
 )
 from argus.api.chat.discovery_evidence import discovery_allowance_for_turn
+from argus.api.chat.guest_compute_ceiling import (
+    check_guest_compute_ceiling,
+    guest_compute_settlement,
+)
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
@@ -264,6 +264,7 @@ async def chat_stream(
     # One turn, one subject: allowance read, job row and settlement agree.
     turn_is_guest = turn_account.kind == "guest"
     turn_client_identity = client_identity(request)
+    turn_visitor_key = visitor_key_for(turn_client_identity)
     turn_guest_research_key = guest_research_visitor_key(
         is_guest=turn_is_guest, client_identity=turn_client_identity
     )
@@ -283,7 +284,7 @@ async def chat_stream(
             idempotency_key=clean_idempotency_key,
         )
     if not is_run_backtest_turn and not cancel_confirmation_action:
-        check_message_allowance(request, user)
+        check_guest_compute_ceiling(request, user)
 
     current_user_profile = None
     if api_state.supabase_gateway is not None:
@@ -722,14 +723,10 @@ async def chat_stream(
             assistant_message = lifecycle_hooks.complete(
                 content=assistant_text,
                 metadata=metadata,
-                settle_usage=ordinary_turn_settlement(
+                settle_usage=guest_compute_settlement(
+                    turn_account,
                     is_run_backtest_turn=is_run_backtest_turn,
-                    account=turn_account,
-                    visitor_key=(
-                        visitor_key_for(turn_client_identity)
-                        if turn_account.kind == "guest"
-                        else None
-                    ),
+                    visitor_key=turn_visitor_key,
                 ),
             )
             progress = "redirected" if stale_card_redirect else "clarification"
@@ -765,14 +762,10 @@ async def chat_stream(
                     lifecycle_hooks=lifecycle_hooks,
                     conversation_id=conversation.id,
                     language=runtime_user.language_preference,
-                    settle_usage=ordinary_turn_settlement(
+                    settle_usage=guest_compute_settlement(
+                        turn_account,
                         is_run_backtest_turn=False,
-                        account=turn_account,
-                        visitor_key=(
-                            visitor_key_for(turn_client_identity)
-                            if turn_account.kind == "guest"
-                            else None
-                        ),
+                        visitor_key=turn_visitor_key,
                     ),
                 )
             except Exception:
@@ -1246,14 +1239,10 @@ async def chat_stream(
                         assistant_message = lifecycle_hooks.complete(
                             content=persisted_text or "",
                             metadata=metadata,
-                            settle_usage=ordinary_turn_settlement(
+                            settle_usage=guest_compute_settlement(
+                                turn_account,
                                 is_run_backtest_turn=is_run_backtest_turn,
-                                account=turn_account,
-                                visitor_key=(
-                                    visitor_key_for(turn_client_identity)
-                                    if turn_account.kind == "guest"
-                                    else None
-                                ),
+                                visitor_key=turn_visitor_key,
                             ),
                         )
                     if (

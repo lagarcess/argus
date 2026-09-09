@@ -1,10 +1,9 @@
 """Research rail metering: one flat meter for users, rich classes underneath.
 
-For a signed-in account, research turns count as ordinary chat turns (spec
-section 9) and the message allowance is the meter. A guest is the exception
-(section 9b): ten free messages spent entirely on the most expensive shape is
-not an allowance anyone sized, so a guest carries a small research allowance of
-their own, keyed to the visitor. What this module owns:
+Retrieval is the grounding operation class: metered per retrieval, never per
+turn. A signed-in account has no research window of its own and is bounded
+only by the shared ceiling. A guest carries a small research allowance keyed
+to the visitor (spec section 9b). What this module owns:
 
 - the shared global daily ceiling, atomically claimed immediately before a
   cache miss enters provider work;
@@ -27,11 +26,13 @@ from typing import Any
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat.discovery_evidence import discovery_meter
 from argus.domain.research.admission import ResearchAttemptAdmission
 from argus.domain.research.config import research_rail_enabled
 from argus.domain.usage_limits import (
     GLOBAL_RESEARCH_CEILING_SUBJECT,
     GUEST_RESEARCH_VISITOR_LIMITS,
+    UsageMeter,
     align_usage_period,
     global_research_daily_ceiling,
     read_memory_usage,
@@ -56,6 +57,23 @@ def _ceiling_limits() -> list[tuple[str, int]]:
     return [("day", global_research_daily_ceiling())]
 
 
+def research_meter(*, is_guest: bool) -> UsageMeter:
+    """The per-visitor research counter the atomic claim charges; a signed-in
+    account has no window of its own on it."""
+    return UsageMeter(
+        resource=RESEARCH_USAGE_RESOURCE,
+        limits=list(GUEST_RESEARCH_VISITOR_LIMITS) if is_guest else [],
+    )
+
+
+def grounding_meter(*, is_guest: bool) -> UsageMeter:
+    """Which meter grounds a retrieval: the one the live rail charges, so the
+    allowance projection can never name a counter the charge does not."""
+    if research_rail_enabled():
+        return research_meter(is_guest=is_guest)
+    return discovery_meter(is_guest=is_guest)
+
+
 def guest_research_visitor_key(
     *, is_guest: bool, client_identity: str | None
 ) -> str | None:
@@ -75,10 +93,8 @@ def claim_research_provider_attempt(
     """Atomically claim capacity immediately before billable provider work.
 
     Two bounds are owned here: the shared global circuit breaker, and, for a
-    guest, that visitor's own daily research allowance. A signed-in user still
-    meters research through their message allowance (spec section 9); a guest
-    does not, because ten free messages spent entirely on the most expensive
-    shape is not an allowance anyone sized.
+    guest, that visitor's own daily research allowance. A signed-in user has
+    no research window of their own.
 
     Flag-off short-circuits to available. Fails closed: without writable truth,
     no research spend is allowed, and
@@ -87,6 +103,7 @@ def claim_research_provider_attempt(
     if not research_rail_enabled():
         return ResearchAttemptAdmission(available=True)
     now = datetime.now(timezone.utc)
+    guest_meter = research_meter(is_guest=True)
     try:
         if api_state.supabase_gateway is not None:
             client = api_state.supabase_gateway.client
@@ -94,10 +111,10 @@ def claim_research_provider_attempt(
                 "claim_research_usage",
                 {
                     "p_guest_visitor_key": guest_visitor_key,
-                    "p_resource": RESEARCH_USAGE_RESOURCE,
+                    "p_resource": guest_meter.resource,
                     "p_global_visitor_key": GLOBAL_CEILING_KEY,
                     "p_global_limit": global_research_daily_ceiling(),
-                    "p_guest_limit": GUEST_RESEARCH_VISITOR_LIMITS[0][1],
+                    "p_guest_limit": dict(guest_meter.limits)["day"],
                 },
             ).execute()
             payload = getattr(result, "data", None)
@@ -109,6 +126,7 @@ def claim_research_provider_attempt(
             )
         return _claim_memory_research_usage(
             guest_visitor_key=guest_visitor_key,
+            guest_meter=guest_meter,
             now=now,
         )
     except Exception as exc:  # noqa: BLE001
@@ -122,6 +140,7 @@ def claim_research_provider_attempt(
 def _claim_memory_research_usage(
     *,
     guest_visitor_key: str | None,
+    guest_meter: UsageMeter,
     now: datetime,
 ) -> ResearchAttemptAdmission:
     """Process-local twin of the database transaction used in tests/dev."""
@@ -131,8 +150,8 @@ def _claim_memory_research_usage(
             guest_within = memory_visitor_within_limits(
                 api_state.store.visitor_usage_counters,
                 visitor_key=guest_visitor_key,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
+                resource=guest_meter.resource,
+                limits=list(guest_meter.limits),
                 now=now,
             )
             if not guest_within:
@@ -153,8 +172,8 @@ def _claim_memory_research_usage(
             settle_memory_visitor_usage(
                 api_state.store.visitor_usage_counters,
                 visitor_key=guest_visitor_key,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
+                resource=guest_meter.resource,
+                limits=list(guest_meter.limits),
                 now=now,
             )
         return ResearchAttemptAdmission(available=True)

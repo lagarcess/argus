@@ -88,14 +88,21 @@ function allowances(state: UsageState, isGuest: boolean) {
     window_(limit, Math.round(limit * spent), HOUR_PERIOD_END);
   const available = state !== "exhausted";
   return {
-    messages: {
+    compute: {
+      hour: null,
+      day: null,
+      guest_session: null,
+      available_now: true,
+      limiting_window: null,
+    },
+    grounding: {
       hour: isGuest ? null : hour(20),
       day: day(60),
       guest_session: null,
       available_now: available,
       limiting_window: isGuest ? "day" : "hour",
     },
-    backtests: {
+    execution: {
       hour: isGuest ? null : hour(5),
       day: day(10),
       guest_session: null,

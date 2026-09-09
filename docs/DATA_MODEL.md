@@ -1778,7 +1778,8 @@ Tracks resource consumption for quotas and limits.
 
 ### Alpha Enums
 - **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`,
-  `discovery_searches`
+  `discovery_searches` (account rows); `guest_compute_turns` lives only in
+  `visitor_usage_counters`
 - **Period**: `hour`, `day`, `guest_session`
 
 ### Discovery Search Accounting
@@ -1796,9 +1797,10 @@ Tracks resource consumption for quotas and limits.
 ### Notes
 - Usage counters are operational safety data, not monetization data in Alpha.
 - For `guest_session`, `period_start` equals `guest_workspaces.created_at` and
-  `period_end` equals its fixed seven-day `expires_at`. Limits are ten completed
-  assistant terminals, two unique simulation admissions, and five feedback
-  submissions over the identity lifetime.
+  `period_end` equals its fixed seven-day `expires_at`. Limits are two unique
+  simulation admissions and five feedback submissions over the identity
+  lifetime. Conversation is compute and is not metered: `chat_messages` rows
+  are retired history that no product path writes.
 - Registered users continue to use the existing UTC hour/day accounting.
 
 ---
@@ -1807,11 +1809,15 @@ Tracks resource consumption for quotas and limits.
 
 Tracks visitor-scoped and shared provider allowances without inventing a
 profile owner. This is intentionally separate from `usage_counters`, whose
-`user_id` is a foreign key to `profiles.id`.
+`user_id` is a foreign key to `profiles.id`. It also holds the guest compute
+anti-abuse ceiling (`guest_compute_turns`, one unit per completed guest turn,
+settled in the terminal transaction), which is not an allowance and is never
+projected by `GET /me/usage`.
 
 ### Fields
 - `visitor_key`: `text` (opaque keyed digest; never a raw address)
-- `resource`: `text` (`discovery_searches`, `research_searches`)
+- `resource`: `text` (`discovery_searches`, `research_searches`,
+  `guest_compute_turns`)
 - `period`: `text` (`day`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`

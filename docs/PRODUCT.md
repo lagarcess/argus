@@ -549,15 +549,20 @@ either way, because opening the gate grants access without granting a role.
 Two clocks govern a guest, and they are deliberately distinct. The
 **workspace** lives seven fixed days with one conversation: that is how long
 the temporary chat survives and the window to claim it to an account.
-Activity never extends the expiry. **Allowances** follow the visitor as an
-abuse boundary (decision 2026-07-28): ten useful assistant terminals and two
-unique simulations per visitor per day, resetting at UTC midnight. The
-workspace separately caps the temporary chat at two unique simulations over
-its fixed lifetime, plus five feedback submissions. A fresh session cannot
-mint a fresh daily allowance—the visitor counter keys on a keyed digest of the
-caller—and Start over preserves the workspace counters. Simulations keep a
-workspace-keyed reservation as replay identity; the visitor charge beside it
-is best-effort past admission, and settlement enforces the cap. The current
+Activity never extends the expiry. **Allowances** follow the visitor
+(decision 2026-07-28, re-keyed by operation class 2026-09-08): two unique
+simulations and three searches with sources per visitor per day, resetting at
+UTC midnight. The workspace separately caps the temporary chat at two unique
+simulations over its fixed lifetime, plus five feedback submissions.
+Conversation is not an allowance: it is free, and the usage panel says so with
+no limit. An anonymous endpoint is still not unbounded, so guest turns carry a
+silent anti-abuse ceiling per visitor per day, sized so no real person reaches
+it; it is never rendered or promised as an allowance, and a signed-in account
+carries none. A fresh session cannot mint a fresh daily allowance—the visitor
+counter keys on a keyed digest of the caller—and Start over preserves the
+workspace counters. Simulations keep a workspace-keyed reservation as replay
+identity; the visitor charge beside it is best-effort past admission, and
+settlement enforces the cap. The current
 landing implementation and its centered auth modal remain intact for
 configuration rollback and later conversion work.
 

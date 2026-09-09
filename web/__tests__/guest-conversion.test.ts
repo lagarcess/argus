@@ -43,7 +43,7 @@ function guestExperienceSurfaceFixture({
 }
 
 describe("guest conversion contract", () => {
-  test("keeps the five contextual reasons typed and localized", () => {
+  test("keeps the four contextual reasons typed and localized", () => {
     const actions: GuestPendingAction[] = [
       {
         reason: "simulation_limit",
@@ -54,13 +54,6 @@ describe("guest conversion contract", () => {
           label: "Run backtest",
           payload: { confirmation_id: "confirmation-1" },
         },
-      },
-      {
-        reason: "message_limit",
-        conversationId: "conversation-1",
-        actionId: "message-11",
-        text: "Keep this exact draft",
-        mentions: [],
       },
       {
         reason: "save_decision",
@@ -85,17 +78,16 @@ describe("guest conversion contract", () => {
 
     expect(actions.map((action) => guestConversionBenefitKey(action.reason))).toEqual([
       "guest.conversion.simulation_limit",
-      "guest.conversion.message_limit",
       "guest.conversion.save_decision",
       "guest.conversion.new_conversation",
       "guest.conversion.keep_history",
     ]);
-    expect(pendingGuestActionSummary(actions[1])).toEqual({
-      reason: "message_limit",
+    expect(pendingGuestActionSummary(actions[0])).toEqual({
+      reason: "simulation_limit",
       conversation_id: "conversation-1",
-      action_id: "message-11",
+      action_id: "run-2",
     });
-    expect(pendingGuestActionSummary(actions[2])).toEqual({
+    expect(pendingGuestActionSummary(actions[1])).toEqual({
       reason: "save_decision",
       conversation_id: "conversation-1",
       action_id: "decision-1",
@@ -246,9 +238,11 @@ describe("guest conversion contract", () => {
       experience.indexOf("const recoverGuestSimulationRejection"),
     );
 
-    // A renewed workspace receives its own allowance; the visitor's daily
-    // window, not the old workspace expiry, is the truthful precheck reset.
-    expect(admission).toContain("guestSimulationPrecheckResetAt(usage.allowances.backtests)");
+    // The backend names which window holds the guest: the visitor's day
+    // after a renewal, or the workspace lifetime when that is what is spent.
+    expect(admission).toContain("guestSimulationPrecheckReset(");
+    expect(admission).toContain("usage.allowances.execution");
+    expect(admission).toContain("reset.resetKind");
     // The server-only workspace ceiling still names the actual temporary
     // workspace expiry after an authoritative rejection.
     expect(authoritativeRejection).toContain(

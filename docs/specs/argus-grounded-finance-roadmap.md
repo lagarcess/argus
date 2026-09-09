@@ -387,13 +387,13 @@ and none needs a rebase.
 
 | Lane | Where it actually is |
 | --- | --- |
-| Lift the loop, Lane A | **LANDED** 2026-09-08 as `f7c9192b`, PR #560 at `53a7a523`, CI 7/7, Codex cleared at the head, zero review threads. |
-| Refusal log | PR #559, now at `aa8d5371`. `c748950b` failed `guest-release-gates` on the lane's own postgres test, which seeded `auth.users` and `public.profiles` with two independent `fake.email()` values and tripped `validate_profile_auth_identity`. **The lane found and fixed it before anyone sent it back**, and fixed it better than a one-line patch: seeding is now one `_seed_owner` helper so the identity rule holds by construction. Still owed at the new head: `guest-release-gates` finishing, and a fresh Codex round, since the cleared review names the superseded `c748950b`. |
-| Metering | No branch pushed. Mid-flight locally, 21 dirty files, and `src/argus/api/schemas.py` is among them, so the overlap is real. |
-| Decisions | No branch pushed, no commits, no dirty files. **Not started.** |
-| Retrieval parameters | No branch pushed. Mid-flight locally, 10 dirty files. It edits `render.yaml`, `.github/private-alpha-release-profile.json`, and `.github/argus-env.sh` to register `ARGUS_RESEARCH_HOME_COUNTRY`, which is the release surface feature lanes may not author. The value belongs on this item; the three release-surface lines are the founder's to apply at promotion. |
+| Lift the loop, Lane A | **LANDED** `f7c9192b`, PR #560. |
+| Refusal log | **LANDED** `fa69466c`, PR #559. |
+| Metering | **LANDED** `1db1aa75`, PR #561. Guest compute ceiling is silent and anti-abuse, 300 per UTC day, never projected in `/me/usage`; `PRODUCT.md` §19 amended. |
+| Decisions | PR #564 at `68dbed54`, CI 7/7, one open P2: `DecisionAffordance.tsx` keeps a component-local `savedState` that never resyncs from the prop, which is the split brain the lane just removed on the backend, one layer up. |
+| Retrieval parameters | PR #562 at `689984f3`, CI 7/7, release-surface files dropped. Two open P1s, both holes in the new prose-versus-rows verifier: `EPS` classified as a currency, and title-cased labels read as entity names. |
 | Sharing on | **Done.** Evidence landed on integration. Only the flag flip remains and the founder has deferred it to the next promotion. |
-| #462 latency | No branch pushed. Mid-flight locally, five untracked benchmark scripts under `scripts/benchmarks/` and `tests/perf/`. |
+| #462 latency | **LANDED** `76937883`, PR #563. Its measurement produced the Subtract the guardrails item. |
 
 ### The finishing bar every build lane owes
 
@@ -496,6 +496,60 @@ Smaller than this board originally assumed. The bill moved to the registry.
 **Start Lane A now.** `confirmation.py` has 36 commits in 90 days and zero open
 PRs against it, so the window is open and closes the moment another lane opens
 on that file.
+
+---
+
+### Subtract the guardrails  ·  ships in **The spine**
+
+**This is the subtractive thesis with a latency payoff nobody counted.** It is
+scheduled here because operating rule 2 promises that a cheap calculation
+answers first since it is instant, and on a 33-second spine that promise is
+false. The calculations lane would build on a runtime that cannot keep it, and
+the same audits would then fire on the new calculations too, turning a one-file
+change into a retrofit across five cards.
+
+**What is known, and what is not.** Known: every audit and repair runs *after*
+`LLMInterpretationResponse` and takes it as input, so they are post-hoc rather
+than routing, and each is already gated by an existing predicate
+(`_response_needs_capability_side_question_audit`,
+`_response_needs_context_question_audit`,
+`_strategy_extraction_repair_is_allowed`). Known: they fire on plain
+conversation, and the repair's own trigger is
+`required_strategy_shape_missing`, a backtest shape that a conversation turn
+will never have.
+
+**Not known, and this lane's first job: whether those gates can be narrowed
+without losing what they catch.** Nobody has read what each predicate actually
+tests, why it admits a conversation turn, or what the audit corrects when it
+does fire. The fix may be a tighter predicate, a cheaper check, a reordering, or
+for one of them, nothing. **The lane diagnoses before it proposes.** A dispatch
+that says "narrow the gates" is a guess; the board does not carry guesses.
+
+**Done means.** Each of the four calls has a written answer to: what does it
+catch, what admitted this turn, and what is the smallest change that stops it
+firing where there is nothing to check. Then the changes that survive that
+answer are made, and ordinary chat first token drops materially against the
+#563 baseline. No new machinery, no model-facing text, no fingerprint change.
+
+**The second lever, measure before acting.** The interpretation call itself is
+9.45s. At the tier model's 95 tokens per second that is roughly 900 output
+tokens, so the cost is the size of the structured response, not the model. Grok
+4.3 is already the right choice on this tier: 0.58s first-token latency and 95
+tok/s against Haiku 4.5's 0.67s and 48 tok/s at twice the output price, which
+would make this call take about 19s. **Do not switch models.** Measure what
+shrinking the response schema buys before changing it.
+
+**Surface.** `src/argus/agent_runtime/llm_interpreter.py` and
+`src/argus/agent_runtime/interpreter/`.
+
+**Do not touch.** Rule 7 stands: no shortcut routing before the LLM. Nothing here
+decides anything ahead of interpretation; it only stops running backtest checks
+on interpretations that are not backtests.
+
+**Proof.** The #563 harness re-run, same turn types, before and against the
+change. **And a live eval scorecard**, because tightening a gate trades latency
+for interpretation accuracy at the edges and that trade has to be shown, not
+asserted.
 
 ---
 
@@ -983,6 +1037,23 @@ subject to what the measurement says: compute answers under one second to first
 token, grounded answers under four. A backtest is slow and tolerated because it
 is visibly working; a time-value answer that takes four seconds breaks the
 calculator promise.
+
+**Measured 2026-09-08, PR #563, 68 real turns. The target is unreachable on
+today's spine and the reason is the box.** Ordinary chat reaches first token at
+33.14s p50, against a target of one second. Grounded answers land between 12.55s
+and 26.17s, against four. Splitting provider time per turn into the two calls
+that are the product, the interpretation and the composer, and everything else:
+ordinary chat spends 15.60s of 30.13s on guardrails, 52 percent. Confirmation
+spends 48 percent, the compute-intent probe 43 percent. The research paths spend
+9 to 12 percent, which is why **asking Argus to research something reaches first
+token in 12.55s while talking to it takes 33.14s.**
+
+The guardrails are backtest guardrails firing on turns with no backtest:
+`CapabilitySideQuestionAudit` at 11.49s on 4 of 10 turns, `ContextQuestionAudit`
+at 5.11s on 7, `FocusedAssetDiscoveryRead` at 4.01s on 7, and the repair
+`FocusedStrategyExtraction`, whose trigger is `required_strategy_shape_missing`,
+16 times across 10 plain-conversation turns. Decision 3 is no longer blocked;
+what it now needs is the item below.
 
 **4. When Argus cannot ground something it returns a typed unverified state,
 never prose.** The answer shows the computation with the missing input named and
