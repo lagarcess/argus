@@ -952,6 +952,48 @@ ten-terminal meter back.
 
 ---
 
+## Where this board actually stands
+
+**Recorded 2026-09-08 at integration `05d55d55`. Production is still
+`ee9c3491`; nothing below has been promoted.** Landed means merged to
+integration and green there, not shipped to a user.
+
+| Item | Release | State |
+| --- | --- | --- |
+| Refusal log | Instrumentation | **Landed** `fa69466c`. #314 closed. |
+| #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
+| Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
+| Decisions | Plumbing | **Landed** `67facaf5`. |
+| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. |
+| Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
+| Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
+| Lift the loop, Lane C | The spine | **Ran**, draft PR #566, never a product change. Its finding is that Lane A did not make the loop reusable. |
+| Subtract the guardrails | The spine | **In flight**, PR #565, draft, no review round yet. |
+| Lift the loop, Lane B | The spine | **Not started.** Optional for the spine. Carries #430. |
+| The registry | The spine | **Not started.** The largest remaining item, now specified by Lane C. |
+| The five calculations | The calculations | **Not started.** This is the product. |
+| Teach the method | Grounding | **Not started.** |
+
+**The honest read.** Five of the seven dispatched lanes were plumbing,
+instrumentation or verification, and all five landed. **None of them changes
+what a user can ask.** The goalpost is that a money question in an unwritten
+shape lands on a primitive and gets computed, and today **zero calculations
+exist**. Everything shipped so far makes the next work possible; none of it is
+the work.
+
+**What stands between here and the goalpost**, in order: finish subtracting the
+guardrails, build the registry, build the five calculations. Teach the method
+and Lane B are real but neither blocks the goalpost.
+
+**Two findings from today change the estimate.** Lane C proved that relocation
+did not make the loop reusable, so the registry has to cut the catalog import
+edge and absorb six existing owners before calculation one. And #462 measured
+ordinary chat at 33.14s to first token against decision 3's one-second target,
+so operating rule 2's promise that a cheap calculation answers first has no
+runtime behind it at all.
+
+---
+
 ## Releases
 
 The board does not wait for the vision to be complete. Each checkpoint is
