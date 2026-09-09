@@ -1,0 +1,121 @@
+{
+  "before_source": "1d087fce1726195f3782d741dde3065fe3f92e93",
+  "before": {
+    "records": [
+      {
+        "width": 390,
+        "language": "es-419",
+        "turns": [
+          {
+            "case": "missing_headline",
+            "question": "Authored incomplete historical example: headline return is missing.",
+            "disabled": false,
+            "reason": null
+          },
+          {
+            "case": "missing_benchmark",
+            "question": "Authored incomplete historical example: benchmark evidence is missing.",
+            "disabled": false,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "width": 1280,
+        "language": "es-419",
+        "turns": [
+          {
+            "case": "missing_headline",
+            "question": "Authored incomplete historical example: headline return is missing.",
+            "disabled": false,
+            "reason": null
+          },
+          {
+            "case": "missing_benchmark",
+            "question": "Authored incomplete historical example: benchmark evidence is missing.",
+            "disabled": false,
+            "reason": null
+          }
+        ]
+      }
+    ],
+    "publications": 0
+  },
+  "after_source": "746b7b745f7cd1ed35916587a508a95e8312ef80",
+  "after": [
+    {
+      "width": 390,
+      "language": "en",
+      "turns": [
+        {
+          "case": "missing_headline",
+          "question": "Authored incomplete historical example: headline return is missing.",
+          "disabled": true,
+          "reason": "This test does not have all the facts needed for sharing."
+        },
+        {
+          "case": "missing_benchmark",
+          "question": "Authored incomplete historical example: benchmark evidence is missing.",
+          "disabled": true,
+          "reason": "This test does not have all the facts needed for sharing."
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "language": "en",
+      "turns": [
+        {
+          "case": "missing_headline",
+          "question": "Authored incomplete historical example: headline return is missing.",
+          "disabled": true,
+          "reason": "This test does not have all the facts needed for sharing."
+        },
+        {
+          "case": "missing_benchmark",
+          "question": "Authored incomplete historical example: benchmark evidence is missing.",
+          "disabled": true,
+          "reason": "This test does not have all the facts needed for sharing."
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "language": "es-419",
+      "turns": [
+        {
+          "case": "missing_headline",
+          "question": "Authored incomplete historical example: headline return is missing.",
+          "disabled": true,
+          "reason": "Esta prueba no tiene todos los datos necesarios para compartirla."
+        },
+        {
+          "case": "missing_benchmark",
+          "question": "Authored incomplete historical example: benchmark evidence is missing.",
+          "disabled": true,
+          "reason": "Esta prueba no tiene todos los datos necesarios para compartirla."
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "language": "es-419",
+      "turns": [
+        {
+          "case": "missing_headline",
+          "question": "Authored incomplete historical example: headline return is missing.",
+          "disabled": true,
+          "reason": "Esta prueba no tiene todos los datos necesarios para compartirla."
+        },
+        {
+          "case": "missing_benchmark",
+          "question": "Authored incomplete historical example: benchmark evidence is missing.",
+          "disabled": true,
+          "reason": "Esta prueba no tiene todos los datos necesarios para compartirla."
+        }
+      ]
+    }
+  ],
+  "publications": 0,
+  "provenance": "Intentionally incomplete copies of the saved synthetic engine example; no calculation or provider call."
+}

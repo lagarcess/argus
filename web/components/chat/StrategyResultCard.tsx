@@ -13,7 +13,6 @@ import { displayResultActionLabel } from "@/lib/result-card-display";
 import { resultCardViewModel } from "@/lib/result-card-view-model";
 import { degradedValueClass } from "@/lib/failure-treatment";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
-import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import {
   AddDecisionButton,
   DecisionEditorPanel,
@@ -24,7 +23,6 @@ import {
 } from "./DecisionAffordance";
 import ResultEquityChart from "./ResultEquityChart";
 import { EntityToken } from "./entity-token";
-import ShareReceiptAction from "./ShareReceiptAction";
 import type { ChatActionOption, StrategyResultPayload } from "./types";
 
 type StrategyResultCardProps = {
@@ -320,11 +318,6 @@ export default function StrategyResultCard({
             "Saved to memory. Manage it in Data Controls under Personalization.",
           )}
         </p>
-      ) : null}
-      {evidenceReceiptSharingEnabled &&
-      canSaveDecision &&
-      result.evidenceArtifactId ? (
-        <ShareReceiptAction evidenceArtifactId={result.evidenceArtifactId} />
       ) : null}
     </section>
   );

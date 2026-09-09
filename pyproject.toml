@@ -30,6 +30,8 @@ fastapi = {version = "0.124.4", extras = ["standard"]}
 starlette = ">=0.48.0,<1.0.0"
 uvicorn = {version = "^0.32.0", extras = ["standard"]}
 python-multipart = "^0.0.20"
+# CommonMark link destinations in public receipt privacy checks.
+markdown-it-py = "4.0.0"
 # Supabase Auth
 supabase = "^2.10.0"
 pyjwt = {version = "^2.9.0", extras = ["crypto"]}

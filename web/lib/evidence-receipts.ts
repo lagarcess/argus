@@ -3,6 +3,7 @@ import {
   publicReceiptPath,
   type PublicReceiptDateRange,
 } from "./public-receipt-contract";
+import type { PublicReceiptDocument, ReceiptKind, ReceiptRefusalField, ReceiptRefusalReason } from "./public-receipt-turns";
 
 /** Mirrors PublicExcerptListItem. Carries no source id, by design. */
 export type EvidenceReceipt = {
@@ -13,10 +14,11 @@ export type EvidenceReceipt = {
   symbols: string[];
   // Two dates, not a rendered string: the owner reads this row in whatever
   // language the app is in, which need not be the one the run was made in.
-  date_range: PublicReceiptDateRange;
+  date_range?: PublicReceiptDateRange | null;
+  kind: ReceiptKind;
   created_at: string;
   revoked_at?: string | null;
-  revocation_reason?: "owner_revoked" | "source_deleted" | null;
+  revocation_reason?: "owner_revoked" | "source_deleted" | "removed_by_argus" | null;
 };
 
 export const RECEIPT_OWNER_NOTE_MAX_LENGTH = 280;
@@ -24,14 +26,43 @@ export const RECEIPT_OWNER_NOTE_MAX_LENGTH = 280;
 export type ReceiptFailureReason =
   | "note_rejected"
   | "rate_limited"
+  | "account_conversion_required"
+  | "preview_changed"
+  | "source_unsupported"
   | "unavailable";
 
 export function receiptFailureReason(error: unknown): ReceiptFailureReason {
   const code = (error as { code?: string } | null)?.code;
   const status = (error as { status?: number } | null)?.status;
   if (code === "receipt_note_rejected") return "note_rejected";
+  if (code === "account_conversion_required") return "account_conversion_required";
+  if (code === "receipt_preview_changed") return "preview_changed";
+  if (code === "receipt_source_unsupported") return "source_unsupported";
   if (status === 429) return "rate_limited";
   return "unavailable";
+}
+
+export type ReceiptCandidate = {
+  message_id: string; question?: string | null; kind?: Exclude<ReceiptKind, "mixed"> | null;
+  eligible: boolean; reason?: ReceiptRefusalReason | null; field?: ReceiptRefusalField | null;
+};
+export type ReceiptCandidates = { items: ReceiptCandidate[]; max_turns: number };
+export type ReceiptSelection = { message_ids: string[]; owner_note?: string | null };
+export type ReceiptPreview = {
+  payload: PublicReceiptDocument; payload_digest: string; kind: ReceiptKind; existing_receipt?: EvidenceReceipt | null;
+};
+const conversationReceiptPath = (conversationId: string) => `/conversations/${encodeURIComponent(conversationId)}/public-excerpt`;
+export function listReceiptCandidates(conversationId: string): Promise<ReceiptCandidates> {
+  return apiFetch(`${conversationReceiptPath(conversationId)}-candidates`);
+}
+export function previewEvidenceReceipt(conversationId: string, selection: ReceiptSelection): Promise<ReceiptPreview> {
+  return apiFetch(`${conversationReceiptPath(conversationId)}-preview`, { method: "POST", body: JSON.stringify(selection) });
+}
+export async function createSelectedEvidenceReceipt(conversationId: string, selection: ReceiptSelection, payloadDigest: string): Promise<EvidenceReceipt> {
+  const response = await apiFetch<{ receipt: EvidenceReceipt }>(conversationReceiptPath(conversationId), {
+    method: "POST", body: JSON.stringify({ ...selection, payload_digest: payloadDigest }),
+  });
+  return response.receipt;
 }
 
 export function receiptUrl(receipt: EvidenceReceipt): string {

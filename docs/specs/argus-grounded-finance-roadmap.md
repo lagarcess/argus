@@ -647,8 +647,9 @@ calculations ship it is a retrofit across every card.
 founder described: the owner selects turns, only eligible ones are selectable,
 one link, one tombstone, revocable. It was sequenced, not rejected, and its
 unit is the turn. A thread share is a sequence of turn receipts, so it cannot
-exist until a turn that is not a backtest can be a receipt. Not on this board;
-placed after the calculations land.
+exist until a turn that is not a backtest can be a receipt. Section 4.5 now
+authorizes up to four selected turns inside one conversation in Share the answer;
+composition beyond that remains deferred.
 
 **Surface.** `src/argus/domain/capability_registry.py`,
 `src/argus/agent_runtime/llm_interpreter_types.py`,
@@ -695,7 +696,8 @@ backtest. The payload carries a `kind` discriminator, version 1 rows stay
 readable, and eligibility is keyed on typed metadata rather than on what the
 prose looks like. The reader sees the question, the answer, and the evidence
 under it. `docs/specs/conversation-sharing.md` section 4 already specifies the
-research kind end to end and section 9 holds the multi-turn design, which stays
+research kind end to end. Section 4.5 authorizes section 9's closed wrapper for
+up to four selected turns inside one conversation; composition beyond that stays
 out of scope.
 
 **This ships with the calculations, not after them.** A calculation nobody can
@@ -710,8 +712,10 @@ has been built wrong. A link glyph sits in the chat header beside the existing
 screen is the work no competitor has done for us:** they offer "select all"
 because every turn is shareable and ours are not, so an ineligible turn renders
 unselectable with a reason the owner can read, and "select all" means all
-eligible. The result card keeps its share control as a shortcut through the
-same record, because two lineages would drift. The public page stays a receipt
+eligible. The header is the only entry point: no message pill, overflow share
+item or visible result-card share control remains. A single answer is one ticked
+turn in that same selection screen, using the existing creation logic and record.
+The public page stays a receipt
 rather than a rendered card, derived from the card's typed facts instead of
 `receiptPlan` and `benchmarkVerdict`. The action reads **"Continue with
 Argus"**.

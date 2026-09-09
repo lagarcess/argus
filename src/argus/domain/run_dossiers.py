@@ -20,7 +20,7 @@ from argus.api.schemas import (
 )
 from argus.domain.display_figure import display_figure
 from argus.domain.evidence import result_metrics_summary
-from argus.domain.result_figures import with_result_figures
+from argus.domain.result_readout_facts import with_result_readout_facts
 from argus.domain.retest_setup import (
     has_finalized_evidence_identity,
     retest_setup_from_run,
@@ -131,7 +131,21 @@ def project_run_dossier(
             )
         )
 
-    config = mapping(run.get("config_snapshot"))
+    readout_bank = with_result_readout_facts(
+        without_private_prose(
+            {
+                key: run.get(key)
+                for key in (
+                    "symbols",
+                    "metrics",
+                    "config_snapshot",
+                    "benchmark_symbol",
+                    "conversation_result_card",
+                )
+            }
+        )
+    )
+    config = mapping(readout_bank.get("config_snapshot"))
     resolved_parameters = mapping(config.get("resolved_parameters"))
     start_date, end_date = run_date_span(run)
     return RunDossier(
@@ -160,20 +174,7 @@ def project_run_dossier(
                 run.get("benchmark_symbol"),
                 24,
             ),
-            result_fact_bank=with_result_figures(
-                without_private_prose(
-                    {
-                        key: run.get(key)
-                        for key in (
-                            "symbols",
-                            "metrics",
-                            "config_snapshot",
-                            "benchmark_symbol",
-                            "conversation_result_card",
-                        )
-                    }
-                )
-            ),
+            result_fact_bank=readout_bank,
             metrics=metric_rows,
         ),
         decision=decision_projection,

@@ -1,8 +1,8 @@
 """Owner-side service for public evidence receipts.
 
-Creation is the only place private records are read. It loads the owner's
-artifact and the immutable run behind it, freezes a sanitized payload, and stores
-it. Everything after that reads the snapshot and nothing else.
+Owner candidate and preview reads resolve private sources through one selection
+service; creation rechecks and freezes that exact public document. Public readers
+hold only a snapshot reader and never resolve source records.
 """
 
 from __future__ import annotations
@@ -22,9 +22,6 @@ from argus.api.public_excerpt_schemas import (
 from argus.api.schemas import Conversation, EvidenceArtifact, User
 from argus.domain.public_excerpts import (
     PublicExcerptSourceError,
-    build_public_excerpt_payload,
-    new_public_excerpt_id,
-    payload_digest,
     revoked_public_view,
     snapshot_public_view,
 )
@@ -97,12 +94,18 @@ def require_evidence_receipt_sharing_enabled() -> None:
 
 
 def _is_receipt_path(path: str) -> bool:
+    path = path.rstrip("/")
     if path in _RECEIPT_EXACT_PATHS:
         return True
     if any(path.startswith(prefix) for prefix in _RECEIPT_PATH_PREFIXES):
         return True
-    return path.startswith("/api/v1/evidence-artifacts/") and path.endswith(
-        "/public-excerpt"
+    return (
+        path.startswith("/api/v1/evidence-artifacts/")
+        and path.endswith("/public-excerpt")
+    ) or (
+        path.startswith("/api/v1/conversations/")
+        and path.rsplit("/", 1)[-1]
+        in {"public-excerpt-candidates", "public-excerpt-preview", "public-excerpt"}
     )
 
 
@@ -148,14 +151,17 @@ class MemoryPublicExcerptRepository:
     def create_public_excerpt_snapshot(
         self, *, snapshot: PublicExcerptSnapshot
     ) -> tuple[PublicExcerptSnapshot, bool]:
-        existing = self.get_live_public_excerpt_for_artifact(
-            owner_id=snapshot.owner_id,
-            evidence_artifact_id=snapshot.evidence_artifact_id,
-        )
-        if existing is not None:
-            return existing, False
-        self._store.public_excerpt_snapshots[snapshot.id] = snapshot
-        return snapshot, True
+        with self._store.conversation_message_lock:
+            existing = self.get_live_public_excerpt_for_artifact(
+                owner_id=snapshot.owner_id,
+                evidence_artifact_id=snapshot.evidence_artifact_id,
+            ) or self.get_live_public_excerpt_for_selection(
+                owner_id=snapshot.owner_id, selection_key=snapshot.selection_key
+            )
+            if existing is not None:
+                return existing, False
+            self._store.public_excerpt_snapshots[snapshot.id] = snapshot
+            return snapshot, True
 
     def get_live_public_excerpt_for_artifact(
         self, *, owner_id: str, evidence_artifact_id: str | None
@@ -170,6 +176,22 @@ class MemoryPublicExcerptRepository:
             ):
                 return snapshot
         return None
+
+    def get_live_public_excerpt_for_selection(
+        self, *, owner_id: str, selection_key: str | None
+    ) -> PublicExcerptSnapshot | None:
+        if selection_key is None:
+            return None
+        return next(
+            (
+                row
+                for row in self._store.public_excerpt_snapshots.values()
+                if row.owner_id == owner_id
+                and row.selection_key == selection_key
+                and row.revoked_at is None
+            ),
+            None,
+        )
 
     def list_public_excerpt_snapshots(
         self,
@@ -282,46 +304,11 @@ def create_receipt_for_artifact(
     existing link, and the caller needs to know that so a retry or a reload is not
     counted as a new receipt in the funnel.
     """
-    artifact, conversation = _owned_artifact(user_id=user.id, artifact_id=artifact_id)
-    repository = public_excerpt_repository()
-    existing = repository.get_live_public_excerpt_for_artifact(
-        owner_id=user.id,
-        evidence_artifact_id=artifact.id,
+    from argus.api.public_excerpt_selection import create_receipt_for_artifact_adapter
+
+    return create_receipt_for_artifact_adapter(
+        user=user, artifact_id=artifact_id, owner_note=owner_note
     )
-    if existing is not None:
-        return existing, False
-    run = _owned_run(user_id=user.id, run_id=artifact.source_run_id)
-    payload = build_public_excerpt_payload(
-        artifact=artifact,
-        run_chart=getattr(run, "chart", None) if run is not None else None,
-        run_config_snapshot=(
-            getattr(run, "config_snapshot", None) if run is not None else None
-        ),
-        owner_note=owner_note,
-        content_language=_artifact_content_language(conversation),
-    )
-    snapshot = PublicExcerptSnapshot(
-        id=api_state.store.new_id(),
-        public_id=new_public_excerpt_id(),
-        owner_id=user.id,
-        evidence_artifact_id=artifact.id,
-        source_conversation_id=artifact.source_conversation_id,
-        source_run_id=artifact.source_run_id,
-        title=payload.idea_title,
-        payload=payload,
-        payload_digest=payload_digest(payload),
-        created_at=datetime.now(timezone.utc),
-    )
-    try:
-        return repository.create_public_excerpt_snapshot(snapshot=snapshot)
-    except Exception as exc:
-        # The database refuses a source that was deleted while this request was in
-        # flight, which the application check above cannot catch on its own.
-        if _is_source_refusal(exc):
-            raise EvidenceReceiptSourceMissingError(
-                "That result is not available."
-            ) from exc
-        raise
 
 
 def revoke_receipts_for_conversation(*, user_id: str, conversation_id: str) -> int:
@@ -430,3 +417,11 @@ def _owned_run(*, user_id: str, run_id: str | None) -> Any | None:
     if api_state.store.backtest_run_owners.get(run_id) != user_id:
         return None
     return run
+
+
+# Public owner entry points, kept out of the storage and flag middleware module.
+from argus.api.public_excerpt_selection import (  # noqa: E402,F401
+    create_receipt_for_messages,
+    preview_receipt_for_messages,
+    receipt_candidates,
+)

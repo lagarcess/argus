@@ -61,6 +61,7 @@ from tests.public_excerpt_factories import (
     build_conversation,
     build_result_card,
     build_run,
+    seed_result_messages,
     utc,
 )
 
@@ -471,6 +472,7 @@ def test_public_view_carries_no_owner_and_no_source_reference() -> None:
     assert set(serialized) == {
         "public_id",
         "status",
+        "kind",
         "indexing",
         "created_at",
         "payload",
@@ -545,6 +547,7 @@ def _seed_owned_result() -> None:
     api_state.store.evidence_artifact_owners[artifact.id] = OWNER.id
     api_state.store.backtest_runs[run.id] = run
     api_state.store.backtest_run_owners[run.id] = OWNER.id
+    seed_result_messages(api_state.store, run)
 
 
 def test_creating_twice_returns_the_same_live_receipt() -> None:

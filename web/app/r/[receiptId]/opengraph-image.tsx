@@ -1,11 +1,9 @@
 import { ImageResponse } from "next/og";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import { receiptCopy } from "@/lib/receipt-copy";
-import { benchmarkVerdict } from "@/lib/receipt-plan";
+import { receiptPreviewFacts } from "@/lib/receipt-preview-facts";
 import {
   readPublicReceipt,
-  headlineReceiptMetric,
-  type PublicReceiptPayload,
 } from "@/lib/public-receipt-contract";
 
 /**
@@ -65,13 +63,6 @@ function cardCopy(language: "en" | "es-419") {
     provenance: copy.provenance,
     gone: copy.tombstone.title,
     wordmark: copy.wordmark,
-  };
-}
-
-function previewFacts(payload: PublicReceiptPayload, language: "en" | "es-419") {
-  return {
-    metricValue: headlineReceiptMetric(payload)?.value ?? "",
-    verdict: benchmarkVerdict(payload, receiptCopy(language)) ?? "",
   };
 }
 
@@ -162,8 +153,21 @@ export default async function Image({
     );
   }
 
-  const copy = cardCopy(result.payload.content_language);
-  const facts = previewFacts(result.payload, result.payload.content_language);
+  const language = result.payload.schema_version === 1 ? result.payload.content_language : result.payload.turns[0].content_language;
+  const copy = cardCopy(language);
+  const facts = receiptPreviewFacts(result.payload, language);
+  if (facts.research) {
+    return new ImageResponse((
+      <Frame>
+        <div style={{ display: "flex", fontSize: 46, fontWeight: 500, letterSpacing: 1, color: FOREGROUND }}>{copy.wordmark}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ display: "flex", fontSize: 62, fontWeight: 500, lineHeight: 1.1, color: FOREGROUND }}>{facts.imageTitle}</div>
+          <div style={{ display: "flex", fontSize: 30, color: MUTED }}>{[facts.stamp, facts.countText].filter(Boolean).join(" · ")}</div>
+        </div>
+        <div style={{ display: "flex", fontSize: 36, color: MUTED }}>{facts.framing}</div>
+      </Frame>
+    ), { ...size, headers: IMAGE_HEADERS });
+  }
   const negative = facts.metricValue.trim().startsWith("-");
   return new ImageResponse(
     (
@@ -207,6 +211,7 @@ export default async function Image({
           ) : null}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {facts.countText && <div style={{ display: "flex", fontSize: 24, color: MUTED }}>{facts.countText}</div>}
           {facts.verdict ? (
             <div
               style={{

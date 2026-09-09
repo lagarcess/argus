@@ -21,7 +21,7 @@ from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.routers import agent as agent_router
 from argus.api.routers import auth as auth_router
-from argus.api.schemas import Message
+from argus.api.schemas import GuestPendingAction, Message
 from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
@@ -1058,12 +1058,11 @@ def test_signup_creates_profile_before_first_login_claims_pending_handoff(
         assert signed_in.status_code == 200, signed_in.json()
         assert signed_in.json()["guest_claim"] == {
             "conversation_id": conversation_id,
-            "pending_action": {
-                "reason": "keep_history",
-                "conversation_id": conversation_id,
-                "action_id": "first-login-keep-history",
-                "artifact_id": None,
-            },
+            "pending_action": GuestPendingAction(
+                reason="keep_history",
+                conversation_id=conversation_id,
+                action_id="first-login-keep-history",
+            ).model_dump(mode="json"),
         }
         assert gateway.get_user(user_id=destination_user_id) is not None
         transferred = (

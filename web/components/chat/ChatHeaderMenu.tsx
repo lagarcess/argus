@@ -14,6 +14,8 @@ import { useTranslation } from "react-i18next";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import type { MemoryChrome } from "./memory-chrome";
+import ShareReceiptAction, { type ReceiptShareRequest } from "./ShareReceiptAction";
+import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 
 type ChatHeaderMenuProps = {
   isOpen: boolean;
@@ -36,6 +38,8 @@ type ChatHeaderMenuProps = {
   onRequestDelete: () => void;
   /** Memory controls stay invisible unless the backend exposes them. */
   memoryChrome?: MemoryChrome;
+  conversationId?: string;
+  onShare?: ReceiptShareRequest;
 };
 
 /** Header owner menu for the active conversation. */
@@ -59,6 +63,8 @@ export default function ChatHeaderMenu({
   isDeleting,
   onRequestDelete,
   memoryChrome,
+  conversationId,
+  onShare,
 }: ChatHeaderMenuProps) {
   const { t } = useTranslation();
   // The panel line, not the sidebar's: at tablet width the dossier beside
@@ -197,7 +203,8 @@ export default function ChatHeaderMenu({
   );
 
   return (
-    <div className="relative animate-in fade-in duration-300" ref={containerRef}>
+    <div className="relative flex items-center animate-in fade-in duration-300" ref={containerRef}>
+      {evidenceReceiptSharingEnabled && conversationId && onShare && <ShareReceiptAction conversationId={conversationId} onShare={onShare} />}
       <button
         ref={triggerRef}
         type="button"
