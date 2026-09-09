@@ -67,7 +67,9 @@ def _as_datetime(value: Any, *, field: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
-def _source_from_row(raw: Mapping[str, Any]) -> ActivitySource:
+def source_from_row(raw: Mapping[str, Any]) -> ActivitySource:
+    """Decode one persisted activity row; Postgres proofs read through here."""
+
     source_kind = raw.get("source_kind")
     if source_kind not in {"chat_turn", "backtest_job"}:
         raise RuntimeError("Invalid conversation activity source kind.")
@@ -337,7 +339,7 @@ class ConversationActivityService:
                 result[conversation_id] = project_conversation_activity(
                     conversation_id=conversation_id,
                     sources=[
-                        _source_from_row(raw)
+                        source_from_row(raw)
                         for raw in raw_sources
                         if isinstance(raw, dict)
                     ],
