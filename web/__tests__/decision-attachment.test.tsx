@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import {
   ComputedAnswerDecision,
   computedAnswerAttachment,
+  visibleDecisionState,
 } from "../components/chat/DecisionAffordance";
 import {
   hydrateMessagesFromApi,
@@ -132,6 +136,39 @@ describe("computed answer decisions", () => {
     expect(decided).not.toContain("Add decision");
     expect(decided).toContain("chat.result_card.decision");
     expect(plain).toBe("");
+  });
+
+  test("the owner-derived prop always wins over the component's local copy", () => {
+    // The transcript read derives decisionState from decision_notes; the local
+    // copy only bridges a save until that refresh arrives.
+    expect(visibleDecisionState(null, null)).toBeNull();
+    expect(visibleDecisionState(undefined, "promising")).toBe("promising");
+    expect(visibleDecisionState("watching", "promising")).toBe("watching");
+    expect(visibleDecisionState("rejected", null)).toBe("rejected");
+
+    // No DOM harness exists in this suite, so the resync itself is pinned at
+    // the source: the copy follows the prop whenever the prop changes, exactly
+    // as StrategyResultCard resyncs on result.decisionState.
+    const affordance = readFileSync(
+      join(import.meta.dir, "../components/chat/DecisionAffordance.tsx"),
+      "utf-8",
+    );
+    const component = affordance.slice(
+      affordance.indexOf("export function ComputedAnswerDecision("),
+    );
+    expect(component).toContain(
+      "useEffect(() => {\n    setSavedState(message.decisionState ?? null);\n  }, [message.decisionState]);",
+    );
+    expect(component).toContain(
+      "const visibleState = visibleDecisionState(message.decisionState, savedState);",
+    );
+    const card = readFileSync(
+      join(import.meta.dir, "../components/chat/StrategyResultCard.tsx"),
+      "utf-8",
+    );
+    expect(card).toContain(
+      "useEffect(() => {\n    setSavedDecisionState(result.decisionState ?? null);\n  }, [result.decisionState]);",
+    );
   });
 
   test("the client posts to the route the attachment names", async () => {

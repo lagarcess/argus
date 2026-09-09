@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, Check, CircleX, Eye, FileText, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -244,6 +244,17 @@ export function DecisionEditorPanel({ draft }: { draft: DecisionDraftController 
   );
 }
 
+/**
+ * The state to show: the owner's, or the just-saved one only while the owner
+ * has not spoken yet. A refreshed owner value always wins over a local copy.
+ */
+export function visibleDecisionState(
+  owner: DecisionState | null | undefined,
+  saved: DecisionState | null,
+): DecisionState | null {
+  return owner ?? saved ?? null;
+}
+
 /** The attachment a computed answer offers a decision on, or null. */
 export function computedAnswerAttachment(
   message: Pick<Message, "id" | "computation">,
@@ -261,8 +272,10 @@ type ComputedAnswerDecisionProps = {
 
 /**
  * The decision affordance under a computed answer. Rendered only when the
- * backend declared a computation on the message; the saved state it shows is
- * the backend's stamp, never inferred from prose.
+ * backend declared a computation on the message. The message's
+ * `decisionState` is the owner-derived state the transcript read supplies;
+ * the local copy only bridges a save until the transcript refreshes, and it
+ * resyncs to the prop whenever the prop changes, as the result card does.
  */
 export function ComputedAnswerDecision({
   message,
@@ -273,6 +286,9 @@ export function ComputedAnswerDecision({
   const [savedState, setSavedState] = useState<DecisionState | null>(
     message.decisionState ?? null,
   );
+  useEffect(() => {
+    setSavedState(message.decisionState ?? null);
+  }, [message.decisionState]);
   const draft = useDecisionDraft({
     attachment,
     initialState: message.decisionState,
@@ -282,7 +298,7 @@ export function ComputedAnswerDecision({
     },
   });
   if (!attachment) return null;
-  const visibleState = savedState ?? message.decisionState ?? null;
+  const visibleState = visibleDecisionState(message.decisionState, savedState);
   return (
     <div
       data-testid="computed-answer-decision"
