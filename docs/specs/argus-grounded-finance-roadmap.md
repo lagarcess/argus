@@ -954,9 +954,21 @@ ten-terminal meter back.
 
 ## Where this board actually stands
 
-**Recorded 2026-09-08 at integration `05d55d55`. Production is still
-`ee9c3491`; nothing below has been promoted.** Landed means merged to
+**Recorded 2026-09-09 at integration `6fa3f55a`, CI green there. Production is
+still `ee9c3491`; nothing below has been promoted.** Landed means merged to
 integration and green there, not shipped to a user.
+
+**Four lanes are running overnight, all collision-checked against each other.**
+
+| Lane | PR | Surface it owns |
+| --- | --- | --- |
+| Subtract the guardrails | #565, draft | `llm_interpreter.py`, four files under `agent_runtime/interpreter/` |
+| Cut the catalog import edge | not yet pushed | `state/models.py`, `api/schemas.py`, `capability_registry.py` |
+| Withheld answers keep their sources, and are not paid for twice | not yet pushed | `research_grounded.py`, `perplexity_agent.py`, research contracts |
+| Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
+
+`llm_interpreter.py` has roughly 19 lines of modularity headroom and belongs to
+the guardrail lane alone; every other lane was told to stay out of it.
 
 | Item | Release | State |
 | --- | --- | --- |
@@ -968,8 +980,8 @@ integration and green there, not shipped to a user.
 | Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
-| Subtract the guardrails | The spine | **In flight**, PR #565, draft, no review round yet. |
-| Lift the loop, Lane B | The spine | **Not started.** Optional for the spine. Carries #430. |
+| Subtract the guardrails | The spine | **In flight**, PR #565. Round one diagnosed before touching code; the early head read shows ordinary chat running zero guardrail calls and the interpret stage at 15.6s p50, against 33.14s before. It also found two of ten turns had been losing their composer entirely to a seven-call allowance, which is a correctness finding, not a latency one. |
+| Lift the loop, Lane B | The spine | **Dispatched 2026-09-09**, carrying #430. Optional for the spine; run overnight because the capacity was idle, not because it blocks the goalpost. |
 | The registry | The spine | **Not started.** The largest remaining item, now specified by Lane C. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |
