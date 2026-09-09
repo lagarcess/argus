@@ -387,13 +387,13 @@ and none needs a rebase.
 
 | Lane | Where it actually is |
 | --- | --- |
-| Lift the loop, Lane A | **LANDED** 2026-09-08 as `f7c9192b`, PR #560 at `53a7a523`, CI 7/7, Codex cleared at the head, zero review threads. |
-| Refusal log | PR #559, now at `aa8d5371`. `c748950b` failed `guest-release-gates` on the lane's own postgres test, which seeded `auth.users` and `public.profiles` with two independent `fake.email()` values and tripped `validate_profile_auth_identity`. **The lane found and fixed it before anyone sent it back**, and fixed it better than a one-line patch: seeding is now one `_seed_owner` helper so the identity rule holds by construction. Still owed at the new head: `guest-release-gates` finishing, and a fresh Codex round, since the cleared review names the superseded `c748950b`. |
-| Metering | No branch pushed. Mid-flight locally, 21 dirty files, and `src/argus/api/schemas.py` is among them, so the overlap is real. |
-| Decisions | No branch pushed, no commits, no dirty files. **Not started.** |
-| Retrieval parameters | No branch pushed. Mid-flight locally, 10 dirty files. It edits `render.yaml`, `.github/private-alpha-release-profile.json`, and `.github/argus-env.sh` to register `ARGUS_RESEARCH_HOME_COUNTRY`, which is the release surface feature lanes may not author. The value belongs on this item; the three release-surface lines are the founder's to apply at promotion. |
+| Lift the loop, Lane A | **LANDED** `f7c9192b`, PR #560. |
+| Refusal log | **LANDED** `fa69466c`, PR #559. |
+| Metering | **LANDED** `1db1aa75`, PR #561. Guest compute ceiling is silent and anti-abuse, 300 per UTC day, never projected in `/me/usage`; `PRODUCT.md` §19 amended. |
+| Decisions | PR #564 at `68dbed54`, CI 7/7, one open P2: `DecisionAffordance.tsx` keeps a component-local `savedState` that never resyncs from the prop, which is the split brain the lane just removed on the backend, one layer up. |
+| Retrieval parameters | PR #562 at `689984f3`, CI 7/7, release-surface files dropped. Two open P1s, both holes in the new prose-versus-rows verifier: `EPS` classified as a currency, and title-cased labels read as entity names. |
 | Sharing on | **Done.** Evidence landed on integration. Only the flag flip remains and the founder has deferred it to the next promotion. |
-| #462 latency | No branch pushed. Mid-flight locally, five untracked benchmark scripts under `scripts/benchmarks/` and `tests/perf/`. |
+| #462 latency | **LANDED** `76937883`, PR #563. Its measurement produced the Subtract the guardrails item. |
 
 ### The finishing bar every build lane owes
 
