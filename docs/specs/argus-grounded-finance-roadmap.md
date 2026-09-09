@@ -390,8 +390,8 @@ and none needs a rebase.
 | Lift the loop, Lane A | **LANDED** `f7c9192b`, PR #560. |
 | Refusal log | **LANDED** `fa69466c`, PR #559. |
 | Metering | **LANDED** `1db1aa75`, PR #561. Guest compute ceiling is silent and anti-abuse, 300 per UTC day, never projected in `/me/usage`; `PRODUCT.md` §19 amended. |
-| Decisions | PR #564 at `68dbed54`, CI 7/7, one open P2: `DecisionAffordance.tsx` keeps a component-local `savedState` that never resyncs from the prop, which is the split brain the lane just removed on the backend, one layer up. |
-| Retrieval parameters | PR #562 at `689984f3`, CI 7/7, release-surface files dropped. Two open P1s, both holes in the new prose-versus-rows verifier: `EPS` classified as a currency, and title-cased labels read as entity names. |
+| Decisions | **LANDED** `67facaf5`, PR #564. Four rounds, each returning one finding at the head; the last two were the same fact-ownership defect at successive layers, the durable stamp then the component copy. `decision_notes` owns both. |
+| Retrieval parameters | **LANDED** `41bf9930`, PR #562. The prose-versus-rows verifier was deleted rather than widened: a rejected row now withholds the whole answer through `_withheld_code`, the one owner of the honesty line at the composition seam, and the row declares its own subject so the audit infers nothing. #404 and #545 closed. |
 | Sharing on | **Done.** Evidence landed on integration. Only the flag flip remains and the founder has deferred it to the next promotion. |
 | #462 latency | **LANDED** `76937883`, PR #563. Its measurement produced the Subtract the guardrails item. |
 
