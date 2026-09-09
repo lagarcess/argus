@@ -807,11 +807,12 @@ audited author fields remain in the author's language. Labels, date and number
 formats remain in the reader's language. No usage, raw card, provider, model,
 memory, executable action text or private id is included.
 
-Guest taps enter the existing conversion flow with reason `share_result`; its
-pending action carries `conversation_id`, `action_id` and `message_id`. The message
-id is required for this reason and the existing `artifact_id` remains exclusive
-to `save_decision`. After claim the same share panel reopens on that message.
-No receipt is created under an anonymous owner.
+The sole header entry belongs to registered owners. The former per-turn guest
+conversion entry is dormant. The compatible `share_result` pending action carries
+`conversation_id`, `action_id` and a required `message_id`; `artifact_id` remains
+exclusive to `save_decision`. If a compatibility caller resumes that action after
+claim, the same panel opens on its verified message. No anonymous owner can
+create a receipt. See conversation-sharing.md section 6 for the final placement.
 
 The same rule cuts the other way: a projection that cannot describe something
 refuses rather than dropping it silently. An unknown metric key is refused, and a

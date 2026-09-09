@@ -6,15 +6,15 @@ driving the built receipt flow end to end; that assessment is at
 
 This spec widens
 [`2026-08-07-sharing-evidence-receipts.md`](../superpowers/specs/2026-08-07-sharing-evidence-receipts.md).
-Everything that spec locked stays locked except one line, §7.5's "research
-answers not at all", which section 3 asks the founder to overturn on stated
-terms. No product code ships from this lane.
+The founder approved the widening on 2026-09-09 in section 4.5, which supersedes
+the original research exclusion and sequencing below. All other freeze, privacy,
+revocation and owner boundaries remain locked.
 
 ## 0. The answer
 
-**Build the research receipt first: one grounded answer, frozen as its own
-public page on the pipeline that already exists.** Not a whole conversation,
-and not more work on the backtest receipt, which is built and verified.
+**Extend the existing receipt to grounded answers.** Section 4.5 now authorizes
+up to four independently eligible turns selected inside one conversation. The
+per-turn receipt remains the unit; broader composition remains deferred.
 
 Why that order:
 
@@ -25,12 +25,11 @@ Why that order:
 - It reuses every hard part that is already built and now proven: the
   immutable snapshot table, the closed payload discipline, the tombstone, the
   Shared links list, the funnel, the flag gate, noindex, rate limits, and the
-  revoke-on-delete triggers. The build is a second payload kind, a second
-  owner endpoint, and a second page body. One flag, one list, one tombstone.
-- Its risk is bounded to one message pair. A whole conversation is the
-  largest surface Argus could publish and the shape that produced the ChatGPT
-  and DeepSeek incidents. Argus threads are also mostly clarify-and-confirm
-  plumbing; the compelling unit is the turn, not the thread.
+  revoke-on-delete triggers. Closed payload kinds extend the existing owner
+  endpoints and one shared page body. One flag, one list, one tombstone.
+- Every selected message pair passes the same checks independently. The
+  four-turn wrapper adds the cross-turn inference risk explicitly accepted in
+  section 4.5; it does not make clarifications or confirmations eligible.
 
 The five hard questions, answered in one place. Each has its own section.
 
