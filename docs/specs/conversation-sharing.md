@@ -238,6 +238,58 @@ Shared links lists both kinds with a kind label and the same controls. The
 funnel events carry `kind` so the two receipts can be compared as acquisition
 paths, which is the measurement section 9 waits on.
 
+### 4.5 Generalising this to every answer. Founder-decided 2026-09-09.
+
+**This extends the sharing feature that exists. It is not a second sharing
+system beside it.** Same `evidence_receipts` records, same `/r/<id>` route,
+same Settings list, same revoke, same tombstone, same cascade on delete, same
+`noindex`, same rendered preview card. `schema_version` 2 adds `kind`; version
+1 rows are backtest receipts and keep rendering unchanged. Anything that reads
+like a parallel "conversation sharing" feature has been built wrong.
+
+**The affordance.** A link glyph in the chat header, to the left of the
+existing `MoreVertical` in `ChatHeaderMenu`, never inside that menu. Its label
+says it shares the conversation rather than that it creates a link, because the
+click opens selection and no link exists until turns are chosen. Selecting
+turns, then one link, is the DeepSeek shape and it is the one we want.
+
+**Selection is where Argus differs from every competitor, and it is the work.**
+They can offer "select all" because every turn is shareable. Ours are not:
+section 4.1 refuses clarifications, confirmations, degraded turns, turns shaped
+by `memory_recalls`, and turns whose prose carries a URL absent from the typed
+sources. **An ineligible turn renders unselectable with a reason the owner can
+read**, in their language, or the screen looks broken and sharing reads as
+flaky. "Select all" means all eligible and says so.
+
+**The card keeps its own share control, and it is the same mechanism.** The
+button on the result card is the moment of intent and removing it would regress
+the only flow that works today. It becomes a shortcut that shares that one
+turn, producing the same record, through the same eligibility check, listed in
+the same place. Today it shares an `evidence_artifact_id` while turn sharing
+shares a message; if those stay separate the product grows two receipt
+lineages and they will drift.
+
+**The public page stays a receipt, not a rendered card.** `ReceiptBody`'s form
+is deliberate: ruled rows and a record stamp, because the page has to argue for
+its numbers to someone who never arrived through Argus. That judgment stands.
+What changes is where its content comes from: the card's typed facts rather
+than `receiptPlan` and `benchmarkVerdict`. Same form, any kind. If a second
+calculation needs its own receipt body, operating rule 3 has failed and the
+board stops.
+
+**The call to action reads "Continue with Argus."** It lands on guest entry
+with no carried state, as today. A bare arrow to `/` is the weakest part of a
+loop that is otherwise complete, and this is copy rather than engineering; the
+funnel events to measure it already exist.
+
+**Deferred on purpose, not forgotten.** A shared answer that offers its own
+re-run, saying what was true on the day and what has happened since, is
+something a product that shares prose cannot do and one that shares a
+computation can. It contradicts "everything freezes at creation" in section 5,
+so it is a later decision taken deliberately, not a tweak inside this work.
+
+---
+
 ## 5. Freeze versus live
 
 | Frozen at creation | Live at view |
