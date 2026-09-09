@@ -70,14 +70,16 @@ structured LLM clarifier with bounded facts and requested fields. Deterministic
 user-facing copy is reserved for explicit artifact-action recovery, such as a
 stale or non-retryable failed-run action, where code owns the safety boundary.
 
-The edit disclosure boundary: a compound edit's guarantee is that every
-requested change is applied or disclosed with a reason, and it holds when at
-least one interpretation layer (the primary read, the edit planner, or the
-stated-run-field audit) extracted the change as a typed value. When all three
-fail to extract it, nothing typed exists to require, complete, or disclose,
-and the change is lost without a record. Observed rate: once in six es-419
-live capture attempts of the compound slippage scenario. Deterministic code
-cannot close this without parsing prose, which the runtime forbids.
+The edit disclosure boundary: `domain.edit_contract` owns applied-or-disclosed
+accounting. Normal and recovery adapters supply requested targets, materialized
+targets, actual change status and existing refusals. A reissued card with no
+change carries a typed `no_change_applied` receipt even if no operation was
+extracted. Rejected flat fields and values discarded by downstream normalization
+are explicitly unapplied. This deterministic receipt does not guess user intent.
+For a partially understood compound request, a field missed by every structured
+read remains unknowable to deterministic code; it cannot name that missing field
+without parsing prose. The primary read, planner and stated-run-field audit still
+own extraction, with their existing completion and coverage guards unchanged.
 
 Recovery copy may only speak for live artifacts. Argus never contradicts its
 own card: a confirmation that was cancelled or superseded is not "still

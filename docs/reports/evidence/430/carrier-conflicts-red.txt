@@ -1,0 +1,629 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/2549/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 5 items
+
+tests/agent_runtime/test_edit_carrier_conflicts.py FF..F                 [100%]
+
+=================================== FAILURES ===================================
+_ test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a5c2a70>
+route = 'main', same_value = False
+
+    @pytest.mark.parametrize("route", ["main", "recovery"])
+    @pytest.mark.parametrize("same_value", [False, True])
+    def test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed(
+        monkeypatch, route, same_value
+    ):
+        request = _request("Change the capital", requested_field="assumption")
+        prior = request.latest_task_snapshot.pending_strategy_summary.capital_amount
+        typed = prior * 0.9
+        plan = {
+            "outcome": "ready_to_confirm",
+            "operations": [{"op": "set", "target": "capital", "number": typed}],
+            "initial_capital": typed if same_value else prior * 0.8,
+        }
+        if route == "main":
+            outcome, card = asyncio.run(card_for_edit_plan(monkeypatch, plan))
+            assert outcome == "await_approval"
+            capital = card["display_facts"]["capital"]
+        else:
+            card = asyncio.run(_recover_and_confirm(request, plan, monkeypatch))
+            capital = card["strategy"]["capital_amount"]
+        assert capital == typed
+        if same_value:
+            assert not card.get("edit_disclosure")
+        else:
+>           assert card["edit_disclosure"]["unapplied"] == [
+                {"op": "set", "target": "capital", "reason": "conflicting_edit_carriers"}
+            ]
+E           KeyError: 'edit_disclosure'
+
+tests/agent_runtime/test_edit_carrier_conflicts.py:40: KeyError
+----------------------------- Captured stderr call -----------------------------
+2026-09-09 00:15:37.396 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:374 - Interpret stage started
+2026-09-09 00:15:37.396 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:438 - Interpret stage structured interpreter completed
+2026-09-09 00:15:37.397 | DEBUG    | argus.agent_runtime.stages.interpret:_stage_result_from_interpretation:481 - Interpret stage post-LLM repair started
+2026-09-09 00:15:37.398 | DEBUG    | argus.agent_runtime.stages.confirm:confirm_stage:56 - Confirm stage started
+2026-09-09 00:15:37.398 | DEBUG    | argus.agent_runtime.stages.confirm:_strategy_with_latest_complete_data_adjustment:461 - Confirm stage latest data adjustment started
+2026-09-09 00:15:37.398 | DEBUG    | argus.agent_runtime.stages.confirm:_market_clock_for_strategy:516 - Confirm stage market clock fetch started
+2026-09-09 00:15:37.614 | DEBUG    | argus.agent_runtime.stages.confirm:_market_clock_for_strategy:523 - Confirm stage market clock fetch failed
+Traceback (most recent call last):
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/bin/pytest", line 8, in <module>
+    sys.exit(console_main())
+    │   │    └ <function console_main at 0x106a220e0>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/config/__init__.py", line 201, in console_main
+    code = main()
+           └ <function main at 0x106a22050>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/config/__init__.py", line 175, in main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+         │                │      │    │                          └ <_pytest.config.Config object at 0x106337520>
+         │                │      │    └ <HookCaller 'pytest_cmdline_main'>
+         │                │      └ <_pytest.config.compat.PathAwareHookProxy object at 0x106cdc1c0>
+         │                └ <_pytest.config.Config object at 0x106337520>
+         └ <enum 'ExitCode'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'config': <_pytest.config.Config object at 0x106337520>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_cmdline_main'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_cmdline_main'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_cmdline_main'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'config': <_pytest.config.Config object at 0x106337520>}
+           │    │               │          └ [<HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ve...
+           │    │               └ 'pytest_cmdline_main'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<_pytest.config.Config object at 0x106337520>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ven...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 336, in pytest_cmdline_main
+    return wrap_session(config, _main)
+           │            │       └ <function _main at 0x106ad8f70>
+           │            └ <_pytest.config.Config object at 0x106337520>
+           └ <function wrap_session at 0x106ad8e50>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 289, in wrap_session
+    session.exitstatus = doit(config, session) or 0
+    │       │            │    │       └ <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=5>
+    │       │            │    └ <_pytest.config.Config object at 0x106337520>
+    │       │            └ <function _main at 0x106ad8f70>
+    │       └ <ExitCode.OK: 0>
+    └ <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=5>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 343, in _main
+    config.hook.pytest_runtestloop(session=session)
+    │      │    │                          └ <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=5>
+    │      │    └ <HookCaller 'pytest_runtestloop'>
+    │      └ <_pytest.config.compat.PathAwareHookProxy object at 0x106cdc1c0>
+    └ <_pytest.config.Config object at 0x106337520>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'session': <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=5>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_runtestloop'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_runtestloop'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_runtestloop'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'session': <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=5>}
+           │    │               │          └ [<HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ve...
+           │    │               └ 'pytest_runtestloop'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=5>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ven...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 367, in pytest_runtestloop
+    item.config.hook.pytest_runtest_protocol(item=item, nextitem=nextitem)
+    │    │                                        │              └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+    │    │                                        └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+    │    └ <member 'config' of 'Node' objects>
+    └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>, 'nextitem': <Fun...
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_runtest_protocol'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_runtest_protocol'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_runtest_protocol'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>, 'nextitem': <Fun...
+           │    │               │          └ [<HookImpl plugin_name='runner', plugin=<module '_pytest.runner' from '/Users/garces/.codex/worktrees/2549/private-alpha-next...
+           │    │               └ 'pytest_runtest_protocol'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>, <Function test_typed_cap...
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='runner', plugin=<module '_pytest.runner' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 117, in pytest_runtest_protocol
+    runtestprotocol(item, nextitem=nextitem)
+    │               │              └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+    │               └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+    └ <function runtestprotocol at 0x106ad81f0>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 136, in runtestprotocol
+    reports.append(call_and_report(item, "call", log))
+    │       │      │               │             └ True
+    │       │      │               └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+    │       │      └ <function call_and_report at 0x106ad85e0>
+    │       └ <method 'append' of 'list' objects>
+    └ [<TestReport 'tests/agent_runtime/test_edit_carrier_conflicts.py::test_typed_capital_owns_application_and_conflicting_flat_va...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 245, in call_and_report
+    call = CallInfo.from_call(
+           │        └ <classmethod(<function CallInfo.from_call at 0x106ad88b0>)>
+           └ <class '_pytest.runner.CallInfo'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 344, in from_call
+    result: TResult | None = func()
+            │                └ <function call_and_report.<locals>.<lambda> at 0x108b7e7a0>
+            └ +TResult
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 246, in <lambda>
+    lambda: runtest_hook(item=item, **kwds), when=when, reraise=reraise
+            │                 │       └ {}
+            │                 └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+            └ <HookCaller 'pytest_runtest_call'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ False
+           │    │         │    │     │    │                  └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_runtest_call'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_runtest_call'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_runtest_call'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ False
+           │    │               │          │        └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>}
+           │    │               │          └ [<HookImpl plugin_name='threadexception', plugin=<module '_pytest.threadexception' from '/Users/garces/.codex/worktrees/2549/...
+           │    │               └ 'pytest_runtest_call'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='runner', plugin=<module '_pytest.runner' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 178, in pytest_runtest_call
+    item.runtest()
+    │    └ <function Function.runtest at 0x106bf8b80>
+    └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/python.py", line 1671, in runtest
+    self.ihook.pytest_pyfunc_call(pyfuncitem=self)
+    │    │                                   └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+    │    └ <property object at 0x106a4a520>
+    └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'pyfuncitem': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_pyfunc_call'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_pyfunc_call'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_pyfunc_call'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'pyfuncitem': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>}
+           │    │               │          └ [<HookImpl plugin_name='python', plugin=<module '_pytest.python' from '/Users/garces/.codex/worktrees/2549/private-alpha-next...
+           │    │               └ 'pytest_pyfunc_call'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='python', plugin=<module '_pytest.python' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/python.py", line 157, in pytest_pyfunc_call
+    result = testfunction(**testargs)
+             │              └ {'monkeypatch': <_pytest.monkeypatch.MonkeyPatch object at 0x10a5c2a70>, 'route': 'main', 'same_value': False}
+             └ <function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed at 0x108b7f1c0>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/tests/agent_runtime/test_edit_carrier_conflicts.py", line 30, in test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed
+    outcome, card = asyncio.run(card_for_edit_plan(monkeypatch, plan))
+                    │       │   │                  │            └ {'outcome': 'ready_to_confirm', 'operations': [{'op': 'set', 'target': 'capital', 'number': 9000.0}], 'initial_capital': 8000.0}
+                    │       │   │                  └ <_pytest.monkeypatch.MonkeyPatch object at 0x10a5c2a70>
+                    │       │   └ <function card_for_edit_plan at 0x10a05a290>
+                    │       └ <function run at 0x106e2b130>
+                    └ <module 'asyncio' from '/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/__init...
+
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+           │    │                  └ <coroutine object card_for_edit_plan at 0x10ca728f0>
+           │    └ <function BaseEventLoop.run_until_complete at 0x106f7e830>
+           └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py", line 636, in run_until_complete
+    self.run_forever()
+    │    └ <function BaseEventLoop.run_forever at 0x106f7e7a0>
+    └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py", line 603, in run_forever
+    self._run_once()
+    │    └ <function BaseEventLoop._run_once at 0x106f8c310>
+    └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py", line 1909, in _run_once
+    handle._run()
+    │      └ <function Handle._run at 0x106f33c70>
+    └ <Handle <TaskStepMethWrapper object at 0x10cad26b0>()>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+    │    │            │    │           │    └ <member '_args' of 'Handle' objects>
+    │    │            │    │           └ <Handle <TaskStepMethWrapper object at 0x10cad26b0>()>
+    │    │            │    └ <member '_callback' of 'Handle' objects>
+    │    │            └ <Handle <TaskStepMethWrapper object at 0x10cad26b0>()>
+    │    └ <member '_context' of 'Handle' objects>
+    └ <Handle <TaskStepMethWrapper object at 0x10cad26b0>()>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/tests/agent_runtime/_pending_edit_outcome_support.py", line 77, in card_for_edit_plan
+    confirmed = confirm_stage(state=state, contract=contract, language=language)
+                │                   │               │                  └ 'en'
+                │                   │               └ CapabilityContract(version='1.0', supported_intents=('strategy_drafting', 'backtest_execution', 'results_explanation'), suppo...
+                │                   └ RunState(current_user_message='Apply these edits', recent_thread_history=[], discovery_allowance_available=True, prior_next_e...
+                └ <function confirm_stage at 0x10a4edb40>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/agent_runtime/stages/confirm.py", line 62, in confirm_stage
+    strategy = _strategy_with_latest_complete_data_adjustment(strategy)
+               │                                              └ {'raw_user_phrasing': 'Apply these edits', 'requested_strategy_template': None, 'strategy_type': 'buy_and_hold', 'strategy_th...
+               └ <function _strategy_with_latest_complete_data_adjustment at 0x10a5a9900>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/agent_runtime/stages/confirm.py", line 472, in _strategy_with_latest_complete_data_adjustment
+    clock=_market_clock_for_strategy(asset_class),
+          │                          └ 'equity'
+          └ <function _market_clock_for_strategy at 0x10a5a9ab0>
+
+> File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/agent_runtime/stages/confirm.py", line 517, in _market_clock_for_strategy
+    clock = fetch_alpaca_market_clock()
+            └ <function fetch_alpaca_market_clock at 0x108e885e0>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/domain/market_data/capabilities.py", line 126, in fetch_alpaca_market_clock
+    raise ValueError("market_clock_unavailable")
+
+ValueError: market_clock_unavailable
+2026-09-09 00:15:37.620 | DEBUG    | argus.agent_runtime.stages.confirm:_strategy_with_latest_complete_data_adjustment:475 - Confirm stage latest data adjustment not needed
+2026-09-09 00:15:37.621 | DEBUG    | argus.agent_runtime.stages.confirm:confirm_stage:64 - Confirm stage latest complete data adjustment checked
+_ test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x11f52f910>
+route = 'recovery', same_value = False
+
+    @pytest.mark.parametrize("route", ["main", "recovery"])
+    @pytest.mark.parametrize("same_value", [False, True])
+    def test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed(
+        monkeypatch, route, same_value
+    ):
+        request = _request("Change the capital", requested_field="assumption")
+        prior = request.latest_task_snapshot.pending_strategy_summary.capital_amount
+        typed = prior * 0.9
+        plan = {
+            "outcome": "ready_to_confirm",
+            "operations": [{"op": "set", "target": "capital", "number": typed}],
+            "initial_capital": typed if same_value else prior * 0.8,
+        }
+        if route == "main":
+            outcome, card = asyncio.run(card_for_edit_plan(monkeypatch, plan))
+            assert outcome == "await_approval"
+            capital = card["display_facts"]["capital"]
+        else:
+            card = asyncio.run(_recover_and_confirm(request, plan, monkeypatch))
+            capital = card["strategy"]["capital_amount"]
+>       assert capital == typed
+E       assert 8000.0 == 9000.0
+
+tests/agent_runtime/test_edit_carrier_conflicts.py:36: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-09 00:15:38.785 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:374 - Interpret stage started
+2026-09-09 00:15:38.785 | DEBUG    | argus.agent_runtime.stages.interpret:interpret_stage_async:438 - Interpret stage structured interpreter completed
+2026-09-09 00:15:38.786 | DEBUG    | argus.agent_runtime.stages.interpret:_stage_result_from_interpretation:481 - Interpret stage post-LLM repair started
+2026-09-09 00:15:38.787 | DEBUG    | argus.agent_runtime.stages.confirm:confirm_stage:56 - Confirm stage started
+2026-09-09 00:15:38.787 | DEBUG    | argus.agent_runtime.stages.confirm:_strategy_with_latest_complete_data_adjustment:461 - Confirm stage latest data adjustment started
+2026-09-09 00:15:38.788 | DEBUG    | argus.agent_runtime.stages.confirm:_market_clock_for_strategy:516 - Confirm stage market clock fetch started
+2026-09-09 00:15:38.788 | DEBUG    | argus.agent_runtime.stages.confirm:_market_clock_for_strategy:523 - Confirm stage market clock fetch failed
+Traceback (most recent call last):
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/bin/pytest", line 8, in <module>
+    sys.exit(console_main())
+    │   │    └ <function console_main at 0x106a220e0>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/config/__init__.py", line 201, in console_main
+    code = main()
+           └ <function main at 0x106a22050>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/config/__init__.py", line 175, in main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+         │                │      │    │                          └ <_pytest.config.Config object at 0x106337520>
+         │                │      │    └ <HookCaller 'pytest_cmdline_main'>
+         │                │      └ <_pytest.config.compat.PathAwareHookProxy object at 0x106cdc1c0>
+         │                └ <_pytest.config.Config object at 0x106337520>
+         └ <enum 'ExitCode'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'config': <_pytest.config.Config object at 0x106337520>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_cmdline_main'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_cmdline_main'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_cmdline_main'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'config': <_pytest.config.Config object at 0x106337520>}
+           │    │               │          └ [<HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ve...
+           │    │               └ 'pytest_cmdline_main'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<_pytest.config.Config object at 0x106337520>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ven...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 336, in pytest_cmdline_main
+    return wrap_session(config, _main)
+           │            │       └ <function _main at 0x106ad8f70>
+           │            └ <_pytest.config.Config object at 0x106337520>
+           └ <function wrap_session at 0x106ad8e50>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 289, in wrap_session
+    session.exitstatus = doit(config, session) or 0
+    │       │            │    │       └ <Session  exitstatus=<ExitCode.OK: 0> testsfailed=1 testscollected=5>
+    │       │            │    └ <_pytest.config.Config object at 0x106337520>
+    │       │            └ <function _main at 0x106ad8f70>
+    │       └ <ExitCode.OK: 0>
+    └ <Session  exitstatus=<ExitCode.OK: 0> testsfailed=1 testscollected=5>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 343, in _main
+    config.hook.pytest_runtestloop(session=session)
+    │      │    │                          └ <Session  exitstatus=<ExitCode.OK: 0> testsfailed=1 testscollected=5>
+    │      │    └ <HookCaller 'pytest_runtestloop'>
+    │      └ <_pytest.config.compat.PathAwareHookProxy object at 0x106cdc1c0>
+    └ <_pytest.config.Config object at 0x106337520>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'session': <Session  exitstatus=<ExitCode.OK: 0> testsfailed=1 testscollected=5>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_runtestloop'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_runtestloop'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_runtestloop'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'session': <Session  exitstatus=<ExitCode.OK: 0> testsfailed=1 testscollected=5>}
+           │    │               │          └ [<HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ve...
+           │    │               └ 'pytest_runtestloop'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Session  exitstatus=<ExitCode.OK: 0> testsfailed=1 testscollected=5>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='main', plugin=<module '_pytest.main' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/.ven...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/main.py", line 367, in pytest_runtestloop
+    item.config.hook.pytest_runtest_protocol(item=item, nextitem=nextitem)
+    │    │                                        │              └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[True-main]>
+    │    │                                        └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+    │    └ <member 'config' of 'Node' objects>
+    └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>, 'nextitem': ...
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_runtest_protocol'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_runtest_protocol'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_runtest_protocol'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>, 'nextitem': ...
+           │    │               │          └ [<HookImpl plugin_name='runner', plugin=<module '_pytest.runner' from '/Users/garces/.codex/worktrees/2549/private-alpha-next...
+           │    │               └ 'pytest_runtest_protocol'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>, <Function test_typed...
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='runner', plugin=<module '_pytest.runner' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 117, in pytest_runtest_protocol
+    runtestprotocol(item, nextitem=nextitem)
+    │               │              └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[True-main]>
+    │               └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+    └ <function runtestprotocol at 0x106ad81f0>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 136, in runtestprotocol
+    reports.append(call_and_report(item, "call", log))
+    │       │      │               │             └ True
+    │       │      │               └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+    │       │      └ <function call_and_report at 0x106ad85e0>
+    │       └ <method 'append' of 'list' objects>
+    └ [<TestReport 'tests/agent_runtime/test_edit_carrier_conflicts.py::test_typed_capital_owns_application_and_conflicting_flat_va...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 245, in call_and_report
+    call = CallInfo.from_call(
+           │        └ <classmethod(<function CallInfo.from_call at 0x106ad88b0>)>
+           └ <class '_pytest.runner.CallInfo'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 344, in from_call
+    result: TResult | None = func()
+            │                └ <function call_and_report.<locals>.<lambda> at 0x108bbe5f0>
+            └ +TResult
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 246, in <lambda>
+    lambda: runtest_hook(item=item, **kwds), when=when, reraise=reraise
+            │                 │       └ {}
+            │                 └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+            └ <HookCaller 'pytest_runtest_call'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ False
+           │    │         │    │     │    │                  └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_runtest_call'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_runtest_call'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_runtest_call'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ False
+           │    │               │          │        └ {'item': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>}
+           │    │               │          └ [<HookImpl plugin_name='threadexception', plugin=<module '_pytest.threadexception' from '/Users/garces/.codex/worktrees/2549/...
+           │    │               └ 'pytest_runtest_call'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='runner', plugin=<module '_pytest.runner' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 178, in pytest_runtest_call
+    item.runtest()
+    │    └ <function Function.runtest at 0x106bf8b80>
+    └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/python.py", line 1671, in runtest
+    self.ihook.pytest_pyfunc_call(pyfuncitem=self)
+    │    │                                   └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+    │    └ <property object at 0x106a4a520>
+    └ <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           │    │         │    │     │    │                  │       └ True
+           │    │         │    │     │    │                  └ {'pyfuncitem': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>}
+           │    │         │    │     │    └ <member '_hookimpls' of 'HookCaller' objects>
+           │    │         │    │     └ <HookCaller 'pytest_pyfunc_call'>
+           │    │         │    └ <member 'name' of 'HookCaller' objects>
+           │    │         └ <HookCaller 'pytest_pyfunc_call'>
+           │    └ <member '_hookexec' of 'HookCaller' objects>
+           └ <HookCaller 'pytest_pyfunc_call'>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           │    │               │          │        │       └ True
+           │    │               │          │        └ {'pyfuncitem': <Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>}
+           │    │               │          └ [<HookImpl plugin_name='python', plugin=<module '_pytest.python' from '/Users/garces/.codex/worktrees/2549/private-alpha-next...
+           │    │               └ 'pytest_pyfunc_call'
+           │    └ <function _multicall at 0x1065f8940>
+           └ <_pytest.config.PytestPluginManager object at 0x106416860>
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          │         │         └ [<Function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]>]
+          │         └ <member 'function' of 'HookImpl' objects>
+          └ <HookImpl plugin_name='python', plugin=<module '_pytest.python' from '/Users/garces/.codex/worktrees/2549/private-alpha-next/...
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/.venv/lib/python3.10/site-packages/_pytest/python.py", line 157, in pytest_pyfunc_call
+    result = testfunction(**testargs)
+             │              └ {'monkeypatch': <_pytest.monkeypatch.MonkeyPatch object at 0x11f52f910>, 'route': 'recovery', 'same_value': False}
+             └ <function test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed at 0x108b7f1c0>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/tests/agent_runtime/test_edit_carrier_conflicts.py", line 34, in test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed
+    card = asyncio.run(_recover_and_confirm(request, plan, monkeypatch))
+           │       │   │                    │        │     └ <_pytest.monkeypatch.MonkeyPatch object at 0x11f52f910>
+           │       │   │                    │        └ {'outcome': 'ready_to_confirm', 'operations': [{'op': 'set', 'target': 'capital', 'number': 9000.0}], 'initial_capital': 8000.0}
+           │       │   │                    └ InterpretationRequest(current_user_message='Change the capital', recent_thread_history=[], latest_task_snapshot=TaskSnapshot(...
+           │       │   └ <function _recover_and_confirm at 0x10a5c68c0>
+           │       └ <function run at 0x106e2b130>
+           └ <module 'asyncio' from '/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/__init...
+
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+           │    │                  └ <coroutine object _recover_and_confirm at 0x11f551690>
+           │    └ <function BaseEventLoop.run_until_complete at 0x106f7e830>
+           └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py", line 636, in run_until_complete
+    self.run_forever()
+    │    └ <function BaseEventLoop.run_forever at 0x106f7e7a0>
+    └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py", line 603, in run_forever
+    self._run_once()
+    │    └ <function BaseEventLoop._run_once at 0x106f8c310>
+    └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py", line 1909, in _run_once
+    handle._run()
+    │      └ <function Handle._run at 0x106f33c70>
+    └ <Handle <TaskStepMethWrapper object at 0x11f52dc30>()>
+  File "/Users/garces/.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+    │    │            │    │           │    └ <member '_args' of 'Handle' objects>
+    │    │            │    │           └ <Handle <TaskStepMethWrapper object at 0x11f52dc30>()>
+    │    │            │    └ <member '_callback' of 'Handle' objects>
+    │    │            └ <Handle <TaskStepMethWrapper object at 0x11f52dc30>()>
+    │    └ <member '_context' of 'Handle' objects>
+    └ <Handle <TaskStepMethWrapper object at 0x11f52dc30>()>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/tests/agent_runtime/test_recovery_edit_outcomes.py", line 88, in _recover_and_confirm
+    confirmed = confirm_stage(state=state, contract=build_default_capability_contract())
+                │                   │               └ <function build_default_capability_contract at 0x108b7f5b0>
+                │                   └ RunState(current_user_message='Change the capital', recent_thread_history=[], discovery_allowance_available=True, prior_next_...
+                └ <function confirm_stage at 0x10a4edb40>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/agent_runtime/stages/confirm.py", line 62, in confirm_stage
+    strategy = _strategy_with_latest_complete_data_adjustment(strategy)
+               │                                              └ {'raw_user_phrasing': 'Change the capital', 'requested_strategy_template': None, 'strategy_type': 'buy_and_hold', 'strategy_t...
+               └ <function _strategy_with_latest_complete_data_adjustment at 0x10a5a9900>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/agent_runtime/stages/confirm.py", line 472, in _strategy_with_latest_complete_data_adjustment
+    clock=_market_clock_for_strategy(asset_class),
+          │                          └ 'equity'
+          └ <function _market_clock_for_strategy at 0x10a5a9ab0>
+
+> File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/agent_runtime/stages/confirm.py", line 517, in _market_clock_for_strategy
+    clock = fetch_alpaca_market_clock()
+            └ <function fetch_alpaca_market_clock at 0x108e885e0>
+
+  File "/Users/garces/.codex/worktrees/2549/private-alpha-next/src/argus/domain/market_data/capabilities.py", line 126, in fetch_alpaca_market_clock
+    raise ValueError("market_clock_unavailable")
+
+ValueError: market_clock_unavailable
+2026-09-09 00:15:38.790 | DEBUG    | argus.agent_runtime.stages.confirm:_strategy_with_latest_complete_data_adjustment:475 - Confirm stage latest data adjustment not needed
+2026-09-09 00:15:38.790 | DEBUG    | argus.agent_runtime.stages.confirm:confirm_stage:64 - Confirm stage latest complete data adjustment checked
+___________ test_refused_target_alias_has_one_authoritative_receipt ____________
+
+    def test_refused_target_alias_has_one_authoritative_receipt():
+        response = _response_from_artifact_assumption_edit_plan(
+            plan=ArtifactAssumptionEditPlan(
+                outcome="ready_to_confirm",
+                operations=[{"op": "clear", "target": "starting_capital"}],
+            ),
+            request=_request("Clear starting capital"),
+        )
+>       assert response.candidate_strategy_draft.extra_parameters["edit_disclosure"][
+            "unapplied"
+        ] == [{"op": "clear", "target": "capital", "reason": "unsupported_operation"}]
+E       AssertionError: assert [{'op': 'clea...': 'capital'}] == [{'op': 'clea...': 'capital'}]
+E         
+E         At index 0 diff: {'op': 'clear', 'target': 'starting_capital', 'reason': 'unsupported_operation'} != {'op': 'clear', 'target': 'capital', 'reason': 'unsupported_operation'}
+E         Left contains one more item: {'op': 'clear', 'reason': 'not_materialized', 'target': 'capital'}
+E         Use -v to get more diff
+
+tests/agent_runtime/test_edit_carrier_conflicts.py:53: AssertionError
+=========================== short test summary info ============================
+FAILED tests/agent_runtime/test_edit_carrier_conflicts.py::test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]
+FAILED tests/agent_runtime/test_edit_carrier_conflicts.py::test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]
+FAILED tests/agent_runtime/test_edit_carrier_conflicts.py::test_refused_target_alias_has_one_authoritative_receipt
+========================= 3 failed, 2 passed in 2.27s ==========================

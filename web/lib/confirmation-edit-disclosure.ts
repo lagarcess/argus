@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { StrategyConfirmationEditDisclosure } from "@/components/chat/types";
+import { artifactEditDisclosureText } from "./artifact-edit-disclosure";
 
 /**
  * §3.2 disclosure: the part of an edit that could not be applied, rendered as
@@ -29,26 +30,18 @@ export function confirmationEditDisclosureText(
   disclosure: StrategyConfirmationEditDisclosure | null | undefined,
   t: TFunction,
 ): string | null {
-  if (!disclosure) {
-    return null;
-  }
-  const targets = (disclosure.unapplied ?? [])
-    .map((entry) => String(entry.target ?? "").trim())
-    .filter(Boolean)
-    .map((target) =>
+  return artifactEditDisclosureText(disclosure, t, (targets) => {
+    const labels = targets.map((target) =>
       t(
         TARGET_LABEL_KEYS[target] ??
           "chat.confirmation.edit_disclosure.targets.generic",
         target.replace(/_/g, " "),
       ),
     );
-  if (targets.length > 0) {
-    const unique = Array.from(new Set(targets));
+    const unique = Array.from(new Set(labels));
     return t("chat.confirmation.edit_disclosure.unapplied", {
       defaultValue: "I could not change {{targets}}; the rest is applied below.",
       targets: unique.join(", "),
     });
-  }
-  const note = String(disclosure.note ?? "").trim();
-  return note || null;
+  });
 }

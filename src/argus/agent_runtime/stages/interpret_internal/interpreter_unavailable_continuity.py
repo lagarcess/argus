@@ -5,12 +5,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from argus.agent_runtime.artifact_edit_outcomes import (
+    artifact_edit_disclosure,
+    artifact_edit_has_changes,
+    canonical_artifact_edit_plan,
+    executable_edit_targets,
+)
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     _edit_plan_reshapes_non_recurring_strategy,
     accepted_operations_partially_materialized,
     apply_edit_operations,
     materialized_strategy_summary_targets,
+    typed_unapplied_operations,
 )
 from argus.agent_runtime.artifact_edit_planner import (
     plan_artifact_assumption_edit as _plan_artifact_assumption_edit,
@@ -441,6 +448,8 @@ async def _planned_artifact_edit_interpretation(
     )
     if plan is None or plan.outcome != "ready_to_confirm":
         return None
+    original_plan = plan
+    plan = canonical_artifact_edit_plan(plan)
     if _edit_plan_reshapes_non_recurring_strategy(
         plan,
         prior_strategy_type=prior_strategy.strategy_type,
@@ -452,6 +461,8 @@ async def _planned_artifact_edit_interpretation(
         # draft itself; an edit never changes the anchor's family.
         candidate.strategy_type = prior_strategy.strategy_type
     field_provenance: dict[str, str] = {}
+    unapplied: list[dict[str, str]] = []
+    resolved = None
     if plan.operations:
         resolved = apply_edit_operations(
             plan.operations,
@@ -481,6 +492,10 @@ async def _planned_artifact_edit_interpretation(
             # A half-applied edit is worse than no edit; decline so the
             # caller's ordinary recovery owns the turn (issue #498).
             return None
+        unapplied = typed_unapplied_operations(
+            resolved_unsupported=resolved.unsupported,
+            dropped_cost_fields=[],
+        )
     elif plan.asset_universe:
         operation = normalized_asset_universe_operation(plan.asset_universe_operation)
         if operation is None:
@@ -526,7 +541,24 @@ async def _planned_artifact_edit_interpretation(
         field_provenance["initial_capital"] = "starting_capital"
     if not field_provenance:
         return None
+    materialized_targets = executable_edit_targets(
+        materialized_strategy_summary_targets(field_provenance),
+        timeframe=candidate.timeframe,
+    )
     candidate.extra_parameters["field_provenance"] = field_provenance
+    disclosure = artifact_edit_disclosure(
+        original_plan,
+        materialized_targets=materialized_targets,
+        has_changes=artifact_edit_has_changes(
+            materialized_targets=materialized_targets,
+            draft=candidate,
+            current_strategy=prior_strategy,
+        ),
+        existing={"unapplied": unapplied},
+        resolved=resolved,
+    )
+    if disclosure is not None:
+        candidate.extra_parameters["edit_disclosure"] = disclosure
     return StructuredInterpretation(
         intent="backtest_execution",
         task_relation="continue",

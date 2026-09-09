@@ -1,0 +1,1334 @@
+{
+  "en": {
+    "no_change": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-c09deebe-3273-46fb-add6-2e8917fc17cb",
+      "confirmation_state": "active",
+      "launch_payload_hash": "7821299118748e9b",
+      "canonical_launch_payload_hash": "sha256:7821299118748e9bfac11fdf97734793a0195269c488f15eb567317345ad60b0",
+      "title": "NFLX buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX over January 2, 2023 - June 30, 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "January 2, 2023 - June 30, 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-c09deebe-3273-46fb-add6-2e8917fc17cb",
+            "artifact_id": "confirmation-c09deebe-3273-46fb-add6-2e8917fc17cb",
+            "launch_payload_hash": "7821299118748e9b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-c09deebe-3273-46fb-add6-2e8917fc17cb",
+            "artifact_id": "confirmation-c09deebe-3273-46fb-add6-2e8917fc17cb",
+            "launch_payload_hash": "7821299118748e9b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-c09deebe-3273-46fb-add6-2e8917fc17cb",
+            "artifact_id": "confirmation-c09deebe-3273-46fb-add6-2e8917fc17cb",
+            "launch_payload_hash": "7821299118748e9b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "January 2, 2023 - June 30, 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "edit",
+            "target": "requested_change",
+            "reason": "no_change_applied"
+          }
+        ]
+      }
+    },
+    "refused": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-d6b63f19-7223-4a17-b14b-5324d156b848",
+      "confirmation_state": "active",
+      "launch_payload_hash": "7821299118748e9b",
+      "canonical_launch_payload_hash": "sha256:7821299118748e9bfac11fdf97734793a0195269c488f15eb567317345ad60b0",
+      "title": "NFLX buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX over January 2, 2023 - June 30, 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "January 2, 2023 - June 30, 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-d6b63f19-7223-4a17-b14b-5324d156b848",
+            "artifact_id": "confirmation-d6b63f19-7223-4a17-b14b-5324d156b848",
+            "launch_payload_hash": "7821299118748e9b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-d6b63f19-7223-4a17-b14b-5324d156b848",
+            "artifact_id": "confirmation-d6b63f19-7223-4a17-b14b-5324d156b848",
+            "launch_payload_hash": "7821299118748e9b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-d6b63f19-7223-4a17-b14b-5324d156b848",
+            "artifact_id": "confirmation-d6b63f19-7223-4a17-b14b-5324d156b848",
+            "launch_payload_hash": "7821299118748e9b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "January 2, 2023 - June 30, 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "remove",
+            "target": "asset",
+            "reason": "unsupported_operation"
+          }
+        ]
+      }
+    },
+    "applied": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-1cefa84c-e8be-4933-9fe7-72d2502eb3a6",
+      "confirmation_state": "active",
+      "launch_payload_hash": "c904419d72047d9f",
+      "canonical_launch_payload_hash": "sha256:c904419d72047d9ff2b7718b66165fa8f1b5412cfb24934abf9fce48059395c4",
+      "title": "NFLX buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX over January 2, 2023 - June 30, 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "January 2, 2023 - June 30, 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$9,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-1cefa84c-e8be-4933-9fe7-72d2502eb3a6",
+            "artifact_id": "confirmation-1cefa84c-e8be-4933-9fe7-72d2502eb3a6",
+            "launch_payload_hash": "c904419d72047d9f",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-1cefa84c-e8be-4933-9fe7-72d2502eb3a6",
+            "artifact_id": "confirmation-1cefa84c-e8be-4933-9fe7-72d2502eb3a6",
+            "launch_payload_hash": "c904419d72047d9f",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-1cefa84c-e8be-4933-9fe7-72d2502eb3a6",
+            "artifact_id": "confirmation-1cefa84c-e8be-4933-9fe7-72d2502eb3a6",
+            "launch_payload_hash": "c904419d72047d9f",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 9000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "January 2, 2023 - June 30, 2023"
+      }
+    },
+    "dca_no_change": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-83b3647d-09f8-4a2f-9df1-87153c51a7a3",
+      "confirmation_state": "active",
+      "launch_payload_hash": "0cae5b0c1edf4a78",
+      "canonical_launch_payload_hash": "sha256:0cae5b0c1edf4a788bc4a7e193b9066d5a9df7129d4fcbe18f089a85f6f88463",
+      "title": "NFLX recurring buys",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "dca_accumulation",
+      "summary": "Ready to test recurring buys for NFLX over January 2, 2023 - June 30, 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Recurring Buys"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "January 2, 2023 - June 30, 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        },
+        {
+          "key": "contribution",
+          "label": "Contribution",
+          "labelKey": "chat.confirmation.rows.contribution",
+          "value": "$500 monthly"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-83b3647d-09f8-4a2f-9df1-87153c51a7a3",
+            "artifact_id": "confirmation-83b3647d-09f8-4a2f-9df1-87153c51a7a3",
+            "launch_payload_hash": "0cae5b0c1edf4a78",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-83b3647d-09f8-4a2f-9df1-87153c51a7a3",
+            "artifact_id": "confirmation-83b3647d-09f8-4a2f-9df1-87153c51a7a3",
+            "launch_payload_hash": "0cae5b0c1edf4a78",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-83b3647d-09f8-4a2f-9df1-87153c51a7a3",
+            "artifact_id": "confirmation-83b3647d-09f8-4a2f-9df1-87153c51a7a3",
+            "launch_payload_hash": "0cae5b0c1edf4a78",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "starting_capital": 10000.0,
+        "recurring_contribution": 500.0,
+        "contribution_period": "monthly",
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          },
+          "starting_capital": {
+            "min": 0.0,
+            "max": 100000000.0
+          },
+          "contribution": {
+            "max": 100000000.0,
+            "periods": [
+              "daily",
+              "weekly",
+              "biweekly",
+              "monthly",
+              "quarterly"
+            ]
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "January 2, 2023 - June 30, 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "edit",
+            "target": "requested_change",
+            "reason": "no_change_applied"
+          }
+        ]
+      }
+    },
+    "dca_applied": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-a27ea791-5f08-41da-9ef5-96b995beb0a6",
+      "confirmation_state": "active",
+      "launch_payload_hash": "b4984fd3c6b09379",
+      "canonical_launch_payload_hash": "sha256:b4984fd3c6b09379f6614e5773959c23711cfcefca759aeaa936dcdb327a57bb",
+      "title": "NFLX recurring buys",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "dca_accumulation",
+      "summary": "Ready to test recurring buys for NFLX over January 2, 2023 - June 30, 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Recurring Buys"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "January 2, 2023 - June 30, 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        },
+        {
+          "key": "contribution",
+          "label": "Contribution",
+          "labelKey": "chat.confirmation.rows.contribution",
+          "value": "$650 monthly"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-a27ea791-5f08-41da-9ef5-96b995beb0a6",
+            "artifact_id": "confirmation-a27ea791-5f08-41da-9ef5-96b995beb0a6",
+            "launch_payload_hash": "b4984fd3c6b09379",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-a27ea791-5f08-41da-9ef5-96b995beb0a6",
+            "artifact_id": "confirmation-a27ea791-5f08-41da-9ef5-96b995beb0a6",
+            "launch_payload_hash": "b4984fd3c6b09379",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-a27ea791-5f08-41da-9ef5-96b995beb0a6",
+            "artifact_id": "confirmation-a27ea791-5f08-41da-9ef5-96b995beb0a6",
+            "launch_payload_hash": "b4984fd3c6b09379",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "starting_capital": 10000.0,
+        "recurring_contribution": 650.0,
+        "contribution_period": "monthly",
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          },
+          "starting_capital": {
+            "min": 0.0,
+            "max": 100000000.0
+          },
+          "contribution": {
+            "max": 100000000.0,
+            "periods": [
+              "daily",
+              "weekly",
+              "biweekly",
+              "monthly",
+              "quarterly"
+            ]
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "January 2, 2023 - June 30, 2023"
+      }
+    }
+  },
+  "es-419": {
+    "no_change": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-2076db97-0169-4893-aa80-7800ca3824c1",
+      "confirmation_state": "active",
+      "launch_payload_hash": "68c19ecb562c1499",
+      "canonical_launch_payload_hash": "sha256:68c19ecb562c1499bac0fbdb1a7569dae89ebde18d9b967507aaea5d37cfad2c",
+      "title": "NFLX buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX over 2 de enero de 2023 al 30 de junio de 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "2 de enero de 2023 al 30 de junio de 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-2076db97-0169-4893-aa80-7800ca3824c1",
+            "artifact_id": "confirmation-2076db97-0169-4893-aa80-7800ca3824c1",
+            "launch_payload_hash": "68c19ecb562c1499",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-2076db97-0169-4893-aa80-7800ca3824c1",
+            "artifact_id": "confirmation-2076db97-0169-4893-aa80-7800ca3824c1",
+            "launch_payload_hash": "68c19ecb562c1499",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-2076db97-0169-4893-aa80-7800ca3824c1",
+            "artifact_id": "confirmation-2076db97-0169-4893-aa80-7800ca3824c1",
+            "launch_payload_hash": "68c19ecb562c1499",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "2 de enero de 2023 al 30 de junio de 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "edit",
+            "target": "requested_change",
+            "reason": "no_change_applied"
+          }
+        ]
+      }
+    },
+    "refused": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-3aec6e3f-2151-4ecf-86eb-2dc5659a4400",
+      "confirmation_state": "active",
+      "launch_payload_hash": "68c19ecb562c1499",
+      "canonical_launch_payload_hash": "sha256:68c19ecb562c1499bac0fbdb1a7569dae89ebde18d9b967507aaea5d37cfad2c",
+      "title": "NFLX buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX over 2 de enero de 2023 al 30 de junio de 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "2 de enero de 2023 al 30 de junio de 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-3aec6e3f-2151-4ecf-86eb-2dc5659a4400",
+            "artifact_id": "confirmation-3aec6e3f-2151-4ecf-86eb-2dc5659a4400",
+            "launch_payload_hash": "68c19ecb562c1499",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-3aec6e3f-2151-4ecf-86eb-2dc5659a4400",
+            "artifact_id": "confirmation-3aec6e3f-2151-4ecf-86eb-2dc5659a4400",
+            "launch_payload_hash": "68c19ecb562c1499",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-3aec6e3f-2151-4ecf-86eb-2dc5659a4400",
+            "artifact_id": "confirmation-3aec6e3f-2151-4ecf-86eb-2dc5659a4400",
+            "launch_payload_hash": "68c19ecb562c1499",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "2 de enero de 2023 al 30 de junio de 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "remove",
+            "target": "asset",
+            "reason": "unsupported_operation"
+          }
+        ]
+      }
+    },
+    "applied": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-71344498-57dc-4782-b0e6-e6ba78804ddc",
+      "confirmation_state": "active",
+      "launch_payload_hash": "15dbd2309d40d496",
+      "canonical_launch_payload_hash": "sha256:15dbd2309d40d4967b2c92d13a1d3f0d2246080c661778ca05f08dd6ea816b50",
+      "title": "NFLX buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX over 2 de enero de 2023 al 30 de junio de 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "2 de enero de 2023 al 30 de junio de 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$9,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-71344498-57dc-4782-b0e6-e6ba78804ddc",
+            "artifact_id": "confirmation-71344498-57dc-4782-b0e6-e6ba78804ddc",
+            "launch_payload_hash": "15dbd2309d40d496",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-71344498-57dc-4782-b0e6-e6ba78804ddc",
+            "artifact_id": "confirmation-71344498-57dc-4782-b0e6-e6ba78804ddc",
+            "launch_payload_hash": "15dbd2309d40d496",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-71344498-57dc-4782-b0e6-e6ba78804ddc",
+            "artifact_id": "confirmation-71344498-57dc-4782-b0e6-e6ba78804ddc",
+            "launch_payload_hash": "15dbd2309d40d496",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 9000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "2 de enero de 2023 al 30 de junio de 2023"
+      }
+    },
+    "dca_no_change": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-26197537-ddd8-45e4-9dbc-1b64cf4655a8",
+      "confirmation_state": "active",
+      "launch_payload_hash": "bac2821ed386e36c",
+      "canonical_launch_payload_hash": "sha256:bac2821ed386e36cd6f3f285a0e9d66d0d7b98099d904720a8214ae421e88827",
+      "title": "NFLX recurring buys",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "dca_accumulation",
+      "summary": "Ready to test recurring buys for NFLX over 2 de enero de 2023 al 30 de junio de 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Recurring Buys"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "2 de enero de 2023 al 30 de junio de 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        },
+        {
+          "key": "contribution",
+          "label": "Contribution",
+          "labelKey": "chat.confirmation.rows.contribution",
+          "value": "$500 monthly"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-26197537-ddd8-45e4-9dbc-1b64cf4655a8",
+            "artifact_id": "confirmation-26197537-ddd8-45e4-9dbc-1b64cf4655a8",
+            "launch_payload_hash": "bac2821ed386e36c",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-26197537-ddd8-45e4-9dbc-1b64cf4655a8",
+            "artifact_id": "confirmation-26197537-ddd8-45e4-9dbc-1b64cf4655a8",
+            "launch_payload_hash": "bac2821ed386e36c",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-26197537-ddd8-45e4-9dbc-1b64cf4655a8",
+            "artifact_id": "confirmation-26197537-ddd8-45e4-9dbc-1b64cf4655a8",
+            "launch_payload_hash": "bac2821ed386e36c",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "starting_capital": 10000.0,
+        "recurring_contribution": 500.0,
+        "contribution_period": "monthly",
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          },
+          "starting_capital": {
+            "min": 0.0,
+            "max": 100000000.0
+          },
+          "contribution": {
+            "max": 100000000.0,
+            "periods": [
+              "daily",
+              "weekly",
+              "biweekly",
+              "monthly",
+              "quarterly"
+            ]
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "2 de enero de 2023 al 30 de junio de 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "edit",
+            "target": "requested_change",
+            "reason": "no_change_applied"
+          }
+        ]
+      }
+    },
+    "dca_applied": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-f52eccef-b2d9-4945-b8b5-f75122ab23c7",
+      "confirmation_state": "active",
+      "launch_payload_hash": "14e976830c143d92",
+      "canonical_launch_payload_hash": "sha256:14e976830c143d92801b31f1b23ab80c187c12f6ae1274c2eb7d7290bc413943",
+      "title": "NFLX recurring buys",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "dca_accumulation",
+      "summary": "Ready to test recurring buys for NFLX over 2 de enero de 2023 al 30 de junio de 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Recurring Buys"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "2 de enero de 2023 al 30 de junio de 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        },
+        {
+          "key": "contribution",
+          "label": "Contribution",
+          "labelKey": "chat.confirmation.rows.contribution",
+          "value": "$650 monthly"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-f52eccef-b2d9-4945-b8b5-f75122ab23c7",
+            "artifact_id": "confirmation-f52eccef-b2d9-4945-b8b5-f75122ab23c7",
+            "launch_payload_hash": "14e976830c143d92",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-f52eccef-b2d9-4945-b8b5-f75122ab23c7",
+            "artifact_id": "confirmation-f52eccef-b2d9-4945-b8b5-f75122ab23c7",
+            "launch_payload_hash": "14e976830c143d92",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-f52eccef-b2d9-4945-b8b5-f75122ab23c7",
+            "artifact_id": "confirmation-f52eccef-b2d9-4945-b8b5-f75122ab23c7",
+            "launch_payload_hash": "14e976830c143d92",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "starting_capital": 10000.0,
+        "recurring_contribution": 650.0,
+        "contribution_period": "monthly",
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          },
+          "starting_capital": {
+            "min": 0.0,
+            "max": 100000000.0
+          },
+          "contribution": {
+            "max": 100000000.0,
+            "periods": [
+              "daily",
+              "weekly",
+              "biweekly",
+              "monthly",
+              "quarterly"
+            ]
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "2 de enero de 2023 al 30 de junio de 2023"
+      }
+    }
+  }
+}

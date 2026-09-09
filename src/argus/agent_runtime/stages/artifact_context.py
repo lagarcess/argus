@@ -23,6 +23,12 @@ from argus.agent_runtime.state.models import (
     StructuredActionContext,
     TaskSnapshot,
 )
+from argus.domain.pending_artifacts import (
+    ACTIVE_ARTIFACT_STATE,
+    CONSUMED_ARTIFACT_STATE,
+    PendingArtifactLayout,
+    pending_artifact_is_dead,
+)
 
 RESULT_EXPLANATION_TARGET_INFERRED = "result_explanation_target_inferred"
 RESULT_FOLLOWUP_TARGET_INFERRED = "result_followup_target_inferred"
@@ -82,17 +88,15 @@ def stale_confirmation_action_response(
     return None
 
 
-# The one liveness vocabulary. "consumed" is stamped on the card row at run
-# admission: pressing Run is a commitment, so a card whose run was admitted
-# is no longer pending, whatever the job later does; a run that dies without
-# a result restores the card to "active" through the same guarded writer.
-_DEAD_CONFIRMATION_STATES = frozenset({"cancelled", "canceled", "superseded", "consumed"})
-CONSUMED_CONFIRMATION_STATE = "consumed"
-ACTIVE_CONFIRMATION_STATE = "active"
-
-
-def _confirmation_state_is_dead(value: Any) -> bool:
-    return str(value or "").strip().casefold() in _DEAD_CONFIRMATION_STATES
+ACTIVE_CONFIRMATION_STATE = ACTIVE_ARTIFACT_STATE
+CONSUMED_CONFIRMATION_STATE = CONSUMED_ARTIFACT_STATE
+CONFIRMATION_ARTIFACT_LAYOUT = PendingArtifactLayout(
+    card_key="confirmation_card",
+    card_state_key="confirmation_state",
+    reference_key="active_confirmation_reference",
+    references_key="artifact_references",
+    reference_type="confirmation",
+)
 
 
 def confirmation_card_is_dead(metadata: dict[str, Any] | None) -> bool:
@@ -104,19 +108,7 @@ def confirmation_card_is_dead(metadata: dict[str, Any] | None) -> bool:
     stamps it, terminal-without-result restores it, and cancellation or
     supersession stamp their own states through the same guarded writer.
     """
-    if not isinstance(metadata, dict):
-        return False
-    card = metadata.get("confirmation_card")
-    if isinstance(card, dict) and _confirmation_state_is_dead(
-        card.get("confirmation_state")
-    ):
-        return True
-    reference = metadata.get("active_confirmation_reference")
-    if isinstance(reference, dict) and _confirmation_state_is_dead(
-        reference.get("artifact_status")
-    ):
-        return True
-    return False
+    return pending_artifact_is_dead(metadata, layout=CONFIRMATION_ARTIFACT_LAYOUT)
 
 
 def _metadata_is_latest_result_fact_reply_marker(metadata: dict[str, Any]) -> bool:
@@ -197,14 +189,14 @@ def live_pending_confirmation(
 
 
 def _reference_confirmation_is_dead(reference: ArtifactReference) -> bool:
-    if _confirmation_state_is_dead(reference.artifact_status):
-        return True
-    card = reference.metadata.get("confirmation_card")
-    if isinstance(card, dict) and _confirmation_state_is_dead(
-        card.get("confirmation_state")
-    ):
-        return True
-    return False
+    return confirmation_card_is_dead(
+        {
+            **reference.metadata,
+            CONFIRMATION_ARTIFACT_LAYOUT.reference_key: {
+                "artifact_status": reference.artifact_status
+            },
+        }
+    )
 
 
 def has_pending_confirmation_context(snapshot: TaskSnapshot | None) -> bool:

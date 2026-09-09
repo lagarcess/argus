@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import i18next from "i18next";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { I18nextProvider } from "react-i18next";
 
 import {
   ChatStreamError,
@@ -11,8 +15,32 @@ import {
 } from "../lib/argus-api";
 import { commandPaletteRequestIsCurrent } from "../lib/command-palette-items";
 import { effectivePaletteLayout } from "../components/sidebar/command-palette/paletteLayout";
+import ChatMessage from "../components/chat/ChatMessage";
+import type { Message } from "../components/chat/types";
+import en from "../public/locales/en/common.json";
 
 const root = join(import.meta.dir, "..");
+
+async function renderConfirmationMessage(kind?: string, active = true) {
+  const i18n = i18next.createInstance();
+  await i18n.init({ lng: "en", fallbackLng: false, resources: { en: { translation: en } } });
+  const message = {
+    id: "confirmation-message", role: "ai", kind: "strategy_confirmation",
+    confirmation: {
+      ...(kind === undefined ? {} : { kind }),
+      confirmation_id: "confirmation-1",
+      confirmation_state: active ? "active" : "superseded",
+      title: "AAPL", status: active ? "ready_to_run" : "updated",
+      statusLabel: active ? "Ready to run" : "Updated", summary: "Review this test.",
+      rows: [{ key: "assets", label: "Assets", value: "AAPL" }],
+      actions: [{ id: "run-backtest", type: "run_backtest", label: "Run backtest",
+        payload: { confirmation_id: "confirmation-1" } }],
+    },
+  } as unknown as Message;
+  return renderToStaticMarkup(createElement(
+    I18nextProvider, { i18n }, createElement(ChatMessage, { message }),
+  ));
+}
 
 function readChatImplementationSource(): string {
   return [
@@ -597,7 +625,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("chartTimeLookupKey");
   });
 
-  test("chat renders structured confirmation cards with card-scoped actions only", () => {
+  test("chat renders structured confirmation cards with card-scoped actions only", async () => {
     const chat = readChatImplementationSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
@@ -627,7 +655,9 @@ describe("Argus Alpha frontend contract", () => {
     // that the floating composer strip is gone.
     expect(message).toContain("slide-in-from-bottom-2");
     expect(message).toContain("<StrategyConfirmationCard");
-    expect(message).toContain("confirmation={message.confirmation}");
+    const markup = await renderConfirmationMessage("backtest");
+    expect(markup).toContain("argus-confirmation-reveal");
+    expect(markup.match(/Run backtest/g)).toHaveLength(1);
     expect(message).toContain("onAction={onAction}");
   });
 
@@ -1172,24 +1202,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("message.confirmation.actions");
   });
 
-  test("confirmation cards render active artifact actions", () => {
-    const card = readFileSync(
-      join(root, "components/chat/StrategyConfirmationCard.tsx"),
-      "utf-8",
-    );
-    const message = readFileSync(
-      join(root, "components/chat/ChatMessage.tsx"),
-      "utf-8",
-    );
-
-    expect(card).toContain("onAction?: (action: ChatActionOption) => void");
-    expect(card).toContain("confirmation.actions");
-    expect(card).toContain('confirmation.confirmation_state === "active"');
-    expect(card).toContain("!confirmation.confirmation_state");
-    expect(card).not.toContain("ArrowRight");
-    expect(message).toContain("<StrategyConfirmationCard");
-    expect(message).toContain("confirmation={message.confirmation}");
-    expect(message).toContain("onAction={onAction}");
+  test.each([undefined, "backtest"])("only active recognized confirmation kind %p renders Run", async (kind) => {
+    expect(await renderConfirmationMessage(kind)).toContain("Run backtest");
+    expect(await renderConfirmationMessage(kind, false)).not.toContain("Run backtest");
+    expect(await renderConfirmationMessage("future_calculation")).not.toContain("Run backtest");
   });
 
   test("result cards render only active artifact scoped actions", () => {

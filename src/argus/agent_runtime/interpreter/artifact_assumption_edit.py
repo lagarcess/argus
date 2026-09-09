@@ -7,6 +7,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from argus.agent_runtime.artifact_edit_outcomes import (
+    artifact_edit_has_changes,
+    canonical_artifact_edit_plan,
+    executable_edit_targets,
+    normalized_edit_timeframe,
+)
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     ResolvedArtifactEdit,
@@ -22,6 +28,9 @@ from argus.agent_runtime.artifacts.asset_edits import (
 )
 from argus.agent_runtime.asset_text_grounding import (
     provider_grounded_asset_evidence_from_text,
+)
+from argus.agent_runtime.interpreter.artifact_edit_response import (
+    build_artifact_edit_response,
 )
 from argus.agent_runtime.interpreter.asset_role_constraints import (
     asset_role_constraints_satisfied,
@@ -1029,7 +1038,7 @@ def _materialized_target_matches_primary_delta(
     materialized_draft: LLMStrategyDraft,
     primary_draft: LLMStrategyDraft | None,
     current_strategy: StrategySummary | None,
-    request: InterpretationRequest,
+    request: InterpretationRequest | None,
     grounded_asset_symbols: set[str] | None = None,
     primary_asset_inclusions: set[str] | None = None,
     primary_asset_exclusions: set[str] | None = None,
@@ -1295,8 +1304,14 @@ def _materialized_target_mutates_current(
     *,
     materialized_draft: LLMStrategyDraft,
     current_strategy: StrategySummary | None,
-    request: InterpretationRequest,
+    request: InterpretationRequest | None,
 ) -> bool:
+    if target == "timeframe":
+        return normalized_edit_timeframe(
+            materialized_draft.timeframe
+        ) != normalized_edit_timeframe(
+            current_strategy.timeframe if current_strategy is not None else None
+        )
     if target == "asset":
         current = set(
             normalized_asset_symbols(
@@ -1456,106 +1471,37 @@ def _response_from_artifact_assumption_edit_plan(
             else None
         )
     )
-    draft, field_provenance, extra_parameters, _ = _materialized_artifact_edit(
-        plan,
+    draft, field_provenance, extra_parameters, resolved = _materialized_artifact_edit(
+        canonical_artifact_edit_plan(plan),
         request=request,
         asset_symbol_resolver=asset_symbol_resolver,
         primary_draft=primary_draft,
     )
 
-    if plan.outcome == "ready_to_confirm":
-        if plan.operations and not field_provenance and not extra_parameters:
-            # Every operation was refused. When a refusal is impossible
-            # against the card state ("Quita TSLA" with no TSLA in the
-            # basket), no restatement can fix it, so the honest §3.2 shape is
-            # the same card re-issued with the typed disclosure; a
-            # clarification here gets swallowed by the stage because
-            # 'assumption' is not a contract field, and the card would
-            # re-issue clean. A refused cost is different: the value is
-            # correctable, so asking helps and the clarification reply stays
-            # (the #271 contract), as it does for refusals without a typed
-            # record (an indicator op dropped after the resolver).
-            disclosure_record = draft.extra_parameters.get("edit_disclosure")
-            discloses_impossible_change = isinstance(disclosure_record, dict) and any(
-                isinstance(entry, dict)
-                and entry.get("target") not in ("fees", "slippage")
-                for entry in disclosure_record.get("unapplied") or []
-            )
-            if not discloses_impossible_change:
-                return LLMInterpretationResponse(
-                    intent="conversation_followup",
-                    task_relation="continue",
-                    requires_clarification=True,
-                    user_goal_summary=(
-                        plan.user_goal_summary
-                        or "The requested assumption change cannot be applied here."
-                    ),
-                    candidate_strategy_draft=draft,
-                    assistant_response=(
-                        plan.assistant_response
-                        or "I can change RSI thresholds only on an active RSI confirmation card."
-                    ),
-                    confidence=plan.confidence,
-                    reason_codes=["artifact_assumption_edit_planned"],
-                    semantic_turn_act="unsupported_request",
-                    artifact_target=artifact_target,
-                )
-        # A mixed edit's unapplied part must reach the user through the card:
-        # card turns drop assistant prose, so the typed record carries the
-        # disclosure and the planner's note rides beside it as the voice. On a
-        # ready outcome the planner only writes a note for what it could not
-        # change, so a note without a rejected operation still discloses.
-        note = str(plan.assistant_response or "").strip()
-        disclosure = draft.extra_parameters.get("edit_disclosure")
-        if note:
-            if not isinstance(disclosure, dict):
-                disclosure = {"unapplied": []}
-                draft.extra_parameters["edit_disclosure"] = disclosure
-            disclosure["note"] = note
-        applied_reason_codes = ["artifact_assumption_edit_planned"]
-        if primary_draft is not None and (
-            set(normalized_asset_symbols(primary_draft.asset_universe))
-            & set(normalized_asset_symbols(primary_draft.asset_exclusions))
-        ):
-            # Turn-correlated receipt: the exclusions-outrank override fired.
-            applied_reason_codes.append("asset_exclusions_outranked_universe_copy")
-        return LLMInterpretationResponse(
-            intent="backtest_execution",
-            task_relation="continue",
-            requires_clarification=False,
-            user_goal_summary=(
-                plan.user_goal_summary
-                or "User changed a visible confirmation assumption."
-            ),
-            candidate_strategy_draft=draft,
-            assistant_response=plan.assistant_response,
-            confidence=plan.confidence,
-            reason_codes=applied_reason_codes,
-            semantic_turn_act="answer_pending_need",
-            artifact_target=artifact_target,
-        )
-
-    return LLMInterpretationResponse(
-        intent=(
-            "unsupported_or_out_of_scope"
-            if plan.outcome == "unsupported"
-            else "conversation_followup"
-        ),
-        task_relation="continue",
-        requires_clarification=True,
-        user_goal_summary=(
-            plan.user_goal_summary
-            or "The requested assumption change needs clarification."
-        ),
-        candidate_strategy_draft=draft,
-        missing_required_fields=list(plan.missing_required_fields),
-        assistant_response=plan.assistant_response,
-        confidence=plan.confidence,
-        reason_codes=["artifact_assumption_edit_planned"],
-        semantic_turn_act=(
-            "unsupported_request"
-            if plan.outcome == "unsupported"
-            else "answer_pending_need"
+    materialized_targets = {
+        target
+        for field, target in _MATERIALIZED_FIELD_TARGETS.items()
+        if field in field_provenance
+    }
+    if draft.date_range_intent is not None:
+        materialized_targets.add("date_window")
+    materialized_targets = executable_edit_targets(
+        materialized_targets,
+        timeframe=draft.timeframe,
+    )
+    return build_artifact_edit_response(
+        plan=plan,
+        draft=draft,
+        field_provenance=field_provenance,
+        extra_parameters=extra_parameters,
+        materialized_targets=materialized_targets,
+        has_changes=artifact_edit_has_changes(
+            materialized_targets=materialized_targets,
+            draft=draft,
+            current_strategy=_current_artifact_strategy(request),
+            request=request,
         ),
         artifact_target=artifact_target,
+        primary_draft=primary_draft,
+        resolved=resolved,
     )

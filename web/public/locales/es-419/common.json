@@ -229,6 +229,9 @@
     "close": "Cerrar comentarios"
   },
   "chat": {
+    "artifact_edit_disclosure": {
+      "no_change_applied": "No se aplicó ninguno de los cambios que pediste. Vuelve a decir qué quieres cambiar."
+    },
     "artifact_assumptions": {
       "confirmation": "Para la confirmación, estos son los supuestos: {{assumptions}}.",
       "current_idea": "Para esta idea, estos son los supuestos conocidos: {{assumptions}}.",

@@ -87,12 +87,12 @@ has 5,335 lines against limit 5,354, leaving 19. Neither budget is widened.
 
 ## Implementation sequence
 
-- [ ] Reproduce and inventory silent edit outcomes with focused failing tests.
-- [ ] Extract lifecycle with a second metadata layout proving parameterization;
+- [x] Reproduce and inventory silent edit outcomes with focused failing tests.
+- [x] Extract lifecycle with a second metadata layout proving parameterization;
   retain backtest adapter compatibility and existing lifecycle suites.
-- [ ] Extract shared edit completion/disclosure, close reachable silent paths
+- [x] Extract shared edit completion/disclosure, close reachable silent paths
   in the callee, shrink the watched interpreter module.
-- [ ] Add card discriminator and bilingual generic disclosure at hydration/render.
+- [x] Add card discriminator and bilingual generic disclosure at hydration/render.
 - [ ] Run focused and mocked verification, browser acceptance, reconcile,
   merged-tree budget, PR CI and scoped Codex review; record terminal evidence.
 

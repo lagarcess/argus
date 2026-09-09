@@ -229,6 +229,9 @@
     "close": "Close feedback"
   },
   "chat": {
+    "artifact_edit_disclosure": {
+      "no_change_applied": "No requested changes were applied. Please restate what you want to change."
+    },
     "artifact_assumptions": {
       "confirmation": "For the confirmation, these are the assumptions: {{assumptions}}.",
       "current_idea": "For this idea, these are the known assumptions: {{assumptions}}.",
