@@ -702,13 +702,33 @@ out of scope.
 send does not distribute, and the receipt is a retrofit across every card once
 they exist.
 
+**Decided 2026-09-09, and written into
+[`conversation-sharing.md`](conversation-sharing.md) section 4.5.** This
+extends the sharing feature that exists; a parallel conversation-sharing system
+has been built wrong. A link glyph sits in the chat header beside the existing
+`MoreVertical`, never inside it, and opens per-turn selection. **The selection
+screen is the work no competitor has done for us:** they offer "select all"
+because every turn is shareable and ours are not, so an ineligible turn renders
+unselectable with a reason the owner can read, and "select all" means all
+eligible. The result card keeps its share control as a shortcut through the
+same record, because two lineages would drift. The public page stays a receipt
+rather than a rendered card, derived from the card's typed facts instead of
+`receiptPlan` and `benchmarkVerdict`. The action reads **"Continue with
+Argus"**.
+
+**Deferred deliberately:** a receipt that offers its own re-run. It is the one
+thing a product sharing prose cannot copy, and it contradicts the freeze rule,
+so it is a later decision rather than a tweak.
+
 **Do not touch.** No fork, no prefilled prompt, no guest shares, no multi-turn
-selection. Operating rule 3 stays at four artifacts: if a second calculation
-needs its own receipt body, the abstraction failed.
+selection beyond choosing turns in one conversation. Operating rule 3 stays at
+four artifacts: if a second calculation needs its own receipt body, the
+abstraction failed.
 
 **Proof.** A non-backtest answer shared, opened signed out at 390 and 1280 in
-both languages, revoked, and its tombstone rendered. A version 1 backtest
-receipt still readable unchanged.
+both languages, revoked, and its tombstone rendered. An ineligible turn shown
+unselectable with its reason, in both languages. A version 1 backtest receipt
+still readable unchanged.
 
 ---
 
