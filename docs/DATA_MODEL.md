@@ -1057,8 +1057,11 @@ Constraints:
   canonical current decision; a repeated write on a computed answer keeps the
   first stored computation.
 - The message metadata that declares a computation (`metadata.computation`)
-  and the decision stamp the backend writes beside it (`decision_note_id`,
-  `decision_state`) share the keys `argus.domain.decision_attachment` owns.
+  is written once by the backend. The decision beside it (`decision_note_id`,
+  `decision_state`) is not stored on the message: every transcript read derives
+  it from this table through `argus.api.decision_message_reads`, for computed
+  answers and result cards alike, so no second durable copy can disagree with
+  the row.
 - Migration `20260908120000_decision_notes_attach_to_computations.sql` relaxes
   the three lineage columns and adds the attachment columns and constraints;
   no row is rewritten and no object is removed. The promotion gate classifies

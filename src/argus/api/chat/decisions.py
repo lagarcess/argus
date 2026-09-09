@@ -15,8 +15,6 @@ from collections.abc import Callable, Mapping
 from datetime import date
 from typing import Any
 
-from loguru import logger
-
 from argus.api import state as api_state
 from argus.api.chat.evidence import _emit_product_event
 from argus.api.decision_contract import (
@@ -26,7 +24,7 @@ from argus.api.decision_contract import (
     DecisionRerun,
 )
 from argus.api.message_store import owned_conversation_message
-from argus.api.schemas import EvidenceArtifact, Message, User
+from argus.api.schemas import EvidenceArtifact, User
 from argus.domain.computations import (
     InvalidComputationInputs,
     RerunContext,
@@ -36,7 +34,6 @@ from argus.domain.computations import (
 from argus.domain.decision_attachment import (
     computation_from_message_metadata,
     decision_computation,
-    decision_message_metadata,
 )
 from argus.domain.store import utcnow
 
@@ -109,7 +106,9 @@ def create_decision_for_message(
             ) from exc
     api_state.store.decision_notes[decision.id] = decision
     api_state.store.decision_note_owners[decision.id] = user.id
-    _stamp_message(user_id=user.id, message=message, decision=decision)
+    # The transcript read derives the answer's decision from decision_notes,
+    # so no second copy is written onto the message.
+    api_state.store.bump_search_revision()
 
     _emit_product_event(
         "decision_capture",
@@ -240,39 +239,3 @@ def _run_row(run: object) -> Mapping[str, Any]:
     model_dump = getattr(run, "model_dump", None)
     dumped = model_dump(mode="python") if callable(model_dump) else {}
     return dumped if isinstance(dumped, Mapping) else {}
-
-
-def _stamp_message(*, user_id: str, message: Message, decision: DecisionNote) -> None:
-    """Stamp the decision onto its message in every store that holds it.
-
-    The durable stamp is best effort after the decision committed, matching
-    the result-card path: a failed stamp is logged, never a failed decision.
-    """
-    if api_state.supabase_gateway is not None:
-        try:
-            api_state.supabase_gateway.stamp_message_decision(
-                user_id=user_id,
-                message=message,
-                decision=decision,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Supabase message decision stamp failed after decision commit",
-                error=str(exc),
-                message_id=message.id,
-                decision_id=decision.id,
-            )
-    with api_state.store.conversation_message_lock:
-        messages = api_state.store.messages.get(message.conversation_id, [])
-        for index, existing in enumerate(messages):
-            if existing.id != message.id:
-                continue
-            messages[index] = existing.model_copy(
-                update={
-                    "metadata": decision_message_metadata(
-                        existing.metadata, decision=decision
-                    )
-                }
-            )
-            api_state.store.bump_search_revision()
-            break

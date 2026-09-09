@@ -152,6 +152,44 @@ def test_the_answer_message_carries_the_decision_after_reload(
     assert answer["metadata"]["computation"]["kind"] == SAVINGS_PROJECTION_KIND
 
 
+def test_the_transcript_read_takes_the_decision_from_its_owner_not_the_copy(
+    harness_kernel: ComputationKernel,
+) -> None:
+    """A lost or stale stamp on the message cannot disagree with decision_notes."""
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    message_id = _computed_answer(conversation["id"])
+    decision = client.post(
+        _decision_path(conversation["id"], message_id),
+        json={"decision_state": "promising"},
+    ).json()["decision"]
+
+    with api_state.store.conversation_message_lock:
+        messages = api_state.store.messages[conversation["id"]]
+        for index, message in enumerate(messages):
+            if message.id == message_id:
+                messages[index] = message.model_copy(
+                    update={
+                        "metadata": {
+                            **(message.metadata or {}),
+                            "decision_note_id": "stale-copy",
+                            "decision_state": "rejected",
+                        }
+                    }
+                )
+
+    reloaded = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    answer = next(item for item in reloaded.json()["items"] if item["id"] == message_id)
+    assert answer["metadata"]["decision_note_id"] == decision["id"]
+    assert answer["metadata"]["decision_state"] == "promising"
+
+    del api_state.store.decision_notes[decision["id"]]
+    reloaded = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    answer = next(item for item in reloaded.json()["items"] if item["id"] == message_id)
+    assert "decision_note_id" not in answer["metadata"]
+    assert "decision_state" not in answer["metadata"]
+
+
 def test_decision_is_idempotent_per_answer_and_keeps_its_first_computation(
     harness_kernel: ComputationKernel,
 ) -> None:
@@ -442,6 +480,29 @@ def test_existing_backtest_decisions_open_with_a_derived_computation_and_retest(
     assert dossiers.status_code == 200
     assert dossiers.json()["decided_runs"] == 1
     assert dossiers.json()["items"][0]["decision"]["state"] == "watching"
+
+    # The result card's decision is read from decision_notes too: wiping the
+    # stored stamp changes nothing the transcript shows.
+    result_message = memory_message(
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="",
+        metadata={
+            "result_run_id": run_id,
+            "result_card": {
+                "title": "TSLA buy and hold",
+                "evidence_artifact_id": artifact_id,
+            },
+        },
+    )
+    reloaded = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    card = next(
+        item for item in reloaded.json()["items"] if item["id"] == result_message.id
+    )
+    assert card["metadata"]["decision_note_id"] == decision["id"]
+    assert card["metadata"]["decision_state"] == "watching"
+    assert card["metadata"]["result_card"]["decision_state"] == "watching"
+    assert card["metadata"]["result_card"]["evidence_lifecycle"] == "decided"
 
 
 def test_guests_are_asked_to_sign_in_before_deciding_on_a_computed_answer(

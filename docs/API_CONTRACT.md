@@ -4290,6 +4290,8 @@ Completed chat-launched backtests auto-capture P1 evidence sidecars. The
 result-card metadata may include `idea_id`, `idea_version_id`,
 `evidence_artifact_id`, `evidence_lifecycle`, `artifact_type = "backtest"`,
 and after explicit decision capture, `decision_note_id` and `decision_state`.
+The two decision fields are derived on each transcript read from
+`decision_notes`, which owns them; the stored card copy is not the source.
 These are stable ids/enums and must not be localized.
 
 ## `POST /evidence-artifacts/{id}/decision`
@@ -4395,10 +4397,12 @@ A computed answer declares its computation in message metadata:
 `metadata.computation = {"kind": "<registered kind>", "inputs": {...}}`. `kind`
 is a lowercase slug of at most 80 characters; `inputs` is a JSON object of at
 most 32 keys that serializes to at most 8,192 characters. Only the backend
-writes this field. After a decision is recorded, the backend stamps
-`decision_note_id` and `decision_state` onto the same message metadata, exactly
-as it does on a result card, and clients render that stamp instead of inferring
-one. A message without a valid declaration offers no decision.
+writes this field. On every transcript read, the backend derives
+`decision_note_id` and `decision_state` for the message from `decision_notes`,
+the one owner of that fact, exactly as it does for a result card; a stored copy
+on the message is never trusted, and a decision the owner no longer holds is
+not shown. Clients render that state instead of inferring one. A message
+without a valid declaration offers no decision.
 
 ### `POST /conversations/{conversation_id}/messages/{message_id}/decision`
 

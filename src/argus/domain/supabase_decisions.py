@@ -3,6 +3,8 @@
 A backtest decision keeps its RPC path in the gateway proper, because it moves
 the artifact, idea, and version lifecycles together. A computed-answer
 decision has no sidecars: it is one row keyed by the message it attaches to.
+Message metadata never carries a durable copy of the decision; the transcript
+read derives it from these rows.
 """
 
 from __future__ import annotations
@@ -10,8 +12,6 @@ from __future__ import annotations
 from typing import Any
 
 from argus.api.decision_contract import DecisionNote
-from argus.api.schemas import Message
-from argus.domain.decision_attachment import decision_message_metadata
 from argus.domain.store import utcnow
 from supabase import Client
 
@@ -93,14 +93,37 @@ class DecisionAttachmentPersistenceMixin:
         )
         return DecisionNote.model_validate(_row_one(updated))
 
-    def stamp_message_decision(
+    def current_decisions_for_attachments(
         self,
         *,
         user_id: str,
-        message: Message,
-        decision: DecisionNote,
-    ) -> None:
-        metadata = decision_message_metadata(message.metadata, decision=decision)
-        self.client.table("messages").update({"metadata": metadata}).eq(
-            "user_id", user_id
-        ).eq("id", message.id).execute()
+        artifact_ids: list[str],
+        message_ids: list[str],
+    ) -> dict[str, DecisionNote]:
+        """Current decisions keyed by the attachment id that names them."""
+        current: dict[str, DecisionNote] = {}
+        for column, wanted in (
+            ("evidence_artifact_id", artifact_ids),
+            ("source_message_id", message_ids),
+        ):
+            if not wanted:
+                continue
+            rows = (
+                self.client.table("decision_notes")
+                .select("*")
+                .eq("user_id", user_id)
+                .in_(column, list(wanted))
+                .execute()
+            )
+            for row in getattr(rows, "data", None) or []:
+                decision = DecisionNote.model_validate(row)
+                key = getattr(decision, column)
+                if key is None:
+                    continue
+                held = current.get(key)
+                if held is None or (decision.updated_at, decision.id) > (
+                    held.updated_at,
+                    held.id,
+                ):
+                    current[key] = decision
+        return current

@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from argus.api.decision_contract import DecisionComputation, DecisionNote
-from argus.api.schemas import Message
 from argus.domain.supabase_gateway import SupabaseGateway
 from faker import Faker
 
@@ -212,33 +211,3 @@ def test_artifact_decisions_are_refused_by_the_message_writer() -> None:
         gateway.upsert_message_decision_note(
             user_id=fake.uuid4(), decision=artifact_decision
         )
-
-
-def test_stamping_writes_the_shared_decision_keys_onto_the_owned_message() -> None:
-    client = _Client()
-    gateway = _gateway(client)
-    user_id = fake.uuid4()
-    conversation_id = fake.uuid4()
-    message = Message(
-        id=fake.uuid4(),
-        conversation_id=conversation_id,
-        role="assistant",
-        content="Nine months of 5,000 a month is 45,000.",
-        created_at=NOW,
-        metadata={"computation": {"kind": "savings_projection", "inputs": {}}},
-    )
-    client.rows_by_table["messages"].append(
-        {**message.model_dump(mode="json"), "user_id": user_id}
-    )
-    decision = _message_decision(
-        user_message_id=message.id, conversation_id=conversation_id
-    )
-
-    gateway.stamp_message_decision(user_id=user_id, message=message, decision=decision)
-
-    update = next(op for op in client.operations if op[0] == "update")
-    assert update[1] == "messages"
-    assert update[3] == {"user_id": user_id, "id": message.id}
-    assert update[2]["metadata"]["computation"] == message.metadata["computation"]
-    assert update[2]["metadata"]["decision_note_id"] == decision.id
-    assert update[2]["metadata"]["decision_state"] == "watching"
