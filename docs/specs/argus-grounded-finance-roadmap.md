@@ -390,8 +390,8 @@ and none needs a rebase.
 | Lift the loop, Lane A | **LANDED** `f7c9192b`, PR #560. |
 | Refusal log | **LANDED** `fa69466c`, PR #559. |
 | Metering | **LANDED** `1db1aa75`, PR #561. Guest compute ceiling is silent and anti-abuse, 300 per UTC day, never projected in `/me/usage`; `PRODUCT.md` §19 amended. |
-| Decisions | PR #564 at `68dbed54`, CI 7/7, one open P2: `DecisionAffordance.tsx` keeps a component-local `savedState` that never resyncs from the prop, which is the split brain the lane just removed on the backend, one layer up. |
-| Retrieval parameters | PR #562 at `689984f3`, CI 7/7, release-surface files dropped. Two open P1s, both holes in the new prose-versus-rows verifier: `EPS` classified as a currency, and title-cased labels read as entity names. |
+| Decisions | **LANDED** `67facaf5`, PR #564. Four rounds, each returning one finding at the head; the last two were the same fact-ownership defect at successive layers, the durable stamp then the component copy. `decision_notes` owns both. |
+| Retrieval parameters | **LANDED** `41bf9930`, PR #562. The prose-versus-rows verifier was deleted rather than widened: a rejected row now withholds the whole answer through `_withheld_code`, the one owner of the honesty line at the composition seam, and the row declares its own subject so the audit infers nothing. #404 and #545 closed. |
 | Sharing on | **Done.** Evidence landed on integration. Only the flag flip remains and the founder has deferred it to the next promotion. |
 | #462 latency | **LANDED** `76937883`, PR #563. Its measurement produced the Subtract the guardrails item. |
 
@@ -466,6 +466,33 @@ first expensive non-backtest calculation.
 - **Lane C, the throwaway proof.** A second calculation driven by a unit
   harness, never merged, run before the registry lane so the registry is
   designed from what the throwaway actually needed. One round.
+
+**Lane C ran 2026-09-08 against `6bc3e0ee`, draft PR #566, never to merge.**
+Report and evidence under `docs/reports/lift-loop-lane-c/`. Time value of money
+solved for any one of five blanks, 93 tests, 31 fresh-process import probes with
+guards that refuse backtest imports rather than stubbing them. Three findings
+change this board.
+
+**Relocation did not make the loop reusable.** The open containers hold the five
+inputs through real Pydantic round trips with no strategy, symbol, date range or
+run id. But `state/models.py:16` imports `capability_registry`, which imports
+`STRATEGY_CAPABILITIES`, and `api/schemas.py:30` imports it independently, so the
+message envelope cannot be reached without loading the strategy catalog. Lane A
+moved code; it did not cut that edge. **Verified independently at the head.**
+
+**The four-artifact bar is unproven, not passed.** Lane C produced four runnable
+artifacts, and says plainly that counting them as a passing calculation would
+conceal the absent work: no product card, no dispatch, no recompute. Rule 3's
+stop condition stays live and this spike does not waive it.
+
+**The bill in the registry is now itemized.** Using the loop as it stands needs
+changes at six existing owners: dispatch, pending-card assembly and update, edit
+application and disclosure, fact projection and localization, result selection
+and hydration, and retry and continuity semantics. The sharpest single blocker
+is that nothing dispatches to a cheap calculation at all: the graph has one
+backtest tool and `stages/execute.py:50-71` always builds a launch payload
+first, so answering first without a confirm card has no path today. That is
+operating rule 2 with no runtime behind it.
 
 **Almost nothing moves.** `models.py`, `confirm.py`, `contextual_merge.py` and
 the web card stay untouched.

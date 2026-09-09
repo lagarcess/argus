@@ -393,11 +393,13 @@ describe("chat archive/delete lifecycle source contract", () => {
       join(root, "lib/chat-transcript-session-cache.ts"),
       "utf-8",
     );
+    // The shared affordance calls onSaved only after the durable write
+    // succeeded, so the card's callback is the success slice.
     const decisionSuccessStart = card.indexOf(
-      "const response = await createEvidenceDecision",
+      "onSaved: async (decision) => {",
     );
     const decisionSuccessEnd = card.indexOf(
-      "} catch",
+      "if (!memoryProposalEnabled) return;",
       decisionSuccessStart,
     );
     const decisionSuccess = card.slice(
@@ -407,10 +409,10 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(decisionSuccessStart).toBeGreaterThan(-1);
     expect(decisionSuccessEnd).toBeGreaterThan(decisionSuccessStart);
     expect(decisionSuccess).toContain(
-      "setSavedDecisionState(response.decision.decision_state)",
+      "setSavedDecisionState(decision.decision_state)",
     );
     expect(decisionSuccess).toContain(
-      "onDecisionSaved?.(response.decision.decision_state)",
+      "onDecisionSaved?.(decision.decision_state)",
     );
     expect(decisionSuccess.indexOf("setSavedDecisionState")).toBeLessThan(
       decisionSuccess.indexOf("onDecisionSaved?.("),

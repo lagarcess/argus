@@ -340,6 +340,11 @@ export type Message = {
   researchSources?: DiscoverySource[] | null;
   /** Backend post-turn saved-decision recalls; rendered as context only. */
   memoryRecalls?: MemoryRecallItem[] | null;
+  /** Backend-declared computation behind a computed answer; it offers a decision. */
+  computation?: import("@/lib/decision-contract").DecisionComputation | null;
+  /** Current decision stamped on a computed answer by the backend. */
+  decisionNoteId?: string | null;
+  decisionState?: DecisionState | null;
   /** Backend-owned structured context for a retest receipt turn. */
   retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
   /** Ephemeral optimistic presentation; never hydrated or persisted. */
