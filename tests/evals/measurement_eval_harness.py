@@ -50,9 +50,12 @@ from tests.evals.measurement_prose import (
     unavailable_prose_result,
 )
 from tests.evals.measurement_registry import (
+    chronological_patch,
     compare_dispatch,
     compare_stage_outcomes,
+    continue_turn_stages,
     dispatch_requested_calls,
+    latest_stage_result,
     measurement_execution_evidence,
 )
 from tests.evals.measurement_registry import (
@@ -179,7 +182,12 @@ def run_eval_case(
         action_context=_action_payload(case.action),
     )
     if case.confirmation_payload is not None:
-        state.confirmation_payload = case.confirmation_payload
+        state = RunState.model_validate(
+            {
+                **state.model_dump(mode="python"),
+                "confirmation_payload": case.confirmation_payload,
+            }
+        )
 
     user = UserState(
         user_id="argus-eval",
@@ -216,45 +224,18 @@ def run_eval_case(
             state=state, interpreted=interpret_result, user=user, **turn_context
         )
         routed_result = dispatch_result or interpret_result
-        routed_patch = {**interpret_result.patch, **routed_result.patch}
-        if routed_result.outcome == "ready_for_confirmation":
-            confirm_state = _state_for_confirmation(
-                case=case,
-                interpret_patch=routed_patch,
-            )
-            confirm_result = confirm_stage(
-                state=confirm_state,
-                contract=contract,
-                language=case.user_language,
-            )
-            if confirm_result.outcome == "needs_clarification":
-                clarify_result = clarify_stage(
-                    state=_state_from_interpret_patch(
-                        case=case,
-                        interpret_patch={
-                            **routed_patch,
-                            **confirm_result.patch,
-                        },
-                    ),
-                    contract=contract,
-                    clarification_generator=clarifier,
-                    language=case.user_language,
-                )
-        elif routed_result.outcome == "needs_clarification":
-            clarify_state = _state_from_interpret_patch(
-                case=case,
-                interpret_patch=routed_patch,
-            )
-            clarify_result = clarify_stage(
-                state=clarify_state,
-                contract=contract,
-                clarification_generator=clarifier,
-                language=case.user_language,
-                prefilled_assistant_prompt=(
-                    routed_patch.get("assistant_response")
-                    or routed_patch.get("assistant_prompt")
-                ),
-            )
+        stage_results = continue_turn_stages(
+            state=state,
+            interpreted=interpret_result,
+            dispatched=dispatch_result,
+            contract=contract,
+            language=case.user_language,
+            clarification_generator=clarifier,
+            confirm=confirm_stage,
+            clarify=clarify_stage,
+        )
+        confirm_result = latest_stage_result(stage_results, "confirm")
+        clarify_result = latest_stage_result(stage_results, "clarify")
         followup_result = _run_followup_turn_if_needed(
             case=case,
             user=user,
@@ -262,6 +243,7 @@ def run_eval_case(
             interpret_result=routed_result,
             clarify_result=clarify_result,
             clarification_generator=clarifier,
+            stage_results=stage_results,
         )
     finally:
         route_receipts = [
@@ -276,6 +258,7 @@ def run_eval_case(
         confirm_result=confirm_result,
         clarify_result=clarify_result,
         followup_result=followup_result,
+        stage_results=stage_results,
     )
     failed_checks = typed_expectation_failures(case=case, outcome=typed_outcome)
     infrastructure_errors = composer_unavailability(route_receipts)
@@ -286,6 +269,7 @@ def run_eval_case(
             dispatch_result=dispatch_result,
             confirm_result=confirm_result,
             clarify_result=clarify_result,
+            stage_results=stage_results,
         )
         assistant_text = _assistant_text(judged_final_patch)
         rendered_surface = rendered_beside_reply(
@@ -578,13 +562,18 @@ def _run_followup_turn_if_needed(
     interpret_result: Any,
     clarify_result: Any | None,
     clarification_generator: Any,
+    stage_results: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     if not case.followup_prompt:
         return None
     if clarify_result is None:
         return {"skipped_reason": "initial_turn_did_not_clarify"}
 
-    final_clarify_patch = {**interpret_result.patch, **clarify_result.patch}
+    final_clarify_patch = (
+        chronological_patch(stage_results)
+        if stage_results is not None
+        else {**interpret_result.patch, **clarify_result.patch}
+    )
     assistant_text = _assistant_text(final_clarify_patch)
     state = RunState.new(
         current_user_message=case.followup_prompt,
@@ -610,85 +599,25 @@ def _run_followup_turn_if_needed(
     followup_dispatch = dispatch_requested_calls(
         state=state, interpreted=followup_interpret, user=user, **turn_context
     )
-    routed_result = followup_dispatch or followup_interpret
-    routed_patch = {**followup_interpret.patch, **routed_result.patch}
-    if routed_result.outcome == "ready_for_confirmation":
-        followup_confirm = confirm_stage(
-            state=_state_for_followup_confirmation(
-                prompt=case.followup_prompt,
-                interpret_patch=routed_patch,
-            ),
-            contract=contract,
-            language=case.user_language,
-        )
-        if followup_confirm.outcome == "needs_clarification":
-            followup_clarify = clarify_stage(
-                state=_state_for_followup_clarification(
-                    prompt=case.followup_prompt,
-                    interpret_patch={
-                        **routed_patch,
-                        **followup_confirm.patch,
-                    },
-                ),
-                contract=contract,
-                clarification_generator=clarification_generator,
-                language=case.user_language,
-            )
-    elif routed_result.outcome == "needs_clarification":
-        followup_clarify = clarify_stage(
-            state=_state_for_followup_clarification(
-                prompt=case.followup_prompt,
-                interpret_patch=routed_patch,
-            ),
-            contract=contract,
-            clarification_generator=clarification_generator,
-            language=case.user_language,
-            prefilled_assistant_prompt=(
-                routed_patch.get("assistant_response")
-                or routed_patch.get("assistant_prompt")
-            ),
-        )
+    followup_stages = continue_turn_stages(
+        state=state,
+        interpreted=followup_interpret,
+        dispatched=followup_dispatch,
+        contract=contract,
+        language=case.user_language,
+        clarification_generator=clarification_generator,
+        confirm=confirm_stage,
+        clarify=clarify_stage,
+    )
+    followup_confirm = latest_stage_result(followup_stages, "confirm")
+    followup_clarify = latest_stage_result(followup_stages, "clarify")
     return {
         "interpret_result": followup_interpret,
         "dispatch_result": followup_dispatch,
         "confirm_result": followup_confirm,
         "clarify_result": followup_clarify,
+        "stage_results": followup_stages,
     }
-
-
-def _state_for_followup_clarification(
-    *,
-    prompt: str,
-    interpret_patch: dict[str, Any],
-) -> RunState:
-    state = _state_for_followup_confirmation(
-        prompt=prompt,
-        interpret_patch=interpret_patch,
-    )
-    state.missing_required_fields = list(
-        interpret_patch.get("missing_required_fields") or []
-    )
-    state.requested_field = interpret_patch.get("requested_field")
-    if "response_intent" in interpret_patch:
-        state.response_intent = interpret_patch["response_intent"]
-    return state
-
-
-def _state_for_followup_confirmation(
-    *,
-    prompt: str,
-    interpret_patch: dict[str, Any],
-) -> RunState:
-    state = RunState.new(current_user_message=prompt, recent_thread_history=[])
-    if "candidate_strategy_draft" in interpret_patch:
-        state.candidate_strategy_draft = StrategySummary.model_validate(
-            interpret_patch["candidate_strategy_draft"]
-        )
-    if "optional_parameter_status" in interpret_patch:
-        state.optional_parameter_status = dict(
-            interpret_patch["optional_parameter_status"]
-        )
-    return state
 
 
 async def _judge_prose_quality_async(
@@ -872,38 +801,6 @@ def _action_payload(action: EvalAction | None) -> dict[str, Any] | None:
     }
 
 
-def _state_for_confirmation(
-    *,
-    case: EvalCase,
-    interpret_patch: dict[str, Any],
-) -> RunState:
-    state = RunState.new(current_user_message=case.prompt, recent_thread_history=[])
-    if "candidate_strategy_draft" in interpret_patch:
-        state.candidate_strategy_draft = StrategySummary.model_validate(
-            interpret_patch["candidate_strategy_draft"]
-        )
-    if "optional_parameter_status" in interpret_patch:
-        state.optional_parameter_status = dict(
-            interpret_patch["optional_parameter_status"]
-        )
-    return state
-
-
-def _state_from_interpret_patch(
-    *,
-    case: EvalCase,
-    interpret_patch: dict[str, Any],
-) -> RunState:
-    state = _state_for_confirmation(case=case, interpret_patch=interpret_patch)
-    state.missing_required_fields = list(
-        interpret_patch.get("missing_required_fields") or []
-    )
-    state.requested_field = interpret_patch.get("requested_field")
-    if "response_intent" in interpret_patch:
-        state.response_intent = interpret_patch["response_intent"]
-    return state
-
-
 def _typed_outcome(
     *,
     case: EvalCase,
@@ -912,6 +809,7 @@ def _typed_outcome(
     clarify_result: Any | None,
     dispatch_result: Any | None = None,
     followup_result: dict[str, Any] | None = None,
+    stage_results: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any]:
     followup_interpret = (
         followup_result.get("interpret_result") if followup_result else None
@@ -931,6 +829,11 @@ def _typed_outcome(
     payload_dispatch_result = (
         followup_dispatch if followup_interpret is not None else dispatch_result
     )
+    payload_stage_results = (
+        followup_result.get("stage_results")
+        if followup_interpret is not None
+        else stage_results
+    )
 
     interpret_patch = payload_interpret_result.patch
     final_patch = _final_patch(
@@ -938,6 +841,7 @@ def _typed_outcome(
         dispatch_result=payload_dispatch_result,
         confirm_result=payload_confirm_result,
         clarify_result=payload_clarify_result,
+        stage_results=payload_stage_results,
     )
     confirmation_payload = final_patch.get("confirmation_payload") or {}
     launch_payload = confirmation_payload.get("launch_payload") or {}
@@ -976,6 +880,7 @@ def _typed_outcome(
         confirmed=confirm_result,
         clarified=clarify_result,
         followup=followup_result,
+        stage_results=stage_results,
     )
     discovery_arguments = [
         call["arguments"]
@@ -1028,6 +933,7 @@ def _typed_outcome(
                 dispatch_result=payload_dispatch_result,
                 confirm_result=payload_confirm_result,
                 clarify_result=payload_clarify_result,
+                stage_results=payload_stage_results,
             ),
             patch=final_patch,
         ),
@@ -1054,7 +960,11 @@ def _final_patch(
     confirm_result: Any | None,
     clarify_result: Any | None,
     dispatch_result: Any | None = None,
+    stage_results: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    if stage_results is not None:
+        stage, result = stage_results[-1]
+        return chronological_patch(stage_results) if stage == "clarify" else result.patch
     if clarify_result is not None:
         return {
             **interpret_result.patch,
@@ -1198,7 +1108,10 @@ def _last_stage_outcome(
     confirm_result: Any | None,
     clarify_result: Any | None,
     dispatch_result: Any | None = None,
+    stage_results: list[tuple[str, Any]] | None = None,
 ) -> str:
+    if stage_results is not None:
+        return str(stage_results[-1][1].outcome)
     if clarify_result is not None:
         return str(clarify_result.outcome)
     if confirm_result is not None:

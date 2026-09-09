@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from collections.abc import Callable
 from typing import Any
 
 from argus.agent_runtime.stages.interpret_types import StageResult
@@ -17,6 +19,91 @@ from argus.domain.tool_contracts import ToolOutcome, ToolResultCard
 from pydantic import ValidationError
 
 from tests.evals.measurement_assertions import _compare
+
+
+def continue_turn_stages(
+    *,
+    state: RunState,
+    interpreted: Any,
+    dispatched: Any,
+    contract: Any,
+    language: str,
+    clarification_generator: Any,
+    confirm: Callable[..., Any],
+    clarify: Callable[..., Any],
+) -> list[tuple[str, Any]]:
+    """Follow runtime confirmation/clarification edges to the user boundary."""
+    from argus.agent_runtime.graph import workflow
+
+    stages = ordered_stage_results(interpreted=interpreted, dispatched=dispatched)
+    patch = chronological_patch(stages)
+    seen = set()
+    while True:
+        route = workflow._route_from_stage_outcome(
+            {**patch, "stage_outcome": stages[-1][1].outcome}
+        )
+        if route not in {
+            workflow.WorkflowRoute.CONFIRM.value,
+            workflow.WorkflowRoute.CLARIFY.value,
+        }:
+            # Run-button cases retain the harness's validated-approval boundary.
+            return stages
+        run_state = workflow._patched_run_state(run_state=state, patch=patch)
+        marker = (route, json.dumps(run_state.model_dump(mode="json"), sort_keys=True))
+        if marker in seen:
+            trace = [(name, result.outcome) for name, result in stages]
+            raise RuntimeError(
+                f"Measurement stopped a repeated runtime route and state: {trace!r}"
+            )
+        seen.add(marker)
+        if route == workflow.WorkflowRoute.CONFIRM.value:
+            result = confirm(state=run_state, contract=contract, language=language)
+        else:
+            result = clarify(
+                state=run_state,
+                contract=contract,
+                language=language,
+                clarification_generator=clarification_generator,
+                prefilled_assistant_prompt=(
+                    patch.get("assistant_response") or patch.get("assistant_prompt")
+                ),
+            )
+        stages.append((route, result))
+        patch.update(result.patch)
+
+
+def ordered_stage_results(
+    *,
+    interpreted: Any,
+    dispatched: Any = None,
+    confirmed: Any = None,
+    clarified: Any = None,
+    stage_results: list[tuple[str, Any]] | None = None,
+) -> list[tuple[str, Any]]:
+    if stage_results is not None:
+        return stage_results
+    # Read compatibility for authored stage observations from older harness tests.
+    return [
+        (name, result)
+        for name, result in (
+            ("interpret", interpreted),
+            ("execute", dispatched),
+            ("confirm", confirmed),
+            ("clarify", clarified),
+        )
+        if result is not None
+    ]
+
+
+def latest_stage_result(stages: list[tuple[str, Any]], name: str) -> Any:
+    return next((result for stage, result in reversed(stages) if stage == name), None)
+
+
+def chronological_patch(stages: list[tuple[str, Any]]) -> dict[str, Any]:
+    patch = {}
+    for _, result in stages:
+        patch.update(result.patch)
+    return patch
 
 
 def dispatch_requested_calls(
@@ -74,13 +161,15 @@ def turn_trace(
     dispatched: Any = None,
     confirmed: Any = None,
     clarified: Any = None,
+    stage_results: list[tuple[str, Any]] | None = None,
 ) -> tuple[list[dict[str, str]], list[str]]:
-    stages = [
-        ("interpret", interpreted),
-        ("execute", dispatched),
-        ("confirm", confirmed),
-        ("clarify", clarified),
-    ]
+    stages = ordered_stage_results(
+        interpreted=interpreted,
+        dispatched=dispatched,
+        confirmed=confirmed,
+        clarified=clarified,
+        stage_results=stage_results,
+    )
     raw = [
         {"stage": name, "outcome": str(result.outcome)}
         for name, result in stages
@@ -156,8 +245,9 @@ def measurement_execution_evidence(
     confirmed: Any,
     clarified: Any,
     followup: dict[str, Any] | None,
+    stage_results: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    turns = [(interpreted, dispatched, confirmed, clarified)]
+    turns = [(interpreted, dispatched, confirmed, clarified, stage_results)]
     if followup and followup.get("interpret_result") is not None:
         turns.append(
             tuple(
@@ -167,6 +257,7 @@ def measurement_execution_evidence(
                     "dispatch_result",
                     "confirm_result",
                     "clarify_result",
+                    "stage_results",
                 )
             )
         )
@@ -179,15 +270,21 @@ def measurement_execution_evidence(
         "tool_result_cards": [],
         "tool_usage": [],
     }
-    for interpreted, dispatched, confirmed, clarified in turns:
-        for result in (interpreted, dispatched, confirmed, clarified):
-            if result is not None:
-                effective_patch.update(result.patch)
+    for interpreted, dispatched, confirmed, clarified, stage_results in turns:
+        stages = ordered_stage_results(
+            interpreted=interpreted,
+            dispatched=dispatched,
+            confirmed=confirmed,
+            clarified=clarified,
+            stage_results=stage_results,
+        )
+        effective_patch.update(chronological_patch(stages))
         turn_events, turn_milestones = turn_trace(
             interpreted=interpreted,
             dispatched=dispatched,
             confirmed=confirmed,
             clarified=clarified,
+            stage_results=stages,
         )
         trace.extend(turn_events)
         milestones.extend(turn_milestones)

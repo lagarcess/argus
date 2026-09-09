@@ -30,6 +30,328 @@ fake = Faker()
 
 
 @pytest.mark.parametrize("followup", [False, True])
+@pytest.mark.parametrize("declared_dispatch", [False, True])
+def test_clarification_readiness_reaches_real_confirmation_in_chronological_order(
+    monkeypatch, followup, declared_dispatch
+):
+    from argus.agent_runtime.graph import workflow
+    from argus.agent_runtime.stages import confirm as confirmation_stage
+    from argus.domain.backtesting.confirmation_preflight import (
+        ConfirmationLaunchPreflight,
+    )
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(confirmation_stage, "_market_clock_for_strategy", lambda _: None)
+    original = next(
+        case
+        for case in harness.load_eval_cases()
+        if case.id == "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455"
+    )
+    expected = original.expected
+
+    def coverage(payload):
+        # Authored provider boundary: January 1 is not an equity trading session.
+        return ConfirmationLaunchPreflight(
+            outcome="ready_to_confirm",
+            launch_payload={
+                **payload,
+                "date_range": expected.effective_date_range,
+                "coverage_preflight": {
+                    "requested_date_range": expected.date_range,
+                    "effective_date_range": expected.effective_date_range,
+                    "adjustment_reason": expected.adjustment_reason,
+                },
+            },
+        )
+
+    monkeypatch.setattr(confirmation_stage, "prepare_confirmation_launch", coverage)
+    strategy = {
+        "strategy_type": expected.strategy_type,
+        "asset_universe": list(expected.assets),
+        "asset_class": expected.asset_class,
+        "capital_amount": expected.capital_amount,
+        "cadence": expected.contribution_period,
+        "date_range": expected.date_range,
+        "extra_parameters": {
+            "initial_capital": expected.starting_capital,
+            "recurring_contribution": expected.recurring_contribution,
+            "field_provenance": {
+                "initial_capital": "explicit_user",
+                "recurring_contribution": "explicit_user",
+                "cadence": "explicit_user",
+            },
+        },
+    }
+    prepared = StageResult(
+        outcome="needs_clarification",
+        stage_patch={
+            "intent": "calculate",
+            "candidate_strategy_draft": strategy,
+            "missing_required_fields": [],
+            "optional_parameter_status": {"initial_capital": expected.starting_capital},
+        },
+    )
+    interpreted = prepared
+    if declared_dispatch:
+        interpreted = StageResult(
+            outcome="approved_for_execution",
+            stage_patch={
+                "intent": "calculate",
+                "tool_calls": [
+                    ToolCall(
+                        tool_name="backtest",
+                        call_id=fake.uuid4(),
+                        arguments={"strategy": strategy},
+                    )
+                ],
+            },
+        )
+    turns = [interpreted]
+    prefix = []
+    if followup:
+        turns.insert(
+            0,
+            StageResult(
+                outcome="needs_clarification",
+                stage_patch={"missing_required_fields": ["asset_universe"]},
+            ),
+        )
+        prefix = [
+            {"stage": "interpret", "outcome": "needs_clarification"},
+            {"stage": "clarify", "outcome": "await_user_reply"},
+        ]
+    reads = iter(turns)
+    monkeypatch.setattr(harness, "interpret_stage", lambda **_: next(reads))
+    monkeypatch.setattr(
+        harness,
+        "dispatch_requested_calls",
+        lambda **kwargs: prepared
+        if kwargs["interpreted"].outcome == "approved_for_execution"
+        else None,
+    )
+    actual_clarify, actual_confirm = harness.clarify_stage, harness.confirm_stage
+    confirmed_states, routed_outcomes = [], []
+    actual_route = workflow._route_from_stage_outcome
+
+    def clarify(**kwargs):
+        result = actual_clarify(**kwargs)
+        if result.outcome == "ready_for_confirmation":
+            result.stage_patch["intent"] = "explain"
+        return result
+
+    def confirm(**kwargs):
+        confirmed_states.append(kwargs["state"])
+        result = actual_confirm(**kwargs)
+        result.stage_patch["intent"] = "calculate"
+        return result
+
+    def route(state):
+        routed_outcomes.append(str(state["stage_outcome"]))
+        return actual_route(state)
+
+    monkeypatch.setattr(harness, "clarify_stage", clarify)
+    monkeypatch.setattr(harness, "confirm_stage", confirm)
+    monkeypatch.setattr(workflow, "_route_from_stage_outcome", route)
+    expected_milestones = tuple(entry["outcome"] for entry in prefix) + (
+        "needs_clarification",
+        "ready_for_confirmation",
+        "await_approval",
+    )
+    case = replace(
+        original,
+        expected=replace(expected, stage_outcomes=expected_milestones),
+        followup_prompt=original.prompt if followup else None,
+        degraded_mode={"clarifier": "offline"},
+    )
+
+    result = harness.run_eval_case(case, run_prose_judge=False)
+
+    assert len(confirmed_states) == 1
+    assert "ready_for_confirmation" in routed_outcomes
+    assert result["failed_checks"] == [], result["failed_checks"]
+    outcome = result["typed_outcome"]
+    raw = [
+        {"stage": "interpret", "outcome": interpreted.outcome},
+        *(
+            [{"stage": "execute", "outcome": prepared.outcome}]
+            if declared_dispatch
+            else []
+        ),
+        {"stage": "clarify", "outcome": "ready_for_confirmation"},
+        {"stage": "confirm", "outcome": "await_approval"},
+    ]
+    assert outcome["execution_trace"] == prefix + raw
+    assert outcome["acceptance_stage_outcomes"] == list(expected_milestones)
+    assert outcome["intent"] == "calculate"
+    assert outcome["starting_capital"] == expected.starting_capital
+    assert outcome["recurring_contribution"] == expected.recurring_contribution
+    assert outcome["offered"]["launch_payload"]
+    # Following the real edge does not erase an unexpected clarification event.
+    unchanged_fixture = replace(case, expected=expected)
+    assert any(
+        failure.startswith("stage_outcomes:")
+        for failure in harness.typed_expectation_failures(
+            case=unchanged_fixture, outcome=outcome
+        )
+    )
+
+
+def test_a_real_clarification_blocker_stops_before_confirmation(monkeypatch):
+    monkeypatch.setattr(
+        harness,
+        "interpret_stage",
+        lambda **_: StageResult(
+            outcome="needs_clarification",
+            stage_patch={
+                "intent": "calculate",
+                "missing_required_fields": ["asset_universe"],
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        harness,
+        "confirm_stage",
+        lambda **_: (_ for _ in ()).throw(AssertionError("A real blocker must stop")),
+    )
+    case = replace(
+        _case(
+            expected={
+                "intent": "calculate",
+                "capability_verdict": "needs_clarification",
+                "stage_outcomes": ("needs_clarification", "await_user_reply"),
+                "offered": {"response": True},
+            }
+        ),
+        degraded_mode={"clarifier": "offline"},
+    )
+
+    result = harness.run_eval_case(case, run_prose_judge=False)
+
+    assert result["failed_checks"] == []
+    assert result["typed_outcome"]["offered"]["launch_payload"] == {}
+
+
+def test_runtime_terminal_route_does_not_invent_a_clarification(monkeypatch):
+    monkeypatch.setattr(
+        harness,
+        "interpret_stage",
+        lambda **_: StageResult(
+            outcome="needs_clarification",
+            stage_patch={
+                "intent": "cannot",
+                "failure_classification": "unsupported_capability",
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        harness,
+        "clarify_stage",
+        lambda **_: (_ for _ in ()).throw(AssertionError("Runtime chose to end")),
+    )
+
+    result = harness.run_eval_case(
+        _case(expected={"intent": "cannot", "capability_verdict": "needs_clarification"}),
+        run_prose_judge=False,
+    )
+
+    assert result["typed_outcome"]["execution_trace"] == [
+        {"stage": "interpret", "outcome": "needs_clarification"}
+    ]
+
+
+def test_repeated_runtime_state_stops_before_repeating_stage_work(monkeypatch):
+    observed = []
+    monkeypatch.setattr(
+        harness,
+        "interpret_stage",
+        lambda **_: StageResult(outcome="needs_clarification"),
+    )
+
+    def stage(name, outcome):
+        def invoke(**_):
+            observed.append(name)
+            return StageResult(outcome=outcome)
+
+        return invoke
+
+    monkeypatch.setattr(
+        harness, "clarify_stage", stage("clarify", "ready_for_confirmation")
+    )
+    monkeypatch.setattr(harness, "confirm_stage", stage("confirm", "needs_clarification"))
+
+    with pytest.raises(RuntimeError, match="repeated runtime route and state") as error:
+        harness.run_eval_case(
+            _case(expected={"intent": "calculate", "capability_verdict": "executable"}),
+            run_prose_judge=False,
+        )
+
+    assert observed == ["clarify", "confirm"]
+    assert "('confirm', 'needs_clarification')" in str(error.value)
+
+
+def test_revisited_confirmation_keeps_each_event_and_latest_patch(monkeypatch):
+    from argus.agent_runtime.state.models import RunState
+
+    from tests.evals.measurement_registry import continue_turn_stages
+
+    interpreted = StageResult(outcome="ready_for_confirmation")
+    amount = fake.pyfloat(min_value=1, max_value=10000, right_digits=2)
+
+    def confirm(*, state, **_):
+        if state.candidate_strategy_draft.capital_amount is None:
+            return StageResult(
+                outcome="needs_clarification",
+                stage_patch={"missing_required_fields": ["capital_amount"]},
+            )
+        return StageResult(
+            outcome="await_approval",
+            stage_patch={
+                "intent": "calculate",
+                "confirmation_payload": {"validation": {"executable": True}},
+            },
+        )
+
+    def clarify(*, state, **_):
+        return StageResult(
+            outcome="ready_for_confirmation",
+            stage_patch={
+                "intent": "explain",
+                "candidate_strategy_draft": state.candidate_strategy_draft.model_copy(
+                    update={"capital_amount": amount}
+                ).model_dump(mode="python"),
+                "missing_required_fields": [],
+            },
+        )
+
+    stages = continue_turn_stages(
+        state=RunState(current_user_message=fake.sentence()),
+        interpreted=interpreted,
+        dispatched=None,
+        contract=harness.build_default_capability_contract(),
+        language="en",
+        clarification_generator=None,
+        confirm=confirm,
+        clarify=clarify,
+    )
+    outcome = harness._typed_outcome(
+        case=_case(expected={"intent": "calculate", "capability_verdict": "executable"}),
+        interpret_result=interpreted,
+        confirm_result=stages[-1][1],
+        clarify_result=stages[-2][1],
+        stage_results=stages,
+    )
+
+    assert outcome["execution_trace"] == [
+        {"stage": "interpret", "outcome": "ready_for_confirmation"},
+        {"stage": "confirm", "outcome": "needs_clarification"},
+        {"stage": "clarify", "outcome": "ready_for_confirmation"},
+        {"stage": "confirm", "outcome": "await_approval"},
+    ]
+    assert outcome["intent"] == "calculate"
+    assert outcome["capability_verdict"] == "executable"
+
+
+@pytest.mark.parametrize("followup", [False, True])
 def test_dispatch_receives_the_same_trusted_context_as_interpret(monkeypatch, followup):
     from argus.domain import capability_registry
 
