@@ -74,13 +74,15 @@ presentation helpers, receipt components and `/r/[receiptId]` routes,
 and ChatInterface mounts, SharedReceiptsView and focused frontend tests.
 
 **Interfaces:** Consume Task 1's candidate reasons and preview/create contract.
-The header and card invoke the same share panel; the card preselects its canonical
-message. The panel renders Task 1's closed preview through `ReceiptBody` with
+The header is the sole sharing entry point and opens selection. No message
+overflow item, assistant-bubble pill or visible result-card share control remains.
+Sharing one answer means selecting one turn there. The panel renders Task 1's
+closed preview through `ReceiptBody` with
 analytics/action bar disabled until a real public page is rendered. Legacy v1
 formatting is adapted into the same internal presentation and DOM.
 
 - [ ] Write interaction tests for disabled candidate reasons, four-turn bound,
-  eligible-only select all, preview before creation and the card shortcut:
+  eligible-only select all, preview before creation and singleton selection:
 
   ```tsx
   expect(screen.getByRole("checkbox", { name: /not grounded/i })).toBeDisabled();
@@ -107,8 +109,8 @@ formatting is adapted into the same internal presentation and DOM.
   compare rendering; never edit historical evidence. Use one real research turn
   per author language and freeze its sanitized proof for repeated rendering.
 - [ ] Capture research at 390/1280 in en/es-419 signed out, disabled reasons in
-  both languages, header/card identity, owner preview, Settings revoke/tombstone,
-  guest conversion and bare-entry CTA. Inspect screenshots, not only assertions.
+  both languages, sole header entry, singleton selection, owner preview, Settings
+  revoke/tombstone and bare-entry CTA. Inspect screenshots, not only assertions.
 - [ ] Run disposable Postgres tests with zero skips and update canonical docs and
   OpenAPI. Commit durable screenshots and a truthful evidence manifest.
 - [ ] Fetch integration, merge one-way if needed, audit overlap, run modularity

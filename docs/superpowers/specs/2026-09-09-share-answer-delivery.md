@@ -26,11 +26,15 @@ artifact distribution loop.
 - One `ReceiptBody` renders receipt form from a presentation projection. Legacy
   formatting is a compatibility adapter, not another public body.
 - One backend eligibility/projection service serves candidate reasons, exact
-  preview, final creation, and the existing result-card shortcut. Final creation
+  preview, final creation, and the artifact compatibility endpoint. Final creation
   checks the facts again, including every question, answer and owner note.
 - The header link glyph sits left of MoreVertical and opens selection. Ineligible
   turns remain visible and disabled with localized reasons. Select all means all
   eligible; when more than four exist it cannot silently select an arbitrary four.
+- The header glyph is the only entry point. No assistant-bubble share pill,
+  message-overflow share item or visible StrategyResultCard share control remains.
+  The existing creation logic serves the selection screen. One checked turn means
+  a single-answer receipt, through the same ownership and eligibility checks.
 - The public action says Continue with Argus and lands at bare guest entry.
 - All content freezes; cross-turn inference remains the explicitly accepted risk
   documented in section 4.5. Preview displays the entire selected publication.
@@ -58,8 +62,9 @@ Focused new tests must cover closed variants, all refusal classes and named fiel
 four-turn bounds, owner/conversation boundaries, race/idempotency, preview/create
 agreement, v1 compatibility, flag-off identity and lifecycle behavior in Postgres.
 Browser proof covers research shared and opened signed out at 390 and 1280 in both
-languages; readable disabled reasons in both languages; revoke/tombstone; the
-result shortcut's identity; and an unchanged v1 fixture. Preserve screenshots and
+languages; readable disabled selector reasons in both languages;
+revoke/tombstone; one header entry point, singleton and four-turn selection; and an
+unchanged v1 fixture. Preserve screenshots and
 sanitized evidence in the PR. Real research provenance is captured once; browser
 rendering reuses the frozen answer without further retrieval.
 
