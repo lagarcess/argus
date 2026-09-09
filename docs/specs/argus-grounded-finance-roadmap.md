@@ -960,13 +960,13 @@ ten-terminal meter back.
 still `ee9c3491`; nothing below has been promoted.** Landed means merged to
 integration and green there, not shipped to a user.
 
-**Four lanes are running overnight, all collision-checked against each other.**
+**The overnight batch, 2026-09-09. Three of four landed; one is in review.**
 
 | Lane | PR | Surface it owns |
 | --- | --- | --- |
 | Subtract the guardrails | **LANDED** `695d9250`, PR #565 | done; surface released |
 | Cut the catalog import edge | **LANDED** `772aa276`, PR #567 | done; surface released |
-| Withheld answers keep their sources, and are not paid for twice | not yet pushed | `research_grounded.py`, `perplexity_agent.py`, research contracts |
+| Withheld answers keep their sources, and are not paid for twice | **LANDED** `6f7e7354`, PR #568 | done; surface released |
 | Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
 
 `llm_interpreter.py` has roughly 19 lines of modularity headroom and belongs to
@@ -978,12 +978,12 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
 | Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
 | Decisions | Plumbing | **Landed** `67facaf5`. |
-| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. |
+| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569: on the inline path `missing_public_sources` discards a paid packet, so the cost ledger records zero for a turn that made two provider calls. |
 | Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
-| Lift the loop, Lane B | The spine | **Dispatched 2026-09-09**, carrying #430. Optional for the spine; run overnight because the capacity was idle, not because it blocks the goalpost. |
+| Lift the loop, Lane B | The spine | **In review**, PR #570, carrying #430. Seven silent-reissue classes closed, card `kind` shipped, twelve bilingual browser cases. One open Codex P1 on the new conflict detection. `artifact_assumption_edit.py` went 1,561 to 1,507 lines, so 57 of its 75 growth lines are free again. |
 | The registry | The spine | **First half landed** as PR #567, `772aa276`. The catalog edge is cut: `state/models.py` now takes `RegisteredStrategyTemplate` from a new `strategy_template_contract.py` that loads the catalog only inside the validator, so a general envelope imports without it. Lane C's probes went from three passing the catalog guard to seven. The rest of the registry, the tool declaration itself, is not started. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |
