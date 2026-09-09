@@ -30,8 +30,17 @@ after promotion.
   `argus_module` is the authoritative line for which tree ran.
 - `head-1.jsonl`, `head-2.jsonl`: this lane's head, same venv, same manifest.
 - `summary.json`: pooled per-label summary written by `summarize`.
-- `live-measurement.json`: the live measurement scorecard at the head, all
-  categories including the new `ordinary_conversation` one.
+- `live-measurement.json`: the live measurement scorecard at the reconciled
+  head `4af15b30`, all categories including the new `ordinary_conversation`
+  one: 68 cases, 65 passed, 3 failed, 0 infrastructure errors.
+- `baseline-comparison.json`: case-by-case comparison against the
+  fingerprint's last measured scorecard, `../411/live-measurement.json` at
+  `9fec4bf7`.
+- `live-measurement-retry.json`: the three failed cases re-run once on this
+  head and once on integration `7de65e26` without this lane's changes,
+  value-free (status, checks, recovery code, receipt outcomes). The two
+  discovery cases pass on both; the try-next case fails on both, so it is
+  pre-existing and filed separately.
 
 Runs were interleaved head, base, head, base so provider drift during the
 hour cannot masquerade as a change. Each file records `case_id`, language,

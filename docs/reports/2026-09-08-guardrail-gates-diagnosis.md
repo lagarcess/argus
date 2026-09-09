@@ -7,6 +7,40 @@ ordinary chat first token 33.14s p50, with 15.60s of 30.13s of provider time
 spent outside the interpretation and the composer. This round changed no code.
 Line numbers are at integration `aca53c03`.
 
+## The result
+
+Measured in-process at the interpret node, on the #563 cohort messages, two
+interleaved runs per label pooled (twenty turns per row). First token on the
+deployed product is this interval plus the transport around it, which #563
+measured at about 1.7s and this lane does not touch.
+
+| Turn type | before: interpret p50 (p95) | after: interpret p50 (p95) | deployed first token, before measured / after derived |
+| --- | ---: | ---: | ---: |
+| Ordinary chat | 35.27s (63.75s) | 15.63s (35.39s) | 33.14s / about 17s |
+| Compute-intent probe | 25.85s (45.42s) | 16.14s (27.13s) | 19.07s / about 12s |
+| Confirmation | 32.08s (58.51s) | 29.80s (38.13s) | card at 27.44s / unchanged by this lane |
+
+The "after" first-token column is derived (interpret p50 plus the #563
+transport), not measured on the deployed product, because the deployed API
+runs `main`; the #563 HTTP harness re-run after promotion is the measured
+number.
+
+**The correctness half.** The seven-call turn allowance was calibrated for
+the preflight, the interpretation and the clarifier with their fallbacks and
+one repair; the audits were never budgeted. On ordinary chat before the
+change, 9 of 20 turns spent all seven calls and 2 of 20 lost their composer to
+it and shipped canned recovery text instead of an answer ("What is an ETF?"
+received the 99-character "I saved your message, but I could not turn it into
+a reliable test setup" text; "What does inflation mean?" the 154-character
+macro-context fallback, both in English regardless of the user's language).
+The deployed #563 cohort showed the same failure at 1 of 10, with a second
+turn saved only because the primary read had written its own prose. After
+the change, 0 of 20 ordinary turns exhaust the allowance and 0 lose their
+composer; ordinary chat runs zero gated calls on 18 of 20 turns and one
+single repair call on the other two. That is the half of this lane that
+changes what a user is shown, and it is the reason the allowance can stay at
+seven.
+
 ## The turn, as the receipts show it
 
 Every ordinary-chat turn in the cohort ran the asset-mention preflight and the
@@ -391,4 +425,39 @@ What the numbers say.
 
 ## Round two: the live scorecard
 
-LIVE_EVAL_PARAGRAPH
+Run once at the reconciled head `4af15b30` on a clean tree with live providers
+([evidence/565/live-measurement.json](evidence/565/live-measurement.json)):
+68 cases, 65 passed, 3 failed, 0 infrastructure errors, $1.11 of provider
+spend. Against the fingerprint's last measured scorecard
+([411/live-measurement.json](evidence/411/live-measurement.json) at
+`9fec4bf7`, 61 passed, 1 failed), per
+[baseline-comparison.json](evidence/565/baseline-comparison.json):
+
+- The six new `ordinary_conversation` cases passed, and their receipts show
+  the preflight, the interpretation and at most the composer on every one:
+  the four calls did not run on a single concept, capability or market
+  curiosity question, in either language, and the prose judge passed honesty
+  on all six, including the two Bollinger Bands capability questions the
+  capability audit used to exist for.
+- `capability_honesty` 6 of 6, `graceful_recovery` 3 of 3, `messy_english`
+  and `messy_spanish` 8 of 8, `dca_capital_semantics` 16 of 16 (the one
+  baseline failure, the prebaked Spanish pesos chip, passed this time). The
+  repair fired on 12 cases, all strategy shapes, as at the baseline.
+- `asset_discovery_routing` 9 of 12. The twelve include the five #344 shapes;
+  the narrowed focused read fired on none of them because the primary read
+  filled the payload or the act itself, as it did at the baseline.
+
+The three failures are all in `asset_discovery_routing` and none is on the
+four gates' path. The two pharma escalation turns were routed as discovery
+with a coherent payload, exactly as at the baseline, and then lost their
+`discovery_voicing` call on both chat-tier models (deepseek timeout or empty
+response, then qwen empty response), which the composer reports as
+`discovery_search_failed` with no rows; both passed on a targeted rerun forty
+minutes later, on this head and on integration `7de65e26` without this lane,
+five candidates each
+([live-measurement-retry.json](evidence/565/live-measurement-retry.json)). The
+third, "ok what should I try next?" after a result, is a `result_followup`
+turn that returns before any of the four gates; its `ResultFollowupDraft` on
+the chat tier timed out on this head and was rejected by the causal-attribution
+validator on integration without this lane, so it fails without this change.
+It is filed as its own task rather than chased here.
