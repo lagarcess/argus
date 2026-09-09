@@ -49,6 +49,17 @@ GUEST_SIMULATION_VISITOR_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_SIMULATION_ALLOWANCE)
 ]
 
+# Anti-abuse, not an allowance. Conversation is compute: free, and the product
+# surface says so with no limit. An anonymous endpoint still cannot be
+# unbounded, so a guest's turns count against a visitor-keyed daily ceiling
+# sized so no real person reaches it. Never rendered, never promised, and a
+# registered account carries none.
+GUEST_COMPUTE_CEILING_RESOURCE = "guest_compute_turns"
+GUEST_COMPUTE_DAILY_CEILING = 300
+GUEST_COMPUTE_CEILING_LIMITS: list[tuple[str, int]] = [
+    ("day", GUEST_COMPUTE_DAILY_CEILING)
+]
+
 # One ceiling for every research shape, not one per tier. A stranger cannot
 # tell a fast lookup from a thorough comparison, and a meter they cannot
 # predict is a meter that feels arbitrary; the rail decides the tier, so the

@@ -146,6 +146,9 @@ def forbid_expensive_chat_owners(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
     monkeypatch.setitem(app.dependency_overrides, current_user, forbidden_gateway)
     monkeypatch.setattr(
+        agent_router, "check_guest_compute_ceiling", forbidden_owner("ceiling")
+    )
+    monkeypatch.setattr(
         agent_router, "reconcile_stale_chat_turns", forbidden_owner("persistence")
     )
     monkeypatch.setattr(

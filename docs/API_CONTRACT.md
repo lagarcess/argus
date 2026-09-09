@@ -118,6 +118,15 @@ Unauthenticated `/auth/login` and `/auth/signup` attempts are also protected by
 short-window alpha throttles before allowlist or provider calls. These limits
 return the same `429` Problem Details shape with `code: "too_many_requests"`.
 
+Guest conversation turns carry a silent anti-abuse ceiling per visitor per
+UTC day (`guest_compute_turns` in `visitor_usage_counters`, 300 completed
+turns), sized so no real person reaches it. It is not an allowance:
+`GET /me/usage` reports conversation as unbounded and never projects this
+counter, and no product surface names it. At the ceiling `POST /chat/stream`
+answers the same `429` shape with `code: "too_many_requests"` and
+`Retry-After` set to the seconds until the UTC day resets. Run actions are
+execution and do not count; signed-in accounts carry no such ceiling.
+
 Supported rate-limit headers where applicable:
 - `X-RateLimit-Limit`
 - `X-RateLimit-Remaining`
@@ -2545,9 +2554,12 @@ Three operation classes, one meter each:
   them.
 
 **Accounting semantics:**
-- Conversation is compute. Ordinary turns settle nothing at entry or at their
-  terminal outcome, are never rejected for an exhausted counter, and write no
-  `chat_messages` row. That resource survives only in historical rows.
+- Conversation is compute. Ordinary turns settle no allowance at entry or at
+  their terminal outcome, are never rejected for an exhausted allowance, and
+  write no `chat_messages` row; that resource survives only in historical rows.
+  A guest turn additionally counts one unit against the silent anti-abuse
+  ceiling described under Rate Limiting, in the same terminal transaction; that
+  counter is not an allowance and is not projected here.
 - Grounding capacity is claimed atomically immediately before billable
   provider work (see the research rail section); cache hits, unconfigured
   providers, and replays claim nothing.
