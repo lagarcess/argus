@@ -215,6 +215,17 @@ def _packet_from_response(
         return _packet_from_priced_response(document, usage=usage)
     except ResearchUnavailableError as exc:
         raise ResearchUnavailableError(exc.reason, exc.detail, usage=usage) from exc
+    except Exception as exc:  # noqa: BLE001
+        # However the document defeats the parser, it is a malformed response
+        # Argus was billed for, not a crashed turn. Checking each nested shape
+        # would only name the ones seen so far; the next one is already out
+        # there. The deployed log sink drops structured extras.
+        logger.warning(
+            "Research response could not be parsed" f" error={type(exc).__name__}: {exc}"
+        )
+        raise ResearchUnavailableError(
+            "malformed_response", f"{type(exc).__name__}: {exc}"[:500], usage=usage
+        ) from exc
 
 
 def _packet_from_priced_response(

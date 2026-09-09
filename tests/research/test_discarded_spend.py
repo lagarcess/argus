@@ -276,6 +276,29 @@ def test_a_served_response_with_a_broken_envelope_still_bills_its_invoice(
     assert _settle(result, ledger)["cost_amount"] == pytest.approx(ONE_RESPONSE_USD)
 
 
+def test_a_billed_response_the_parser_chokes_on_degrades_and_bills(
+    monkeypatch, ledger, stepping_clock
+) -> None:
+    """Codex round 2: a nested envelope of the wrong shape used to raise a bare
+    TypeError out of the parser, which crashed the turn and took the invoice
+    with it. Any way the document fails to parse is a malformed response that
+    was paid for."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    nested_broken = agent_response()
+    nested_broken["output"] = [{"type": "message", "content": 1}]
+    wire_grounded_client(monkeypatch, [nested_broken])
+
+    result = run_research_turn("What is AAPL trading at?")
+
+    assert result is not None, "the turn answers honestly instead of raising"
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_unavailable_malformed_response"}
+    assert sidecar["usage"]["cost_usd"] == pytest.approx(ONE_RESPONSE_USD)
+    assert _settle(result, ledger)["cost_amount"] == pytest.approx(ONE_RESPONSE_USD)
+
+
 def test_a_response_with_no_invoice_at_all_bills_nothing(
     monkeypatch, ledger, stepping_clock
 ) -> None:
