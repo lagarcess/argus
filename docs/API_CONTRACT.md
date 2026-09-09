@@ -3728,10 +3728,10 @@ Contract rules:
   that record, plus any tool count the invoice did establish, so a usable
   answer whose invoice is missing or malformed is delivered without a second
   paid request. `usage.invocations` is the finance_search count the turn's
-  invoices established, summed over every response it read. It
-  is null when an invoice did not establish a count and is never spelled as
-  zero unless the provider reported zero; an Argus-built turn that ran no
-  provider call reports zero.
+  invoices established, summed over every response it read. It is null when an
+  invoice did not establish a count and is never spelled as zero unless the
+  provider reported zero; an Argus-built turn that ran no provider call
+  reports zero.
 - A pure quote or market-data number may use `fast`; its public source list may
   be empty because provider provenance belongs to the route receipt rather
   than a publisher link. A narrative, causal, or explanatory clause is typed
@@ -3824,11 +3824,10 @@ Contract rules:
   `research_figures_unverified` and `survey_synthesis_incomplete`.
   `research_not_grounded` and `survey_not_grounded` never retrieved, the
   other `research_unavailable_*` codes have no packet,
-  `research_capacity_exhausted`
-  and `asset_class_not_covered` ran no provider call, and
-  `research_unavailable_missing_public_sources` composes from its real packet
-  but means no retrieved page survived selection; all of those carry an empty
-  list by construction.
+  `research_capacity_exhausted` and `asset_class_not_covered` ran no provider
+  call, and `research_unavailable_missing_public_sources` composes from its
+  real packet but means no retrieved page survived selection; all of those
+  carry an empty list by construction.
   Clients render a degraded turn's sources as where Argus looked, never as
   the sources of an answer: the same drawer, framed by the typed
   `degraded.code`, so a page that yielded no figure is never presented as
