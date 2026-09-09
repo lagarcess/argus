@@ -380,7 +380,11 @@ def seed_backtest(owner):
 
 def test_artifact_shortcut_turn_and_historical_v1_keep_one_lineage(owner):
     from argus.api.public_excerpt_schemas import PUBLIC_EXCERPT_DOCUMENT_ADAPTER
-    from argus.domain.public_excerpts import build_public_excerpt_payload, payload_digest
+    from argus.domain.public_excerpts import (
+        build_public_excerpt_payload,
+        new_public_excerpt_id,
+        payload_digest,
+    )
 
     artifact, run, message = seed_backtest(owner)
     first = preview(owner, [message])
@@ -403,6 +407,7 @@ def test_artifact_shortcut_turn_and_historical_v1_keep_one_lineage(owner):
     saved = snapshot.model_copy(
         update={
             "id": str(uuid4()),
+            "public_id": new_public_excerpt_id(),
             "payload": legacy,
             "payload_digest": payload_digest(legacy),
             "selection_key": None,
@@ -411,12 +416,157 @@ def test_artifact_shortcut_turn_and_historical_v1_keep_one_lineage(owner):
     )
     api_state.store.public_excerpt_snapshots[saved.id] = saved
     assert preview(owner, [message], "Different").payload.model_dump_json() == raw
+    # Stored snapshots and the artifact's existing-live adapter remain readable
+    # even if their historical source would no longer qualify for a new share.
+    run.metrics = {"aggregate": {"performance": {"max_drawdown_pct": -6.2}}}
+    assert (
+        service.public_excerpt_reader()
+        .read_public_excerpt_view(public_id=saved.public_id)
+        .payload.model_dump_json()
+        == raw
+    )
     assert (
         service.create_receipt_for_artifact(
             user=owner[0], artifact_id=artifact.id, owner_note=None
         )[0].id
         == saved.id
     )
+
+
+def assert_incomplete_backtest_refused(owner, monkeypatch, change_run):
+    from argus.api.main import app
+    from argus.api.routers.evidence_receipts import reset_receipt_create_limiter_for_tests
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED", "true")
+    reset_receipt_create_limiter_for_tests()
+    artifact, run, message = seed_backtest(owner)
+    _, research = add_pair(owner, index=2)
+    selections = ([message], [message, research])
+    # A create attempted with a previously valid preview still rechecks every
+    # selected source before it can write a receipt or return a drift error.
+    previews = [preview(owner, selected) for selected in selections]
+    change_run(run)
+    base = f"/api/v1/conversations/{owner[1].id}/public-excerpt"
+    with TestClient(app) as client:
+        candidates = client.get(base + "-candidates")
+        assert candidates.status_code == 200
+        by_id = {item["message_id"]: item for item in candidates.json()["items"]}
+        assert not by_id[message.id]["eligible"]
+        assert by_id[message.id]["reason"] == "unsupported_backtest"
+        assert by_id[research.id]["eligible"]
+        for selected, prior in zip(selections, previews, strict=True):
+            body = {"message_ids": [m.id for m in selected]}
+            for response in (
+                client.post(base + "-preview", json=body),
+                client.post(base, json={**body, "payload_digest": prior.payload_digest}),
+            ):
+                assert response.status_code == 422, response.text
+                assert response.json()["code"] == "receipt_source_unsupported"
+                assert response.json()["context"]["reason"] == "unsupported_backtest"
+        adapter = client.post(
+            f"/api/v1/evidence-artifacts/{artifact.id}/public-excerpt", json={}
+        )
+        assert adapter.status_code == 422, adapter.text
+        assert adapter.json()["code"] == "receipt_source_unsupported"
+    assert not api_state.store.public_excerpt_snapshots
+
+
+@pytest.mark.parametrize(
+    "available", ["drawdown_only", "headline_only", "gross_net_only"]
+)
+def test_partial_figure_sets_refuse_all_new_receipt_paths(owner, monkeypatch, available):
+    def change(run):
+        performance = run.metrics["aggregate"]["performance"]
+        if available == "headline_only":
+            kept = {"total_return_pct": performance["total_return_pct"]}
+        elif available == "gross_net_only":
+            kept = {
+                "execution_realism": {
+                    "enabled": True,
+                    "gross_total_return_pct": 2,
+                    "net_total_return_pct": 1,
+                }
+            }
+        else:
+            kept = {"max_drawdown_pct": -6.2}
+        run.metrics["aggregate"]["performance"] = kept
+
+    assert_incomplete_backtest_refused(owner, monkeypatch, change)
+
+
+@pytest.mark.parametrize(
+    "field", ["total_return_pct", "benchmark_return_pct", "delta_vs_benchmark_pct"]
+)
+@pytest.mark.parametrize(
+    "invalid", [None, "unavailable", True, float("nan"), float("inf")]
+)
+def test_missing_or_invalid_required_figures_refuse_publication(
+    owner, monkeypatch, field, invalid
+):
+    def change(run):
+        performance = run.metrics["aggregate"]["performance"]
+        if invalid is None:
+            performance.pop(field)
+        else:
+            performance[field] = invalid
+
+    assert_incomplete_backtest_refused(owner, monkeypatch, change)
+
+
+def set_benchmark_name(run, location):
+    run.benchmark_symbol = ""
+    for key in ("benchmark_symbol", "resolved_parameters", "parameters"):
+        run.config_snapshot.pop(key, None)
+    if location == "run":
+        run.benchmark_symbol = "SPY"
+    elif location == "config":
+        run.config_snapshot["benchmark_symbol"] = "SPY"
+    elif location is not None:
+        run.config_snapshot[location] = {"benchmark_symbol": "SPY"}
+
+
+@pytest.mark.parametrize("location", ["config", "resolved_parameters", "parameters"])
+def test_a_benchmark_named_in_public_config_requires_evidence(
+    owner, monkeypatch, location
+):
+    def change(run):
+        set_benchmark_name(run, location)
+        run.metrics["aggregate"]["performance"].pop("benchmark_return_pct")
+
+    assert_incomplete_backtest_refused(owner, monkeypatch, change)
+
+
+@pytest.mark.parametrize(
+    "location", ["run", "config", "resolved_parameters", "parameters", None]
+)
+def test_complete_zero_returns_and_unnamed_benchmark_remain_shareable(owner, location):
+    artifact, run, message = seed_backtest(owner)
+    set_benchmark_name(run, location)
+    performance = run.metrics["aggregate"]["performance"]
+    for key in tuple(performance):
+        if location is None and key != "total_return_pct":
+            del performance[key]
+        else:
+            performance[key] = 0.0
+    candidate = service.receipt_candidates(
+        user=owner[0], conversation_id=owner[1].id
+    ).items[0]
+    assert candidate.eligible
+    document = preview(owner, [message])
+    figures = document.payload.turns[0].fact_bank.figures
+    assert figures.total_return_pct == 0.0
+    if location is not None:
+        assert figures.benchmark_return_pct == 0.0
+        assert figures.delta_vs_benchmark_pct == 0.0
+        assert figures.benchmark_comparison_claim == "matched_benchmark"
+    snapshot, created = create(owner, [message], document)
+    assert created
+    reused, created = service.create_receipt_for_artifact(
+        user=owner[0], artifact_id=artifact.id, owner_note=None
+    )
+    assert not created and reused.id == snapshot.id
+    assert len(api_state.store.public_excerpt_snapshots) == 1
 
 
 def test_backtest_uses_shared_display_figures_and_closed_config(owner):

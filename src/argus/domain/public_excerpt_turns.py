@@ -16,6 +16,7 @@ from argus.api.public_excerpt_fact_schemas import (
     ReceiptConfig,
     ReceiptCosts,
     ReceiptDates,
+    ReceiptFigures,
     ReceiptParameters,
     ReceiptStrategy,
 )
@@ -224,6 +225,37 @@ def _subset(value: object, model: Any) -> dict[str, Any]:
     return {key: source[key] for key in model.model_fields if key in source}
 
 
+def _require_complete_figures(
+    facts: PublicExcerptFactBank, metrics: dict[str, Any]
+) -> None:
+    config = facts.config_snapshot
+    named_benchmark = any(
+        name is not None and name.strip()
+        for name in (
+            facts.benchmark_symbol,
+            config.benchmark_symbol,
+            config.resolved_parameters.benchmark_symbol
+            if config.resolved_parameters
+            else None,
+            config.parameters.benchmark_symbol if config.parameters else None,
+        )
+    )
+    required = ["total_return_pct"]
+    if named_benchmark:
+        required.extend(("benchmark_return_pct", "delta_vs_benchmark_pct"))
+        if facts.figures.benchmark_comparison_claim in (None, "unknown"):
+            refuse("unsupported_backtest")
+    if any(getattr(facts.figures, key) is None for key in required):
+        refuse("unsupported_backtest")
+    # Private display projection tolerates old strings and coerces booleans.
+    # Publishing requires typed source numbers, using the existing closed model.
+    aggregate = metrics.get("aggregate")
+    performance = aggregate.get("performance") if isinstance(aggregate, dict) else None
+    if not isinstance(performance, dict):
+        refuse("unsupported_backtest")
+    ReceiptFigures.model_validate({key: performance.get(key) for key in required})
+
+
 def project_backtest_turn(
     *,
     run: Any,
@@ -275,8 +307,7 @@ def project_backtest_turn(
             if source_card.get("execution_costs")
             else {},
         )
-        if not facts.figures.model_dump(exclude_none=True):
-            refuse("unsupported_backtest")
+        _require_complete_figures(facts, bank["metrics"])
         payload = PublicExcerptBacktestTurn(
             idea_title=audit_text(title, field="question", private_ids=private_ids),
             fact_bank=facts,

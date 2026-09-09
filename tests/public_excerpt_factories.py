@@ -184,7 +184,7 @@ def build_run(
         symbols=["AAPL"],
         allocation_method="equal_weight",
         benchmark_symbol="SPY",
-        metrics={"aggregate": {"performance": {"total_return_pct": 18.4}}},
+        metrics=build_artifact_payload()["metrics"],
         config_snapshot={
             "template": "buy_and_hold",
             "start_date": WINDOW_START,
