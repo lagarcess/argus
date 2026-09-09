@@ -504,8 +504,10 @@ the web card stay untouched.
 - **`EditOperation.target` is model-facing schema the fingerprint does not
   see.** It must not widen. This is the one trap that would ship an unmeasured
   behavior change.
-- **`artifact_assumption_edit.py` has 72 of its 75 growth lines spent.** Leave
-  it alone.
+- **`artifact_assumption_edit.py` had 72 of its 75 growth lines spent before
+  Lane B.** The budget config does watch it. PR #570 extracts the response and
+  shared edit outcome adapter, reducing it from 1,561 to 1,507 lines (57 left).
+  `llm_interpreter.py` and #565's interpreter files stay untouched by Lane B.
 - No universal input schema. No model-facing text.
 
 **Proof.** `.agent/interpreter_prompt_fingerprint.json` byte-identical before
@@ -965,7 +967,7 @@ integration and green there, not shipped to a user.
 | Subtract the guardrails | #565, draft | `llm_interpreter.py`, four files under `agent_runtime/interpreter/` |
 | Cut the catalog import edge | not yet pushed | `state/models.py`, `api/schemas.py`, `capability_registry.py` |
 | Withheld answers keep their sources, and are not paid for twice | not yet pushed | `research_grounded.py`, `perplexity_agent.py`, research contracts |
-| Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
+| Lift the edit contract, closing #430 | #570, draft | Shared lifecycle/edit outcome adapters, `interpreter/artifact_assumption_edit.py`, recovery, web card. Planner/prompt/schema unchanged. |
 
 `llm_interpreter.py` has roughly 19 lines of modularity headroom and belongs to
 the guardrail lane alone; every other lane was told to stay out of it.
@@ -981,7 +983,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **In flight**, PR #565. Round one diagnosed before touching code; the early head read shows ordinary chat running zero guardrail calls and the interpret stage at 15.6s p50, against 33.14s before. It also found two of ten turns had been losing their composer entirely to a seven-call allowance, which is a correctness finding, not a latency one. |
-| Lift the loop, Lane B | The spine | **Dispatched 2026-09-09**, carrying #430. Optional for the spine; run overnight because the capacity was idle, not because it blocks the goalpost. |
+| Lift the loop, Lane B | The spine | **In review**, PR #570, carrying #430. Shared lifecycle, canonical edit-outcome accounting and web card kind; bilingual browser evidence in the PR. CI and final review remain gates. Optional for the spine. |
 | The registry | The spine | **Not started.** The largest remaining item, now specified by Lane C. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |
