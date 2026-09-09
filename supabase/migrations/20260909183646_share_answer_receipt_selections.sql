@@ -175,6 +175,8 @@ for each row execute function public.revoke_public_excerpts_for_deleted_source()
 
 -- Retain the table and trigger-function access boundary.
 revoke all on table public.public_excerpt_snapshots from anon, authenticated;
+-- Backend access must not depend on environment-specific default privileges.
+grant select, insert, update on table public.public_excerpt_snapshots to service_role;
 revoke all on function public.prevent_public_excerpt_immutable_update() from public, anon, authenticated;
 revoke all on function public.enforce_public_excerpt_source_is_live() from public, anon, authenticated;
 revoke all on function public.revoke_public_excerpts_for_deleted_source() from public, anon, authenticated;

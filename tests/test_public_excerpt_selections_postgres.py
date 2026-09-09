@@ -50,6 +50,44 @@ def insert(cursor, fixture, ids, *, key=None, runs=(), artifacts=()):
     return cursor.fetchone()[0]
 
 
+def test_service_role_can_read_create_and_revoke_but_cannot_rewrite():
+    with psycopg.connect(DSN) as connection:
+        try:
+            fixture, ids = seed(connection)
+            connection.execute("set local role service_role")
+            assert connection.execute(
+                "select public_id from public.public_excerpt_snapshots where id=%s",
+                (fixture.snapshot_id,),
+            ).fetchone() == (fixture.public_id,)
+
+            snapshot = insert(connection.cursor(), fixture, ids)
+            assert connection.execute(
+                "select source_message_ids, revoked_at from public.public_excerpt_snapshots where id=%s",
+                (snapshot,),
+            ).fetchone() == (ids, None)
+
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with connection.transaction():
+                    connection.execute(
+                        "update public.public_excerpt_snapshots set payload=%s where id=%s",
+                        ('{"rewritten":true}', snapshot),
+                    )
+
+            assert connection.execute(
+                "update public.public_excerpt_snapshots set revoked_at=now(),revocation_reason='owner_revoked' where id=%s",
+                (snapshot,),
+            ).rowcount == 1
+            revoked_at, reason = connection.execute(
+                "select revoked_at,revocation_reason from public.public_excerpt_snapshots where id=%s",
+                (snapshot,),
+            ).fetchone()
+            assert revoked_at is not None
+            assert reason == "owner_revoked"
+
+        finally:
+            connection.rollback()
+
+
 def test_new_selection_locks_sources_and_each_message_delete_revokes():
     with psycopg.connect(DSN) as connection:
         fixture, ids = seed(connection)
