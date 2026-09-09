@@ -78,6 +78,7 @@ from argus.api.chat.recovery import (
     ordinary_turn_metadata_fallback_context,
     runtime_checkpoint_values,
 )
+from argus.api.chat.refusal_evidence import bind_refusal_request
 from argus.api.chat.request_admission import (
     prepare_chat_request_admission,
     reject_invalid_non_run_confirmation_action,
@@ -258,6 +259,7 @@ async def chat_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
+    bind_refusal_request(request, payload=payload, user_id=user.id)
     turn_account = account_context(request)
     # One turn, one subject: allowance read, job row and settlement agree.
     turn_is_guest = turn_account.kind == "guest"
