@@ -669,6 +669,49 @@ here.
 
 ---
 
+### Share the answer  ·  ships with **The calculations**
+
+**Promoted from a note under the registry to its own item, founder 2026-09-09.**
+Sharing is not a feature on the product, it is the distribution loop, and the
+loop is already built: anonymous link, `noindex`, revocable, a tombstone when
+the source is gone, a Settings list, and a fixed action bar that lands a reader
+on guest entry. All of it verified at 390 and 1280 in both languages.
+
+**It is wired to the one artifact this audience never asks for.** `ShareReceiptAction`
+takes a single `evidenceArtifactId` and is mounted in exactly one place,
+`StrategyResultCard.tsx:327`. `PublicReceiptPayload` is `strategy_facts`,
+`date_range`, `metrics`, `benchmark_symbol` and a `portfolio_equity` series. It
+has no shape for an answer that is not a run. Twenty people arrived on
+2026-08-12 with salaries and priced goals; had Argus answered one of them well,
+there would have been nothing to send.
+
+**Where Argus beats the competitor at its own surface.** A shared page elsewhere
+shows that the model thought. Argus can show what it computed and where each
+number came from, dated and cited, because the honesty line already forces
+that. One is a persuasive essay, the other is a receipt a stranger can check.
+
+**Done means.** Any eligible answer can become a public page, not only a
+backtest. The payload carries a `kind` discriminator, version 1 rows stay
+readable, and eligibility is keyed on typed metadata rather than on what the
+prose looks like. The reader sees the question, the answer, and the evidence
+under it. `docs/specs/conversation-sharing.md` section 4 already specifies the
+research kind end to end and section 9 holds the multi-turn design, which stays
+out of scope.
+
+**This ships with the calculations, not after them.** A calculation nobody can
+send does not distribute, and the receipt is a retrofit across every card once
+they exist.
+
+**Do not touch.** No fork, no prefilled prompt, no guest shares, no multi-turn
+selection. Operating rule 3 stays at four artifacts: if a second calculation
+needs its own receipt body, the abstraction failed.
+
+**Proof.** A non-backtest answer shared, opened signed out at 390 and 1280 in
+both languages, revoked, and its tombstone rendered. A version 1 backtest
+receipt still readable unchanged.
+
+---
+
 ### The five calculations  ·  ships in **The calculations**
 
 The board schedules all five, not one. Four of the smoke-test questions need
