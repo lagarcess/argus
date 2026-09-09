@@ -117,9 +117,13 @@ class PerplexityAgentClient:
             )
         except ResearchUnavailableError as exc:
             # The run is complete, so polling again cannot change its answer:
-            # an answer that cannot be read is the job's terminal failure.
+            # an answer that cannot be read is the job's terminal failure. It
+            # was still billed, so the invoice leaves with the failure.
             return BackgroundPoll(
-                status="failed", failure_detail=f"{exc.reason}: {exc.detail or ''}"
+                status="failed",
+                failure_detail=f"{exc.reason}: {exc.detail or ''}",
+                failure_reason=exc.reason,
+                usage=exc.usage,
             )
         if spec is not None:
             _observe_retrieval(packet, spec)
@@ -203,6 +207,31 @@ def _packet_from_response(
     latency_ms: int,
     on_unpriced: UnpricedSpendRecorder = record_unpriced_spend,
 ) -> ResearchPacket:
+    # The invoice is read before anything can reject the response, so every
+    # rejection below carries what Argus was billed. A document that got this
+    # far was served; only transport and a non-object body have no invoice.
+    usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
+    try:
+        return _packet_from_priced_response(document, usage=usage)
+    except ResearchUnavailableError as exc:
+        raise ResearchUnavailableError(exc.reason, exc.detail, usage=usage) from exc
+    except Exception as exc:  # noqa: BLE001
+        # However the document defeats the parser, it is a malformed response
+        # Argus was billed for, not a crashed turn. Checking each nested shape
+        # would only name the ones seen so far; the next one is already out
+        # there. The catch is wide enough to cover an Argus-side regression in
+        # the parser too, so the traceback is attached: no sink is configured,
+        # and loguru's default renders it. What leaves with the error stays
+        # generic instead, because a failed job serves its detail to a reader.
+        logger.opt(exception=True).warning("Research response could not be parsed")
+        raise ResearchUnavailableError(
+            "malformed_response", "response shape not parseable", usage=usage
+        ) from exc
+
+
+def _packet_from_priced_response(
+    document: dict[str, Any], *, usage: ResearchUsage
+) -> ResearchPacket:
     output = document.get("output")
     if not isinstance(output, list):
         raise ResearchUnavailableError("malformed_response", "missing output list")
@@ -232,7 +261,6 @@ def _packet_from_response(
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
                         _append_public_source(parsed, annotation)
-    usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
     typed = _typed_retrieval("\n\n".join(text_blocks))
     rows: list[RetrievedRow] = []
     rejected: list[RetrievedRow] = []

@@ -1029,6 +1029,13 @@ integration and green there, not shipped to a user.
 
 **The overnight batch, 2026-09-09. Three of four landed; one is in review.**
 
+**The deployed log sink renders tracebacks; the note about it is narrower than
+it reads.** PR #571 checked and nothing in this repository calls `logger.add`
+outside tests, so production runs loguru's default sink. The note repeated
+across the codebase, that the deployed sink drops structured extras, is about
+**kwargs, not exceptions**: `logger.opt(exception=True)` reaches the log intact
+and flattening a traceback by hand duplicates what the sink already does.
+
 **A second CI flake exists and is not the `fromisoformat` one.**
 `tests/test_private_alpha_canary_split.py::test_session_tool_provisions_only_a_safe_dedicated_identity`
 shells out to `bun e2e/support/private-alpha-canary-session.ts provision`, which
@@ -1041,6 +1048,7 @@ a rerun of the same head with no code change. Rerun it; do not chase it.
 | Subtract the guardrails | **LANDED** `695d9250`, PR #565 | done; surface released |
 | Cut the catalog import edge | **LANDED** `772aa276`, PR #567 | done; surface released |
 | Withheld answers keep their sources, and are not paid for twice | **LANDED** `6f7e7354`, PR #568 | done; surface released |
+| A turn is billed for every response it read | PR #571, open | `research_grounded.py` spend seam, `research/contracts.py`, `research_jobs.py` failure path |
 | Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
 
 `llm_interpreter.py` has roughly 19 lines of modularity headroom and belongs to
@@ -1052,7 +1060,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
 | Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
 | Decisions | Plumbing | **Landed** `67facaf5`. |
-| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569: on the inline path `missing_public_sources` discards a paid packet, so the cost ledger records zero for a turn that made two provider calls. |
+| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569, answered by PR #571: a turn now reports what it paid rather than what it published, so a discarded packet, a retry either kept or thrown away, and a response rejected after its invoice all reach the ledger. Eleven inline degraded turns between 2026-08-13 and 2026-09-02 recorded zero spend, under about $1.50 and not worth a backfill; the three thorough `missing_public_sources` turns on 2026-09-08 were already correct, and no research job has ever failed in production. |
 | Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
