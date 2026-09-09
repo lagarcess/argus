@@ -92,8 +92,17 @@ def run(args: argparse.Namespace) -> None:
         "schema_version": "argus_interpret_stage_ab/v1",
         "label": args.label,
         "started_at": _utc_now(),
+        # The commit of the tree actually imported, which PYTHONPATH may point
+        # away from the invoking worktree.
         "source_sha": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], text=True
+            [
+                "git",
+                "-C",
+                os.fspath(Path(argus.__file__).resolve().parent),
+                "rev-parse",
+                "HEAD",
+            ],
+            text=True,
         ).strip(),
         "argus_module": os.fspath(Path(argus.__file__).resolve()),
         "manifest_sha256": hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
@@ -254,6 +263,11 @@ def summarize(records: list[dict]) -> dict:
             "elapsed_p95_s": round(_quantile(elapsed, 0.95) or 0, 2),
             "provider_mean_s": round(provider_total / max(1, len(rows)) / 1000, 2),
             "guardrail_mean_s": round(guardrail_total / max(1, len(rows)) / 1000, 2),
+            # Every call outside the four gated ones; a move here is provider
+            # drift between runs, not the lane.
+            "other_calls_mean_s": round(
+                (provider_total - guardrail_total) / max(1, len(rows)) / 1000, 2
+            ),
             "guardrail_share": round(guardrail_total / provider_total, 3)
             if provider_total
             else 0.0,
@@ -273,8 +287,8 @@ def summarize(records: list[dict]) -> dict:
 
 def render(label_summaries: list[tuple[str, dict]]) -> str:
     lines = [
-        "| Turn type | label | n | interpret p50 | p95 | provider mean | guardrail mean | share | composer skipped | cost |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Turn type | label | n | interpret p50 | p95 | provider mean | other calls mean | guardrail mean | share | composer skipped | cost |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     categories = sorted(
         {category for _, summary in label_summaries for category in summary}
@@ -287,6 +301,7 @@ def render(label_summaries: list[tuple[str, dict]]) -> str:
             lines.append(
                 f"| {category} | {label} | {row['turns']} | {row['elapsed_p50_s']:.2f}s | "
                 f"{row['elapsed_p95_s']:.2f}s | {row['provider_mean_s']:.2f}s | "
+                f"{row['other_calls_mean_s']:.2f}s | "
                 f"{row['guardrail_mean_s']:.2f}s | {row['guardrail_share']:.0%} | "
                 f"{row['composer_skipped']} | ${row['cost_usd']:.3f} |"
             )

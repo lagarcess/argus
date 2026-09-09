@@ -280,24 +280,40 @@ passes unchanged), and `llm_interpreter.py` shrank by two lines.
 | `CapabilitySideQuestionAudit` | the educational-prose admit is gone; pending-field, removed-asset and vague-start admits stay | `_response_needs_capability_side_question_audit` |
 | `ContextQuestionAudit` | the educational admit is gone; the unsupported strategy shape and the forced unsupported path stay | `_response_needs_context_question_audit` |
 | `FocusedAssetDiscoveryRead` | triggers only on a typed contradiction: the primary typed a fact-kind `research_query` but left the payload empty | `focused_discovery_read_applicable`, over `research_routing.primary_read_asks_a_fact_question`, which `primary_research_query` now shares |
-| `FocusedStrategyExtraction` | `educational_question` needs current-turn execution evidence, the precondition every strategy entry already had; a well-formed empty extraction ends the model ladder | `strategy_extraction_repair_is_allowed`; the ladder in `_repair_incomplete_strategy_extraction` |
+| `FocusedStrategyExtraction` | `educational_question` needs current-turn execution evidence, the precondition every strategy entry already had; a clear not-a-strategy read (`is_testable_strategy=false`) ends the model ladder | `strategy_extraction_repair_is_allowed`; the ladder in `_repair_incomplete_strategy_extraction` |
 
-Two proposals from round one did not survive. The unsupported-path thesis
-clause stays: `test_extraction_cannot_invent_a_strategy_from_an_echo` pins
-that a model-asserted thesis distinct from the message is an idea to extract,
-a graded-routing decision this lane does not reopen. And the discovery read
-was narrowed rather than unplugged, because the typed contradiction it should
-resolve does exist, it just is not a concept question; the read stays wired,
-observable, and dead on plain turns.
+Three proposals from round one were cut back by pinned tests, and the tests
+won. The unsupported-path thesis clause stays:
+`test_extraction_cannot_invent_a_strategy_from_an_echo` pins that a
+model-asserted thesis distinct from the message is an idea to extract, a
+graded-routing decision this lane does not reopen. The ladder stops only on a
+clear "no strategy here": `test_default_interpreter_retries_empty_unsupported_clarification`
+pins a real rescue, where the first repair model calls the turn testable yet
+extracts nothing and the fallback model completes it, so that
+self-contradicting read still moves on while a clear no ends the ladder. And
+the discovery read was narrowed rather than unplugged, because the typed
+contradiction it should resolve does exist, it just is not a concept question;
+the read stays wired, observable, and dead on plain turns.
+
+One pinned behavior changed on purpose and is now documented by its test.
+`test_default_interpreter_repairs_social_sentiment_trade_misroute` had "trade
+based on Reddit sentiment", read by the primary as a capability question,
+repaired into a typed unsupported refusal. With no asset and no number in the
+message the repair now has nothing to work with and the primary's capability
+answer stands; the same misroute naming an asset ("trade Tesla based on Reddit
+sentiment") still repairs. That is the edge traded for the latency, stated in
+round one, and it is the case the live category cannot pin to one typed
+verdict, so the unit test is its record.
 
 Tests: `tests/agent_runtime/test_ordinary_turn_runs_no_audits.py` proves a
 concept question reaches the runtime with zero provider calls after the
 primary read, that the strategy-flow shapes still earn their reads, that the
 evidence predicate sees a named asset but not a concept, and that the ladder
-stops on an empty extraction while still moving past a provider failure. The
+stops on a clear no while still moving past a provider failure or a
+testable-but-empty read. The
 three tests that pinned the deleted admits became trust tests on the same
 shapes. The hermetic sweep (`tests/agent_runtime`, `tests/test_spine_guardrails.py`,
-`tests/perf`) passes 2056.
+`tests/perf`) passes 2057, and `tests/test_openrouter_policy.py` passes 99.
 
 ## Round two: before and after
 

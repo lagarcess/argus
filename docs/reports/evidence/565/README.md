@@ -24,7 +24,10 @@ after promotion.
 
 - `base-1.jsonl`, `base-2.jsonl`: integration `6bc3e0ee` without this lane's
   changes, run from a sibling worktree on `PYTHONPATH` (the `argus_module`
-  provenance line names the tree each run imported).
+  provenance line names the tree each run imported). The first pair was
+  collected before `source_sha` learned to name the imported tree, so
+  `base-1.jsonl` and `head-1.jsonl` carry the invoking worktree's head there;
+  `argus_module` is the authoritative line for which tree ran.
 - `head-1.jsonl`, `head-2.jsonl`: this lane's head, same venv, same manifest.
 - `summary.json`: pooled per-label summary written by `summarize`.
 - `live-measurement.json`: the live measurement scorecard at the head, all

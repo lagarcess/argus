@@ -70,6 +70,7 @@ def test_summary_counts_fires_per_turn_and_the_guardrail_share() -> None:
     }
     assert summary["calls"]["ContextQuestionAudit"]["fires"] == 0
     assert summary["guardrail_share"] == round(5000 / 22000, 3)
+    assert summary["other_calls_mean_s"] == 8.5
     assert summary["composer_skipped"] == 1
     assert summary["elapsed_p50_s"] == 10.0
 
