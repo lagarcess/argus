@@ -5,6 +5,7 @@ import { ExternalLink, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import { researchSourcesDisplay } from "@/lib/research-sources-display";
 import type { DiscoverySidecar } from "./types";
 
 /** Everything the panel renders: sources and when they were retrieved. */
@@ -18,6 +19,12 @@ type DiscoverySourcesPanelProps = {
   sidecar: SourcesPanelSidecar;
   /** Opens scrolled to this source, so a row chip lands on its evidence. */
   anchorIndex?: number | null;
+  /**
+   * The turn withheld its answer: these are the pages Argus read and could
+   * not verify it with, framed as where Argus looked. Decided by the
+   * backend's typed degraded code, never by reading the sources.
+   */
+  withheld?: boolean;
 };
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,6 +57,7 @@ export default function DiscoverySourcesPanel({
   onClose,
   sidecar,
   anchorIndex = null,
+  withheld = false,
 }: DiscoverySourcesPanelProps) {
   const { t, i18n } = useTranslation();
   // The panel line, not the sidebar's: at tablet width the dossier beside
@@ -104,12 +112,9 @@ export default function DiscoverySourcesPanel({
     };
   }, [onClose, anchorIndex, isBelowDesktop]);
 
-  const title = t("chat.discovery_results.sources_panel_title", {
-    defaultValue: "Sources Argus read",
-  });
-  const note = t("chat.discovery_results.sources_panel_note", {
-    defaultValue: "Argus read these while answering. Not recommended reading.",
-  });
+  const display = researchSourcesDisplay(withheld);
+  const title = t(display.titleKey, { defaultValue: display.titleFallback });
+  const note = t(display.noteKey, { defaultValue: display.noteFallback });
   const closeLabel = t("chat.discovery_results.sources_panel_close", {
     defaultValue: "Close sources",
   });

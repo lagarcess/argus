@@ -8,6 +8,7 @@ import time
 from argus.domain.research import cache as research_cache
 from argus.domain.research.cache import (
     DATA_CLASS_TTL_SECONDS,
+    WITHHELD_TTL_SECONDS,
     cache_get,
     cache_put,
     cache_stats,
@@ -143,3 +144,27 @@ def test_expired_entries_fall_out(monkeypatch) -> None:
         research_cache.time, "monotonic", lambda: real_monotonic() + 121.0
     )
     assert cache_get(key) is None
+
+
+def test_a_withheld_record_serves_for_its_class_capped_at_a_day() -> None:
+    """An absence is bounded twice: by how fast the figure itself changes,
+    and by the day a page can appear. Volatile classes keep their minutes,
+    so a model fault on a quote never outlives a retry; quarterly and closed
+    classes are cut from ninety days to one."""
+    assert WITHHELD_TTL_SECONDS == 86_400.0
+    assert (
+        DATA_CLASS_TTL_SECONDS["movers"]
+        < WITHHELD_TTL_SECONDS
+        < DATA_CLASS_TTL_SECONDS["analyst_estimates"]
+    )
+    for kind in ("live_quote", "market_pulse", "screening"):
+        assert ttl_for_packet(question_kind=kind, withheld=True) == ttl_for_packet(
+            question_kind=kind
+        )
+    for kind in ("cross_company", "company_lookup", "etf_constituents"):
+        assert ttl_for_packet(question_kind=kind, withheld=True) == WITHHELD_TTL_SECONDS
+        assert ttl_for_packet(question_kind=kind) > WITHHELD_TTL_SECONDS
+    assert (
+        ttl_for_packet(question_kind="live_quote", closed_period=True, withheld=True)
+        == WITHHELD_TTL_SECONDS
+    )
