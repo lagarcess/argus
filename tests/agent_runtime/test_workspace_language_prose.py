@@ -318,6 +318,8 @@ def test_confirm_stage_does_not_fabricate_english_assumption_prose() -> None:
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE_LANGUAGE_MODULES = (
     REPO_ROOT / "src" / "argus" / "api" / "chat" / "confirmation.py",
+    REPO_ROOT / "src" / "argus" / "api" / "chat" / "confirmation_lifecycle.py",
+    REPO_ROOT / "src" / "argus" / "api" / "chat" / "confirmation_research_peers.py",
     REPO_ROOT / "src" / "argus" / "agent_runtime" / "stages" / "confirm.py",
     REPO_ROOT / "src" / "argus" / "agent_runtime" / "stages" / "explain.py",
     REPO_ROOT / "src" / "argus" / "agent_runtime" / "clarification_contract.py",

@@ -4751,6 +4751,30 @@ symbol lineage. This protects the bounded per-keystroke read contract.
 
 # 17.1 Private Alpha Observability Envelope
 
+### Internal question/outcome evidence
+
+The Refusal log observes terminal chat replies and validated artifact-action
+requests rejected before message storage. This adds no public endpoint, request
+field, response metadata, SSE frame, visible copy, or model-facing text.
+The service-only `refusal_log` SQL view is documented in
+`docs/DATA_MODEL.md` under `refusal_observations and refusal_log`.
+
+Accepted turns link the exact persisted user/assistant messages and read their
+question, action, original outcome metadata, and response from those owners.
+Rejected actions retain the submitted question, validated action, actual HTTP
+status, and unchanged problem response. Caller-supplied artifact/conversation
+ids remain claims; the evidence writer neither resolves them nor treats them
+as proof of ownership. Repeated rejected requests count independently even when
+they reuse `X-Request-ID`.
+
+The writer observes all terminal replies without identifying which ones are
+refusals or deciding whether a boundary is correct. Observation failure leaves
+the public response and allowance behavior unchanged and emits only a
+content-free operational failure. This evidence remains internal to Supabase,
+outside frontend reads, PostHog, model context, and the live-eval fingerprint.
+
+### Product event envelope
+
 P1 defines a stable measurement envelope for product analytics, future cost
 accounting, and eval readiness. B3 slice 2 emits the approved product-event set
 to PostHog when `POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host
