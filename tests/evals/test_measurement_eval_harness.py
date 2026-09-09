@@ -23,6 +23,7 @@ EXPECTED_LOCKED_CATEGORIES = {
     "graceful_recovery",
     "asset_discovery_routing",
     "dca_capital_semantics",
+    "ordinary_conversation",
 }
 
 PHRASE_ASSERTION_KEYS = {

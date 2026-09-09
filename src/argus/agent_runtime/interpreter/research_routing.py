@@ -35,8 +35,14 @@ def research_turn_has_conflicting_owner(interpretation: Any) -> bool:
     )
 
 
+def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
+    """The primary read typed the message as a finance fact question."""
+    query = getattr(interpretation, "research_query", None)
+    return query is not None and query.question_kind not in ("concept", "none")
+
+
 def primary_research_query(interpretation: Any) -> ResearchQueryExtraction | None:
-    query = interpretation.research_query
-    if query is None or query.question_kind in ("concept", "none"):
+    if not primary_read_asks_a_fact_question(interpretation):
         return None
+    query = interpretation.research_query
     return None if research_turn_has_conflicting_owner(interpretation) else query
