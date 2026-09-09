@@ -1,0 +1,580 @@
+{
+  "artifact_type": "partial_interleaved_case_probe",
+  "case_input_sha256": "406b4b0c7790510ac67be3d21eb72af0b5901460ee19590691935a8053d29d43",
+  "elapsed_seconds": 51.30072170800122,
+  "is_full_suite_scorecard": false,
+  "label": "11-candidate-r1",
+  "provenance": {
+    "asset_provider_mode": "live_provider",
+    "candidate_sha": "262d670f6a595660b3f489535eb744201f81597b",
+    "evaluation_mode": "live",
+    "fixture_case_ids": [
+      "action_chip_run_visible_confirmation_aapl",
+      "action_chip_change_asset_remove_aapl_issue_188",
+      "action_chip_change_asset_bare_ticker_append_issue_190",
+      "action_chip_change_asset_compound_replace_issue_188",
+      "action_chip_change_asset_changed_mind_capital_issue_188",
+      "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+      "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+      "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+      "natural_language_establishes_modeled_costs_issue_271",
+      "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "asset_discovery_category_english_issue_244",
+      "asset_discovery_peer_anchor_english_issue_244",
+      "asset_discovery_comparison_anchor_english_issue_244",
+      "asset_discovery_category_spanish_issue_244",
+      "asset_discovery_recent_ipo_exact_issue_344",
+      "asset_discovery_trending_crypto_exact_issue_344",
+      "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "asset_discovery_semantic_pharma_escalation_issue_344",
+      "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "asset_discovery_not_direct_backtest_issue_244",
+      "asset_discovery_not_result_followup_issue_244",
+      "asset_discovery_not_capability_question_issue_244",
+      "metric_correctness_eth_default_crypto_benchmark",
+      "capability_honesty_options_straddle_tsla",
+      "capability_honesty_golden_cross_control_aapl",
+      "capability_honesty_momentum_breakout_aapl",
+      "capability_honesty_news_sentiment_rule_aapl",
+      "capability_honesty_future_performance_nvda_golden_cross",
+      "capability_honesty_future_performance_btc_regression",
+      "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+      "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "dca_capital_semantics_crypto_weekly_btc_issue_455",
+      "dca_capital_semantics_truncated_window_measures_served_issue_455",
+      "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "graceful_recovery_weekly_options_aapl",
+      "graceful_recovery_spanish_weekly_options_aapl",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_english_aapl_simple_hold_2024",
+      "messy_english_company_name_multi_asset_issue_142",
+      "messy_english_complete_sma_crossover_benchmark_issue_270",
+      "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_btc_hold_q1_2024",
+      "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_future_performance_nvda_cruce_dorado",
+      "ordinary_conversation_concept_compound_interest_en",
+      "ordinary_conversation_concept_inflation_es",
+      "ordinary_conversation_concept_etf_es",
+      "ordinary_conversation_capability_indicator_question_en",
+      "ordinary_conversation_capability_indicator_question_es",
+      "ordinary_conversation_macro_curiosity_en",
+      "spanish_ui_english_user_msft_hold_h1_2024"
+    ],
+    "fixture_sha256": "6f6c535a5e1ec0c073014506cff34dc79cb7afd8a670c897b8122057ad42290c",
+    "live_market_data_probe": {
+      "adjustment_reason": "calendar_alignment",
+      "effective_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-02"
+      },
+      "requested_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-01"
+      },
+      "symbol": "SPY"
+    },
+    "market_data_provider_mode": "live_provider",
+    "python_version": "3.10.20",
+    "worktree_clean": true
+  },
+  "provider_usage": {
+    "reported_cost_receipt_count": 6,
+    "reported_cost_usd": 0.03146697,
+    "route_receipt_count": 7,
+    "unreported_cost_receipt_count": 1
+  },
+  "results": [
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 244,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "29556a6419da8d6e7911ce70bea4ad17bc5df0d06bb05c170a8704c12b1910c5",
+          "text": "Strong momentum is evident in several cryptocurrencies currently, driven by factors like ETF inflows and network upgrades. A search for trending names returned Pieverse, STONK, and Zcash, but they could not be confirmed as testable assets here.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 2388,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "78c680cc1beb91d4a78784230c45ec6b326f710410567b3b0f37c33f8c421e2d",
+          "text": "{\"discovery_rows\": [{\"name\": \"XBT/USD\", \"reason_text\": \"Dominant cryptocurrency with sustained institutional inflows and recent all-time highs.\", \"symbol\": \"BTC\"}, {\"name\": \"ETH/USD\", \"reason_text\": \"Leading smart-contract platform with strong ETF inflows and network upgrades.\", \"symbol\": \"ETH\"}, {\"name\": \"SOL/USD\", \"reason_text\": \"High-throughput blockchain seeing rapid DeFi and NFT activity growth.\", \"symbol\": \"SOL\"}, {\"name\": \"XRP/USD\", \"reason_text\": \"Cross-border payments token with renewed legal clarity and trading volume surge.\", \"symbol\": \"XRP\"}, {\"name\": \"ADA/USD\", \"reason_text\": \"Research-driven smart-contract platform with upcoming scalability upgrades.\", \"symbol\": \"ADA\"}], \"retrieved_at\": \"2026-09-09T22:31:17.403749+00:00\", \"tool_result_cards\": [{\"presentation\": {\"answer\": {\"label\": {\"interpolation_args\": {\"name\": \"XBT/USD\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_0\", \"unit\": null, \"value\": \"BTC\", \"value_text\": null}, \"inputs\": [{\"editable\": false, \"label\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.request\"}, \"name\": \"request\", \"unit\": null, \"unknown\": false, \"value\": \"Find cryptocurrencies that are trending or showing strong momentum in the current market\", \"value_text\": null, \"visibility\": \"private\"}], \"narrative\": \"Strong momentum is evident in several cryptocurrencies currently, driven by factors like ETF inflows and network upgrades. A search for trending names returned Pieverse, STONK, and Zcash, but they could not be confirmed as testable assets here.\", \"notes\": [], \"rows\": [{\"label\": {\"interpolation_args\": {\"name\": \"ETH/USD\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_1\", \"unit\": null, \"value\": \"ETH\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"SOL/USD\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_2\", \"unit\": null, \"value\": \"SOL\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"XRP/USD\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_3\", \"unit\": null, \"value\": \"XRP\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"ADA/USD\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_4\", \"unit\": null, \"value\": \"ADA\", \"value_text\": null}], \"sources\": [], \"title\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.title\"}, \"visual\": null}, \"status\": \"succeeded\"}]}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v2"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-09T22:30:36.736930+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1002,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 17,
+            "prompt_tokens": 782,
+            "total_tokens": 799
+          },
+          "usage_cost_usd": 0.0008856
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-09T22:30:56.779145+00:00",
+          "failure_mode": "TimeoutError",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 20019,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "failed",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": null,
+          "usage_cost_usd": null
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-09T22:31:04.619752+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 7839,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 13379,
+            "completion_tokens": 624,
+            "prompt_tokens": 33293,
+            "total_tokens": 33917
+          },
+          "usage_cost_usd": 0.0243719
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-09T22:31:10.585432+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 4967,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_extraction",
+          "task": "discovery_extraction",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 503,
+            "prompt_tokens": 2573,
+            "total_tokens": 3076
+          },
+          "usage_cost_usd": 0.00433935
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-09T22:31:17.403313+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3884,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 378,
+            "prompt_tokens": 479,
+            "total_tokens": 857
+          },
+          "usage_cost_usd": 0.00140935
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-09T22:31:25.649508+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 8036,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 720,
+            "prompt_tokens": 360,
+            "total_tokens": 1080
+          },
+          "usage_cost_usd": 0.000306
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-09T22:31:26.780049+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1127,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 17,
+            "prompt_tokens": 1121,
+            "total_tokens": 1138
+          },
+          "usage_cost_usd": 0.00015477
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "acceptance_stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": [
+          {
+            "anchor_symbols": [],
+            "asset_class_hint": "crypto",
+            "category_description": "Trending cryptocurrencies with strong current momentum",
+            "needs_current_facts": true,
+            "relationship": "category",
+            "request": "Find cryptocurrencies that are trending or showing strong momentum in the current market"
+          }
+        ],
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "execution_trace": [
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "ready_to_respond",
+            "stage": "execute"
+          }
+        ],
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "follow_up",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [
+            "BTC",
+            "ETH",
+            "SOL",
+            "XRP",
+            "ADA"
+          ],
+          "dropped_not_named": [],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "primary_intent": "calculate",
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "approved_for_execution",
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null,
+        "tool_call_records": [
+          {
+            "call_id": "trending_cryptos_discovery",
+            "outcome": "succeeded",
+            "tool_name": "peer_expansion",
+            "tool_outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Strong momentum is evident in several cryptocurrencies currently, driven by factors like ETF inflows and network upgrades. A search for trending names returned Pieverse, STONK, and Zcash, but they could not be confirmed as testable assets here.",
+                "peers": [
+                  {
+                    "name": "XBT/USD",
+                    "symbol": "BTC"
+                  },
+                  {
+                    "name": "ETH/USD",
+                    "symbol": "ETH"
+                  },
+                  {
+                    "name": "SOL/USD",
+                    "symbol": "SOL"
+                  },
+                  {
+                    "name": "XRP/USD",
+                    "symbol": "XRP"
+                  },
+                  {
+                    "name": "ADA/USD",
+                    "symbol": "ADA"
+                  }
+                ],
+                "relationship": "category",
+                "retrieved_at": "2026-09-09T22:31:17.403749+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": []
+              },
+              "status": "succeeded"
+            }
+          }
+        ],
+        "tool_calls": [
+          {
+            "arguments": {
+              "anchor_symbols": [],
+              "asset_class_hint": "crypto",
+              "category_description": "Trending cryptocurrencies with strong current momentum",
+              "needs_current_facts": true,
+              "relationship": "category",
+              "request": "Find cryptocurrencies that are trending or showing strong momentum in the current market"
+            },
+            "call_id": "trending_cryptos_discovery",
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_result_cards": [
+          {
+            "arguments": {
+              "anchor_symbols": [],
+              "asset_class_hint": "crypto",
+              "category_description": "Trending cryptocurrencies with strong current momentum",
+              "needs_current_facts": true,
+              "relationship": "category",
+              "request": "Find cryptocurrencies that are trending or showing strong momentum in the current market"
+            },
+            "artifact_id": "3ad71513-3f11-4d6c-a5f3-8cc22380e673",
+            "artifact_state": "active",
+            "call_id": "trending_cryptos_discovery",
+            "card_type": "research",
+            "card_version": 1,
+            "input_revision": 0,
+            "kind": "tool_result",
+            "outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Strong momentum is evident in several cryptocurrencies currently, driven by factors like ETF inflows and network upgrades. A search for trending names returned Pieverse, STONK, and Zcash, but they could not be confirmed as testable assets here.",
+                "peers": [
+                  {
+                    "name": "XBT/USD",
+                    "symbol": "BTC"
+                  },
+                  {
+                    "name": "ETH/USD",
+                    "symbol": "ETH"
+                  },
+                  {
+                    "name": "SOL/USD",
+                    "symbol": "SOL"
+                  },
+                  {
+                    "name": "XRP/USD",
+                    "symbol": "XRP"
+                  },
+                  {
+                    "name": "ADA/USD",
+                    "symbol": "ADA"
+                  }
+                ],
+                "relationship": "category",
+                "retrieved_at": "2026-09-09T22:31:17.403749+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": []
+              },
+              "status": "succeeded"
+            },
+            "presentation": {
+              "answer": {
+                "label": {
+                  "interpolation_args": {
+                    "name": "XBT/USD"
+                  },
+                  "locale_key": "chat.tools.research.subject"
+                },
+                "name": "subject_0",
+                "unit": null,
+                "value": "BTC",
+                "value_text": null
+              },
+              "inputs": [
+                {
+                  "editable": false,
+                  "label": {
+                    "interpolation_args": {},
+                    "locale_key": "chat.tools.research.request"
+                  },
+                  "name": "request",
+                  "unit": null,
+                  "unknown": false,
+                  "value": "Find cryptocurrencies that are trending or showing strong momentum in the current market",
+                  "value_text": null,
+                  "visibility": "private"
+                }
+              ],
+              "narrative": "Strong momentum is evident in several cryptocurrencies currently, driven by factors like ETF inflows and network upgrades. A search for trending names returned Pieverse, STONK, and Zcash, but they could not be confirmed as testable assets here.",
+              "notes": [],
+              "rows": [
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "ETH/USD"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_1",
+                  "unit": null,
+                  "value": "ETH",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "SOL/USD"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_2",
+                  "unit": null,
+                  "value": "SOL",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "XRP/USD"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_3",
+                  "unit": null,
+                  "value": "XRP",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "ADA/USD"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_4",
+                  "unit": null,
+                  "value": "ADA",
+                  "value_text": null
+                }
+              ],
+              "sources": [],
+              "title": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.research.title"
+              },
+              "visual": null
+            },
+            "schema_version": 1,
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_usage": [
+          {
+            "call_id": "trending_cryptos_discovery",
+            "tool_name": "peer_expansion",
+            "usage": {
+              "cache_status": "miss",
+              "cost_usd": 0.005,
+              "invocations": 1,
+              "latency_ms": 973
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "selected_case_ids": [
+    "asset_discovery_trending_crypto_exact_issue_344"
+  ],
+  "started_at": "2026-09-09T22:30:35.636885+00:00"
+}
