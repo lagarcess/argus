@@ -13,7 +13,11 @@ from typing import Any
 from pydantic import BaseModel, field_serializer
 
 from argus.domain.artifact_presentation_kind import artifact_presentation_kind
-from argus.domain.result_figures import result_display_figures, with_result_figures
+from argus.domain.result_figures import result_display_figures
+from argus.domain.result_readout_facts import (
+    result_readout_config,
+    with_result_readout_facts,
+)
 
 # These storage fields are private across their historical nesting locations.
 # The AST guard forbids a presentation consumer from reading them again.
@@ -62,12 +66,13 @@ def reader_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             "kind": "result_breakdown",
             "facts": {"result_fact_bank": public.get("result_fact_bank")},
         }
-    # Display figures are rounded here, once, from the bank's own metrics; a
+    # Project stored plan facts and display figures on the transport copy; a
     # typed breakdown carries its bank inside the intent, older shapes at root.
-    with_result_figures(public.get("result_fact_bank"))
+    if "result_fact_bank" in public:
+        public["result_fact_bank"] = with_result_readout_facts(public["result_fact_bank"])
     facts = (public.get("response_intent") or {}).get("facts")
-    if isinstance(facts, dict):
-        with_result_figures(facts.get("result_fact_bank"))
+    if isinstance(facts, dict) and "result_fact_bank" in facts:
+        facts["result_fact_bank"] = with_result_readout_facts(facts["result_fact_bank"])
     return public
 
 
@@ -77,6 +82,7 @@ def reader_run(value: Any) -> Any:
         return None
     public = without_private_prose(value.model_dump())
     public["figures"] = result_display_figures(public.get("metrics"))
+    public["config_snapshot"] = result_readout_config(public.get("config_snapshot"))
     return value.model_copy(update=public)
 
 

@@ -40,6 +40,9 @@ from argus.domain.backtesting.rules.signals import (
     _opposite_moving_average_crossover_rule as engine_mirrored_exit_rule,
 )
 from argus.domain.credential_shapes import credential_shape_in
+from argus.domain.result_readout_facts import (
+    engine_config_from_snapshot as _engine_config,
+)
 
 PUBLIC_EXCERPT_ID_BYTES = 24
 PUBLIC_EXCERPT_PATH_PREFIX = "/r/"
@@ -670,20 +673,6 @@ def _assumptions(
     if len(assumptions) > MAX_ASSUMPTIONS:
         raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
     return assumptions
-
-
-def _engine_config(config_snapshot: object) -> dict[str, Any]:
-    """The engine config the run executed, whichever snapshot shape wraps it.
-
-    Same two shapes ``_strategy_facts`` handles. The direct engine path stores the
-    config itself; the agent path repeats part of it in ``resolved_parameters`` and
-    carries a whole copy under ``engine_config``. The run builder lifts that copy to
-    the top level and the launch envelope leaves it nested, so both places are read.
-    The copy is what the engine was actually handed, so it is merged last and wins.
-    """
-    snapshot = _mapping(config_snapshot)
-    merged = {**snapshot, **_mapping(snapshot.get("resolved_parameters"))}
-    return {**merged, **_mapping(merged.get("engine_config"))}
 
 
 def _is_recurring_contribution_run(
