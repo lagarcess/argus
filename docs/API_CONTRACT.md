@@ -3718,7 +3718,12 @@ Contract rules:
   discarded, a claim withheld for want of a public publisher, and a response
   billed and then rejected as unreadable all reach the cost ledger at what
   they cost; only a turn that reached no provider reports zero and
-  `cache_status: "bypass"`. A completed thorough run whose answer cannot be
+  `cache_status: "bypass"`. A cache hit is the one turn whose `usage`
+  describes something other than its own work: it serves a stored record and
+  republishes that record's invocations, latency and cost as provenance, and
+  because it spent nothing, its ledger row carries `billable_quantity: 0` with
+  no cost and no latency. The retrieval is charged once, on the miss that
+  stored it. A completed thorough run whose answer cannot be
   read posts no sidecar to a reader, so its spend is recorded on the ledger
   directly. None of this is reader-facing: `usage` is server-side evidence,
   and cost never appears on a public surface.

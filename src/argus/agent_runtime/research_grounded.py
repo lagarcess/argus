@@ -698,11 +698,9 @@ def unavailable_result(
     turn that never called one bypasses the meter."""
     del state
     language = language_tag(user.language_preference)
-    note = (
-        _missing_public_source_note(language)
-        if reason == "missing_public_sources"
-        else _unavailable_note(language)
-    )
+    # No reason reaching here has a note of its own: a claim withheld for want
+    # of a publisher has a real packet and composes through _packet_stage_result.
+    note = _unavailable_note(language)
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     if not rows and subjects:
         note = f"{note}\n\n{honest_no_next_line(language)}"

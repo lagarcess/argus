@@ -207,6 +207,19 @@ def _packet_from_response(
     latency_ms: int,
     on_unpriced: UnpricedSpendRecorder = record_unpriced_spend,
 ) -> ResearchPacket:
+    # The invoice is read before anything can reject the response, so every
+    # rejection below carries what Argus was billed. A document that got this
+    # far was served; only transport and a non-object body have no invoice.
+    usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
+    try:
+        return _packet_from_priced_response(document, usage=usage)
+    except ResearchUnavailableError as exc:
+        raise ResearchUnavailableError(exc.reason, exc.detail, usage=usage) from exc
+
+
+def _packet_from_priced_response(
+    document: dict[str, Any], *, usage: ResearchUsage
+) -> ResearchPacket:
     output = document.get("output")
     if not isinstance(output, list):
         raise ResearchUnavailableError("malformed_response", "missing output list")
@@ -236,23 +249,16 @@ def _packet_from_response(
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
                         _append_public_source(parsed, annotation)
-    usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
-    # Past this line the invoice is established, so every rejection below is a
-    # response Argus paid for. One re-raise attaches that invoice to all of
-    # them, so a new rejection cannot lose its spend by forgetting to.
-    try:
-        typed = _typed_retrieval("\n\n".join(text_blocks))
-        rows: list[RetrievedRow] = []
-        rejected: list[RetrievedRow] = []
-        if typed is not None:
-            rows, rejected = _cited_rows(typed.rows, parsed)
-            answer = _sanitize_answer(typed.answer_markdown)
-        else:
-            answer = _sanitize_answer("\n\n".join(text_blocks))
-        if not answer:
-            raise ResearchUnavailableError("empty_answer")
-    except ResearchUnavailableError as exc:
-        raise ResearchUnavailableError(exc.reason, exc.detail, usage=usage) from exc
+    typed = _typed_retrieval("\n\n".join(text_blocks))
+    rows: list[RetrievedRow] = []
+    rejected: list[RetrievedRow] = []
+    if typed is not None:
+        rows, rejected = _cited_rows(typed.rows, parsed)
+        answer = _sanitize_answer(typed.answer_markdown)
+    else:
+        answer = _sanitize_answer("\n\n".join(text_blocks))
+    if not answer:
+        raise ResearchUnavailableError("empty_answer")
     seen: set[str] = set()
     unique_pairs = []
     for pair in parsed.pairs:

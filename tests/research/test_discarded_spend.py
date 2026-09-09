@@ -253,6 +253,64 @@ def test_an_answer_that_could_not_be_read_still_bills_its_invoice(
     assert entry["cost_amount"] == pytest.approx(ONE_RESPONSE_USD)
 
 
+def test_a_served_response_with_a_broken_envelope_still_bills_its_invoice(
+    monkeypatch, ledger, stepping_clock
+) -> None:
+    """Codex round 1: the invoice is read before the output envelope is
+    validated, so a billed response Argus cannot even begin to parse is not
+    mistaken for a call that never happened."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    envelope_broken = agent_response()
+    envelope_broken["output"] = "not a list"
+    wire_grounded_client(monkeypatch, [envelope_broken])
+
+    result = run_research_turn("What is AAPL trading at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_unavailable_malformed_response"}
+    assert sidecar["usage"]["cost_usd"] == pytest.approx(ONE_RESPONSE_USD)
+    assert sidecar["usage"]["cache_status"] == "miss"
+    assert _settle(result, ledger)["cost_amount"] == pytest.approx(ONE_RESPONSE_USD)
+
+
+def test_a_response_with_no_invoice_at_all_bills_nothing(
+    monkeypatch, ledger, stepping_clock
+) -> None:
+    """A body that is not an object never reached pricing, so there is no
+    invoice to claim and the turn must not invent one."""
+    import httpx
+    from argus.agent_runtime import research_grounded as grounded
+    from argus.domain.research.perplexity_agent import PerplexityAgentClient
+
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+
+    class _NonObjectBody(httpx.BaseTransport):
+        def handle_request(self, request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=["not", "an", "object"])
+
+    monkeypatch.setattr(
+        grounded,
+        "_client",
+        lambda: PerplexityAgentClient("k", transport=_NonObjectBody()),
+    )
+
+    result = run_research_turn("What is AAPL trading at?")
+
+    assert result is not None
+    assert result.stage_patch["research"]["usage"] == {
+        "invocations": 0,
+        "latency_ms": 0,
+        "cost_usd": None,
+        "cache_status": "bypass",
+    }
+    assert _settle(result, ledger)["billable_quantity"] == 0
+
+
 def test_a_turn_that_never_reached_the_provider_bills_nothing(monkeypatch, ledger):
     """The unconfigured path calls no provider, so it bypasses the meter and
     the ledger rather than claiming a zero-cost request."""
@@ -309,7 +367,14 @@ def test_a_cache_hit_reports_the_packet_it_served_and_claims_no_new_call(
     assert served["cache_status"] == "hit"
     assert served["cost_usd"] == pytest.approx(ONE_RESPONSE_USD)
     assert served["invocations"] == first.stage_patch["research"]["usage"]["invocations"]
-    assert _settle(second, ledger)["billable_quantity"] == 0
+    # The sidecar describes the record it served; the ledger records what this
+    # turn paid, which is nothing, so a report summing the column cannot charge
+    # one retrieval twice.
+    entry = _settle(second, ledger)
+    assert entry["billable_quantity"] == 0
+    assert entry["cost_amount"] is None
+    assert entry["cost_source"] == "unavailable"
+    assert entry["latency_ms"] is None
 
 
 def test_the_cache_stores_one_response_not_the_turn_that_retried(
