@@ -629,6 +629,34 @@ persisted solely to represent abandonment.
 
 ### Public evidence receipts
 
+#### Approved answer-sharing extension
+
+The Share the answer lane extends this same API and snapshot lifecycle under
+[`conversation-sharing.md`](specs/conversation-sharing.md) section 4.5, including
+the founder's 2026-09-09 four-turn decision. It does not introduce a second sharing
+system. Version 1 receipts retain their payload and rendering. Version 2 introduces
+typed receipt kinds and a closed `turns` wrapper, with one through four turns from
+one owned conversation in conversation order. The research payload is exactly the
+closed field list in that spec's section 4.2.
+
+The owner can read share candidates, preview a selection, and create its receipt
+under `/conversations/{conversation_id}/public-excerpt-candidates`,
+`/conversations/{conversation_id}/public-excerpt-preview`, and
+`/conversations/{conversation_id}/public-excerpt`. Candidate reads supply typed
+eligibility reasons and field identities for localization; the frontend never
+classifies prose. Preview and creation share the same validation, with final
+creation checking every source and the previewed payload digest again. One refused
+turn refuses the entire selection. All owner endpoints require
+`can_save_decision`, and the artifact endpoint becomes an adapter through the same
+turn eligibility and receipt identity. The existing public route, owner list,
+revoke, tombstone, rate limits, and flag-off byte identity continue to apply.
+
+The reader receives only a frozen snapshot. No live source reads, fork, prompt
+seed, history copy, refresh, or rerun are part of this extension. The public action
+is Continue with Argus and lands at guest entry without carried state. Selection
+preview and the four-turn cap bound but do not eliminate the cross-turn inference
+risk explicitly accepted in section 4.5.
+
 Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
 off, every path below answers exactly as a route that does not exist: status 404
 with body `{"detail":"Not Found"}`, produced by the same handler an unmatched path
