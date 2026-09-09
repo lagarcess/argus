@@ -10,9 +10,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 QuestionShape = Literal["fast", "balanced", "thorough"]
+# What a row's value measures. Declared by the provider under the strict
+# schema, never inferred from the shape of its unit.
+RowKind = Literal["currency", "percent", "multiple", "count"]
 CapabilityClass = Literal[
     "fast_quote",
     "balanced_lookup",
@@ -52,22 +55,41 @@ TYPED_RETRIEVAL_SCHEMA_NAME = "argus_typed_retrieval"
 # interpreter, and are frozen by the recorded probe in tests/research rather
 # than by the interpreter fingerprint.
 class RetrievedRow(BaseModel):
-    """One figure read from a retrieved page: a number, its unit, its date and its citation."""
+    """One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation."""
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
-    label: str
-    """What the figure is, in a few words, naming the entity it describes."""
-    value: float
-    """The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000."""
-    unit: str
-    """The unit of value: a currency code such as USD or DOP, percent, x, or shares."""
-    as_of: str | None
-    """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
+    subject: str
+    """The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix."""
     symbol: str | None
     """The exchange ticker of the security the figure describes, or null."""
+    label: str
+    """What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025."""
+    value: float
+    """The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000."""
+    kind: RowKind
+    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares."""
+    unit: str
+    """The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count."""
+    as_of: str | None
+    """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
     source_url: str | None
     """The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."""
+
+    @field_validator("unit")
+    @classmethod
+    def _stripped(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def _currency_unit_is_a_code(self) -> "RetrievedRow":
+        # A money amount names its currency by code, the one shape a
+        # deterministic reader can hold against a written mark.
+        if self.kind == "currency" and not (
+            len(self.unit) == 3 and self.unit.isalpha() and self.unit.isupper()
+        ):
+            raise ValueError("a currency row names its unit by ISO 4217 code")
+        return self
 
 
 class TypedRetrieval(BaseModel):

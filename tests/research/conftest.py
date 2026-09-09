@@ -179,20 +179,24 @@ def typed_answer_text(answer: str, rows: list[dict[str, Any]]) -> str:
 
 def retrieved_row(
     *,
-    label: str = "NVIDIA share price change today",
-    value: float = -4.3,
-    unit: str = "percent",
-    as_of: str | None = "2026-09-04",
+    subject: str = "NVIDIA",
     symbol: str | None = "NVDA",
+    label: str = "share price change today",
+    value: float = -4.3,
+    kind: str = "percent",
+    unit: str = "%",
+    as_of: str | None = "2026-09-04",
     source_url: str | None = "https://www.perplexity.ai/finance/NVDA",
 ) -> dict[str, Any]:
     """One row in the shape the schema requires: every field present."""
     return {
+        "subject": subject,
+        "symbol": symbol,
         "label": label,
         "value": value,
+        "kind": kind,
         "unit": unit,
         "as_of": as_of,
-        "symbol": symbol,
         "source_url": source_url,
     }
 
@@ -294,8 +298,9 @@ def rows_with_one_rejected() -> list[dict[str, Any]]:
     return [
         retrieved_row(source_url=PUBLISHER),
         retrieved_row(
-            label="Invented target price",
+            label="analyst target price",
             value=250.0,
+            kind="currency",
             unit="USD",
             source_url="https://invented.example/target",
         ),

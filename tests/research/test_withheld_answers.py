@@ -152,9 +152,10 @@ def test_a_survey_with_figures_but_no_verified_name_persists_no_rows(
                     "ZZZZFAKE led the gainers, up 9.1%.",
                     [
                         retrieved_row(
-                            label="ZZZZFAKE change today",
-                            value=9.1,
+                            subject="ZZZZFAKE",
                             symbol="ZZZZFAKE",
+                            label="change today",
+                            value=9.1,
                         )
                     ],
                 ),
@@ -217,7 +218,14 @@ def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
                 agent_response(
                     text=typed_answer_text(
                         "ZZZZFAKE fell **4.3%**.",
-                        [retrieved_row(label="x", value=4.3, symbol="ZZZZFAKE")],
+                        [
+                            retrieved_row(
+                                subject="ZZZZFAKE",
+                                symbol="ZZZZFAKE",
+                                label="change",
+                                value=-4.3,
+                            )
+                        ],
                     ),
                     tickers=["ZZZZFAKE"],
                     sources=[PROVIDER_PAGE],
@@ -244,7 +252,16 @@ def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
                 agent_response(
                     text=typed_answer_text(
                         "AAPL is **$4.3** today.",
-                        [retrieved_row(label="AAPL", value=4.3, symbol="AAPL")],
+                        [
+                            retrieved_row(
+                                subject="Apple",
+                                symbol="AAPL",
+                                label="price",
+                                value=4.3,
+                                kind="currency",
+                                unit="USD",
+                            )
+                        ],
                     ),
                     invocations=0,
                 )
@@ -256,14 +273,14 @@ def test_the_sidecar_builder_owns_the_degraded_shape() -> None:
                 agent_response(
                     text=typed_answer_text(
                         "NVDA (NVDA) rose **4.3%**.",
-                        [retrieved_row(label="NVDA", value=4.3)],
+                        [retrieved_row(label="change", value=4.3)],
                     ),
                     invocations=0,
                 ),
                 agent_response(
                     text=typed_answer_text(
                         "NVDA (NVDA) rose **4.3%**.",
-                        [retrieved_row(label="NVDA", value=4.3)],
+                        [retrieved_row(label="change", value=4.3)],
                     ),
                     invocations=0,
                 ),
@@ -383,7 +400,16 @@ def test_rows_without_any_retrieval_are_not_grounded_not_unverified(monkeypatch)
             agent_response(
                 text=typed_answer_text(
                     "AAPL is **$200** today.",
-                    [retrieved_row(label="AAPL price", value=200.0, symbol="AAPL")],
+                    [
+                        retrieved_row(
+                            subject="Apple",
+                            symbol="AAPL",
+                            label="price",
+                            value=200.0,
+                            kind="currency",
+                            unit="USD",
+                        )
+                    ],
                 ),
                 invocations=0,
             )
@@ -405,7 +431,7 @@ def test_a_survey_with_rows_but_no_retrieval_keeps_its_own_code(monkeypatch) -> 
     set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     document = agent_response(
         text=typed_answer_text(
-            "NVDA (NVDA) rose **4.3%**.", [retrieved_row(label="NVDA", value=4.3)]
+            "NVDA (NVDA) rose **4.3%**.", [retrieved_row(label="change", value=4.3)]
         ),
         invocations=0,
     )
@@ -460,10 +486,12 @@ def test_a_prose_figure_no_row_carries_withholds_the_answer(monkeypatch) -> None
             "AAPL is **$200** today and up **5%** this week.",
             [
                 retrieved_row(
-                    label="AAPL price",
-                    value=200.0,
-                    unit="USD",
+                    subject="Apple",
                     symbol="AAPL",
+                    label="price",
+                    value=200.0,
+                    kind="currency",
+                    unit="USD",
                     source_url="https://www.perplexity.ai/finance/AAPL",
                 )
             ],
@@ -497,17 +525,19 @@ def test_prose_whose_every_figure_is_a_row_is_published(monkeypatch) -> None:
                     "AAPL is **$200** today, up **5%** this week, as of September 8, 2026.",
                     [
                         retrieved_row(
-                            label="AAPL price",
-                            value=200.0,
-                            unit="USD",
+                            subject="Apple",
                             symbol="AAPL",
+                            label="price",
+                            value=200.0,
+                            kind="currency",
+                            unit="USD",
                             source_url="https://www.perplexity.ai/finance/AAPL",
                         ),
                         retrieved_row(
-                            label="AAPL weekly change",
-                            value=5.0,
-                            unit="percent",
+                            subject="Apple",
                             symbol="AAPL",
+                            label="weekly change",
+                            value=5.0,
                             source_url="https://www.perplexity.ai/finance/AAPL",
                         ),
                     ],

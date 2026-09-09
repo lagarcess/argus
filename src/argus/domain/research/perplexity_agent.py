@@ -410,48 +410,21 @@ _DIRECTION_WORDS = {
     "perdi\u00f3": -1,
     "retrocedi\u00f3": -1,
 }
-_PERCENT_UNITS = (
-    "%",
-    "percent",
-    "pct",
-    "por ciento",
-    "porcentaje",
-    "puntos porcentuales",
-)
-_RATIO_UNITS = ("ratio", "fraction", "decimal")
-_CURRENCY_UNITS = ("$", "dollar", "d\u00f3lar", "peso", "euro", "usd", "dop", "eur")
-_MULTIPLE_UNITS = ("x", "times", "multiple", "veces")
-_SEGMENT = re.compile(r"(?<=[.!?])\s+")
-
-
-def _unit_family(unit: str) -> str:
-    """The kind of quantity a row's unit names: percent, ratio, multiple,
-    currency (an ISO code or a currency word) or a plain quantity."""
-    lowered = unit.strip().lower()
-    if any(mark in lowered for mark in _PERCENT_UNITS):
-        return "percent"
-    if any(mark in lowered for mark in _RATIO_UNITS):
-        return "ratio"
-    if lowered in _MULTIPLE_UNITS or "multiple" in lowered:
-        return "multiple"
-    stripped = unit.strip()
-    if any(mark in lowered for mark in _CURRENCY_UNITS) or (
-        len(stripped) == 3 and stripped.isalpha() and stripped.isupper()
-    ):
-        return "currency"
-    return "quantity"
-
-
-# The row families a written figure of each kind may be verified by. An
-# unmarked figure (a decimal, a separator or a scale word alone) is a plain
-# quantity and may name a currency amount or a multiple written without its
+# A currency mark the prose writes that names one currency. A bare "$" or a
+# currency word such as pesos names a family, not a code, and is held only
+# against the row's kind.
+_CURRENCY_MARK_CODES = {"rd$": "DOP", "us$": "USD", "\u20ac": "EUR", "\u00a3": "GBP"}
+# The row kinds a written figure of each kind may be verified by. An unmarked
+# figure (a decimal, a separator or a scale word alone) is a plain quantity
+# and may name a money amount, a multiple or a count written without its
 # mark; a marked figure needs the matching kind.
-_COMPATIBLE_FAMILIES = {
-    "percent": {"percent", "ratio"},
+_COMPATIBLE_KINDS = {
+    "percent": {"percent"},
     "currency": {"currency"},
     "multiple": {"multiple"},
-    "quantity": {"quantity", "currency", "multiple"},
+    "quantity": {"count", "currency", "multiple"},
 }
+_SEGMENT = re.compile(r"(?<=[.!?])\s+")
 
 
 def _written_value(number: str, language: str) -> tuple[float, int]:
@@ -479,14 +452,14 @@ def _written_value(number: str, language: str) -> tuple[float, int]:
 
 
 def _subject_tokens(row: RetrievedRow) -> set[str]:
-    """What names the row's entity: its symbol and the proper nouns of its
-    label (the schema asks the label to name the entity). Empty when the
-    label names none, and such a row verifies nothing."""
-    tokens = {row.symbol.lower()} if row.symbol else set()
-    for word in row.label.split():
-        cleaned = "".join(ch for ch in word if ch.isalnum())
-        if len(cleaned) >= 3 and (cleaned[0].isupper() or cleaned[0].isdigit()):
-            tokens.add(cleaned.lower())
+    """What names the row's entity: its symbol and the words of its typed
+    subject. Empty when the row names none, and such a row verifies
+    nothing."""
+    tokens = {row.symbol.strip().lower()} if row.symbol and row.symbol.strip() else set()
+    for word in row.subject.split():
+        cleaned = "".join(ch for ch in word if ch.isalnum()).lower()
+        if len(cleaned) >= 2:
+            tokens.add(cleaned)
     return tokens
 
 
@@ -501,10 +474,12 @@ def _unverified_figure_count(
     exposes: the value under the response language's number convention at
     the written precision, the scale word (12.93 billion is 12930000000, not
     12.93), the sign when the prose writes one or a direction word fixes it,
-    the unit kind (a percent is never a price, a price is never a share
-    count, a multiple is never a currency), and the subject, which the
-    figure's own sentence or table line must name by the row's symbol or a
-    proper noun of its label; a row naming no entity verifies nothing. One
+    the kind the row declares (a percent is never a price, a price is never
+    a share count, a multiple is never a currency, and a currency mark that
+    names a code must be the row's code), and the subject, which the
+    figure's own sentence or table line must name by the row's symbol or its
+    typed subject; a row naming no entity verifies nothing. Nothing is
+    inferred from the shape of a unit or a label. One
     unverified figure withholds the answer at the composition seam."""
     unverified = 0
     for line in markdown.split("\n"):
@@ -558,12 +533,14 @@ def _figure_from(
             if cleaned in _DIRECTION_WORDS:
                 sign = _DIRECTION_WORDS[cleaned]
                 break
+    mark = (groups["currency"] or "").strip().lower()
     return {
         "written": written,
         "precision": precision,
         "scale": _SCALE_FACTORS.get((groups["scale"] or "").strip().lower(), 1.0),
         "percent": percent,
         "kind": kind,
+        "currency_code": _CURRENCY_MARK_CODES.get(mark),
         "sign": sign,
     }
 
@@ -576,12 +553,11 @@ def _row_verifies(row: RetrievedRow, figure: dict[str, Any], words: set[str]) ->
         return False
     if figure["sign"] and (row.value == 0 or (row.value > 0) != (figure["sign"] > 0)):
         return False
-    family = _unit_family(row.unit)
-    if family not in _COMPATIBLE_FAMILIES[figure["kind"]]:
+    if row.kind not in _COMPATIBLE_KINDS[figure["kind"]]:
+        return False
+    if figure["currency_code"] and row.unit != figure["currency_code"]:
         return False
     magnitude = abs(row.value)
-    if figure["percent"] and family == "ratio":
-        magnitude *= 100
     candidate = magnitude / figure["scale"]
     tolerance = 0.5 * 10 ** (-figure["precision"]) + 1e-9
     return abs(round(candidate, figure["precision"]) - figure["written"]) <= tolerance

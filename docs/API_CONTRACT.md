@@ -3565,11 +3565,13 @@ final payload and persisted metadata:
     ],
     "rows": [
       {
-        "label": "Netflix Q2 2026 revenue",
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Q2 2026 revenue",
         "value": 11079000000,
+        "kind": "currency",
         "unit": "USD",
         "as_of": "2026-07-16",
-        "symbol": "NFLX",
         "source_url": "https://example.com/filing"
       }
     ],
@@ -3686,8 +3688,10 @@ Contract rules:
 - **Retrieval produces typed rows, never prose** (grounded-finance board,
   operating rule 4). Every provider call requests a strict `json_schema`
   response: the answer prose plus `rows`, one per figure the answer states,
-  each `{label, value, unit, as_of, symbol, source_url}` with `value` a plain
-  number. A row survives parsing only when its `source_url` is a page the
+  each `{subject, symbol, label, value, kind, unit, as_of, source_url}` with
+  `value` a plain number, `subject` the entity the figure describes, and
+  `kind` one of `currency`, `percent`, `multiple`, `count`; a currency row
+  names its unit by ISO 4217 code or the answer is malformed. A row survives parsing only when its `source_url` is a page the
   same response retrieved (a finance or web tool result, a fetched page, or
   an annotation); a row citing anything else is dropped and counted, never
   asserted. Fetched pages are typed sources too, without a publisher date. A row
@@ -3701,12 +3705,13 @@ Contract rules:
   verified only by a row that agrees on every dimension the prose exposes:
   the value under the response language's number convention at the written
   precision, the scale word (12.93 billion is 12930000000, never 12.93), the
-  sign when the prose writes one or a direction word fixes it, the unit
-  kind (a percent needs a percent or ratio row, a currency-marked figure a
-  currency row, an ISO code or a currency word, a multiple a multiple row),
-  and the subject, which the figure's own sentence or table line must name
-  by the row's symbol or a proper noun of its label; a row that names no
-  entity verifies nothing. Bare integers such as years, dates and index
+  sign when the prose writes one or a direction word fixes it, the kind the
+  row declares (a percent figure needs a percent row, a currency-marked
+  figure a currency row whose code matches a mark that names one, a
+  multiple a multiple row), and the subject the row declares, which the
+  figure's own sentence or table line must name by symbol or subject; a row
+  that names no entity verifies nothing, and nothing is inferred from the
+  shape of a unit or a label. Bare integers such as years, dates and index
   names are not audited. Prose cannot be trimmed of one claim, so a rejected
   row, an unverified prose figure, or a typed answer that retrieved and wrote
   no row, withholds the whole answer: the turn carries `degraded.code = "research_figures_unverified"`,
