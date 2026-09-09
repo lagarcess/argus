@@ -42,6 +42,46 @@ export type UsageAllowanceResponse = {
   };
 };
 
+/** What an API that has not deployed the operation classes yet answers. */
+export type LegacyUsageAllowanceResponse = {
+  allowances: {
+    messages: UsageAllowance;
+    backtests: UsageAllowance;
+  };
+};
+
+export type RawUsageAllowanceResponse =
+  | UsageAllowanceResponse
+  | LegacyUsageAllowanceResponse;
+
+export const UNBOUNDED_ALLOWANCE: UnboundedAllowance = {
+  hour: null,
+  day: null,
+  guest_session: null,
+  available_now: true,
+  limiting_window: null,
+};
+
+/**
+ * Rollout shim, removed together with the API's deprecated aliases. The web
+ * and the API deploy independently, so a new bundle can meet an API that
+ * still answers with messages and backtests only. Execution is that same
+ * meter under its old name; the classes a legacy API does not report present
+ * as unbounded until it does.
+ */
+export function normalizeUsageAllowances(
+  raw: RawUsageAllowanceResponse,
+): UsageAllowanceResponse {
+  if ("execution" in raw.allowances) return raw;
+  return {
+    allowances: {
+      compute: UNBOUNDED_ALLOWANCE,
+      grounding: UNBOUNDED_ALLOWANCE,
+      execution: raw.allowances.backtests,
+    },
+  };
+}
+
 export function isUnboundedAllowance(
   allowance: OperationClassAllowance,
 ): allowance is UnboundedAllowance {

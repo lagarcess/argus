@@ -7,10 +7,12 @@ import {
   classifyAllowance,
   formatAllowancePeriodEnd,
   isUnboundedAllowance,
+  normalizeUsageAllowances,
   showsHourlyWindow,
   showsWorkspaceWindow,
   type UnboundedAllowance,
   type UsageAllowance,
+  type UsageAllowanceResponse,
 } from "@/lib/usage-allowance";
 
 const root = join(import.meta.dir, "..");
@@ -212,6 +214,43 @@ describe("private-alpha usage allowance", () => {
     expect(isUnboundedAllowance(guestExecution)).toBe(false);
   });
 
+  test("normalizes a pre-class API answer until the API deploy lands", () => {
+    const backtests: UsageAllowance = {
+      hour: null,
+      day: {
+        limit: 2,
+        used: 2,
+        remaining: 0,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: false,
+      limiting_window: "day",
+    };
+    const legacy = {
+      allowances: {
+        messages: { ...backtests, available_now: true },
+        backtests,
+      },
+    };
+
+    // Execution is the same meter under its old name; the run gate keeps
+    // reading truthful availability while the API is behind the web.
+    const normalized = normalizeUsageAllowances(legacy);
+    expect(normalized.allowances.execution).toEqual(backtests);
+    expect(normalized.allowances.compute.limiting_window).toBeNull();
+    expect(normalized.allowances.grounding.limiting_window).toBeNull();
+
+    const current: UsageAllowanceResponse = {
+      allowances: {
+        compute: normalized.allowances.compute,
+        grounding: normalized.allowances.grounding,
+        execution: backtests,
+      },
+    };
+    expect(normalizeUsageAllowances(current)).toBe(current);
+  });
+
   test("formats the exact backend period end in English and Spanish", () => {
     const periodEnd = "2026-07-17T00:00:00Z";
 
@@ -238,7 +277,8 @@ describe("private-alpha usage allowance", () => {
       "utf-8",
     );
 
-    expect(api).toContain('apiFetch<UsageAllowanceResponse>("/me/usage")');
+    expect(api).toContain('apiFetch<RawUsageAllowanceResponse>("/me/usage")');
+    expect(api).toContain("normalizeUsageAllowances(");
     expect(api).toContain("runActionIdempotencyKey(input)");
     expect(usageLib).toContain('input.type !== "run_backtest"');
     expect(usageLib).toContain("confirmation_id");
