@@ -137,7 +137,14 @@ async function openUsageWithOneRemaining(page: Page) {
       contentType: "application/json",
       body: JSON.stringify({
         allowances: {
-          messages: {
+          compute: {
+            hour: null,
+            day: null,
+            guest_session: null,
+            available_now: true,
+            limiting_window: null,
+          },
+          grounding: {
             hour: {
               limit: 20,
               used: 19,
@@ -154,7 +161,7 @@ async function openUsageWithOneRemaining(page: Page) {
             available_now: true,
             limiting_window: "hour",
           },
-          backtests: {
+          execution: {
             hour: {
               limit: 5,
               used: 4,

@@ -890,13 +890,18 @@ describe("Checks 6–20 harness guards", () => {
     expect(check7).toContain("latestResultFacts");
     expect(check7).toContain("guest_session");
     expect(check7).toContain("graph.runs");
-    expect(check7).toContain("uiMessageUnits");
+    // Conversation is compute: step 7 no longer reconciles a message meter,
+    // only the execution window admission actually charges.
+    expect(check7).not.toContain("uiMessageUnits");
+    expect(check7).toContain("uiSimulationUnits");
+    expect(check7).toContain("allowances.execution.guest_session");
+    expect(check7).toContain("allowances.compute.limiting_window");
     expect(check7).toContain("uiSimulationUnits");
     expect(source).toContain(
       'page.locator("section.argus-confirmation-reveal")',
     );
     expect(source).not.toContain("section:has([data-confirmation-status])");
-    expect(check7).toContain("expect(uiMessageUnits).toBe(messageWindow.used)");
+    expect(check7).toContain("expect(uiSimulationUnits).toBe(simulationWindow.used)");
     expect(check7).toContain(
       "expect(uiSimulationUnits).toBe(simulationWindow.used)",
     );
@@ -961,7 +966,7 @@ describe("Checks 6–20 harness guards", () => {
     expect(check11).toContain("seededConfirmation.messageId");
     expect(check11).toContain("hydrationResponse");
     expect(check11).toContain('data-confirmation-status="ready_to_run"');
-    expect(check11).toContain("usageAtGate.allowances.backtests");
+    expect(check11).toContain("usageAtGate.allowances.execution");
     expect(check11).toContain("graphBeforeClick");
     expect(check11).toContain('"route_receipts"');
     expect(check11).toContain('"POST /api/v1/chat/stream"');

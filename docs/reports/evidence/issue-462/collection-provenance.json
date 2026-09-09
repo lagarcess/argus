@@ -1,0 +1,66 @@
+{
+  "main": {
+    "schema_version": "argus_turn_latency/v1",
+    "started_at": "2026-09-08T21:01:20.676506+00:00",
+    "api_url": "https://api.arguschat.ai",
+    "source_sha": "00331188c9e42bb86b74042d0a74a8e24e423af3",
+    "manifest_sha256": "7a5d46dcb61c86803b07963b79dd62696c91bab5d70f3401572cfed7b50ce1c5",
+    "script_sha256": {
+      "run_turn_latency.py": "bea79da860b749d2c33d0a3ff021b1feb1ae37288381d8713b8aa5013a68b4c3",
+      "turn_latency.py": "ccedeee67694fb2665892cbbb432691ec4858a6b0246f091bdee45cfa0f7f04b"
+    },
+    "sample_start": 0,
+    "sample_limit": 10,
+    "concurrency": 1,
+    "clock": "time.perf_counter",
+    "quantiles": "nearest_rank",
+    "warmup": "health and authenticated login only; no measured turn discarded",
+    "authentication": "existing_QA_profile_admin_generated_link_no_email_sent",
+    "finished_at": "2026-09-08T21:35:39.162050+00:00"
+  },
+  "preliminary": {
+    "schema_version": "argus_turn_latency/v1",
+    "started_at": "2026-09-08T20:57:46.773454+00:00",
+    "api_url": "https://api.arguschat.ai",
+    "source_sha": "00331188c9e42bb86b74042d0a74a8e24e423af3",
+    "manifest_sha256": "7a5d46dcb61c86803b07963b79dd62696c91bab5d70f3401572cfed7b50ce1c5",
+    "script_sha256": {
+      "run_turn_latency.py": "bea79da860b749d2c33d0a3ff021b1feb1ae37288381d8713b8aa5013a68b4c3",
+      "turn_latency.py": "02f0fded9bb2be6137cf7bc72f33d0096ab0f23385ceeebc7103d99eddf69186"
+    },
+    "sample_start": 0,
+    "sample_limit": 1,
+    "concurrency": 1,
+    "clock": "time.perf_counter",
+    "quantiles": "nearest_rank",
+    "warmup": "health and authenticated login only; no measured turn discarded",
+    "authentication": "existing_QA_profile_admin_generated_link_no_email_sent",
+    "finished_at": "2026-09-08T21:00:23.861825+00:00"
+  },
+  "preliminary_notes": [
+    "Six initial observations retained separately. The preliminary collector missed the nested confirmation card, so that sample has no first-visible timestamp and no Run action was followed. It remains excluded from primary statistics.",
+    "These requests may have warmed shared caches. No cache was flushed or bypassed."
+  ],
+  "review_revalidation": {
+    "main_rows": 68,
+    "expected_main_rows": 68,
+    "requested_category_counts": {
+      "ordinary_chat": 10,
+      "compute_intent_probe": 10,
+      "confirmation": 10,
+      "backtest_run": 8,
+      "research_fast": 10,
+      "research_balanced": 10,
+      "research_thorough": 10
+    },
+    "error_events": 0,
+    "missing_final_or_done": 0,
+    "succeeded_jobs_missing_artifact": 0,
+    "duplicates": 0,
+    "collector_change": "The final collector adds error retention and waits for temporarily absent artifacts. The running collector was loaded before those changes. Every captured main sample was audited and exercised the unchanged successful collection path; no paid rerun was required.",
+    "scope_registry_followup": "A later CI fix replaced the three operation-scope literals with the canonical registry imports. Values and successful collection behavior are unchanged; the full 68-row summary remains byte-identical, confirmed by a clean delta review.",
+    "stream_status_followup": "The GitHub review found that a successful job could mask a failed stream. The recorder now preserves that failure, and incomplete streams classify before artifact type. All 68 main rows have final/DONE, no error events or error_kind, and unchanged byte-identical distributions; the recorded real-run evidence is retained without new provider calls."
+  },
+  "source_sha_meaning": "Checkout base, not deployed API SHA or a claim that the collector was committed. Collector file hashes identify the bytes loaded at collection. deployment-during.json and deployment-after.json identify the measured API.",
+  "privacy": "No raw answers, source URLs, identities, request/job/message ids, credentials, or runtime fingerprints. Private correlation maps remain gitignored in temp/. Runtime summary copies are reduced to one maximum duration per request, never added together."
+}

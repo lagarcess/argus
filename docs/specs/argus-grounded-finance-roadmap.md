@@ -387,13 +387,13 @@ and none needs a rebase.
 
 | Lane | Where it actually is |
 | --- | --- |
-| Lift the loop, Lane A | PR #560 at `53a7a523`. **Verified, landable.** CI 7/7 and `mergeStateStatus` CLEAN, Codex round completed naming `53a7a52`, zero review threads. Merged onto integration in a throwaway worktree: zero conflicts, and the merged tree differs from the branch tree by this roadmap file alone, so the branch's CI is valid for the merge. The relocation holds independently: the interpreter prompt fingerprint never enters the merged diff, every outside importer still goes through the `confirmation` and `next_experiments` facades, the only names to leave the facade surface are `logger` and `threading` which nothing imports or patches, and the one monkeypatch hazard, `_confirmation_today`, stays in `confirmation.py` and is guarded. |
-| Refusal log | PR #559, now at `aa8d5371`. `c748950b` failed `guest-release-gates` on the lane's own postgres test, which seeded `auth.users` and `public.profiles` with two independent `fake.email()` values and tripped `validate_profile_auth_identity`. **The lane found and fixed it before anyone sent it back**, and fixed it better than a one-line patch: seeding is now one `_seed_owner` helper so the identity rule holds by construction. Still owed at the new head: `guest-release-gates` finishing, and a fresh Codex round, since the cleared review names the superseded `c748950b`. |
-| Metering | No branch pushed. Mid-flight locally, 21 dirty files, and `src/argus/api/schemas.py` is among them, so the overlap is real. |
-| Decisions | No branch pushed, no commits, no dirty files. **Not started.** |
-| Retrieval parameters | No branch pushed. Mid-flight locally, 10 dirty files. It edits `render.yaml`, `.github/private-alpha-release-profile.json`, and `.github/argus-env.sh` to register `ARGUS_RESEARCH_HOME_COUNTRY`, which is the release surface feature lanes may not author. The value belongs on this item; the three release-surface lines are the founder's to apply at promotion. |
-| Sharing on | Done. See the item. |
-| #462 latency | No branch pushed. Mid-flight locally, five untracked benchmark scripts under `scripts/benchmarks/` and `tests/perf/`. |
+| Lift the loop, Lane A | **LANDED** `f7c9192b`, PR #560. |
+| Refusal log | **LANDED** `fa69466c`, PR #559. |
+| Metering | **LANDED** `1db1aa75`, PR #561. Guest compute ceiling is silent and anti-abuse, 300 per UTC day, never projected in `/me/usage`; `PRODUCT.md` §19 amended. |
+| Decisions | PR #564 at `68dbed54`, CI 7/7, one open P2: `DecisionAffordance.tsx` keeps a component-local `savedState` that never resyncs from the prop, which is the split brain the lane just removed on the backend, one layer up. |
+| Retrieval parameters | PR #562 at `689984f3`, CI 7/7, release-surface files dropped. Two open P1s, both holes in the new prose-versus-rows verifier: `EPS` classified as a currency, and title-cased labels read as entity names. |
+| Sharing on | **Done.** Evidence landed on integration. Only the flag flip remains and the founder has deferred it to the next promotion. |
+| #462 latency | **LANDED** `76937883`, PR #563. Its measurement produced the Subtract the guardrails item. |
 
 ### The finishing bar every build lane owes
 
@@ -499,6 +499,60 @@ on that file.
 
 ---
 
+### Subtract the guardrails  ·  ships in **The spine**
+
+**This is the subtractive thesis with a latency payoff nobody counted.** It is
+scheduled here because operating rule 2 promises that a cheap calculation
+answers first since it is instant, and on a 33-second spine that promise is
+false. The calculations lane would build on a runtime that cannot keep it, and
+the same audits would then fire on the new calculations too, turning a one-file
+change into a retrofit across five cards.
+
+**What is known, and what is not.** Known: every audit and repair runs *after*
+`LLMInterpretationResponse` and takes it as input, so they are post-hoc rather
+than routing, and each is already gated by an existing predicate
+(`_response_needs_capability_side_question_audit`,
+`_response_needs_context_question_audit`,
+`_strategy_extraction_repair_is_allowed`). Known: they fire on plain
+conversation, and the repair's own trigger is
+`required_strategy_shape_missing`, a backtest shape that a conversation turn
+will never have.
+
+**Not known, and this lane's first job: whether those gates can be narrowed
+without losing what they catch.** Nobody has read what each predicate actually
+tests, why it admits a conversation turn, or what the audit corrects when it
+does fire. The fix may be a tighter predicate, a cheaper check, a reordering, or
+for one of them, nothing. **The lane diagnoses before it proposes.** A dispatch
+that says "narrow the gates" is a guess; the board does not carry guesses.
+
+**Done means.** Each of the four calls has a written answer to: what does it
+catch, what admitted this turn, and what is the smallest change that stops it
+firing where there is nothing to check. Then the changes that survive that
+answer are made, and ordinary chat first token drops materially against the
+#563 baseline. No new machinery, no model-facing text, no fingerprint change.
+
+**The second lever, measure before acting.** The interpretation call itself is
+9.45s. At the tier model's 95 tokens per second that is roughly 900 output
+tokens, so the cost is the size of the structured response, not the model. Grok
+4.3 is already the right choice on this tier: 0.58s first-token latency and 95
+tok/s against Haiku 4.5's 0.67s and 48 tok/s at twice the output price, which
+would make this call take about 19s. **Do not switch models.** Measure what
+shrinking the response schema buys before changing it.
+
+**Surface.** `src/argus/agent_runtime/llm_interpreter.py` and
+`src/argus/agent_runtime/interpreter/`.
+
+**Do not touch.** Rule 7 stands: no shortcut routing before the LLM. Nothing here
+decides anything ahead of interpretation; it only stops running backtest checks
+on interpretations that are not backtests.
+
+**Proof.** The #563 harness re-run, same turn types, before and against the
+change. **And a live eval scorecard**, because tightening a gate trades latency
+for interpretation accuracy at the edges and that trade has to be shown, not
+asserted.
+
+---
+
 ### The registry  ·  ships in **The spine**
 
 **It is a tool catalog, not a question classifier.** Founder, 2026-09-08: the
@@ -547,6 +601,25 @@ so no latency on a path that must feel instant. No fingerprint surface. And it
 is bilingual for free: the template is a locale key and the arguments are typed
 facts, which is operating rule 4 doing the work again. The stage-keyed strings
 are deleted.
+
+**The receipt renders from the card contract, not from backtest fields.**
+Founder, 2026-09-08. Sharing is the distribution lever, and today the only
+shareable answer is a backtest, because `web/components/receipt/ReceiptBody.tsx`
+reads `receiptPlan`, `receiptAssumptions`, `benchmarkReturn` and
+`benchmarkVerdict`. Ship the calculations without this and every new answer is
+unshareable on the day it lands. Point the receipt at the same contract the card
+renders and sharing generalizes for free, which keeps operating rule 3 at four
+artifacts instead of a fifth per calculation. This is the same move Lane A made
+on the confirmation envelope. It belongs here, in The spine, because after the
+calculations ship it is a retrofit across every card.
+
+**Whole-conversation sharing follows from this, and only from this.**
+`docs/specs/conversation-sharing.md` section 9 already holds the design the
+founder described: the owner selects turns, only eligible ones are selectable,
+one link, one tombstone, revocable. It was sequenced, not rejected, and its
+unit is the turn. A thread share is a sequence of turn receipts, so it cannot
+exist until a turn that is not a backtest can be a receipt. Not on this board;
+placed after the calculations land.
 
 **Surface.** `src/argus/domain/capability_registry.py`,
 `src/argus/agent_runtime/llm_interpreter_types.py`,
@@ -741,7 +814,10 @@ x-axis label, is unreachable for a different reason: the receipt uses
 verification did not re-prove, because it seeded the fixture directly, is the
 owner's Share button and database persistence; those were driven end to end at
 `5d408acf` and no receipt source file has changed in the 94 commits since.
-**All that remains on this item is the founder's flag decision.**
+**Founder decision 2026-09-08: the flag flips at the next promotion, not before.**
+The four lines are `render.yaml` lines 59 and 182 and
+`.github/private-alpha-release-profile.json` lines 23 and 89, all `false` today,
+and they are the founder's to author.
 
 ---
 
@@ -829,6 +905,23 @@ the machinery.
 **Proof.** Behavior-preserving for backtests: a guest still gets the same
 execution allowance. Compute operations never decrement anything. No live eval
 required.
+
+**Read the meter labels once before the Plumbing promotion.** Founder,
+2026-09-08. The meter is cost recovery by design, so it names only the two
+things that cost us money, and the thing Argus actually sells, the computation
+and the honesty line, is free and therefore absent from the panel. PR #561's
+own strings are already close: "Searches with sources" names the guarantee and
+not just the supplier. So this is one reading pass over four locale strings, not
+a rework, and it belongs in #561 while that file is open rather than in a later
+pass. Pricing is not on this board and should not be decided while production
+usage is one non-founder message in thirty days.
+
+**The guest ceiling is not a product meter.** "Never for talking" is a pricing
+rule and it stays. It does not say an anonymous endpoint may be unbounded. A
+silent abuse ceiling on guest turns protects interpreter spend, never appears in
+the Usage panel, and is not promised in `PRODUCT.md` as an allowance. Codex's
+open P1 on PR #561 is asking for that distinction, not for the old
+ten-terminal meter back.
 
 ---
 
@@ -944,6 +1037,23 @@ subject to what the measurement says: compute answers under one second to first
 token, grounded answers under four. A backtest is slow and tolerated because it
 is visibly working; a time-value answer that takes four seconds breaks the
 calculator promise.
+
+**Measured 2026-09-08, PR #563, 68 real turns. The target is unreachable on
+today's spine and the reason is the box.** Ordinary chat reaches first token at
+33.14s p50, against a target of one second. Grounded answers land between 12.55s
+and 26.17s, against four. Splitting provider time per turn into the two calls
+that are the product, the interpretation and the composer, and everything else:
+ordinary chat spends 15.60s of 30.13s on guardrails, 52 percent. Confirmation
+spends 48 percent, the compute-intent probe 43 percent. The research paths spend
+9 to 12 percent, which is why **asking Argus to research something reaches first
+token in 12.55s while talking to it takes 33.14s.**
+
+The guardrails are backtest guardrails firing on turns with no backtest:
+`CapabilitySideQuestionAudit` at 11.49s on 4 of 10 turns, `ContextQuestionAudit`
+at 5.11s on 7, `FocusedAssetDiscoveryRead` at 4.01s on 7, and the repair
+`FocusedStrategyExtraction`, whose trigger is `required_strategy_shape_missing`,
+16 times across 10 plain-conversation turns. Decision 3 is no longer blocked;
+what it now needs is the item below.
 
 **4. When Argus cannot ground something it returns a typed unverified state,
 never prose.** The answer shows the computation with the missing input named and

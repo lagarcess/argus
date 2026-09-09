@@ -18,8 +18,11 @@ import {
 } from "./language-features";
 import { isConversationMemoryOptOut } from "./memory-privacy";
 import { currentViewportBand } from "./responsive-layout";
-import { runActionIdempotencyKey } from "./usage-allowance";
-import type { UsageAllowanceResponse } from "./usage-allowance";
+import {
+  runActionIdempotencyKey,
+  normalizeUsageAllowances,
+  type RawUsageAllowanceResponse,
+} from "./usage-allowance";
 import type { MarketSessionPhase } from "@/components/chat/greetingPool";
 import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
@@ -585,7 +588,9 @@ export async function getMe() {
 }
 
 export async function getUsageAllowances() {
-  return apiFetch<UsageAllowanceResponse>("/me/usage");
+  return normalizeUsageAllowances(
+    await apiFetch<RawUsageAllowanceResponse>("/me/usage"),
+  );
 }
 
 export type MarketSessionResponse = {

@@ -465,7 +465,6 @@ async function installActivityFixture(
             ? {
                 expires_at: "2026-08-08T16:00:00.000Z",
                 conversation_limit: 1,
-                message_limit: 10,
                 simulation_limit: 1,
                 feedback_limit: 5,
               }

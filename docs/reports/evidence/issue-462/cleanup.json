@@ -1,0 +1,7 @@
+{
+  "attempted": 66,
+  "archived": 66,
+  "failed": 0,
+  "method": "owner-scoped PATCH archived=true; only conversation ids created by the two measurement runs",
+  "recorded_at": "2026-09-08T21:39:31.341319+00:00"
+}
