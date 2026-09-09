@@ -19,17 +19,17 @@ import {
 
 const OUTLINE_BUTTON = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-[#505a63] transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-[#8d969e] dark:hover:bg-white/[0.05]";
 const SOLID_BUTTON = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-[#191c1f] px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90";
-export type ReceiptShareRequest = (conversationId: string, messageId?: string) => void;
+export type ReceiptShareRequest = (conversationId: string) => void;
 
-/** Header and answer shortcuts open the same panel with canonical identities. */
-export default function ShareReceiptAction({ conversationId, messageId, onShare, variant = "answer" }: ReceiptShareTarget & { onShare: ReceiptShareRequest; variant?: "header" | "answer" }) {
+/** The header opens the one conversation selection and publication flow. */
+export default function ShareReceiptAction({ conversationId, onShare }: { conversationId: string; onShare: ReceiptShareRequest }) {
   const { t } = useTranslation();
-  const label = variant === "header" ? t("receipt.selection.title") : t("receipt.owner.share");
-  const button = <button type="button" onClick={() => onShare(conversationId, messageId)} aria-label={label} className={variant === "header" ? "flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/5" : OUTLINE_BUTTON}>
-    <Link2 className={variant === "header" ? "h-5 w-5" : "h-3.5 w-3.5"} aria-hidden="true" />
-    {variant === "answer" && label}
-  </button>;
-  return variant === "header" ? <Tooltip content={label}>{button}</Tooltip> : <div className="mt-3">{button}</div>;
+  const label = t("receipt.selection.title");
+  return <Tooltip content={label}>
+    <button type="button" onClick={() => onShare(conversationId)} aria-label={label} className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+      <Link2 className="h-5 w-5" aria-hidden="true" />
+    </button>
+  </Tooltip>;
 }
 
 /** Selection is visible even for unsupported turns; only the API decides why. */

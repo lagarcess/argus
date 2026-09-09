@@ -204,7 +204,7 @@ export default function ChatHeaderMenu({
 
   return (
     <div className="relative flex items-center animate-in fade-in duration-300" ref={containerRef}>
-      {evidenceReceiptSharingEnabled && conversationId && onShare && <ShareReceiptAction conversationId={conversationId} onShare={onShare} variant="header" />}
+      {evidenceReceiptSharingEnabled && conversationId && onShare && <ShareReceiptAction conversationId={conversationId} onShare={onShare} />}
       <button
         ref={triggerRef}
         type="button"

@@ -12,7 +12,7 @@ import { evidenceReceiptSharingEnabled } from "../lib/private-alpha-flags";
 const WEB_ROOT = join(import.meta.dir, "..");
 const SHARE_ACTION = join(WEB_ROOT, "components/chat/ShareReceiptAction.tsx");
 const RECEIPT_LIST = join(WEB_ROOT, "components/settings/SharedReceiptsView.tsx");
-const RESULT_CARD = join(WEB_ROOT, "components/chat/StrategyResultCard.tsx");
+const CHAT_HEADER = join(WEB_ROOT, "components/chat/ChatHeaderMenu.tsx");
 const PROFILE_MENU = join(WEB_ROOT, "components/sidebar/ProfileMenu.tsx");
 const PANEL_REGISTRY = join(
   WEB_ROOT,
@@ -47,7 +47,7 @@ describe("the sharing flag", () => {
   });
 
   test("gates every owner surface", () => {
-    expect(source(RESULT_CARD)).toContain("evidenceReceiptSharingEnabled &&");
+    expect(source(CHAT_HEADER)).toContain("evidenceReceiptSharingEnabled &&");
     expect(source(PROFILE_MENU)).toContain("evidenceReceiptSharingEnabled");
   });
 

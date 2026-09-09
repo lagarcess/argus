@@ -13,7 +13,6 @@ import { displayResultActionLabel } from "@/lib/result-card-display";
 import { resultCardViewModel } from "@/lib/result-card-view-model";
 import { degradedValueClass } from "@/lib/failure-treatment";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
-import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import {
   AddDecisionButton,
   DecisionEditorPanel,
@@ -24,7 +23,6 @@ import {
 } from "./DecisionAffordance";
 import ResultEquityChart from "./ResultEquityChart";
 import { EntityToken } from "./entity-token";
-import ShareReceiptAction, { type ReceiptShareRequest } from "./ShareReceiptAction";
 import type { ChatActionOption, StrategyResultPayload } from "./types";
 
 type StrategyResultCardProps = {
@@ -39,9 +37,6 @@ type StrategyResultCardProps = {
   /** Earned memory moment after a saved decision; backend policy still owns
    * cooldowns, consent, and sensitivity. */
   memoryProposalEnabled?: boolean;
-  conversationId?: string | null;
-  messageId?: string;
-  onShare?: ReceiptShareRequest;
 };
 
 export default function StrategyResultCard({
@@ -54,9 +49,6 @@ export default function StrategyResultCard({
   onAction,
   result,
   memoryProposalEnabled = false,
-  conversationId,
-  messageId,
-  onShare,
 }: StrategyResultCardProps) {
   const { t, i18n } = useTranslation();
   const [memoryProposal, setMemoryProposal] = useState<MemoryCandidate | null>(
@@ -326,10 +318,6 @@ export default function StrategyResultCard({
             "Saved to memory. Manage it in Data Controls under Personalization.",
           )}
         </p>
-      ) : null}
-      {evidenceReceiptSharingEnabled &&
-      conversationId && messageId && onShare ? (
-        <ShareReceiptAction conversationId={conversationId} messageId={messageId} onShare={onShare} />
       ) : null}
     </section>
   );

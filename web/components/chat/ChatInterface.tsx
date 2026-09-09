@@ -2487,7 +2487,6 @@ export default function ChatInterface() {
                               if (conversationId) invalidateTranscriptForMutation(conversationId, "durable_result_action");
                             }}
                             onRequestSearchUpgrade={requestGuestSearchUpgrade}
-                            onShare={guestExperience.receiptSharing.request}
                             resumeDecisionArtifactId={
                               msg.id === resumeDecisionMessageId ? resumeDecisionArtifactId : null
                             }

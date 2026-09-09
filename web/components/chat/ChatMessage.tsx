@@ -6,8 +6,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
-import ShareReceiptAction, { type ReceiptShareRequest } from "./ShareReceiptAction";
-import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
@@ -90,7 +88,6 @@ type ChatMessageProps = {
   onRequestSearchUpgrade?: () => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;
-  onShare?: ReceiptShareRequest;
 };
 
 const retryIconButtonClass =
@@ -115,7 +112,6 @@ export default function ChatMessage({
   onRequestSearchUpgrade,
   resumeDecisionArtifactId,
   onDecisionResumeHandled,
-  onShare,
 }: ChatMessageProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
@@ -385,9 +381,6 @@ export default function ChatMessage({
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard
                 result={message.result}
-                conversationId={conversationId}
-                messageId={message.id}
-                onShare={onShare}
                 onAction={onAction}
                 canSaveDecision={canSaveDecision}
                 memoryProposalEnabled={memoryProposalEnabled}
@@ -509,7 +502,6 @@ export default function ChatMessage({
           {!isUser && !isStreaming && message.memoryRecalls?.length ? (
             <MemoryRecallNote recalls={message.memoryRecalls} />
           ) : null}
-          {evidenceReceiptSharingEnabled && !isUser && !isStreaming && message.researchSources && conversationId && onShare ? <ShareReceiptAction conversationId={conversationId} messageId={message.id} onShare={onShare} /> : null}
           {/* Any computed answer offers a decision; guests resume on cards only. */}
           {!isUser && !isStreaming && message.computation && canSaveDecision ? (
             <ComputedAnswerDecision

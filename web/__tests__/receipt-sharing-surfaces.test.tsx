@@ -42,7 +42,7 @@ describe.each(["en", "es-419"] as const)("share surfaces in %s", (language) => {
   test("header shortcut announces sharing the conversation, not creating a link", async () => {
     const i18n = createInstance();
     await i18n.init({ lng: language, resources: { en: { translation: en }, "es-419": { translation: es } } });
-    const markup = renderToStaticMarkup(<I18nextProvider i18n={i18n}><ShareReceiptAction conversationId="conversation" onShare={noop} variant="header" /></I18nextProvider>);
+    const markup = renderToStaticMarkup(<I18nextProvider i18n={i18n}><ShareReceiptAction conversationId="conversation" onShare={noop} /></I18nextProvider>);
     expect(markup).toContain(`aria-label="${receiptCopy(language).selection.title}"`);
     expect(markup).not.toContain(receiptCopy(language).owner.create);
     expect(markup).not.toContain("conversationId");
