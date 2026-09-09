@@ -69,10 +69,16 @@ export const UNBOUNDED_ALLOWANCE: UnboundedAllowance = {
  * meter under its old name; the classes a legacy API does not report present
  * as unbounded until it does.
  */
+function isOperationClassResponse(
+  raw: RawUsageAllowanceResponse,
+): raw is UsageAllowanceResponse {
+  return "execution" in raw.allowances;
+}
+
 export function normalizeUsageAllowances(
   raw: RawUsageAllowanceResponse,
 ): UsageAllowanceResponse {
-  if ("execution" in raw.allowances) return raw;
+  if (isOperationClassResponse(raw)) return raw;
   return {
     allowances: {
       compute: UNBOUNDED_ALLOWANCE,
