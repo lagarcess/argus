@@ -192,6 +192,58 @@ async def test_unresolved_declared_cost_blocker_survives_stage_decision(monkeypa
     assert result.patch["tool_calls"] == [call]
 
 
+@pytest.mark.parametrize("field_name,value", [("fee_rate", 0), ("slippage", 0.0005)])
+@pytest.mark.parametrize("source", ["typed", "extra"])
+def test_unresolved_cost_preserves_candidate_in_canonical_ambiguity(
+    field_name, value, source, faker
+):
+    from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+        apply_cost_fidelity,
+    )
+    from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    values = (
+        {field_name: value}
+        if source == "typed"
+        else {"extra_parameters": {field_name: value}}
+    )
+    response = LLMInterpretationResponse(
+        intent="calculate",
+        task_relation="new_task",
+        semantic_turn_act="new_idea",
+        user_goal_summary="Review execution cost assumptions.",
+        candidate_strategy_draft=LLMStrategyDraft(**values),
+    )
+    request = InterpretationRequest(
+        current_user_message="Review these execution cost assumptions.",
+        user=UserState(user_id=faker.uuid4()),
+    )
+
+    assert apply_cost_fidelity(
+        response,
+        llm_interpreter.StatedRunFieldFidelityAudit(),
+        request.current_user_message,
+        None,
+    )
+    canonical = llm_interpreter.canonical_strategy_interpretation(
+        response, request=request
+    )
+
+    assert canonical.requires_clarification
+    assert field_name not in canonical.candidate_strategy_draft.extra_parameters
+    assert [
+        (item.field_name, float(item.raw_value), item.reason_code)
+        for item in canonical.ambiguous_fields
+    ] == [
+        (
+            field_name,
+            value,
+            "execution_cost_evidence_unresolved",
+        )
+    ]
+
+
 @pytest.mark.asyncio
 async def test_unscoped_repeated_calls_never_use_whole_question_repair(monkeypatch):
     original = retained_call(

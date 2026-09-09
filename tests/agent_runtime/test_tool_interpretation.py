@@ -472,8 +472,12 @@ async def test_repeated_backtest_calls_keep_independent_inputs(
     for call in result.tool_calls:
         prepared_call = await prepare_backtest_tool_input(
             BacktestStrategyInput.model_validate(call.arguments["strategy"]),
-            state=RunState(current_user_message=request.current_user_message),
+            state=RunState(
+                current_user_message=request.current_user_message,
+                tool_calls=result.tool_calls,
+            ),
             user=request.user,
+            call=call,
         )
         canonical_dates.append(
             prepared_call.patch["candidate_strategy_draft"]["date_range"]["start"]

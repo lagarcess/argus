@@ -58,3 +58,18 @@ affected cases, with two repetitions and identical case inputs, before the
 required full suite. The announced additional cost estimate is $0.75–$1.50
 for that comparison and $3–$5 for the full suite. Raw partial measurements are
 labeled as partial probes and cannot be accepted as a full-suite scorecard.
+
+The full free suite at `53ed45df` passed 6,851 tests and skipped 571. Its three
+failures were the owed fingerprint, a repeated-call test that omitted the
+call/queue context used by the actual dispatcher, and a test matching three
+obsolete literal description substrings. The repeated-call test now exercises
+the actual context. The substring test was retired: the shared model-facing
+fingerprint owns prose changes, while declared argument and live behavior tests
+own the contract. Their directly affected checks passed 63 tests.
+
+The independent runtime review found one reachable cost-ambiguity defect:
+legacy extra-only input was removed before its disputed value was copied into
+the clarification fact. The correction retains the original value before
+removal, with no falsy fallback. A real fidelity-to-canonical regression covers
+both typed and legacy fee zero and slippage inputs. The directly affected suite
+passed 88 tests. The final review checks this correction's delta only.

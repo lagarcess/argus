@@ -82,7 +82,7 @@ def apply_cost_fidelity(
             draft._validated_execution_cost_evidence[draft_field] = validated_marker
             changed = True
 
-    unresolved_fields: list[str] = []
+    unresolved_fields: dict[str, object] = {}
     for field_name in ("fee_rate", "slippage"):
         if field_name in validated_fields:
             continue
@@ -99,7 +99,9 @@ def apply_cost_fidelity(
         if field_name in grounded_conflicts or _introduces_unowned_cost(
             draft, field_name=field_name, prior_strategy=prior_strategy
         ):
-            unresolved_fields.append(field_name)
+            unresolved_fields[field_name] = draft.extra_parameters.get(
+                field_name, getattr(draft, field_name)
+            )
         if field_name in draft.extra_parameters:
             draft.extra_parameters.pop(field_name, None)
             changed = True
@@ -148,7 +150,7 @@ def apply_cost_fidelity(
     response.ambiguous_fields.extend(
         LLMAmbiguousField(
             field_name=name,
-            raw_value=str(getattr(draft, name)),
+            raw_value=str(unresolved_fields[name]),
             reason_code="execution_cost_evidence_unresolved",
         )
         for name in unresolved_fields
