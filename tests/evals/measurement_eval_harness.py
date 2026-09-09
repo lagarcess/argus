@@ -566,15 +566,25 @@ def _run_followup_turn_if_needed(
 ) -> dict[str, Any] | None:
     if not case.followup_prompt:
         return None
-    if clarify_result is None:
-        return {"skipped_reason": "initial_turn_did_not_clarify"}
+    last_stage_outcome = _last_stage_outcome(
+        interpret_result=interpret_result,
+        confirm_result=None,
+        clarify_result=clarify_result,
+        stage_results=stage_results,
+    )
+    if last_stage_outcome != "await_user_reply":
+        return {"skipped_reason": "initial_turn_did_not_await_user_reply"}
 
-    final_clarify_patch = (
+    initial_turn_patch = (
         chronological_patch(stage_results)
         if stage_results is not None
-        else {**interpret_result.patch, **clarify_result.patch}
+        else _final_patch(
+            interpret_result=interpret_result,
+            confirm_result=None,
+            clarify_result=clarify_result,
+        )
     )
-    assistant_text = _assistant_text(final_clarify_patch)
+    assistant_text = _assistant_text(initial_turn_patch)
     state = RunState.new(
         current_user_message=case.followup_prompt,
         recent_thread_history=(
@@ -584,8 +594,8 @@ def _run_followup_turn_if_needed(
     turn_context = {
         "latest_task_snapshot": case.snapshot,
         "selected_thread_metadata": _followup_thread_metadata(
-            final_clarify_patch,
-            last_stage_outcome=str(clarify_result.outcome),
+            initial_turn_patch,
+            last_stage_outcome=last_stage_outcome,
         ),
     }
     followup_interpret = interpret_stage(

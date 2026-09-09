@@ -29,7 +29,7 @@ from tests.evals.test_measurement_registry_dispatch import _case, _interpreter
 fake = Faker()
 
 
-@pytest.mark.parametrize("followup", [False, True])
+@pytest.mark.parametrize("followup", ["absent", "unused", "required"])
 @pytest.mark.parametrize("declared_dispatch", [False, True])
 def test_clarification_readiness_reaches_real_confirmation_in_chronological_order(
     monkeypatch, followup, declared_dispatch
@@ -108,7 +108,7 @@ def test_clarification_readiness_reaches_real_confirmation_in_chronological_orde
         )
     turns = [interpreted]
     prefix = []
-    if followup:
+    if followup == "required":
         turns.insert(
             0,
             StageResult(
@@ -120,8 +120,16 @@ def test_clarification_readiness_reaches_real_confirmation_in_chronological_orde
             {"stage": "interpret", "outcome": "needs_clarification"},
             {"stage": "clarify", "outcome": "await_user_reply"},
         ]
-    reads = iter(turns)
-    monkeypatch.setattr(harness, "interpret_stage", lambda **_: next(reads))
+    interpreted_contexts = []
+
+    def interpret(**context):
+        assert len(interpreted_contexts) < len(
+            turns
+        ), "A turn awaiting approval must not consume the fixture's clarification reply"
+        interpreted_contexts.append(context)
+        return turns[len(interpreted_contexts) - 1]
+
+    monkeypatch.setattr(harness, "interpret_stage", interpret)
     monkeypatch.setattr(
         harness,
         "dispatch_requested_calls",
@@ -160,12 +168,18 @@ def test_clarification_readiness_reaches_real_confirmation_in_chronological_orde
     case = replace(
         original,
         expected=replace(expected, stage_outcomes=expected_milestones),
-        followup_prompt=original.prompt if followup else None,
+        followup_prompt=original.prompt if followup != "absent" else None,
         degraded_mode={"clarifier": "offline"},
     )
 
     result = harness.run_eval_case(case, run_prose_judge=False)
 
+    assert len(interpreted_contexts) == (2 if followup == "required" else 1)
+    if followup == "required":
+        assert (
+            interpreted_contexts[-1]["selected_thread_metadata"]["last_stage_outcome"]
+            == "await_user_reply"
+        )
     assert len(confirmed_states) == 1
     assert "ready_for_confirmation" in routed_outcomes
     assert result["failed_checks"] == [], result["failed_checks"]
