@@ -94,6 +94,10 @@ captain's gate.
 
 ## Measurement harness contract migration
 
+This subsection records the initial migration before paid measurement. Its
+research-intent assumption and incomplete completion check are superseded by
+the observation repair below. The original comparison artifact is preserved.
+
 The old harness stopped at interpret/confirm/clarify. A fresh catalog response
 requests dispatch before a backtest confirmation or research response exists,
 so renaming intent expectations alone would have measured an incomplete path.
@@ -171,3 +175,80 @@ revalidated after the final edit-liveness fix. Frontend lint passed with eight
 existing warnings, and the production build passed after permitting its local
 compiler port. Backend Ruff and the modularity budget passed. These are
 implementation checks, not a terminal CI or release-readiness claim.
+
+## Post-scorecard observation repair
+
+The first registry scorecard remains in `../live-measurement-initial.json`,
+measured at `3c4f5aab93f1928d999a20fc34c4b0a6bcecf5a8` under its original
+harness and fixture hashes. It has not been regraded. Diagnosis found six
+research failures caused only by the migrated intent expectation, plus two
+research cases with an intent mismatch and a separate typed or prose failure.
+Those separate failures remain failures to investigate.
+
+The old harness observed research after its stage completed within interpret.
+After registered dispatch moved that work into execute, the harness still read
+only the initial interpreter patch. The actual research owner sets `follow_up`
+after execution, regardless of whether the model initially selected `explain`,
+`calculate`, or `follow_up`. The initial fixture migration had additionally
+required `calculate` for all research. That was an unnecessary model
+classification requirement, rather than an observation of executed work.
+
+The corrected `intent` comes from applying actual stage patches in order;
+`primary_intent` retains the interpreter's original value. The nine discovery
+expectations return to the original canonical `follow_up`, and macro curiosity
+returns to its original allowed canonical labels. Successful declared dispatch,
+all original arguments, financial facts, recovery, clarification, approval,
+delivery, and prose assertions remain. No question-to-tool mapping or new
+intent policy was added.
+
+Backtest execution now hands preparation to confirm before that owner can
+request missing fields. The acceptance trace removes a readiness handoff only
+when the actual next event is confirm requesting clarification. The same
+adjacent handoff is normalized in expected milestones. Raw stage names and
+outcomes remain unchanged; missing confirm or clarify events still fail, and
+readiness leading to real approval is retained. This is a structural comparison
+rule, not an exception for the Spanish DCA fixture.
+
+An answer-required dispatch must also have a succeeded typed result card with
+`presentation.answer` or a nonblank `presentation.narrative`, matching an
+executed call's outcome. Private chat delivery accepts sourced narrative without
+a numeric headline; public receipt eligibility intentionally remains narrower.
+A successful queued
+job without an answer cannot pass. One completed answer can accompany another
+honestly pending call; the original delivery assertions still establish the
+requested content. Queue-only contracts do not acquire an answer requirement.
+The delivery mutation tests use authored matching records and cards to keep
+their original offered-content checks isolated.
+
+The execution evidence also preserves the existing research sidecar's reported
+`cost_usd`, `latency_ms`, `invocations`, and `cache_status`, per call. The whitelist
+excludes other private effects, keeps null and zero distinct, and does not
+calculate prices, fees, or totals. This is capture of existing facts only.
+
+The observation tests first produced **16 failures and five passing controls**;
+all 21 passed after the repair. The additional usage-capture test first failed
+on missing evidence and then passed. The focused dispatcher, observation, and
+delivery command passed **123 tests**. The complete mocked command plus the
+issue 498 compound-edit checks passed **294 tests in 8.40 seconds**. No provider
+calls were made. `measurement-observation-repair.json` records the fixture
+comparison and deterministic evidence. A new full live run must measure this
+harness; these checks do not turn the initial scorecard into a passing run.
+
+Review found two further harness gaps. Initial and follow-up dispatch omitted
+the trusted snapshot and metadata that interpretation had already received.
+Both paths now pass the same objects through; two actual-handler identity tests
+failed before this handoff and passed after it. The unchanged follow-up metadata
+builder moved into the existing dispatch helper to keep the main harness within
+its budget. No new context is invented or recovered from prose.
+
+The first completion predicate also incorrectly treated public receipt
+eligibility as private chat delivery. An actual research presenter can deliver
+a sourced narrative with no numeric headline. Its new regression failed while
+three empty-narrative controls passed; the generic predicate now accepts that
+nonblank narrative or a typed answer, still requiring the matching successful
+call and outcome. Pending, blank, unrelated, and failed result controls remain.
+After both corrections, all **28 observation tests** and the full mocked command
+plus issue 498's original compound-edit checks passed: **300 tests in 9.05
+seconds**. Ruff, diff checks, and the shared modularity gate passed; the main
+harness is **1,240 lines against its existing 1,250-line limit**. No provider
+calls were made.

@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, get_args
+from unittest.mock import AsyncMock
 
 import pytest
 from argus.agent_runtime import research_grounded as grounded
@@ -437,6 +438,75 @@ def test_registered_retrieval_withholds_prose_without_typed_figures(monkeypatch)
         context.stage_result.stage_patch["research"]["degraded"]["code"]
         == "research_figures_unverified"
     )
+
+
+@pytest.mark.parametrize(
+    ("discovery_enabled", "naming_available", "code", "retryable"),
+    [
+        (True, True, "discovery_no_verified_candidates", False),
+        (True, False, "discovery_suggestions_unavailable", True),
+        (False, False, "discovery_unavailable", False),
+    ],
+    ids=["no_verified_candidates", "naming_unavailable", "disabled"],
+)
+def test_discovery_recovery_is_an_unavailable_tool_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+    discovery_enabled: bool,
+    naming_available: bool,
+    code: str,
+    retryable: bool,
+) -> None:
+    from argus.agent_runtime.discovery import composer
+    from argus.agent_runtime.discovery.contracts import DiscoveryExtraction
+    from argus.agent_runtime.research_tools import research_outcome_from_patch
+    from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
+    from argus.domain.tool_contracts import ToolCall
+
+    monkeypatch.setenv("ARGUS_GROUNDED_DISCOVERY_ENABLED", str(discovery_enabled).lower())
+    naming = AsyncMock(return_value=DiscoveryExtraction() if naming_available else None)
+    recovery_response = FAKE.sentence()
+    monkeypatch.setattr(composer, "name_candidates", naming)
+    monkeypatch.setattr(
+        composer,
+        "_voiced_discovery_recovery",
+        AsyncMock(return_value=recovery_response),
+    )
+    context = _context()
+    call = ToolCall(
+        call_id=FAKE.uuid4(),
+        tool_name="peer_expansion",
+        arguments={
+            "request": "Find verified companies in this sector",
+            "relationship": "category",
+            "category_description": "cybersecurity",
+            "needs_current_facts": False,
+        },
+    )
+    state = context.state.model_copy(update={"tool_calls": [call]})
+
+    result = asyncio.run(
+        execute_tool_calls_async(state=state, tool=None, user=context.user)
+    )
+
+    effect = result.stage_patch["tool_effects"][0]["stage_patch"]
+    assert effect["recovery"]["code"] == code
+    assert effect["recovery"]["retryable"] is retryable
+    assert naming.await_count == int(discovery_enabled)
+    record = result.stage_patch["tool_call_records"][0]
+    assert record["outcome"] == "unavailable"
+    assert record["tool_outcome"]["failure"]["code"] == code
+    assert record["tool_outcome"]["result"] is None
+    # The same projection owns a persisted job's terminal tool outcome.
+    assert (
+        research_outcome_from_patch(effect).model_dump(mode="json")
+        == record["tool_outcome"]
+    )
+    card = result.stage_patch["final_response_payload"]["tool_result_cards"][0]
+    assert card["outcome"] == record["tool_outcome"]
+    assert card["presentation"]["answer"] is None
+    assert card["presentation"]["narrative"] is None
+    assert card["presentation"]["sources"] == []
+    assert result.stage_patch["assistant_response"] == recovery_response
 
 
 def test_catalog_zero_calls_never_fall_back_to_a_question_classifier(monkeypatch) -> None:

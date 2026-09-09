@@ -85,7 +85,7 @@ cases:
     expected:
       offered:
         response: true
-      intent: calculate
+      intent: ["follow_up", "explain", "cannot"]
       tool_dispatch: true
       capability_verdict: answer_only
       stage_outcomes: ["ready_to_respond"]

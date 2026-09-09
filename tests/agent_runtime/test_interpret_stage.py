@@ -1154,7 +1154,9 @@ def test_supported_indicator_capability_contradiction_uses_locale_recovery(
         assert spec.label not in answer
 
 
-def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> None:
+def test_strategy_family_education_keeps_llm_language_over_registry_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     response = StructuredInterpretation(
         intent="conversation_followup",
         task_relation="continue",
@@ -1168,6 +1170,18 @@ def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> No
         capability_question_focus="supported_strategies",
     )
 
+    from argus.domain.capability_registry import get_tool_catalog
+
+    captured: dict[str, Any] = {}
+
+    async def compose(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return response.assistant_response
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion", compose
+    )
+
     result, _interpreter = run_interpret_with_llm(
         message="Can you explain dollar cost averaging like I'm completely new?",
         response=response,
@@ -1177,6 +1191,9 @@ def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> No
     assert result.outcome == "ready_to_respond"
     assert "Dollar cost averaging" in answer
     assert "Executable strategy families" not in answer
+    assert get_tool_catalog().capability_text() in " ".join(
+        message["content"] for message in captured["messages"]
+    )
 
 
 def test_supported_strategy_capability_uses_chat_tier_for_natural_language(
@@ -1711,7 +1728,7 @@ def test_unanchored_strategy_route_uses_chat_tier_without_pending_draft(
     assert result.patch["assistant_response"] != response.assistant_response
     assert "buy and hold" in result.patch["assistant_response"]
     assert captured["task"] == "chat_composer"
-    assert "Supported-strategy facts" in captured["messages"][1]["content"]
+    assert "Declared capability facts" in captured["messages"][1]["content"]
     assert result.decision.intent == 'follow_up'
     assert result.decision.missing_required_fields == []
     assert result.decision.candidate_strategy_draft.asset_universe == []

@@ -25,6 +25,7 @@ Run the mocked harness checks with:
 ```bash
 poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_registry_dispatch.py \
+  tests/evals/test_measurement_registry_observation.py \
   tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
@@ -51,11 +52,32 @@ Scorecards retain the full `execution_trace`, raw `stage_outcomes`, selected
 `tool_calls`, arguments, records, and result cards. `acceptance_stage_outcomes`
 keeps the older fixture milestones comparable: it removes the interpreter's
 new dispatch-scheduling edge only after an actual registered execute stage
-returns, retaining that stage's outcome. Intent expectations use the four
-canonical names; historical fixtures and scorecard labels normalize through
-the same state-model compatibility owner. Discovery's original typed facts
+returns, retaining that stage's outcome. A readiness handoff immediately before
+an actual confirmation stage requests clarification is compared at that
+clarification owner; successful confirmation readiness and all raw events remain.
+The same adjacent handoff is normalized in expected milestones. `intent` comes
+from the ordered stage patches after dispatch, while `primary_intent` preserves
+the original interpreter read. Expectations use the four canonical names;
+historical labels normalize through the state-model compatibility owner.
+Discovery's original effective `follow_up` expectation is retained. Its typed facts
 are checked against actual peer-expansion arguments, and its original delivery
 checks remain unchanged. No prompt-to-tool-name expectation is added.
+
+Answer-required dispatch also needs a successful typed result card with a
+typed answer or a nonblank narrative from a recorded call. A queued job with
+neither cannot pass that gate;
+composed work can deliver an answer while another call remains honestly pending.
+Existing offered-content checks still establish what the user received.
+Per-call `tool_usage` retains only the research sidecar's reported cost, latency,
+invocations, and cache status. Missing or null cost stays unknown; the harness
+does not price calls or infer invoices. Historical scorecards retain the harness
+and fixture provenance under which they were measured and are never regraded
+as though this path had executed.
+
+Interpretation and dispatch receive the same trusted snapshot and metadata
+objects on each initial and follow-up turn. Dispatch does not reconstruct that
+context from prose. Private chat delivery accepts sourced narrative without a
+numeric headline; public receipt eligibility intentionally remains narrower.
 
 ## Search Provider Evaluation (Issue #244)
 

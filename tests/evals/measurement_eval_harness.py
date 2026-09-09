@@ -51,8 +51,12 @@ from tests.evals.measurement_prose import (
 )
 from tests.evals.measurement_registry import (
     compare_dispatch,
+    compare_stage_outcomes,
     dispatch_requested_calls,
     measurement_execution_evidence,
+)
+from tests.evals.measurement_registry import (
+    followup_thread_metadata as _followup_thread_metadata,
 )
 
 LOCKED_EVAL_CATEGORIES = {
@@ -193,20 +197,23 @@ def run_eval_case(
     dispatch_result = None
     clarify_result = None
     followup_result = None
+    turn_context = {
+        "latest_task_snapshot": case.snapshot,
+        "selected_thread_metadata": {
+            "ui_language": case.ui_language,
+            "last_stage_outcome": "await_approval",
+            **case.thread_metadata,
+        },
+    }
     try:
         interpret_result = interpret_stage(
             state=state,
             user=user,
-            latest_task_snapshot=case.snapshot,
-            selected_thread_metadata={
-                "ui_language": case.ui_language,
-                "last_stage_outcome": "await_approval",
-                **case.thread_metadata,
-            },
+            **turn_context,
             structured_interpreter=interpreter,
         )
         dispatch_result = dispatch_requested_calls(
-            state=state, interpreted=interpret_result, user=user
+            state=state, interpreted=interpret_result, user=user, **turn_context
         )
         routed_result = dispatch_result or interpret_result
         routed_patch = {**interpret_result.patch, **routed_result.patch}
@@ -353,7 +360,12 @@ def typed_expectation_failures(
     expected = case.expected
     failures: list[str] = []
     _compare_intent(expected.intent, outcome.get("intent"), failures)
-    compare_dispatch(expected.tool_dispatch, outcome, failures)
+    compare_dispatch(
+        expected.tool_dispatch,
+        outcome,
+        failures,
+        requires_answer=expected.capability_verdict == "answer_only",
+    )
     _compare(
         "capability_verdict",
         expected.capability_verdict,
@@ -464,13 +476,7 @@ def typed_expectation_failures(
             outcome.get("launch_execution_realism"),
             failures,
         )
-    if expected.stage_outcomes:
-        _compare(
-            "stage_outcomes",
-            list(expected.stage_outcomes),
-            outcome.get("acceptance_stage_outcomes", outcome.get("stage_outcomes")),
-            failures,
-        )
+    compare_stage_outcomes(expected.stage_outcomes, outcome, failures)
     _compare(
         "requested_field",
         expected.requested_field,
@@ -586,20 +592,23 @@ def _run_followup_turn_if_needed(
             [{"role": "assistant", "content": assistant_text}] if assistant_text else []
         ),
     )
-    followup_interpret = interpret_stage(
-        state=state,
-        user=user,
-        latest_task_snapshot=case.snapshot,
-        selected_thread_metadata=_followup_thread_metadata(
+    turn_context = {
+        "latest_task_snapshot": case.snapshot,
+        "selected_thread_metadata": _followup_thread_metadata(
             final_clarify_patch,
             last_stage_outcome=str(clarify_result.outcome),
         ),
+    }
+    followup_interpret = interpret_stage(
+        state=state,
+        user=user,
+        **turn_context,
         structured_interpreter=OpenRouterStructuredInterpreter(contract=contract),
     )
     followup_confirm = None
     followup_clarify = None
     followup_dispatch = dispatch_requested_calls(
-        state=state, interpreted=followup_interpret, user=user
+        state=state, interpreted=followup_interpret, user=user, **turn_context
     )
     routed_result = followup_dispatch or followup_interpret
     routed_patch = {**followup_interpret.patch, **routed_result.patch}
@@ -645,24 +654,6 @@ def _run_followup_turn_if_needed(
         "confirm_result": followup_confirm,
         "clarify_result": followup_clarify,
     }
-
-
-def _followup_thread_metadata(
-    patch: dict[str, Any],
-    *,
-    last_stage_outcome: str,
-) -> dict[str, Any]:
-    metadata: dict[str, Any] = {"last_stage_outcome": last_stage_outcome}
-    for key in (
-        "requested_field",
-        "missing_required_fields",
-        "response_intent",
-        "clarification",
-    ):
-        value = patch.get(key)
-        if value not in (None, "", [], {}):
-            metadata[key] = value
-    return metadata
 
 
 def _state_for_followup_clarification(
@@ -993,8 +984,8 @@ def _typed_outcome(
     ]
 
     return {
-        "intent": _intent(case=case, patch=interpret_patch),
         **execution_evidence,
+        "intent": _intent(case=case, patch=execution_evidence),
         "assets": _symbols(launch_payload=launch_payload, strategy=strategy),
         "asset_class": launch_payload.get("asset_class") or strategy.get("asset_class"),
         "requested_strategy_template": strategy.get("requested_strategy_template"),

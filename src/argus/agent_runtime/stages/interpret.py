@@ -1820,8 +1820,6 @@ async def _capability_answer_if_applicable(
         or requires_clarification
     ):
         return None
-    if focus in {"supported_strategies", "general"} and assistant_response:
-        return None
     composed = await _compose_natural_capability_answer(
         focus=focus,
         current_user_message=current_user_message,
@@ -1892,7 +1890,7 @@ async def _compose_natural_capability_answer(
         },
         {
             "role": "system",
-            "content": f"Supported-strategy facts: {fact_packet}",
+            "content": f"Declared capability facts: {fact_packet}",
         },
         {"role": "user", "content": current_user_message},
     ]
@@ -2129,7 +2127,7 @@ async def _compose_unanchored_strategy_recovery_answer(
                 "give investment advice."
             ),
         },
-        {"role": "system", "content": f"Supported-strategy facts: {fact_packet}"},
+        {"role": "system", "content": f"Declared capability facts: {fact_packet}"},
         {"role": "user", "content": current_user_message},
     ]
     try:
@@ -2173,6 +2171,9 @@ async def _compose_general_educational_answer(
     current_user_message: str,
     language: str = "en",
 ) -> str | None:
+    fact_packet = capability_fact_packet(
+        focus="general", contract=build_default_capability_contract()
+    )
     messages = [
         {
             "role": "system",
@@ -2183,10 +2184,11 @@ async def _compose_general_educational_answer(
                 f"{response_language_instruction(language)} "
                 "Answer in warm, plain language. Start with useful context, keep it "
                 "concise, avoid report tone, do not name data vendors, do not imply "
-                "live news coverage, and do not give investment advice. End with one "
+                "capabilities beyond the declared facts, and do not give investment advice. End with one "
                 "nearby historical experiment or recoverable next step when useful."
             ),
         },
+        {"role": "system", "content": f"Declared capability facts: {fact_packet}"},
         {"role": "user", "content": current_user_message},
     ]
     try:

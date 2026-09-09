@@ -492,6 +492,13 @@ No-call catalog responses do not fall into the legacy research classifier.
 Incomplete backtest drafting still uses its structured strategy draft; a response
 with tool calls cannot carry a competing top-level strategy draft.
 
+Backtest extraction and the real callable share `BacktestStrategyInput`. This
+input retains temporal intent, money roles, rule structure and evidence until
+the existing strategy preparation owners produce a canonical `StrategySummary`.
+Confirmation approves that prepared artifact; approving it does not interpret
+its dates or other facts again. The persisted summary remains an output of
+preparation, rather than a second input schema with fewer fields.
+
 Neutral `domain/tool_contracts.py` transports never import the catalog or a
 backtest implementation. The serializer-pinned runtime model class paths remain
 unchanged. Declaration validation and invocation distinguish `succeeded`,

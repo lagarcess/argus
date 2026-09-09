@@ -321,6 +321,11 @@ def research_result_from_patch(patch: dict[str, Any]) -> ResearchToolResult:
     """Project inline and background completion through the same typed return."""
     from argus.domain.tool_declaration import ToolInvocationError
 
+    recovery = patch.get("recovery") or {}
+    if recovery.get("code"):
+        # Recovery owns the no-answer state even when no provider attempt
+        # produced usage or a degraded research sidecar.
+        raise ToolInvocationError("unavailable", code=recovery["code"])
     if "research_job_request" in patch:
         return ResearchToolResult(status="pending")
     sidecar = patch.get("research") or {}

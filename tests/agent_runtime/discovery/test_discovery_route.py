@@ -121,24 +121,27 @@ class TestDiscoveryRouteFlagOff:
         assert result.outcome == "ready_to_respond"
         assert result.patch["recovery"]["code"] == "discovery_unavailable"
 
+    @pytest.mark.parametrize("rail_enabled", ["false", "true"])
     def test_detected_turn_language_reaches_discovery_composer(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, monkeypatch: pytest.MonkeyPatch, rail_enabled: str
     ) -> None:
         from argus.agent_runtime.discovery import composer as composer_module
 
+        monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", rail_enabled)
         captured: dict[str, Any] = {}
-        original = composer_module.discovery_stage_result_if_applicable
+        original = composer_module.discovery_operation_result
 
         async def _spy(**kwargs: Any):
             captured["language"] = kwargs.get("language")
             return await original(**kwargs)
 
-        monkeypatch.setattr(composer_module, "discovery_stage_result_if_applicable", _spy)
-        _run(
+        monkeypatch.setattr(composer_module, "discovery_operation_result", _spy)
+        result = _run(
             message="¿Qué acciones de ciberseguridad podría probar?",
             response=_discovery_interpretation(language="es-419"),
         )
         assert captured["language"] == "es-419"
+        assert result.patch["recovery"]["code"] == "discovery_unavailable"
 
     def test_discovery_patch_never_touches_pending_or_result_state(self) -> None:
         snapshot = TaskSnapshot(

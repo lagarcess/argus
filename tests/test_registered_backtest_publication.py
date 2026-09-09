@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from argus.agent_runtime.artifacts.drafts import draft_from_failed_launch_payload
+from argus.agent_runtime.tools.registered_backtest import get_backtest_declaration
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.tool_contracts import ToolCall, ToolResultCard
 from argus.domain.tool_job_binding import bind_tool_job_call
@@ -45,14 +46,18 @@ def _request_payload(language: str = "en") -> dict:
 
 
 def _call(language: str = "en") -> ToolCall:
-    return ToolCall(
-        tool_name="backtest",
-        call_id=fake.uuid4(),
-        arguments={
+    declaration = get_backtest_declaration()
+    arguments = declaration.validate_arguments(
+        {
             "strategy": draft_from_failed_launch_payload(
                 _request_payload(language)
             ).model_dump(mode="json")
-        },
+        }
+    )
+    return ToolCall(
+        tool_name=declaration.name,
+        call_id=fake.uuid4(),
+        arguments=arguments.model_dump(mode="json"),
     )
 
 

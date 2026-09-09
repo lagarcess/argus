@@ -17,6 +17,7 @@ from faker import Faker
 
 from tests.evals import measurement_eval_harness as harness
 from tests.evals.measurement_outcome import offered_to_user
+from tests.evals.test_measurement_registry_observation import _delivered_call
 
 SWEEP_CASES = harness.load_eval_cases()
 fake = Faker()
@@ -39,11 +40,7 @@ def _correct_routing(case: harness.EvalCase) -> dict[str, Any]:
     if case.expected.tool_dispatch:
         # Authored routing facts isolate the delivery mutation. Actual
         # declaration invocation is proven in test_measurement_registry_dispatch.
-        call_id = fake.uuid4()
-        outcome["tool_calls"] = [
-            {"call_id": call_id, "tool_name": "synthetic_measured_call", "arguments": {}}
-        ]
-        outcome["tool_call_records"] = [{"call_id": call_id, "outcome": "succeeded"}]
+        outcome.update(_delivered_call(completed=True))
     return outcome
 
 

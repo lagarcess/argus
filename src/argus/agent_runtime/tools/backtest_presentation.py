@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.backtest_input import BacktestStrategyInput
 from argus.api.public_excerpt_schemas import PublicExcerptPayload
 from argus.domain.public_excerpts import (
     PublicExcerptSourceError,
@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 class BacktestArguments(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    strategy: StrategySummary
+    strategy: BacktestStrategyInput
 
 
 class BacktestExecutionResult(BaseModel):

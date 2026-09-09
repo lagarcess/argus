@@ -1,0 +1,153 @@
+{
+  "evidence_kind": "deterministic_harness_observation_repair",
+  "source_parent_sha": "7d09858016528a907fa23d27925fc36ecb7e256f",
+  "worktree_clean": false,
+  "integration_baseline_sha": "9e8b59b23f29d432ec7603c42f7362137b1ee21f",
+  "initial_measured_candidate_sha": "3c4f5aab93f1928d999a20fc34c4b0a6bcecf5a8",
+  "initial_scorecard": "docs/reports/evidence/registry/live-measurement-initial.json",
+  "initial_scorecard_regraded": false,
+  "initial_migration_artifact_preserved": "docs/reports/evidence/registry/verification/measurement-contract-migration.json",
+  "initial_fixture_sha256": "0212d21ccaafb2b5714c60e00ece8e462a92375e3928e6ef4fa8a762773525d8",
+  "current_fixture_sha256": "6f6c535a5e1ec0c073014506cff34dc79cb7afd8a670c897b8122057ad42290c",
+  "case_count": 68,
+  "case_ids_unchanged": true,
+  "all_non_intent_case_data_unchanged_from_initial_registry_candidate": true,
+  "financial_recovery_clarification_approval_delivery_and_prose_assertions_unchanged": true,
+  "restored_intent_changes": [
+    {
+      "case_id": "asset_discovery_category_english_issue_244",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_peer_anchor_english_issue_244",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_category_spanish_issue_244",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_recent_ipo_exact_issue_344",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_semantic_pharma_escalation_issue_344",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "original_intent": "conversation_followup",
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": "follow_up"
+    },
+    {
+      "case_id": "ordinary_conversation_macro_curiosity_en",
+      "original_intent": [
+        "conversation_followup",
+        "beginner_guidance",
+        "unsupported_or_out_of_scope"
+      ],
+      "initial_registry_intent": "calculate",
+      "restored_canonical_intent": [
+        "follow_up",
+        "explain",
+        "cannot"
+      ]
+    }
+  ],
+  "observation_contract": {
+    "intent": "last value after applying actual stage patches in order",
+    "primary_intent": "original interpreter value on the final measured turn",
+    "raw_execution_trace_retained": true,
+    "acceptance_milestones": "remove executed dispatch scheduling and verified confirm-to-clarification handoffs, normalize the same adjacent expected handoff",
+    "answer_required_dispatch": "matching successful execution outcome and typed result card with presentation.answer or a nonblank presentation.narrative; one delivered chat answer can accompany honest pending work",
+    "research_usage_fields": [
+      "cost_usd",
+      "latency_ms",
+      "invocations",
+      "cache_status"
+    ],
+    "usage_null_and_zero_remain_distinct": true,
+    "trusted_context": "the same existing snapshot and selected-thread metadata objects are passed to interpret and dispatch on each initial and follow-up turn",
+    "public_receipt_eligibility_unchanged": true
+  },
+  "tests": {
+    "observation_red": {
+      "failed": 16,
+      "passed": 5
+    },
+    "observation_green": {
+      "passed": 21
+    },
+    "usage_capture_red": {
+      "failed": 1
+    },
+    "focused_dispatch_observation_delivery_green": {
+      "passed": 123
+    },
+    "mocked_harness_plus_issue_498_green": {
+      "passed": 294,
+      "duration_seconds": 8.4
+    },
+    "owned_files_ruff": "passed",
+    "measurement_harness_line_count": 1240,
+    "measurement_harness_line_limit": 1250
+  },
+  "source_sha256": {
+    "tests/evals/measurement_registry.py": "1196df69a97dcf7ee7451a2a8f98f105f90282b3af6c223a9f0d2a3ebf40c126",
+    "tests/evals/measurement_eval_harness.py": "573262246f2a0c459ae83fe3b8080f32b20f860843779d55cdd603d308ae302b",
+    "tests/evals/test_measurement_registry_observation.py": "a9632e0f943dbfd41be3f7062907ad82011de9d680d604f063e7db7e15aab940",
+    "tests/evals/test_measurement_delivery.py": "67f35c6da2182e2b9c3114495e7a3c88350bacc35979eae4003a2261a34ea81c"
+  },
+  "provider_calls": 0,
+  "required_next_measurement": "new full live run with its own candidate and harness provenance",
+  "review_followup": {
+    "source_parent_sha": "7d09858016528a907fa23d27925fc36ecb7e256f",
+    "trusted_context_red": {
+      "failed": 2
+    },
+    "actual_research_presenter_narrative_red": {
+      "failed": 1,
+      "empty_content_controls_passed": 3
+    },
+    "observation_green": {
+      "passed": 28
+    },
+    "mocked_harness_plus_issue_498_green": {
+      "passed": 300,
+      "duration_seconds": 9.05
+    },
+    "owned_files_ruff": "passed",
+    "shared_modularity_budget": "passed",
+    "fixtures_changed": false,
+    "provider_calls": 0
+  }
+}

@@ -26,19 +26,21 @@ def capability_fact_packet(
     contract: CapabilityContract,
     tool_catalog: ToolCatalog | None = None,
 ) -> str:
-    if focus == "supported_indicators":
-        return _supported_indicators_answer()
-    if focus == "supported_strategies":
-        return _supported_strategies_answer()
-    if focus == "limits":
-        return _limits_answer(contract)
-    if focus == "assets":
-        return _assets_answer()
     if tool_catalog is None:
         from argus.domain.capability_registry import get_tool_catalog
 
         tool_catalog = get_tool_catalog()
-    return f"Declared tools: {tool_catalog.capability_text()} {_general_answer(contract)}"
+    if focus == "supported_indicators":
+        focused_facts = _supported_indicators_answer()
+    elif focus == "supported_strategies":
+        focused_facts = _supported_strategies_answer()
+    elif focus == "limits":
+        focused_facts = _limits_answer(contract)
+    elif focus == "assets":
+        focused_facts = _assets_answer()
+    else:
+        focused_facts = _general_answer(contract)
+    return f"Declared tools: {tool_catalog.capability_text()} {focused_facts}"
 
 
 def _supported_indicators_answer() -> str:

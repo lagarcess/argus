@@ -63,7 +63,7 @@ def requested_strategy_template_capability_clause() -> str:
     return (
         "Named strategy capability identity is separate from execution routing. "
         "When the user names or clearly requests a registered strategy template, "
-        "set candidate_strategy_draft.requested_strategy_template to its canonical "
+        "set the strategy input requested_strategy_template to its canonical "
         f"registry key. Registered template statuses are: {capability_rows}. "
         f"Template contracts: {capability_details}. "
         "Preserve a draft template's identity even though it is not runnable: do "

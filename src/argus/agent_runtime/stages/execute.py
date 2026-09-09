@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from argus.agent_runtime.state.models import UserState
+    from argus.agent_runtime.state.models import TaskSnapshot, UserState
     from argus.domain.tool_declaration import ToolCatalog
 
 from argus.agent_runtime.coverage_recovery import (
@@ -340,6 +340,8 @@ async def execute_stage_async(
     language: str = "en",
     catalog: ToolCatalog | None = None,
     user: UserState | None = None,
+    latest_task_snapshot: TaskSnapshot | None = None,
+    selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
     from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
 
@@ -350,6 +352,8 @@ async def execute_stage_async(
         max_retries=max_retries,
         language=language,
         user=user,
+        latest_task_snapshot=latest_task_snapshot,
+        selected_thread_metadata=selected_thread_metadata,
     )
 
 

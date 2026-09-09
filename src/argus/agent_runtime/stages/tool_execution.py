@@ -8,7 +8,12 @@ from typing import Any
 from uuid import uuid4
 
 from argus.agent_runtime.stages.interpret_types import StageOutcome, StageResult
-from argus.agent_runtime.state.models import ArtifactReference, RunState, UserState
+from argus.agent_runtime.state.models import (
+    ArtifactReference,
+    RunState,
+    TaskSnapshot,
+    UserState,
+)
 from argus.agent_runtime.substage_events import emit_tool_progress
 from argus.domain.tool_contracts import MAX_TOOL_CALLS, ToolCall, ToolFailure, ToolOutcome
 from argus.domain.tool_declaration import ToolCatalog, ToolInvocationError
@@ -24,6 +29,8 @@ class ToolExecutionContext:
     backtest_tool: Any
     max_retries: int
     language: str
+    latest_task_snapshot: TaskSnapshot | None = None
+    selected_thread_metadata: dict[str, Any] = field(default_factory=dict)
     call: ToolCall | None = None
     artifact_id: str = field(default_factory=lambda: str(uuid4()))
     approval_available: bool = False
@@ -48,6 +55,8 @@ async def execute_tool_calls_async(
     max_retries: int = 2,
     language: str = "en",
     user: UserState | None = None,
+    latest_task_snapshot: TaskSnapshot | None = None,
+    selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
     calls = list(state.tool_calls)
     if not calls and state.confirmation_payload is not None:
@@ -89,6 +98,10 @@ async def execute_tool_calls_async(
             backtest_tool=tool,
             max_retries=max_retries,
             language=language,
+            latest_task_snapshot=latest_task_snapshot,
+            selected_thread_metadata=(
+                selected_thread_metadata if selected_thread_metadata is not None else {}
+            ),
             call=call,
             artifact_id=str(uuid4()),
             approval_available=index == 0,

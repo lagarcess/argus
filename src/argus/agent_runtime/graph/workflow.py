@@ -235,6 +235,7 @@ def build_workflow(
         WorkflowNode.EXECUTE.value,
         _route_from_stage_outcome,
         {
+            WorkflowRoute.CLARIFY.value: WorkflowNode.CLARIFY.value,
             WorkflowRoute.CONFIRM.value: WorkflowNode.CONFIRM.value,
             WorkflowRoute.EXPLAIN.value: WorkflowNode.EXPLAIN.value,
             WorkflowRoute.END.value: END,
@@ -277,6 +278,8 @@ async def _interpret_node_async(
     ):
         calls = list(snapshot.pending_tool_calls)
         if calls[0].tool_name == "backtest":
+            from argus.agent_runtime.backtest_input import BacktestStrategyInput
+
             strategy = StrategySummary.model_validate(
                 result.patch.get(
                     "candidate_strategy_draft", _run_state(state).candidate_strategy_draft
@@ -285,7 +288,13 @@ async def _interpret_node_async(
             # Confirmation may materialize defaults or an executable data window.
             # Its canonical strategy replaces only the call just approved.
             calls[0] = calls[0].model_copy(
-                update={"arguments": {"strategy": strategy.model_dump(mode="json")}}
+                update={
+                    "arguments": {
+                        "strategy": BacktestStrategyInput.from_runtime_strategy(
+                            strategy
+                        ).model_dump(mode="json")
+                    }
+                }
             )
             result.stage_patch["tool_calls"] = calls
     return _apply_stage_result(state, result)
@@ -330,6 +339,8 @@ async def _execute_node_async(
             language=_user(state).language_preference,
             catalog=catalog,
             user=_user(state),
+            latest_task_snapshot=state.get("latest_task_snapshot"),
+            selected_thread_metadata=state.get("selected_thread_metadata"),
         ),
     )
 

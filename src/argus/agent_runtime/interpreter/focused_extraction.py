@@ -204,6 +204,8 @@ def _focused_extraction_field_provenance(
         extraction.comparison_baseline,
         current_message=current_message,
     )
+    provenance.update(extraction.field_provenance)
+    provenance.update(extraction.declared_capital_roles())
     evidence_spans = dict(extraction.evidence_spans or {})
     if (
         extraction.comparison_baseline
@@ -517,45 +519,37 @@ def response_from_focused_strategy_extraction(
         resolved_date_intent = resolve_date_range_intent(extraction.date_range_intent)
         if resolved_date_intent is not None:
             extraction_date_range = resolved_date_intent.payload
+    draft_payload = extraction.model_dump(
+        mode="python", include=set(LLMStrategyDraft.model_fields)
+    )
+    draft_payload.update(
+        raw_user_phrasing=request.current_user_message,
+        strategy_type=strategy_type,
+        strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
+        asset_universe=asset_universe,
+        asset_class=extraction.asset_class or resolved_asset_class,
+        date_range=extraction_date_range,
+        entry_logic=entry_logic,
+        exit_logic=exit_logic,
+        field_provenance=_focused_extraction_field_provenance(
+            extraction=extraction,
+            current_message=request.current_user_message,
+            resolved_strategy_type=strategy_type,
+        ),
+    )
+    if strategy_type is None and extraction.strategy_type:
+        draft_payload["extra_parameters"] = {
+            **draft_payload.get("extra_parameters", {}),
+            "raw_strategy_type": extraction.strategy_type,
+        }
+    draft = LLMStrategyDraft.model_validate(draft_payload)
     if strategy_type is None:
         return LLMInterpretationResponse(
             intent="cannot",
             task_relation="new_task",
             requires_clarification=True,
             user_goal_summary=extraction.user_goal_summary,
-            candidate_strategy_draft=LLMStrategyDraft(
-                raw_user_phrasing=request.current_user_message,
-                language=extraction.language,
-                strategy_thesis=extraction.strategy_thesis
-                or extraction.user_goal_summary,
-                asset_universe=asset_universe,
-                asset_class=extraction.asset_class or resolved_asset_class,
-                timeframe=extraction.timeframe,
-                date_range=extraction_date_range,
-                date_range_raw_text=extraction.date_range_raw_text,
-                date_range_intent=extraction.date_range_intent,
-                comparison_baseline=extraction.comparison_baseline,
-                capital_amount=extraction.capital_amount,
-                recurring_contribution=extraction.recurring_contribution,
-                cadence=extraction.cadence,
-                entry_logic=entry_logic,
-                exit_logic=exit_logic,
-                indicator=extraction.indicator,
-                indicator_period=extraction.indicator_period,
-                entry_threshold=extraction.entry_threshold,
-                exit_threshold=extraction.exit_threshold,
-                evidence_spans=dict(extraction.evidence_spans or {}),
-                field_provenance=_focused_extraction_field_provenance(
-                    extraction=extraction,
-                    current_message=request.current_user_message,
-                    resolved_strategy_type=strategy_type,
-                ),
-                extra_parameters={
-                    "raw_strategy_type": extraction.strategy_type,
-                }
-                if extraction.strategy_type
-                else {},
-            ),
+            candidate_strategy_draft=draft,
             unsupported_constraints=[
                 LLMUnsupportedConstraint(
                     category="unsupported_strategy_logic",
@@ -579,43 +573,11 @@ def response_from_focused_strategy_extraction(
             semantic_turn_act="unsupported_request",
         )
     response = LLMInterpretationResponse(
-        intent="calculate"
-        if extraction.requires_clarification
-        else "calculate",
+        intent="calculate",
         task_relation="continue" if is_pending_strategy_answer else "new_task",
         requires_clarification=extraction.requires_clarification,
         user_goal_summary=extraction.user_goal_summary,
-        candidate_strategy_draft=LLMStrategyDraft(
-            raw_user_phrasing=request.current_user_message,
-            language=extraction.language,
-            strategy_type=strategy_type,
-            strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
-            asset_universe=asset_universe,
-            asset_class=extraction.asset_class or resolved_asset_class,
-            timeframe=extraction.timeframe,
-            date_range=extraction_date_range,
-            date_range_raw_text=extraction.date_range_raw_text,
-            date_range_intent=extraction.date_range_intent,
-            comparison_baseline=extraction.comparison_baseline,
-            capital_amount=extraction.capital_amount,
-            recurring_contribution=extraction.recurring_contribution,
-            cadence=extraction.cadence,
-            entry_logic=entry_logic,
-            exit_logic=exit_logic,
-            entry_rule=extraction.entry_rule,
-            exit_rule=extraction.exit_rule,
-            rule_spec=extraction.rule_spec,
-            indicator=extraction.indicator,
-            indicator_period=extraction.indicator_period,
-            entry_threshold=extraction.entry_threshold,
-            exit_threshold=extraction.exit_threshold,
-            evidence_spans=dict(extraction.evidence_spans or {}),
-            field_provenance=_focused_extraction_field_provenance(
-                extraction=extraction,
-                current_message=request.current_user_message,
-                resolved_strategy_type=strategy_type,
-            ),
-        ),
+        candidate_strategy_draft=draft,
         missing_required_fields=list(extraction.missing_required_fields),
         assistant_response=extraction.assistant_response,
         confidence=extraction.confidence,

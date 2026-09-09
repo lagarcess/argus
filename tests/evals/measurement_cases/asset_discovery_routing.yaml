@@ -9,7 +9,7 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -29,7 +29,7 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -48,7 +48,7 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -67,7 +67,7 @@ cases:
     user_language: es
     ui_language: es
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -88,7 +88,7 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -110,7 +110,7 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -142,7 +142,7 @@ cases:
       - role: assistant
         content: "Here are resolver-verified pharmaceutical stocks from general knowledge, not a current search."
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -164,7 +164,7 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:
@@ -194,7 +194,7 @@ cases:
       - role: assistant
         content: "Aquí tienes acciones farmacéuticas de conocimiento general, no de una búsqueda actual."
     expected:
-      intent: calculate
+      intent: follow_up
       capability_verdict: answer_only
       tool_dispatch: true
       asset_discovery:

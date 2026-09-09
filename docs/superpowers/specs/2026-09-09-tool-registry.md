@@ -35,6 +35,9 @@ envelope imports; this lane supplies the declaration and its real consumers.
    their ownership. Strategy-template unsupported admission remains strategy
    specific. Capability answers and model-facing catalog text derive from the
    same declarations and executable strategy data.
+   Backtest extraction and dispatch share one typed input owner; existing
+   deterministic preparation produces the durable strategy artifact before
+   confirmation, preserving temporal intent, money roles and modeled costs.
 7. Policy is consumed before constructing a backtest launch payload. Free,
    local, unambiguous calls execute and answer immediately. Backtest calls keep
    confirmation, durable admission and worker execution. Shared outcomes
@@ -101,6 +104,10 @@ envelope imports; this lane supplies the declaration and its real consumers.
   PR #565 reported $1.11 with some missing receipt prices; its same ten
   research-required cases reported about $0.11. The revised estimate is not a
   hard cap. State any additional paid rerun cost before running it.
+  The first pass failed (43/68 passed) and remains committed. After the typed
+  input and observation repairs, another full pass was announced at $2–$4,
+  based on about $1.80 accounted for in the initial run; missing receipt costs
+  remain unknown. No initial failure is regraded as if the repaired harness ran.
 - Before readiness: fetch/reconcile integration one-way, assess semantic
   overlap, run modularity on the would-be merged tree, retain/revalidate exact
   head evidence, require terminal CI, completed Codex review naming current

@@ -171,7 +171,9 @@ def test_call_list_is_bounded_by_the_shared_resource_limit() -> None:
 
     model = llm_interpreter_types.interpretation_response_model(_schema_catalog())
     calls = _calls(("number_echo",) * MAX_TOOL_CALLS)
-    assert len(model.model_validate(_response_payload(calls)).tool_calls) == MAX_TOOL_CALLS
+    assert (
+        len(model.model_validate(_response_payload(calls)).tool_calls) == MAX_TOOL_CALLS
+    )
     calls.extend(_calls(("label_echo",)))
     with pytest.raises(ValidationError):
         model.model_validate(_response_payload(calls))
@@ -463,9 +465,20 @@ async def test_repeated_backtest_calls_keep_independent_inputs(
     ] == [["AAPL"], ["MSFT"]]
     assert result.candidate_strategy_draft.strategy_type is None
 
-    assert [
-        call.arguments["strategy"]["date_range"]["start"] for call in result.tool_calls
-    ] == ["2022-01-01", "2023-01-01"]
+    from argus.agent_runtime.backtest_input import BacktestStrategyInput
+    from argus.agent_runtime.interpreter.backtest_calls import prepare_backtest_tool_input
+
+    canonical_dates = []
+    for call in result.tool_calls:
+        prepared_call = await prepare_backtest_tool_input(
+            BacktestStrategyInput.model_validate(call.arguments["strategy"]),
+            state=RunState(current_user_message=request.current_user_message),
+            user=request.user,
+        )
+        canonical_dates.append(
+            prepared_call.patch["candidate_strategy_draft"]["date_range"]["start"]
+        )
+    assert canonical_dates == ["2022-01-01", "2023-01-01"]
 
 
 class UnknownArguments(BaseModel):

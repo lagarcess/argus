@@ -7,10 +7,7 @@ from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS
-from argus.agent_runtime.llm_interpreter_types import (
-    LLMInterpretationResponse,
-    LLMStrategyDraft,
-)
+from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -19,7 +16,7 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import StrategySummary, UserState
+from argus.agent_runtime.state.models import UserState
 from argus.domain.tool_contracts import ToolCall
 
 
@@ -40,19 +37,12 @@ def catalog_standalone_response(
 
 def runtime_catalog_interpretation(
     response: LLMInterpretationResponse,
-    *,
-    current_user_message: str,
-    normalize_strategy: Callable[[LLMStrategyDraft, str], StrategySummary],
 ) -> StructuredInterpretation:
     return StructuredInterpretation.model_validate(
         {
             **response.model_dump(mode="json"),
             "uses_tool_catalog": True,
-            "tool_calls": runtime_tool_calls(
-                response.tool_calls,
-                current_user_message=current_user_message,
-                normalize_strategy=normalize_strategy,
-            ),
+            "tool_calls": runtime_tool_calls(response.tool_calls),
             "candidate_strategy_draft": {},
             "missing_required_fields": [],
             "ambiguous_fields": [],
@@ -102,43 +92,6 @@ async def catalog_stage_result(
     )
 
 
-def runtime_tool_calls(
-    calls: list[Any],
-    *,
-    current_user_message: str,
-    normalize_strategy: Callable[[LLMStrategyDraft, str], StrategySummary],
-) -> list[ToolCall]:
-    """Each backtest draft derives from its own call, never the whole batch.
-
-    The existing draft converter resolves typed temporal intent and preserves
-    the backtest's own evidence. Provider and launch validity remain the
-    confirmation/launch owner's job; no rejected asset is silently dropped here.
-    """
-    normalized: list[ToolCall] = []
-    for raw_call in calls:
-        call = ToolCall.model_validate(raw_call.model_dump(mode="json"))
-        if call.tool_name == "backtest":
-            raw_strategy = call.arguments.get("strategy")
-            if isinstance(raw_strategy, dict):
-                payload = dict(raw_strategy)
-                extra = payload.get("extra_parameters")
-                if isinstance(extra, dict):
-                    for name in LLMStrategyDraft.model_fields:
-                        if name not in payload and name in extra:
-                            payload[name] = extra[name]
-                draft = LLMStrategyDraft.model_validate(payload)
-                strategy = normalize_strategy(draft, current_user_message)
-                if raw_strategy.get("resolution_provenance") is not None:
-                    strategy.resolution_provenance = StrategySummary.model_validate(
-                        raw_strategy
-                    ).resolution_provenance
-                call = call.model_copy(
-                    update={
-                        "arguments": {
-                            **call.arguments,
-                            "strategy": strategy.model_dump(mode="json"),
-                        }
-                    }
-                )
-        normalized.append(call)
-    return normalized
+def runtime_tool_calls(calls: list[Any]) -> list[ToolCall]:
+    """Preserve declared input; its confirmation handler owns preparation."""
+    return [ToolCall.model_validate(call.model_dump(mode="json")) for call in calls]

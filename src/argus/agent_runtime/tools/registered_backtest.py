@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import get_args
 
+from argus.agent_runtime.backtest_input import BacktestStrategyInput
 from argus.agent_runtime.confirmation_artifacts import confirmation_id_from_payload
 from argus.agent_runtime.stages.interpret_types import StageResult
 from argus.agent_runtime.stages.tool_execution import ToolExecutionContext
@@ -61,8 +62,9 @@ def get_backtest_declaration() -> ToolDeclaration:
     return ToolDeclaration(
         name="backtest",
         description=(
-            "Simulate a supported long-only strategy against historical market data. "
-            "Each call presents its exact inputs for confirmation before execution."
+            "Prepare and validate a historical strategy test from typed input facts. "
+            "Incomplete or unsupported facts are preserved for clarification. "
+            "Supported inputs require confirmation before simulation executes."
         ),
         handler=run_registered_backtest,
         confirmation_handler=prepare_backtest_confirmation,
@@ -78,6 +80,7 @@ def get_backtest_declaration() -> ToolDeclaration:
         ),
         domain=(
             "Historical simulations only; no forecasts or real-money orders.",
+            "Preparation preserves incomplete or unsupported requested facts for clarification.",
             "Approved launch validation owns strategy, asset, date and capital semantics.",
             "Unavailable data or invalid execution never yields a numerical answer.",
             *(
@@ -100,7 +103,11 @@ def approved_backtest_call(state: RunState) -> ToolCall | None:
     return ToolCall(
         tool_name="backtest",
         call_id=confirmation_id_from_payload(state.structured_action.payload),
-        arguments={"strategy": state.candidate_strategy_draft.model_dump(mode="json")},
+        arguments={
+            "strategy": BacktestStrategyInput.from_runtime_strategy(
+                state.candidate_strategy_draft
+            ).model_dump(mode="json")
+        },
     )
 
 
@@ -115,17 +122,18 @@ def backtest_call_is_approved(*, call: ToolCall, state: RunState) -> bool:
     if action is None or action.type != "run_backtest":
         return False
     arguments = BacktestArguments.model_validate(call.arguments)
-    if arguments.strategy != state.candidate_strategy_draft:
+    strategy = arguments.strategy.to_runtime_strategy()
+    if strategy != state.candidate_strategy_draft:
         return False
     return (
         validated_approval_confirmation_payload_from_state(
-            state=state, approved_strategy=arguments.strategy
+            state=state, approved_strategy=strategy
         )
         is not None
     )
 
 
-def prepare_backtest_confirmation(
+async def prepare_backtest_confirmation(
     arguments: BacktestArguments, *, context: ToolExecutionContext
 ) -> StageResult:
     if (
@@ -134,11 +142,16 @@ def prepare_backtest_confirmation(
         and backtest_call_is_approved(call=context.call, state=context.state)
     ):
         return StageResult(outcome="approved_for_execution")
-    return StageResult(
-        outcome="ready_for_confirmation",
-        stage_patch={
-            "candidate_strategy_draft": arguments.strategy.model_dump(mode="python"),
-            "confirmation_payload": None,
-            "assistant_prompt": None,
-        },
+    from argus.agent_runtime.interpreter.backtest_calls import prepare_backtest_tool_input
+
+    prepared = await prepare_backtest_tool_input(
+        arguments.strategy,
+        state=context.state,
+        user=context.user,
+        latest_task_snapshot=context.latest_task_snapshot,
+        selected_thread_metadata=context.selected_thread_metadata,
     )
+    if prepared.outcome not in {"ready_for_confirmation", "needs_clarification"}:
+        raise ValueError("Backtest preparation cannot authorize execution")
+    prepared.stage_patch["confirmation_payload"] = None
+    return prepared

@@ -59,7 +59,7 @@ export default function ToolResultCard({ card, onRecompute, disabled = false, sh
     {card.outcome.status !== "succeeded" ? <p role="status" className="mb-3 text-sm text-amber-800 dark:text-amber-200">{t(`tools.card.status.${card.outcome.status}`)}</p> : null}
     {hasDraftChanges ? <p data-previous-tool-result className="mb-3 text-xs text-black/50 dark:text-white/50">{t("tools.card.saved_result")}</p> : null}
     <ToolCardPresentation presentation={card.presentation} t={t} locale={locale} inputs={controls} withheld={card.outcome.status !== "succeeded"} />
-    {evidenceReceiptSharingEnabled && shareSource && card.outcome.status === "succeeded" && !pending && !hasDraftChanges ? <ShareReceiptAction toolSource={shareSource} /> : null}
+    {evidenceReceiptSharingEnabled && shareSource && card.outcome.status === "succeeded" && card.presentation.answer && !pending && !hasDraftChanges ? <ShareReceiptAction toolSource={shareSource} /> : null}
     {pending ? <p role="status" className="mt-3 text-xs text-black/50 dark:text-white/50">{t("tools.card.updating")}</p> : null}
     {eligible && error ? <p role="alert" className="mt-3 text-xs text-rose-700 dark:text-rose-300">{error}</p> : null}
   </article>;

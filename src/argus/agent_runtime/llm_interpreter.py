@@ -837,12 +837,14 @@ class OpenRouterStructuredInterpreter:
             "a numerical answer in prose. If a fact is missing, ask for it or call "
             "a declared retrieval tool. Only declared tools are available. "
             "A tool call owns all its inputs. Keep candidate_strategy_draft empty "
-            "when tool_calls is nonempty; that field is only a pending backtest "
-            "draft when more inputs are needed before any call can be made. "
-            "The backtest call uses the declared StrategySummary structure. "
-            "Its richer extraction facts, including temporal intent, indicator "
-            "overrides and field evidence, belong in strategy.extra_parameters "
-            "when they are absent from the declared strategy properties. "
+            "when tool_calls is nonempty. That field preserves a pending historical "
+            "test when inputs are missing or unsupported; retain its known assets, "
+            "dates, money roles and rejected rule meaning for recovery. "
+            "All strategy field instructions below apply to the declared typed "
+            "strategy input in each tool call, or to candidate_strategy_draft when "
+            "there are no calls. Put declared fields directly in that input, "
+            "including temporal intent, capital roles, costs and evidence. "
+            "Do not hide declared fields in extra_parameters. "
             "Non-backtest tools never inherit strategy fields. A cannot response "
             "must name only the requested capability that is actually unavailable.\n\n"
             + "Declared tool catalog: " + self.tool_catalog.capability_text() + "\n\n"
@@ -851,9 +853,9 @@ class OpenRouterStructuredInterpreter:
             "such as strategy_type, asset_class, cadence, timeframe, indicator, "
             "semantic_turn_act, artifact_target, and result_followup_focus; do not "
             "translate those machine fields. Put the detected user language in "
-            "detected_user_language for every turn and in candidate_strategy_draft.language when "
-            "a strategy draft is present. Put the exact bounded date/window phrase in candidate_strategy_draft.date_range_raw_text. For relative "
-            "or semantic time windows, also fill candidate_strategy_draft."
+            "detected_user_language for every turn and in strategy.language when "
+            "a strategy draft is present. Put the exact bounded date/window phrase in strategy.date_range_raw_text. For relative "
+            "or semantic time windows, also fill strategy."
             "date_range_intent with canonical fields: kind=rolling_window with "
             "count/unit where count keeps a stated fractional quantity exactly "
             "(the last 8.5 months means count=8.5, never 8 or 5), "
@@ -1127,50 +1129,53 @@ class OpenRouterStructuredInterpreter:
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
         if response.tool_calls or catalog_standalone_response(response):
-            return runtime_catalog_interpretation(
-                response, current_user_message=request.current_user_message,
-                normalize_strategy=_strategy_from_llm,
-            )
-        strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)  # fmt: skip
-        _merge_prior_strategy(strategy=strategy, request=request, response=response)
-        _ground_strategy_in_current_turn(strategy=strategy, request=request)
-        _validate_capability_boundaries(
-            strategy=strategy,
-            response=response,
-            request=request,
-        )
-        unsupported = [
-            _unsupported_from_llm(item) for item in response.unsupported_constraints
-        ]
-        ambiguous = [
-            AmbiguousField.model_validate(item.model_dump(mode="python"))
-            for item in response.ambiguous_fields
-        ]
-        return StructuredInterpretation(
-            uses_tool_catalog=True,
-            tool_calls=[call.model_dump(mode="json") for call in response.tool_calls],
-            intent=response.intent,
-            task_relation=response.task_relation,
-            requires_clarification=response.requires_clarification,
-            user_goal_summary=response.user_goal_summary,
-            detected_user_language=response.detected_user_language,
-            candidate_strategy_draft=strategy,
-            missing_required_fields=list(response.missing_required_fields),
-            assistant_response=response.assistant_response,
-            confidence=response.confidence,
-            reason_codes=list(response.reason_codes),
-            ambiguous_fields=ambiguous,
-            unsupported_constraints=unsupported,
-            response_profile_overrides=response.response_profile_overrides,
-            semantic_turn_act=response.semantic_turn_act,
-            result_followup_focus=response.result_followup_focus,
-            result_followup_fact_key=response.result_followup_fact_key,
-            capability_question_focus=response.capability_question_focus,
-            context_question_focus=response.context_question_focus,
-            artifact_target=_artifact_target_from_response(response),
-            asset_discovery=response.asset_discovery,
-            research_query=response.research_query,
-        )
+            return runtime_catalog_interpretation(response)
+        return canonical_strategy_interpretation(response, request=request)
+
+
+def canonical_strategy_interpretation(
+    response: LLMInterpretationResponse, *, request: InterpretationRequest
+) -> StructuredInterpretation:
+    strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)  # fmt: skip
+    _merge_prior_strategy(strategy=strategy, request=request, response=response)
+    _ground_strategy_in_current_turn(strategy=strategy, request=request)
+    _validate_capability_boundaries(
+        strategy=strategy,
+        response=response,
+        request=request,
+    )
+    unsupported = [
+        _unsupported_from_llm(item) for item in response.unsupported_constraints
+    ]
+    ambiguous = [
+        AmbiguousField.model_validate(item.model_dump(mode="python"))
+        for item in response.ambiguous_fields
+    ]
+    return StructuredInterpretation(
+        uses_tool_catalog=True,
+        tool_calls=[call.model_dump(mode="json") for call in response.tool_calls],
+        intent=response.intent,
+        task_relation=response.task_relation,
+        requires_clarification=response.requires_clarification,
+        user_goal_summary=response.user_goal_summary,
+        detected_user_language=response.detected_user_language,
+        candidate_strategy_draft=strategy,
+        missing_required_fields=list(response.missing_required_fields),
+        assistant_response=response.assistant_response,
+        confidence=response.confidence,
+        reason_codes=list(response.reason_codes),
+        ambiguous_fields=ambiguous,
+        unsupported_constraints=unsupported,
+        response_profile_overrides=response.response_profile_overrides,
+        semantic_turn_act=response.semantic_turn_act,
+        result_followup_focus=response.result_followup_focus,
+        result_followup_fact_key=response.result_followup_fact_key,
+        capability_question_focus=response.capability_question_focus,
+        context_question_focus=response.context_question_focus,
+        artifact_target=_artifact_target_from_response(response),
+        asset_discovery=response.asset_discovery,
+        research_query=response.research_query,
+    )
 
 
 def _provider_asset_resolution_context_from_extraction(extraction):
@@ -2315,7 +2320,6 @@ async def _response_ready_for_runtime(
         request=request,
         asset_resolution_context=asset_resolution_context,
     )
-
 
 
 async def _audited_response_ready_for_runtime(
