@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from argus.agent_runtime.stages.interpret_types import SemanticTurnAct
+from argus.agent_runtime.interpreter.repair_observability import repair_effect_metadata
+from argus.agent_runtime.stages.interpret_types import InterpretDecision, SemanticTurnAct
 from argus.agent_runtime.state.models import IntentName
 
 RouteOwner = Literal["strategy", "result"]
@@ -32,6 +33,31 @@ def strategy_route_expected(
     intent: IntentName,
     semantic_turn_act: SemanticTurnAct | None,
 ) -> bool:
-    return (
-        route_owner(intent=intent, semantic_turn_act=semantic_turn_act) == "strategy"
+    return route_owner(intent=intent, semantic_turn_act=semantic_turn_act) == "strategy"
+
+
+def decision_with_strategy_route_intent(decision: InterpretDecision) -> InterpretDecision:
+    """Keep the effective label aligned with typed strategy work, and audit repair."""
+    if decision.intent == "calculate" or not strategy_route_expected(
+        intent=decision.intent, semantic_turn_act=decision.semantic_turn_act
+    ):
+        return decision
+    repaired = decision.model_copy(
+        update={
+            "intent": "calculate",
+            "reason_codes": [*decision.reason_codes, "strategy_route_intent_normalized"],
+        }
     )
+    repaired.normalized_signals = {
+        **decision.normalized_signals,
+        "strategy_route_intent_repair": {
+            "original_model_intent": decision.intent,
+            **repair_effect_metadata(
+                before=decision,
+                after=repaired,
+                trigger_reason="typed_strategy_route",
+                repair_applied=True,
+            ),
+        },
+    }
+    return repaired

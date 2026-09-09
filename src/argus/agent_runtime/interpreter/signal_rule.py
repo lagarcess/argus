@@ -11,6 +11,7 @@ from argus.agent_runtime.interpreter.shared import (
     _llm_strategy_draft_has_extractable_fields,
     _llm_strategy_draft_has_rule_or_indicator_fields,
 )
+from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMSimplificationOption,
@@ -395,17 +396,20 @@ def _response_from_signal_rule_plan(
         return repaired
 
     draft.strategy_type = "signal_strategy"
+    repaired.intent = "calculate"
+    if not strategy_route_expected(
+        intent=repaired.intent, semantic_turn_act=repaired.semantic_turn_act
+    ):
+        repaired.semantic_turn_act = "new_idea"
     if plan.outcome == "ready_to_confirm":
         # A ready signal-rule plan is the executable contract. Drop unrelated
         # non-executable draft fields that the planner did not ground in the rule.
         draft.risk_rules = []
-        repaired.intent = "calculate"
         repaired.requires_clarification = False
         repaired.missing_required_fields = []
         repaired.assistant_response = None
         return repaired
 
-    repaired.intent = "calculate"
     repaired.requires_clarification = True
     repaired.assistant_response = plan.assistant_response
     repaired.missing_required_fields = list(

@@ -26,6 +26,9 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.interpreter.strategy_routing import (
+    decision_with_strategy_route_intent,
+)
 from argus.agent_runtime.research_answer import discovery_turn_stage_result
 from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
@@ -1074,6 +1077,7 @@ async def _stage_result_from_interpretation(
         artifact_target=artifact_target,
         asset_discovery=interpretation.asset_discovery,
     )
+    decision = decision_with_strategy_route_intent(decision)
     if interpretation.capability_question_focus is not None:
         decision.normalized_signals["capability_question_focus"] = (
             interpretation.capability_question_focus
