@@ -1,0 +1,14 @@
+{
+  "runtime_sha": "dfb86ef8e3a6b994f3462cb4ee0d300b56543195",
+  "web_build_sha": "92a6abde93ab0283aaace559f6a33c713042e1da",
+  "original_integration_base": "743dfda3da9b467d32023ac32e900dad5a392500",
+  "current_integration_sha": "743dfda3da9b467d32023ac32e900dad5a392500",
+  "trees": {
+    "src": "c28119c203fa0bbd90e388ca794f901ea494483c",
+    "web": "5310fc9246da3bd207abb25e4a32c89f75f5d9ee",
+    "supabase": "8a607e142410f402345b6397eeed724b873af95d"
+  },
+  "final_dca_browser_source": "dfb86ef8e3a6b994f3462cb4ee0d300b56543195",
+  "v1_revalidated_source": "dfb86ef8e3a6b994f3462cb4ee0d300b56543195",
+  "retained_evidence": "The DCA normalization changes no research source, stored snapshot reader, selection UI, Settings/revoke, or guest-entry behavior. Those accepted surfaces retain their source evidence; DCA card/mixed receipt and v1 compatibility were revalidated at this runtime."
+}
