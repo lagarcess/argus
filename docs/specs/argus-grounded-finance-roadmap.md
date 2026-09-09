@@ -960,6 +960,13 @@ integration and green there, not shipped to a user.
 
 **The overnight batch, 2026-09-09. Three of four landed; one is in review.**
 
+**A second CI flake exists and is not the `fromisoformat` one.**
+`tests/test_private_alpha_canary_split.py::test_session_tool_provisions_only_a_safe_dedicated_identity`
+shells out to `bun e2e/support/private-alpha-canary-session.ts provision`, which
+makes a live `fetch`, and it reds `backend-checks` with "the socket connection
+was closed unexpectedly". It failed once on integration `6bb73c86` and passed on
+a rerun of the same head with no code change. Rerun it; do not chase it.
+
 | Lane | PR | Surface it owns |
 | --- | --- | --- |
 | Subtract the guardrails | **LANDED** `695d9250`, PR #565 | done; surface released |
