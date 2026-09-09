@@ -66,8 +66,11 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
               )}
               {entry.research && (
                 <>
-                  <div lang={entry.language} className={`mt-4 pt-5 text-[15px] leading-relaxed text-white/90 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_h2]:my-4 [&_h2]:font-medium [&_h3]:my-3 [&_h3]:font-medium [&_a]:underline [&_a]:underline-offset-4 ${RULE}`}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml allowedElements={["p", "strong", "em", "ul", "ol", "li", "a", "blockquote", "h2", "h3", "br", "code"]} unwrapDisallowed components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{entry.research.answer}</ReactMarkdown>
+                  <div lang={entry.language} className={`mt-4 min-w-0 pt-5 text-[15px] leading-relaxed text-white/90 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_h2]:my-4 [&_h2]:font-medium [&_h3]:my-3 [&_h3]:font-medium [&_a]:underline [&_a]:underline-offset-4 ${RULE}`}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml allowedElements={["p", "strong", "em", "ul", "ol", "li", "a", "blockquote", "h2", "h3", "br", "code", "table", "thead", "tbody", "tr", "th", "td"]} unwrapDisallowed components={{
+                      a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+                      table: ({ children }) => <div className="my-4 max-w-full overflow-x-auto"><table className="w-full border-collapse text-left text-[13px] leading-relaxed [&_th]:border-b [&_th]:border-white/20 [&_th]:px-3 [&_th]:py-2 [&_th]:font-medium [&_td]:border-b [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">{children}</table></div>,
+                    }}>{entry.research.answer}</ReactMarkdown>
                   </div>
                   <section className={`mt-4 pt-5 ${RULE}`}>
                     <h2 className={LABEL}>{copy.research.sources}</h2>

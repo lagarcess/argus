@@ -33,6 +33,24 @@ describe.each(["en", "es-419"] as const)("receipt body in %s", (language) => {
     expect(markup).not.toContain('href="/"');
   });
 
+  test.each([false, true])("research preserves a safe readable table, preview=%s", (preview) => {
+    const answer = `| Metric | AAPL | Context |\n| --- | ---: | --- |\n| **Revenue** | $12.3B | [Filing](https://www.apple.com/newsroom/) |\n| Gross margin | 42.1% | Quarterly result |\n\n<script>alert('unsafe')</script>`;
+    const markup = renderToStaticMarkup(<ReceiptBody payload={turnDocument({ ...researchTurn, answer })} createdAt={null} language={language} copy={receiptCopy(language)} preview={preview} />);
+    expect(markup.match(/<table[\s>]/g)).toHaveLength(1);
+    expect(markup).toContain("<thead>");
+    expect(markup).toContain("<tbody>");
+    expect(markup.match(/<th[\s>]/g)).toHaveLength(3);
+    expect(markup.match(/<tr[\s>]/g)).toHaveLength(3);
+    expect(markup.match(/<td[\s>]/g)).toHaveLength(6);
+    expect(markup).toContain("<strong>Revenue</strong>");
+    expect(markup).toContain("$12.3B");
+    expect(markup).toContain("42.1%");
+    expect(markup).toMatch(/class="[^"]*max-w-full[^\"]*overflow-x-auto[^\"]*"><table/);
+    expect(markup).toContain('href="https://www.apple.com/newsroom/" target="_blank" rel="noopener noreferrer">Filing</a>');
+    expect(markup).not.toContain("<script");
+    expect(markup).not.toContain("alert(");
+  });
+
   test("the typed starting principal survives without a private chart or card prose", () => {
     const capital = 1300;
     const turn = { ...backtestTurn, fact_bank: { ...backtestTurn.fact_bank, config_snapshot: { template: "buy_and_hold", starting_capital: capital } } };

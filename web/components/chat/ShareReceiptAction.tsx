@@ -9,11 +9,11 @@ import ReceiptBody from "@/components/receipt/ReceiptBody";
 import { normalizeEnabledLanguage } from "@/lib/language-features";
 import { interpolate, receiptCopy, type ReceiptCopy } from "@/lib/receipt-copy";
 import {
-  RECEIPT_OWNER_NOTE_MAX_LENGTH, copyReceiptLink, createSelectedEvidenceReceipt,
+  RECEIPT_OWNER_NOTE_MAX_LENGTH, copyReceiptLink,
   listReceiptCandidates, previewEvidenceReceipt, receiptFailureReason, receiptUrl,
 } from "@/lib/evidence-receipts";
 import {
-  initialReceiptSelection, receiptSelectionReducer, receiptSelectionRequest,
+  initialReceiptSelection, receiptSelectionReducer, receiptSelectionRequest, publishReceiptSelection,
   receiptRefusalText, selectAllEligibleAvailable, type ReceiptSelectionState, type ReceiptShareTarget,
 } from "@/lib/receipt-selection";
 
@@ -89,14 +89,6 @@ export function ShareReceiptPanel({ conversationId, messageId, onClose }: Receip
     try { dispatch({ type: "previewed", revision, preview: await previewEvidenceReceipt(conversationId, receiptSelectionRequest(state)) }); }
     catch (error) { dispatch({ type: "failed", error }); }
   };
-  const publish = async () => {
-    if (!state.preview) return;
-    const stored = state.preview.existing_receipt;
-    if (stored) { dispatch({ type: "created", receipt: stored }); return; }
-    dispatch({ type: "busy", phase: "creating" });
-    try { dispatch({ type: "created", receipt: await createSelectedEvidenceReceipt(conversationId, receiptSelectionRequest(state), state.preview.payload_digest) }); }
-    catch (error) { dispatch({ type: "failed", error }); }
-  };
   const failure = receiptFailureReason(state.error);
   const errorText = !state.error ? null : failure === "source_unsupported"
     ? receiptRefusalText((state.error as { context?: Record<string, unknown> }).context ?? {}, copy)
@@ -107,7 +99,7 @@ export function ShareReceiptPanel({ conversationId, messageId, onClose }: Receip
   const footer = state.phase === "created" ? null : <div className="flex flex-wrap justify-end gap-2">
     {state.preview ? <>
       <button type="button" disabled={busy} className={OUTLINE_BUTTON} onClick={() => dispatch({ type: "edit" })}>{copy.selection.edit}</button>
-      <button type="button" disabled={busy} className={SOLID_BUTTON} onClick={() => void publish()}>{state.phase === "creating" ? copy.owner.creating : state.preview.existing_receipt ? copy.selection.reuse : copy.owner.create}</button>
+      <button type="button" disabled={busy} className={SOLID_BUTTON} onClick={() => void publishReceiptSelection(conversationId, state, dispatch)}>{state.phase === "creating" ? copy.owner.creating : state.preview.existing_receipt ? copy.selection.reuse : copy.owner.create}</button>
     </> : <button type="button" className={SOLID_BUTTON} disabled={busy || state.selected.length === 0} onClick={() => void preview()}>{busy ? copy.selection.previewing : copy.selection.preview}</button>}
   </div>;
 

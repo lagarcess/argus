@@ -1,4 +1,5 @@
 import type { EvidenceReceipt, ReceiptCandidates, ReceiptPreview, ReceiptSelection } from "./evidence-receipts";
+import { createSelectedEvidenceReceipt } from "./evidence-receipts";
 import { interpolate, type ReceiptCopy } from "./receipt-copy";
 import type { ReceiptRefusalField, ReceiptRefusalReason } from "./public-receipt-turns";
 
@@ -26,6 +27,14 @@ export function selectAllEligibleAvailable(page: ReceiptCandidates | null): bool
 }
 export function receiptSelectionRequest(state: ReceiptSelectionState): ReceiptSelection {
   return { message_ids: state.selected, owner_note: state.note.trim() || null };
+}
+
+/** The server revalidates even an existing link against the preview digest. */
+export async function publishReceiptSelection(conversationId: string, state: ReceiptSelectionState, dispatch: (action: Action) => void): Promise<void> {
+  if (!state.preview) return;
+  dispatch({ type: "busy", phase: "creating" });
+  try { dispatch({ type: "created", receipt: await createSelectedEvidenceReceipt(conversationId, receiptSelectionRequest(state), state.preview.payload_digest) }); }
+  catch (error) { dispatch({ type: "failed", error }); }
 }
 
 /** The server owns eligibility, ordering and the cap. This only records choices. */
