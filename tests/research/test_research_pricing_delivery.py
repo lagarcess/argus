@@ -20,7 +20,6 @@ from argus.api.chat.research_pricing_evidence import (
 )
 from argus.domain.research import billing, pricing
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
-from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.supabase_gateway import SupabaseGateway
 from fastapi import FastAPI
@@ -282,12 +281,19 @@ def test_repeated_background_completion_records_invoice_once(
 
 
 def test_background_empty_answer_still_fails_closed(netflix_response):
+    """A completed run whose answer cannot be read is the job's terminal
+    failure: polling again cannot change a completed answer, so the poller
+    must not spend its deadline retrying it."""
     netflix_response["output"] = []
     client = PerplexityAgentClient(
         "test", transport=RecordingTransport([netflix_response])
     )
-    with pytest.raises(ResearchUnavailableError, match="empty_answer"):
-        client.poll_background(netflix_response["id"])
+
+    poll = client.poll_background(netflix_response["id"])
+
+    assert poll.terminal and poll.status == "failed"
+    assert poll.packet is None
+    assert str(poll.failure_detail).startswith("empty_answer")
 
 
 def test_api_lifespan_installs_and_removes_the_ledger_adapter(

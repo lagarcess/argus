@@ -111,9 +111,16 @@ class PerplexityAgentClient:
             detail = json.dumps(error)[:500] if error else None
             return BackgroundPoll(status=status, failure_detail=detail)  # type: ignore[arg-type]
         latency_ms = int((time.monotonic() - started) * 1000)
-        packet = _packet_from_response(
-            response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
-        )
+        try:
+            packet = _packet_from_response(
+                response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
+            )
+        except ResearchUnavailableError as exc:
+            # The run is complete, so polling again cannot change its answer:
+            # an answer that cannot be read is the job's terminal failure.
+            return BackgroundPoll(
+                status="failed", failure_detail=f"{exc.reason}: {exc.detail or ''}"
+            )
         if spec is not None:
             _observe_retrieval(packet, spec)
         return BackgroundPoll(status="completed", packet=packet)
@@ -277,7 +284,11 @@ def _typed_retrieval(text: str) -> TypedRetrieval | None:
     """The answer in its requested typed shape, or None when it is prose.
 
     Machine format only: a JSON object, optionally inside a code fence. A
-    document that is not one is prose and is delivered as such."""
+    document that is not one is prose and is delivered as such. A document
+    that is JSON-shaped but not the schema, an invalid row or an answer the
+    output budget truncated, is a broken contract, never prose: its figures
+    cannot be verified and its text must never reach a reader, so it fails
+    closed as a malformed response."""
     body = text.strip()
     if body.startswith("```"):
         body = body.split("\n", 1)[1] if "\n" in body else ""
@@ -286,8 +297,11 @@ def _typed_retrieval(text: str) -> TypedRetrieval | None:
         return None
     try:
         return TypedRetrieval.model_validate(json.loads(body))
-    except (ValueError, ValidationError):
-        return None
+    except (ValueError, ValidationError) as exc:
+        raise ResearchUnavailableError(
+            "malformed_response",
+            f"typed answer did not match the schema: {type(exc).__name__}",
+        ) from exc
 
 
 def _cited_rows(

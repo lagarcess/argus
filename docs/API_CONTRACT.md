@@ -3703,8 +3703,12 @@ Contract rules:
   no retrieval at all carries `research_not_grounded` with the unavailable
   note. Surveys keep their own codes below. `rows` is additive on the
   sidecar and may be empty; a degraded turn always carries an empty list,
-  enforced by the sidecar builder. Prose that arrives under a typed request
-  is still delivered and recorded as prose.
+  enforced by the sidecar builder. A JSON-shaped answer that is not the
+  schema (an invalid row, an answer the output budget truncated) is a broken
+  contract, never prose: it fails closed as
+  `research_unavailable_malformed_response`, is never cached, and a
+  completed background run carrying one fails its job. Genuine prose under a
+  typed request is delivered and recorded as prose.
 - **Retrieval parameters are configuration per question shape.** Each call
   sends a model fallback chain (`models`, the primary and the other priced
   model, served in order; the invoice names the model that served), the

@@ -420,3 +420,30 @@ def test_a_survey_with_rows_but_no_retrieval_keeps_its_own_code(monkeypatch) -> 
     assert result.stage_patch["assistant_response"] == (
         "I couldn't retrieve today's market movers."
     )
+
+
+def test_a_broken_typed_answer_never_reaches_the_reader(monkeypatch) -> None:
+    """Round 4: JSON-shaped text that is not the schema is a broken contract,
+    not prose. The turn says the lookup did not complete, publishes nothing
+    of the text, and asks the provider again next time."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    truncated = '{"answer_markdown": "AAPL is $200 today", "rows": [{"label": "AAPL", "va'
+    transport = _wire(
+        monkeypatch,
+        [agent_response(text=truncated), agent_response(text=truncated)],
+    )
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_unavailable_malformed_response"}
+    answer = result.stage_patch["assistant_response"]
+    assert answer.startswith("I couldn't complete the data lookup")
+    assert "200" not in answer and "answer_markdown" not in answer
+    assert sidecar["rows"] == [] and sidecar["sources"] == []
+
+    _run("What is Apple at?")
+    assert len(transport.requests) == 2, "a broken answer is never served from cache"

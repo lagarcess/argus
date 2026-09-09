@@ -26,6 +26,7 @@ from argus.domain.research.config import (
 )
 from argus.domain.research.contracts import (
     TYPED_RETRIEVAL_SCHEMA_NAME,
+    ResearchUnavailableError,
     typed_response_format,
     typed_retrieval_json_schema,
 )
@@ -363,18 +364,42 @@ def test_prose_under_a_typed_request_is_delivered_as_prose() -> None:
     assert packet.answer_markdown == "Apple closed at $312.41."
 
 
-def test_a_malformed_typed_row_makes_the_whole_answer_prose() -> None:
-    """A row missing a required field is not the schema; the text is then
-    prose and is sanitized like any other, never half-parsed."""
-    broken = typed_answer_text("Fell.", [{"label": "x"}])
+@pytest.mark.parametrize(
+    "text",
+    [
+        typed_answer_text("Fell.", [{"label": "x"}]),
+        '{"answer_markdown": "AAPL is $200 today", "rows": [{"label": "AAPL", "va',
+        "```json\n" + typed_answer_text("Fell.", [{"label": "x"}]) + "\n```",
+        '{"answer": "AAPL is $200 today"}',
+    ],
+)
+def test_json_shaped_text_that_is_not_the_schema_fails_closed(text: str) -> None:
+    """A row missing a field, a truncated answer, a fenced invalid answer, or
+    the wrong keys: JSON-shaped text that is not the schema is a broken
+    contract, never prose, so nothing of it reaches a reader."""
     client = PerplexityAgentClient(
-        "k", transport=RecordingTransport([agent_response(text=broken)])
+        "k", transport=RecordingTransport([agent_response(text=text)])
     )
 
-    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
 
-    assert packet.typed_answer is False
-    assert packet.rows == ()
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_a_completed_background_run_with_a_broken_answer_fails_its_job() -> None:
+    """Polling again cannot change a completed answer, so an unreadable one
+    is the job's terminal failure rather than a poll error to retry."""
+    document = agent_response(
+        text=typed_answer_text("Fell.", [{"label": "x"}]), status="completed"
+    )
+    client = PerplexityAgentClient("k", transport=RecordingTransport([document]))
+
+    poll = client.poll_background("resp_bg", spec=RESEARCH_CONFIG_SPECS["thorough"])
+
+    assert poll.terminal and poll.status == "failed"
+    assert poll.packet is None
+    assert str(poll.failure_detail).startswith("malformed_response")
 
 
 # --- the rail --------------------------------------------------------------
