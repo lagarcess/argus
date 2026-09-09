@@ -952,6 +952,60 @@ ten-terminal meter back.
 
 ---
 
+## Where this board actually stands
+
+**Recorded 2026-09-09 at integration `6fa3f55a`, CI green there. Production is
+still `ee9c3491`; nothing below has been promoted.** Landed means merged to
+integration and green there, not shipped to a user.
+
+**Four lanes are running overnight, all collision-checked against each other.**
+
+| Lane | PR | Surface it owns |
+| --- | --- | --- |
+| Subtract the guardrails | #565, draft | `llm_interpreter.py`, four files under `agent_runtime/interpreter/` |
+| Cut the catalog import edge | not yet pushed | `state/models.py`, `api/schemas.py`, `capability_registry.py` |
+| Withheld answers keep their sources, and are not paid for twice | not yet pushed | `research_grounded.py`, `perplexity_agent.py`, research contracts |
+| Lift the edit contract, closing #430 | not yet pushed | `interpreter/artifact_assumption_edit.py`, `artifact_edit_planner.py`, `confirmation_lifecycle.py`, web card |
+
+`llm_interpreter.py` has roughly 19 lines of modularity headroom and belongs to
+the guardrail lane alone; every other lane was told to stay out of it.
+
+| Item | Release | State |
+| --- | --- | --- |
+| Refusal log | Instrumentation | **Landed** `fa69466c`. #314 closed. |
+| #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
+| Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
+| Decisions | Plumbing | **Landed** `67facaf5`. |
+| Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. |
+| Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
+| Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
+| Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
+| Subtract the guardrails | The spine | **In flight**, PR #565. Round one diagnosed before touching code; the early head read shows ordinary chat running zero guardrail calls and the interpret stage at 15.6s p50, against 33.14s before. It also found two of ten turns had been losing their composer entirely to a seven-call allowance, which is a correctness finding, not a latency one. |
+| Lift the loop, Lane B | The spine | **Dispatched 2026-09-09**, carrying #430. Optional for the spine; run overnight because the capacity was idle, not because it blocks the goalpost. |
+| The registry | The spine | **Not started.** The largest remaining item, now specified by Lane C. |
+| The five calculations | The calculations | **Not started.** This is the product. |
+| Teach the method | Grounding | **Not started.** |
+
+**The honest read.** Five of the seven dispatched lanes were plumbing,
+instrumentation or verification, and all five landed. **None of them changes
+what a user can ask.** The goalpost is that a money question in an unwritten
+shape lands on a primitive and gets computed, and today **zero calculations
+exist**. Everything shipped so far makes the next work possible; none of it is
+the work.
+
+**What stands between here and the goalpost**, in order: finish subtracting the
+guardrails, build the registry, build the five calculations. Teach the method
+and Lane B are real but neither blocks the goalpost.
+
+**Two findings from today change the estimate.** Lane C proved that relocation
+did not make the loop reusable, so the registry has to cut the catalog import
+edge and absorb six existing owners before calculation one. And #462 measured
+ordinary chat at 33.14s to first token against decision 3's one-second target,
+so operating rule 2's promise that a cheap calculation answers first has no
+runtime behind it at all.
+
+---
+
 ## Releases
 
 The board does not wait for the vision to be complete. Each checkpoint is
