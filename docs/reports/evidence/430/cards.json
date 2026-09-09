@@ -663,6 +663,253 @@
         "end": "2023-06-30",
         "display": "January 2, 2023 - June 30, 2023"
       }
+    },
+    "asset_replace_append_conflict": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-57681260-49b5-4924-b30e-6d6126e5fa6c",
+      "confirmation_state": "active",
+      "launch_payload_hash": "eef70609a484567b",
+      "canonical_launch_payload_hash": "sha256:eef70609a484567b965463aeb752ec64eac851589acb0e7cebae6d0efefc6c30",
+      "title": "MSFT buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for MSFT over January 2, 2023 - June 30, 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "MSFT"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "January 2, 2023 - June 30, 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-57681260-49b5-4924-b30e-6d6126e5fa6c",
+            "artifact_id": "confirmation-57681260-49b5-4924-b30e-6d6126e5fa6c",
+            "launch_payload_hash": "eef70609a484567b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-57681260-49b5-4924-b30e-6d6126e5fa6c",
+            "artifact_id": "confirmation-57681260-49b5-4924-b30e-6d6126e5fa6c",
+            "launch_payload_hash": "eef70609a484567b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-57681260-49b5-4924-b30e-6d6126e5fa6c",
+            "artifact_id": "confirmation-57681260-49b5-4924-b30e-6d6126e5fa6c",
+            "launch_payload_hash": "eef70609a484567b",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "January 2, 2023 - June 30, 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "set",
+            "target": "asset",
+            "reason": "conflicting_edit_carriers"
+          }
+        ]
+      }
+    },
+    "asset_add_append_equivalent": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-8a4a301c-85ea-4e45-be37-e656517cbecf",
+      "confirmation_state": "active",
+      "launch_payload_hash": "d6304a98099bd144",
+      "canonical_launch_payload_hash": "sha256:d6304a98099bd1449df522aae96a26a0d18dd2eacf462cfc19451f2f60067078",
+      "title": "NFLX, MSFT buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX, MSFT over January 2, 2023 - June 30, 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX, MSFT"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "January 2, 2023 - June 30, 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-8a4a301c-85ea-4e45-be37-e656517cbecf",
+            "artifact_id": "confirmation-8a4a301c-85ea-4e45-be37-e656517cbecf",
+            "launch_payload_hash": "d6304a98099bd144",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-8a4a301c-85ea-4e45-be37-e656517cbecf",
+            "artifact_id": "confirmation-8a4a301c-85ea-4e45-be37-e656517cbecf",
+            "launch_payload_hash": "d6304a98099bd144",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-8a4a301c-85ea-4e45-be37-e656517cbecf",
+            "artifact_id": "confirmation-8a4a301c-85ea-4e45-be37-e656517cbecf",
+            "launch_payload_hash": "d6304a98099bd144",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "January 2, 2023 - June 30, 2023"
+      }
     }
   },
   "es-419": {
@@ -1320,6 +1567,253 @@
               "monthly",
               "quarterly"
             ]
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "2 de enero de 2023 al 30 de junio de 2023"
+      }
+    },
+    "asset_replace_append_conflict": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-8e09fbbb-224c-4f49-a545-1d0c5eb7aa83",
+      "confirmation_state": "active",
+      "launch_payload_hash": "9deb2a418b33a84a",
+      "canonical_launch_payload_hash": "sha256:9deb2a418b33a84ab752b698e53e52d6d78c85e706e5f762831bda220e687304",
+      "title": "MSFT buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for MSFT over 2 de enero de 2023 al 30 de junio de 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "MSFT"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "2 de enero de 2023 al 30 de junio de 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-8e09fbbb-224c-4f49-a545-1d0c5eb7aa83",
+            "artifact_id": "confirmation-8e09fbbb-224c-4f49-a545-1d0c5eb7aa83",
+            "launch_payload_hash": "9deb2a418b33a84a",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-8e09fbbb-224c-4f49-a545-1d0c5eb7aa83",
+            "artifact_id": "confirmation-8e09fbbb-224c-4f49-a545-1d0c5eb7aa83",
+            "launch_payload_hash": "9deb2a418b33a84a",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-8e09fbbb-224c-4f49-a545-1d0c5eb7aa83",
+            "artifact_id": "confirmation-8e09fbbb-224c-4f49-a545-1d0c5eb7aa83",
+            "launch_payload_hash": "9deb2a418b33a84a",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
+          }
+        }
+      },
+      "asset_class": "equity",
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2023-06-30",
+        "display": "2 de enero de 2023 al 30 de junio de 2023"
+      },
+      "edit_disclosure": {
+        "unapplied": [
+          {
+            "op": "set",
+            "target": "asset",
+            "reason": "conflicting_edit_carriers"
+          }
+        ]
+      }
+    },
+    "asset_add_append_equivalent": {
+      "kind": "backtest",
+      "confirmation_id": "confirmation-03455b8d-9258-40a6-aa06-3dcf61578faa",
+      "confirmation_state": "active",
+      "launch_payload_hash": "a56f5797748f34ac",
+      "canonical_launch_payload_hash": "sha256:a56f5797748f34acf1f72dc439aed64fc4948b2b509e85c7e671a6ebbabdf95c",
+      "title": "NFLX, MSFT buy and hold",
+      "status": "ready_to_run",
+      "statusLabel": "Ready to run",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for NFLX, MSFT over 2 de enero de 2023 al 30 de junio de 2023.",
+      "rows": [
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "labelKey": "chat.confirmation.rows.strategy",
+          "value": "Buy and Hold"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "labelKey": "chat.confirmation.rows.assets",
+          "value": "NFLX, MSFT"
+        },
+        {
+          "key": "period",
+          "label": "Period",
+          "labelKey": "chat.confirmation.rows.period",
+          "value": "2 de enero de 2023 al 30 de junio de 2023"
+        },
+        {
+          "key": "starting_capital",
+          "label": "Starting capital",
+          "labelKey": "chat.confirmation.rows.starting_capital",
+          "value": "$10,000"
+        }
+      ],
+      "assumptions": [],
+      "actions": [
+        {
+          "id": "run-backtest",
+          "type": "run_backtest",
+          "label": "Run backtest",
+          "labelKey": "chat.confirmation.actions.run_backtest",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-03455b8d-9258-40a6-aa06-3dcf61578faa",
+            "artifact_id": "confirmation-03455b8d-9258-40a6-aa06-3dcf61578faa",
+            "launch_payload_hash": "a56f5797748f34ac",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "adjust-assumptions",
+          "type": "adjust_assumptions",
+          "label": "Change assumptions",
+          "labelKey": "chat.confirmation.actions.adjust_assumptions",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-03455b8d-9258-40a6-aa06-3dcf61578faa",
+            "artifact_id": "confirmation-03455b8d-9258-40a6-aa06-3dcf61578faa",
+            "launch_payload_hash": "a56f5797748f34ac",
+            "conversation_id": "edit-contract-conversation"
+          }
+        },
+        {
+          "id": "cancel-confirmation",
+          "type": "cancel_confirmation",
+          "label": "Cancel",
+          "labelKey": "chat.confirmation.actions.cancel",
+          "presentation": "confirmation",
+          "payload": {
+            "confirmation_id": "confirmation-03455b8d-9258-40a6-aa06-3dcf61578faa",
+            "artifact_id": "confirmation-03455b8d-9258-40a6-aa06-3dcf61578faa",
+            "launch_payload_hash": "a56f5797748f34ac",
+            "conversation_id": "edit-contract-conversation"
+          }
+        }
+      ],
+      "display_facts": {
+        "capital": 10000.0,
+        "timeframe": "1D",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "benchmark_symbol": "SPY"
+      },
+      "capabilities": {
+        "execution_costs_editable": true,
+        "direct_edits": [
+          "capital",
+          "dates",
+          "costs"
+        ],
+        "edit_constraints": {
+          "capital": {
+            "max": 100000000.0,
+            "min": 1000.0
+          },
+          "fees": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "slippage": {
+            "min": 0.0,
+            "max": 0.05
+          },
+          "date_window": {
+            "max_end": "2026-09-09",
+            "min_start": "2016-01-01"
           }
         }
       },

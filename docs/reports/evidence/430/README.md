@@ -142,3 +142,19 @@ both current statuses. Eight generated JSON schemas, including `EditOperation`,
 before and after reconciliation. Focused lifecycle/edit/import-boundary tests,
 mocked evals, browser replay and the merged-tree budget are rechecked on the new
 candidate; there is no model-facing change or paid evaluation to repeat.
+
+
+## Ready-review carrier-mode follow-up
+
+The ready transition exposed a P1 in the new duplicate-carrier comparison. The
+[pre-fix class sweep and red/green proof](carrier-mode-sweep.md) records both missed
+conflicts and false conflicts. The shared owner now compares final baskets from
+the same starting basket through the existing asset-edit function. The original
+7-class inventory includes this carrier-conflict class, but the draft-era proof
+had failed to cover operation mode and did not close it.
+
+The PR stays non-draft for final CI, including the full agent-runtime sweep and
+local-smoke workflow. A replacement terminal audit is owed after the final-head
+Codex response and zero-unresolved-thread check; the earlier draft-era report is
+explicitly superseded on the PR. New bilingual fixtures cover both conflicting
+replacement/append carriers and equivalent add/append carriers.

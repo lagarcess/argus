@@ -17,7 +17,8 @@ const screenshotRoot = path.resolve(process.env.LIFT_EDIT_SCREENSHOT_DIR ?? path
 const conversationId = "conversation-alpha";
 const createdAt = "2026-09-08T12:00:00Z";
 type Locale = "en" | "es-419";
-type CaseName = "no_change" | "refused" | "applied" | "dca_no_change" | "dca_applied";
+type CaseName = "no_change" | "refused" | "applied" | "dca_no_change" | "dca_applied"
+  | "asset_replace_append_conflict" | "asset_add_append_equivalent";
 type BackendCard = StrategyConfirmationPayload & { kind: "backtest" };
 type Cards = Record<Locale, Record<CaseName, BackendCard>>;
 
@@ -110,6 +111,12 @@ function requestText(locale: Locale, scenario: CaseName, after: BackendCard): st
     return spanish ? `Cambia el aporte a ${contribution}.` : `Change the contribution to ${contribution}.`;
   }
   if (scenario === "refused") return spanish ? "Quita TSLA de la prueba." : "Remove TSLA from the test.";
+  if (scenario === "asset_replace_append_conflict") {
+    return spanish ? "Reemplaza NFLX por MSFT." : "Replace NFLX with MSFT.";
+  }
+  if (scenario === "asset_add_append_equivalent") {
+    return spanish ? "Agrega MSFT a la prueba." : "Add MSFT to the test.";
+  }
   return spanish ? "Cambia las condiciones de esta prueba." : "Change the conditions of this test.";
 }
 
@@ -142,10 +149,21 @@ async function assertOutcome(page: Page, scenario: CaseName, card: BackendCard, 
     name: bundle(locale).chat.confirmation.actions.run_backtest, exact: true,
   })).toBeVisible();
   await assertMoney(latest, card, locale);
+  if (scenario.startsWith("asset_")) {
+    const expected = scenario === "asset_replace_append_conflict" ? ["MSFT"] : ["NFLX", "MSFT"];
+    await expect(latest.locator('[data-entity-token-kind="asset"]')).toHaveText(expected);
+    if (scenario === "asset_replace_append_conflict") {
+      expect(card.edit_disclosure?.unapplied).toEqual([
+        { op: "set", target: "asset", reason: "conflicting_edit_carriers" },
+      ]);
+    } else {
+      expect(card.edit_disclosure).toBeFalsy();
+    }
+  }
   const leadIn = page.getByTestId("confirmation-edit-disclosure");
   if (scenario.endsWith("no_change")) {
     await expect(leadIn).toHaveText(bundle(locale).chat.artifact_edit_disclosure.no_change_applied);
-  } else if (scenario === "refused") {
+  } else if (scenario === "refused" || scenario === "asset_replace_append_conflict") {
     const targets = bundle(locale).chat.confirmation.edit_disclosure.targets;
     const labels = [...new Set(card.edit_disclosure!.unapplied.map((entry) =>
       targets[entry.target as keyof typeof targets] ?? targets.generic))];
@@ -197,7 +215,8 @@ const viewports = [
 for (const viewport of viewports) {
   const scenarios: CaseName[] = viewport.name === "mobile"
     ? ["dca_no_change"]
-    : ["no_change", "refused", "applied", "dca_no_change", "dca_applied"];
+    : ["no_change", "refused", "applied", "dca_no_change", "dca_applied",
+      "asset_replace_append_conflict", "asset_add_append_equivalent"];
   for (const scenario of scenarios) {
     test(`lift edit contract ${viewport.locale} ${viewport.name} ${scenario}`, async ({ page }) => {
       test.setTimeout(60_000);
@@ -215,6 +234,10 @@ for (const viewport of viewports) {
       await expect(page.locator("section.argus-confirmation-reveal")).toHaveCount(1);
       await expect(page.getByTestId("confirmation-edit-disclosure")).toHaveCount(0);
       await assertMoney(page.locator("section.argus-confirmation-reveal"), before, viewport.locale);
+      if (scenario.startsWith("asset_")) {
+        await expect(page.locator('section.argus-confirmation-reveal [data-entity-token-kind="asset"]'))
+          .toHaveText(["NFLX"]);
+      }
       await page.getByTestId("chat-input").fill(prompt);
       await page.getByTestId("chat-send").click();
       await expect(page.locator("section.argus-confirmation-reveal")).toHaveCount(2);
@@ -238,7 +261,7 @@ for (const viewport of viewports) {
       await expect(page.locator("section.argus-confirmation-reveal")).toHaveCount(2);
       const reloaded = await assertOutcome(page, scenario, after, viewport.locale);
       expect(fixture.requests).toHaveLength(1);
-      if (scenario === "no_change" || viewport.name === "mobile") {
+      if (scenario === "no_change" || viewport.name === "mobile" || scenario.startsWith("asset_")) {
         await captureOutcome(page, reloaded, `${name}-reload`, viewport.name === "mobile", viewport.locale);
       }
       expect(pageErrors).toEqual([]);
