@@ -333,6 +333,8 @@ class TaskSnapshot(BaseModel):
     pending_tool_calls: list[ToolCall] = Field(
         default_factory=list, max_length=MAX_TOOL_CALLS
     )
+    # Runtime-owned context follows this queue through checkpointed approvals.
+    pending_tool_context: dict[str, str] = Field(default_factory=dict, repr=False)
     latest_task_type: IntentName | None = None
     completed: bool | None = None
     pending_strategy_summary: StrategySummary | None = None

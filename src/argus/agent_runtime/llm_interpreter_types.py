@@ -164,6 +164,7 @@ class LLMAmbiguousField(BaseModel):
 
 
 class LLMInterpretationResponse(BaseModel):
+    _tool_asset_resolution_context: str | None = PrivateAttr(default=None)
     uses_tool_catalog: ClassVar[bool] = False
     tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
     _read_legacy_intent = model_validator(mode="before")(normalize_legacy_interpretation)
@@ -412,7 +413,7 @@ def _declared_call_model(declaration: ToolDeclaration) -> type[BaseModel]:
     parameters = declaration.tool_schema()["parameters"]
     arguments_type = create_model(
         f"{title}ToolArguments",
-        __base__=declaration.arguments_type,
+        __base__=declaration.call_arguments_type,
         __config__=ConfigDict(
             extra="forbid",
             json_schema_extra={"allOf": parameters["allOf"]}

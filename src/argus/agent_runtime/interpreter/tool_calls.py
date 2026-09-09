@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
+from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.profile.response_profile import (
@@ -38,7 +39,7 @@ def catalog_standalone_response(
 def runtime_catalog_interpretation(
     response: LLMInterpretationResponse,
 ) -> StructuredInterpretation:
-    return StructuredInterpretation.model_validate(
+    interpretation = StructuredInterpretation.model_validate(
         {
             **response.model_dump(mode="json"),
             "uses_tool_catalog": True,
@@ -49,6 +50,10 @@ def runtime_catalog_interpretation(
             "unsupported_constraints": [],
         }
     )
+    interpretation._tool_asset_resolution_context = (
+        response._tool_asset_resolution_context
+    )
+    return interpretation
 
 
 async def catalog_stage_result(
@@ -70,7 +75,15 @@ async def catalog_stage_result(
         ),
     )
     if interpretation.tool_calls:
-        return StageResult(outcome="approved_for_execution", decision=decision)
+        return StageResult(
+            outcome="approved_for_execution",
+            decision=decision,
+            stage_patch={
+                "normalized_signals": {
+                    provider_context_assets.TOOL_ASSET_CONTEXT_SIGNAL: interpretation._tool_asset_resolution_context,
+                }
+            },
+        )
     answer = interpretation.assistant_response
     if interpretation.capability_question_focus is not None:
         capability_answer = await compose_capability_answer(

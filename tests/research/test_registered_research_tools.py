@@ -198,8 +198,9 @@ def test_thorough_call_retains_job_lifecycle_without_inline_provider_work(
         data_class="filings_transcripts",
     )
     result = asyncio.run(thorough_research(args, context=context))
-    assert result.status == "pending"
-    assert result.answer is None and not result.rows
+    payload = result.model_dump(mode="json")
+    assert payload["status"] == "pending"
+    assert payload["answer"] is None and not payload["rows"]
     assert client.calls == []
     job = context.stage_result.stage_patch["research_job_request"]
     assert job["question"] == args.request

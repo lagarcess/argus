@@ -483,6 +483,10 @@ The model-facing schema, capability text, runtime dispatch and result projection
 derive from those declarations. Availability derives from the same feature-flag
 owner that guards execution. Strategy templates retain their existing registry
 and strategy-specific unsupported-admission checks.
+The callable's input models also generate a closed nested argument tree for both
+schema and runtime validation. Unknown fields are rejected at their owning
+level; explicitly typed maps retain their declared openness. Historical state
+and result readers keep their existing compatibility behavior.
 
 The four task intents are `explain`, `calculate`, `follow_up`, and `cannot`.
 Compatibility readers normalize older persisted spellings. An intent is not a
@@ -498,6 +502,12 @@ the existing strategy preparation owners produce a canonical `StrategySummary`.
 Confirmation approves that prepared artifact; approving it does not interpret
 its dates or other facts again. The persisted summary remains an output of
 preparation, rather than a second input schema with fewer fields.
+Selected backtest calls reuse the existing readiness and fidelity checks, with
+repair receipts scoped to that call. Batch repair requires a unique, disjoint
+source span; it cannot reread the whole question separately for every call.
+Trusted asset context follows the pending call queue through checkpointed Run
+approvals in `TaskSnapshot.pending_tool_context`. It is omitted from model and
+public projections and cleared when the queue is replaced, canceled, or spent.
 
 Neutral `domain/tool_contracts.py` transports never import the catalog or a
 backtest implementation. The serializer-pinned runtime model class paths remain

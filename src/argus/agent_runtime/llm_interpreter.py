@@ -845,8 +845,9 @@ class OpenRouterStructuredInterpreter:
             "there are no calls. Put declared fields directly in that input, "
             "including temporal intent, capital roles, costs and evidence. "
             "Do not hide declared fields in extra_parameters. "
-            "Non-backtest tools never inherit strategy fields. A cannot response "
-            "must name only the requested capability that is actually unavailable.\n\n"
+            "Non-backtest tools never inherit strategy fields. In every response, "
+            "derive capability claims from the catalog. Product focus or choosing "
+            "zero calls never makes an available declared operation unavailable.\n\n"
             + "Declared tool catalog: " + self.tool_catalog.capability_text() + "\n\n"
             + "Language-agnostic contract: users may speak English, Spanish, or another "
             "language. Always return canonical internal values for executable fields "
@@ -2281,7 +2282,7 @@ async def _response_ready_for_runtime(
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
     if response.tool_calls:
-        return response
+        return provider_context_assets.retain_tool_asset_context(response, asset_resolution_context)
     if catalog_standalone_response(response):
         if response.assistant_response or response.capability_question_focus:
             return response

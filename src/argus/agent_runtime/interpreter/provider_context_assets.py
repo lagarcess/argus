@@ -15,6 +15,27 @@ from argus.agent_runtime.state.models import ResolutionProvenance
 from argus.domain.market_data.assets import ResolvedAsset
 
 _PROVIDER_RESOLVED_ASSETS_KEY = "provider_resolved_assets"
+TOOL_ASSET_CONTEXT_SIGNAL = "tool_asset_resolution_context"
+
+
+def retain_tool_asset_context(
+    response: LLMInterpretationResponse,
+    context: str | None,
+) -> LLMInterpretationResponse:
+    response._tool_asset_resolution_context = context
+    return response
+
+
+def context_for_declared_assets(context: str | None, references: list[str]) -> str | None:
+    """Filter the existing provider facts; never resolve or add another asset."""
+    rows = [
+        row
+        for row in _asset_context_rows(context)
+        if any(
+            _provider_record_matches_symbol(row, reference) for reference in references
+        )
+    ]
+    return json.dumps({"asset_resolution_candidates": rows}) if rows else None
 
 
 def response_with_runtime_context_assets(
@@ -47,8 +68,7 @@ def carry_incomplete_asset_blocker(
     """
 
     if (
-        response.intent
-        not in {"calculate", "follow_up"}
+        response.intent not in {"calculate", "follow_up"}
         or response.semantic_turn_act == "unsupported_request"
         or _all_traded_asset_mentions_accounted_for(asset_resolution_context) is not False
     ):

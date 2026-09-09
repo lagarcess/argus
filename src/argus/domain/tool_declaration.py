@@ -11,7 +11,7 @@ from types import MappingProxyType, UnionType
 from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
 from loguru import logger
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from argus.domain.tool_contracts import (
     LocalizedText,
@@ -181,6 +181,40 @@ def _require_unaliased_fields(*models: type[BaseModel]) -> None:
             pending.append(model_field.annotation)
 
 
+def _closed_tool_arguments(model: type[BaseModel]) -> type[BaseModel]:
+    """Derive a closed input tree without changing the callable's legacy models."""
+    derived: dict[type[BaseModel], type[BaseModel]] = {}
+
+    def close(annotation: Any) -> Any:
+        if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
+            if annotation not in derived:
+                closed = create_model(
+                    annotation.__name__,
+                    __base__=annotation,
+                    __config__=ConfigDict(extra="forbid", defer_build=True),
+                )
+                derived[annotation] = closed
+                # Pydantic gives subclasses their own FieldInfo instances. Keep
+                # defaults, constraints and validators while replacing only types.
+                for model_field in closed.model_fields.values():
+                    model_field.annotation = close(model_field.annotation)
+            return derived[annotation]
+        arguments = get_args(annotation)
+        if not arguments:
+            return annotation
+        closed_arguments = tuple(close(argument) for argument in arguments)
+        if closed_arguments == arguments:
+            return annotation
+        origin = get_origin(annotation)
+        return (
+            Union[closed_arguments] if origin is UnionType else origin[closed_arguments]
+        )
+
+    closed: type[BaseModel] = close(model)
+    closed.model_rebuild(force=True)
+    return closed
+
+
 @dataclass(frozen=True)
 class ToolDeclaration:
     name: str
@@ -194,6 +228,7 @@ class ToolDeclaration:
     units: tuple[ToolUnit, ...] = ()
     confirmation_handler: Callable[..., Any] | None = None
     arguments_type: type[BaseModel] = field(init=False, repr=False)
+    call_arguments_type: type[BaseModel] = field(init=False, repr=False)
     result_type: type[BaseModel] = field(init=False, repr=False)
     confirmation_result_type: type[BaseModel] | None = field(init=False, repr=False)
     _uses_context: bool = field(init=False, repr=False)
@@ -250,6 +285,9 @@ class ToolDeclaration:
             if unit.field not in owner.model_fields:
                 raise ValueError("Tool unit references an unknown typed field")
         LocalizedText(locale_key=self.progress.locale_key)
+        object.__setattr__(
+            self, "call_arguments_type", _closed_tool_arguments(argument_type)
+        )
 
     def validate_arguments(self, arguments: Mapping[str, Any] | BaseModel) -> BaseModel:
         raw = (
@@ -263,15 +301,14 @@ class ToolDeclaration:
             raise ToolInvocationError(
                 "invalid", code="unknown_argument", fields=tuple(sorted(extra))
             )
-        validated = self.arguments_type.model_validate(raw)
+        validated = self.call_arguments_type.model_validate(raw)
         _require_finite_json(validated.model_dump(mode="json"))
         for rule in self.rules:
             rule.validate(validated)
         return validated
 
     def tool_schema(self) -> dict[str, Any]:
-        parameters = self.arguments_type.model_json_schema()
-        parameters["additionalProperties"] = False
+        parameters = self.call_arguments_type.model_json_schema()
         if self.rules:
             parameters.setdefault("allOf", []).extend(
                 rule.schema() for rule in self.rules

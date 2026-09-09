@@ -12,6 +12,7 @@ from argus.agent_runtime.interpreter.execution_cost_capability import (
     execution_costs_enabled,
 )
 from argus.agent_runtime.llm_interpreter_types import (
+    LLMAmbiguousField,
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
@@ -110,6 +111,14 @@ def apply_cost_fidelity(
             changed = True
         draft._validated_execution_cost_evidence.pop(field_name, None)
 
+    response.ambiguous_fields = [
+        item
+        for item in response.ambiguous_fields
+        if not (
+            item.reason_code == "execution_cost_evidence_unresolved"
+            and item.field_name in validated_fields
+        )
+    ]
     if not unresolved_fields:
         return changed
     for field_name in unresolved_fields:
@@ -131,6 +140,20 @@ def apply_cost_fidelity(
         )
         return True
     response.requires_clarification = True
+    existing_blockers = {
+        item.field_name
+        for item in response.ambiguous_fields
+        if item.reason_code == "execution_cost_evidence_unresolved"
+    }
+    response.ambiguous_fields.extend(
+        LLMAmbiguousField(
+            field_name=name,
+            raw_value=str(getattr(draft, name)),
+            reason_code="execution_cost_evidence_unresolved",
+        )
+        for name in unresolved_fields
+        if name not in refused_fields and name not in existing_blockers
+    )
     response.assistant_response = None
     response.missing_required_fields = list(
         dict.fromkeys([*response.missing_required_fields, "assumption"])

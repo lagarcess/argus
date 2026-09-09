@@ -8,9 +8,9 @@ quota admission, and background completion.
 from __future__ import annotations
 
 from datetime import date
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
 
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.research_query import ResearchOperationQuery
@@ -54,8 +54,9 @@ class ResearchArguments(BaseModel):
         min_length=1,
         max_length=2000,
         description=(
-            "The public-market facts to retrieve for this call. Include the desired "
-            "figures and source requirements, never private balances or user context."
+            "The public-market evidence or candidate assets requested for this call. "
+            "Preserve the requested scope and source requirements; exclude private "
+            "balances or personal context."
         ),
     )
 
@@ -111,7 +112,7 @@ class PeerExpansionArguments(AssetDiscoveryRequest, ResearchArguments):
 
 
 class ResearchToolResult(BaseModel):
-    """The published research facts, projected from the canonical sidecar."""
+    """Read-compatible research envelope; callable returns narrow its fact boundary."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -138,10 +139,68 @@ class ResearchToolResult(BaseModel):
         return self
 
 
+class ResearchFiguresResult(ResearchToolResult):
+    """Completed verified numeric rows with units and available source dates.
+
+    Public citations may be absent for provider-grounded market-data figures.
+    """
+
+    status: Literal["completed"] = "completed"
+    rows: tuple[RetrievedRow, ...] = Field(min_length=1)
+    relationship: None = None
+
+
+class CitedResearchFiguresResult(ResearchFiguresResult):
+    """Completed verified numeric rows accompanied by retained public-source citations."""
+
+    sources: tuple[ResearchSource, ...] = Field(min_length=1)
+
+
+class ResearchCandidatesResult(ResearchToolResult):
+    """Completed resolver-verified candidate assets for the requested selection purpose.
+
+    Sources accompany current retrieval; a model-knowledge candidate list has
+    no citations. This result carries candidate identities, not numeric figures.
+    """
+
+    status: Literal["completed"] = "completed"
+    rows: tuple[()] = ()
+    relationship: AssetDiscoveryRelationship
+    peers: tuple[ResearchNamePair, ...] = Field(
+        min_length=1,
+        description="Candidate assets accepted by the shared resolver and coverage gates.",
+    )
+
+
+class ResearchPendingResult(ResearchToolResult):
+    """An admitted research job receipt with no completed evidence or answer."""
+
+    status: Literal["pending"] = "pending"
+    answer: None = None
+    rows: tuple[()] = ()
+    sources: tuple[()] = ()
+    relationship: None = None
+    subjects: tuple[()] = ()
+    peers: tuple[()] = ()
+
+
+class ResearchWorkflowResult(
+    RootModel[
+        Annotated[
+            CitedResearchFiguresResult | ResearchPendingResult,
+            Field(discriminator="status"),
+        ]
+    ]
+):
+    """A pending job receipt or completed cited numeric evidence, distinguished by status."""
+
+    model_config = ConfigDict(frozen=True)
+
+
 async def fast_quote(
     arguments: FastQuoteArguments, *, context: ResearchExecutionContext
-) -> ResearchToolResult:
-    return await _read(
+) -> ResearchFiguresResult:
+    result = await _read(
         arguments,
         query=ResearchOperationQuery(
             shape="fast",
@@ -151,36 +210,39 @@ async def fast_quote(
         ),
         context=context,
     )
+    return ResearchFiguresResult.model_validate(result.model_dump())
 
 
 async def balanced_lookup(
     arguments: BalancedLookupArguments, *, context: ResearchExecutionContext
-) -> ResearchToolResult:
-    return await _read(
+) -> CitedResearchFiguresResult:
+    result = await _read(
         arguments,
         query=_sourced_query(
             arguments, shape="balanced", capability_class="balanced_lookup"
         ),
         context=context,
     )
+    return CitedResearchFiguresResult.model_validate(result.model_dump())
 
 
 async def thorough_research(
     arguments: ThoroughResearchArguments, *, context: ResearchExecutionContext
-) -> ResearchToolResult:
-    return await _read(
+) -> ResearchWorkflowResult:
+    result = await _read(
         arguments,
         query=_sourced_query(
             arguments, shape="thorough", capability_class="thorough_research"
         ),
         context=context,
     )
+    return ResearchWorkflowResult.model_validate(result.model_dump())
 
 
 async def screening(
     arguments: ScreeningArguments, *, context: ResearchExecutionContext
-) -> ResearchToolResult:
-    return await _read(
+) -> CitedResearchFiguresResult:
+    result = await _read(
         arguments,
         query=ResearchOperationQuery(
             shape="balanced",
@@ -194,11 +256,12 @@ async def screening(
         ),
         context=context,
     )
+    return CitedResearchFiguresResult.model_validate(result.model_dump())
 
 
 async def peer_expansion(
     arguments: PeerExpansionArguments, *, context: ResearchExecutionContext
-) -> ResearchToolResult:
+) -> ResearchCandidatesResult:
     from argus.agent_runtime.research_find import find_assets_stage_result
 
     user, state, interpretation = _call_context(arguments, context)
@@ -213,7 +276,8 @@ async def peer_expansion(
         user=user,
         capability_class="peer_expansion",
     )
-    return _published_result(result, context=context)
+    published = _published_result(result, context=context)
+    return ResearchCandidatesResult.model_validate(published.model_dump())
 
 
 def _period_facts(period: ResearchPeriod | None) -> dict[str, Any]:
@@ -457,7 +521,6 @@ def get_research_declarations() -> tuple[ToolDeclaration, ...]:
         presenter=research_card_presentation,
     )
     domain = (
-        "Returns cited public-market figures with source dates and units.",
         "Research values never become simulation inputs; market data is re-grounded before a test.",
         "Unresolved subjects are invalid; unverified or missing evidence is bounded or unavailable.",
         "The shared research cache, quota admission, provider pricing, and public-source filters remain authoritative.",

@@ -150,6 +150,7 @@ async def prepare_backtest_confirmation(
         user=context.user,
         latest_task_snapshot=context.latest_task_snapshot,
         selected_thread_metadata=context.selected_thread_metadata,
+        call=context.call,
     )
     if prepared.outcome not in {"ready_for_confirmation", "needs_clarification"}:
         raise ValueError("Backtest preparation cannot authorize execution")
