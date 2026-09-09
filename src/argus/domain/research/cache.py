@@ -27,6 +27,11 @@ was), and from the question's dominant data need otherwise; the most volatile
 ingredient of a genuinely current ask (a live quote) keeps its short
 tolerance because the question kind carries it there.
 
+A withheld packet, one whose prose composition will not publish, is stored
+under the same key for its class TTL capped at ``WITHHELD_TTL_SECONDS`` (one
+day) when it carries a retrieval record; one that never retrieved is not
+stored.
+
 The closed-period rule stands: a question about an entirely closed window is
 ``closed_ohlcv`` regardless of anything else. The cache key includes the
 period of interest, so a specific past close is a different entry from a
@@ -63,6 +68,10 @@ DATA_CLASS_TTL_SECONDS: dict[DataClass, float] = {
     "closed_ohlcv": 7_776_000.0,
     "filings_transcripts": 7_776_000.0,
 }
+
+# The longest a withheld packet is served: an absence is bounded by the day a
+# page can appear, whatever the class of the figure that was not found.
+WITHHELD_TTL_SECONDS = 86_400.0
 
 # Ordered: the first family a category matches decides it, so
 # "earnings_transcript" is a filing before it is fundamentals and
@@ -128,14 +137,17 @@ def ttl_for_packet(
     question_kind: str | None,
     categories: Sequence[str] = (),
     closed_period: bool = False,
+    withheld: bool = False,
 ) -> float:
-    return DATA_CLASS_TTL_SECONDS[
+    """The class TTL of one entry; a withheld packet's is capped at one day."""
+    ttl = DATA_CLASS_TTL_SECONDS[
         data_class_for(
             question_kind=question_kind,
             categories=categories,
             closed_period=closed_period,
         )
     ]
+    return min(ttl, WITHHELD_TTL_SECONDS) if withheld else ttl
 
 
 @dataclass

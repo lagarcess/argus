@@ -137,6 +137,22 @@ export function researchSourcesFromMetadata(
 }
 
 /**
+ * The research sidecar's typed degraded code, or null on a published answer.
+ * A degraded turn keeps the pages it read as sources; the panel frames them
+ * as where Argus looked, from this code, never from reading the pages.
+ */
+export function researchDegradedCodeFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): string | null {
+  const raw = metadata?.research;
+  if (!raw || typeof raw !== "object") return null;
+  const degraded = (raw as Record<string, unknown>).degraded;
+  if (!degraded || typeof degraded !== "object") return null;
+  const code = (degraded as Record<string, unknown>).code;
+  return typeof code === "string" && code.trim() !== "" ? code : null;
+}
+
+/**
  * Citations for a streamed turn, or undefined when it carried none.
  *
  * The panel must be fed by the live turn and not only by a later hydration:
