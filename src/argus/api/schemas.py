@@ -5,13 +5,11 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
-    WithJsonSchema,
     field_serializer,
     field_validator,
     model_serializer,
@@ -48,7 +46,9 @@ from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_SERIALIZED_LENGTH,
     MAX_FEEDBACK_MESSAGE_LENGTH,
 )
-from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
+from argus.domain.strategy_template_contract import (
+    ExecutableStrategyTemplate as StrategyTemplate,
+)
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
@@ -96,30 +96,6 @@ CHAT_STREAM_MAX_ACTION_PAYLOAD_BYTES = 16_384
 CHAT_STREAM_MAX_ACTION_PAYLOAD_DEPTH = 6
 CHAT_STREAM_MAX_ACTION_PAYLOAD_CONTAINER_ITEMS = 50
 CHAT_STREAM_MAX_ACTION_PAYLOAD_STRING_LENGTH = 4_096
-
-
-# Single source of truth: executable templates live only in the capability registry
-# (derived from each StrategyCapability's status). StrategyTemplate validates against that
-# set at runtime and publishes its OpenAPI enum from it, so there is no second hardcoded
-# list to keep in sync. Draft templates are absent from the registry's executable set, so
-# the API rejects them at the request boundary.
-def _ensure_executable_template(value: str) -> str:
-    if value not in EXECUTABLE_TEMPLATES:
-        raise ValueError(f"unsupported strategy template: {value!r}")
-    return value
-
-
-StrategyTemplate = Annotated[
-    str,
-    AfterValidator(_ensure_executable_template),
-    WithJsonSchema(
-        {
-            "type": "string",
-            "enum": sorted(EXECUTABLE_TEMPLATES),
-            "title": "StrategyTemplate",
-        }
-    ),
-]
 
 
 class OnboardingState(BaseModel):
@@ -364,6 +340,8 @@ class Strategy(BaseModel):
     @field_validator("template", mode="before")
     @classmethod
     def _tolerate_retired_template(cls, value: Any) -> Any:
+        from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
+
         # Persisted strategies saved before a template was retired (e.g. the draft
         # momentum_breakout / trend_follow) must still load. Coerce any non-executable
         # template to buy_and_hold on read. BacktestRunRequest intentionally stays

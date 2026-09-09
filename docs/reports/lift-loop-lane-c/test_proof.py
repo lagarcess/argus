@@ -458,7 +458,15 @@ def test_real_import_boundary_is_observed(name, boundary, observations):
         or (boundary == "body" and name in ("edit_bookkeeping", "display_facts"))
         or (
             boundary == "catalog"
-            and name not in ("calculation", "lifecycle", "presentation")
+            and name not in (
+                "calculation",
+                "lifecycle",
+                "presentation",
+                "transport",
+                "confirmation_payload",
+                "next_rows",
+                "retry",
+            )
         )
     )
     assert row["status"] == ("blocked" if should_block else "returned"), row

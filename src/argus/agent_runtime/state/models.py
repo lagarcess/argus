@@ -13,7 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from argus.domain.capability_registry import RegisteredStrategyTemplate
+from argus.domain.strategy_template_contract import RegisteredStrategyTemplate
 
 ToneName = Literal["friendly", "concise"]
 VerbosityName = Literal["low", "medium", "high"]
