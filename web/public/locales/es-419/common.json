@@ -1798,7 +1798,7 @@
         "question": "La pregunta",
         "answer": "La respuesta",
         "owner_note": "Tu nota",
-        "sources": "Las fuentes"
+        "sources": "El contenido de las fuentes"
       },
       "reasons": {
         "not_completed": "Esta respuesta todavía no está completa.",
