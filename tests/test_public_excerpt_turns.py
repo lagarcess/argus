@@ -127,16 +127,20 @@ def test_preview_is_exact_closed_frozen_document_without_side_effects(owner):
     assert not created and again.id == snapshot.id
 
 
-@pytest.mark.parametrize("count", [0, 1, 4, 5])
+@pytest.mark.parametrize("count", [0, 1, 4, 9])
 def test_selection_bounds_and_canonical_order(owner, count):
+    """A selection is one or more distinct eligible turns; nothing about its
+    size is a rule, so nine turns freeze as readily as one."""
     answers = [add_pair(owner, index=i)[1] for i in range(count)]
-    if count in (0, 5):
+    if count == 0:
         with pytest.raises(PublicExcerptSourceError):
             preview(owner, answers)
     else:
         result = preview(owner, answers[::-1])
         assert len(result.payload.turns) == count
         assert result.payload.turns[0].answer == answers[0].content
+        snapshot, created = create(owner, answers, result)
+        assert created and len(snapshot.payload.turns) == count
 
 
 @pytest.mark.parametrize(
@@ -145,7 +149,6 @@ def test_selection_bounds_and_canonical_order(owner, count):
         (lambda m: m.update(memory_recalls=[{}]), "memory_used"),
         (lambda m: m["research"].update(degraded=True), "degraded"),
         (lambda m: m["research"].update(sources=[]), "missing_sources"),
-        (lambda m: m["research"].update(shape="fast"), "unsupported_shape"),
         (lambda m: m["research"].update(shape="find"), "unsupported_shape"),
         (lambda m: m["research"].update(shape="personal_money"), "unsupported_shape"),
         (lambda m: m["agent_runtime_turn"].update(terminal=False), "not_completed"),
@@ -163,9 +166,30 @@ def test_refusal_refuses_whole_selection_and_candidates_name_reason(
     assert error.value.reason == reason
     assert not api_state.store.public_excerpt_snapshots
     candidates = service.receipt_candidates(user=owner[0], conversation_id=owner[1].id)
-    assert candidates.max_turns == 4
+    assert set(candidates.model_dump()) == {"items"}
     assert candidates.items[1].reason == reason
     assert not candidates.items[1].eligible
+
+
+@pytest.mark.parametrize("shape", ["fast", "balanced", "thorough"])
+def test_every_rail_shape_with_a_publisher_is_a_receipt(owner, shape):
+    """A quote is an answer like any other. The fast shape was excluded on the
+    reasoning that a quote has no publisher; a fast turn with a typed source
+    freezes like a balanced one, and one without any is refused for the
+    missing source, never for its shape."""
+    _, answer = add_pair(
+        owner, question="What is Apple at?", answer="Apple is at **$316.22**."
+    )
+    answer.metadata["research"]["shape"] = shape
+    result = preview(owner, [answer])
+    assert result.payload.turns[0].kind == "research_answer"
+    assert result.payload.turns[0].answer == answer.content
+    candidates = service.receipt_candidates(user=owner[0], conversation_id=owner[1].id)
+    assert candidates.items[0].eligible
+    answer.metadata["research"]["sources"] = []
+    with pytest.raises(PublicExcerptSourceError) as error:
+        preview(owner, [answer])
+    assert error.value.reason == "missing_sources"
 
 
 @pytest.mark.parametrize("field", ["question", "answer", "owner_note"])
@@ -260,6 +284,25 @@ def test_closed_nested_models_reject_extra_source_fields(owner):
         type(result.payload).model_validate(document)
 
 
+def test_a_request_beyond_the_transport_bound_is_refused_before_any_work(owner):
+    """Five hundred ids is a request-size bound no conversation reaches, never
+    a product cap: one more is refused as an invalid selection before the
+    conversation is read, and a client is never told the number."""
+    from argus.api.public_excerpt_schemas import (
+        PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT,
+        PublicExcerptCandidates,
+    )
+
+    user, conversation = owner
+    ids = [str(uuid4()) for _ in range(PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT + 1)]
+    with pytest.raises(PublicExcerptSourceError) as error:
+        service.preview_receipt_for_messages(
+            user=user, conversation_id=conversation.id, message_ids=ids, owner_note=None
+        )
+    assert error.value.reason == "invalid_selection"
+    assert "max_turns" not in PublicExcerptCandidates.model_fields
+
+
 def test_duplicate_and_foreign_message_selection_refuses(owner):
     _, message = add_pair(owner)
     with pytest.raises(PublicExcerptSourceError):
@@ -281,7 +324,7 @@ def test_owner_candidate_preview_create_routes_and_drift(owner, monkeypatch):
     client = TestClient(app)
     candidates = client.get(base + "-candidates")
     assert candidates.status_code == 200, candidates.text
-    assert candidates.json()["max_turns"] == 4
+    assert set(candidates.json()) == {"items"}
     body = {"message_ids": [message.id]}
     preview_response = client.post(base + "-preview", json=body)
     assert preview_response.status_code == 200, preview_response.text

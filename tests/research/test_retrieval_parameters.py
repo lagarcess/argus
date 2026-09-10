@@ -309,7 +309,7 @@ def test_the_instructions_never_name_a_declared_tool() -> None:
 # --- the answer ------------------------------------------------------------
 
 
-def test_a_typed_answer_is_read_into_rows_cited_to_retrieved_pages() -> None:
+def test_a_typed_answer_is_read_into_rows_with_the_citations_the_model_wrote() -> None:
     client = PerplexityAgentClient(
         "k",
         transport=RecordingTransport(
@@ -338,15 +338,17 @@ def test_a_typed_answer_is_read_into_rows_cited_to_retrieved_pages() -> None:
     assert [row.label for row in packet.rows] == [
         "share price change today",
         "last price",
+        "Invented",
     ]
-    # The publisher citation survives; the provider-host citation keeps its
-    # evidence in the tool result and loses the URL, like every provider host.
-    assert packet.rows[0].source_url == PUBLISHER
-    assert packet.rows[1].source_url is None
-    assert [row.label for row in packet.rejected_rows] == [
-        "analyst target price",
-        "Uncited",
-    ] or len(packet.rejected_rows) == 2
+    # A citation is the model's own, retrieved or not; the provider-host
+    # citation keeps its evidence in the tool result and loses the URL, like
+    # every provider host. A row written with no citation is kept apart.
+    assert [row.source_url for row in packet.rows] == [
+        PUBLISHER,
+        None,
+        "https://x.example/",
+    ]
+    assert [row.label for row in packet.unsourced_rows] == ["Uncited"]
     assert [source.url for source in packet.sources] == [PUBLISHER]
 
 
@@ -373,7 +375,7 @@ def test_prose_under_a_typed_request_is_delivered_as_prose() -> None:
 
     assert packet.typed_answer is False
     assert packet.rows == ()
-    assert packet.rejected_rows == ()
+    assert packet.unsourced_rows == ()
     assert packet.answer_markdown == "Apple closed at $312.41."
 
 
@@ -534,8 +536,8 @@ def test_the_spec_is_one_object_per_call() -> None:
 
 
 def test_fetched_pages_join_the_retrieval_record() -> None:
-    """A page the model opened is a page it read: rows citing it are kept and
-    it reaches the typed sources like a search hit."""
+    """A page the model opened is a page it read: it reaches the typed
+    sources like a search hit."""
     from tests.research.conftest import fetch_url_results_item
 
     page = "https://finance.yahoo.com/markets/stocks/gainers/"
@@ -567,7 +569,7 @@ def test_fetched_pages_join_the_retrieval_record() -> None:
 
     assert packet.tool_results == ("fetch_url_results",)
     assert [row.source_url for row in packet.rows] == [page]
-    assert packet.rejected_rows == ()
+    assert packet.unsourced_rows == ()
     assert [(source.url, source.title) for source in packet.sources] == [
         (page, "Top Stock Gainers Today")
     ]

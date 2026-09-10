@@ -1,0 +1,281 @@
+{
+  "label": "nike-after",
+  "language": "en",
+  "question": "what's the price of nike today",
+  "asked_at": "2026-09-10T00:12:10.589884+00:00",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "fast"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "Nike (NKE) is priced at **$37.35 per share**, as of September 9, 2026. The market was in after-hours trading when the quote was retrieved."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "Nike (NKE) is priced at **$37.35 per share**, as of September 9, 2026. The market was in after-hours trading when the quote was retrieved.",
+        "next_experiments": {
+          "version": "argus_next_experiments/v1",
+          "rows": [
+            {
+              "kind": "research_test_single",
+              "label": "Test Nike (NKE) over the last 3 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Nike"
+                },
+                {
+                  "type": "ticker",
+                  "value": "NKE"
+                },
+                {
+                  "type": "text",
+                  "value": " over the last 3 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding NKE over the last three years"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "fast_quote",
+          "shape": "fast",
+          "sources": [],
+          "rows": [
+            {
+              "subject": "NIKE, Inc.",
+              "symbol": "NKE",
+              "label": "latest share price",
+              "value": 37.35,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-09",
+              "source_url": null
+            }
+          ],
+          "retrieved_at": "2026-09-10T00:12:30.489172+00:00",
+          "anchor_symbols": [
+            "NKE"
+          ],
+          "peers": [],
+          "usage": {
+            "invocations": 1,
+            "latency_ms": 9239,
+            "cost_usd": 0.04848,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [
+              {
+                "symbol": "NKE",
+                "name": "Nike, Inc.",
+                "asset_class": "equity"
+              }
+            ],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "fast",
+              "period_of_interest": null
+            }
+          }
+        },
+        "message_id": "1eefe8a6-f6a9-4cf1-95f0-b606b81a1e38",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "account_kind": "registered",
+  "conversation_id": "0725894f-4276-4d38-96db-b2bb0246a110",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "0b8e8d53-1492-403b-bf1b-f493644aad9e",
+        "conversation_id": "0725894f-4276-4d38-96db-b2bb0246a110",
+        "role": "user",
+        "content": "what's the price of nike today",
+        "created_at": "2026-09-10T00:12:10.627119Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "0725894f-4276-4d38-96db-b2bb0246a110",
+            "request_id": "ff1ad3b5-4d70-4a61-a6e4-750d18c8bc42",
+            "started_at": "2026-09-10T00:12:10.627105+00:00"
+          }
+        }
+      },
+      {
+        "id": "1eefe8a6-f6a9-4cf1-95f0-b606b81a1e38",
+        "conversation_id": "0725894f-4276-4d38-96db-b2bb0246a110",
+        "role": "assistant",
+        "content": "Nike (NKE) is priced at **$37.35 per share**, as of September 9, 2026. The market was in after-hours trading when the quote was retrieved.",
+        "created_at": "2026-09-10T00:12:30.925627Z",
+        "metadata": {
+          "conversation_mode": "guide",
+          "agent_runtime_stage_outcome": "ready_to_respond",
+          "next_experiments": {
+            "version": "argus_next_experiments/v1",
+            "rows": [
+              {
+                "kind": "research_test_single",
+                "label": "Test Nike (NKE) over the last 3 years",
+                "label_parts": [
+                  {
+                    "type": "text",
+                    "value": "Test "
+                  },
+                  {
+                    "type": "text",
+                    "value": "Nike"
+                  },
+                  {
+                    "type": "ticker",
+                    "value": "NKE"
+                  },
+                  {
+                    "type": "text",
+                    "value": " over the last 3 years"
+                  }
+                ],
+                "label_key": "chat.next_experiments.labels.research_dynamic",
+                "send_text": "Test buying and holding NKE over the last three years"
+              }
+            ]
+          },
+          "research": {
+            "schema_version": "argus_research/v1",
+            "capability_class": "fast_quote",
+            "shape": "fast",
+            "sources": [],
+            "rows": [
+              {
+                "subject": "NIKE, Inc.",
+                "symbol": "NKE",
+                "label": "latest share price",
+                "value": 37.35,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-09-09",
+                "source_url": null
+              }
+            ],
+            "retrieved_at": "2026-09-10T00:12:30.489172+00:00",
+            "anchor_symbols": [
+              "NKE"
+            ],
+            "peers": [],
+            "usage": {
+              "invocations": 1,
+              "latency_ms": 9239,
+              "cost_usd": 0.04848,
+              "cache_status": "miss"
+            },
+            "follow_up": {
+              "schema_version": "argus_research_follow_up/v1",
+              "subjects": [
+                {
+                  "symbol": "NKE",
+                  "name": "Nike, Inc.",
+                  "asset_class": "equity"
+                }
+              ],
+              "comparison_set": [],
+              "peer_suggestions": [],
+              "open_thread": {
+                "shape": "fast",
+                "period_of_interest": null
+              }
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "0b8e8d53-1492-403b-bf1b-f493644aad9e",
+            "request_id": "ff1ad3b5-4d70-4a61-a6e4-750d18c8bc42",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "candidates_status": 200,
+  "candidates": {
+    "items": [
+      {
+        "message_id": "1eefe8a6-f6a9-4cf1-95f0-b606b81a1e38",
+        "question": "what's the price of nike today",
+        "kind": null,
+        "eligible": false,
+        "reason": "missing_sources",
+        "field": "sources"
+      }
+    ]
+  },
+  "elapsed_seconds": 20.35,
+  "summary": {
+    "label": "nike-after",
+    "elapsed_seconds": 20.35,
+    "assistant_text": "Nike (NKE) is priced at **$37.35 per share**, as of September 9, 2026. The market was in after-hours trading when the quote was retrieved.",
+    "shape": "fast",
+    "degraded": null,
+    "rows": [
+      {
+        "subject": "NIKE, Inc.",
+        "symbol": "NKE",
+        "label": "latest share price",
+        "value": 37.35,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-09",
+        "source_url": null
+      }
+    ],
+    "sources": [],
+    "usage": {
+      "invocations": 1,
+      "latency_ms": 9239,
+      "cost_usd": 0.04848,
+      "cache_status": "miss"
+    },
+    "candidates": {
+      "items": [
+        {
+          "message_id": "1eefe8a6-f6a9-4cf1-95f0-b606b81a1e38",
+          "question": "what's the price of nike today",
+          "kind": null,
+          "eligible": false,
+          "reason": "missing_sources",
+          "field": "sources"
+        }
+      ]
+    }
+  }
+}

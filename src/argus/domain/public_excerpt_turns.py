@@ -168,7 +168,9 @@ def project_research_turn(
         or source.get("schema_version") != "argus_research/v1"
     ):
         refuse("unsupported_turn")
-    if source.get("shape") not in set(get_args(QuestionShape)) - {"fast"}:
+    # Every rail shape is a receipt, the quote included. The find operation's
+    # sidecar is a list of tickers rather than an answer and is not one.
+    if source.get("shape") not in set(get_args(QuestionShape)):
         refuse("unsupported_shape")
     if source.get("degraded"):
         refuse("degraded")

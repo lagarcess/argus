@@ -115,6 +115,11 @@ class TypedExpectations:
     # says the turn went somewhere the user can act on, which is the only
     # thing a green case is supposed to promise.
     offered: dict[str, Any] | None = None
+    # A grounded turn's typed sidecar: whether the answer published (no
+    # degraded code) and, as `rows`, the least number of typed figures it
+    # carried. A research turn that withheld its answer still reaches
+    # ready_to_respond, so nothing above can see the refusal this pins.
+    research: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -487,6 +492,8 @@ def typed_expectation_failures(
             failures,
             expected_fields=vars(expected),
         )
+    if expected.research is not None:
+        _compare_research(expected.research, outcome.get("research"), failures)
     return failures
 
 
@@ -756,6 +763,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             semantic_turn_act=expected.get("semantic_turn_act"),
             asset_discovery=expected.get("asset_discovery"),
             offered=expected.get("offered"),
+            research=expected.get("research"),
         ),
         action=(
             None
@@ -1007,6 +1015,7 @@ def _typed_outcome(
         "clarification": final_patch.get("clarification"),
         "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
         "asset_discovery": interpret_patch.get("asset_discovery"),
+        "research": _research_outcome(final_patch),
         "offered": offered_to_user(
             final_patch=final_patch,
             interpret_patch=interpret_patch,
@@ -1014,6 +1023,40 @@ def _typed_outcome(
             assistant_text=_assistant_text(final_patch),
         ),
     }
+
+
+def _research_outcome(patch: dict[str, Any]) -> dict[str, Any] | None:
+    """The typed research sidecar as the eval reads it, or None when the turn
+    took no rail: published is the absence of a degraded code, rows and
+    sources are counts of what the sidecar carries."""
+    sidecar = patch.get("research")
+    if not isinstance(sidecar, dict):
+        return None
+    degraded = sidecar.get("degraded")
+    return {
+        "published": not degraded,
+        "degraded_code": degraded.get("code") if isinstance(degraded, dict) else None,
+        "shape": sidecar.get("shape"),
+        "rows": len(sidecar.get("rows") or []),
+        "sources": len(sidecar.get("sources") or []),
+    }
+
+
+def _compare_research(expected: dict[str, Any], actual: Any, failures: list[str]) -> None:
+    if not isinstance(actual, dict):
+        failures.append(f"research: expected a research sidecar, got {actual!r}")
+        return
+    _compare(
+        "research.published", expected.get("published"), actual.get("published"), failures
+    )
+    _compare("research.shape", expected.get("shape"), actual.get("shape"), failures)
+    # An expected row count is a floor: a green case promises at least that
+    # many typed figures, and the provider is free to state more.
+    rows = expected.get("rows")
+    if rows is not None and (actual.get("rows") or 0) < rows:
+        failures.append(
+            f"research.rows: expected at least {rows}, got {actual.get('rows')!r}"
+        )
 
 
 def _final_patch(

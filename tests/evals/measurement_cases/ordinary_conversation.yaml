@@ -90,3 +90,25 @@ cases:
       stage_outcomes: ["ready_to_respond"]
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
+  - id: ordinary_conversation_price_question_en
+    # The founder's own test for the open-the-gates lane (2026-09-10): a
+    # price question is answered with whatever the provider returned, never
+    # withheld by a rule. The rail used to withhold the quote whenever the
+    # model's citation was not the page the response retrieved, and the
+    # refusal still reached ready_to_respond, so only the typed sidecar can
+    # see it: `published` is the absence of a degraded code. Whether the
+    # provider delivers a figure on a given run is its own to deliver, so
+    # no row floor is pinned here.
+    prompt: "what's the price of nike today"
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+      intent: ["conversation_followup", "beginner_guidance", "unsupported_or_out_of_scope"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+      research:
+        published: true
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]

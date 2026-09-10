@@ -46,7 +46,7 @@ export type ReceiptCandidate = {
   message_id: string; question?: string | null; kind?: Exclude<ReceiptKind, "mixed"> | null;
   eligible: boolean; reason?: ReceiptRefusalReason | null; field?: ReceiptRefusalField | null;
 };
-export type ReceiptCandidates = { items: ReceiptCandidate[]; max_turns: number };
+export type ReceiptCandidates = { items: ReceiptCandidate[] };
 export type ReceiptSelection = { message_ids: string[]; owner_note?: string | null };
 export type ReceiptPreview = {
   payload: PublicReceiptDocument; payload_digest: string; kind: ReceiptKind; existing_receipt?: EvidenceReceipt | null;

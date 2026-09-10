@@ -1,0 +1,245 @@
+{
+  "captured_at": "2026-09-10T00:27:18.183139+00:00",
+  "candidate_sha": "ba5a9fb71a2696cc7155d6c8241d20dc79bea4c7",
+  "question": "what's the price of nike today",
+  "request": {
+    "models": [
+      "openai/gpt-5.6-sol",
+      "anthropic/claude-opus-4-7"
+    ],
+    "input": "what's the price of nike today\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+    "tools": [
+      {
+        "type": "finance_search"
+      }
+    ],
+    "max_steps": 2,
+    "max_output_tokens": 1024,
+    "language_preference": "en",
+    "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+    "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+        "name": "argus_typed_retrieval",
+        "strict": true,
+        "schema": {
+          "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+          "properties": {
+            "answer_markdown": {
+              "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+              "type": "string"
+            },
+            "rows": {
+              "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+              "items": {
+                "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                "properties": {
+                  "subject": {
+                    "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                    "type": "string"
+                  },
+                  "symbol": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The exchange ticker of the security the figure describes, or null."
+                  },
+                  "label": {
+                    "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                    "type": "number"
+                  },
+                  "kind": {
+                    "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                    "enum": [
+                      "currency",
+                      "percent",
+                      "multiple",
+                      "count"
+                    ],
+                    "type": "string"
+                  },
+                  "unit": {
+                    "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                    "type": "string"
+                  },
+                  "as_of": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                  },
+                  "source_url": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                  }
+                },
+                "required": [
+                  "subject",
+                  "symbol",
+                  "label",
+                  "value",
+                  "kind",
+                  "unit",
+                  "as_of",
+                  "source_url"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "answer_markdown",
+            "rows"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "response": {
+    "background": false,
+    "completed_at": 1789000030,
+    "created_at": 1789000030,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_04ba77af-40eb-4003-af0a-8ea9b79a3b77",
+    "incomplete_details": null,
+    "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "tickers_lookup"
+        ],
+        "results": [
+          {
+            "category": "tickers_lookup",
+            "content": "Ticker matches:\n\n| query | ticker | name |\n| --- | --- | --- |\n| Nike | NKE | NIKE, Inc. |",
+            "tickers": null
+          }
+        ],
+        "tickers": null,
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "{\"answer_markdown\":\"Nike’s current share price could not be retrieved.\",\"rows\":[]}",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_112f2564-45ec-48c9-a6b7-a0790cbf99ca",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.01038,
+        "cache_read_cost": 0.00545,
+        "currency": "USD",
+        "input_cost": 0.00032,
+        "output_cost": 0.00296,
+        "tool_calls_cost": 0.005,
+        "tool_calls_cost_details": {
+          "finance_search": 0.005
+        },
+        "total_cost": 0.02411
+      },
+      "input_tokens": 15790,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 2076,
+        "cache_read_input_tokens": 13633,
+        "cached_tokens": 13633
+      },
+      "output_tokens": 148,
+      "output_tokens_details": {
+        "reasoning_tokens": 74
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "cost_usd": 0.005,
+          "invocation": 1
+        }
+      },
+      "total_tokens": 15938
+    },
+    "user": null
+  },
+  "summary": {
+    "label": "nike-unresolved-fast-2steps",
+    "shape": "fast",
+    "tools": [
+      "finance_search"
+    ],
+    "max_steps": 2,
+    "http_status": 200,
+    "elapsed_seconds": 7.4,
+    "answer_markdown": "Nike’s current share price could not be retrieved.",
+    "rows": [],
+    "unsourced_rows": [],
+    "sources": [],
+    "tool_results": [
+      "finance_results"
+    ],
+    "cost_usd": 0.02411
+  }
+}

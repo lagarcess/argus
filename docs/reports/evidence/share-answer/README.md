@@ -44,7 +44,7 @@ with no cookies, no horizontal overflow, and `noindex, nofollow, nocache`.
 | Eligible-only selection and readable refusal reasons | [English](selection-en-result.json), [Spanish](selection-es-419-result.json), [English phone](selection-390-en-reasons.png), [Spanish phone](selection-390-es-419-reasons.png) |
 | Refusal identifies question, answer and owner note | [English fields](selection-1280-en-fields.png), [Spanish fields](selection-1280-es-419-fields.png), [English note](selection-390-en-note.png), [Spanish note](selection-390-es-419-note.png) |
 | Incomplete historical returns/benchmarks cannot be selected | [Before/after](incomplete-selection.json), [English phone](incomplete-missing_headline-390-en.png), [Spanish desktop](incomplete-missing_benchmark-1280-es-419.png) |
-| Five eligible turns: no arbitrary Select all, manual cap four | [Records](cap-five-result.json), [phone](cap-five-390-en.png), [desktop](cap-five-1280-en.png) |
+| Five eligible turns: no arbitrary Select all, manual cap four (the cap was withdrawn on 2026-09-10; this row is historical) | [Records](cap-five-result.json), [phone](cap-five-390-en.png), [desktop](cap-five-1280-en.png) |
 | Same Settings list and revoke | [Records](settings-revoke.json), [before](settings-revoke-before.png), [after](settings-revoke-after.png) |
 | Revoked research link becomes the same tombstone | [Matrix](tombstone-public.json), [English phone](tombstone-390-en.png), [Spanish phone](tombstone-390-es-419.png) |
 | Existing SSR preview card supports research/mixed | [Records](preview-cards.json), [Spanish research card](research-es-419-preview-card-es-419.png) |

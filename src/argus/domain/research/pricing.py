@@ -28,16 +28,24 @@ class ModelTokenRate:
     max_input_tokens: int | None = None
 
 
-# Published rates rechecked 2026-09-03 against
-# https://docs.perplexity.ai/docs/agent-api/models (unchanged).
-# Live invoices can disagree: see tests/research/fixtures/README.md.
+# The table follows what the provider bills, which is not always what it
+# publishes. https://docs.perplexity.ai/docs/agent-api/models (rechecked
+# 2026-09-09) still lists gpt-5.6-sol at $5 input, $30 output and $0.50 cache
+# reads below 272k input tokens, and the 2026-08-07 recording under
+# docs/reports/evidence/377/probes was billed at exactly that. Every invoice
+# since 2026-09-03 (tests/research/fixtures and the fourteen recordings under
+# docs/reports/evidence/545/probes) bills $4 input, $20 output, $5 cache
+# creation and $0.40 cache read. A table that reads the page rejects every real
+# invoice as rate_mismatch, and rejected spend reaches no ledger. The
+# long-context tier has never been observed and keeps the published values.
+# See tests/research/fixtures/README.md.
 MODEL_RATE_TABLE_USD_PER_MILLION: dict[str, tuple[ModelTokenRate, ...]] = {
     "openai/gpt-5.6-sol": (
         ModelTokenRate(
-            input_usd_per_million=Decimal("5"),
-            output_usd_per_million=Decimal("30"),
-            cache_creation_input_usd_per_million=Decimal("6.25"),
-            cache_read_input_usd_per_million=Decimal("0.5"),
+            input_usd_per_million=Decimal("4"),
+            output_usd_per_million=Decimal("20"),
+            cache_creation_input_usd_per_million=Decimal("5"),
+            cache_read_input_usd_per_million=Decimal("0.4"),
             max_input_tokens=272_000,
         ),
         ModelTokenRate(

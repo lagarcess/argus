@@ -22,7 +22,7 @@ afterEach(() => { globalThis.fetch = originalFetch; });
 
 describe.each(["en", "es-419"] as const)("share surfaces in %s", (language) => {
   test("unsupported candidate stays visible with a named checkbox, reason and turn fallback", () => {
-    const state = receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page: { max_turns: 4, items: [{ message_id: "unsupported", eligible: false, question: null, reason: "unsafe_text", field: "answer" }] } });
+    const state = receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page: { items: [{ message_id: "unsupported", eligible: false, question: null, reason: "unsafe_text", field: "answer" }] } });
     const markup = renderToStaticMarkup(<ReceiptCandidateChoices state={state} copy={receiptCopy(language)} id="selection" onToggle={noop} onSelectAll={noop} onClear={noop} />);
     expect(markup).toContain('type="checkbox"');
     expect(markup).toContain('disabled=""');
@@ -32,11 +32,14 @@ describe.each(["en", "es-419"] as const)("share surfaces in %s", (language) => {
     expect(markup).toContain(language === "en" ? "Turn 1" : "Turno 1");
   });
 
-  test("filling the cap with Select all does not tell the owner to choose individually", () => {
-    const page = { max_turns: 4, items: Array.from({ length: 4 }, (_, index) => ({ message_id: String(index), eligible: true, question: `Question ${index}` })) };
+  test("select all takes every eligible answer and the count says how many there are, never a limit", () => {
+    const page = { items: Array.from({ length: 6 }, (_, index) => ({ message_id: String(index), eligible: index !== 2, question: `Question ${index}` })) };
     const state = receiptSelectionReducer(receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page }), { type: "select_all" });
+    expect(state.selected).toHaveLength(5);
     const markup = renderToStaticMarkup(<ReceiptCandidateChoices state={state} copy={receiptCopy(language)} id="selection" onToggle={noop} onSelectAll={noop} onClear={noop} />);
-    expect(markup).not.toContain(language === "en" ? "Choose them individually" : "de forma individual");
+    expect(markup).toContain(language === "en" ? "5 of 5 selected" : "5 de 5 seleccionados");
+    expect(markup).not.toContain(language === "en" ? "up to" : "hasta");
+    expect(markup.match(/disabled=""/g) ?? []).toHaveLength(1);
   });
 
   test("header shortcut announces sharing the conversation, not creating a link", async () => {

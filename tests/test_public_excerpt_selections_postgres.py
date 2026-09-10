@@ -18,11 +18,11 @@ pytestmark = pytest.mark.skipif(
 psycopg = pytest.importorskip("psycopg")
 
 
-def seed(connection):
+def seed(connection, count=2):
     cursor = connection.cursor()
     fixture = _Fixture(cursor)
     fixture.seed()
-    ids = [uuid4(), uuid4()]
+    ids = [uuid4() for _ in range(count)]
     for message_id in ids:
         cursor.execute(
             "insert into messages(id,user_id,conversation_id,role,content) values (%s,%s,%s,'assistant','A grounded answer')",
@@ -73,10 +73,13 @@ def test_service_role_can_read_create_and_revoke_but_cannot_rewrite():
                         ('{"rewritten":true}', snapshot),
                     )
 
-            assert connection.execute(
-                "update public.public_excerpt_snapshots set revoked_at=now(),revocation_reason='owner_revoked' where id=%s",
-                (snapshot,),
-            ).rowcount == 1
+            assert (
+                connection.execute(
+                    "update public.public_excerpt_snapshots set revoked_at=now(),revocation_reason='owner_revoked' where id=%s",
+                    (snapshot,),
+                ).rowcount
+                == 1
+            )
             revoked_at, reason = connection.execute(
                 "select revoked_at,revocation_reason from public.public_excerpt_snapshots where id=%s",
                 (snapshot,),
@@ -297,3 +300,23 @@ def test_guest_conversion_sql_accepts_only_message_bound_share_actions(action, a
             (Jsonb(pending), conversation_id),
         ).fetchone()[0]
         assert result is allowed
+
+
+def test_a_selection_of_many_turns_is_not_a_constraint_violation():
+    """The four-turn cap lived in a check constraint as well as the API; the
+    migration that lifts it leaves the lower bound and no upper one."""
+    with psycopg.connect(DSN) as connection:
+        try:
+            fixture, ids = seed(connection, count=9)
+            connection.execute("set local role service_role")
+            snapshot_id = insert(connection.cursor(), fixture, ids)
+            (stored,) = connection.execute(
+                "select cardinality(source_message_ids) from public.public_excerpt_snapshots where id=%s",
+                (snapshot_id,),
+            ).fetchone()
+            assert stored == 9
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with connection.transaction():
+                    insert(connection.cursor(), fixture, [], key="c" * 64)
+        finally:
+            connection.rollback()

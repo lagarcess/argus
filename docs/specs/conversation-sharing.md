@@ -13,7 +13,7 @@ revocation and owner boundaries remain locked.
 ## 0. The answer
 
 **Extend the existing receipt to grounded answers.** Section 4.5 now authorizes
-up to four independently eligible turns selected inside one conversation. The
+any number of independently eligible turns selected inside one conversation. The
 per-turn receipt remains the unit; broader composition remains deferred.
 
 Why that order:
@@ -28,7 +28,7 @@ Why that order:
   revoke-on-delete triggers. Closed payload kinds extend the existing owner
   endpoints and one shared page body. One flag, one list, one tombstone.
 - Every selected message pair passes the same checks independently. The
-  four-turn wrapper adds the cross-turn inference risk explicitly accepted in
+  turns wrapper adds the cross-turn inference risk explicitly accepted in
   section 4.5; it does not make clarifications or confirmations eligible.
 
 The five hard questions, answered in one place. Each has its own section.
@@ -130,8 +130,9 @@ A turn is eligible when every one of these holds:
   registered account (`can_save_decision`).
 - It carries `metadata.research` with `schema_version` `argus_research/v1`,
   at least one entry in `sources`, no `degraded`, and a `shape` other than
-  `fast` and `find`. A quote with no publisher is not a receipt; a discovery
-  answer is a list of tickers, not an answer.
+  `find`. A discovery answer is a list of tickers, not an answer. A quote is
+  an answer like any other; the founder withdrew the fast-shape exclusion on
+  2026-09-10.
 - It carries no `memory_recalls`. An answer shaped by what Argus remembers
   about the owner is personal by construction.
 - Its question is the user message the turn answered: the immediately
@@ -268,13 +269,16 @@ implementation. A shared thread is **a closed outer `turns` wrapper over
 payloads that are exactly what 4.2 specifies**, which is section 9's own design
 and not a new shape. Every turn passes 4.1 independently at creation and one
 refusal refuses the thread, so a thread can never carry what a single receipt
-could not. **Capped at four turns.** Section 9 stays deferred for everything
-beyond selection inside one conversation.
+could not. Section 9 stays deferred for everything beyond selection inside one
+conversation. A four-turn cap stood in this paragraph from 2026-09-09 to
+2026-09-10; it was not a founder decision but a line written while resolving
+the conflict with section 9, and the founder withdrew it. The selection screen
+counts the eligible turns; it shows no limit, because there is none.
 
 **The risk this accepts, named rather than waved at:** three turns that are each
 individually safe can identify someone together, and no per-turn audit catches
-that. The cap bounds it and the owner sees exactly what they are publishing
-before confirming; it is not eliminated.
+that. The owner sees exactly what they are publishing before confirming; it is
+not eliminated.
 
 **Selection is where Argus differs from every competitor, and it is the work.**
 They can offer "select all" because every turn is shareable. Ours are not:
@@ -413,8 +417,8 @@ first thing carried across the hop that §7.2 kept empty.
 
 ## 9. Whole conversation, if ever
 
-Selection of up to four turns inside one conversation is authorized by section
-4.5. Everything beyond that remains deferred. Any future wider composition is
+Selection of any number of turns inside one conversation is authorized by
+section 4.5. Everything beyond that remains deferred. Any future wider composition is
 still a composition of turn receipts, and the
 archived Slice 7 design in
 `docs/archive/private-alpha-conversation-trust.md` is the shape to reuse with
@@ -424,8 +428,8 @@ one change: no raw card payloads, only per-turn closed payloads.
   confirmations, failures, memory-shaped turns and untyped answers are not
   turns a stranger should read, and they are the turns where transcripts
   leak.
-- One snapshot, one link, one tombstone, capped at a small number of turns,
-  rendered in conversation order as a sequence of receipt blocks.
+- One snapshot, one link, one tombstone, rendered in conversation order as a
+  sequence of receipt blocks.
 - Every turn passes section 4.1 independently at creation; one refusal
   refuses the thread.
 
@@ -445,8 +449,8 @@ founder decision; these contracts do not enable the flags.
 - `kind text not null default 'backtest'`, closed to `backtest`,
   `research_answer`, and `mixed`.
 - Private immutable `source_message_ids`, `source_run_ids` and
-  `source_artifact_ids` arrays, bounded by the four-turn selection. The existing
-  scalar source columns remain for version 1 compatibility and singleton identity.
+  `source_artifact_ids` arrays. The existing scalar source columns remain for
+  version 1 compatibility and singleton identity.
 - A canonical `selection_key` and partial unique index on `(owner_id,
   selection_key)` for live selections. The existing live-artifact uniqueness
   remains, so both singleton entry points resolve the same record. Re-share after
@@ -460,7 +464,7 @@ founder decision; these contracts do not enable the flags.
 
 **Schemas:** version 1 `PublicExcerptPayload` stays the concrete backtest payload.
 Version 2 is a closed `{schema_version: 2, kind: "turns", turns: [...]}` wrapper
-whose one to four leaves discriminate on `kind`. Every research leaf is exactly
+whose leaves discriminate on `kind`. Every research leaf is exactly
 section 4.2. New singleton shares use the same wrapper. The public view, the owner
 list item and the funnel stage each gain
 `kind`. `RevocationReason` gains `removed_by_argus`. `GuestConversionReason`
@@ -471,8 +475,8 @@ gains `share_result`.
 - Owner-scoped candidate, preview and create endpoints under
   `/conversations/{conversation_id}/public-excerpt-candidates`,
   `/conversations/{conversation_id}/public-excerpt-preview`, and
-  `/conversations/{conversation_id}/public-excerpt`. Preview/create name one to
-  four distinct message ids. Create requires the preview digest and rechecks all
+  `/conversations/{conversation_id}/public-excerpt`. Preview/create name one or
+  more distinct message ids. Create requires the preview digest and rechecks all
   sources. Typed refusal reason and field appear in the Problem Details context.
   The artifact endpoint adapts into this same service and singleton identity.
 - `GET /public-excerpts`, `DELETE /public-excerpts/{id}` and the public read

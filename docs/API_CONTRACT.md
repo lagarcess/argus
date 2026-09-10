@@ -633,10 +633,11 @@ persisted solely to represent abandonment.
 
 The Share the answer lane extends this same API and snapshot lifecycle under
 [`conversation-sharing.md`](specs/conversation-sharing.md) section 4.5, including
-the founder's 2026-09-09 four-turn decision. It does not introduce a second sharing
+the founder's 2026-09-09 selection decision. It does not introduce a second sharing
 system. Version 1 receipts retain their payload and rendering. Version 2 introduces
-typed receipt kinds and a closed `turns` wrapper, with one through four turns from
-one owned conversation in conversation order. The research payload is exactly the
+typed receipt kinds and a closed `turns` wrapper, with one or more turns from
+one owned conversation in conversation order; nothing bounds the count but the
+conversation itself. The research payload is exactly the
 closed field list in that spec's section 4.2.
 
 The owner can read share candidates, preview a selection, and create its receipt
@@ -653,9 +654,9 @@ revoke, tombstone, rate limits, and flag-off byte identity continue to apply.
 
 The reader receives only a frozen snapshot. No live source reads, fork, prompt
 seed, history copy, refresh, or rerun are part of this extension. The public action
-is Continue with Argus and lands at guest entry without carried state. Selection
-preview and the four-turn cap bound but do not eliminate the cross-turn inference
-risk explicitly accepted in section 4.5.
+is Continue with Argus and lands at guest entry without carried state. The
+selection preview bounds but does not eliminate the cross-turn inference risk
+explicitly accepted in section 4.5: the owner sees exactly what they publish.
 
 Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
 off, every path below answers exactly as a route that does not exist: status 404
@@ -687,14 +688,17 @@ A result whose conversation has been deleted is no longer shareable: creation an
 if the deletion lands mid-request. Revoking is idempotent, and only the state
 transition emits `receipt_revoked`.
 
-Candidate reads return `{items, max_turns}`, where `max_turns` is four and each
-item is `{message_id, question, kind, eligible, reason, field}`. Unsupported turns
+Candidate reads return `{items}`, where each item is
+`{message_id, question, kind, eligible, reason, field}`; the client counts the
+eligible items, and no limit is part of the contract. Unsupported turns
 remain in the list with `eligible: false`. The reason is a closed language-neutral
 enum, and the client displays it in the owner's language. The private message id
 is a selection input only; it never reaches a public snapshot payload.
 
 Preview takes `{message_ids: UUID[], owner_note?: string | null}`. There must be
-one to four distinct assistant message ids from this owned conversation. The
+one or more distinct assistant message ids from this owned conversation. A
+request carries at most 500 ids, a transport bound no conversation reaches and
+not a product limit; the selection screen never shows it. The
 server puts them in conversation order and returns
 `{payload, payload_digest, kind, existing_receipt}`. Every turn passes the same
 eligibility and privacy checks independently. No snapshot or funnel creation
@@ -763,7 +767,7 @@ answers the metadata pass and the preview image; a link pasted into a chat would
 otherwise log views nobody caused. It exists because the Try Argus tap
 happens on a page nobody is signed in to, and the alternative, a marker on the
 guest entry url, is ruled out: sharing adds no new parameter to that surface.
-An owner preview reports no view, and a four-turn public page reports one view.
+An owner preview reports no view, and a multi-turn public page reports one view.
 Tombstones and unavailable pages with no known kind do not emit kind-attributed
 events; they never guess that the missing document was a backtest.
 
@@ -3883,42 +3887,38 @@ Contract rules:
   `value` a plain number, `subject` the entity the figure describes, and
   `kind` one of `currency`, `percent`, `multiple`, `count`; a currency row
   names its unit by an ISO 4217 code known to the maintained currency data
-  Babel ships, never a copied list, or the answer is malformed, and an answer carrying more rows than the packet holds
-  (64) is malformed rather than cut. A row survives parsing only when its `source_url` is a page the
-  same response retrieved (a finance or web tool result, a fetched page, or
-  an annotation); a row citing anything else is dropped and counted, never
-  asserted. Fetched pages are typed sources too, without a publisher date. A row
-  read from the provider's own finance data keeps its evidence in the tool
-  result and carries `source_url: null`, the way every provider-host citation
-  is scrubbed. **A typed answer is publishable only with at least one cited
-  row and no rejected one.** Prose cannot be trimmed of one claim, so a
-  rejected row, or a typed answer that retrieved and wrote no row, withholds
-  the whole answer: the turn carries `degraded.code =
-  "research_figures_unverified"`, an honest note replaces the prose and
-  names the figures it will not quote from the rejected rows' own typed
-  subject and label, the subjects the user named stay testable, and the
-  pages the response retrieved stay in `sources` (next bullet). The prose is
-  never matched against the rows by heuristic: that shape leaks by
-  construction, and rule 4 keeps prose from being the carrier of facts at
-  all. A typed answer with no row and
-  no retrieval at all carries `research_not_grounded` with the unavailable
-  note. Surveys keep their own codes below. `rows` is additive on the
-  sidecar and may be empty; a degraded turn always carries an empty list,
-  enforced by the sidecar builder. A JSON-shaped answer that is not the
-  schema (an invalid row, an answer the output budget truncated) is a broken
-  contract, never prose: it fails closed as
+  Babel ships, never a copied list, or the answer is malformed, and an answer
+  carrying more rows than the packet holds (64) is malformed rather than cut.
+  A row's `source_url` is the citation the model wrote: the page it names is
+  the figure's source, whether or not the same response retrieved that page,
+  and it is `null` for a figure read from the provider's own finance data,
+  whose evidence is the tool result and whose provider host is scrubbed at
+  parse time. Fetched pages are typed sources too, without a publisher date.
+  A row the model wrote with no citation at all is kept, with
+  `source_url: null`, after the cited rows, and the turn says so beneath the
+  answer, naming the figure from the row's own typed subject and label
+  ("I couldn't tie Apple analyst target price to a source."). **A retrieved
+  answer publishes.** No answer is withheld for a row, a missing row or a
+  missing retrieval record: the strict schema is what keeps a figure from
+  memory unrepresentable, and composition does not second-guess it. `rows`
+  is additive on the sidecar and may be empty; a degraded turn always
+  carries an empty list, enforced by the sidecar builder. A JSON-shaped
+  answer that is not the schema (an invalid row, an answer the output budget
+  truncated) is a broken contract, never prose: it fails closed as
   `research_unavailable_malformed_response`, is never cached, and a
   completed background run carrying one fails its job. Genuine prose under a
   typed request is delivered and recorded as prose.
-- **A withheld answer keeps its retrieval record and is cached like an
-  answer.** Whatever withholds the prose, the turn's `sources` are the pages
-  the response actually retrieved, selected exactly as for a published
-  answer (period-plausible, one page per publisher, retrieval order, at most
-  five): no ranking, no content check, and nothing the packet did not
-  return. Two codes carry them, because they are the two that retrieved:
-  `research_figures_unverified` and `survey_synthesis_incomplete`.
-  `research_not_grounded` and `survey_not_grounded` never retrieved, the
-  other `research_unavailable_*` codes have no packet,
+- **A withheld survey keeps its retrieval record and is cached like an
+  answer.** The only withholding left is the survey's own, unchanged from
+  before the typed contract: `survey_synthesis_incomplete` when the survey
+  retrieved but its prose names no asset the resolver verifies,
+  `survey_not_grounded` when it never retrieved. Whatever withholds the
+  prose, the turn's `sources` are the pages the response actually retrieved,
+  selected exactly as for a published answer (period-plausible, one page per
+  publisher, retrieval order, at most five): no ranking, no content check,
+  and nothing the packet did not return. `survey_synthesis_incomplete`
+  carries them because it retrieved. `survey_not_grounded` never retrieved,
+  the other `research_unavailable_*` codes have no packet,
   `research_capacity_exhausted` and `asset_class_not_covered` ran no provider
   call, and `research_unavailable_missing_public_sources` composes from its
   real packet but means no retrieved page survived selection; all of those
@@ -3933,8 +3933,10 @@ Contract rules:
   identical question inside that window is answered from the record with
   `cache_status: "hit"`, the same withheld note and sources, and no provider
   spend or capacity claim. A packet without a retrieval record is never
-  stored, because a model that did not look is evidence about the model and
-  not about the world; a malformed or unavailable response has no packet to
+  stored, published or withheld, because a model that did not look is
+  evidence about the model and not about the world and the shared cache
+  holds provider packets about public markets, never one turn's prose for
+  every other user; a malformed or unavailable response has no packet to
   store; and a packet withheld for want of a required public source is not
   stored.
 - **Retrieval parameters are configuration per question shape.** Each call
