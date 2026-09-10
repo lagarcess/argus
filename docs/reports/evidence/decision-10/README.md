@@ -38,6 +38,15 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   answer, and can run without the provider's finance tool.
   `research_answer.py` grounds a claim about crypto or a currency pair on
   public pages that way instead of degrading it to a coverage note.
+- The typed scenario signal. The interpreter sets
+  `research_query.scenario_question` for a question whose answer is a value,
+  target or fair value to compute; `retrieval_spec(scenario=True)` then sends
+  `SCENARIO_RETRIEVAL_INSTRUCTIONS`, the recorded retrieval contract plus the
+  carve-out that the inputs are the retrieved figures and are rowed while the
+  scenario values are the model's arithmetic and are never rowed. Every other
+  question keeps the recorded contract byte for byte; the scenario contract is
+  frozen by `probes/scenario_typed_balanced.json` through the same test that
+  freezes the others.
 - `src/argus/domain/research/config.py`: the balanced shape's ceiling moves
   from 75s to 150s. A scenario answer took 122s in the probe below and every
   forward-looking question timed out at 75s in the first after picture. The

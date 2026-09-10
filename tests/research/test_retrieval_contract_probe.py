@@ -20,11 +20,19 @@ from argus.domain.research.config import (
     LOCAL_SOURCE_DOMAINS,
     RESEARCH_CONFIG_SPECS,
     RETRIEVAL_INSTRUCTIONS,
+    SCENARIO_RETRIEVAL_INSTRUCTIONS,
+    retrieval_spec,
 )
 from argus.domain.research.contracts import typed_response_format
 from argus.domain.research.perplexity_agent import _packet_from_response
 
 PROBES = Path(__file__).resolve().parents[2] / "docs/reports/evidence/545/probes"
+# Decision 10: the scenario contract is frozen by its own recording, captured
+# through the same client on the balanced configuration.
+SCENARIO_PROBE = (
+    Path(__file__).resolve().parents[2]
+    / "docs/reports/evidence/decision-10/probes/scenario_typed_balanced.json"
+)
 
 
 def _recording(name: str) -> dict[str, Any]:
@@ -179,3 +187,36 @@ def test_the_finance_tool_refusal_is_the_provider_not_the_request_shape() -> Non
         assert packet.tool_results == (), name
         assert packet.rows == (), name
         assert "could not retrieve" in packet.answer_markdown.lower(), name
+
+
+def test_the_scenario_recording_is_the_request_the_code_builds_today() -> None:
+    """The scenario contract (decision 10) travels with its own recording: a
+    change to SCENARIO_RETRIEVAL_INSTRUCTIONS, the balanced configuration or
+    the typed schema has to be re-recorded, like every other retrieval text."""
+    recording = json.loads(SCENARIO_PROBE.read_text(encoding="utf-8"))
+    request = recording["exchanges"][0]["request"]
+    spec = retrieval_spec(
+        "balanced", question_kind="company_lookup", language_tag="en", scenario=True
+    )
+    assert request["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert request["instructions"] == spec.instructions
+    assert request["response_format"] == typed_response_format()
+    assert request["models"] == list(spec.models)
+    assert request["max_steps"] == spec.max_steps
+    assert [tool["type"] for tool in request["tools"]] == list(spec.tools)
+    assert "scenarios you compute" in request["input"]
+
+
+def test_the_provider_computes_scenarios_from_rowed_inputs() -> None:
+    """What the scenario contract buys: rowed inputs with pages, and an
+    answer that gives labeled ranges rather than one number or a refusal."""
+    recording = json.loads(SCENARIO_PROBE.read_text(encoding="utf-8"))
+    assert recording["error"] is None
+    packet = _packet_from_response(
+        recording["exchanges"][-1]["response"], latency_ms=0, on_unpriced=lambda _: None
+    )
+    assert packet.rows, "the inputs must be rowed"
+    assert any(row.source_url for row in packet.rows), "inputs cite their pages"
+    answer = packet.answer_markdown.lower()
+    assert "could not be retrieved" not in answer
+    assert sum(label in answer for label in ("bear", "base", "bull")) >= 2

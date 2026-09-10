@@ -1,0 +1,581 @@
+{
+  "probe": "scenario_typed_balanced",
+  "purpose": "decision 10: the scenario retrieval contract on the balanced configuration",
+  "candidate_sha": "b15b25d19749685fff80eabcfaaf2ca69cee34bc",
+  "captured_at": "2026-09-10T20:24:31.070122+00:00",
+  "question": "what will $10,000 in NVDA be worth in ten years?",
+  "packet": {
+    "answer_markdown": "**A $10,000 NVDA investment could be worth roughly $5,200, $83,000 after ten years across these scenarios.** The range is deliberately wide because published analyst targets extend only twelve months, not the full decade.\n\n| Scenario | Ten-year value range | Assumptions after the published twelve-month target |\n|---|---:|---|\n| Bear | **$5,200, $23,200** | Low-to-average analyst target, followed by annual returns of −5% to +5% for nine years |\n| Base | **$25,300, $55,600** | Average-to-high analyst target, followed by annual returns of 6% to 10% for nine years |\n| Bull | **$38,300, $83,000** | Average-to-high analyst target, followed by annual returns of 11% to 15% for nine years |\n\n**Calculation:** At NVDA’s $218.40 price as of September 10, 2026, $10,000 buys 45.7875 shares. Applying the published twelve-month targets gives first-year values of $8,242 at the $180 low target, $14,981 at the $327.18 average target, and $23,581 at the $515 high target. I then compounded those starting values for the remaining nine years using the stated scenario rates, for example, the base range is $14,981 × 1.06⁹ through $23,581 × 1.10⁹.\n\nThese are scenario calculations, not a single prediction. They assume the share count remains unchanged and exclude taxes, fees, and dividends.",
+    "categories": [
+      "quote"
+    ],
+    "tickers": [
+      "NVDA"
+    ],
+    "sources": [
+      {
+        "url": "https://public.com/stocks/nvda/forecast-price-target",
+        "title": "NVIDIA (NVDA) Stock Forecast: Analyst Ratings, Predictions & Price ...",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://www.thestreet.com/investing/jpmorgan-revamps-nvidia-stock-price-target-for-rest-of-2026",
+        "title": "JPMorgan revamps Nvidia stock price target for rest of 2026",
+        "source_date": "2026-03-03"
+      },
+      {
+        "url": "https://www.marketbeat.com/stocks/NASDAQ/NVDA/forecast/",
+        "title": "NVIDIA (NVDA) Stock Forecast and Price Target 2026 - MarketBeat",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://price-target.com/ai/nvidia/",
+        "title": "Nvidia (NVDA) Price Targets & Analyst Ratings",
+        "source_date": "2026-09-01"
+      },
+      {
+        "url": "https://www.marketwatch.com/livecoverage/nvidia-earnings-stock-results-guidance-china-ai-q2/card/jpmorgan-sets-2026-price-target-for-215-after-solid-quarter-with-multiple-ways-to-drive-upside-Np71YiEGscSwXShWkL9w",
+        "title": "JPMorgan sets 2026 Nvidia price target for $215 after 'solid' quarter with multiple ways to drive upside",
+        "source_date": "2025-08-27"
+      },
+      {
+        "url": "https://www.investing.com/equities/nvidia-corp-consensus-estimates",
+        "title": "NVIDIA (NVDA) Stock Forecast & Price Target - Investing.com",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://capital.com/en-int/market-updates/nvidia-stock-forecast-10-03-2026",
+        "title": "NVIDIA Stock Forecast | OpenAI $110bn Funding Alliance | Capital.com",
+        "source_date": "2026-03-10"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/analyst-nvidia-nasdaq-nvda-price-target-raised-to-30000-2026-08-27/",
+        "title": "NVIDIA (NASDAQ:NVDA) Price Target Raised to $300.00",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://www.moomoo.com/news/post/65298992/goldman-sachs-is-bullish-on-nvidia-optimistic-signals-from-both",
+        "title": "Goldman Sachs is bullish on NVIDIA: Optimistic signals from both ...",
+        "source_date": "2026-02-09"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/analyst-nvidia-nasdaq-nvda-given-new-34600-price-target-at-truist-financial-2026-08-27/",
+        "title": "NVIDIA (NASDAQ:NVDA) Given New $346.00 Price Target at Truist ...",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://www.wsj.com/market-data/quotes/NVDA/research-ratings",
+        "title": "NVDA | NVIDIA Corp. Analyst Estimates & Ratings - WSJ",
+        "source_date": "2026-05-14"
+      },
+      {
+        "url": "https://finance.yahoo.com/news/nvidia-nasdaq-nvda-stock-price-131016593.html",
+        "title": "Nvidia (NASDAQ: NVDA) Stock Price Prediction for 2026",
+        "source_date": "2026-01-28"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/prediction-nvidias-stock-price-end-082200663.html",
+        "title": "Prediction: This Will Be Nvidia's Stock Price by the End of the Year",
+        "source_date": "2026-04-05"
+      },
+      {
+        "url": "https://www.benzinga.com/quote/NVDA/analyst-ratings",
+        "title": "NVIDIA Analyst Ratings and Price Targets | NASDAQ:NVDA",
+        "source_date": "2026-08-04"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/analysts-resets-nvidia-stock-price-173038308.html",
+        "title": "Analysts Resets Nvidia Stock Price Target For Rest of 2026",
+        "source_date": "2026-05-12"
+      }
+    ],
+    "name_pairs": [],
+    "rows": [
+      {
+        "subject": "NVIDIA Corporation",
+        "symbol": "NVDA",
+        "label": "current share price",
+        "value": 218.4,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-10",
+        "source_url": null
+      },
+      {
+        "subject": "NVIDIA Corporation",
+        "symbol": "NVDA",
+        "label": "low twelve-month analyst price target",
+        "value": 180.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-10",
+        "source_url": "https://www.investing.com/equities/nvidia-corp-consensus-estimates"
+      },
+      {
+        "subject": "NVIDIA Corporation",
+        "symbol": "NVDA",
+        "label": "average twelve-month analyst price target",
+        "value": 327.18,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-10",
+        "source_url": "https://www.investing.com/equities/nvidia-corp-consensus-estimates"
+      },
+      {
+        "subject": "NVIDIA Corporation",
+        "symbol": "NVDA",
+        "label": "high twelve-month analyst price target",
+        "value": 515.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-10",
+        "source_url": "https://www.investing.com/equities/nvidia-corp-consensus-estimates"
+      }
+    ],
+    "typed_answer": true,
+    "unsourced_rows": [],
+    "tool_results": [
+      "finance_results",
+      "search_results",
+      "fetch_url_results"
+    ],
+    "usage": {
+      "invocations": 1,
+      "finance_search_invocations": 1,
+      "web_search_invocations": 1,
+      "fetch_url_invocations": 1,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 39583,
+      "cost_usd": 0.11927,
+      "input_tokens": 31164,
+      "output_tokens": 2455,
+      "cache_creation_input_tokens": 10795,
+      "cache_read_input_tokens": 20357
+    },
+    "retrieved_at": "2026-09-10T20:25:10.656193Z",
+    "background_id": "resp_d19ed177-02d0-4115-88dc-e684bee84f90"
+  },
+  "error": null,
+  "elapsed_s": 39.6,
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "what will $10,000 in NVDA be worth in ten years?\nTickers: NVIDIA (NVDA)\nTime window: ten years\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nThe answer is a set of scenarios you compute from published inputs, as the instructions describe: inputs rowed with their pages, the arithmetic written out, labeled ranges from low to high, no single number as the future, no advice.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium"
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "en",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question asks what something will be worth, what it must grow into, or what it is worth today, so the answer is a set of scenarios you compute. The retrieved figures are the inputs: the current price, published forecasts, analyst targets, growth rates and valuation multiples, each rowed with the page it was read from. The scenario values are your own arithmetic from those inputs, written out step by step in answer_markdown and never rowed; no page needs to state them. Give the result as labeled scenario ranges (for example bear, base and bull), each written as low to high. When no published forecast covers the full horizon, build the scenarios from the nearest published horizon and say what you assumed. Say that a figure could not be retrieved only when no input at all was retrieved. Never present one number as the future, and never say what the reader should do.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                    "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "label": {
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "subject",
+                      "symbol",
+                      "label",
+                      "value",
+                      "kind",
+                      "unit",
+                      "as_of",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "background": false,
+        "completed_at": 1789071871,
+        "created_at": 1789071871,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_d19ed177-02d0-4115-88dc-e684bee84f90",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question asks what something will be worth, what it must grow into, or what it is worth today, so the answer is a set of scenarios you compute. The retrieved figures are the inputs: the current price, published forecasts, analyst targets, growth rates and valuation multiples, each rowed with the page it was read from. The scenario values are your own arithmetic from those inputs, written out step by step in answer_markdown and never rowed; no page needs to state them. Give the result as labeled scenario ranges (for example bear, base and bull), each written as low to high. When no published forecast covers the full horizon, build the scenarios from the nearest published horizon and say what you assumed. Say that a figure could not be retrieved only when no input at all was retrieved. Never present one number as the future, and never say what the reader should do.",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "name": "finance",
+            "type": "skill_loaded"
+          },
+          {
+            "categories": [
+              "quote"
+            ],
+            "results": [
+              {
+                "category": "quote",
+                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency |\n| --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-10 20:00:00 UTC | 2026-09-10 20:24:38 UTC | after_hours | 218.40 | USD |\n\nData available in: `NVDA_quotes_132e95.csv` (row key column: symbol)",
+                "sources": [
+                  "https://www.perplexity.ai/finance/NVDA"
+                ],
+                "tickers": [
+                  "NVDA"
+                ]
+              }
+            ],
+            "tickers": [
+              "NVDA"
+            ],
+            "type": "finance_results"
+          },
+          {
+            "queries": [
+              "NVIDIA analyst price target 2026 consensus",
+              "NVIDIA long term EPS growth forecast analyst 2026",
+              "NVIDIA investor relations growth outlook 2026"
+            ],
+            "results": [
+              {
+                "date": "2026-09-09",
+                "id": 1,
+                "last_updated": "2026-09-10",
+                "snippet": "35 analysts have given NVIDIA (NVDA) a consensus rating of Buy while the NVIDIA (NVDA) price prediction in 2026 is $330.63.",
+                "source": "web",
+                "title": "NVIDIA (NVDA) Stock Forecast: Analyst Ratings, Predictions & Price ...",
+                "url": "https://public.com/stocks/nvda/forecast-price-target"
+              },
+              {
+                "date": "2026-03-03",
+                "id": 2,
+                "last_updated": "2026-09-07",
+                "snippet": "- **Street‑wide analyst consensus**: The average 12‑month Nvidia target is about $256.50, with a strong buy rating from more than 40 analysts and a range running from roughly $250 to $352.",
+                "source": "web",
+                "title": "JPMorgan revamps Nvidia stock price target for rest of 2026",
+                "url": "https://www.thestreet.com/investing/jpmorgan-revamps-nvidia-stock-price-target-for-rest-of-2026"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 3,
+                "last_updated": "2026-09-10",
+                "snippet": "Consensus Price Target $324.34 48.28% the average price target is $324.34. The highest price target for NVDA is $515.00, while the lowest price target for NVDA ...",
+                "source": "web",
+                "title": "NVIDIA (NVDA) Stock Forecast and Price Target 2026 - MarketBeat",
+                "url": "https://www.marketbeat.com/stocks/NASDAQ/NVDA/forecast/"
+              },
+              {
+                "date": "2026-09-01",
+                "id": 4,
+                "last_updated": "2026-09-09",
+                "snippet": "As of September 2026, the average 12-month analyst price target for Nvidia (NVDA) is $341.44 (high $515.00, low $270.00) across 25 Wall Street analysts tracked by Price Target.\n...\n$341.44",
+                "source": "web",
+                "title": "Nvidia (NVDA) Price Targets & Analyst Ratings",
+                "url": "https://price-target.com/ai/nvidia/"
+              },
+              {
+                "date": "2025-08-27",
+                "id": 5,
+                "last_updated": "2026-04-06",
+                "snippet": "JPMorgan analysts expressed satisfaction with Nvidia's recent financial results, prompting them to revise their price target to $215, now projected for the conclusion of 2026, an increase from the previous target of $170 set for the end of 2025.",
+                "source": "web",
+                "title": "JPMorgan sets 2026 Nvidia price target for $215 after 'solid' quarter with multiple ways to drive upside",
+                "url": "https://www.marketwatch.com/livecoverage/nvidia-earnings-stock-results-guidance-china-ai-q2/card/jpmorgan-sets-2026-price-target-for-215-after-solid-quarter-with-multiple-ways-to-drive-upside-Np71YiEGscSwXShWkL9w"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 6,
+                "last_updated": "2026-09-10",
+                "snippet": "According to projections from 58 analysts, the average 12-month price target for NVIDIA is 327.18 USD, with a high estimate of 515 USD and a low estimate of 180 ...",
+                "source": "web",
+                "title": "NVIDIA (NVDA) Stock Forecast & Price Target - Investing.com",
+                "url": "https://www.investing.com/equities/nvidia-corp-consensus-estimates"
+              },
+              {
+                "date": "2026-03-10",
+                "id": 7,
+                "last_updated": "2026-08-09",
+                "snippet": "Across 37–38 covering analysts as of 5 March 2026, the aggregate 12-month consensus price target for NVDA stands at approximately $263–$264, with a Strong Buy consensus rating; 54% of analysts rate the stock Strong Buy and 41% rate it Buy, leaving just 3% at Hold.",
+                "source": "web",
+                "title": "NVIDIA Stock Forecast | OpenAI $110bn Funding Alliance | Capital.com",
+                "url": "https://capital.com/en-int/market-updates/nvidia-stock-forecast-10-03-2026"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 8,
+                "last_updated": "2026-09-08",
+                "snippet": "MarketBeat analysts have a consensus “Moderate Buy” rating and an average target of $312.21.",
+                "source": "web",
+                "title": "NVIDIA (NASDAQ:NVDA) Price Target Raised to $300.00",
+                "url": "https://www.marketbeat.com/instant-alerts/analyst-nvidia-nasdaq-nvda-price-target-raised-to-30000-2026-08-27/"
+              },
+              {
+                "date": "2026-02-09",
+                "id": 9,
+                "last_updated": "2026-02-14",
+                "snippet": "Additionally, Goldman Sachs maintained its target price for NVIDIA at $250, implying a potential 35% increase from last Friday’s closing price.\n...\nFiscal Year 2026: Revenue of $215.1 billion / Earnings Per Share (EPS) of $44.90\nFiscal Year 2027: Revenue of $382.9 billion/Earnings Per Share (EPS) of $87.50\nFiscal Year 2028: Revenue of $513.0 billion/Earnings Per Share (EPS) of $121.30",
+                "source": "web",
+                "title": "Goldman Sachs is bullish on NVIDIA: Optimistic signals from both ...",
+                "url": "https://www.moomoo.com/news/post/65298992/goldman-sachs-is-bullish-on-nvidia-optimistic-signals-from-both"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 10,
+                "last_updated": "2026-09-10",
+                "snippet": "The broader analyst consensus is “Moderate Buy,” with an average target of $317.44.\n...\nBased on data from MarketBeat, the stock presently has a consensus rating of \"Moderate Buy\" and an average price target of $317.44.Get NVIDIA alerts:Sign UpCheck Out Our Latest Research Report on NVIDIANVIDIA Price PerformanceLooking Beyond NVIDIA?",
+                "source": "web",
+                "title": "NVIDIA (NASDAQ:NVDA) Given New $346.00 Price Target at Truist ...",
+                "url": "https://www.marketbeat.com/instant-alerts/analyst-nvidia-nasdaq-nvda-given-new-34600-price-target-at-truist-financial-2026-08-27/"
+              },
+              {
+                "date": "2026-05-14",
+                "id": 11,
+                "last_updated": "2026-09-10",
+                "snippet": "Quarterly Annual Actual Analyst Range Consensus 3.50 3.00 2.50 2.00 1.50 Actual 1.30 1.26 $12.78 3 months ago: $12.48 Historical Prices 08/11/2026 - 09/10/2026 ...",
+                "source": "web",
+                "title": "NVDA | NVIDIA Corp. Analyst Estimates & Ratings - WSJ",
+                "url": "https://www.wsj.com/market-data/quotes/NVDA/research-ratings"
+              },
+              {
+                "date": "2026-01-28",
+                "id": 12,
+                "last_updated": "2026-09-05",
+                "snippet": "Their consensus one-year price target is $253.19, which signals more than 34% upside potential from its current price.",
+                "source": "web",
+                "title": "Nvidia (NASDAQ: NVDA) Stock Price Prediction for 2026",
+                "url": "https://finance.yahoo.com/news/nvidia-nasdaq-nvda-stock-price-131016593.html"
+              },
+              {
+                "date": "2026-04-05",
+                "id": 13,
+                "last_updated": "2026-09-10",
+                "snippet": "Among 70 analysts, the stock has a median target price of $265 per share, Nvidia will reach $276 per share by December 2026. Nvidia will ...",
+                "source": "web",
+                "title": "Prediction: This Will Be Nvidia's Stock Price by the End of the Year",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/prediction-nvidias-stock-price-end-082200663.html"
+              },
+              {
+                "date": "2026-08-04",
+                "id": 14,
+                "last_updated": "2026-08-06",
+                "snippet": "NVIDIA Corp has a consensus price target of $309.13 based on the ratings of 32 analysts.",
+                "source": "web",
+                "title": "NVIDIA Analyst Ratings and Price Targets | NASDAQ:NVDA",
+                "url": "https://www.benzinga.com/quote/NVDA/analyst-ratings"
+              },
+              {
+                "date": "2026-05-12",
+                "id": 15,
+                "last_updated": "2026-09-10",
+                "snippet": "UBS analyst Timothy Arcuri set a 12-month target of $245 for Nvidia, which suggests about 12% upside from recent levels.\nBernstein's David Dai and Citi's Atif Malik were more upbeat, both keeping buy ratings and $300 targets on Nvidia.\n...\n- Is NVDA fairly valued?\n...\n- - (-0.28%)",
+                "source": "web",
+                "title": "Analysts Resets Nvidia Stock Price Target For Rest of 2026",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/analysts-resets-nvidia-stock-price-173038308.html"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "NVIDIA (NVDA) Stock Forecast & Price Target - Investing.com\n\n# NVIDIA Corporation (NVDA)\n\nNASDAQ\n\n|Symbol|Exchange|Currency|\n|--|--|--|\n|NVDA|·|NASDAQ|\n|NVDL|·|NASDAQ|\n|NVDS|·|NASDAQ|\n|NVYY|·|NASDAQ|\n|0R1I|·|London|\n|NVDA|·|Xetra|\n|NVDA|·|Switzerland|\n|NNVDA|·|Milan|\n|NVDA|·|Vienna|\n|NVDA|·|Warsaw|\n|NVDAm|·|Buenos Aires|\n|NVDC34|·|B3|\n|NVDA|·|Toronto|\n|NVDA|·|Mexico|\n|NVDACO|·|Colombia|\n|NVDAUS|·|Lima|\n|NVDA|·|Ukraine|\n|NVDA|·|Frankfurt|\n|NVDA|·|TradeGate|\n|NVDA_KZ|·|KASE|\n|NVDA_KZEUOM|·|KASE|\n|NVDA_KZEUSW|·|KASE|\n|NVDA|·|CBOE Canada|\n|NVDA/USD|·|Binance Futures|\n\nCurrency in USD\n\nNVDA Pro Research\n\nAdd to Watchlist\n\n223.67\n\n-2.06(-0.91%)\n\nClosed·09/09\n\nAfter Hours\n\n223.00-0.67(-0.30%)\n\n·03:14:29\n\nFair Value\n\nAn estimate of a stock's true price based on valuation models like discounted cash flow, peer valuation multiples, and dividend discount models.\n\nUnlock Value\n\nDay's Range\n\n223.46226.18\n\n52 wk Range\n\n164.27236.54\n\n- General - Overview\n  - Profile\n  - Ownership\n  - Historical Data\n  - Historical Splits\n  - Options\n  - Index Component\n  - Technical Analysis\n  - Candlestick Patterns\n  - Discussions\n  - Recent Sentiments\n  - User Rankings\n\n- Financial Summary\n- Income Statement\n- Balance Sheet\n- Cash Flow\n- Ratios\n- Dividends\n- Earnings\n- Forecast\n\n## NVIDIA (NVDA) Stock Forecast & Price Target\n\nView NVIDIA stock forecast data, including NVDA stock price estimates and 12-month NVIDIA price targets, to assess potential upside or downside. Compare NVDA analyst ratings to see whether analysts rate the stock as a strong buy, hold, or strong sell based on current market expectations.\n\nAdvanced Equity Forecast\n\nOverall Consensus\n\nStrong Buy\n\n58 Buy\n\n2 Hold\n\n1 Sell\n\nData based on a poll of the past **3 months**\n\n#### Analysts 12-Month Price Target\n\nAverage 327.18\n\n(+46.28% Upside)\n\n#### Past 24 Months\n\n#### 12-Month Forecast\n\n## Analyst Ratings\n\nAnalyst Ratings\n\n|Firm|Article|Position|Price Target|Upside / Downside|From Price Target|Action|Date|\n|--|--|--|--|--|--|--|--|\n|Piper Sandler|Buy|300.00|+34.13%|-|New Coverage|Sep 10, 2026| |\n|PI Financial|Buy|300.00|+34.13%|-|New Coverage|Sep 09, 2026| |\n|BMO Capital|Buy|340.00|+52.01%|-|Maintain|Sep 08, 2026| |\n|Cantor Fitzgerald|Buy|350.00|+56.48%|-|Maintain|Sep 08, 2026| |\n|StoneX|Buy|335.00|+49.77%|335.00|Maintain|Sep 04, 2026| |\n\nShow More\n\n## Fair Value\n\nAn estimate of a stock's true price based on valuation models like discounted cash flow, peer valuation multiples, and dividend discount models.\n\nAverage\n\nUnlock\n\nUpside\n\nUnlock\n\nUncertainty\n\nUnlock\n\nSpread\n\nUnlock\n\nMarket Range\n\n52 weeks\n\n$164\n\n$237\n\n$223.67\n\nAnalyst Targets\n\n58 analysts\n\n$180\n\n$515\n\n$327.18\n\nFair Value\n\n14 models\n\nUnlock\n\nDividends: Stable Growth\n\nEBITDA Multiples\n\nRevenue Multiples\n\nDividends: Multi-Stage\n\nP/E Multiples\n\nMultiples Valuation: Price / Book\n\nMultiples Valuation: Price / Sales\n\nMultiples Valuation: EBIT\n\n5Y DCF Terminal Growth Exit\n\n5Y DCF Revenue Exit\n\n10Y DCF Revenue Exit\n\n10Y DCF Terminal Growth Exit\n\n5Y DCF EBITDA Exit\n\n10Y DCF EBITDA Exit\n\n## FAQ\n\n### Is NVDA a Buy, Sell, or Hold?\n\nThe consensus rating for NVIDIA is \"Strong Buy\", based on insights from 58 analysts. 58 analysts recommend buying the stock, 1 suggest selling, and 2 recommend holding.\n\n### What Is the Price Target for NVIDIA (NVDA) According to Analysts?\n\nAccording to projections from 58 analysts, the average 12-month price target for NVIDIA is 327.18 USD, with a high estimate of 515 USD and a low estimate of 180 USD.\n\n### What Is NVDA’s Potential Upside or Downside, Based on the Analysts’ Average Price Target?\n\nNVIDIA has a potential Upside of +46.28%, based on analysts’ average price target.\n\n### How Has NVIDIA Stock Performed Over the Past 52 Weeks?\n\nThe NVIDIA 52-week range spans from 164.27 to 236.54.\n\nFind a Stock Broker\n\nIndicesCommoditiesBondsStocks\n\nMarket Movers\n\nMost ActiveGainers %Losers %\n\nName\n\n## Trending Stocks\n\nShow more\n\nMost Undervalued Stocks\n\nMost UndervaluedMost Overvalued\n|Name|Upside|Fair Value|\n|--|--|--|\n|36.97| | |\n|Name|Upside|\n|--|--|\n|36.97| |\n\nSee full list\n\nProPicks AI\n\nAI-powered **stock picks** with a proven track record to **beat the S&P 500**.\n\nTop Value Stocks\n\nBeat the S&P 500\n\nNVDA Comments\n\nPost\n\nComment Guidelines\n\nTools",
+                "title": "NVIDIA (NVDA) Stock Forecast & Price Target - Investing.com",
+                "url": "https://www.investing.com/equities/nvidia-corp-consensus-estimates"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"**A $10,000 NVDA investment could be worth roughly $5,200–$83,000 after ten years across these scenarios.** The range is deliberately wide because published analyst targets extend only twelve months, not the full decade.\\n\\n| Scenario | Ten-year value range | Assumptions after the published twelve-month target |\\n|---|---:|---|\\n| Bear | **$5,200–$23,200** | Low-to-average analyst target, followed by annual returns of −5% to +5% for nine years |\\n| Base | **$25,300–$55,600** | Average-to-high analyst target, followed by annual returns of 6% to 10% for nine years |\\n| Bull | **$38,300–$83,000** | Average-to-high analyst target, followed by annual returns of 11% to 15% for nine years |\\n\\n**Calculation:** At NVDA’s $218.40 price as of September 10, 2026, $10,000 buys 45.7875 shares. Applying the published twelve-month targets gives first-year values of $8,242 at the $180 low target, $14,981 at the $327.18 average target, and $23,581 at the $515 high target. I then compounded those starting values for the remaining nine years using the stated scenario rates—for example, the base range is $14,981 × 1.06⁹ through $23,581 × 1.10⁹.\\n\\nThese are scenario calculations, not a single prediction. They assume the share count remains unchanged and exclude taxes, fees, and dividends.\",\"rows\":[{\"as_of\":\"2026-09-10\",\"kind\":\"currency\",\"label\":\"current share price\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":218.4},{\"as_of\":\"2026-09-10\",\"kind\":\"currency\",\"label\":\"low twelve-month analyst price target\",\"source_url\":\"https://www.investing.com/equities/nvidia-corp-consensus-estimates\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":180},{\"as_of\":\"2026-09-10\",\"kind\":\"currency\",\"label\":\"average twelve-month analyst price target\",\"source_url\":\"https://www.investing.com/equities/nvidia-corp-consensus-estimates\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":327.18},{\"as_of\":\"2026-09-10\",\"kind\":\"currency\",\"label\":\"high twelve-month analyst price target\",\"source_url\":\"https://www.investing.com/equities/nvidia-corp-consensus-estimates\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":515}]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_c5cba7b1-ca8e-4add-8313-fbad2c0c32d5",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium"
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.05398,
+            "cache_read_cost": 0.00814,
+            "currency": "USD",
+            "input_cost": 5e-05,
+            "output_cost": 0.0491,
+            "tool_calls_cost": 0.008,
+            "tool_calls_cost_details": {
+              "fetch_url": 0.0005,
+              "finance_search": 0.005,
+              "search_web": 0.0025
+            },
+            "total_cost": 0.11927
+          },
+          "input_tokens": 31164,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 10795,
+            "cache_read_input_tokens": 20357,
+            "cached_tokens": 20357
+          },
+          "output_tokens": 2455,
+          "output_tokens_details": {
+            "reasoning_tokens": 1651
+          },
+          "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.0005,
+              "invocation": 1
+            },
+            "finance_search": {
+              "cost_usd": 0.005,
+              "invocation": 1
+            },
+            "search_web": {
+              "cost_usd": 0.0025,
+              "invocation": 1
+            }
+          },
+          "total_tokens": 33619
+        },
+        "user": null
+      }
+    }
+  ]
+}
