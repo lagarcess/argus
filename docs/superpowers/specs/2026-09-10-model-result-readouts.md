@@ -98,3 +98,55 @@ regeneration require a separate explicit founder go.
 Authority: founder's lane brief; AGENTS.md; PRODUCT.md; ARCHITECTURE.md;
 API_CONTRACT.md; DATA_MODEL.md; DESIGN.md; active grounded-finance roadmap;
 private-alpha-next-decision-memo.md EvidenceArtifact clarification.
+
+## 7. Founder-authorized second round
+
+Continuation from `b66ff55a2a1673ae7a6323d248d42e5bd3706263`. The first
+comparison failed; preserve its evidence. This is one further implementation
+and measurement round, then a stop report. No merge, full live suite or
+fingerprint regeneration is authorized.
+
+1. Both composers consume one labeled fact sheet. Each stored numerical fact
+   has a stable key, canonical value/unit, meaning, grain, basis and source.
+   Distinguish executed fills from completed trades, annualized statistics
+   from daily values, nominal chart extrema from ending equity, and starting
+   capital from periodic and total contributions. Typed chart series may share
+   meaning/unit metadata; their points remain individually referenceable.
+2. Derive historical fixed-capital drawdown endpoints only when complete,
+   ordered saved chart evidence and the pre-trade baseline support them and
+   the derived percentage agrees with the stored metric. DCA nominal chart
+   values cannot establish flow-adjusted drawdown dates; report unavailable
+   when the underlying flow/risk path was not retained. Keep the capital-scaled
+   money example explicitly an illustration.
+3. Structured drafts report `language`, complete `text`, and `figures`. Each
+   figure reports its `fact_key`, canonical `value`, exact visible `quote` and
+   one-based occurrence. Code resolves each visible span, checks the key and
+   value against that specific fact, checks the quoted rounding/unit and
+   requires complete numeric coverage. Unknown, swapped, absent, overlapping
+   or duplicate references fail the complete draft. Identity names such as
+   S&P 500 are not numerical facts or a license to quote an unsupported 500.
+4. The reported written language must match the requested workspace language.
+   A mismatch or malformed report falls back atomically through existing
+   provenance fields. No partial salvage, general language classifier,
+   additional prose quotas or new causal/forecast rules are introduced.
+5. References verify structured attribution; they cannot prove arbitrary
+   natural-language entailment. The final comparison therefore reviews every
+   accepted text for factual errors, including false relationships between
+   individually true values. The bar is zero factual errors in accepted text.
+6. Prepare 48 tasks for each tier setting using the same three genuine saved
+   runs, both languages, four repetitions and both surfaces: 96 tasks total.
+   Interleave current and structured settings. Both arms use the same corrected
+   code; only the two readout task-tier mappings differ, exclusively in
+   `src/argus/llm/openrouter_tasks.py`. Retain source hashes, raw drafts,
+   structured references, failures, receipts, costs and quality dispositions.
+7. Post an estimate after free exact-payload sizing, then wait for explicit
+   founder approval before any paid execution. Earlier unused budget does not
+   authorize this round. No fresh backtests or browser turns are included.
+8. Push verified fixes and resolve review threads r3983053127 and r3983053137
+   with their concrete evidence; this does not merge the PR. Report per-tier
+   acceptance, fallback, quality pass and every factual error in accepted text.
+   If neither tier has zero accepted factual errors, recommend keeping templates.
+
+The existing frame, transport, history, privacy, no-touch and founder-merge
+boundaries remain in force. The second-round evidence must not replace the
+first round or become fingerprint authority.
