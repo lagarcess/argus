@@ -402,6 +402,45 @@ def test_crypto_never_reaches_finance_search(monkeypatch) -> None:
     assert result.stage_patch["next_experiments"]["rows"]
 
 
+def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
+    monkeypatch,
+) -> None:
+    """Decision 10: a forecast about Bitcoin is a claim, not a figure Argus's
+    own data can answer, so it is grounded on publishers with the finance tool
+    (which never covered crypto) left out of the request."""
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="company_lookup",
+        symbols=["BTC"],
+        asset_class_hint="crypto",
+        requires_publisher_sources=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Analyst targets for Bitcoin range widely; base case shown.",
+                sources=["https://www.reuters.com/markets/bitcoin-outlook/"],
+                tickers=["BTC"],
+            )
+        ],
+    )
+
+    result = _run("If I hold $10,000 of Bitcoin, what will it be worth in ten years?")
+
+    assert result is not None
+    assert len(transport.requests) == 1
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    tools = [tool["type"] for tool in body["tools"]]
+    assert "finance_search" not in tools
+    assert "web_search" in tools
+    assert body["max_steps"] == RESEARCH_CONFIG_SPECS["balanced"].max_steps
+    sidecar = result.stage_patch["research"]
+    assert sidecar.get("degraded") != {"code": "asset_class_not_covered"}
+    assert sidecar["capability_class"] == "balanced_lookup"
+
+
 def test_currency_pairs_degrade_honestly(monkeypatch) -> None:
     set_research_query(
         monkeypatch,

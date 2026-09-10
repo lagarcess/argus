@@ -223,14 +223,37 @@ def research_next_experiment_rows(
     peers: list[dict[str, str]],
     language: str,
     coverage_probe: Callable[[str, str], date | None] | None = None,
+    entry_rule: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Compose up to three prebaked runnable rows for a research answer."""
+    """Compose up to three prebaked runnable rows for a research answer.
+
+    ``entry_rule`` is the typed rule the question named, if any: a forward
+    question about a golden cross is answered as research, and the row then
+    offers what that idea actually did, beside the plain hold."""
     spanish = language == "es-419"
     rows: list[dict[str, Any]] = []
     testable = [s for s in subjects if s.get("asset_class") in ("equity", "crypto")]
     if not testable:
         return None
     anchor = testable[0]
+    crossover = _crossover_rule(entry_rule)
+    if crossover is not None and len(testable) == 1:
+        rule_window = row_window([anchor], probe=coverage_probe)
+        rows.append(
+            _row(
+                kind="research_test_rule",
+                parts=[
+                    {"type": "text", "value": "Probar " if spanish else "Test "},
+                    {"type": "text", "value": _crossover_label(crossover, spanish)},
+                    {"type": "text", "value": " en " if spanish else " on "},
+                    *_identity_parts([anchor]),
+                    *_window_parts(rule_window, spanish),
+                ],
+                send_text=_crossover_send_text(
+                    anchor["symbol"], crossover, spanish, rule_window
+                ),
+            )
+        )
     if len(testable) >= 2:
         group = testable[: min(len(testable), 5)]
         symbols = ", ".join(s["symbol"] for s in group)
@@ -366,6 +389,62 @@ def _send_text(symbols: str, spanish: bool, window: RowWindow) -> str:
     if spanish:
         return f"Prueba comprar y mantener {symbols} en su historial disponible"
     return f"Test buying and holding {symbols} over its available history"
+
+
+def _crossover_rule(entry_rule: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The typed moving-average crossover a question named, or nothing.
+
+    Only the crossover family is offered as a row: its send text is the
+    shorthand the interpreter already reads, so a tap needs no clarification."""
+    if not isinstance(entry_rule, dict):
+        return None
+    if str(entry_rule.get("type") or "") != "moving_average_crossover":
+        return None
+    try:
+        fast = int(entry_rule.get("fast_period"))
+        slow = int(entry_rule.get("slow_period"))
+    except (TypeError, ValueError):
+        return None
+    if fast <= 0 or slow <= 0 or fast >= slow:
+        return None
+    indicator = str(entry_rule.get("fast_indicator") or "sma").strip().lower()
+    return {
+        "fast": fast,
+        "slow": slow,
+        "indicator": "ema" if indicator == "ema" else "sma",
+    }
+
+
+def _crossover_label(rule: dict[str, Any], spanish: bool) -> str:
+    average = rule["indicator"].upper()
+    if spanish:
+        return f"el cruce {average} {rule['fast']}/{rule['slow']}"
+    return f"the {rule['fast']}/{rule['slow']} {average} crossover"
+
+
+def _crossover_send_text(
+    symbol: str, rule: dict[str, Any], spanish: bool, window: RowWindow
+) -> str:
+    average = rule["indicator"].upper()
+    if spanish:
+        trigger = (
+            f"comprar {symbol} cuando la {average} de {rule['fast']} días cruza "
+            f"por encima de la de {rule['slow']} días"
+        )
+        if window.is_full:
+            return f"Prueba {trigger} durante los últimos tres años"
+        if window.start is not None:
+            return f"Prueba {trigger} desde {window.start.isoformat()} hasta hoy"
+        return f"Prueba {trigger} en su historial disponible"
+    trigger = (
+        f"buying {symbol} when the {rule['fast']}-day {average} crosses above "
+        f"the {rule['slow']}-day {average}"
+    )
+    if window.is_full:
+        return f"Test {trigger} over the last three years"
+    if window.start is not None:
+        return f"Test {trigger} from {window.start.isoformat()} until today"
+    return f"Test {trigger} over its available history"
 
 
 def _row(*, kind: str, parts: list[dict[str, str]], send_text: str) -> dict[str, Any]:

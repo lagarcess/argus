@@ -146,9 +146,7 @@ def test_a_row_never_names_a_window_the_asset_cannot_cover() -> None:
         return ipo_day if symbol == "SWMR" else date(2020, 1, 2)
 
     rows = research_next_experiment_rows(
-        subjects=[
-            {"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}
-        ],
+        subjects=[{"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}],
         peers=[],
         language="en",
         coverage_probe=probe,
@@ -161,9 +159,7 @@ def test_a_row_never_names_a_window_the_asset_cannot_cover() -> None:
     assert "2026-03-17" in rows["rows"][0]["send_text"]
 
     spanish = research_next_experiment_rows(
-        subjects=[
-            {"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}
-        ],
+        subjects=[{"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}],
         peers=[],
         language="es-419",
         coverage_probe=probe,
@@ -206,3 +202,63 @@ def test_unknown_coverage_drops_the_window_rather_than_guessing() -> None:
     label = rows["rows"][0]["label"]
     assert label == "Test Netflix (NFLX)"
     assert "available history" in rows["rows"][0]["send_text"]
+
+
+def test_a_named_crossover_is_offered_beside_the_plain_hold() -> None:
+    """Decision 10: after a forward answer about a golden cross, the rows
+    offer what that idea actually did and the plain hold the market contrast
+    rides on; the sent text is the shorthand the interpreter already reads."""
+    rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    rows = research_next_experiment_rows(
+        subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
+        peers=[],
+        language="en",
+        coverage_probe=lambda symbol, asset_class: None,
+        entry_rule=rule,
+    )
+    assert rows is not None
+    assert [row["kind"] for row in rows["rows"]] == [
+        "research_test_rule",
+        "research_test_single",
+    ]
+    assert rows["rows"][0]["label"] == "Test the 50/200 SMA crossover on NVIDIA (NVDA)"
+    assert rows["rows"][0]["send_text"] == (
+        "Test buying NVDA when the 50-day SMA crosses above the 200-day SMA "
+        "over its available history"
+    )
+    spanish = research_next_experiment_rows(
+        subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
+        peers=[],
+        language="es-419",
+        coverage_probe=lambda symbol, asset_class: None,
+        entry_rule=rule,
+    )
+    assert spanish is not None
+    assert spanish["rows"][0]["label"] == "Probar el cruce SMA 50/200 en NVIDIA (NVDA)"
+    assert "cruza por encima" in spanish["rows"][0]["send_text"]
+
+
+def test_only_a_complete_crossover_earns_a_rule_row() -> None:
+    subjects = [{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}]
+    for rule in (
+        None,
+        {"type": "rsi_threshold", "entry_threshold": 30},
+        {"type": "moving_average_crossover", "fast_period": 200, "slow_period": 50},
+        {"type": "moving_average_crossover", "fast_period": None, "slow_period": 200},
+    ):
+        rows = research_next_experiment_rows(
+            subjects=subjects,
+            peers=[],
+            language="en",
+            coverage_probe=lambda symbol, asset_class: None,
+            entry_rule=rule,
+        )
+        assert rows is not None
+        assert [row["kind"] for row in rows["rows"]] == ["research_test_single"]

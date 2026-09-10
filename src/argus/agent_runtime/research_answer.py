@@ -202,13 +202,28 @@ async def _dispatch(
     subjects = _resolved_subjects(query)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
     if off_coverage or query.asset_class_hint in ("crypto", "currency_pair"):
-        return await grounded.off_coverage_result(
+        if not grounded.requires_publisher_sources(query):
+            return await grounded.off_coverage_result(
+                query=query,
+                subjects=subjects,
+                interpretation=interpretation,
+                state=state,
+                user=user,
+                decision=decision,
+            )
+        # A claim about crypto or a currency pair (a forecast, a company
+        # story, why it moved) is grounded on public pages: the provider's
+        # finance tool never covers these classes, publishers do, and a
+        # figure from Argus's own data cannot answer a claim.
+        return await grounded.grounded_result(
             query=query,
             subjects=subjects,
+            shape="balanced",
             interpretation=interpretation,
             state=state,
             user=user,
             decision=decision,
+            provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
     if shape == "thorough":

@@ -15,8 +15,10 @@ patch carries prose, sidecars, and rows only.
 
 Coverage (spec section 5, probe-verified 2026-08-07): equities and ETFs route
 to finance_search. Crypto and currency pairs never do: the live probe showed
-"BTC" resolving to an ETF proxy and FX quotes returning empty, so both classes
-answer from Argus's own Kraken-backed data with an honest coverage note.
+"BTC" resolving to an ETF proxy and FX quotes returning empty, so a figure
+about them answers from Argus's own Kraken-backed data with an honest coverage
+note, and a claim about them (a forecast, a company story, why it moved) is
+grounded on public pages with the finance tool left out (decision 10).
 """
 
 from __future__ import annotations
@@ -171,6 +173,7 @@ async def grounded_result(
     state: RunState,
     user: UserState,
     decision: InterpretDecision | None = None,
+    provider_finance: bool = True,
 ) -> StageResult | None:
     publisher_sources_required = requires_publisher_sources(query)
     question_as_of_date = question_date()
@@ -184,6 +187,14 @@ async def grounded_result(
         closed_period=query.period_is_closed_window,
         language_tag=language,
     )
+    if not provider_finance:
+        # Crypto and currency pairs are outside the finance tool's coverage
+        # (module docstring); a claim about them is grounded on public pages.
+        spec = spec.model_copy(
+            update={
+                "tools": tuple(tool for tool in spec.tools if tool != "finance_search")
+            }
+        )
     prompt = _research_prompt(
         message=state.current_user_message,
         subjects=subjects,
@@ -448,7 +459,10 @@ def _packet_stage_result(
         subjects = peers[:1]
         peers = peers[1:]
     rows = research_next_experiment_rows(
-        subjects=subjects, peers=peers, language=language
+        subjects=subjects,
+        peers=peers,
+        language=language,
+        entry_rule=getattr(interpretation.candidate_strategy_draft, "entry_rule", None),
     )
     if not rows and subjects:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
@@ -1047,6 +1061,15 @@ def _research_prompt(
             "answering. If no such page is available, say only that the "
             "claim could not be verified."
         )
+    lines.append(
+        "If the question asks what something will be worth, what it must grow "
+        "into, or what it is worth today, answer as scenarios: build them from "
+        "cited forecasts, analyst targets and valuation multiples, write the "
+        "arithmetic out step by step from those inputs, and give the result as "
+        "labeled scenario ranges (for example bear, base and bull). Never "
+        "present one number as the future, and never say what the reader "
+        "should do."
+    )
     lines.append(
         "Answer the question directly for a curious non-expert, leading with "
         "the answer. Use compact tables only where they genuinely help. State "

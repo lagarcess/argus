@@ -179,7 +179,7 @@ from argus.agent_runtime.interpreter.execution_cost_capability import (
     has_execution_cost_candidate,
 )
 from argus.agent_runtime.interpreter.unsupported_admission import (
-    future_performance_capability_clause,
+    future_test_window_capability_clause,
     requested_strategy_template_capability_clause,
 )
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
@@ -888,17 +888,17 @@ class OpenRouterStructuredInterpreter:
             "other executable signal by yourself. If the user does not name the "
             "indicator, threshold, crossover, or price rule, mark the entry rule as "
             "missing or ask for the executable definition.\n\n"
-            + future_performance_capability_clause()
+            + future_test_window_capability_clause()
             + "Valuation and fundamental language is valid investing intent, not user "
-            "error. If the user says a stock looked cheap, undervalued, expensive, "
-            "or references P/E, earnings, revenue, margins, or fundamentals, preserve "
-            "that meaning. The current engine cannot execute valuation or fundamental "
-            "data as entry/exit rules, so do not pretend those rules are runnable. "
-            "Ask for a supported proxy when needed, such as buy-and-hold over the "
-            "period they care about, DCA, a supported RSI threshold, or a supported "
-            "moving-average/signal rule. Explain the boundary in product language: "
-            "the concept is financially real, but Argus needs an executable historical "
-            "price/indicator rule to simulate it today.\n\n"
+            "error. Whether a stock is cheap, expensive or fairly valued, and what "
+            "its P/E, earnings, revenue, margins or fundamentals say, is a research "
+            "question: fill research_query and let it be answered; do not steer it "
+            "toward a backtest. Only when the user wants to test a rule built on "
+            "valuation or fundamentals (buy when the P/E is under 15) does the "
+            "engine boundary apply: it cannot execute valuation or fundamental data "
+            "as entry/exit rules, so preserve the meaning, say so in product "
+            "language, and offer a supported proxy such as buy-and-hold, DCA, an RSI "
+            "threshold, or a moving-average/signal rule over the period they care about.\n\n"
             "Use data-availability allowances as deterministic capability truth. "
             "Equity launch history starts in 2016 for the current launch path, so "
             "do not invent a shorter 3-year limit for equities. Currency-pair "
