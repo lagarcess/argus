@@ -41,8 +41,10 @@ these example numbers may be represented as historical performance. Paid mode
 rejects every synthetic source. A genuine saved DOCN/SPY run was subsequently
 located through a read-only database query, with no provider call. Its sanitized
 typed snapshot remains separate under `/private/tmp/`; it is not committed and
-does not change the synthetic examples into empirical evidence. The DCA and
-indicator empirical fixtures are still missing.
+does not change the synthetic examples into empirical evidence. Fresh DOCN and RSI fixtures are now retained under `live-browser/stored-runs/`.
+The DCA chat setup hit an unrelated capital-interpretation failure. The fourth
+simulation allowance will supply its genuine fixture through the typed engine
+path; that fixture will not represent a successful DCA browser journey.
 
 For an empirical fixture, `source.kind` is `recorded_run`; `source.artifact`
 points to the approved sanitized saved-run JSON, relative to the fixture file;
@@ -53,8 +55,8 @@ metric precision and absent fields; do not fabricate a curve or full ledger.
 
 ## Cost and execution bounds
 
-Founder-approved total allowance: **up to $5**, using **$4 for the 48-completion
-comparison plus $1 for browser proof**, with at most four fresh browser
+Founder-approved total allowance: **up to $5**, using **$3.50 for the 48-completion
+comparison and at most $1.50 for browser proof**, with at most four fresh browser
 backtests. This supersedes the earlier $1 targeted measurement / $2 total
 request. No full live suite or fingerprint regeneration is included in this
 authorization.
@@ -90,8 +92,9 @@ Refreshed official maximum rate envelopes, USD per million input/output tokens:
 
 Including all configured primary/fallback models, four attempts per completion
 and the 60,000-byte bound, the 48-completion worst-case reservation is
-**$3.482112**. The $4 measurement allocation covers that bound. Browser spending
-is tracked separately within the $1 allocation and four-backtest limit.
+**$3.482112**. The $3.50 measurement allocation covers that bound. Browser spending
+is tracked separately; its original $1 guard remains in force unless explicitly
+raised within the combined $5 allowance. The four-backtest limit is unchanged.
 
 Sum that for all 48 task completions. Prices may be supplied in a small JSON
 file with `verified_at`, `source`, and `models`, where each configured model has
@@ -135,7 +138,7 @@ poetry run python -m tests.evals.result_readout_eval \
   --candidate /Users/garces/.codex/worktrees/7c2d/private-alpha-next \
   --fixtures /private/tmp/model-result-readouts-recorded-fixtures.json \
   --pricing /private/tmp/model-result-readouts-refreshed-prices.json \
-  --budget-usd 4 --live \
+  --budget-usd 3.5 --live \
   --output /private/tmp/model-result-readouts-live.json
 ```
 

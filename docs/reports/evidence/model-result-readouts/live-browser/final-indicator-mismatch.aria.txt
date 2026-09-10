@@ -1,0 +1,128 @@
+- alert: Estrategia RSI SPY 2025-2026 · Argus
+- main:
+  - button "Show dev tools":
+    - img
+  - complementary:
+    - button "Collapse sidebar":
+      - img
+    - text: argus
+    - button "New chat":
+      - img
+      - text: New chat
+    - button "Search":
+      - img
+      - text: Search
+    - button "Recents":
+      - img
+      - text: Recents
+      - img
+    - button "Settings":
+      - img
+      - text: Settings
+  - heading "Estrategia RSI SPY 2025-2026" [level=1]
+  - button "Chat options":
+    - img
+  - status
+  - region "Conversation":
+    - text: Prueba una estrategia RSI en SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con capital inicial de $1,000. Compra cuando el RSI de 14 días caiga por debajo de 30 y vende cuando supere 70. Compara con SPY. Sin comisiones ni deslizamiento.
+    - button "Copy Plain Text":
+      - img
+    - text: SPY
+    - heading "RSI Threshold" [level=3]
+    - text: Run complete
+    - term: Starting capital
+    - definition: $1,000
+    - term: Period
+    - definition: Sep 10, 2025 → Sep 9, 2026
+    - term: Buy rule
+    - definition: Comprar cuando RSI(14) cae a 30 o menos
+    - term: Exit rule
+    - definition: Vender cuando RSI(14) sube a 70 o más
+    - text: "Stocks Daily data No fees No slippage Benchmark: SPY"
+    - button "Good response":
+      - img
+    - button "Poor response":
+      - img
+    - button "More Actions":
+      - img
+    - text: Ejecutar backtest
+    - button "Copy Plain Text":
+      - img
+    - region "Hero + Delta Evidence Card":
+      - text: SPY
+      - heading "RSI Threshold" [level=3]
+      - paragraph: Sep 10, 2025 → Sep 9, 2026 · Daily data
+      - text: Simulation Complete
+      - table:
+        - row:
+          - cell
+          - cell:
+            - link "Charting by TradingView":
+              - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=127.0.0.1/chat
+              - img
+          - cell
+        - row:
+          - cell
+          - cell
+          - cell
+      - link "TradingView Lightweight Charts":
+        - /url: https://www.tradingview.com/
+      - group "Chart range":
+        - button "1M"
+        - button "3M"
+        - button "YTD"
+        - button "All" [pressed]
+        - button "Range details":
+          - text: Range details
+          - img
+      - status: "Período visible: 10 sept 2025 al 9 sept 2026."
+      - paragraph: Ending value
+      - paragraph: $1,086
+      - paragraph: +$86 gain · +8.6% total return
+      - term: Compared with SPY
+      - definition: Lagged by 8.3 percentage points
+      - term: Worst drop
+      - definition: "-4.8%"
+      - paragraph: Stocks · Historical simulation · No fees/slippage · Not advice
+      - group:
+        - text: View details
+        - img
+      - button "Refine idea":
+        - img
+        - text: Refine idea
+      - button "Add decision":
+        - img
+        - text: Add decision
+    - region "Quick take":
+      - text: Quick take
+      - paragraph: RSI Threshold for SPY, Sep 10, 2025 → Sep 9, 2026. The total return was +8.6%. It finished 8.3 percentage points behind SPY. The worst drop was -4.8%.
+    - button "Good response":
+      - img
+    - button "Poor response":
+      - img
+    - button "More Actions":
+      - img
+    - text: Explicar resultado
+    - button "Copy Plain Text":
+      - img
+    - region "Result breakdown":
+      - text: Breakdown
+      - paragraph: RSI Threshold for SPY, Sep 10, 2025 → Sep 9, 2026. The total return was +8.6%. It finished 8.3 percentage points behind SPY. The worst drop was -4.8%.
+      - paragraph: "Entry rule: RSI(14) is at or below 30"
+      - paragraph: "Exit rule: RSI(14) is at or above 70"
+      - paragraph: SPY returned +16.9% over the tested period.
+      - paragraph: This is a historical simulation, not a forecast or investment advice.
+    - button "Good response":
+      - img
+    - button "Poor response":
+      - img
+    - button "More Actions":
+      - img
+  - button "Mention an asset or indicator":
+    - img
+  - combobox "Add a follow-up"
+  - text: Add a follow-up
+  - button "Send message" [disabled]:
+    - img
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.
+  - status: Copied

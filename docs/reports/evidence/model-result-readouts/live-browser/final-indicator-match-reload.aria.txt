@@ -1,0 +1,127 @@
+- alert
+- main:
+  - button "Show dev tools":
+    - img
+  - complementary:
+    - button "Expand sidebar":
+      - img
+    - text: argus
+    - button "Nuevo chat":
+      - img
+      - text: Nuevo chat
+    - button "Buscar":
+      - img
+      - text: Buscar
+    - button "Recientes":
+      - img
+      - text: Recientes
+    - button "Ajustes":
+      - img
+      - text: Ajustes
+  - heading "Estrategia RSI SPY 2025-2026" [level=1]
+  - button "Opciones de chat":
+    - img
+  - status
+  - region "Conversación":
+    - text: Prueba una estrategia RSI en SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con capital inicial de $1,000. Compra cuando el RSI de 14 días caiga por debajo de 30 y vende cuando supere 70. Compara con SPY. Sin comisiones ni deslizamiento.
+    - button "Copiar texto":
+      - img
+    - text: SPY
+    - heading "Umbral RSI" [level=3]
+    - text: Ejecución completa
+    - term: Capital inicial
+    - definition: $1,000
+    - term: Periodo
+    - definition: 10 sept 2025 → 9 sept 2026
+    - term: Regla de compra
+    - definition: Comprar cuando RSI(14) cae a 30 o menos
+    - term: Regla de salida
+    - definition: Vender cuando RSI(14) sube a 70 o más
+    - text: "Acciones Datos diarios Sin comisiones Sin deslizamiento Referencia: SPY"
+    - button "Buena respuesta":
+      - img
+    - button "Mala respuesta":
+      - img
+    - button "Más acciones":
+      - img
+    - text: Ejecutar backtest
+    - button "Copiar texto":
+      - img
+    - region "Hero + Delta Evidence Card":
+      - text: SPY
+      - heading "Umbral RSI" [level=3]
+      - paragraph: 10 sept 2025 → 9 sept 2026 · Datos diarios
+      - text: Simulación completa
+      - table:
+        - row:
+          - cell
+          - cell:
+            - link "Charting by TradingView":
+              - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=127.0.0.1/chat
+              - img
+          - cell
+        - row:
+          - cell
+          - cell
+          - cell
+      - link "TradingView Lightweight Charts":
+        - /url: https://www.tradingview.com/
+      - group "Rango del gráfico":
+        - button "1M"
+        - button "3M"
+        - button "Este año"
+        - button "Todo" [pressed]
+        - button "Detalles del rango":
+          - text: Detalles del rango
+          - img
+      - status: "Período visible: 10 sept 2025 al 9 sept 2026."
+      - paragraph: Valor final
+      - paragraph: $1,086
+      - paragraph: +$86 ganancia · +8.6% rendimiento total
+      - term: Comparado con SPY
+      - definition: Quedó por debajo por 8.3 puntos porcentuales
+      - term: Peor caída
+      - definition: "-4.8%"
+      - paragraph: Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+      - group:
+        - text: Ver detalles
+        - img
+      - button "Ajustar idea":
+        - img
+        - text: Ajustar idea
+      - button "Agregar decisión":
+        - img
+        - text: Agregar decisión
+    - region "Lectura rápida":
+      - text: Lectura rápida
+      - paragraph: Umbral RSI de SPY, 10 sept 2025 → 9 sept 2026. El retorno total fue de +8.6%. Terminó 8.3 puntos porcentuales por debajo de SPY. La peor caída fue de -4.8%.
+    - button "Buena respuesta":
+      - img
+    - button "Mala respuesta":
+      - img
+    - button "Más acciones":
+      - img
+    - text: Explicar resultado
+    - button "Copiar texto":
+      - img
+    - region "Desglose del resultado":
+      - text: Desglose
+      - paragraph: Umbral RSI de SPY, 10 sept 2025 → 9 sept 2026. El retorno total fue de +8.6%. Terminó 8.3 puntos porcentuales por debajo de SPY. La peor caída fue de -4.8%.
+      - paragraph: "Regla de entrada: RSI(14) es igual o inferior a 30"
+      - paragraph: "Regla de salida: RSI(14) es igual o superior a 70"
+      - paragraph: SPY tuvo un retorno de +16.9% durante el período probado.
+      - paragraph: Esta es una simulación histórica, no un pronóstico ni asesoría de inversión.
+    - button "Buena respuesta":
+      - img
+    - button "Mala respuesta":
+      - img
+    - button "Más acciones":
+      - img
+  - button "Menciona un activo o indicador":
+    - img
+  - combobox "Haz una pregunta de seguimiento..."
+  - text: Haz una pregunta de seguimiento...
+  - button "Enviar mensaje" [disabled]:
+    - img
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
+  - status: Copiado

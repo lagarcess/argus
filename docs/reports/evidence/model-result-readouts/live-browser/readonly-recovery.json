@@ -1,0 +1,42 @@
+{
+  "candidate_sha": "c36c099316578fb03804405f24cc1600debd0f25",
+  "observations": [
+    {
+      "label": "docn-en-saved-match",
+      "language": "en",
+      "url": "http://127.0.0.1:3220/chat?conversation=40c75455-f043-437a-bb00-1a33540b1fc9",
+      "title": "DOCN Buy and Hold Strategy · Argus",
+      "quick_take": "This backtest shows a buy-and-hold strategy for DigitalOcean (DOCN) from September 2023 through September 2026, which grew a $1,000 starting capital to a total return of 396.26%. That outperformed the SPY benchmark by 327.27 percentage points over the same period, though the ride was rough with a maximum drawdown of 44.86%. The strategy executed only one trade during this window, meaning the entire result comes from holding the position through a single entry and exit.",
+      "breakdown": "Buy and Hold for DOCN, Sep 1, 2023 → Sep 9, 2026. The total return was +396.3%. It finished 327.3 percentage points ahead of SPY. The worst drop was -44.9%.\n\nSPY returned +69.0% over the tested period.\n\nThis is a historical simulation, not a forecast or investment advice."
+    },
+    {
+      "label": "docn-en-saved-match-reload",
+      "language": "en",
+      "url": "http://127.0.0.1:3220/chat?conversation=40c75455-f043-437a-bb00-1a33540b1fc9",
+      "title": "DOCN Buy and Hold Strategy · Argus",
+      "quick_take": "This backtest shows a buy-and-hold strategy for DigitalOcean (DOCN) from September 2023 through September 2026, which grew a $1,000 starting capital to a total return of 396.26%. That outperformed the SPY benchmark by 327.27 percentage points over the same period, though the ride was rough with a maximum drawdown of 44.86%. The strategy executed only one trade during this window, meaning the entire result comes from holding the position through a single entry and exit.",
+      "breakdown": "Buy and Hold for DOCN, Sep 1, 2023 → Sep 9, 2026. The total return was +396.3%. It finished 327.3 percentage points ahead of SPY. The worst drop was -44.9%.\n\nSPY returned +69.0% over the tested period.\n\nThis is a historical simulation, not a forecast or investment advice."
+    },
+    {
+      "label": "docn-en-saved-mismatch-es",
+      "language": "es-419",
+      "url": "http://127.0.0.1:3220/chat?conversation=40c75455-f043-437a-bb00-1a33540b1fc9",
+      "title": "DOCN Buy and Hold Strategy · Argus",
+      "quick_take": "Comprar y mantener de DOCN, 1 sept 2023 → 9 sept 2026. El retorno total fue de +396.3%. Terminó 327.3 puntos porcentuales por encima de SPY. La peor caída fue de -44.9%.",
+      "breakdown": "Comprar y mantener de DOCN, 1 sept 2023 → 9 sept 2026. El retorno total fue de +396.3%. Terminó 327.3 puntos porcentuales por encima de SPY. La peor caída fue de -44.9%.\n\nSPY tuvo un retorno de +69.0% durante el período probado.\n\nEsta es una simulación histórica, no un pronóstico ni asesoría de inversión."
+    },
+    {
+      "label": "docn-en-saved-mismatch-es-reload",
+      "language": "es-419",
+      "url": "http://127.0.0.1:3220/chat?conversation=40c75455-f043-437a-bb00-1a33540b1fc9",
+      "title": "DOCN Buy and Hold Strategy · Argus",
+      "quick_take": "Comprar y mantener de DOCN, 1 sept 2023 → 9 sept 2026. El retorno total fue de +396.3%. Terminó 327.3 puntos porcentuales por encima de SPY. La peor caída fue de -44.9%.",
+      "breakdown": "Comprar y mantener de DOCN, 1 sept 2023 → 9 sept 2026. El retorno total fue de +396.3%. Terminó 327.3 puntos porcentuales por encima de SPY. La peor caída fue de -44.9%.\n\nSPY tuvo un retorno de +69.0% durante el período probado.\n\nEsta es una simulación histórica, no un pronóstico ni asesoría de inversión."
+    }
+  ],
+  "console_entries": [],
+  "before_attempt_count": 9,
+  "after_attempt_count": 9,
+  "additional_model_requests": 0,
+  "scope": "Saved first-attempt result only; accepted Qwen Quick take and template Breakdown after budget halt"
+}

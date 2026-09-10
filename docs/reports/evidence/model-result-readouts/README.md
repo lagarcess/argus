@@ -39,9 +39,19 @@ free payload sizing. The candidate request reached 48,835 bytes, so the earlier
 8,000-byte/$1 targeted estimate is superseded by the revised measurement plan.
 No saved user identifiers or private prose are published with that snapshot.
 
-No paid model requests or new market-data simulations have run in this lane.
+Approved live browser proof is now in progress. Its attempt ledger preserves
+provider-reported costs and conservatively charges the full reservation when
+a failed request has no reported cost. Earlier captured results retain their
+original source versions; fixes do not rewrite their saved readouts.
 The prompt fingerprint intentionally remains unchanged until approved measured
 evidence exists. Its expected failure must not be waived or relabeled green.
+
+The GitHub Codex review returned three findings. Provider provenance was removed
+from both model inputs and its thread was resolved. Two scope questions remain
+open: semantic binding of a known number to its claimed metric, and automatic
+language detection. The requested numeric guard checks stored membership and
+units; the language stamp records the requested composition language. Neither
+is represented here as a general semantic or language classifier.
 
 ## Deterministic verification
 

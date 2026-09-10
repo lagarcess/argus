@@ -1,0 +1,52 @@
+- alert
+- main:
+  - button "Show dev tools":
+    - img
+  - complementary:
+    - button "Expand sidebar":
+      - img
+    - text: argus
+    - button "New chat":
+      - img
+      - text: New chat
+    - button "Search":
+      - img
+      - text: Search
+    - button "Recents":
+      - img
+      - text: Recents
+    - button "Settings":
+      - img
+      - text: Settings
+  - heading "DOCN vs SPY DCA Test" [level=1]
+  - button "Chat options":
+    - img
+  - status
+  - region "Conversation":
+    - text: Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 and contribute $100 every month. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.
+    - button "Copy Plain Text":
+      - img
+    - paragraph: Argus can run the monthly DCA with $100 contributions, fees, and slippage as you described. The $1,000 starting amount is a bit tricky here — would you like to run recurring buys only, use the $1,000 as starting capital plus the monthly buys, or switch to a buy-and-hold test with that starting amount?
+    - button "Good response":
+      - img
+    - button "Poor response":
+      - img
+    - button "More Actions":
+      - img
+    - text: Use the $1,000 as starting capital plus the $100 monthly contributions; it is not a total budget cap. Keep the same DOCN monthly schedule, dates, SPY benchmark, 10 basis point fee, and 5 basis point slippage.
+    - button "Copy Plain Text":
+      - img
+    - paragraph: "Argus can't run that rule directly yet for DOCN. Which supported direction should I use: Run recurring buys only, Use it as starting capital, or Use buy and hold with starting capital?"
+    - button "Good response":
+      - img
+    - button "Poor response":
+      - img
+    - button "More Actions":
+      - img
+  - button "Mention an asset or indicator":
+    - img
+  - combobox "Add a follow-up"
+  - button "Send message" [disabled]:
+    - img
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.
+- tooltip "Message is empty"

@@ -1,0 +1,65 @@
+- alert
+- main:
+  - button "Show dev tools":
+    - img
+  - complementary:
+    - button "Expand sidebar":
+      - img
+    - text: argus
+    - button "Nuevo chat":
+      - img
+      - text: Nuevo chat
+    - button "Buscar":
+      - img
+      - text: Buscar
+    - button "Recientes":
+      - img
+      - text: Recientes
+    - button "Ajustes":
+      - img
+      - text: Ajustes
+  - heading "Nuevo chat" [level=1]
+  - button "Opciones de chat":
+    - img
+  - status
+  - region "Conversación":
+    - text: Prueba una estrategia RSI en SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con capital inicial de $1,000. Compra cuando el RSI de 14 días caiga por debajo de 30 y vende cuando supere 70. Compara con SPY. Sin comisiones ni deslizamiento.
+    - button "Copiar texto":
+      - img
+    - text: SPY
+    - heading "Umbral RSI" [level=3]
+    - text: Listo para ejecutar
+    - term: Capital inicial
+    - definition: $1,000
+    - term: Periodo
+    - definition: 10 sept 2025 → 9 sept 2026
+    - term: Regla de compra
+    - definition: Comprar cuando RSI(14) cae a 30 o menos
+    - term: Regla de salida
+    - definition: Vender cuando RSI(14) sube a 70 o más
+    - text: "Acciones Datos diarios Sin comisiones Sin deslizamiento Referencia: SPY"
+    - button "Editar capital"
+    - button "Editar fechas"
+    - button "Editar costos"
+    - button "Ejecutar backtest":
+      - img
+      - text: Ejecutar backtest
+    - button "Cambiar supuestos":
+      - img
+      - text: Cambiar supuestos
+    - button "Cancelar":
+      - img
+      - text: Cancelar
+    - button "Buena respuesta":
+      - img
+    - button "Mala respuesta":
+      - img
+    - button "Más acciones":
+      - img
+  - button "Menciona un activo o indicador":
+    - img
+  - combobox "Haz una pregunta de seguimiento..."
+  - text: Haz una pregunta de seguimiento...
+  - button "Enviar mensaje" [disabled]:
+    - img
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

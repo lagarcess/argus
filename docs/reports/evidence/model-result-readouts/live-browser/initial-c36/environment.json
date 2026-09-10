@@ -1,0 +1,434 @@
+{
+  "candidate_sha": "c36c099316578fb03804405f24cc1600debd0f25",
+  "runtime_source_clean": true,
+  "budget": {
+    "cap_usd": "1.00",
+    "reported_cost_usd": "0.02436845",
+    "unreconciled_reservation_usd": "0.04329132",
+    "remaining_usd": "0.93234023",
+    "halted": "unpriced_completed_attempt",
+    "attempt_count": 9,
+    "attempts": [
+      {
+        "attempt": 1,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:11:35.509974+00:00",
+        "model": "x-ai/grok-4.3",
+        "schema": "LLMAssetMentionExtraction",
+        "request_sha256": "a97f45d2c316a7e912a77c8c48204b37f955aa021267791d51627f6b4f8876aa",
+        "input_token_upper_bound": 5334,
+        "max_output_tokens": 2200,
+        "reservation_usd": "0.03767",
+        "cost_usd": "0.00102685",
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:11:36.971980+00:00",
+        "status": 200,
+        "generation_id": "gen-1789071095-RBxMosuFmUIVRb6Djllo",
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 813,
+          "completion_tokens": 58,
+          "total_tokens": 871,
+          "cost": 0.00102685,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00102685,
+            "upstream_inference_prompt_cost": 0.00088185,
+            "upstream_inference_completions_cost": 0.000145
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "error_class": null
+      },
+      {
+        "attempt": 2,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:11:37.326544+00:00",
+        "model": "x-ai/grok-4.3",
+        "schema": "LLMInterpretationResponse",
+        "request_sha256": "9d3a59004cf0c006f2fbf4566659664c524a1e8d871c3ca017b12f9e9c66a73a",
+        "input_token_upper_bound": 54771,
+        "max_output_tokens": 3200,
+        "reservation_usd": "0.289855",
+        "cost_usd": "0.0172584",
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:11:51.353498+00:00",
+        "status": 200,
+        "generation_id": "gen-1789071097-O4qKdSKm0tkxG4w89O7r",
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 10626,
+          "completion_tokens": 1671,
+          "total_tokens": 12297,
+          "cost": 0.0172584,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0172584,
+            "upstream_inference_prompt_cost": 0.0130809,
+            "upstream_inference_completions_cost": 0.0041775
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1191,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "error_class": null
+      },
+      {
+        "attempt": 3,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:11:53.450649+00:00",
+        "model": "x-ai/grok-4.3",
+        "schema": "FocusedDateWindowExtraction",
+        "request_sha256": "7bf2b3632cb87d631264c263578d49bbbff86d41db49be6626ee668c29943c5b",
+        "input_token_upper_bound": 11361,
+        "max_output_tokens": 2200,
+        "reservation_usd": "0.067805",
+        "cost_usd": "0.00279435",
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:11:54.653819+00:00",
+        "status": 200,
+        "generation_id": "gen-1789071113-QAsSkOI0cb85PoJBftdi",
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 2179,
+          "completion_tokens": 82,
+          "total_tokens": 2261,
+          "cost": 0.00279435,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00279435,
+            "upstream_inference_prompt_cost": 0.00258935,
+            "upstream_inference_completions_cost": 0.000205
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "error_class": null
+      },
+      {
+        "attempt": 4,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:11:54.671990+00:00",
+        "model": "x-ai/grok-4.3",
+        "schema": "StatedRunFieldFidelityAudit",
+        "request_sha256": "c9918583477f25444bc00e10542185cff66ab69a7f66f788098f84d6583a5531",
+        "input_token_upper_bound": 11471,
+        "max_output_tokens": 900,
+        "reservation_usd": "0.061855",
+        "cost_usd": "0.0030131",
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:11:56.542800+00:00",
+        "status": 200,
+        "generation_id": "gen-1789071114-gg24ClvyhrHuW9iwckT0",
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 2268,
+          "completion_tokens": 125,
+          "total_tokens": 2393,
+          "cost": 0.0030131,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0030131,
+            "upstream_inference_prompt_cost": 0.0027006,
+            "upstream_inference_completions_cost": 0.0003125
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "error_class": null
+      },
+      {
+        "attempt": 5,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:11:57.078446+00:00",
+        "model": "google/gemini-2.5-flash-lite",
+        "schema": "name_suggestion",
+        "request_sha256": "b9b62615a7673e76a1939a1a44c8d23def4b8ea41b5d2ffa7f9770ee2018e64b",
+        "input_token_upper_bound": 3234,
+        "max_output_tokens": 400,
+        "reservation_usd": "0.00145224",
+        "cost_usd": "0.0000293",
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:11:57.791191+00:00",
+        "status": 200,
+        "generation_id": "gen-1789071117-6F5yGdI1qRfDrsligs8T",
+        "served_model": "google/gemini-2.5-flash-lite",
+        "usage": {
+          "prompt_tokens": 221,
+          "completion_tokens": 18,
+          "total_tokens": 239,
+          "cost": 2.93e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 2.93e-05,
+            "upstream_inference_prompt_cost": 2.21e-05,
+            "upstream_inference_completions_cost": 7.2e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "error_class": null
+      },
+      {
+        "attempt": 6,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:11:57.991874+00:00",
+        "model": "deepseek/deepseek-v4-flash",
+        "schema": "QuickTakeDraft",
+        "request_sha256": "1eb320cd344f33651911e9154164a1fff863fc20ff97a6959eedfecc45bba846",
+        "input_token_upper_bound": 9736,
+        "max_output_tokens": 700,
+        "reservation_usd": "0.00448112",
+        "cost_usd": null,
+        "outcome": "in_flight"
+      },
+      {
+        "attempt": 7,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:12:28.003284+00:00",
+        "model": "qwen/qwen3.5-9b",
+        "schema": "QuickTakeDraft",
+        "request_sha256": "7769e39dbf5ca5cac58722d200c9403e6c86f0ea5ef7777ed2c6edebecd15f40",
+        "input_token_upper_bound": 9725,
+        "max_output_tokens": 700,
+        "reservation_usd": "0.0034815",
+        "cost_usd": "0.00022345",
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:12:30.518506+00:00",
+        "status": 200,
+        "generation_id": "gen-1789071148-KfwPstP4Zgi1RROCwtTx",
+        "served_model": "qwen/qwen3.5-9b",
+        "usage": {
+          "prompt_tokens": 2035,
+          "completion_tokens": 133,
+          "total_tokens": 2168,
+          "cost": 0.00022345,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00022345,
+            "upstream_inference_prompt_cost": 0.0002035,
+            "upstream_inference_completions_cost": 1.995e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "error_class": null,
+        "readout_raw_completion": "{\n  \"text\": \"This backtest shows a buy-and-hold strategy for DigitalOcean (DOCN) from September 2023 through September 2026, which grew a $1,000 starting capital to a total return of 396.26%. That outperformed the SPY benchmark by 327.27 percentage points over the same period, though the ride was rough with a maximum drawdown of 44.86%. The strategy executed only one trade during this window, meaning the entire result comes from holding the position through a single entry and exit.\"\n}"
+      },
+      {
+        "attempt": 8,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:12:30.603774+00:00",
+        "model": "google/gemini-2.5-flash-lite",
+        "schema": "name_suggestion",
+        "request_sha256": "34dd8ee6eed99a3b3782f1549db9f6b4d94dcc4090641841e69f6d39344dda4e",
+        "input_token_upper_bound": 3033,
+        "max_output_tokens": 400,
+        "reservation_usd": "0.00137988",
+        "cost_usd": "0.000023",
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:12:31.221850+00:00",
+        "status": 200,
+        "generation_id": "gen-1789071150-6f0715rbXizRWQo5eu7W",
+        "served_model": "google/gemini-2.5-flash-lite",
+        "usage": {
+          "prompt_tokens": 166,
+          "completion_tokens": 16,
+          "total_tokens": 182,
+          "cost": 2.3e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 2.3e-05,
+            "upstream_inference_prompt_cost": 1.66e-05,
+            "upstream_inference_completions_cost": 6.4e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "error_class": null
+      },
+      {
+        "attempt": 9,
+        "case": "docn-en",
+        "started_at": "2026-09-10T20:12:31.790688+00:00",
+        "model": "openai/gpt-oss-120b",
+        "schema": "ResultBreakdownDraft",
+        "request_sha256": "cfea89bc107ddd701a6161c42bc1aede1629ba028fb69adeb748769a2cc5a425",
+        "input_token_upper_bound": 52186,
+        "max_output_tokens": 2400,
+        "reservation_usd": "0.0388102",
+        "cost_usd": null,
+        "outcome": "response",
+        "finished_at": "2026-09-10T20:12:31.948049+00:00",
+        "status": 400,
+        "generation_id": null,
+        "served_model": null,
+        "usage": {},
+        "error_class": null,
+        "readout_raw_completion": null
+      }
+    ]
+  },
+  "run_attempts": [
+    {
+      "case": "docn-en",
+      "payload_sha256": "756de3877ad7e591cea4cf1cd5416d950c6585b370b988ae3a6b45d8b329cabf",
+      "success": true
+    }
+  ],
+  "stored_runs": {
+    "recorded-docn-buyhold": {
+      "case": "old-run-new-breakdown",
+      "path": "docs/reports/evidence/model-result-readouts/live-browser/stored-runs/old-run-new-breakdown.json",
+      "sha256": "71d9f8193990d6a4da4ef3c557ce2cb548f678604ba9e0685a8a52fbc8ee760b",
+      "symbols": [
+        "DOCN"
+      ],
+      "template": null
+    },
+    "cd2b60be-f220-5a9a-9bef-da095669077d": {
+      "case": "docn-en",
+      "path": "docs/reports/evidence/model-result-readouts/live-browser/stored-runs/docn-en.json",
+      "sha256": "3cce17ff8236bb110fbc8c38cade27af74e560a0f07a93a774728d098d0cca56",
+      "symbols": [
+        "DOCN"
+      ],
+      "template": "buy_and_hold"
+    }
+  },
+  "provider_requests": [
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/calendar",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/assets/DOCN",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/assets/SPY",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/assets",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/assets",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/clock",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/calendar",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/calendar",
+      "method": "GET"
+    }
+  ],
+  "route_receipt_count": 11,
+  "hosted_database_calls": 0,
+  "persistence": "memory",
+  "provider_mode": "live_provider",
+  "old_conversation_id": "00000000-0000-4000-8000-000000005499"
+}

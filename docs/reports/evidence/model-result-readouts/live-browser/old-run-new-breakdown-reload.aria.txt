@@ -1,0 +1,57 @@
+- alert
+- main:
+  - button "Show dev tools":
+    - img
+  - complementary:
+    - button "Expand sidebar":
+      - img
+    - text: argus
+    - button "Nuevo chat":
+      - img
+      - text: Nuevo chat
+    - button "Buscar":
+      - img
+      - text: Buscar
+    - button "Recientes":
+      - img
+      - text: Recientes
+    - button "Ajustes":
+      - img
+      - text: Ajustes
+  - 'heading "Saved DOCN run: new Breakdown proof" [level=1]'
+  - button "Opciones de chat":
+    - img
+  - status
+  - region "Conversación":
+    - button "Copiar texto":
+      - img
+    - region "Lectura rápida":
+      - text: Lectura rápida
+      - paragraph: Prueba histórica de DOCN. El retorno total fue de +409.2%. Terminó 339.2 puntos porcentuales por encima de SPY. La peor caída fue de -44.9%.
+    - button "Buena respuesta":
+      - img
+    - button "Mala respuesta":
+      - img
+    - button "Más acciones":
+      - img
+    - text: Explicar resultado
+    - button "Copiar texto":
+      - img
+    - region "Desglose del resultado":
+      - text: Desglose
+      - paragraph: Prueba histórica de DOCN. El retorno total fue de +409.2%. Terminó 339.2 puntos porcentuales por encima de SPY. La peor caída fue de -44.9%.
+      - paragraph: SPY tuvo un retorno de +70.0% durante el período probado.
+      - paragraph: Esta es una simulación histórica, no un pronóstico ni asesoría de inversión.
+    - button "Buena respuesta":
+      - img
+    - button "Mala respuesta":
+      - img
+    - button "Más acciones":
+      - img
+  - button "Menciona un activo o indicador":
+    - img
+  - combobox "Haz una pregunta de seguimiento..."
+  - text: Haz una pregunta de seguimiento...
+  - button "Enviar mensaje" [disabled]:
+    - img
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
