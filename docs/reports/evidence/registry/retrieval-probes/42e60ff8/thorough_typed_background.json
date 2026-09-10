@@ -1,0 +1,436 @@
+{
+  "probe": "thorough_typed_background",
+  "purpose": "thorough background run on the Anthropic path under the schema",
+  "candidate_sha": "42e60ff899178c782573f44570b5f6bd2e20407c",
+  "captured_at": "2026-09-10T05:55:58.838295+00:00",
+  "elapsed_s": 26.4,
+  "request_overrides": {},
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "anthropic/claude-opus-4-7",
+          "openai/gpt-5.6-sol"
+        ],
+        "input": "Compare Netflix and Disney revenue growth over the last two fiscal years.\nTickers: Netflix (NFLX), Walt Disney (DIS)\nTime window: last two fiscal years\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "high",
+            "filters": {
+              "search_recency_filter": "month"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 10,
+        "max_output_tokens": 4096,
+        "language_preference": "en",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                    "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "label": {
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL cited for this figure, or null when no citation was supplied. Figures without a citation are published with a source limitation."
+                      }
+                    },
+                    "required": [
+                      "subject",
+                      "symbol",
+                      "label",
+                      "value",
+                      "kind",
+                      "unit",
+                      "as_of",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        },
+        "background": true
+      },
+      "http_status": 200,
+      "response": {
+        "background": true,
+        "completed_at": null,
+        "created_at": 1789019732,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_52d7ec87-2667-4e50-9099-6340fc739672",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "max_output_tokens": 4096,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "anthropic/claude-opus-4-7",
+        "object": "response",
+        "output": [],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": null,
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "queued",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "high",
+            "filters": {
+              "search_recency_filter": "month"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": null,
+        "user": null
+      }
+    },
+    {
+      "method": "GET",
+      "url": "https://api.perplexity.ai/v1/agent/resp_52d7ec87-2667-4e50-9099-6340fc739672",
+      "request": null,
+      "http_status": 200,
+      "response": {
+        "background": true,
+        "completed_at": 1789019758,
+        "created_at": 1789019758,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_52d7ec87-2667-4e50-9099-6340fc739672",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "max_output_tokens": 4096,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "anthropic/claude-opus-4-7",
+        "object": "response",
+        "output": [
+          {
+            "categories": [
+              "financials"
+            ],
+            "results": [
+              {
+                "category": "financials",
+                "content": "## NFLX FY 2023\n| date | period | income_statement_total_revenues |\n| --- | --- | --- |\n| 2025-12-31 | 2025 FY | 45,183,036,000 |\n| 2024-12-31 | 2024 FY | 39,000,966,000 |\n| 2023-12-31 | 2023 FY | 33,723,297,000 |\n\nData available in: `NFLX_annual_income_statement_f560b4.csv` (row key column: date)\n\n## DIS FY 2023\n| date | period | income_statement_total_revenues |\n| --- | --- | --- |\n| 2025-09-27 | 2025 FY | 94,425,000,000 |\n| 2024-09-28 | 2024 FY | 91,361,000,000 |\n| 2023-09-30 | 2023 FY | 88,898,000,000 |\n\nData available in: `DIS_annual_income_statement_f560b4.csv` (row key column: date)",
+                "sources": [
+                  "https://www.perplexity.ai/finance/DIS/financials",
+                  "https://www.perplexity.ai/finance/NFLX/financials"
+                ],
+                "tickers": [
+                  "NFLX",
+                  "DIS"
+                ]
+              }
+            ],
+            "tickers": [
+              "NFLX",
+              "DIS"
+            ],
+            "type": "finance_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"**Netflix has been growing revenue far faster than Disney over the last two fiscal years.** Netflix grew roughly 15.7% in FY2024 and about 15.9% in FY2025, while Disney grew roughly 2.8% in FY2024 and about 3.4% in FY2025.\\n\\n| Company | FY2023 revenue | FY2024 revenue | FY2025 revenue | FY2024 growth | FY2025 growth |\\n|---|---|---|---|---|---|\\n| Netflix (fiscal year ends December) | $33.72B | $39.00B | $45.18B | ~15.7% | ~15.9% |\\n| Walt Disney (fiscal year ends late September) | $88.90B | $91.36B | $94.43B | ~2.8% | ~3.4% |\\n\\nA few things to keep in mind for a fair comparison:\\n\\n- Disney is a much larger, more diversified business (parks, film, linear TV, streaming, sports), so its baseline growth tends to be slower than a pure-play streamer like Netflix.\\n- The two companies are on different fiscal calendars — Netflix's fiscal year matches the calendar year, while Disney's fiscal year ends in late September — so the periods don't line up exactly.\\n- Netflix's acceleration reflects strength in its subscription business (including paid sharing and ad-tier growth), while Disney's more modest growth reflects mixed results across its traditional media and parks segments alongside expanding streaming.\",\"rows\":[{\"as_of\":\"2023-12-31\",\"kind\":\"currency\",\"label\":\"Netflix FY2023 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":33723297000},{\"as_of\":\"2024-12-31\",\"kind\":\"currency\",\"label\":\"Netflix FY2024 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":39000966000},{\"as_of\":\"2025-12-31\",\"kind\":\"currency\",\"label\":\"Netflix FY2025 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":45183036000},{\"as_of\":\"2024-12-31\",\"kind\":\"percent\",\"label\":\"Netflix FY2024 revenue growth YoY\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"%\",\"value\":15.7},{\"as_of\":\"2025-12-31\",\"kind\":\"percent\",\"label\":\"Netflix FY2025 revenue growth YoY\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"%\",\"value\":15.9},{\"as_of\":\"2023-09-30\",\"kind\":\"currency\",\"label\":\"Disney FY2023 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":88898000000},{\"as_of\":\"2024-09-28\",\"kind\":\"currency\",\"label\":\"Disney FY2024 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":91361000000},{\"as_of\":\"2025-09-27\",\"kind\":\"currency\",\"label\":\"Disney FY2025 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":94425000000},{\"as_of\":\"2024-09-28\",\"kind\":\"percent\",\"label\":\"Disney FY2024 revenue growth YoY\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"%\",\"value\":2.8},{\"as_of\":\"2025-09-27\",\"kind\":\"percent\",\"label\":\"Disney FY2025 revenue growth YoY\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"%\",\"value\":3.4}]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_61425a12-4b64-45a2-8a47-b5fd3d0abef9",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": null,
+        "safety_identifier": null,
+        "service_tier": "standard",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.13881,
+            "currency": "USD",
+            "input_cost": 3e-05,
+            "output_cost": 0.04185,
+            "tool_calls_cost": 0.005,
+            "tool_calls_cost_details": {
+              "finance_search": 0.005
+            },
+            "total_cost": 0.18569
+          },
+          "input_tokens": 22215,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 22209,
+            "cache_read_input_tokens": 0,
+            "cached_tokens": 0
+          },
+          "output_tokens": 1674,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "tool_calls_details": {
+            "finance_search": {
+              "cost_usd": 0.005,
+              "invocation": 1
+            }
+          },
+          "total_tokens": 23889
+        },
+        "user": null
+      }
+    }
+  ],
+  "packet": {
+    "typed_answer": true,
+    "unsourced_rows": [],
+    "rows": [
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Netflix FY2023 total revenue",
+        "value": 33723297000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2023-12-31",
+        "source_url": null
+      },
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Netflix FY2024 total revenue",
+        "value": 39000966000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2024-12-31",
+        "source_url": null
+      },
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Netflix FY2025 total revenue",
+        "value": 45183036000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2025-12-31",
+        "source_url": null
+      },
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Netflix FY2024 revenue growth YoY",
+        "value": 15.7,
+        "kind": "percent",
+        "unit": "%",
+        "as_of": "2024-12-31",
+        "source_url": null
+      },
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Netflix FY2025 revenue growth YoY",
+        "value": 15.9,
+        "kind": "percent",
+        "unit": "%",
+        "as_of": "2025-12-31",
+        "source_url": null
+      },
+      {
+        "subject": "Walt Disney",
+        "symbol": "DIS",
+        "label": "Disney FY2023 total revenue",
+        "value": 88898000000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2023-09-30",
+        "source_url": null
+      },
+      {
+        "subject": "Walt Disney",
+        "symbol": "DIS",
+        "label": "Disney FY2024 total revenue",
+        "value": 91361000000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2024-09-28",
+        "source_url": null
+      },
+      {
+        "subject": "Walt Disney",
+        "symbol": "DIS",
+        "label": "Disney FY2025 total revenue",
+        "value": 94425000000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2025-09-27",
+        "source_url": null
+      },
+      {
+        "subject": "Walt Disney",
+        "symbol": "DIS",
+        "label": "Disney FY2024 revenue growth YoY",
+        "value": 2.8,
+        "kind": "percent",
+        "unit": "%",
+        "as_of": "2024-09-28",
+        "source_url": null
+      },
+      {
+        "subject": "Walt Disney",
+        "symbol": "DIS",
+        "label": "Disney FY2025 revenue growth YoY",
+        "value": 3.4,
+        "kind": "percent",
+        "unit": "%",
+        "as_of": "2025-09-27",
+        "source_url": null
+      }
+    ],
+    "sources": [],
+    "tool_results": [
+      "finance_results"
+    ],
+    "tickers": [
+      "NFLX",
+      "DIS"
+    ],
+    "usage": {
+      "invocations": 1,
+      "finance_search_invocations": 1,
+      "web_search_invocations": 0,
+      "fetch_url_invocations": 0,
+      "model": "anthropic/claude-opus-4-7",
+      "latency_ms": 250,
+      "cost_usd": 0.18569,
+      "input_tokens": 22215,
+      "output_tokens": 1674,
+      "cache_creation_input_tokens": 22209,
+      "cache_read_input_tokens": 0
+    },
+    "answer_markdown": "**Netflix has been growing revenue far faster than Disney over the last two fiscal years.** Netflix grew roughly 15.7% in FY2024 and about 15.9% in FY2025, while Disney grew roughly 2.8% in FY2024 and about 3.4% in FY2025.\n\n| Company | FY2023 revenue | FY2024 revenue | FY2025 revenue | FY2024 growth | FY2025 growth |\n|---|---|---|---|---|---|\n| Netflix (fiscal year ends December) | $33.72B | $39.00B | $45.18B | ~15.7% | ~15.9% |\n| Walt Disney (fiscal year ends late September) | $88.90B | $91.36B | $94.43B | ~2.8% | ~3.4% |\n\nA few things to keep in mind for a fair comparison:\n\n- Disney is a much larger, more diversified business (parks, film, linear TV, streaming, sports), so its baseline growth tends to be slower than a pure-play streamer like Netflix.\n- The two companies are on different fiscal calendars, Netflix's fiscal year matches the calendar year, while Disney's fiscal year ends in late September, so the periods don't line up exactly.\n- Netflix's acceleration reflects strength in its subscription business (including paid sharing and ad-tier growth), while Disney's more modest growth reflects mixed results across its traditional media and parks segments alongside expanding streaming."
+  },
+  "error": null
+}

@@ -4,8 +4,9 @@ The interpreter fingerprint (tests/test_interpreter_prompt_freeze.py) covers
 text the interpretation model reads. The retrieval instructions and the strict
 response schema steer Perplexity instead, so they are measured the way that
 provider can be measured: real responses recorded through the repository's
-own client, committed under docs/reports/evidence/545/probes. A change to
-either text has to travel with a new recording, or these locks fail.
+own client, committed under docs/reports/evidence/. Historical behavioral
+probes remain under 545; CURRENT_PROBES owns the active request recordings.
+A change to either text has to travel with a new recording, or these locks fail.
 """
 
 from __future__ import annotations
@@ -25,6 +26,10 @@ from argus.domain.research.contracts import typed_response_format
 from argus.domain.research.perplexity_agent import _packet_from_response
 
 PROBES = Path(__file__).resolve().parents[2] / "docs/reports/evidence/545/probes"
+CURRENT_PROBES = (
+    Path(__file__).resolve().parents[2]
+    / "docs/reports/evidence/registry/retrieval-probes/42e60ff8"
+)
 
 
 def _recording(name: str) -> dict[str, Any]:
@@ -52,10 +57,10 @@ def _packet(name: str):
 def test_the_recorded_request_is_the_request_the_code_builds_today(name: str) -> None:
     """Instructions and schema are frozen by these recordings: a change here
     has to be re-recorded, the way an interpreter change is re-measured."""
-    request = _request(name)
+    recording = json.loads((CURRENT_PROBES / f"{name}.json").read_text(encoding="utf-8"))
+    request = recording["exchanges"][0]["request"]
     assert request["instructions"] == RETRIEVAL_INSTRUCTIONS
     assert request["response_format"] == typed_response_format()
-    shape = _recording(name)["exchanges"][0]["request"]
     spec = RESEARCH_CONFIG_SPECS[
         "fast"
         if name == "fast_quote_typed"
@@ -63,9 +68,17 @@ def test_the_recorded_request_is_the_request_the_code_builds_today(name: str) ->
         if name == "thorough_typed_background"
         else "balanced"
     ]
-    assert shape["models"] == list(spec.models)
-    assert shape["max_steps"] == spec.max_steps
-    assert [tool["type"] for tool in shape["tools"]] == list(spec.tools)
+    assert request["models"] == list(spec.models)
+    assert request["max_steps"] == spec.max_steps
+    assert [tool["type"] for tool in request["tools"]] == list(spec.tools)
+    assert recording["error"] is None
+    completed = recording["exchanges"][-1]
+    assert completed["http_status"] == 200
+    assert completed["response"]["status"] == "completed"
+    packet = _packet_from_response(
+        completed["response"], latency_ms=0, on_unpriced=lambda _: None
+    )
+    assert packet.typed_answer and packet.answer_markdown.strip()
 
 
 def test_the_provider_answers_the_strict_schema_with_typed_rows() -> None:
