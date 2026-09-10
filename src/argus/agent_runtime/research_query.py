@@ -69,6 +69,15 @@ class ResearchQueryExtraction(BaseModel):
         default=None,
         description="Earliest ISO date implied by the requested period, including relative periods, using the current runtime date; null without a period.",
     )
+    scenario_question: bool = Field(
+        default=False,
+        description=(
+            "True when the question asks what an investment or asset will be "
+            "worth, what price it must grow into, its fair value or a price "
+            "target, in any language: the answer is scenarios computed from "
+            "published inputs. False for a figure or a story that exists on a page."
+        ),
+    )
     requires_publisher_sources: bool = Field(
         default=False,
         description="True for narrative, causal or explanatory claims requiring a publisher page; false for a pure market-data number. True can never use live_quote.",

@@ -402,6 +402,43 @@ def test_crypto_never_reaches_finance_search(monkeypatch) -> None:
     assert result.stage_patch["next_experiments"]["rows"]
 
 
+def test_a_scenario_question_sends_the_scenario_contract(monkeypatch) -> None:
+    """Decision 10: the typed scenario signal swaps the provider instructions
+    for the variant that lets computed figures through; a plain company read
+    keeps the recorded contract."""
+    from argus.domain.research.config import (
+        RETRIEVAL_INSTRUCTIONS,
+        SCENARIO_RETRIEVAL_INSTRUCTIONS,
+    )
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="company_lookup",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Bear $2,300 to $5,500; base $29,000 to $38,000; bull higher.",
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+
+    result = _run("what will $10,000 in NVDA be worth in ten years?")
+
+    assert result is not None
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "scenarios you compute" in body["input"]
+    assert body["instructions"] != RETRIEVAL_INSTRUCTIONS
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:

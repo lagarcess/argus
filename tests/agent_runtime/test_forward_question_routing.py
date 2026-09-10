@@ -32,6 +32,7 @@ from argus.agent_runtime.interpreter.unsupported_admission import (
 )
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
 from argus.agent_runtime.research_grounded import _research_prompt
+from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret import interpret_stage_async
 from argus.agent_runtime.stages.interpret_types import (
     StageResult,
@@ -42,6 +43,11 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     UnsupportedConstraint,
     UserState,
+)
+from argus.domain.research.config import (
+    RETRIEVAL_INSTRUCTIONS,
+    SCENARIO_RETRIEVAL_INSTRUCTIONS,
+    retrieval_spec,
 )
 
 NVDA_FUTURE_QUESTION = (
@@ -265,21 +271,50 @@ def test_the_interpreter_prompt_sends_forward_questions_to_research() -> None:
     clause = future_test_window_capability_clause()
     assert clause in prompt
     assert "Forward-looking and valuation questions are research questions" in clause
+    assert "research_query.scenario_question=true" in clause
     assert "arithmetic, not a prediction" in clause
     assert "backtest over a future period" in clause
     assert "cannot predict future performance" not in prompt
     assert "classify the request as unsupported_or_out_of_scope" not in prompt
 
 
-def test_the_research_prompt_asks_for_labeled_scenarios_and_no_advice() -> None:
-    prompt = _research_prompt(
+def _prompt(*, scenario: bool) -> str:
+    return _research_prompt(
         message=NVDA_FUTURE_QUESTION,
         subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
         period="in ten years",
         language="en",
         question_kind="company_lookup",
         publisher_sources_required=True,
+        scenario=scenario,
     )
-    assert "labeled scenario ranges" in prompt
-    assert "Never present one number as the future" in prompt
+
+
+def test_a_scenario_question_carries_the_scenario_contract() -> None:
+    """The typed signal selects the provider contract that lets computed
+    figures through; every other question keeps the retrieval contract the
+    recordings froze, byte for byte."""
+    prompt = _prompt(scenario=True)
+    assert "scenarios you compute" in prompt
     assert "never estimate a live number. No investment advice." in prompt
+    assert "scenarios" not in _prompt(scenario=False)
+
+    scenario_spec = retrieval_spec(
+        "balanced", question_kind="company_lookup", language_tag="en", scenario=True
+    )
+    plain_spec = retrieval_spec(
+        "balanced", question_kind="company_lookup", language_tag="en"
+    )
+    assert scenario_spec.instructions == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert plain_spec.instructions == RETRIEVAL_INSTRUCTIONS
+    assert SCENARIO_RETRIEVAL_INSTRUCTIONS.startswith(RETRIEVAL_INSTRUCTIONS)
+    assert "labeled scenario ranges" in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "never say what the reader should do" in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "never rowed" in SCENARIO_RETRIEVAL_INSTRUCTIONS
+
+
+def test_the_research_query_types_the_scenario_signal() -> None:
+    field = ResearchQueryExtraction.model_fields["scenario_question"]
+    assert field.default is False
+    assert "will be worth" in str(field.description)
+    assert "grow into" in str(field.description)

@@ -181,11 +181,13 @@ async def grounded_result(
         shape, screening=is_market_survey(query.question_kind)
     )
     language = language_tag(user.language_preference)
+    scenario = bool(getattr(query, "scenario_question", False))
     spec = retrieval_spec(
         shape,
         question_kind=query.question_kind,
         closed_period=query.period_is_closed_window,
         language_tag=language,
+        scenario=scenario,
     )
     if not provider_finance:
         # Crypto and currency pairs are outside the finance tool's coverage
@@ -204,6 +206,7 @@ async def grounded_result(
         criteria=list(getattr(query, "screening_criteria", []) or []),
         sector=getattr(query, "sector_of_interest", None),
         publisher_sources_required=publisher_sources_required,
+        scenario=scenario,
     )
     key = _cache_key_for(
         query=query,
@@ -569,6 +572,7 @@ def thorough_job_result(
                 "question_as_of_date": question_date().isoformat(),
                 "question_kind": query.question_kind,
                 "requires_publisher_sources": requires_publisher_sources(query),
+                "scenario_question": bool(getattr(query, "scenario_question", False)),
                 # The exact key computed at classification time; completion
                 # paths store under it verbatim so later identical questions
                 # hit without recomputation drift.
@@ -1036,6 +1040,7 @@ def _research_prompt(
     criteria: list[str] | None = None,
     sector: str | None = None,
     publisher_sources_required: bool = False,
+    scenario: bool = False,
 ) -> str:
     """Documented prompt guidance: business question first, then tickers and
     the time window; state the desired outcome, let the tool pick fields."""
@@ -1061,25 +1066,13 @@ def _research_prompt(
             "answering. If no such page is available, say only that the "
             "claim could not be verified."
         )
-    lines.append(
-        "If the question asks what something will be worth, what it must grow "
-        "into, or what it is worth today, the answer is a set of scenarios you "
-        "compute. Retrieve the inputs from public pages with web search and by "
-        "fetching pages (the current price with its as-of date, published "
-        "forecasts, analyst targets, growth rates, valuation multiples) and put "
-        "each input in rows with its page; the finance tool is optional here, "
-        "and when it returns nothing the pages you fetched are the retrieval, "
-        "so never answer that a figure could not be retrieved while you hold "
-        "pages that state inputs. Then write the "
-        "arithmetic out step by step and give the result as labeled scenario "
-        "ranges (for example bear, base and bull), each range written as low to "
-        "high. The computed figures are your arithmetic from those inputs, not "
-        "retrieved figures, so no page needs to state them and their absence is "
-        "never a reason to decline; when no published forecast covers the full "
-        "horizon, build the scenarios from the nearest published horizon and "
-        "say what you assumed. Never present one number as the future, and "
-        "never say what the reader should do."
-    )
+    if scenario:
+        lines.append(
+            "The answer is a set of scenarios you compute from published inputs, "
+            "as the instructions describe: inputs rowed with their pages, the "
+            "arithmetic written out, labeled ranges from low to high, no single "
+            "number as the future, no advice."
+        )
     lines.append(
         "Answer the question directly for a curious non-expert, leading with "
         "the answer. Use compact tables only where they genuinely help. State "
@@ -1307,6 +1300,7 @@ def retrieval_spec_for_job(job_request: dict[str, Any]) -> ResearchConfigSpec:
         question_kind=str(job_request.get("question_kind") or "cross_company"),
         closed_period=bool(job_request.get("period_is_closed_window")),
         language_tag=str(job_request.get("language") or "en"),
+        scenario=bool(job_request.get("scenario_question")),
     )
 
 
@@ -1328,6 +1322,7 @@ def research_prompt_for_job(job_request: dict[str, Any]) -> str:
         language=str(job_request.get("language") or "en"),
         question_kind=str(job_request.get("question_kind") or "cross_company"),
         publisher_sources_required=bool(job_request.get("requires_publisher_sources")),
+        scenario=bool(job_request.get("scenario_question")),
     )
 
 
