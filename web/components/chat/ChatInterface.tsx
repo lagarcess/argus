@@ -101,6 +101,8 @@ import {
   POST_TURN_TITLE_REFRESH_DELAYS_MS,
 } from "@/lib/chat-conversation-view-helpers";
 import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
+import { toolResultRecomputeHandler } from "@/lib/tool-result-recompute";
+import { toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
@@ -131,6 +133,7 @@ import {
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
+  toolJobsFromMetadata,
   backtestJobMessage,
 } from "@/lib/chat-backtest-jobs";
 import {
@@ -1215,12 +1218,7 @@ export default function ChatInterface() {
         );
         clearNeutralGuestSubmission();
         if (!canApplyVisibleStreamUpdate()) return;
-        const stageKey = `chat.status.${event.data.stage}`;
-        const detail = event.data.detail;
-        setStreamStatus(
-          (detail ? t(`${stageKey}_detail`, { detail }) || t(stageKey) : t(stageKey)) ||
-            t("chat.status.preparing"),
-        );
+        setStreamStatus(toolProgressText(event.data.tool_progress ?? null, t));
       }
       if (event.event === "token") {
         if (!requestSessions.authorize(requestSession, "token")) return;
@@ -1317,6 +1315,7 @@ export default function ChatInterface() {
           typeof finalPayload.message_id === "string"
             ? finalPayload.message_id
             : undefined;
+        const finalAssistantId = finalMessageId ?? assistantId;
         setMessages((prev) =>
           applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
         );
@@ -1327,7 +1326,12 @@ export default function ChatInterface() {
           finalPayload.recovery,
         );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
+        const finalToolCards = toolCardsFromMetadata(finalPayload);
+        const finalToolCardsUnavailable = hasUnavailableToolCards(finalPayload);
+        const finalToolJobs = toolJobsFromMetadata(finalPayload);
         const finalMemoryRecalls = memoryRecallsFromFinalPayload(finalPayload);
+        const finalNextExperiments =
+          nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1357,11 +1361,8 @@ export default function ChatInterface() {
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
         const confirmation = pendingArtifactCardFromPayload(event.data.confirmation);
         if (confirmation) {
-          const finalAssistantId = finalMessageId ?? assistantId;
           // Researched peer adds ride the ordinary Try-next surface below
           // the card's turn (research rail, spec section 6).
-          const confirmationNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1369,18 +1370,18 @@ export default function ChatInterface() {
                   id: finalAssistantId,
                   role: "ai",
                   kind: "strategy_confirmation",
+                  toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                   content: undefined,
                   confirmation,
                   strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
-                  nextExperiments: confirmationNextExperiments,
+                  nextExperiments: finalNextExperiments,
                 }),
               ),
             ),
           );
         } else if (event.data.run) {
           const run = event.data.run as BacktestRun;
-          const finalAssistantId = finalMessageId ?? assistantId;
           const baseCard = resultCardFromRun(run);
           const resultActions = hydrateResultActionsForRun(
             baseCard.actions ?? [],
@@ -1391,8 +1392,6 @@ export default function ChatInterface() {
             savedStrategyId: run.strategy_id ?? null,
             actions: resultActions,
           };
-          const finalNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1400,6 +1399,7 @@ export default function ChatInterface() {
                   id: finalAssistantId,
                   role: "ai",
                   kind: "strategy_result",
+                  toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                   content: finalText || undefined,
                   result: card,
                   actions: resultActions,
@@ -1411,13 +1411,12 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalBacktestJob) {
-          const finalAssistantId = finalMessageId ?? assistantId;
-          const finalBacktestJobMessage = backtestJobMessage({
+          const finalBacktestJobMessage = { ...backtestJobMessage({
             id: finalAssistantId,
             content: finalText || undefined,
             job: finalBacktestJob,
             metadata: finalPayload,
-          });
+          }), toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs };
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1432,23 +1431,21 @@ export default function ChatInterface() {
               ),
             ),
           );
-        } else if (finalText) {
+        } else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {
           const finalFactHeadingKey =
             resultFactHeadingKeyFromMetadata(finalPayload);
-          const finalTextNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
           const finalResearchDegradedCode =
             researchDegradedCodeFromMetadata(finalPayload);
           const finalTextPresentation =
             action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
-            const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
               prev.map((m) =>
                 mergeFinalTextMessage(m, {
                   assistantId,
                   finalText,
+                  toolResultCards: finalToolCards,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
                   strategyPathContext: finalStrategyPathContext,
@@ -1457,7 +1454,7 @@ export default function ChatInterface() {
                   memoryRecalls: finalMemoryRecalls,
                   researchSources: finalResearchSources,
                   researchDegradedCode: finalResearchDegradedCode,
-                  nextExperiments: finalTextNextExperiments,
+                  nextExperiments: finalNextExperiments,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
                 }),
@@ -1468,6 +1465,7 @@ export default function ChatInterface() {
                 role: "ai",
                 kind: "text",
                 content: finalText,
+                toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                 actions:
                   finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
@@ -1477,7 +1475,7 @@ export default function ChatInterface() {
                 memoryRecalls: finalMemoryRecalls,
                 researchSources: finalResearchSources,
                 researchDegradedCode: finalResearchDegradedCode,
-                nextExperiments: finalTextNextExperiments,
+                nextExperiments: finalNextExperiments,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
               },
@@ -1963,6 +1961,11 @@ export default function ChatInterface() {
     showToast,
     hideToast,
     t,
+  }));
+
+  const handleToolRecompute = toolResultRecomputeHandler(() => ({
+    source: () => ({ conversationId: activeConversationIdRef.current, latestMessageId: latestMessagesRef.current.at(-1)?.id, busy: sendAdmissionInFlightRef.current || conversationActivity.isConversationLocked(activeConversationIdRef.current) }),
+    setMessages, invalidate: (id) => invalidateTranscriptForMutation(id, "durable_result_action"), reload: loadConversation,
   }));
 
   const omnisearch = omnisearchActionHandlers(() => ({
@@ -2460,11 +2463,12 @@ export default function ChatInterface() {
                             message={msg}
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
+                            onToolRecompute={(card, changes) => handleToolRecompute(msg.id, card, changes)}
                             onFeedback={(type, context, rating) => {
                               void handleMessageFeedback(type, context, rating);
                             }}
                             onToast={showToast}
-                            isLatest={isLatestAi}
+                            isLatest={isLatestAi} latestMessageId={messages.at(-1)?.id}
                             isStreaming={isWorkingMessage}
                             conversationId={conversationId}
                             memoryProposalEnabled={memoryChrome.proposalEnabled}

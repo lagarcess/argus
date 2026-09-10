@@ -28,6 +28,20 @@ class PendingArtifactLayout:
     reference_key: str
     references_key: str
     reference_type: str
+    artifact_id: str | None = None
+
+
+def _layout_cards(
+    metadata: dict[str, Any], layout: PendingArtifactLayout
+) -> list[dict[str, Any]]:
+    value = metadata.get(layout.card_key)
+    cards = value if isinstance(value, list) else [value]
+    return [
+        card
+        for card in cards
+        if isinstance(card, dict)
+        and (layout.artifact_id is None or card.get("artifact_id") == layout.artifact_id)
+    ]
 
 
 @dataclass(frozen=True)
@@ -49,8 +63,8 @@ def artifact_state_is_dead(value: Any) -> bool:
 def pending_artifact_state(
     metadata: dict[str, Any], *, layout: PendingArtifactLayout
 ) -> str:
-    card = metadata.get(layout.card_key)
-    value = card.get(layout.card_state_key) if isinstance(card, dict) else None
+    cards = _layout_cards(metadata, layout)
+    value = cards[0].get(layout.card_state_key) if len(cards) == 1 else None
     return str(value or "").strip().casefold()
 
 
@@ -71,8 +85,7 @@ def stamp_pending_artifact(
     metadata: dict[str, Any], *, state: str, layout: PendingArtifactLayout
 ) -> dict[str, Any]:
     stamped = copy.deepcopy(metadata)
-    card = stamped.get(layout.card_key)
-    if isinstance(card, dict):
+    for card in _layout_cards(stamped, layout):
         card[layout.card_state_key] = state
     reference = stamped.get(layout.reference_key)
     if isinstance(reference, dict):
@@ -83,6 +96,10 @@ def stamp_pending_artifact(
             if (
                 isinstance(item, dict)
                 and item.get("artifact_type") == layout.reference_type
+                and (
+                    layout.artifact_id is None
+                    or item.get("artifact_id") == layout.artifact_id
+                )
             ):
                 item["artifact_status"] = state
     return stamped

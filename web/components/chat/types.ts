@@ -295,6 +295,10 @@ export type StrategyPathContext = {
   optionalParameters?: Record<string, unknown> | null;
 };
 
+export type ToolJob = {
+  call_id: string; tool_name: string; artifact_id: string; job: BacktestJob; resultMessageId?: string;
+};
+
 export type Message = {
   id: string;
   /** Hidden durable message ids that should focus this projected transcript row. */
@@ -315,6 +319,9 @@ export type Message = {
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
+  toolResultCards?: import("@/lib/tool-result-card").ToolResultCard[];
+  hasUnavailableToolResults?: boolean;
+  toolJobs?: ToolJob[];
   resultReadoutFacts?: ResultReadoutFacts | null;
   confirmation?: StrategyConfirmationPayload;
   backtestJob?: BacktestJob;

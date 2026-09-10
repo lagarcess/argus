@@ -35,6 +35,10 @@ from argus.llm.openrouter_usage import (
     openrouter_token_usage_from_payload,
     openrouter_usage_cost_from_payload,
 )
+from argus.llm.tool_call_receipts import current_tool_call_receipt_scope
+from argus.llm.tool_call_receipts import (
+    tool_call_receipt_scope as tool_call_receipt_scope,
+)
 
 load_project_dotenv()
 
@@ -89,7 +93,6 @@ _ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = Contex
     "openrouter_route_receipt_capture",
     default=None,
 )
-
 
 
 _TIER_PRIMARY_ENV = TIER_PRIMARY_ENV
@@ -299,6 +302,7 @@ def record_openrouter_route_receipt(
         token_usage=normalize_openrouter_token_usage(token_usage),
         usage_cost_usd=normalize_openrouter_usage_cost(usage_cost_usd),
         context_packet_ids=_normalized_context_packet_ids(context_packet_ids),
+        repair_effect=current_tool_call_receipt_scope(),
         fallback_used=bool(
             fallback_model and resolved_model == fallback_model and resolved_model != ""
         ),
@@ -331,10 +335,19 @@ def annotate_latest_openrouter_route_receipt(
     capture = _ROUTE_RECEIPT_CAPTURE.get()
     if capture is None:
         return False
+    scope = current_tool_call_receipt_scope()
     for receipt in reversed(capture):
         if receipt.task == task and receipt.schema_name == schema_name:
+            if scope and receipt.repair_effect.get("tool_call_id") != scope["tool_call_id"]:
+                continue
+            identity = {
+                key: receipt.repair_effect[key]
+                for key in ("tool_call_id", "tool_name")
+                if key in receipt.repair_effect
+            }
             receipt.repair_effect.clear()
             receipt.repair_effect.update(repair_effect)
+            receipt.repair_effect.update(identity)
             fields = {
                 "task": receipt.task,
                 "schema_name": receipt.schema_name,

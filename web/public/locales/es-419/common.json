@@ -795,25 +795,8 @@
       }
     },
     "status": {
-      "understanding": "Pensando...",
-      "interpret": "Entendiendo tu idea...",
-      "clarify": "Tengo una pregunta...",
-      "confirm": "Esto es lo que encontré...",
-      "execute": "Ejecutando backtest...",
-      "explain": "Revisando resultados...",
-      "next_step": "Qué sigue...",
-      "extracting_strategy": "Extrayendo estrategia",
-      "running_backtest": "Ejecutando simulación",
-      "calculating_metrics": "Calculando métricas",
-      "running": "Ejecutando simulación",
       "checking": "Comprobando lo que se guardó...",
-      "preparing": "Preparando resultados",
-      "intent_run_backtest": "Diseñando tu estrategia...",
-      "intent_education": "Pensando...",
-      "intent_unsupported_request": "Pensando...",
-      "discovery_search": "Buscando en la web...",
-      "discovery_search_detail": "Buscando en la web: {{detail}}",
-      "discovery_verify": "Verificando candidatos en los mercados disponibles..."
+      "working": "En curso..."
     },
     "confirmation": {
       "asset_count": "{{count}} activos",
@@ -974,6 +957,35 @@
       "period": "Periodo",
       "assumptions": "Supuestos",
       "assistant_explanation": "Explicación del asistente"
+    },
+    "tools": {
+      "backtest": {
+        "title": "Prueba histórica: {{asset_universe}}",
+        "start_date": "Fecha inicial",
+        "end_date": "Fecha final",
+        "total_return_pct": "Rendimiento total",
+        "contribution_return_pct": "Rendimiento sobre aportes",
+        "max_drawdown_pct": "Caída máxima"
+      },
+      "units": { "percent": "%", "percentage_points": "puntos porcentuales" },
+      "failed": "Resultado no disponible",
+      "progress": {
+        "backtest": "Ejecutando la prueba histórica de {{asset_universe}}",
+        "fast_quote": "Consultando las cifras más recientes de {{symbols}}",
+        "balanced_lookup": "Buscando {{request}}",
+        "thorough_research": "Investigando {{request}}",
+        "screening": "Comparando candidatos para {{request}}",
+        "peer_expansion": "Buscando activos comparables para {{request}}"
+      },
+      "research": {
+        "title": "Resultado de la investigación",
+        "figure": "{{subject}}: {{label}}",
+        "unit": "{{unit}}",
+        "subject": "{{name}}",
+        "request": "Datos solicitados",
+        "pending": "La investigación está en curso. El resultado aparecerá aquí cuando esté listo.",
+        "unavailable": "No se pudieron verificar los datos solicitados."
+      }
     }
   },
   "settings": {
@@ -1813,6 +1825,33 @@
         "preview_changed": "El contenido cambió. Revisa otra vista previa antes de crear el enlace.",
         "invalid_source": "El contenido original no está disponible o no se puede verificar.",
         "unsupported_backtest": "Esta prueba no tiene todos los datos necesarios para compartirla."
+      }
+    }
+  },
+  "tools": {
+    "progress": {
+      "call": "Ejecutando {{tool_name}}",
+      "value": "Revisando {{known}}"
+    },
+    "card": {
+      "title": "Resultado",
+      "solved_value": "Valor calculado",
+      "input": "Dato",
+      "named_input": "Dato {{name}}",
+      "inputs": "Datos usados",
+      "unknown": "Por calcular",
+      "yes": "Sí",
+      "no": "No",
+      "unavailable": "Este resultado no está disponible.",
+      "enter_value": "Ingresa un valor para actualizar el resultado.",
+      "recompute_failed": "No se pudo actualizar el resultado. Inténtalo de nuevo.",
+      "saved_result": "Se muestra el resultado guardado mientras cambias los datos.",
+      "updating": "Actualizando...",
+      "status": {
+        "invalid": "Estos datos no pudieron producir un resultado.",
+        "ambiguous": "Estos datos tienen más de una respuesta posible.",
+        "bounded": "Una respuesta confiable está fuera de los límites de esta herramienta.",
+        "unavailable": "Este resultado no está disponible por ahora."
       }
     }
   }

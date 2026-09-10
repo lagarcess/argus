@@ -8,6 +8,8 @@ so the two grow independently.
 
 from __future__ import annotations
 
+import pytest
+
 from tests.evals.measurement_outcome import (
     compare_offered,
     offered_to_user,
@@ -93,7 +95,15 @@ class TestOfferedReadsWhatTheUserSaw:
 class TestRenderedBesideReply:
     """Issue #516: the prose judge must see what the reader had on screen."""
 
-    def test_discovery_rows_sources_and_escalation_are_projected(self) -> None:
+    @pytest.mark.parametrize(
+        "source_indices", [None, (), (0,)], ids=["absent", "empty", "linked"]
+    )
+    @pytest.mark.parametrize(
+        "source_date", [None, "2026-08-14"], ids=["undated", "dated"]
+    )
+    def test_discovery_rows_sources_and_escalation_are_projected(
+        self, source_indices: tuple[int, ...] | None, source_date: str | None
+    ) -> None:
         discovery = {
             "schema_version": 1,
             "kind": "asset_discovery",
@@ -106,7 +116,7 @@ class TestRenderedBesideReply:
                     "title": "Recent IPO listings",
                     "domain": "nasdaq.com",
                     "url": "https://nasdaq.com/recent-ipos",
-                    "source_date": "2026-08-14",
+                    "source_date": source_date,
                 },
             ],
             "candidates": [
@@ -115,11 +125,12 @@ class TestRenderedBesideReply:
                     "name": "Medline Industries",
                     "asset_class": "equity",
                     "reason_text": "Listed in early August 2026.",
-                    "source_indices": [0],
                 },
             ],
             "unverified_names": ["Private Holdings LLC"],
         }
+        if source_indices is not None:
+            discovery["candidates"][0]["source_indices"] = list(source_indices)
         surface = rendered_beside_reply(
             final_patch={"discovery": discovery},
             interpret_patch={},
@@ -131,12 +142,14 @@ class TestRenderedBesideReply:
                 "reason_text": "Listed in early August 2026.",
             }
         ]
-        # The reader sees titles and domains, not raw URLs or row indices.
+        # Probe 07: a shared drawer is delivery evidence, not a citation on
+        # every candidate. Neither missing links nor an undated source may
+        # erase that drawer or manufacture a row citation or source date.
         assert surface["discovery_sources"] == [
             {
                 "title": "Recent IPO listings",
                 "domain": "nasdaq.com",
-                "source_date": "2026-08-14",
+                **({"source_date": source_date} if source_date is not None else {}),
             }
         ]
         assert surface["retrieved_at"] == "2026-08-16T14:02:11+00:00"

@@ -3097,6 +3097,59 @@ stores nothing and makes no LLM, provider, or market-data call.
 
 # 12. Chat Streaming Endpoint
 
+### Declared tool calls and results
+
+The neutral transport `ToolCall` is `{tool_name, call_id, arguments}`. Each
+declaration supplies its callable's typed argument and return schemas. Calls are
+ordered, bounded by `MAX_TOOL_CALLS`, and have distinct call IDs. The dispatcher
+supports different tools and repeated calls; a local call bypasses backtest
+launch preparation. The existing validated Run action enters this dispatcher
+with its confirmed canonical strategy.
+
+The interpreter retains its seven intents, system prompt and response schema.
+It does not select calls from this catalog in this lane. The declaration-derived
+catalog is available to runtime consumers without changing the model contract.
+
+An actual invocation emits `stage_start.tool_progress` containing
+`{locale_key, interpolation_args, call_id, tool_name}`. Interpolation values are
+typed argument facts; the client selects localized copy from `locale_key`.
+Stage-only events carry operational state and display a neutral loader. They do
+not imply strategy extraction, backtest execution, or metric calculation.
+
+Final payloads and persisted assistant metadata carry `tool_result_cards` as a
+list. Each card is `{kind: "tool_result", schema_version: 1, tool_name, call_id,
+artifact_id, input_revision, card_type, card_version, arguments, outcome,
+presentation, artifact_state}`. The outcome status is `succeeded`, `invalid`,
+`ambiguous`, `bounded`, or `unavailable`. Only success has a typed result;
+unsuccessful outcomes contain a failure code and affected field names and cannot
+present an answer. The declaration validates the result before projecting it.
+`presentation` contains a localized title, answer, supporting rows, inputs,
+notes, and optional narrative, public source citations and a typed visual.
+Facts retain their raw value; optional `value_text` supplies localized display
+for typed tokens. Input facts preserve units, editability and the retained
+unknown. Their `visibility` defaults to `private`; a declaration explicitly
+marks shareable input facts `public`. This display contract does not
+replace any tool's argument or result model.
+
+`tool_jobs` retains asynchronous work as
+`[{call_id, tool_name, artifact_id, job}]`. Existing job polling and result-message
+publication resolve each entry independently, including repeated calls and
+out-of-order completions. The legacy `result_card` still identifies a backtest;
+general tools never manufacture runs or use that key to force publication.
+
+`POST /conversations/{conversation_id}/tool-results/{artifact_id}/recompute`
+takes `{message_id, input_revision, arguments}`, where `arguments` is a nonempty
+partial edit. Only a declared local, unconfirmed, editable tool is eligible.
+The endpoint verifies ownership, current message/card liveness and revision,
+retains the original unknown, validates all cross-argument rules, and invokes
+the same callable. Zero remains a known input. It returns `{message}` after a
+guarded update of the same artifact with its next revision; it adds no chat turn.
+Missing/foreign results return 404, dead artifacts return
+`409 artifact_action_invalid_state`, stale revisions or racing writes return
+`409 tool_result_changed`, and rejected inputs return
+`422 tool_arguments_invalid`. A missing or incompatible declaration binding
+returns `422 tool_inputs_not_editable`.
+
 ### Structured Action Semantics
 
 `action` payloads are structured product operations, not plain user text.

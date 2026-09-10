@@ -165,11 +165,32 @@ def shadow_launch_payload(
     }
     if context.chat_action is not None:
         launch_payload["chat_action"] = _json_safe_payload(context.chat_action)
+    from argus.agent_runtime.stages.tool_execution import current_tool_execution_context
+    from argus.domain.tool_job_binding import bind_tool_job_call
+
+    tool_context = current_tool_execution_context()
+    if tool_context is not None and tool_context.call is not None:
+        launch_payload["tool_binding"] = bind_tool_job_call(
+            call=tool_context.call, artifact_id=tool_context.artifact_id
+        )
     return launch_payload
 
 
 def _json_safe_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(deepcopy(payload), sort_keys=True, default=str))
+
+
+def _restore_declared_tool_identity(job: dict[str, Any]) -> None:
+    from argus.agent_runtime.stages.tool_execution import current_tool_execution_context
+    from argus.domain.tool_job_binding import ToolJobBinding
+
+    context = current_tool_execution_context()
+    launch = job.get("launch_payload")
+    if context is None or not isinstance(launch, dict) or "tool_binding" not in launch:
+        return
+    binding = ToolJobBinding.model_validate(launch["tool_binding"])
+    context.call = binding.call
+    context.artifact_id = binding.artifact_id
 
 
 def _utcnow_iso() -> str:
@@ -866,6 +887,7 @@ class ShadowBacktestJobTool:
             if job_id:
                 context.created_job_id = job_id
                 if admission.decision == "replay":
+                    _restore_declared_tool_identity(job)
                     self._restore_existing_dispatch_context(context=context, job=job)
                     return dict(job), None
                 if backtest_jobs_shadow_enabled():

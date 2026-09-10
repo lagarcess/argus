@@ -1,0 +1,8 @@
+{
+  "locale_key": "tools.progress.value",
+  "interpolation_args": {
+    "known": 0.0
+  },
+  "call_id": "call-one",
+  "tool_name": "test_echo"
+}

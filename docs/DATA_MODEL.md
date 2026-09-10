@@ -483,8 +483,8 @@ Represents individual messages within a conversation.
   row, inserts the message, and updates `last_message_preview` in one
   transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
   function or mutate `messages` directly.
-- The one sanctioned in-place rewrite, a non-turn edit of a pending
-  confirmation card, uses the service-role-only
+- Sanctioned non-turn edits of a pending confirmation card or an editable local
+  tool result use the service-role-only
   `update_conversation_message_artifact` RPC on the same serialized spine: it
   locks the owned conversation row and applies only while the caller's read
   still holds, comparing both the row's `metadata` and the conversation's
@@ -492,6 +492,16 @@ Represents individual messages within a conversation.
   last-writer win). When the rewritten row is the conversation's latest
   message it carries `last_message_preview` with it while leaving
   `updated_at` untouched, so a non-turn change never reorders recents.
+- `metadata.tool_result_cards` owns ordered general tool artifacts. Each card
+  stores call/artifact identity, input revision, declaration card type/version,
+  arguments, typed outcome, presentation and lifecycle state together. A local
+  recompute retains the unknown, treats zero as known, and increments the
+  revision through the same guarded writer. Sibling cards remain unchanged.
+  Tool outcomes do not require a Strategy, Idea, EvidenceArtifact or backtest
+  run. `metadata.tool_jobs` associates each asynchronous job with its call and
+  artifact identity; repeated calls remain independent through completion and
+  reload. The message remains the durable owner after direct edits, rather than
+  writing a competing checkpoint copy.
 - A confirmation card's liveness truth lives on its own row:
   `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
   `cancelled`, `superseded`). Run admission stamps `consumed` through the

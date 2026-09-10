@@ -5,8 +5,9 @@ openapi: 3.1.0
 info:
   title: Argus Alpha API
   version: 1.0.0-alpha
-  description: Contract-first Alpha API for chat-first investing idea validation. Durable
-    results persist as backtest_runs; result cards render as conversation_result_card artifacts.
+  description: Contract-first Alpha API for chat-first investing idea validation. Declared
+    tool answers persist as conversation artifacts; completed backtests also own immutable
+    backtest_runs.
 paths:
   /api/v1/analytics/guest-events:
     post:
@@ -1174,6 +1175,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/tool-results/{artifact_id}/recompute:
+    post:
+      tags:
+      - tool-results
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolResultRecomputeRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResultRecomputeResponse'
         '422':
           description: Validation Error
           content:
@@ -3687,6 +3732,7 @@ components:
       - created_at
       - conversation_id
       - expires_at
+    JsonValue: {}
     LoginRequest:
       properties:
         email:
@@ -5916,6 +5962,34 @@ components:
       type: object
       required:
       - success
+    ToolResultRecomputeRequest:
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        input_revision:
+          type: integer
+          minimum: 0.0
+        arguments:
+          additionalProperties:
+            $ref: '#/components/schemas/JsonValue'
+          type: object
+          maxProperties: 32
+          minProperties: 1
+      additionalProperties: false
+      type: object
+      required:
+      - message_id
+      - input_revision
+      - arguments
+    ToolResultRecomputeResponse:
+      properties:
+        message:
+          $ref: '#/components/schemas/Message'
+      additionalProperties: false
+      type: object
+      required:
+      - message
     UnboundedAllowance:
       properties:
         hour:

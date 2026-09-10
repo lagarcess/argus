@@ -795,25 +795,8 @@
       }
     },
     "status": {
-      "understanding": "Thinking...",
-      "interpret": "Understanding your idea...",
-      "clarify": "I have a question...",
-      "confirm": "Here's what I found...",
-      "execute": "Running backtest...",
-      "explain": "Reviewing results...",
-      "next_step": "What's next...",
-      "extracting_strategy": "Extracting strategy",
-      "running_backtest": "Running backtest",
-      "calculating_metrics": "Calculating metrics",
-      "running": "Running simulation",
       "checking": "Checking what was saved...",
-      "preparing": "Preparing results",
-      "intent_run_backtest": "Designing your strategy...",
-      "intent_education": "Thinking...",
-      "intent_unsupported_request": "Thinking...",
-      "discovery_search": "Searching the web...",
-      "discovery_search_detail": "Searching the web: {{detail}}",
-      "discovery_verify": "Verifying candidates against supported markets..."
+      "working": "Working..."
     },
     "confirmation": {
       "asset_count": "{{count}} assets",
@@ -974,6 +957,35 @@
       "period": "Period",
       "assumptions": "Assumptions",
       "assistant_explanation": "Assistant explanation"
+    },
+    "tools": {
+      "backtest": {
+        "title": "Backtest: {{asset_universe}}",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "total_return_pct": "Total return",
+        "contribution_return_pct": "Return on contributions",
+        "max_drawdown_pct": "Largest drop"
+      },
+      "units": { "percent": "%", "percentage_points": "percentage points" },
+      "failed": "Result unavailable",
+      "progress": {
+        "backtest": "Running the {{asset_universe}} backtest",
+        "fast_quote": "Checking the latest figures for {{symbols}}",
+        "balanced_lookup": "Looking up {{request}}",
+        "thorough_research": "Researching {{request}}",
+        "screening": "Comparing candidates for {{request}}",
+        "peer_expansion": "Finding comparable assets for {{request}}"
+      },
+      "research": {
+        "title": "Research result",
+        "figure": "{{subject}}: {{label}}",
+        "unit": "{{unit}}",
+        "subject": "{{name}}",
+        "request": "Requested facts",
+        "pending": "Research is in progress. The result will appear here when ready.",
+        "unavailable": "The requested facts could not be verified."
+      }
     }
   },
   "settings": {
@@ -1813,6 +1825,33 @@
         "preview_changed": "The content changed. Preview it again before making the link.",
         "invalid_source": "The source content is unavailable or cannot be verified.",
         "unsupported_backtest": "This test does not have all the facts needed for sharing."
+      }
+    }
+  },
+  "tools": {
+    "progress": {
+      "call": "Running {{tool_name}}",
+      "value": "Checking {{known}}"
+    },
+    "card": {
+      "title": "Result",
+      "solved_value": "Solved value",
+      "input": "Input",
+      "named_input": "Input {{name}}",
+      "inputs": "Inputs",
+      "unknown": "To solve",
+      "yes": "Yes",
+      "no": "No",
+      "unavailable": "This result is unavailable.",
+      "enter_value": "Enter a value to update this result.",
+      "recompute_failed": "Could not update this result. Try again.",
+      "saved_result": "The saved result is shown while your inputs change.",
+      "updating": "Updating...",
+      "status": {
+        "invalid": "These inputs could not produce a result.",
+        "ambiguous": "These inputs have more than one possible answer.",
+        "bounded": "A reliable answer is outside this tool’s limits.",
+        "unavailable": "This result is unavailable right now."
       }
     }
   }

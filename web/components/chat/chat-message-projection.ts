@@ -1,3 +1,4 @@
+import { toolCardsFromMetadata, hasUnavailableToolCards } from "@/lib/tool-result-card";
 import {
   resultCardFromConversationCard,
   type ApiMessage,
@@ -25,6 +26,7 @@ import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
   RESEARCH_JOB_SCOPE,
+  toolJobsFromMetadata,
 } from "@/lib/chat-backtest-jobs";
 import { retestReceiptFromMetadata } from "@/lib/chat-retest";
 import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
@@ -224,6 +226,7 @@ export function messageStreamPresentation(
     isWorkingMessage:
       isLatestAi &&
       message.kind === "text" &&
+      !message.toolResultCards?.length && !message.toolJobs?.length && !message.hasUnavailableToolResults &&
       message.contentPresentation !== "result_readout" &&
       message.contentPresentation !== "result_breakdown" &&
       message.recoveryDisplay?.kind !== "artifact_assumptions" &&
@@ -298,6 +301,9 @@ export function hydrateMessagesFromApi(
     .filter((message) => !hiddenMessageIds.has(message.id))
     .map((message) => {
       const metadata = message.metadata ?? {};
+      const toolResultCards = message.role !== "user" ? toolCardsFromMetadata(metadata) : undefined;
+      const hasUnavailableToolResults = message.role !== "user" && hasUnavailableToolCards(metadata);
+      const toolJobs = message.role !== "user" ? toolJobsFromMetadata(metadata) : undefined;
       const chatAction = metadata.chat_action as ChatActionOption | undefined;
       const confirmation = pendingArtifactCardFromPayload(metadata.confirmation_card);
       const projectedJob =
@@ -356,6 +362,7 @@ export function hydrateMessagesFromApi(
           id: message.id,
           role: "ai",
           kind: "strategy_result",
+          toolResultCards, hasUnavailableToolResults, toolJobs,
           content: undefined,
           result: {
             ...card,
@@ -381,11 +388,12 @@ export function hydrateMessagesFromApi(
           role: "ai",
           kind: "text",
           contentPresentation: "result_readout",
+          toolResultCards, hasUnavailableToolResults, toolJobs,
           resultReadoutFacts: resultReadoutFacts(metadata.result_fact_bank),
         };
       }
       const jobMessage = backtestJobMessageFromApi(message);
-      if (jobMessage) return jobMessage;
+      if (jobMessage) return { ...jobMessage, toolResultCards, hasUnavailableToolResults, toolJobs };
       if (
         message.role !== "user" &&
         confirmation &&
@@ -398,6 +406,7 @@ export function hydrateMessagesFromApi(
           id: message.id,
           role: "ai",
           kind: "strategy_confirmation",
+          toolResultCards, hasUnavailableToolResults, toolJobs,
           content: message.content,
           confirmation,
           strategyPathContext: strategyPathContextFromMetadata(
@@ -411,7 +420,7 @@ export function hydrateMessagesFromApi(
             nextExperimentRowsFromMetadata(metadata) ?? undefined,
         };
       }
-      const hydratedText = hydrateTextMessageFromApi(message, {
+      const hydratedText = { ...hydrateTextMessageFromApi(message, {
         retryRequestMessage:
           retryRequestMessageForAssistant(items, message) ??
           precedingUserMessageForRetryableRecovery(items, message),
@@ -419,7 +428,7 @@ export function hydrateMessagesFromApi(
           message.role !== "user" && isBreakdownActionMetadata(metadata)
             ? "result_breakdown"
             : undefined,
-      });
+      }), toolJobs };
       if (message.role !== "user" && isBreakdownActionMetadata(metadata)) {
         return {
           ...hydratedText,
@@ -489,7 +498,23 @@ export function hydrateMessagesFromApi(
       ),
     ),
   );
-  return { messages: normalized, inputActions: latestInputActions(normalized) };
+  const reconciled = reconcileToolJobMessages(normalized);
+  return { messages: reconciled, inputActions: latestInputActions(reconciled) };
+}
+
+/** Completed canonical answer messages retire only their own pending tool card. */
+export function reconcileToolJobMessages(messages: Message[]): Message[] {
+  return messages.map((source) => {
+    if (!source.toolJobs?.length) return source;
+    const toolJobs = source.toolJobs.map((pending) => {
+      const completed = messages.find((candidate) => candidate.id !== source.id &&
+        candidate.toolResultCards?.some((card) => card.call_id === pending.call_id &&
+          card.artifact_id === pending.artifact_id && card.tool_name === pending.tool_name));
+      return completed ? { ...pending, resultMessageId: completed.id } : pending;
+    });
+    return { ...source, toolJobs, toolResultCards: source.toolResultCards?.filter((card) =>
+      !toolJobs.some((pending) => pending.resultMessageId && pending.artifact_id === card.artifact_id && pending.call_id === card.call_id)) };
+  });
 }
 
 // A terminal research job's message (the answer, or the failure note) is a
@@ -509,6 +534,15 @@ export function applyResearchJobAnswer(
   const answer = response.result_message;
   if (response.job.operation_scope !== RESEARCH_JOB_SCOPE || !answer) {
     return messages;
+  }
+  const toolSourceIndex = messages.findIndex((source) => source.toolJobs?.some((pending) => pending.job.id === response.job.id));
+  if (toolSourceIndex !== -1) {
+    if (messages.some((entry) => entry.id === answer.id)) return reconcileToolJobMessages(messages);
+    const projected = hydrateMessagesFromApi([answer]).messages[0];
+    if (!projected) return messages;
+    const siblings = new Set(messages[toolSourceIndex].toolJobs?.map((pending) => pending.resultMessageId).filter(Boolean));
+    const insertAfter = Math.max(toolSourceIndex, messages.findLastIndex((entry) => siblings.has(entry.id)));
+    return reconcileToolJobMessages([...messages.slice(0, insertAfter + 1), projected, ...messages.slice(insertAfter + 1)]);
   }
   const cardIndex = messages.findIndex(
     (message) =>

@@ -7,10 +7,13 @@ identity.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from argus.api.chat.discovery_evidence import settle_discovery_turn
 from argus.api.chat.research_evidence import settle_research_turn
+
+if TYPE_CHECKING:
+    from argus.api.chat.tool_results import ToolExecutionEffect
 
 
 def settle_metered_turn(
@@ -23,20 +26,36 @@ def settle_metered_turn(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
+    tool_effects: list[ToolExecutionEffect] | None = None,
 ) -> None:
-    settle_discovery_turn(
-        usage=discovery_usage,
-        user_id=user_id,
-        is_guest=is_guest,
-        client_identity=client_identity,
-        conversation_id=conversation_id,
-        message_id=message_id,
-        request_id=request_id,
+    sources: list[tuple[dict[str, Any], Any, str | None]] = (
+        [
+            (
+                effect.stage_patch,
+                effect.stage_patch.get("discovery_usage"),
+                effect.call_id,
+            )
+            for effect in tool_effects
+        ]
+        if tool_effects
+        else [(runtime_result, discovery_usage, tool_call_id)]
     )
-    settle_research_turn(
-        runtime_result,
-        user_id=user_id,
-        conversation_id=conversation_id,
-        message_id=message_id,
-        request_id=request_id,
-    )
+    for result, usage, call_id in sources:
+        settle_discovery_turn(
+            usage=usage,
+            user_id=user_id,
+            is_guest=is_guest,
+            client_identity=client_identity,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            request_id=request_id,
+        )
+        settle_research_turn(
+            result,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            request_id=request_id,
+            **({"tool_call_id": call_id} if call_id is not None else {}),
+        )

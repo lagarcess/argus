@@ -200,11 +200,29 @@ def probe_confirmation_payload():
 
 
 def probe_lifecycle():
-    from argus.api.chat.confirmation_lifecycle import _stamped_card_metadata
+    from argus.domain.pending_artifacts import (
+        PendingArtifactLayout,
+        stamp_pending_artifact,
+    )
+
+    # Lane B lifted the stamper and removed its private confirmation helper.
+    # This fixture preserves the historical probe's layout and assertions; it
+    # does not claim to import the current production confirmation adapter.
+    historical_layout = PendingArtifactLayout(
+        card_key="confirmation_card",
+        card_state_key="confirmation_state",
+        reference_key="active_confirmation_reference",
+        references_key="artifact_references",
+        reference_type="confirmation",
+    )
 
     metadata = {"calculation_card": {"kind": "time_value_of_money", "status": "computed"}}
-    stamped = _stamped_card_metadata(metadata, "superseded")
-    conventional = _stamped_card_metadata({"confirmation_card": {}}, "superseded")
+    stamped = stamp_pending_artifact(
+        metadata, state="superseded", layout=historical_layout
+    )
+    conventional = stamp_pending_artifact(
+        {"confirmation_card": {}}, state="superseded", layout=historical_layout
+    )
     return {
         "own_kind_unchanged": stamped == metadata,
         "confirmation_state": conventional["confirmation_card"]["confirmation_state"],

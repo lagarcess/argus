@@ -3287,6 +3287,12 @@ def test_openrouter_failure_log_reports_raising_origin(monkeypatch) -> None:
             "OpenRouter interpretation returned an incomplete strategy draft"
         )
 
+    # The logger selects Argus frames; a checkout's directory name is incidental.
+    # Give this isolated raising fixture a module path inside that package.
+    _raise_local_rejection.__code__ = _raise_local_rejection.__code__.replace(
+        co_filename="/fixture/argus/test_openrouter_policy.py"
+    )
+
     try:
         _raise_local_rejection()
     except ValueError as exc:

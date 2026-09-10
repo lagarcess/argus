@@ -123,7 +123,7 @@ describe("chat final frame visibility", () => {
       "utf-8",
     );
     const finalHandler = chat.slice(
-      chat.indexOf("} else if (finalText) {"),
+      chat.indexOf("} else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {"),
       chat.indexOf("terminalReadiness.accept(event.data, identityAuthorized)"),
     );
     expect(finalHandler).toContain(

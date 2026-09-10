@@ -14,6 +14,12 @@ from pydantic import (
 )
 
 from argus.domain.strategy_template_contract import RegisteredStrategyTemplate
+from argus.domain.tool_contracts import (
+    MAX_TOOL_CALLS,
+    ToolCall,
+    ToolOutcome,
+    ToolResultCard,
+)
 
 ToneName = Literal["friendly", "concise"]
 VerbosityName = Literal["low", "medium", "high"]
@@ -70,6 +76,7 @@ IntentName = Literal[
     "conversation_followup",
     "unsupported_or_out_of_scope",
 ]
+
 
 TaskRelation = Literal["new_task", "continue", "refine", "ambiguous"]
 
@@ -316,12 +323,15 @@ class ConfirmationPayload(BaseModel):
 
 
 class ToolCallRecord(BaseModel):
+    call_id: str | None = None
+    tool_outcome: ToolOutcome | None = None
     tool_name: str
     payload: dict[str, Any] = Field(default_factory=dict)
     outcome: str | None = None
 
 
 class FinalResponsePayload(BaseModel):
+    tool_result_cards: list[ToolResultCard] = Field(default_factory=list)
     code: str | None = None
     result: dict[str, Any] | None = None
     backtest_job: dict[str, Any] | None = None
@@ -361,6 +371,7 @@ class ThreadState(BaseModel):
 
 
 class RunState(BaseModel):
+    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
     current_user_message: str
     recent_thread_history: list[ConversationMessage] = Field(default_factory=list)
     # Backend-derived per-turn discovery allowance truth; the runtime consumes

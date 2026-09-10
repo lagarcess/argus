@@ -456,10 +456,12 @@ HTTP POST /api/v1/chat/stream (SSE)
     ├── [confirm]    if ready_for_confirmation → deterministic confirmation card assembly.
     │                → streams stage_outcome event; frontend renders card.
     │
-    ├── [execute]    if approved_for_execution → RealBacktestTool call.
-    │                → streams stage_start event; frontend shows "Running backtest..."
+    ├── [execute]    declaration policy gates the actual callable before any launch payload.
+    │                Local calls return immediately; backtests retain confirmation and jobs.
+    │                → streams declaration-owned tool_progress with typed argument facts.
     │
-    ├── [explain]    if execution_succeeded → LLM generates result narrative from metrics.
+    ├── [explain]    backtest success → LLM generates result narrative from metrics.
+    │                Direct tool answers use their typed result/card binding without this call.
     │                → streams explanation tokens.
     │
     └── [next_step]  LLM suggests follow-up actions. → streams next-step chips.
@@ -470,6 +472,47 @@ HTTP POST /api/v1/chat/stream (SSE)
     ▼
 SSE stream: done event with final payload
 ```
+
+### Executable tool declarations
+
+`domain/capability_registry.py:get_tool_catalog` is the catalog assembly point.
+Each declaration binds a real callable's typed argument and return models to its
+description, cross-argument rules, domain and units, failure semantics, execution
+cost, confirmation callback, progress template, and versioned card presenter.
+Its schema, catalog text, runtime dispatch and result projection derive from
+those declarations. Availability derives from the existing feature-flag owner.
+Strategy templates retain their registry and unsupported-admission checks.
+
+The interpreter's system prompt, seven intents and response schema remain
+unchanged. Catalog-driven model selection is parked for roadmap decision 9.
+The existing validated Run action calls the declared backtest with its canonical
+`StrategySummary`; the same confirmation owner checks the approved inputs.
+Unapproved direct calls return `confirmation_required`, and one approval cannot
+authorize a second backtest. Research declarations expose the typed query and
+shape supported by the existing service, preserving its routing and retrieval
+contracts. This lane adds no question-to-tool classifier or production calculator.
+
+The callable's models generate a closed nested input tree for schema and runtime
+validation. Unknown fields are rejected at their owning level; explicit maps
+retain their declared openness. Legacy models retain their read behavior.
+Neutral `domain/tool_contracts.py` transports import no catalog or backtest code;
+serializer-pinned model paths remain unchanged. Outcomes distinguish `succeeded`,
+`invalid`, `ambiguous`, `bounded`, and `unavailable`. Unsuccessful outcomes cannot
+carry an answer. Cross-argument blank rules count `None`; zero remains known.
+
+`tool_result_cards` and per-call `tool_jobs` retain each call's identity through
+streaming, publication, worker completion and reload. Existing workers, quota,
+cost ledger and persistence owners remain authoritative. The card presenter owns
+display facts while the callable owns the typed result. Local editable tools
+recompute through the guarded message-artifact writer: the original unknown
+stays blank and the input revision advances with the result. Public sharing
+continues to use its shipped selected-turn contract; connecting general tool
+results to sharing remains a separate change.
+
+Progress is a declaration locale key with typed arguments, emitted when that
+call executes. Graph-stage events retain operational meaning and cannot select
+product prose. A stage without tool progress renders a neutral loader. This
+path requires no extra model call.
 
 ### NLU Ownership Rule
 

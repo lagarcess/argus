@@ -1,0 +1,64 @@
+{
+  "checked_at_utc": "2026-09-10T09:13:10.725103+00:00",
+  "candidate_head": "6b8d846e8543d532ecbfac73b9d744a3b1ac1ec2",
+  "original_integration_base": "9e8b59b23f29d432ec7603c42f7362137b1ee21f",
+  "previous_integration": "09b0f6af2107931a9d2540987f6a24eaa3b6d963",
+  "current_integration": "3ceada309a450c12335ad6e1048ab141ce1680bb",
+  "reconciliation_merge": "6b8d846e8543d532ecbfac73b9d744a3b1ac1ec2",
+  "incoming_change": "PR #581: shared profile write queue and removal of unreachable SettingsView, plus its roadmap landing note.",
+  "shared_files": [
+    "web/components/chat/ChatInterface.tsx",
+    "web/__tests__/alpha-frontend.test.ts"
+  ],
+  "overlap_audit": {
+    "runtime_owner": "Only frontend chat shell overlaps. Incoming removes the unreachable full-page settings import/render block; registry progress, final message hydration and recompute handlers are retained.",
+    "api_data_contract": "No incoming API or persisted data contract change; profile writes use existing getMe/patchMe. Registry adds recompute API independently.",
+    "ui_state_owner": "Profile state queue and rollback are upstream-owned. Chat shell and bilingual rendering acceptance repeated after merge.",
+    "migration": "No incoming or registry migration diff.",
+    "environment": "Upstream deletes obsolete NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION example flag. Registry adds no environment variable.",
+    "tests": "Both independent alpha-frontend assertions survive the normal merge. Complete frontend tests, lint/build and registry browser matrix repeated; no fixture assertions relaxed."
+  },
+  "evidence_retained": {
+    "source": "b17d25775028b7d7e2ea2f30ab35348291c973cc",
+    "unchanged_roots": [
+      "src",
+      "tests",
+      "scripts",
+      "workflows",
+      "supabase",
+      ".agent/interpreter_prompt_fingerprint.json"
+    ],
+    "backend_tests": {
+      "passed": 6908,
+      "failed": 0,
+      "skipped": 585
+    },
+    "full_model_input_identity": "All backend sources unchanged; 19 frozen/serializer file hashes and integration bytes rechecked. The complete prompt/schema before/after catalog proof in boundary-verification.json is retained.",
+    "protected_dispatch_and_recompute": "Both protected hashes unchanged from 31b20baf.",
+    "public_surface": "All 44 excluded paths and all migrations have no diff from current integration."
+  },
+  "checks_on_merge": {
+    "frontend_tests": {
+      "passed": 1691,
+      "failed": 0,
+      "files": 167
+    },
+    "frontend_lint": {
+      "passed": true,
+      "errors": 0,
+      "warnings": 8
+    },
+    "frontend_production_build": "passed",
+    "fingerprint_import_lane_c": {
+      "passed": 101,
+      "failed": 0,
+      "fresh_process_probes": 31
+    },
+    "modularity": "passed on this normal merged tree; no violations",
+    "browser": "Post-merge rendered-fixture evidence recorded separately under 6b8d846e/browser."
+  },
+  "additional_live_evals": 0,
+  "additional_provider_calls": 0,
+  "additional_provider_cost_usd": 0,
+  "final_status": "Evidence only; exact published-head CI and final Codex review must complete before a READY claim."
+}

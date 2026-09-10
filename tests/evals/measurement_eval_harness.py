@@ -304,6 +304,8 @@ def run_eval_case(
                     f"prose_judge:{criterion}"
                     for criterion in judge_result["failed_criteria"]
                 )
+                if not judge_result["failed_criteria"]:
+                    failed_checks.append("prose_judge:failed_without_criteria")
         retain_prose_context(
             judge_result,
             criteria=case.prose_judge_criteria,

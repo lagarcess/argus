@@ -1,0 +1,11 @@
+{
+  "source_sha": "6b8d846e8543d532ecbfac73b9d744a3b1ac1ec2",
+  "fixture_files": [
+    "backtest-cards.json",
+    "fixture-coherence.json",
+    "signal-cards.json",
+    "tool-cards.json",
+    "tool-progress.json"
+  ],
+  "network_attempts": 0
+}

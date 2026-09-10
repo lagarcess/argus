@@ -1,0 +1,366 @@
+{
+  "initial": {
+    "kind": "tool_result",
+    "schema_version": 1,
+    "tool_name": "test_echo",
+    "call_id": "call-one",
+    "artifact_id": "artifact-call-one",
+    "input_revision": 0,
+    "card_type": "test_echo",
+    "card_version": 1,
+    "arguments": {
+      "known": 0.0,
+      "other": 0.0,
+      "unknown": null
+    },
+    "outcome": {
+      "status": "succeeded",
+      "result": {
+        "value": 0.0
+      },
+      "failure": null
+    },
+    "presentation": {
+      "title": {
+        "locale_key": "tools.card.title",
+        "interpolation_args": {}
+      },
+      "answer": {
+        "name": "answer",
+        "label": {
+          "locale_key": "tools.card.solved_value",
+          "interpolation_args": {}
+        },
+        "value": 0.0,
+        "value_text": null,
+        "unit": null
+      },
+      "narrative": null,
+      "sources": [],
+      "visual": null,
+      "rows": [],
+      "inputs": [
+        {
+          "name": "known",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "known"
+            }
+          },
+          "value": 0.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "other",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "other"
+            }
+          },
+          "value": 0.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "unknown",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "unknown"
+            }
+          },
+          "value": null,
+          "value_text": null,
+          "unit": null,
+          "editable": false,
+          "unknown": true,
+          "visibility": "public"
+        }
+      ],
+      "notes": []
+    },
+    "artifact_state": "active"
+  },
+  "sibling": {
+    "kind": "tool_result",
+    "schema_version": 1,
+    "tool_name": "test_echo",
+    "call_id": "call-two",
+    "artifact_id": "artifact-call-two",
+    "input_revision": 0,
+    "card_type": "test_echo",
+    "card_version": 1,
+    "arguments": {
+      "known": 40.0,
+      "other": 0.0,
+      "unknown": null
+    },
+    "outcome": {
+      "status": "succeeded",
+      "result": {
+        "value": 40.0
+      },
+      "failure": null
+    },
+    "presentation": {
+      "title": {
+        "locale_key": "tools.card.title",
+        "interpolation_args": {}
+      },
+      "answer": {
+        "name": "answer",
+        "label": {
+          "locale_key": "tools.card.solved_value",
+          "interpolation_args": {}
+        },
+        "value": 40.0,
+        "value_text": null,
+        "unit": null
+      },
+      "narrative": null,
+      "sources": [],
+      "visual": null,
+      "rows": [],
+      "inputs": [
+        {
+          "name": "known",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "known"
+            }
+          },
+          "value": 40.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "other",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "other"
+            }
+          },
+          "value": 0.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "unknown",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "unknown"
+            }
+          },
+          "value": null,
+          "value_text": null,
+          "unit": null,
+          "editable": false,
+          "unknown": true,
+          "visibility": "public"
+        }
+      ],
+      "notes": []
+    },
+    "artifact_state": "active"
+  },
+  "edited": {
+    "kind": "tool_result",
+    "schema_version": 1,
+    "tool_name": "test_echo",
+    "call_id": "call-one",
+    "artifact_id": "artifact-call-one",
+    "input_revision": 1,
+    "card_type": "test_echo",
+    "card_version": 1,
+    "arguments": {
+      "known": 42.0,
+      "other": 7.0,
+      "unknown": null
+    },
+    "outcome": {
+      "status": "succeeded",
+      "result": {
+        "value": 42.0
+      },
+      "failure": null
+    },
+    "presentation": {
+      "title": {
+        "locale_key": "tools.card.title",
+        "interpolation_args": {}
+      },
+      "answer": {
+        "name": "answer",
+        "label": {
+          "locale_key": "tools.card.solved_value",
+          "interpolation_args": {}
+        },
+        "value": 42.0,
+        "value_text": null,
+        "unit": null
+      },
+      "narrative": null,
+      "sources": [],
+      "visual": null,
+      "rows": [],
+      "inputs": [
+        {
+          "name": "known",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "known"
+            }
+          },
+          "value": 42.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "other",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "other"
+            }
+          },
+          "value": 7.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "unknown",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "unknown"
+            }
+          },
+          "value": null,
+          "value_text": null,
+          "unit": null,
+          "editable": false,
+          "unknown": true,
+          "visibility": "public"
+        }
+      ],
+      "notes": []
+    },
+    "artifact_state": "active"
+  },
+  "zero": {
+    "kind": "tool_result",
+    "schema_version": 1,
+    "tool_name": "test_echo",
+    "call_id": "call-one",
+    "artifact_id": "artifact-call-one",
+    "input_revision": 2,
+    "card_type": "test_echo",
+    "card_version": 1,
+    "arguments": {
+      "known": 0.0,
+      "other": 7.0,
+      "unknown": null
+    },
+    "outcome": {
+      "status": "succeeded",
+      "result": {
+        "value": 0.0
+      },
+      "failure": null
+    },
+    "presentation": {
+      "title": {
+        "locale_key": "tools.card.title",
+        "interpolation_args": {}
+      },
+      "answer": {
+        "name": "answer",
+        "label": {
+          "locale_key": "tools.card.solved_value",
+          "interpolation_args": {}
+        },
+        "value": 0.0,
+        "value_text": null,
+        "unit": null
+      },
+      "narrative": null,
+      "sources": [],
+      "visual": null,
+      "rows": [],
+      "inputs": [
+        {
+          "name": "known",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "known"
+            }
+          },
+          "value": 0.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "other",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "other"
+            }
+          },
+          "value": 7.0,
+          "value_text": null,
+          "unit": null,
+          "editable": true,
+          "unknown": false,
+          "visibility": "public"
+        },
+        {
+          "name": "unknown",
+          "label": {
+            "locale_key": "tools.card.named_input",
+            "interpolation_args": {
+              "name": "unknown"
+            }
+          },
+          "value": null,
+          "value_text": null,
+          "unit": null,
+          "editable": false,
+          "unknown": true,
+          "visibility": "public"
+        }
+      ],
+      "notes": []
+    },
+    "artifact_state": "active"
+  }
+}

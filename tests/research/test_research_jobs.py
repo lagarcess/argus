@@ -38,16 +38,19 @@ class _JobGateway:
 
     def create_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
         job = {
-            "id": "job-1",
+            "id": f"job-{len(self.rows) + 1}",
             "status": "queued",
             "conversation_id": kwargs["conversation_id"],
             "request_message_id": kwargs.get("request_message_id"),
+            "idempotency_key": kwargs.get(
+                "idempotency_key", kwargs.get("request_message_id")
+            ),
             "operation_scope": kwargs.get("operation_scope"),
             "launch_payload": kwargs.get("launch_payload"),
             "execution_metadata": kwargs.get("execution_metadata") or {},
             "retryable": False,
         }
-        self.rows["job-1"] = job
+        self.rows[job["id"]] = job
         return job
 
     def get_backtest_job(self, *, user_id: str, job_id: str):
@@ -61,7 +64,7 @@ class _JobGateway:
                 row
                 for row in self.rows.values()
                 if row.get("operation_scope") == operation_scope
-                and row.get("request_message_id") == idempotency_key
+                and row.get("idempotency_key") == idempotency_key
             ),
             None,
         )
@@ -108,7 +111,7 @@ class _FakeClient:
 
     def submit_background(self, prompt: str, spec: Any) -> str:
         self.submitted.append(prompt)
-        return "resp_bg1"
+        return f"resp_bg{len(self.submitted)}"
 
     def poll_background(self, background_id: str, **_kw: Any) -> BackgroundPoll:
         return self.polls.pop(0)

@@ -25,6 +25,10 @@ from loguru import logger
 from argus.api import state as api_state
 from argus.api.chat.backtest_job_envelopes import public_backtest_job_payload
 from argus.api.chat.research_evidence import record_research_turn_evidence
+from argus.api.chat.research_tool_results import (
+    research_tool_card_for_completion,
+    with_research_tool_binding,
+)
 
 # Re-exported: the scope literal is owned by the settlement rule the SQL is
 # rendered from.
@@ -44,6 +48,7 @@ from argus.domain.research.contracts import (
 )
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.tool_job_binding import ToolJobBinding
 
 # Keep strong references so in-flight pollers never get garbage collected.
 _POLLER_TASKS: set[asyncio.Task[None]] = set()
@@ -63,6 +68,10 @@ def apply_research_job_request(
     conversation_id: str,
     request_message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
+    tool_name: str | None = None,
+    tool_artifact_id: str | None = None,
+    tool_arguments: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Consume a typed research job request from the runtime result.
 
@@ -80,6 +89,13 @@ def apply_research_job_request(
     job_request = runtime_result.pop("research_job_request", None)
     if not isinstance(job_request, dict):
         return None
+    job_request = with_research_tool_binding(
+        job_request,
+        call_id=tool_call_id,
+        tool_name=tool_name,
+        artifact_id=tool_artifact_id,
+        arguments=tool_arguments,
+    )
     try:
         job, sync_packet = start_research_job(
             job_request=job_request,
@@ -95,6 +111,7 @@ def apply_research_job_request(
         )
         runtime_result["assistant_response"] = composed["answer"]
         runtime_result["research"] = composed["research"]
+        _attach_completed_tool_card(runtime_result, job_request)
         return None
     if job is not None:
         return job
@@ -105,11 +122,25 @@ def apply_research_job_request(
         runtime_result["research"] = composed["research"]
         if composed.get("next_experiments") is not None:
             runtime_result["next_experiments"] = composed["next_experiments"]
+        _attach_completed_tool_card(runtime_result, job_request)
         return None
     runtime_result["assistant_response"] = research_failure_note(
         str(job_request.get("language") or "en")
     )
+    _attach_completed_tool_card(
+        runtime_result, job_request, failure_code="research_failed"
+    )
     return None
+
+
+def _attach_completed_tool_card(
+    patch: dict[str, Any], job_request: dict[str, Any], *, failure_code: str | None = None
+) -> None:
+    card = research_tool_card_for_completion(
+        job_request, patch, failure_code=failure_code
+    )
+    if card is not None:
+        patch["tool_result_cards"] = [card]
 
 
 def start_research_job(
@@ -152,9 +183,10 @@ def start_research_job(
             )
             return None, None
         return None, packet
+    idempotency_key = _research_job_identity(job_request, request_message_id)
     replay = _replayed_research_job(
         user_id=user_id,
-        request_message_id=request_message_id,
+        idempotency_key=idempotency_key,
     )
     if replay is not None:
         # The same request message already admitted a research job. Its row is
@@ -190,7 +222,7 @@ def start_research_job(
             payload_hash=payload_hash,
             launch_payload=launch_payload,
             request_message_id=request_message_id,
-            idempotency_key=request_message_id,
+            idempotency_key=idempotency_key,
             execution_metadata={
                 "capability_class": job_request.get("capability_class"),
                 "perplexity_background_id": background_id,
@@ -214,20 +246,32 @@ def start_research_job(
 def _replayed_research_job(
     *,
     user_id: str,
-    request_message_id: str | None,
+    idempotency_key: str | None,
 ) -> dict[str, Any] | None:
     gateway = api_state.supabase_gateway
-    if gateway is None or not request_message_id:
+    if gateway is None or not idempotency_key:
         return None
     try:
         return gateway.find_backtest_job_by_idempotency_key(
             user_id=user_id,
             operation_scope=RESEARCH_OPERATION_SCOPE,
-            idempotency_key=request_message_id,
+            idempotency_key=idempotency_key,
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Research job replay lookup failed", error=str(exc))
         return None
+
+
+def _research_job_identity(
+    job_request: dict[str, Any], request_message_id: str | None
+) -> str | None:
+    binding = job_request.get("tool_binding")
+    if not isinstance(binding, dict):
+        return request_message_id
+    if not request_message_id:
+        raise ValueError("A registered research job requires a durable request message")
+    material = json.dumps([request_message_id, binding["call"]["call_id"]])
+    return "research-tool:" + hashlib.sha256(material.encode()).hexdigest()
 
 
 def _spawn_poller(
@@ -376,6 +420,12 @@ async def _finalize_success(
         "conversation_mode": "guide",
         "research": composed["research"],
     }
+    card = research_tool_card_for_completion(
+        job_request,
+        {"assistant_response": composed["answer"], "research": composed["research"]},
+    )
+    if card is not None:
+        metadata["tool_result_cards"] = [card]
     if composed.get("next_experiments") is not None:
         metadata["next_experiments"] = composed["next_experiments"]
     try:
@@ -402,6 +452,7 @@ async def _finalize_success(
         conversation_id=conversation_id,
         message_id=message.id,
         request_id=request_id,
+        tool_call_id=card["call_id"] if card is not None else None,
     )
 
 
@@ -466,6 +517,7 @@ def _fail_job(
             research_billed_failure_evidence,
         )
 
+        binding = job_request.get("tool_binding")
         record_research_turn_evidence(
             research=research_billed_failure_evidence(
                 job_request,
@@ -476,6 +528,11 @@ def _fail_job(
             conversation_id=conversation_id,
             message_id=message_id,
             request_id=request_id,
+            tool_call_id=(
+                ToolJobBinding.model_validate(binding).call.call_id
+                if binding is not None
+                else None
+            ),
         )
     gateway = api_state.supabase_gateway
     if gateway is None:
@@ -510,13 +567,19 @@ def _persist_failure_note(
     from argus.agent_runtime.research_answer import research_failure_note
     from argus.api.message_store import create_message
 
+    card = research_tool_card_for_completion(
+        job_request, {}, failure_code="research_failed"
+    )
+    metadata: dict[str, Any] = {"conversation_mode": "guide"}
+    if card is not None:
+        metadata["tool_result_cards"] = [card]
     try:
         note = create_message(
             user_id=user_id,
             conversation_id=conversation_id,
             role="assistant",
             content=research_failure_note(str(job_request.get("language") or "en")),
-            metadata={"conversation_mode": "guide"},
+            metadata=metadata,
             settle_usage=None,
         )
     except Exception as exc:  # noqa: BLE001

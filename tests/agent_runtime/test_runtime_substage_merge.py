@@ -13,6 +13,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from argus.agent_runtime import substage_events
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.agent_runtime.substage_events import (
@@ -93,3 +94,39 @@ async def test_closed_channel_drops_events_instead_of_leaking() -> None:
 @pytest.mark.asyncio()
 async def test_emit_without_a_channel_is_a_no_op() -> None:
     emit_substage("discovery_search", detail="anything")
+
+
+@pytest.mark.asyncio()
+async def test_actual_call_progress_wakes_stream_from_worker_thread() -> None:
+    """A sync handler must publish progress while its thread is still occupied."""
+    import threading
+
+    from faker import Faker
+
+    fake = Faker()
+    queue: asyncio.Queue = asyncio.Queue()
+    release = threading.Event()
+    facts = {
+        "locale_key": "chat.tools.echo.progress",
+        "interpolation_args": {"value": 0},
+        "call_id": fake.uuid4(),
+        "tool_name": "echo",
+    }
+
+    def invoke() -> None:
+        substage_events.emit_tool_progress(
+            SimpleNamespace(model_dump=lambda **kwargs: facts)
+        )
+        assert release.wait(timeout=2)
+
+    token = bind_substage_channel(queue)
+    task = asyncio.create_task(asyncio.to_thread(invoke))
+    try:
+        kind, event = await asyncio.wait_for(queue.get(), timeout=1)
+        assert kind == "substage"
+        assert event == {"stage": "execute", "tool_progress": facts}
+        assert not task.done()
+    finally:
+        release.set()
+        await task
+        close_substage_channel(token)

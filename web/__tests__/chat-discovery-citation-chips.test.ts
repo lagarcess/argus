@@ -11,6 +11,10 @@ const sourcesPanel = readFileSync(
   join(root, "components/chat/DiscoverySourcesPanel.tsx"),
   "utf-8",
 );
+const sourcesList = readFileSync(
+  join(root, "components/chat/ResearchSourcesList.tsx"),
+  "utf-8",
+);
 
 describe("per-row citation chips (§9.5)", () => {
   test("the chip is the first corroborating source's domain, one per row", () => {
@@ -49,9 +53,10 @@ describe("per-row citation chips (§9.5)", () => {
 
   test("the drawer scrolls to and highlights the anchored source", () => {
     expect(sourcesPanel).toContain("anchorIndex?: number | null");
-    expect(sourcesPanel).toContain("data-source-index={index}");
+    expect(sourcesPanel).toContain("anchorIndex={anchorIndex}");
+    expect(sourcesList).toContain("data-source-index={index}");
     expect(sourcesPanel).toContain('scrollIntoView({ block: "start" })');
-    expect(sourcesPanel).toContain("index === anchorIndex");
+    expect(sourcesList).toContain("index === anchorIndex");
   });
 
   test("closing the drawer clears the anchor for the next open", () => {
