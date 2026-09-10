@@ -731,6 +731,47 @@ def test_a_failed_scenario_records_the_shape_it_was_selected_for(monkeypatch) ->
     assert sidecar["capability_class"] == "balanced_lookup"
 
 
+def test_a_scenario_typed_as_market_stats_is_grounded_not_voiced_from_history(
+    monkeypatch,
+) -> None:
+    """A forward question the interpreter typed as market_stats still takes the
+    scenario contract: the legacy statistics path would default the future
+    window to the past year and voice history as the answer."""
+    from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
+
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="market_stats",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "Bear to bull ranges.", _scenario_rows(cited=True)
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+
+    result = _run("what return will NVDA have in ten years?")
+
+    assert result is not None
+    assert len(transport.requests) == 1, "the scenario must reach the provider"
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert result.stage_patch["research"]["shape"] == "balanced"
+    assert "Bear" in result.stage_patch["assistant_response"]
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:

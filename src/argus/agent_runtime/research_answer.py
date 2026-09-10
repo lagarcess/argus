@@ -165,11 +165,16 @@ async def _dispatch(
     if ka.refusal_route_survives_classification(interpretation):
         ka.note_refusal_route_kept(interpretation)
         return None
+    # One owner decides whether this turn is a computed scenario (decision
+    # 10), before any kind branch: a scenario is grounded on public pages
+    # whatever kind it was typed as, never voiced from Argus's own statistics
+    # or a survey, and never sent to the find operation.
+    scenario = grounded.scenario_contract_applies(query, interpretation)
     # Current external facts ("why is it moving") take the grounded balanced
     # path like every other claim: typed, dated sources in the sidecar, never
     # publisher URLs written into prose (#545). Statistics stay on Argus's
     # own data.
-    if query.question_kind == "market_stats":
+    if query.question_kind == "market_stats" and not scenario:
         return await _legacy_kind_result(
             query=query,
             interpretation=interpretation,
@@ -177,7 +182,7 @@ async def _dispatch(
             user=user,
             decision=decision,
         )
-    if query.question_kind in _MARKET_SURVEY_KINDS:
+    if query.question_kind in _MARKET_SURVEY_KINDS and not scenario:
         return await grounded.grounded_result(
             query=query,
             subjects=_resolved_subjects(query),
@@ -187,7 +192,7 @@ async def _dispatch(
             user=user,
             decision=decision,
         )
-    if query.question_kind == "find_assets":
+    if query.question_kind == "find_assets" and not scenario:
         from argus.agent_runtime.research_find import find_assets_stage_result
 
         return await find_assets_stage_result(
@@ -200,9 +205,6 @@ async def _dispatch(
     if query.question_kind in ("concept", "none"):
         return None
     subjects = _resolved_subjects(query)
-    # One owner decides whether this turn is a computed scenario (decision
-    # 10); every branch below reads it rather than the query's bit alone.
-    scenario = grounded.scenario_contract_applies(query, interpretation)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
     if off_coverage or query.asset_class_hint in ("crypto", "currency_pair"):
         if not (grounded.requires_publisher_sources(query) or scenario):
@@ -229,8 +231,11 @@ async def _dispatch(
             provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
-    if shape == "fast" and scenario:
-        # A computed scenario is never a quote: it needs public pages.
+    if scenario and query.question_kind != "cross_company":
+        # A computed scenario is never a quote and needs no background job:
+        # it runs on the balanced shape with public pages, whatever kind it
+        # was typed as. Only a named multi-company comparison keeps the
+        # thorough job it would take without the scenario.
         shape = "balanced"
     if shape == "thorough":
         return grounded.thorough_job_result(
