@@ -1,16 +1,16 @@
 # Model result readouts: implementation checkpoint
 
 Status: **not ready to merge**. Implementation and free verification are being
-prepared for review. Founder-approved live measurement, fresh provider-backed
-browser results, the measured fingerprint, exact-head CI, and terminal Codex
-review are still required. This is a progress record, not the terminal audit.
+prepared for review. The founder approved the $5 targeted proof. Full live
+measurement and fingerprint regeneration are explicitly held until a separate
+go; the lane will stop and report after its targeted proof. This is a progress record, not the terminal audit.
 
 ## Behavior
 
 Quick take and Breakdown keep their existing frames, labels, order and result
 card. New complete model text crosses the private-prose boundary only through
 the closed, versioned `result_readout_content` envelope. Its creation language
-must match the reader's workspace language. Older results, language mismatch,
+must match the reader's workspace language. Older saved readouts, language mismatch,
 invalid envelopes and failed compositions use the current templates. Reads do
 not call a model or rewrite saved history.
 
@@ -65,15 +65,14 @@ Python 3.10.20, provider keys blanked, no live calls:
   review of the latest correction was clean. This does not replace the final
   GitHub Codex review.
 
-## Integration and parallel scope
+## Integration and scope
 
 Original integration base and latest fetched integration:
 `d0884c3de81f8c53d454ac4f68f461d3b5dd77e3`.
-No reconciliation merge is currently needed. The initial and repeated open-PR
-overlap checks found no open PRs. Repeat that check and fetch before readiness;
-decision 10 can still advance its parallel branch.
+No integration reconciliation has been performed. The founder alone merges
+PRs and deploys.
 
-No decision-10-owned files, locale catalogs, environment files, `render.yaml`,
+No locale catalogs, environment files, `render.yaml`,
 release contracts or branch protection were changed. AGENTS.md already assigns
 the intended short/deep surface ownership and remains unchanged. The founder
 retains merge and deployment authority.

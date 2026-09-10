@@ -16,7 +16,6 @@ from argus.domain.artifact_presentation_kind import artifact_presentation_kind
 from argus.domain.result_figures import result_display_figures
 from argus.domain.result_readout_content import (
     readout_metadata,
-    stored_readout_metadata,
     validated_readout,
 )
 from argus.domain.result_readout_facts import (
@@ -141,6 +140,4 @@ def result_breakdown_metadata(
             failure_mode=message.failure_mode,
         )
     )
-    if run is None or not stored_readout_metadata(run.conversation_result_card):
-        metadata.pop("result_readout_content", None)
     return metadata

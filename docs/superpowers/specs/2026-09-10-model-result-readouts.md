@@ -23,10 +23,10 @@ clarification make these surfaces the interpretation attached to evidence.
    current workspace language match. Missing, malformed, legacy, null-text, or
    mismatched envelopes use today's typed template. Reads never call a model or
    rewrite history. Legacy private prose fields remain forbidden.
-5. A run saved before this lane has no envelope and remains template-only,
-   including a newly requested Breakdown. The creation stamp exists even when
-   the new Quick take fell back. The founder has been asked to confirm this
-   literal interpretation of the brief; any correction updates this contract.
+5. Readouts saved before this lane have no envelope and remain template-only.
+   A newly requested Breakdown on any run is a new message composed now and
+   stamped with the current language. It never replaces the older readout.
+   The creation stamp exists even when the new composition falls back.
 6. Supply every stored run metric to both composers, including nested aggregate
    and per-symbol values, cost and activity fields. Stored chart data is optional;
    saved trade markers are not a complete ledger. Do not invent a path.
@@ -43,12 +43,10 @@ clarification make these surfaces the interpretation attached to evidence.
 
 ## 3. Reserved scope
 
-Decision 10 owns unsupported_admission.py, llm_interpreter.py,
-clarification_contract.py, chat-recovery-display.ts, research routing,
-future-performance measurement cases, PRODUCT.md, and
-chat.clarification.future_performance in both locale catalogs. This lane owns
-chat.result_readout. No environment-file writes, stash, secret disclosure,
-render.yaml, release-contract edits, branch-protection edits, merge or deploy.
+Keep changes confined to result readout generation, transport, presentation,
+validation, documentation and proof. No environment-file writes, stash,
+secret disclosure, render.yaml, release-contract edits, branch-protection
+edits, PR merge or deploy.
 
 ## 4. Contract gates
 
@@ -56,7 +54,11 @@ render.yaml, release-contract edits, branch-protection edits, merge or deploy.
 - DATA_MODEL.md documents additive composition metadata, without a migration.
 - Private-prose guards allow only the new closed readout transport.
 - AGENTS.md surface ownership already matches; change only if semantics change.
-- Prompt fingerprint changes require committed, founder-approved live evidence.
+- The approved $5 covers the targeted 48-task comparison and at most four
+  fresh browser backtests. Finish this scope and targeted proof, then stop
+  and report. Do not run the full live measurement or regenerate the prompt
+  fingerprint without an explicit founder go. The founder alone merges PRs
+  and deploys.
 
 ## 5. Execution contract and Goal
 
@@ -72,9 +74,8 @@ Implementation sequence:
 - [x] Test and implement creation-time transport and template fallbacks.
 - [x] Test and implement matching-language frame content and clipboard parity.
 - [x] Record every validator disposition and focused verification result.
-- [ ] Post a cost estimate and wait for founder approval before live work.
-- [ ] Commit measured evidence and fingerprint; capture bilingual browser proof.
-- [ ] Recheck PR overlap and current integration, reconcile one-way as needed.
+- [x] Post a cost estimate and obtain founder approval: up to $5 total.
+- [ ] Commit targeted measured evidence and bilingual browser proof; leave the fingerprint unchanged.
 - [ ] Check merged-tree modularity, exact-head CI and final clean Codex review
   with zero unresolved threads, then write the terminal audit.
 
@@ -84,10 +85,9 @@ development evidence, not a substitute for the approved live proof.
 ## 6. Stop conditions
 
 Stop and report any requirements contradiction or necessary forbidden edit.
-Do not run paid measurements or provider-backed browser turns before the founder
-approves the concrete estimate. If integration changes fingerprinted text,
-compare overlap, rerun this lane's affected measured cases, and regenerate its
-fingerprint without changing decision 10's owned files.
+Stay within the approved $5 and at most four fresh browser backtests. Stop
+and report after the targeted proof. Full live measurement and fingerprint
+regeneration require a separate explicit founder go.
 
 ## Sources
 

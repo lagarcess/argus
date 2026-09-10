@@ -1,7 +1,11 @@
 # Targeted result readout measurement
 
-Status: **prepared, no paid calls authorized or made**. This document and the
-free preflight are not live evidence and do not authorize a fingerprint update.
+Status: **founder approved up to $5 for the targeted 48-completion comparison
+and at most four fresh browser backtests**. Execution requires genuine fixtures,
+the final clean code SHA and the price/budget guard. This targeted comparison
+does **not** authorize a fingerprint update, even after successful live results.
+Finish this lane's approved targeted proof, then stop and report. No full live
+eval or fingerprint regeneration may run without a new, explicit founder go.
 
 The comparison invokes each checkout's real `explain_stage_async` and
 `llm_result_breakdown_message`, including their production draft validation and
@@ -41,12 +45,14 @@ metric precision and absent fields; do not fabricate a curve or full ledger.
 
 ## Cost and execution bounds
 
-Updated proposed founder allowance: **$4 for the 48-completion comparison, plus
-a separate $1 for browser proof, $5 total**. This supersedes the earlier $1
-targeted measurement / $2 total request. No paid approval has been received.
+Founder-approved total allowance: **up to $5**, using **$4 for the 48-completion
+comparison plus $1 for browser proof**, with at most four fresh browser
+backtests. This supersedes the earlier $1 targeted measurement / $2 total
+request. No full live suite or fingerprint regeneration is included in this
+authorization.
 The recorded DOCN chart makes the earlier 8,000-byte input assumption invalid;
 the refreshed candidate preflight reaches 48,835 bytes. Keep all stored metrics and the optional
-chart, and raise the proposed request bound to 60,000 bytes.
+chart, with a 60,000-byte request bound.
 
 Verified local task settings during the free preflight:
 
@@ -76,13 +82,13 @@ Refreshed official maximum rate envelopes, USD per million input/output tokens:
 
 Including all configured primary/fallback models, four attempts per completion
 and the 60,000-byte bound, the 48-completion worst-case reservation is
-**$3.482112**. The proposed $4 measurement allowance covers that bound. Browser
-spending is separate and capped by the proposed $1 browser allowance.
+**$3.482112**. The $4 measurement allocation covers that bound. Browser spending
+is tracked separately within the $1 allocation and four-backtest limit.
 
 Sum that for all 48 task completions. Prices may be supplied in a small JSON
 file with `verified_at`, `source`, and `models`, where each configured model has
 `input_per_million` and `output_per_million`. Refresh those public prices before
-seeking approval; do not infer them from model names. The caller's approved
+execution; do not infer them from model names. The caller's approved
 dollar cap must cover this bound. Every actual HTTP attempt reserves against
 the remaining cap before it is sent; unknown prices, excess retries and excess
 payload/output sizes fail closed. Missing response-cost evidence stops further
@@ -108,21 +114,21 @@ fixture sizing was insufficient. The other two cases in that partial fixture
 set are still synthetic; this is free size/configuration evidence, not paid
 measurement or committed-head acceptance.
 
-After approval, recorded fixtures and final clean candidate code exist, the
-paid command is:
+Once three genuine source-verified fixtures and final clean candidate code
+exist, the authorized targeted command is:
 
 ```bash
 poetry run python -m tests.evals.result_readout_eval \
   --baseline /Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next \
   --candidate /Users/garces/.codex/worktrees/7c2d/private-alpha-next \
-  --fixtures docs/reports/evidence/model-result-readouts/recorded-fixtures.json \
-  --pricing /private/tmp/model-result-readouts-prices.json \
+  --fixtures /private/tmp/model-result-readouts-recorded-fixtures.json \
+  --pricing /private/tmp/model-result-readouts-refreshed-prices.json \
   --budget-usd 4 --live \
   --output /private/tmp/model-result-readouts-live.json
 ```
 
-Do not run this command now. No environment file is created or edited. The
-provider credential is inherited/read using the normal runtime; only its
+The preparation subtask does not execute this command. No environment file is
+created or edited. The provider credential is inherited/read using the normal runtime; only its
 presence is reported. Both worktrees must stay clean at their recorded SHAs
 through every visit. Live output must stay outside both checkouts so writing
 evidence cannot dirty the measured code. Existing output files are not replaced.
@@ -151,21 +157,27 @@ case-by-case dispositions. A complete fallback remains a model-quality failure,
 even when it is safe product behavior. Do not turn acceptance by a deterministic
 validator into a claim of good prose. No separate paid prose judge is included.
 
-The manifest's previous full scorecard is retained by exact file hash, original
-totals and every original case; none are counted as freshly run. Its recorded
-totals are 61 passed and 1 failed. One prior case,
+The baseline manifest's previous full scorecard is retained as a **historical
+reference only**, by exact file hash, original totals and every original case;
+none are counted as freshly run. At initial preflight its recorded totals were
+61 passed and 1 failed. One prior case,
 `asset_discovery_not_result_followup_issue_244`, has a result_summary receipt;
 its full-turn result is historical evidence, not remeasured by this targeted
 composer probe. Cases without observed readout calls are explicitly retained
 without new-pass claims. Compare candidate and baseline per case, language,
 surface and replicate; explain any regression rather than waiving it.
 
-Only after the approved live comparison and its qualitative disposition may
-the captain commit a targeted scorecard and point the fingerprint at it. The
-targeted totals must agree with `last_measured`; do not claim the 62-case full
-suite was rerun. Preserve the prior full evidence and existing failure in the
-comparison report. After integration changes, compare the measured prompt
-surface and remeasure this lane's affected cases when required.
+The captain may retain the targeted scorecard and qualitative review as
+readout evidence. **Never point the prompt fingerprint or `last_measured` at
+this targeted scorecard. Do not regenerate the fingerprint.** A clean targeted
+result is not full-suite evidence or fingerprint authority.
+
+Finish this lane's scope and the approved targeted/browser proof, then stop and
+report the results. **No full live eval and no fingerprint regeneration until
+an explicit founder go.** There is no automatic follow-on measurement. Preserve
+the targeted comparison and prior
+full scorecard as historical references. Founder authority for merging this
+lane and deploying remains unchanged.
 
 ## Free verification
 
@@ -177,4 +189,5 @@ poetry run pytest tests/test_interpreter_prompt_surface.py \
 The extractor now covers inline readout message dictionaries, the Breakdown
 API owner and the shared readout instruction constant/schema. It deliberately
 does not sweep unrelated API prose into this lane. The unchanged fingerprint
-is expected to fail until genuine approved measurement exists.
+may remain red at the targeted-proof handoff. That does not authorize changing
+it: report the outstanding fingerprint gate and wait for explicit founder go.

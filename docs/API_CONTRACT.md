@@ -1140,7 +1140,9 @@ card, and never reconstructed from legacy prose. Breakdown messages carry
 their own envelope. The web displays text only for a supported envelope whose
 surface and language match the frame and current workspace language.
 Missing/legacy, malformed, failed or mismatched envelopes use the existing
-typed template. Pre-lane runs remain template-only. There is no read-time
+typed template. Readouts saved before this lane remain template-only. A new
+Breakdown request, including one for an older run, creates a new message with
+the current workspace language; it does not replace any saved readout. There is no read-time
 model call, translation, historical rewrite or partial-draft display.
 `result_readout_source`, `result_readout_fallback_used` and optional
 `result_readout_failure_mode` record generation provenance for both surfaces;
@@ -3205,7 +3207,9 @@ returns `422 tool_inputs_not_editable`.
   figure-count checks. Generation failure selects the typed template and
   records `result_readout_source`, `result_readout_fallback_used`, and
   `result_readout_failure_mode`. Existing `result_breakdown_*` provenance is
-  retained for compatibility. Pre-lane runs remain template-only.
+  retained for compatibility. An older run can receive a newly requested,
+  newly language-stamped Breakdown; readouts already saved before this lane
+  remain on the current templates.
 - `select_response_option` is valid only for typed response-intent options. Its
   payload must include the durable assistant `message_id` that presented the
   option as `source_assistant_id`, plus the exact `option_id` and

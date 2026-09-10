@@ -123,10 +123,16 @@ async def test_graph_keeps_creation_metadata_through_end_stage(monkeypatch):
     assert public["result_readout_fallback_used"] is False
 
 
-def test_pre_lane_breakdown_never_calls_model(monkeypatch, faker):
+@pytest.mark.parametrize("language", ["en", "es-419"])
+@pytest.mark.parametrize("fallback", [False, True])
+def test_new_breakdown_on_old_run_uses_current_language(
+    monkeypatch, faker, language, fallback
+):
     from datetime import timezone
 
-    from argus.api.chat import result_readout
+    from argus.api.artifact_presentation import result_breakdown_metadata
+    from argus.api.chat import breakdown
+    from argus.api.routers.agent import result_breakdown_message_with_metadata
     from argus.api.schemas import BacktestRun
 
     run = BacktestRun(
@@ -142,14 +148,34 @@ def test_pre_lane_breakdown_never_calls_model(monkeypatch, faker):
         conversation_result_card={},
         created_at=faker.date_time(tzinfo=timezone.utc),
     )
-    monkeypatch.setattr(
-        result_readout,
-        "result_breakdown_message_with_metadata",
-        lambda *args, **kwargs: pytest.fail("old run reached model"),
+    calls = []
+
+    def compose(context, *, language):
+        calls.append(language)
+        return (
+            None
+            if fallback
+            else {
+                "en": "A complete new explanation.",
+                "es-419": "Una explicación nueva y completa.",
+            }[language]
+        )
+
+    monkeypatch.setattr(breakdown, "llm_result_breakdown_message", compose)
+    original = deepcopy(run.model_dump())
+    result = result_breakdown_message_with_metadata(run, language=language)
+    assert calls == [language]
+    metadata = result_breakdown_metadata(result, run, language=language)
+    envelope = metadata["result_readout_content"]
+    assert envelope["language"] == language
+    assert envelope["surface"] == "breakdown"
+    assert envelope["text"] == (None if fallback else result.text)
+    assert metadata["result_readout_fallback_used"] is fallback
+    assert (
+        reader_payload({**metadata, "content": result.text})["result_readout_content"]
+        == envelope
     )
-    result = result_readout.compose_result_breakdown(run, language="es")
-    assert result.fallback_used is True
-    assert result.failure_mode == "legacy_result"
+    assert run.model_dump() == original
 
 
 def test_completed_job_reload_and_job_response_share_run_stamp():

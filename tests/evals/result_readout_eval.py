@@ -173,6 +173,7 @@ def retained_case_evidence(path: Path) -> dict[str, Any]:
         )
     return {
         "path": str(path),
+        "evidence_role": "historical_reference_only",
         "sha256": sha256(contents),
         "remeasured": False,
         "disposition": "Prior full-suite evidence retained; no new pass claimed.",
@@ -332,6 +333,11 @@ def main() -> None:
     report = {
         "schema_version": "targeted_readout_scorecard/v1",
         "scope": "result_summary + result_breakdown only; not a full eval suite",
+        "fingerprint_authority": {
+            "eligible": False,
+            "reason": "Targeted readout evidence cannot authorize a fingerprint update.",
+            "required_gate": "Finish this lane's approved targeted proof, then stop and report. No full live eval or fingerprint regeneration without an explicit founder go.",
+        },
         "evaluation_mode": "live_targeted" if args.live else "preflight_no_calls",
         "remaining_prerequisites": prerequisites,
         "generated_at": datetime.now(timezone.utc).isoformat(),
