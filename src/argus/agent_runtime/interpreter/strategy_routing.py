@@ -38,7 +38,8 @@ def strategy_route_expected(
 
 def decision_with_strategy_route_intent(decision: InterpretDecision) -> InterpretDecision:
     """Keep the effective label aligned with typed strategy work, and audit repair."""
-    if decision.intent == "calculate" or not strategy_route_expected(
+    # A route label cannot promote a refusal; capability admission owns that verdict.
+    if decision.intent not in {"explain", "follow_up"} or not strategy_route_expected(
         intent=decision.intent, semantic_turn_act=decision.semantic_turn_act
     ):
         return decision

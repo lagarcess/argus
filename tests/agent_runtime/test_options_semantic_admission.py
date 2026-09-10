@@ -12,16 +12,27 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from argus.agent_runtime.interpreter.strategy_routing import (
+    STRATEGY_TURN_ACTS,
+    decision_with_strategy_route_intent,
+)
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
+)
+from argus.agent_runtime.profile.response_profile import (
+    resolve_effective_response_profile,
 )
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
     interpret_stage_async,
 )
-from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.stages.interpret_types import (
+    InterpretationRequest,
+    InterpretDecision,
+    SemanticTurnAct,
+)
 from argus.agent_runtime.state.models import (
     RunState,
     StrategySummary,
@@ -30,6 +41,9 @@ from argus.agent_runtime.state.models import (
     UserState,
     normalize_task_intent,
 )
+from faker import Faker
+
+fake = Faker()
 
 FULL_YEAR_2024 = {"start": "2024-01-01", "end": "2024-12-31"}
 EN_OPTIONS_MESSAGE = (
@@ -144,6 +158,30 @@ def _assert_blocked_unsupported_admission(
         patch["optional_parameter_status"]["unsupported_constraints"][0]["category"]
         == "unsupported_strategy_logic"
     )
+
+
+@pytest.mark.parametrize("intent", ["cannot", "unsupported_or_out_of_scope"])
+@pytest.mark.parametrize("semantic_turn_act", sorted(STRATEGY_TURN_ACTS))
+def test_strategy_route_label_repair_preserves_unsupported_verdict(
+    intent: str, semantic_turn_act: SemanticTurnAct
+) -> None:
+    decision = InterpretDecision(
+        intent=intent,
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=fake.sentence(),
+        confidence=1.0,
+        effective_response_profile=resolve_effective_response_profile(
+            user=UserState(user_id=fake.uuid4())
+        ),
+        semantic_turn_act=semantic_turn_act,
+    )
+
+    repaired = decision_with_strategy_route_intent(decision)
+
+    assert repaired is decision
+    assert repaired.intent == "cannot"
+    assert "strategy_route_intent_repair" not in repaired.normalized_signals
 
 
 def test_unsupported_intent_new_idea_options_contradiction_blocks_en(
