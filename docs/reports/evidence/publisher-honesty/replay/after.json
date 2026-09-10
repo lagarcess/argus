@@ -1,6 +1,6 @@
 {
   "label": "after",
-  "tree_head": "e1f67bd0",
+  "tree_head": "72c0bf6a",
   "argus_module": "src/argus/__init__.py",
   "cases": [
     {
@@ -707,10 +707,10 @@
         "sources_before_selection": []
       },
       "published": false,
-      "degraded_code": "research_unavailable_missing_public_sources",
+      "degraded_code": "research_not_grounded",
       "sources": [],
       "rows": 0,
-      "answer": "I couldn't verify that explanation with a public source, so I won't present it as fact."
+      "answer": "I couldn't retrieve the data to answer this question."
     },
     {
       "name": "377-equity-peers-netflix-background",
