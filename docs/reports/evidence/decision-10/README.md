@@ -59,7 +59,9 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   scenario about named subjects is a fact question whatever kind it left; a
   scenario bit with no subject stays a projection answered as arithmetic, and
   a typed horizon alone never admits, so a test asked over a future window
-  keeps its recovery (Codex round 11). `retrieval_spec(scenario=True)` then sends
+  keeps its recovery (Codex round 11). A scenario typed as a survey kind is
+  never handled as a survey downstream, and the subjectless-scenario guard
+  runs before any kind check (Codex round 12). `retrieval_spec(scenario=True)` then sends
   `SCENARIO_RETRIEVAL_INSTRUCTIONS`, the recorded retrieval contract plus the
   carve-out that the inputs are the retrieved figures and are rowed while the
   scenario values are the model's arithmetic and are never rowed. Every other

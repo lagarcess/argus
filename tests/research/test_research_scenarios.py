@@ -509,3 +509,61 @@ def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     sidecar = result.stage_patch["research"]
     assert sidecar.get("degraded") != {"code": "asset_class_not_covered"}
     assert sidecar["capability_class"] == "balanced_lookup"
+
+
+def test_a_scenario_typed_as_a_survey_is_not_handled_as_one(monkeypatch) -> None:
+    """A scenario typed as a survey kind gets no survey guidance, no screening
+    class and no verified-ticker withhold: the stale kind reclassifies nothing
+    downstream of the scenario owner."""
+    from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
+
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="sector_radar",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "Bear to bull ranges with no ticker named in the prose.",
+                    _scenario_rows(cited=True),
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+
+    result = _run("what will $10,000 in NVDA be worth in ten years?")
+
+    assert result is not None
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "Retrieve these figures from current market data" not in body["input"]
+    sidecar = result.stage_patch["research"]
+    assert sidecar["capability_class"] == "balanced_lookup"
+    assert "degraded" not in sidecar
+    assert "Bear" in result.stage_patch["assistant_response"]
+
+
+def test_a_subjectless_scenario_stays_arithmetic_whatever_its_kind(monkeypatch) -> None:
+    """A projection on the user's own numbers misread as market_stats with the
+    scenario bit set is not a research turn: it keeps the interpreter's
+    arithmetic answer."""
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="market_stats",
+        symbols=[],
+        scenario_question=True,
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+    assert _run("If I save $500 a month at 5%, how much will I have in 20 years?") is None
+    assert transport.requests == []

@@ -76,9 +76,14 @@ def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
     query = getattr(interpretation, "research_query", None)
     if query is None:
         return False
+    scenario_bit = bool(getattr(query, "scenario_question", False))
+    if scenario_bit and not query.symbols:
+        # A scenario with no subject is the user's own numbers, whatever kind
+        # the read left: arithmetic, never a research turn.
+        return False
     if query.question_kind not in ("concept", "none"):
         return True
-    return bool(getattr(query, "scenario_question", False)) and bool(query.symbols)
+    return scenario_bit
 
 
 def primary_research_query(interpretation: Any) -> ResearchQueryExtraction | None:

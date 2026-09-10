@@ -211,11 +211,13 @@ async def grounded_result(
     provider_finance: bool = True,
 ) -> StageResult | None:
     scenario = scenario_contract_applies(query, interpretation)
+    # A scenario is never a survey, whatever kind it was typed as: no survey
+    # guidance, no screening class, no survey retry, no verified-ticker
+    # withhold. The stale kind reclassifies nothing downstream.
+    survey = is_market_survey(query.question_kind) and not scenario
     publisher_sources_required = requires_publisher_sources(query) or scenario
     question_as_of_date = question_date()
-    capability_class = capability_class_for_shape(
-        shape, screening=is_market_survey(query.question_kind)
-    )
+    capability_class = capability_class_for_shape(shape, screening=survey)
     language = language_tag(user.language_preference)
     spec = retrieval_spec(
         shape,
@@ -237,7 +239,7 @@ async def grounded_result(
         subjects=subjects,
         period=query.period_of_interest,
         language=language,
-        question_kind=query.question_kind,
+        question_kind=None if scenario else query.question_kind,
         criteria=list(getattr(query, "screening_criteria", []) or []),
         sector=getattr(query, "sector_of_interest", None),
         publisher_sources_required=publisher_sources_required,
@@ -304,7 +306,7 @@ async def grounded_result(
                 shape=shape,
             )
         retry_prompt: str | None = None
-        if is_market_survey(query.question_kind) and not _has_figures(packet):
+        if survey and not _has_figures(packet):
             # Asking again is deterministic escalation, not a second router:
             # a vague survey ("anything moving today?") lets the model answer
             # from memory, or retrieve and still state no figure, however
@@ -387,6 +389,7 @@ async def grounded_result(
             decision=decision,
             withheld_code="research_unavailable_missing_public_sources",
             scenario=scenario,
+            survey=survey,
         )
     result = _packet_stage_result(
         packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
@@ -403,6 +406,7 @@ async def grounded_result(
         question_as_of_date=question_as_of_date,
         decision=decision,
         scenario=scenario,
+        survey=survey,
     )
     if cache_status == "miss":
         # The response's own packet is what is stored, not the turn-total copy
@@ -437,10 +441,13 @@ def _packet_stage_result(
     decision: InterpretDecision | None = None,
     withheld_code: str | None = None,
     scenario: bool = False,
+    survey: bool | None = None,
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
-    shared cache, for any shape.
+    shared cache, for any shape. ``survey`` is the caller's derived fact; a
+    scenario typed as a survey kind passes False so the kind reclassifies
+    nothing here.
 
     A retrieved answer publishes. A packet that did not retrieve is withheld
     for that first, since it has no page to find a publisher on.
@@ -448,7 +455,8 @@ def _packet_stage_result(
     packet cannot show for itself, such as a claim whose retrieval kept no
     public publisher; a survey is also withheld when it names nothing the
     resolver verifies."""
-    survey = is_market_survey(question_kind)
+    if survey is None:
+        survey = is_market_survey(question_kind)
     answer = published_answer(packet, language)
     degraded_code = (
         _not_grounded_code(packet, survey=survey)
@@ -1481,16 +1489,17 @@ def compose_completed_research(
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
+    scenario = bool(job_request.get("scenario_question"))
     degraded_code = (
-        _not_grounded_code(packet, survey=is_market_survey(question_kind))
+        _not_grounded_code(
+            packet, survey=is_market_survey(question_kind) and not scenario
+        )
         or (
             "research_unavailable_missing_public_sources"
             if job_request.get("requires_publisher_sources") and not sources
             else None
         )
-        or _scenario_inputs_code(
-            packet, scenario=bool(job_request.get("scenario_question"))
-        )
+        or _scenario_inputs_code(packet, scenario=scenario)
     )
     peers = (
         []
