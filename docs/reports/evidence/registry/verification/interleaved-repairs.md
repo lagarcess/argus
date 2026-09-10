@@ -46,6 +46,17 @@ equal to a known seed. The minimal reconstruction of DCA probe 19 therefore
 The full affected caller sweep passed 799 tests. Quote containment establishes
 provenance, not semantic proof that arbitrary quoted text has the claimed role.
 
+Independent review then reproduced one remaining bypass: a repair could relabel
+the populated `capital_amount` carrier from recurring contribution to starting
+capital without evidence. The follow-up sends every metadata-backed financial
+role, including explicit-provenance carriers, through the same acceptance owner.
+A rejected carrier restores the known base fact and exposes its ambiguity on
+the role's canonical field, so a populated amount cannot hide the blocker.
+The exact reproduction now preserves the contribution and creates no seed.
+Zero and equal-valued seed/ceiling cases retain their required ambiguity. The
+follow-up passed 99 focused and 807 caller tests; independent review passed
+69 focused tests and found the reported bypass closed.
+
 ## Actual observation and identity promotion
 
 The measurement harness now follows the production route owner through
@@ -82,8 +93,8 @@ normal merge preserves one selected-turn receipt writer, ordered sibling tool
 cards within each selected turn, and frozen legacy payloads. Migration and
 affected browser evidence must be verified after that reconciliation.
 
-The financial and route repairs still need their final independent review,
-and the reconciled candidate still owes a full live scorecard, accepted
+The final financial and route repair deltas have clean independent review.
+The reconciled candidate still owes a full live scorecard, accepted
 fingerprint, exact-head CI, and the final GitHub Codex review with no unresolved
 threads. No provider calls were made for these deterministic repairs or their
 local verification.

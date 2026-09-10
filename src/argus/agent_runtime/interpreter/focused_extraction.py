@@ -8,7 +8,7 @@ import json
 from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
-from typing import Any
+from typing import Any, get_args
 
 from langchain_core.messages import (
     AIMessage,
@@ -237,15 +237,21 @@ _REPAIR_MERGE_DICT_CHANNELS = ("extra_parameters", "field_provenance", "evidence
 
 def _capital_role_records(
     draft: FocusedStrategyExtraction | LLMStrategyDraft, roles: dict[str, str]
-) -> list[tuple[str, Any, str | None]]:
-    records: list[tuple[str, Any, str | None]] = []
-    for name in type(draft).model_fields:
+) -> list[tuple[str, str, Any, str | None]]:
+    records: list[tuple[str, str, Any, str | None]] = []
+    for name, field in type(draft).model_fields.items():
         role = roles.get(name, draft.field_provenance.get(name))
+        annotation = get_args(field.annotation)
+        if name not in roles and not (
+            type(None) in annotation
+            and any(number_type in annotation for number_type in (int, float))
+        ):
+            continue
         value = getattr(draft, name)
         if value is None:
             value = draft.extra_parameters.get(name)
         if isinstance(role, str) and role in roles.values() and value is not None:
-            records.append((role, value, draft.evidence_spans.get(name)))
+            records.append((name, role, value, draft.evidence_spans.get(name)))
     return records
 
 
@@ -275,14 +281,14 @@ def _accept_focused_capital_roles(
         else []
     )
     proposed = _capital_role_records(extraction, roles)
+    role_fields = {role: name for name, role in roles.items()}
 
     accepted = extraction.model_copy(deep=True)
     unresolved: list[LLMAmbiguousField] = []
-    for name, role in roles.items():
-        value = getattr(extraction, name)
-        if value is None or any(
+    for name, role, value, _ in proposed:
+        if any(
             known_role == role and known_value == value
-            for known_role, known_value, _ in known
+            for _, known_role, known_value, _ in known
         ):
             continue
         if any(
@@ -293,21 +299,21 @@ def _accept_focused_capital_roles(
             and span.strip() in current_message
             and not any(
                 known_role != role and known_span and span.strip() in known_span
-                for known_role, _, known_span in known
+                for _, known_role, _, known_span in known
             )
-            for proposed_role, proposed_value, span in proposed
+            for _, proposed_role, proposed_value, span in proposed
         ):
             continue
         setattr(accepted, name, None)
         for channel in _REPAIR_MERGE_DICT_CHANNELS:
             getattr(accepted, channel).pop(name, None)
-        unresolved.append(
-            LLMAmbiguousField(
-                field_name=name,
-                raw_value=str(value),
-                reason_code="financial_role_evidence_unresolved",
-            )
+        ambiguity = LLMAmbiguousField(
+            field_name=role_fields[role],
+            raw_value=str(value),
+            reason_code="financial_role_evidence_unresolved",
         )
+        if ambiguity not in unresolved:
+            unresolved.append(ambiguity)
     return accepted, unresolved
 
 

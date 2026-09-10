@@ -10,6 +10,7 @@ from argus.agent_runtime.capabilities.contract import build_default_capability_c
 from argus.agent_runtime.interpreter.focused_extraction import (
     response_from_focused_strategy_extraction,
 )
+from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.llm_interpreter import canonical_strategy_interpretation
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
@@ -263,3 +264,80 @@ def test_ungrounded_replacement_keeps_base_fact_and_disputed_value(
     assert [
         (item.field_name, float(item.raw_value)) for item in response.ambiguous_fields
     ] == [(field_name, 200)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field_name", ROLE_FIELDS)
+@pytest.mark.parametrize("value", [0, 200])
+async def test_canonical_carrier_cannot_reclassify_known_recurring_money(
+    request_context: InterpretationRequest, field_name: str, value: float
+) -> None:
+    role = BacktestStrategyInput.model_fields[field_name].json_schema_extra[
+        "x-argus-capital-role"
+    ]
+    recurring_role = BacktestStrategyInput.model_fields[
+        "recurring_contribution"
+    ].json_schema_extra["x-argus-capital-role"]
+    request = request_context.model_copy(
+        update={"current_user_message": f"Buy SPY for ${value} each month during 2024."}
+    )
+    base = _base(
+        capital_amount=value,
+        recurring_contribution=value,
+        field_provenance={"capital_amount": recurring_role},
+    )
+    response = _repair(
+        request,
+        base=base,
+        capital_amount=value,
+        recurring_contribution=value,
+        field_provenance={"capital_amount": role},
+    )
+    interpretation = canonical_strategy_interpretation(response, request=request)
+    for strategy in (
+        _strategy_from_llm(
+            response.candidate_strategy_draft, request.current_user_message
+        ),
+        interpretation.candidate_strategy_draft,
+    ):
+        report = conserve_semantic_constraints(
+            strategy=strategy, selected_thread_metadata={}
+        )
+        assert report.evidence.total_capital is None
+        assert report.evidence.contribution_ceiling is None
+        assert report.evidence.recurring_contribution == value
+        assert report.unsupported_constraints == []
+    if role == recurring_role:
+        assert response.ambiguous_fields == []
+        return
+
+    assert response.requires_clarification
+    assert [
+        (item.field_name, float(item.raw_value)) for item in response.ambiguous_fields
+    ] == [(field_name, value)]
+    decision = await _stage_result_from_interpretation(
+        state=RunState(current_user_message=request.current_user_message),
+        user=request.user,
+        snapshot=None,
+        interpretation=interpretation,
+        capability_contract=build_default_capability_contract(),
+        selected_thread_metadata={},
+    )
+    assert decision.outcome == "needs_clarification"
+    assert [item["field_name"] for item in decision.patch["ambiguous_fields"]] == [
+        field_name
+    ]
+
+
+@pytest.mark.parametrize("field_name", ["asset_universe", "confidence"])
+def test_non_monetary_fields_do_not_become_financial_carriers(
+    request_context: InterpretationRequest, field_name: str
+) -> None:
+    response = _repair(
+        request_context,
+        confidence=0.8,
+        field_provenance={field_name: "starting_capital"},
+    )
+    assert response.candidate_strategy_draft.asset_universe == ["SPY"]
+    assert response.confidence == 0.8
+    assert response.ambiguous_fields == []
