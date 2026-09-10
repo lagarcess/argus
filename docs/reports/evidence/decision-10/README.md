@@ -31,11 +31,17 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   longer steers valuation language toward a backtest proxy; the proxy is
   offered only when the user wants to test a rule built on valuation.
 - `src/argus/agent_runtime/research_grounded.py`: the research prompt asks for
-  labeled scenarios built from cited inputs with the arithmetic shown, keeps
-  "never estimate a live number" and "No investment advice", and can run
-  without the provider's finance tool; `research_answer.py` grounds a claim
-  about crypto or a currency pair on public pages that way instead of
-  degrading it to a coverage note.
+  labeled scenarios computed from public inputs rowed with their pages, the
+  arithmetic written out, each range low to high; it keeps "never estimate a
+  live number" and "No investment advice", names web search and fetched pages
+  as the retrieval so a finance lookup that returns nothing never ends the
+  answer, and can run without the provider's finance tool.
+  `research_answer.py` grounds a claim about crypto or a currency pair on
+  public pages that way instead of degrading it to a coverage note.
+- `src/argus/domain/research/config.py`: the balanced shape's ceiling moves
+  from 75s to 150s. A scenario answer took 122s in the probe below and every
+  forward-looking question timed out at 75s in the first after picture. The
+  ceiling is room, never a rule; a quick answer still returns quickly.
 - `src/argus/agent_runtime/research_rows.py`: after an answer about a named
   moving-average crossover, the rows offer that idea's historical test beside
   the plain hold (the benchmark on the resulting card is the "or that money in
@@ -64,7 +70,70 @@ runs the opus tier in the background.
 
 ## The before picture
 
-Pending founder approval of the spend.
+Integration `d0884c3d`, run 2026-09-10 between 14:58 and 15:16 New York time
+from a detached checkout of that commit, through the same local API and the
+same drivers as the after picture. Records are under `before/`; the two turns
+that died on interpreter timeouts (`interpreter_unavailable`, the fallback
+model's response failing validation after the primary timed out) were re-run
+and both attempts are kept under `before/infrastructure/`.
+
+Thirteen questions, and Argus refused or dodged nine of them:
+
+- **The founder's two questions refused, in both languages.** "What will
+  $10,000 in NVDA be worth in ten years" and its Spanish twin hit the
+  `future_performance` refusal: "I cannot predict future performance. I can
+  test how the same idea performed over a historical period instead." "What
+  price does NVDA need to grow into" and its Spanish twin hit
+  `unsupported_strategy_logic`: "Argus can't test a price-target rule
+  directly, but we can run a supported strategy on NVDA vs SPY."
+- **The golden cross measurement case refused** with `future_performance`.
+- **The AAPL "fundamentals, valuation and sentiment" read refused** with
+  `unsupported_strategy_logic`: the valuation steer turned a research question
+  into "Argus can't run that rule directly yet for AAPL."
+- **Both savings projections dodged.** "$500 a month at 5% for 20 years" was
+  answered in prose with "Argus cannot predict future returns or savings
+  growth" and an offer to backtest a DCA instead; the Spanish "5,000 pesos al
+  mes al 6%" was read as a strategy draft and asked "What date window should I
+  use?" (`missing_period`).
+- **The rate-cut question was hedged** from model knowledge: "I'm not set up
+  to track live moves or give current market commentary."
+- **Two grounded answers:** the sector radar (balanced, 5 sources, $0.175) and
+  the software screen (balanced, $0.302, on the re-run).
+- **Two provider failures on the base tree**, kept as recorded: the Microsoft
+  deep dive got a provider HTTP 500 on the balanced shape and the NFLX
+  comparison a 400 on the synchronous thorough path.
+
+## Why the after picture took four attempts
+
+The first after run at `f56e9689`'s parent timed out every forward-looking
+question at the balanced shape's 75s ceiling. The probe
+`probes/scenario-balanced-180s.json` asked the exact prompt Argus builds
+through the repository's own client with the ceiling lifted: it answered in
+122s and $0.687 with bear, base and bull ranges, the arithmetic written out
+from a published five-year analysis and the current price, thirteen cited
+rows, labeled illustrative, no advice. The ceiling moved to 150s.
+
+The second attempt answered the founder's question with "The requested
+ten-year NVDA scenario ranges could not be retrieved and verified" while
+holding five forecast pages and writing no rows
+(`probes/after-attempt-2-nvda-non-answer.json`): the publisher line told the
+model to decline when no page states the claim, and no page states a computed
+ten-year figure. The scenario instruction now says the inputs are what must be
+public and rowed, the scenarios are the model's own arithmetic, and a horizon
+no forecast covers is built from the nearest published one with the assumption
+stated.
+
+The third attempt answered "The current figure could not be retrieved" with
+five forecast pages and no rows (`probes/after-attempt-3-nvda-non-answer.json`):
+the finance lookup returned nothing and the retrieval contract's say-only rule
+ended the answer. The instruction now names web search and fetched pages as the
+retrieval for this shape and makes the finance tool optional.
+
+The fourth attempt met a provider outage: an HTTP 500 on the first question
+and a 150s timeout on the second, matching the 500 and the 400 the base tree
+took in its own run. The after picture below was launched by a health gate
+(`drivers/probe_health.py`, a plain company question that must answer inside
+75s) once the provider was serving again.
 
 ## The after picture
 
