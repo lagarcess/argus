@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from argus.agent_runtime.backtest_input import BacktestStrategyInput
+from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.tools.backtest_result_facts import (
     BacktestCardFacts,
     backtest_card_facts,
@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 class BacktestArguments(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    strategy: BacktestStrategyInput
+    strategy: StrategySummary
 
 
 class BacktestExecutionResult(BaseModel):

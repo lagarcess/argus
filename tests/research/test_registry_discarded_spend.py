@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import Any
 
@@ -9,8 +10,8 @@ import pytest
 from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
 from argus.api import state as api_state
 from argus.api.chat import research_jobs
-from argus.api.chat.research_evidence import settle_research_turn
 from argus.api.chat.tool_results import prepare_runtime_tool_publication
+from argus.api.chat.turn_metering import settle_metered_turn
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.tool_contracts import ToolCall, ToolResultCard
 from faker import Faker
@@ -26,7 +27,6 @@ from tests.research.test_discarded_spend import (
     CALL_LATENCY_MS,
     ONE_RESPONSE_USD,
     _provider_only_document,
-    _settle,
 )
 from tests.research.test_registered_research_tools import _context
 from tests.research.test_research_jobs import _JobGateway
@@ -55,6 +55,39 @@ async def _execute(*calls: ToolCall):
     )
 
 
+def _settle_registered(result, ledger) -> dict[str, Any]:
+    """Publish declared effects, then use the API's per-call settlement owner."""
+    identity = {
+        "user_id": FAKE.uuid4(),
+        "conversation_id": FAKE.uuid4(),
+        "request_id": FAKE.uuid4(),
+    }
+    publication = prepare_runtime_tool_publication(
+        result.stage_patch,
+        result.stage_patch["tool_effects"],
+        assistant_text=None,
+        request_message_id=FAKE.uuid4(),
+        **identity,
+    )
+    assert len(publication.effects) == 1
+    reader_bytes = json.dumps(publication.cards, sort_keys=True).encode()
+    entries_before = len(ledger.entries)
+    settle_metered_turn(
+        result.stage_patch,
+        discovery_usage=None,
+        is_guest=False,
+        client_identity=None,
+        message_id=FAKE.uuid4(),
+        tool_effects=publication.effects,
+        **identity,
+    )
+    assert len(ledger.entries) == entries_before + 1
+    entry = ledger.entries[-1]
+    assert entry["usage_metadata"]["tool_call_id"] == publication.effects[0].call_id
+    assert json.dumps(publication.cards, sort_keys=True).encode() == reader_bytes
+    return entry
+
+
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("failure_reason", ["empty_answer", "malformed_response"])
 async def test_billed_parser_failure_is_an_unavailable_call_with_retained_spend(
@@ -80,7 +113,7 @@ async def test_billed_parser_failure_is_an_unavailable_call_with_retained_spend(
     assert card.presentation.narrative is None
     assert card.presentation.sources == []
     assert sidecar["rows"] == []
-    entry = _settle(result, ledger)
+    entry = _settle_registered(result, ledger)
     assert entry["billable_quantity"] == 1
     assert entry["cost_amount"] == pytest.approx(ONE_RESPONSE_USD)
     assert entry["cost_source"] == "provider_reported"
@@ -130,14 +163,8 @@ async def test_registered_retry_bills_the_turn_and_caches_only_the_served_packet
         "cost_usd": pytest.approx(ONE_RESPONSE_USD),
         "cache_status": "hit",
     }
-    paid_entry = _settle(paid, ledger)
-    settle_research_turn(
-        cached.stage_patch,
-        user_id=paid_entry["user_id"],
-        conversation_id=paid_entry["conversation_id"],
-        message_id=FAKE.uuid4(),
-        request_id=FAKE.uuid4(),
-    )
+    paid_entry = _settle_registered(paid, ledger)
+    _settle_registered(cached, ledger)
     assert len(ledger.entries) == 2
     assert paid_entry["cost_amount"] == pytest.approx(2 * ONE_RESPONSE_USD)
     assert paid_entry["billable_quantity"] == 1

@@ -88,18 +88,18 @@ class ToolInputFact(ToolFact):
         return self
 
 
-class PublicExcerptVisualPoint(ToolContract):
+class ToolVisualPoint(ToolContract):
     time: str
     value: StrictFloat
 
 
-class PublicExcerptVisual(ToolContract):
-    """Frozen visual evidence shared by cards and receipts, without a later fetch."""
+class ToolVisual(ToolContract):
+    """Frozen visual evidence owned by the tool card, without a later fetch."""
 
     kind: Literal["portfolio_equity"]
     currency: str | None = None
     base_value: StrictFloat | None = None
-    series: list[PublicExcerptVisualPoint]
+    series: list[ToolVisualPoint]
 
 
 class ToolCardPresentation(ToolContract):
@@ -107,7 +107,7 @@ class ToolCardPresentation(ToolContract):
     answer: ToolFact | None = None
     narrative: str | None = None
     sources: list[ResearchSource] = Field(default_factory=list)
-    visual: PublicExcerptVisual | None = None
+    visual: ToolVisual | None = None
     rows: list[ToolFact] = Field(default_factory=list)
     inputs: list[ToolInputFact] = Field(default_factory=list)
     notes: list[LocalizedText] = Field(default_factory=list)

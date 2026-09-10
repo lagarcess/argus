@@ -692,8 +692,8 @@ def test_visual_evidence_round_trips_in_shared_card_presentation(visual_payload)
     hydrated = tool_contracts.ToolCardPresentation.model_validate_json(
         presentation.model_dump_json()
     )
-    assert isinstance(hydrated.visual, tool_contracts.PublicExcerptVisual)
-    assert isinstance(hydrated.visual.series[0], tool_contracts.PublicExcerptVisualPoint)
+    assert isinstance(hydrated.visual, tool_contracts.ToolVisual)
+    assert isinstance(hydrated.visual.series[0], tool_contracts.ToolVisualPoint)
     assert hydrated.visual.model_dump() == visual_payload
 
 
@@ -711,7 +711,7 @@ def test_visual_transport_rejects_nonfinite_or_coerced_numbers(
     else:
         visual_payload[location][0]["value"] = value
     with pytest.raises(ValidationError):
-        tool_contracts.PublicExcerptVisual.model_validate(visual_payload)
+        tool_contracts.ToolVisual.model_validate(visual_payload)
 
 
 @pytest.mark.parametrize("status", ["invalid", "ambiguous", "bounded", "unavailable"])

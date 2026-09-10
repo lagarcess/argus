@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from types import MappingProxyType
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
 from pydantic import (
     BaseModel,
-    BeforeValidator,
     ConfigDict,
     Field,
     ValidationError,
@@ -68,49 +67,15 @@ ArtifactActionRecoveryStatus = Literal[
     "rebuilt_confirmation",
 ]
 
-CanonicalIntentName = Literal["explain", "calculate", "follow_up", "cannot"]
-
-_LEGACY_TASK_INTENTS: dict[str, CanonicalIntentName] = {
-    "beginner_guidance": "explain",
-    "strategy_drafting": "calculate",
-    "backtest_execution": "calculate",
-    "results_explanation": "explain",
-    "collection_management": "cannot",
-    "conversation_followup": "follow_up",
-    "unsupported_or_out_of_scope": "cannot",
-}
-
-
-def normalize_task_intent(value: Any) -> Any:
-    """Read old checkpoints while every newly serialized intent stays canonical."""
-    return _LEGACY_TASK_INTENTS.get(value, value) if isinstance(value, str) else value
-
-
-IntentName = Annotated[CanonicalIntentName, BeforeValidator(normalize_task_intent)]
-
-
-def normalize_legacy_interpretation(value: Any) -> Any:
-    """Retain the artifact meaning conveyed by an old, more specific intent."""
-    if not isinstance(value, dict):
-        return value
-    legacy = value.get("intent")
-    if legacy not in _LEGACY_TASK_INTENTS:
-        return value
-    normalized = {**value, "intent": normalize_task_intent(legacy)}
-    if legacy == "results_explanation":
-        normalized["semantic_turn_act"] = "result_followup"
-    elif legacy in {"strategy_drafting", "backtest_execution"} and value.get(
-        "semantic_turn_act"
-    ) in {None, "educational_question", "asset_discovery"}:
-        normalized["semantic_turn_act"] = {
-            "continue": "answer_pending_need",
-            "refine": "refine_current_idea",
-        }.get(value.get("task_relation"), "new_idea")
-        normalized["reason_codes"] = [
-            *value.get("reason_codes", []),
-            "legacy_strategy_intent_migrated",
-        ]
-    return normalized
+IntentName = Literal[
+    "beginner_guidance",
+    "strategy_drafting",
+    "backtest_execution",
+    "results_explanation",
+    "collection_management",
+    "conversation_followup",
+    "unsupported_or_out_of_scope",
+]
 
 
 TaskRelation = Literal["new_task", "continue", "refine", "ambiguous"]
@@ -330,11 +295,6 @@ class StructuredActionContext(BaseModel):
 
 
 class TaskSnapshot(BaseModel):
-    pending_tool_calls: list[ToolCall] = Field(
-        default_factory=list, max_length=MAX_TOOL_CALLS
-    )
-    # Runtime-owned context follows this queue through checkpointed approvals.
-    pending_tool_context: dict[str, str] = Field(default_factory=dict, repr=False)
     latest_task_type: IntentName | None = None
     completed: bool | None = None
     pending_strategy_summary: StrategySummary | None = None

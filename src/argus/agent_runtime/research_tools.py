@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
 
 from argus.agent_runtime import research_grounded as grounded
-from argus.agent_runtime.research_query import ResearchOperationQuery
+from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     AssetDiscoveryRelationship,
     AssetDiscoveryRequest,
@@ -21,15 +21,13 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import RunState, UserState
-from argus.domain.research.cache import DataClass
 from argus.domain.research.config import research_rail_enabled
 from argus.domain.research.contracts import (
-    CapabilityClass,
+    QuestionShape,
     ResearchNamePair,
     ResearchSource,
     RetrievedRow,
 )
-from argus.domain.research.evidence_policy import ResearchEvidencePolicy
 
 if TYPE_CHECKING:
     from argus.domain.tool_contracts import (
@@ -51,15 +49,7 @@ class ResearchExecutionContext(Protocol):
 class ResearchArguments(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, frozen=True)
 
-    request: str = Field(
-        min_length=1,
-        max_length=2000,
-        description=(
-            "The public-market evidence or candidate assets requested for this call. "
-            "Preserve the requested scope and source requirements; exclude private "
-            "balances or personal context."
-        ),
-    )
+    request: str = Field(min_length=1, max_length=2000)
 
 
 class ResearchPeriod(BaseModel):
@@ -77,14 +67,10 @@ class FastQuoteArguments(ResearchArguments):
 
 
 class BalancedLookupArguments(ResearchArguments):
-    """Sourced public facts and figures, with the requested freshness bound."""
+    """Sourced public facts and figures under the existing retrieval policy."""
 
     symbols: list[str] = Field(default_factory=list, max_length=5)
     period: ResearchPeriod | None = None
-    data_class: DataClass = Field(
-        default="movers",
-        description="The most time-sensitive data this call needs; governs freshness.",
-    )
 
 
 class ThoroughResearchArguments(BalancedLookupArguments):
@@ -122,7 +108,6 @@ class ResearchToolResult(BaseModel):
     rows: tuple[RetrievedRow, ...] = ()
     sources: tuple[ResearchSource, ...] = ()
     retrieved_at: str | None = None
-    evidence_policy: ResearchEvidencePolicy | None = None
     relationship: AssetDiscoveryRelationship | None = None
     subjects: tuple[ResearchNamePair, ...] = ()
     peers: tuple[ResearchNamePair, ...] = ()
@@ -136,7 +121,6 @@ class ResearchToolResult(BaseModel):
             or self.subjects
             or self.peers
             or self.relationship is not None
-            or self.evidence_policy is not None
         ):
             raise ValueError("Pending research cannot carry completed facts")
         return self
@@ -176,10 +160,7 @@ class ResearchCandidatesResult(ResearchToolResult):
     status: Literal["completed"] = "completed"
     rows: tuple[()] = ()
     relationship: AssetDiscoveryRelationship
-    peers: tuple[ResearchNamePair, ...] = Field(
-        min_length=1,
-        description="Candidate assets accepted by the shared resolver and coverage gates.",
-    )
+    peers: tuple[ResearchNamePair, ...] = Field(min_length=1)
 
 
 class ResearchPendingResult(ResearchToolResult):
@@ -189,7 +170,6 @@ class ResearchPendingResult(ResearchToolResult):
     answer: None = None
     rows: tuple[()] = ()
     sources: tuple[()] = ()
-    evidence_policy: None = None
     relationship: None = None
     subjects: tuple[()] = ()
     peers: tuple[()] = ()
@@ -213,12 +193,11 @@ async def fast_quote(
 ) -> ResearchFiguresResult:
     result = await _read(
         arguments,
-        query=ResearchOperationQuery(
-            shape="fast",
-            capability_class="fast_quote",
-            data_class="quotes",
+        query=ResearchQueryExtraction(
+            question_kind="live_quote",
             symbols=arguments.symbols,
         ),
+        shape="fast",
         context=context,
     )
     return ResearchFiguresResult.model_validate(result.model_dump())
@@ -229,9 +208,8 @@ async def balanced_lookup(
 ) -> CitedResearchFiguresResult:
     result = await _read(
         arguments,
-        query=_sourced_query(
-            arguments, shape="balanced", capability_class="balanced_lookup"
-        ),
+        query=_sourced_query(arguments),
+        shape="balanced",
         context=context,
     )
     return CitedResearchFiguresResult.model_validate(result.model_dump())
@@ -242,9 +220,8 @@ async def thorough_research(
 ) -> ResearchWorkflowResult:
     result = await _read(
         arguments,
-        query=_sourced_query(
-            arguments, shape="thorough", capability_class="thorough_research"
-        ),
+        query=_sourced_query(arguments),
+        shape="thorough",
         context=context,
     )
     return ResearchWorkflowResult.model_validate(result.model_dump())
@@ -255,16 +232,14 @@ async def screening(
 ) -> CitedResearchFiguresResult:
     result = await _read(
         arguments,
-        query=ResearchOperationQuery(
-            shape="balanced",
-            capability_class="screening",
-            data_class="movers",
-            survey=True,
+        query=ResearchQueryExtraction(
+            question_kind="screening",
             screening_criteria=arguments.criteria,
             sector_of_interest=arguments.universe,
             requires_publisher_sources=True,
             **_period_facts(arguments.period),
         ),
+        shape="balanced",
         context=context,
     )
     return CitedResearchFiguresResult.model_validate(result.model_dump())
@@ -285,7 +260,6 @@ async def peer_expansion(
         decision=None,
         state=state,
         user=user,
-        capability_class="peer_expansion",
     )
     published = _published_result(result, context=context)
     return ResearchCandidatesResult.model_validate(published.model_dump())
@@ -301,14 +275,11 @@ def _period_facts(period: ResearchPeriod | None) -> dict[str, Any]:
 
 def _sourced_query(
     arguments: BalancedLookupArguments,
-    *,
-    shape: Literal["balanced", "thorough"],
-    capability_class: CapabilityClass,
-) -> ResearchOperationQuery:
-    return ResearchOperationQuery(
-        shape=shape,
-        capability_class=capability_class,
-        data_class=arguments.data_class,
+) -> ResearchQueryExtraction:
+    # The selected callable already owns the operation. This is the existing
+    # service's public-facts mode, not a fresh classification of the request.
+    return ResearchQueryExtraction(
+        question_kind="current_external",
         symbols=arguments.symbols,
         requires_publisher_sources=True,
         **_period_facts(arguments.period),
@@ -330,7 +301,7 @@ def _call_context(
     # may silently replace this call's declared arguments.
     state = context.state.model_copy(update={"current_user_message": arguments.request})
     interpretation = StructuredInterpretation(
-        intent="calculate",
+        intent="conversation_followup",
         task_relation="continue",
         user_goal_summary=arguments.request,
         semantic_turn_act="educational_question",
@@ -341,7 +312,8 @@ def _call_context(
 async def _read(
     arguments: ResearchArguments,
     *,
-    query: ResearchOperationQuery,
+    query: ResearchQueryExtraction,
+    shape: QuestionShape,
     context: ResearchExecutionContext,
 ) -> ResearchToolResult:
     from argus.agent_runtime.research_answer import _resolved_subjects
@@ -361,7 +333,7 @@ async def _read(
             state=state,
             user=user,
         )
-    elif query.shape == "thorough":
+    elif shape == "thorough":
         result = grounded.thorough_job_result(
             query=query,
             subjects=subjects,
@@ -373,7 +345,7 @@ async def _read(
         result = await grounded.grounded_result(
             query=query,
             subjects=subjects,
-            shape=query.shape,
+            shape=shape,
             interpretation=interpretation,
             state=state,
             user=user,
@@ -429,7 +401,6 @@ def research_result_from_patch(patch: dict[str, Any]) -> ResearchToolResult:
         rows=tuple(RetrievedRow.model_validate(row) for row in sidecar.get("rows", [])),
         sources=tuple(ResearchSource.model_validate(source) for source in sources),
         retrieved_at=sidecar.get("retrieved_at"),
-        evidence_policy=sidecar.get("evidence_policy"),
         relationship=discovery.get("relationship"),
         subjects=tuple(
             ResearchNamePair.model_validate(item)
@@ -551,7 +522,7 @@ def get_research_declarations() -> tuple[ToolDeclaration, ...]:
         ),
         ToolDeclaration(
             name="balanced_lookup",
-            description="Retrieve cited facts and figures from public sources, with typed subjects, time period, and freshness requirements.",
+            description="Retrieve cited facts and figures from public sources for named subjects and a requested time period. The shared retrieval service owns freshness.",
             handler=balanced_lookup,
             policy=ToolPolicy(
                 execution="provider",

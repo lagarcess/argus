@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import textwrap
 from dataclasses import replace
 from typing import Any
 
@@ -9,7 +12,6 @@ import pytest
 from argus.domain.tool_contracts import LocalizedText, ToolCardPresentation
 from argus.domain.tool_declaration import (
     ToolCardBinding,
-    ToolCatalog,
     ToolDeclaration,
     ToolPolicy,
     ToolProgressTemplate,
@@ -67,27 +69,10 @@ def declaration() -> ToolDeclaration:
 def _parse(boundary: str, declaration: ToolDeclaration, arguments: dict[str, Any]):
     if boundary == "runtime":
         return declaration.validate_arguments(arguments)
-    from argus.agent_runtime.llm_interpreter_types import interpretation_response_model
-
-    response = interpretation_response_model(ToolCatalog((declaration,))).model_validate(
-        {
-            "intent": "calculate",
-            "task_relation": "new_task",
-            "user_goal_summary": fake.sentence(),
-            "assistant_response": fake.sentence(),
-            "tool_calls": [
-                {
-                    "tool_name": declaration.name,
-                    "call_id": fake.uuid4(),
-                    "arguments": arguments,
-                }
-            ],
-        }
-    )
-    return response.tool_calls[0].arguments
+    return declaration.call_arguments_type.model_validate(arguments)
 
 
-@pytest.mark.parametrize("boundary", ["runtime", "interpreter"])
+@pytest.mark.parametrize("boundary", ["runtime", "declared_model"])
 @pytest.mark.parametrize(
     "arguments",
     [
@@ -106,7 +91,7 @@ def test_unknown_nested_typed_fields_are_rejected_before_discard(
     assert any(error["type"] == "extra_forbidden" for error in rejected.value.errors())
 
 
-@pytest.mark.parametrize("boundary", ["runtime", "interpreter"])
+@pytest.mark.parametrize("boundary", ["runtime", "declared_model"])
 def test_declared_maps_zero_null_defaults_and_validators_survive(declaration, boundary):
     maps = {"arbitrary": {"unknown": [0, None]}}
     arguments = {
@@ -134,7 +119,7 @@ async def test_invocation_withholds_result_for_undeclared_nested_fact(declaratio
     assert outcome.result is None
 
 
-@pytest.mark.parametrize("boundary", ["runtime", "interpreter"])
+@pytest.mark.parametrize("boundary", ["runtime", "declared_model"])
 def test_tool_schemas_close_typed_objects_and_keep_open_map_contracts(
     declaration, boundary
 ):
@@ -142,17 +127,8 @@ def test_tool_schemas_close_typed_objects_and_keep_open_map_contracts(
         schema = declaration.tool_schema()["parameters"]
         argument_schema = schema
     else:
-        from argus.agent_runtime.llm_interpreter_types import (
-            interpretation_response_model,
-        )
-
-        schema = interpretation_response_model(
-            ToolCatalog((declaration,))
-        ).model_json_schema()
-        call_ref = schema["properties"]["tool_calls"]["items"]["$ref"]
-        call_schema = schema["$defs"][call_ref.rsplit("/", 1)[-1]]
-        arguments_ref = call_schema["properties"]["arguments"]["$ref"]
-        argument_schema = schema["$defs"][arguments_ref.rsplit("/", 1)[-1]]
+        schema = declaration.call_arguments_type.model_json_schema()
+        argument_schema = schema
     assert argument_schema["additionalProperties"] is False
     assert (
         argument_schema["properties"]["extra_parameters"]["additionalProperties"] is True
@@ -175,8 +151,8 @@ def test_tool_model_derivation_does_not_change_legacy_model_reads(declaration):
     assert BoundaryArguments.model_validate({"unknown": 0}).detail is None
 
 
-@pytest.mark.parametrize("boundary", ["runtime", "interpreter"])
-@pytest.mark.parametrize("nested", [False, True], ids=["strategy", "date-intent"])
+@pytest.mark.parametrize("boundary", ["runtime", "declared_model"])
+@pytest.mark.parametrize("nested", [False, True], ids=["strategy", "provenance"])
 def test_real_backtest_call_rejects_unknown_typed_financial_and_temporal_keys(
     boundary, nested
 ):
@@ -185,19 +161,79 @@ def test_real_backtest_call_rejects_unknown_typed_financial_and_temporal_keys(
     tool = get_backtest_declaration()
     strategy = {
         "strategy_type": "dca_accumulation",
-        "initial_capital": 0,
-        "recurring_contribution": 0,
+        "capital_amount": 0,
         "cadence": "monthly",
-        "date_range_intent": {"kind": "calendar_year", "year": 2024},
-        "extra_parameters": {"context": {"unknown": 0}},
+        "resolution_provenance": [
+            {
+                "field": "asset_universe",
+                "raw_text": "AAPL",
+                "source": "user_mention",
+                "candidate_kind": "asset",
+            }
+        ],
+        "extra_parameters": {
+            "recurring_contribution": 0,
+            "context": {"unknown": 0},
+        },
     }
     parsed = _parse(boundary, tool, {"strategy": strategy})
-    assert parsed.strategy.initial_capital == 0
-    assert parsed.strategy.recurring_contribution == 0
-    assert parsed.strategy.date_range_intent.year == 2024
+    assert parsed.strategy.capital_amount == 0
+    assert parsed.strategy.extra_parameters["recurring_contribution"] == 0
     assert parsed.strategy.extra_parameters == strategy["extra_parameters"]
-    target = strategy["date_range_intent"] if nested else strategy
+    target = strategy["resolution_provenance"][0] if nested else strategy
     target["unknown"] = 0
     with pytest.raises(ValidationError) as rejected:
         _parse(boundary, tool, {"strategy": strategy})
     assert any(error["type"] == "extra_forbidden" for error in rejected.value.errors())
+
+
+def test_forward_references_resolve_in_the_callable_model_namespace():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            textwrap.dedent("""
+            from pydantic import BaseModel, ValidationError
+            from argus.domain.tool_contracts import LocalizedText, ToolCardPresentation
+            from argus.domain.tool_declaration import (
+                ToolCardBinding, ToolDeclaration, ToolPolicy, ToolProgressTemplate,
+            )
+
+            class ForwardArguments(BaseModel):
+                value: list["DeferredValue"]
+
+            class DeferredValue(BaseModel):
+                amount: int
+
+            def read_value(arguments: ForwardArguments) -> DeferredValue:
+                return arguments.value[0]
+
+            tool = ToolDeclaration(
+                name="read_value", description="Read the supplied value.",
+                handler=read_value, policy=ToolPolicy(),
+                progress=ToolProgressTemplate(locale_key="tools.read.progress"),
+                card=ToolCardBinding(card_type="facts", version=1,
+                    presenter=lambda _args, _outcome: ToolCardPresentation(
+                        title=LocalizedText(locale_key="tools.read.title"))),
+            )
+            assert tool.validate_arguments({"value": [{"amount": 0}]}).value[0].amount == 0
+            try:
+                tool.validate_arguments({"value": [{"amount": 0, "lost": 1}]})
+            except ValidationError as error:
+                assert error.errors()[0]["type"] == "extra_forbidden"
+            else:
+                raise AssertionError("The derived nested model discarded a field")
+            assert ForwardArguments.model_validate(
+                {"value": [{"amount": 0, "legacy": 1}]}
+            ).value[0].amount == 0
+            assert "additionalProperties" not in DeferredValue.model_json_schema()
+            assert tool.tool_schema()["parameters"]["$defs"]["DeferredValue"][
+                "additionalProperties"
+            ] is False
+        """),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr

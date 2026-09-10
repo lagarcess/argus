@@ -11,7 +11,7 @@ from argus.domain.research.contracts import ResearchNamePair
 
 
 def _pairs(*symbols: str) -> list[ResearchNamePair]:
-    return [ResearchNamePair(name=s, symbol=s) for s in symbols]
+    return [ResearchNamePair(name=f"{s} Inc", symbol=s) for s in symbols]
 
 
 def test_unresolvable_names_never_become_tappable() -> None:
@@ -146,7 +146,9 @@ def test_a_row_never_names_a_window_the_asset_cannot_cover() -> None:
         return ipo_day if symbol == "SWMR" else date(2020, 1, 2)
 
     rows = research_next_experiment_rows(
-        subjects=[{"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}],
+        subjects=[
+            {"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}
+        ],
         peers=[],
         language="en",
         coverage_probe=probe,
@@ -159,7 +161,9 @@ def test_a_row_never_names_a_window_the_asset_cannot_cover() -> None:
     assert "2026-03-17" in rows["rows"][0]["send_text"]
 
     spanish = research_next_experiment_rows(
-        subjects=[{"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}],
+        subjects=[
+            {"symbol": "SWMR", "name": "Swarmer Inc.", "asset_class": "equity"}
+        ],
         peers=[],
         language="es-419",
         coverage_probe=probe,

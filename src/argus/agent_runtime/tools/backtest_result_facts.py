@@ -17,7 +17,7 @@ from argus.domain.indicators import normalize_indicator_parameters
 from argus.domain.result_figures import result_display_figures
 from argus.domain.result_readout_facts import engine_config_from_snapshot
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
-from argus.domain.tool_contracts import PublicExcerptVisual, ToolContract, ToolScalar
+from argus.domain.tool_contracts import ToolContract, ToolScalar, ToolVisual
 from pydantic import (
     Field,
     StrictFloat,
@@ -68,7 +68,7 @@ class BacktestCardFacts(ToolContract):
     metrics: list[BacktestMetric] = Field(min_length=1)
     strategy_facts: list[BacktestFact] = Field(min_length=1)
     assumptions: list[BacktestFact]
-    visual: PublicExcerptVisual | None = None
+    visual: ToolVisual | None = None
 
 
 class CrossoverParameters(ToolContract):
@@ -263,14 +263,14 @@ def _assumptions(
     return facts
 
 
-def _visual(value: object) -> PublicExcerptVisual | None:
+def _visual(value: object) -> ToolVisual | None:
     if value is None:
         return None
     chart = _mapping(value)
     if chart.get("kind") != "portfolio_equity":
         raise ValueError("invalid_backtest_visual")
-    visual = PublicExcerptVisual.model_validate(
-        {key: chart[key] for key in PublicExcerptVisual.model_fields if key in chart}
+    visual = ToolVisual.model_validate(
+        {key: chart[key] for key in ToolVisual.model_fields if key in chart}
     )
     if len(visual.series) < 2:
         return None

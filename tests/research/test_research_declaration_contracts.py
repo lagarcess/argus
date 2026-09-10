@@ -151,7 +151,10 @@ def test_requested_asset_class_semantics_are_exposed_from_the_canonical_argument
     declaration = declarations["peer_expansion"]
     assert issubclass(declaration.arguments_type, AssetDiscoveryRequest)
     schema = declaration.tool_schema()["parameters"]
-    assert schema["properties"]["asset_class_hint"].get("description")
+    assert (
+        schema["properties"]["asset_class_hint"]
+        == AssetDiscoveryRequest.model_json_schema()["properties"]["asset_class_hint"]
+    )
     for hint in (None, "equity", "crypto", "currency_pair"):
         arguments = declaration.validate_arguments(
             {

@@ -192,6 +192,8 @@ def test_next_turn_derives_recomputed_reference_from_message(surface) -> None:
         user_id=owner, conversation_id=message.conversation_id
     )
     assert fallback is not None
+    assert fallback.latest_task_snapshot.latest_task_type is None
+    assert "latest_task_type" not in fallback.selected_thread_metadata
     reference = next(
         item
         for item in fallback.artifact_references
@@ -280,7 +282,7 @@ def test_tool_fallback_keeps_existing_result_owner_and_all_completed_calls(
         "latest_result_fallback_context",
         lambda **_: recovery.RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
-                latest_task_type="calculate",
+                latest_task_type="results_explanation",
                 completed=True,
                 latest_backtest_result_reference=result_ref,
                 artifact_references=[result_ref],

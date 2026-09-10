@@ -118,7 +118,6 @@ def data_class_for(
     question_kind: str | None,
     categories: Sequence[str] = (),
     closed_period: bool = False,
-    requested_data_class: DataClass | None = None,
 ) -> DataClass:
     """The section 7 data class governing one cache entry."""
     if closed_period:
@@ -130,8 +129,6 @@ def data_class_for(
     }
     if len(families) == 1:
         return next(iter(families))
-    if requested_data_class is not None:
-        return requested_data_class
     return _KIND_DATA_CLASS.get(str(question_kind or ""), "movers")
 
 
@@ -141,7 +138,6 @@ def ttl_for_packet(
     categories: Sequence[str] = (),
     closed_period: bool = False,
     withheld: bool = False,
-    data_class: DataClass | None = None,
 ) -> float:
     """The class TTL of one entry; a withheld packet's is capped at one day."""
     ttl = DATA_CLASS_TTL_SECONDS[
@@ -149,7 +145,6 @@ def ttl_for_packet(
             question_kind=question_kind,
             categories=categories,
             closed_period=closed_period,
-            requested_data_class=data_class,
         )
     ]
     return min(ttl, WITHHELD_TTL_SECONDS) if withheld else ttl

@@ -280,7 +280,7 @@ def confirmation_metadata_fallback_context(
             else [confirmation_reference]
         )
         selected_thread_metadata: dict[str, Any] = {
-            "latest_task_type": "calculate",
+            "latest_task_type": "backtest_execution",
             "last_stage_outcome": "await_approval",
             "fallback_source": "message_metadata",
         }
@@ -292,7 +292,7 @@ def confirmation_metadata_fallback_context(
                 selected_thread_metadata["source_result_run_id"] = source_run_id
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
-                latest_task_type="calculate",
+                latest_task_type="backtest_execution",
                 completed=False,
                 pending_strategy_summary=pending_strategy,
                 active_confirmation_reference=confirmation_reference,
@@ -402,7 +402,7 @@ def pending_strategy_metadata_fallback_context_from_message(
     requested_field = pending_payload.get("requested_field")
     stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "await_user_reply")
     selected_thread_metadata: dict[str, Any] = {
-        "latest_task_type": "calculate",
+        "latest_task_type": "backtest_execution",
         "last_stage_outcome": stage_outcome,
         "fallback_source": "pending_strategy_metadata",
         "strategy_path_id": source_message.id,
@@ -477,7 +477,7 @@ def pending_strategy_metadata_fallback_context_from_message(
     artifact_references = [source_reference] if source_reference is not None else []
     return RuntimeFallbackContext(
         latest_task_snapshot=TaskSnapshot(
-            latest_task_type="calculate",
+            latest_task_type="backtest_execution",
             completed=False,
             pending_strategy_summary=pending_strategy,
             latest_backtest_result_reference=source_reference,
@@ -692,14 +692,14 @@ def failed_action_metadata_fallback_context(
         )
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
-                latest_task_type="calculate",
+                latest_task_type="backtest_execution",
                 completed=False,
                 pending_strategy_summary=pending_strategy,
                 latest_failed_action_reference=reference,
                 artifact_references=[reference],
             ),
             selected_thread_metadata={
-                "latest_task_type": "calculate",
+                "latest_task_type": "backtest_execution",
                 "last_stage_outcome": "execution_failed_recoverably",
                 "fallback_source": "failed_action_metadata",
             },
@@ -741,11 +741,8 @@ def _tool_result_metadata_fallback_context(
         for card in cards.values()
     ]
     return RuntimeFallbackContext(
-        latest_task_snapshot=TaskSnapshot(
-            latest_task_type="calculate", completed=True, artifact_references=references
-        ),
+        latest_task_snapshot=TaskSnapshot(completed=True, artifact_references=references),
         selected_thread_metadata={
-            "latest_task_type": "calculate",
             "fallback_source": "message_metadata",
         },
         artifact_references=references,

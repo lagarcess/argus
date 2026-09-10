@@ -446,9 +446,9 @@ HTTP POST /api/v1/chat/stream (SSE)
     │
     ▼
 [LangGraph: astream_events()]
-    ├── [interpret]  LLM reads the executable catalog and produces zero or more typed calls,
-    │                a response, or an incomplete strategy draft. Post-LLM validation owns
-    │                argument/domain rules, symbol resolution, parity and date limits.
+    ├── [interpret]  LLM classifies intent, extracts strategy fields, detects semantic_turn_act.
+    │                Post-LLM validation only: symbol resolution, asset parity, date limits,
+    │                missing required fields. → streams stage_start event immediately.
     │
     ├── [clarify]    if needs_clarification → LLM generates context-aware question.
     │                No hardcoded prompt templates. → streams question tokens.
@@ -479,57 +479,40 @@ SSE stream: done event with final payload
 Each declaration binds a real callable's typed argument and return models to its
 description, cross-argument rules, domain and units, failure semantics, execution
 cost, confirmation callback, progress template, and versioned card presenter.
-The model-facing schema, capability text, runtime dispatch and result projection
-derive from those declarations. Availability derives from the same feature-flag
-owner that guards execution. Strategy templates retain their existing registry
-and strategy-specific unsupported-admission checks.
-The callable's input models also generate a closed nested argument tree for both
-schema and runtime validation. Unknown fields are rejected at their owning
-level; explicitly typed maps retain their declared openness. Historical state
-and result readers keep their existing compatibility behavior.
+Its schema, catalog text, runtime dispatch and result projection derive from
+those declarations. Availability derives from the existing feature-flag owner.
+Strategy templates retain their registry and unsupported-admission checks.
 
-The four task intents are `explain`, `calculate`, `follow_up`, and `cannot`.
-Compatibility readers normalize older persisted spellings. An intent is not a
-question-to-tool classifier: the model may request no calls, different tools, or
-the same tool repeatedly, each with its own call identity and typed arguments.
-No-call catalog responses do not fall into the legacy research classifier.
-Incomplete backtest drafting still uses its structured strategy draft; a response
-with tool calls cannot carry a competing top-level strategy draft.
+The interpreter's system prompt, seven intents and response schema remain
+unchanged. Catalog-driven model selection is parked for roadmap decision 9.
+The existing validated Run action calls the declared backtest with its canonical
+`StrategySummary`; the same confirmation owner checks the approved inputs.
+Unapproved direct calls return `confirmation_required`, and one approval cannot
+authorize a second backtest. Research declarations expose the typed query and
+shape supported by the existing service, preserving its routing and retrieval
+contracts. This lane adds no question-to-tool classifier or production calculator.
 
-Backtest extraction and the real callable share `BacktestStrategyInput`. This
-input retains temporal intent, money roles, rule structure and evidence until
-the existing strategy preparation owners produce a canonical `StrategySummary`.
-Confirmation approves that prepared artifact; approving it does not interpret
-its dates or other facts again. The persisted summary remains an output of
-preparation, rather than a second input schema with fewer fields.
-Selected backtest calls reuse the existing readiness and fidelity checks, with
-repair receipts scoped to that call. Batch repair requires a unique, disjoint
-source span; it cannot reread the whole question separately for every call.
-Trusted asset context follows the pending call queue through checkpointed Run
-approvals in `TaskSnapshot.pending_tool_context`. It is omitted from model and
-public projections and cleared when the queue is replaced, canceled, or spent.
-
-Neutral `domain/tool_contracts.py` transports never import the catalog or a
-backtest implementation. The serializer-pinned runtime model class paths remain
-unchanged. Declaration validation and invocation distinguish `succeeded`,
-`invalid`, `ambiguous`, `bounded`, and `unavailable`; unsuccessful outcomes cannot
-carry a result or present an answer. Cross-argument null rules count `None`;
-zero remains a known value. This lane registers existing operations and creates
-no production financial calculator.
+The callable's models generate a closed nested input tree for schema and runtime
+validation. Unknown fields are rejected at their owning level; explicit maps
+retain their declared openness. Legacy models retain their read behavior.
+Neutral `domain/tool_contracts.py` transports import no catalog or backtest code;
+serializer-pinned model paths remain unchanged. Outcomes distinguish `succeeded`,
+`invalid`, `ambiguous`, `bounded`, and `unavailable`. Unsuccessful outcomes cannot
+carry an answer. Cross-argument blank rules count `None`; zero remains known.
 
 `tool_result_cards` and per-call `tool_jobs` retain each call's identity through
-streaming, publication, worker completion and reload. Existing worker, quota,
-cost-ledger and backtest persistence owners remain authoritative. The shared card
-presenter owns display facts and units, while the callable owns the typed result.
-Local editable tools recompute through the existing guarded message-artifact
-writer; the original unknown remains blank and the input revision advances with
-the result. Public sharing remains on the shipped selected-turn receipt
-contract; connecting general tool results to that contract is a separate lane.
+streaming, publication, worker completion and reload. Existing workers, quota,
+cost ledger and persistence owners remain authoritative. The card presenter owns
+display facts while the callable owns the typed result. Local editable tools
+recompute through the guarded message-artifact writer: the original unknown
+stays blank and the input revision advances with the result. Public sharing
+continues to use its shipped selected-turn contract; connecting general tool
+results to sharing remains a separate change.
 
-Progress is a declaration locale key with typed argument interpolation emitted
-when its call executes. Graph-stage events retain operational meaning and cannot
-select product status prose. A stage without tool progress renders only a neutral
-loading indicator. Progress requires no extra model invocation.
+Progress is a declaration locale key with typed arguments, emitted when that
+call executes. Graph-stage events retain operational meaning and cannot select
+product prose. A stage without tool progress renders a neutral loader. This
+path requires no extra model call.
 
 ### NLU Ownership Rule
 

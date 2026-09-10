@@ -8,7 +8,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType, UnionType
-from typing import Annotated, Any, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, ForwardRef, Literal, Union, get_args, get_origin
 
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
@@ -191,32 +191,43 @@ def _closed_tool_arguments(model: type[BaseModel]) -> type[BaseModel]:
     """Derive a closed input tree without changing the callable's legacy models."""
     derived: dict[type[BaseModel], type[BaseModel]] = {}
 
-    def close(annotation: Any) -> Any:
+    def close(annotation: Any, owner: type[BaseModel]) -> Any:
+        if isinstance(annotation, (str, ForwardRef)):
+            expression = (
+                annotation if isinstance(annotation, str) else annotation.__forward_arg__
+            )
+            # These are trusted Python type annotations, never input values.
+            annotation = eval(expression, vars(inspect.getmodule(owner)))  # noqa: S307
         if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
             if annotation not in derived:
                 closed = create_model(
                     annotation.__name__,
                     __base__=annotation,
+                    __module__=annotation.__module__,
                     __config__=ConfigDict(extra="forbid", defer_build=True),
                 )
                 derived[annotation] = closed
                 # Pydantic gives subclasses their own FieldInfo instances. Keep
                 # defaults, constraints and validators while replacing only types.
                 for model_field in closed.model_fields.values():
-                    model_field.annotation = close(model_field.annotation)
+                    model_field.annotation = close(model_field.annotation, annotation)
             return derived[annotation]
         arguments = get_args(annotation)
-        if not arguments:
+        origin = get_origin(annotation)
+        if not arguments or origin is Literal:
             return annotation
-        closed_arguments = tuple(close(argument) for argument in arguments)
+        closed_arguments = (
+            (close(arguments[0], owner), *arguments[1:])
+            if origin is Annotated
+            else tuple(close(argument, owner) for argument in arguments)
+        )
         if closed_arguments == arguments:
             return annotation
-        origin = get_origin(annotation)
         return (
             Union[closed_arguments] if origin is UnionType else origin[closed_arguments]
         )
 
-    closed: type[BaseModel] = close(model)
+    closed: type[BaseModel] = close(model, model)
     closed.model_rebuild(force=True)
     return closed
 

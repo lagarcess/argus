@@ -234,7 +234,6 @@ def retrieval_spec(
     closed_period: bool = False,
     language_tag: str | None = "en",
     local_sources: bool = False,
-    data_class: DataClass | None = None,
 ) -> ResearchConfigSpec:
     """The documented configuration for a shape, with this question's
     retrieval parameters: response language, home-market location, recency
@@ -246,11 +245,7 @@ def retrieval_spec(
             "language": iso_language(language_tag),
             "location": location,
             "recency": RECENCY_BY_DATA_CLASS[
-                data_class_for(
-                    question_kind=question_kind,
-                    closed_period=closed_period,
-                    requested_data_class=data_class,
-                )
+                data_class_for(question_kind=question_kind, closed_period=closed_period)
             ],
             "source_domains": (local_source_domains(location) if local_sources else ()),
         }

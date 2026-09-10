@@ -108,12 +108,11 @@ def test_background_completion_persists_the_matching_typed_tool_card(
     assert card.artifact_id == fields["tool_artifact_id"]
     assert card.outcome.status == "succeeded"
     assert card.outcome.result["status"] == "completed"
-    assert card.outcome.result["rows"] == [
-        row.model_dump(mode="json") for row in packet.published_rows
-    ]
+    published_rows = written[0]["metadata"]["research"]["rows"]
+    assert card.outcome.result["rows"] == published_rows
     assert card.presentation.narrative.startswith(packet.answer_markdown)
-    if packet.published_rows:
-        assert card.presentation.answer.value == packet.published_rows[0].value
+    if published_rows:
+        assert card.presentation.answer.value == published_rows[0]["value"]
     if row_mode == "unsourced":
         assert card.outcome.result["rows"][0]["source_url"] is None
         assert len(card.presentation.narrative) > len(packet.answer_markdown)

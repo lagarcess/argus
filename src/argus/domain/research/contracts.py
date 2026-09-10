@@ -82,7 +82,7 @@ class RetrievedRow(BaseModel):
     as_of: str | None
     """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
     source_url: str | None
-    """The URL cited for this figure, or null when no citation was supplied. Figures without a citation are published with a source limitation."""
+    """The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."""
 
     @field_validator("unit")
     @classmethod
@@ -302,11 +302,6 @@ class ResearchPacket(BaseModel):
     usage: ResearchUsage = Field(default_factory=ResearchUsage)
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     background_id: str | None = None
-
-    @property
-    def published_rows(self) -> tuple[RetrievedRow, ...]:
-        """All figures the answer publishes, with their original identities and citations."""
-        return (*self.rows, *self.unsourced_rows)
 
 
 class BackgroundPoll(BaseModel):

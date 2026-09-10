@@ -4,69 +4,15 @@ from __future__ import annotations
 
 import pytest
 from argus.agent_runtime.research_tools import (
-    ResearchToolResult,
     get_research_declarations,
-    research_result_from_patch,
 )
 from argus.domain.research.contracts import (
     ResearchNamePair,
-    ResearchPacket,
     ResearchSource,
 )
-from argus.domain.research.evidence_policy import build_research_evidence_policy
 from argus.domain.tool_contracts import ToolCall
-from pydantic import ValidationError
 
 from tests.research.test_registered_research_tools import _context, _packet, _wire
-
-
-def test_packet_owns_the_published_row_projection_without_a_new_wire_field() -> None:
-    packet = _packet()
-    uncited = packet.rows[0].model_copy(update={"source_url": None})
-    packet = packet.model_copy(update={"unsourced_rows": (uncited,)})
-
-    assert packet.published_rows == (*packet.rows, uncited)
-    assert packet.published_rows[0] is packet.rows[0]
-    assert packet.published_rows[1] is packet.unsourced_rows[0]
-    assert "published_rows" not in packet.model_dump()
-    assert "published_rows" not in ResearchPacket.model_json_schema()["properties"]
-
-
-@pytest.mark.parametrize("has_policy", [False, True])
-def test_result_preserves_the_runtime_evidence_policy_and_legacy_absence(has_policy):
-    packet = _packet()
-    policy = build_research_evidence_policy(
-        question_kind=None,
-        data_class="fundamentals",
-        period_start_date=packet.retrieved_at.date(),
-        question_as_of_date=packet.retrieved_at.date(),
-    )
-    sidecar = {"evidence_policy": policy.model_dump(mode="json")} if has_policy else {}
-
-    result = research_result_from_patch(
-        {"assistant_response": packet.answer_markdown, "research": sidecar}
-    )
-
-    assert result.evidence_policy == (policy if has_policy else None)
-    if has_policy:
-        assert (
-            result.model_dump(mode="json")["evidence_policy"]
-            == sidecar["evidence_policy"]
-        )
-        with pytest.raises(ValidationError):
-            ResearchToolResult(status="pending", evidence_policy=policy)
-
-
-def test_result_rejects_an_invalid_evidence_policy_instead_of_ignoring_it() -> None:
-    policy = build_research_evidence_policy(question_kind=None).model_dump(mode="json")
-    policy["max_age_seconds"] = -1.0
-    with pytest.raises(ValidationError):
-        research_result_from_patch(
-            {
-                "assistant_response": _packet().answer_markdown,
-                "research": {"evidence_policy": policy},
-            }
-        )
 
 
 @pytest.mark.asyncio()
@@ -113,7 +59,7 @@ async def test_inline_declaration_publishes_the_shared_answer_and_optional_rows(
     assert outcome.status == "succeeded"
     assert outcome.result["status"] == "completed"
     assert outcome.result["rows"] == [
-        row.model_dump(mode="json") for row in packet.published_rows
+        row.model_dump(mode="json") for row in (*packet.rows, *packet.unsourced_rows)
     ]
     published = context.stage_result.stage_patch["assistant_response"]
     assert "degraded" not in context.stage_result.stage_patch["research"]

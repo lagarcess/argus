@@ -123,25 +123,34 @@ def test_repeated_tool_calls_use_their_arguments_and_the_shared_cache(
     assert "confirmed_strategy_summary" not in context.stage_result.stage_patch
 
 
-def test_balanced_call_preserves_typed_freshness_without_classifying_the_question(
+@pytest.mark.parametrize("closed_window", [False, True])
+def test_balanced_call_preserves_the_existing_service_period_policy(
     monkeypatch: pytest.MonkeyPatch,
+    closed_window: bool,
 ) -> None:
     from argus.agent_runtime.research_tools import (
         BalancedLookupArguments,
+        ResearchPeriod,
         balanced_lookup,
     )
+    from argus.domain.research.config import retrieval_spec
 
     client = _wire(monkeypatch, _packet())
     context = _context()
     args = BalancedLookupArguments(
         request="Read the latest source-backed figures",
         symbols=["AAPL"],
-        data_class="analyst_estimates",
+        period=ResearchPeriod(
+            description="The requested period", closed_window=closed_window
+        ),
     )
     result = asyncio.run(balanced_lookup(args, context=context))
     assert result.sources
     assert client.calls[0][1].shape == "balanced"
-    assert client.calls[0][1].recency == "month"
+    expected = retrieval_spec(
+        "balanced", question_kind="current_external", closed_period=closed_window
+    )
+    assert client.calls[0][1].recency == expected.recency
     assert "question_kind" not in args.model_dump()
     assert (
         context.stage_result.stage_patch["research"]["capability_class"]
@@ -195,7 +204,6 @@ def test_thorough_call_retains_job_lifecycle_without_inline_provider_work(
     args = ThoroughResearchArguments(
         request="Read the source-backed financial comparison",
         symbols=["AAPL", "MSFT"],
-        data_class="filings_transcripts",
     )
     result = asyncio.run(thorough_research(args, context=context))
     payload = result.model_dump(mode="json")
@@ -204,9 +212,13 @@ def test_thorough_call_retains_job_lifecycle_without_inline_provider_work(
     assert client.calls == []
     job = context.stage_result.stage_patch["research_job_request"]
     assert job["question"] == args.request
-    assert job["data_class"] == args.data_class
+    assert "data_class" not in job
     assert job["capability_class"] == "thorough_research"
-    assert grounded.retrieval_spec_for_job(job).recency is None
+    from argus.domain.research.config import retrieval_spec
+
+    assert grounded.retrieval_spec_for_job(job) == retrieval_spec(
+        "thorough", question_kind=job["question_kind"], language_tag=job["language"]
+    )
 
 
 def test_screening_keeps_every_explicit_condition_in_the_provider_call(
@@ -239,28 +251,15 @@ def test_peer_expansion_requires_a_typed_anchor_or_category() -> None:
 
 
 @pytest.mark.parametrize(
-    "catalog_state",
-    [
-        {"tool_calls": [SimpleNamespace(tool_name="fast_quote")]},
-        {"uses_tool_catalog": True},
-    ],
+    "argument_type", ["BalancedLookupArguments", "ThoroughResearchArguments"]
 )
-def test_registered_calls_are_not_reinterpreted_by_legacy_research_routes(
-    catalog_state: dict[str, Any],
-) -> None:
-    from argus.agent_runtime.interpreter.research_routing import primary_research_query
-    from argus.agent_runtime.research_query import ResearchQueryExtraction
-    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+def test_unknown_freshness_override_is_rejected(argument_type: str) -> None:
+    from argus.agent_runtime import research_tools
 
-    interpretation = StructuredInterpretation(
-        intent="conversation_followup",
-        task_relation="continue",
-        user_goal_summary="Read quotes",
-        research_query=ResearchQueryExtraction(
-            question_kind="live_quote", symbols=["AAPL"]
-        ),
-    ).model_copy(update=catalog_state)
-    assert primary_research_query(interpretation) is None
+    with pytest.raises(ValidationError, match="data_class"):
+        getattr(research_tools, argument_type)(
+            request="Read sourced facts", data_class="analyst_estimates"
+        )
 
 
 def test_pending_research_card_has_no_answer() -> None:
@@ -337,10 +336,7 @@ def test_peer_expansion_calls_existing_discovery_and_returns_verified_rows(
         )
     )
     assert [peer.symbol for peer in result.peers] == ["CRWD"]
-    assert (
-        context.stage_result.stage_patch["research"]["capability_class"]
-        == "peer_expansion"
-    )
+    assert context.stage_result.stage_patch["research"]["shape"] == "find"
     assert context.stage_result.stage_patch["discovery"]["relationship"] == relationship
     assert result.relationship == relationship
     assert provider.calls
@@ -350,7 +346,9 @@ def test_peer_expansion_calls_existing_discovery_and_returns_verified_rows(
     assert "candidate_strategy_draft" not in context.stage_result.stage_patch
 
 
-def test_peer_expansion_cache_distinguishes_typed_relationships(monkeypatch) -> None:
+def test_peer_expansion_reuses_the_existing_cache_for_a_repeated_call(
+    monkeypatch,
+) -> None:
     from argus.agent_runtime.research_tools import PeerExpansionArguments, peer_expansion
 
     from tests.research.test_research_router_absorption import (
@@ -370,7 +368,7 @@ def test_peer_expansion_cache_distinguishes_typed_relationships(monkeypatch) -> 
 
     async def invoke():
         results = []
-        for relationship in ("peer", "comparison", "comparison"):
+        for relationship in ("comparison", "comparison"):
             result = await peer_expansion(
                 PeerExpansionArguments(relationship=relationship, **common),
                 context=context,
@@ -384,8 +382,8 @@ def test_peer_expansion_cache_distinguishes_typed_relationships(monkeypatch) -> 
         return results
 
     results = asyncio.run(invoke())
-    assert len(provider.calls) == 2
-    assert results == [("peer", "miss"), ("comparison", "miss"), ("comparison", "hit")]
+    assert len(provider.calls) == 1
+    assert results == [("comparison", "miss"), ("comparison", "hit")]
 
 
 def test_disabled_research_fails_before_provider_or_quota_work(
@@ -432,9 +430,13 @@ def test_discovery_recovery_is_an_unavailable_tool_outcome(
 ) -> None:
     from argus.agent_runtime.discovery import composer
     from argus.agent_runtime.discovery.contracts import DiscoveryExtraction
-    from argus.agent_runtime.research_tools import research_outcome_from_patch
+    from argus.agent_runtime.research_tools import (
+        get_research_declarations,
+        research_outcome_from_patch,
+    )
     from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
     from argus.domain.tool_contracts import ToolCall
+    from argus.domain.tool_declaration import ToolCatalog
 
     monkeypatch.setenv("ARGUS_GROUNDED_DISCOVERY_ENABLED", str(discovery_enabled).lower())
     naming = AsyncMock(return_value=DiscoveryExtraction() if naming_available else None)
@@ -459,7 +461,12 @@ def test_discovery_recovery_is_an_unavailable_tool_outcome(
     state = context.state.model_copy(update={"tool_calls": [call]})
 
     result = asyncio.run(
-        execute_tool_calls_async(state=state, tool=None, user=context.user)
+        execute_tool_calls_async(
+            state=state,
+            tool=None,
+            user=context.user,
+            catalog=ToolCatalog(get_research_declarations()),
+        )
     )
 
     effect = result.stage_patch["tool_effects"][0]["stage_patch"]
@@ -481,31 +488,3 @@ def test_discovery_recovery_is_an_unavailable_tool_outcome(
     assert card["presentation"]["narrative"] is None
     assert card["presentation"]["sources"] == []
     assert result.stage_patch["assistant_response"] == recovery_response
-
-
-def test_catalog_zero_calls_never_fall_back_to_a_question_classifier(monkeypatch) -> None:
-    from argus.agent_runtime import knowledge_answer as knowledge
-    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
-
-    async def unexpected(**_: Any):
-        raise AssertionError("zero catalog calls must remain zero calls")
-
-    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
-    monkeypatch.setattr(knowledge, "_classify_question", unexpected)
-    interpretation = StructuredInterpretation(
-        intent="explain",
-        task_relation="continue",
-        user_goal_summary="Explain a concept",
-        semantic_turn_act="educational_question",
-    ).model_copy(update={"uses_tool_catalog": True})
-    context = _context()
-    result = asyncio.run(
-        knowledge.knowledge_answer_stage_result(
-            interpretation=interpretation,
-            state=context.state,
-            user=context.user,
-            snapshot=None,
-            selected_thread_metadata={},
-        )
-    )
-    assert result is None

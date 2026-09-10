@@ -68,7 +68,7 @@ def test_nested_tool_records_rehydrate_through_production_checkpoint_serializer(
     state = {
         "run_state": RunState(
             current_user_message=faker.sentence(),
-            intent="calculate",
+            intent=None,
             tool_calls=calls,
             tool_call_records=[
                 ToolCallRecord(
@@ -83,8 +83,7 @@ def test_nested_tool_records_rehydrate_through_production_checkpoint_serializer(
             final_response_payload=FinalResponsePayload(tool_result_cards=cards),
         ),
         "latest_task_snapshot": TaskSnapshot(
-            latest_task_type="calculate",
-            pending_tool_calls=calls,
+            latest_task_type=None,
             artifact_references=[
                 ArtifactReference(
                     artifact_kind="tool_result",
@@ -107,8 +106,13 @@ def test_nested_tool_records_rehydrate_through_production_checkpoint_serializer(
     assert isinstance(run_state, RunState)
     assert isinstance(snapshot, TaskSnapshot)
     assert all(isinstance(call, ToolCall) for call in run_state.tool_calls)
-    assert all(isinstance(call, ToolCall) for call in snapshot.pending_tool_calls)
-    assert [call.call_id for call in run_state.tool_calls] == [call.call_id for call in calls]
+    assert snapshot.latest_task_type is None
+    assert [ref.artifact_id for ref in snapshot.artifact_references] == [
+        card.artifact_id for card in cards
+    ]
+    assert [call.call_id for call in run_state.tool_calls] == [
+        call.call_id for call in calls
+    ]
     assert run_state.tool_calls[0].arguments == {"known": 0, "unknown": None}
 
     final = run_state.final_response_payload

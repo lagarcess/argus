@@ -35,10 +35,7 @@ from argus.agent_runtime.research_grounded import (  # noqa: F401
     retrieval_spec_for_job,
     store_research_packet_for_job,
 )
-from argus.agent_runtime.research_query import (
-    ResearchOperationQuery,
-    ResearchQueryExtraction,
-)
+from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     AssetDiscoveryRequest,
     InterpretDecision,
@@ -85,18 +82,15 @@ async def discovery_turn_stage_result(
     state: RunState,
     user: UserState,
 ) -> StageResult | None:
-    """Read compatibility for pre-catalog asset-discovery interpretations.
+    """Own every typed asset-discovery turn.
 
     Flag off, this is exactly the pre-rail composer path. Flag on, the primary
     interpretation supplies the shape: a comparison of named assets becomes
     grounded research, everything discovery-shaped runs the find operation
-    with the historical interpretation's own typed request. Catalog outputs,
-    including zero calls, never enter this compatibility route.
+    with the interpreter's own typed request.
     """
     from argus.agent_runtime.discovery import discovery_stage_result_for
 
-    if interpretation.uses_tool_catalog or interpretation.tool_calls:
-        return None
     if not research_rail_enabled():
         return await discovery_stage_result_for(
             interpretation=interpretation, decision=decision, state=state, user=user
@@ -237,9 +231,7 @@ async def _dispatch(
     )
 
 
-def _resolved_subjects(
-    query: ResearchQueryExtraction | ResearchOperationQuery,
-) -> list[dict[str, str]]:
+def _resolved_subjects(query: ResearchQueryExtraction) -> list[dict[str, str]]:
     """Deterministic guardrail: the resolver owns identity, class, and name."""
     subjects: list[dict[str, str]] = []
     seen: set[str] = set()

@@ -25,7 +25,6 @@ from argus.agent_runtime.stages.clarify import (
     clarify_stage_async,
 )
 from argus.agent_runtime.stages.confirm import confirm_stage
-from argus.agent_runtime.stages.execute import execute_stage_async
 from argus.agent_runtime.stages.explain import explain_stage_async
 from argus.agent_runtime.stages.interpret import (
     StageResult,
@@ -33,6 +32,7 @@ from argus.agent_runtime.stages.interpret import (
     interpret_stage_async,
 )
 from argus.agent_runtime.stages.next_step import next_step_stage_async
+from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
@@ -259,53 +259,16 @@ async def _interpret_node_async(
     *,
     structured_interpreter: StructuredInterpreter | None,
 ) -> WorkflowState:
-    result = await interpret_stage_async(
-        state=_run_state(state),
-        user=_user(state),
-        latest_task_snapshot=state.get("latest_task_snapshot"),
-        selected_thread_metadata=state.get("selected_thread_metadata", {}),
-        structured_interpreter=structured_interpreter,
+    return _apply_stage_result(
+        state,
+        await interpret_stage_async(
+            state=_run_state(state),
+            user=_user(state),
+            latest_task_snapshot=state.get("latest_task_snapshot"),
+            selected_thread_metadata=state.get("selected_thread_metadata", {}),
+            structured_interpreter=structured_interpreter,
+        ),
     )
-    snapshot = state.get("latest_task_snapshot")
-    action = _run_state(state).structured_action
-    if (
-        result.outcome == "approved_for_execution"
-        and not result.patch.get("tool_calls")
-        and action is not None
-        and action.type == "run_backtest"
-        and snapshot is not None
-        and snapshot.pending_tool_calls
-    ):
-        calls = list(snapshot.pending_tool_calls)
-        if calls[0].tool_name == "backtest":
-            from argus.agent_runtime.backtest_input import BacktestStrategyInput
-
-            strategy = StrategySummary.model_validate(
-                result.patch.get(
-                    "candidate_strategy_draft", _run_state(state).candidate_strategy_draft
-                )
-            )
-            # Confirmation may materialize defaults or an executable data window.
-            # Its canonical strategy replaces only the call just approved.
-            calls[0] = calls[0].model_copy(
-                update={
-                    "arguments": {
-                        "strategy": BacktestStrategyInput.from_runtime_strategy(
-                            strategy
-                        ).model_dump(mode="json")
-                    }
-                }
-            )
-            result.stage_patch["tool_calls"] = calls
-            signals = result.patch.get("normalized_signals", {})
-            result.stage_patch["normalized_signals"] = {
-                **_run_state(state).normalized_signals,
-                **signals,
-                **_pending_tool_context(snapshot.pending_tool_context),
-                **_pending_tool_context(_run_state(state).normalized_signals),
-                **_pending_tool_context(signals),
-            }
-    return _apply_stage_result(state, result)
 
 
 async def _clarify_node_async(
@@ -340,7 +303,7 @@ async def _execute_node_async(
         run_state.confirmation_payload = dict(launch_payload)
     return _apply_stage_result(
         state,
-        await execute_stage_async(
+        await execute_tool_calls_async(
             state=run_state,
             tool=tool,
             max_retries=max_retries,
@@ -478,15 +441,6 @@ def _user(state: WorkflowState) -> UserState:
     return cast(UserState, state["user"])
 
 
-def _pending_tool_context(signals: dict[str, Any]) -> dict[str, str]:
-    from argus.agent_runtime.interpreter.provider_context_assets import (
-        TOOL_ASSET_CONTEXT_SIGNAL,
-    )
-
-    packet = signals.get(TOOL_ASSET_CONTEXT_SIGNAL)
-    return {TOOL_ASSET_CONTEXT_SIGNAL: packet} if isinstance(packet, str) else {}
-
-
 def _build_task_snapshot(
     *,
     run_state: RunState,
@@ -552,24 +506,8 @@ def _build_task_snapshot(
         if prior_task_snapshot is not None
         else None
     )
-    pending_tool_calls = list(run_state.tool_calls)
-    pending_tool_context = (
-        _pending_tool_context(run_state.normalized_signals) if pending_tool_calls else {}
-    )
-    if (
-        not pending_tool_calls
-        and preserve_pending_strategy
-        and prior_task_snapshot is not None
-    ):
-        pending_tool_calls = list(prior_task_snapshot.pending_tool_calls)
-        if pending_tool_calls:
-            pending_tool_context = _pending_tool_context(
-                prior_task_snapshot.pending_tool_context
-            )
     return TaskSnapshot(
         latest_task_type=run_state.intent,
-        pending_tool_calls=pending_tool_calls,
-        pending_tool_context=pending_tool_context,
         completed=completed,
         pending_strategy_summary=pending_strategy_summary,
         confirmed_strategy_summary=(
@@ -644,12 +582,6 @@ def _should_preserve_pending_strategy(
     if (
         prior_task_snapshot is None
         or prior_task_snapshot.pending_strategy_summary is None
-    ):
-        return False
-    consumed_call_ids = {record.call_id for record in run_state.tool_call_records}
-    if any(
-        call.call_id in consumed_call_ids
-        for call in prior_task_snapshot.pending_tool_calls
     ):
         return False
     if _has_new_artifact_reference(

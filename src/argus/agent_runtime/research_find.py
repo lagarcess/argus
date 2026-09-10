@@ -12,7 +12,6 @@ unchanged; the user-visible experience is the same or better.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -29,12 +28,9 @@ from argus.domain.research.cache import (
     cache_get,
     cache_put,
     research_cache_key,
+    ttl_for_packet,
 )
 from argus.domain.research.contracts import CapabilityClass
-from argus.domain.research.evidence_policy import (
-    ResearchEvidencePolicy,
-    build_research_evidence_policy,
-)
 
 
 class _FindPacketCache:
@@ -47,9 +43,8 @@ class _FindPacketCache:
     so its results are movers-fresh by definition, never months-stable
     peers data."""
 
-    def __init__(self, key: str, *, evidence_policy: ResearchEvidencePolicy) -> None:
+    def __init__(self, key: str) -> None:
         self._key = key
-        self._evidence_policy = evidence_policy
 
     def get(self) -> Any:
         return cache_get(self._key)
@@ -58,7 +53,7 @@ class _FindPacketCache:
         cache_put(
             self._key,
             packet,
-            ttl_seconds=self._evidence_policy.max_age_seconds,
+            ttl_seconds=ttl_for_packet(question_kind="find_assets"),
         )
 
 
@@ -69,17 +64,15 @@ async def find_assets_stage_result(
     decision: InterpretDecision | None,
     state: RunState,
     user: UserState,
-    capability_class: CapabilityClass | None = None,
 ) -> StageResult | None:
     """Run the find operation and attach the rail's typed instrumentation."""
     from argus.agent_runtime.discovery.composer import discovery_operation_result
 
-    if capability_class is None:
-        capability_class = (
-            "peer_expansion"
-            if request is not None and request.anchor_symbols
-            else "screening"
-        )
+    capability_class: CapabilityClass = (
+        "peer_expansion"
+        if request is not None and request.anchor_symbols
+        else "screening"
+    )
     language = (
         getattr(interpretation, "detected_user_language", None)
         or user.language_preference
@@ -88,7 +81,6 @@ async def find_assets_stage_result(
     effective_decision = decision or grounded.research_decision(
         interpretation, user, f"research_answer_{capability_class}"
     )
-    evidence_policy = build_research_evidence_policy(question_kind="find_assets")
     packet_cache = None
     if request is not None and request.needs_current_facts:
         anchors = tuple(
@@ -99,16 +91,10 @@ async def find_assets_stage_result(
             shape="find",
             symbols=anchors,
             period_key="current",
-            question_fingerprint=json.dumps(
-                {
-                    "request": " ".join(state.current_user_message.lower().split()),
-                    "discovery": request.model_dump(mode="json"),
-                },
-                sort_keys=True,
-            ),
+            question_fingerprint=" ".join(state.current_user_message.lower().split()),
             language=grounded.language_tag(user.language_preference),
         )
-        packet_cache = _FindPacketCache(key, evidence_policy=evidence_policy)
+        packet_cache = _FindPacketCache(key)
     result = await discovery_operation_result(
         decision=effective_decision,
         request=request,
@@ -124,7 +110,6 @@ async def find_assets_stage_result(
             stage_patch=result.stage_patch,
             request=request,
             capability_class=capability_class,
-            evidence_policy=evidence_policy,
         )
     )
     return result
@@ -135,7 +120,6 @@ def _research_sidecar_inputs_for_find(
     stage_patch: dict[str, Any],
     request: AssetDiscoveryRequest | None,
     capability_class: CapabilityClass,
-    evidence_policy: ResearchEvidencePolicy,
 ) -> dict[str, Any]:
     """One settlement contract: the find op meters like every other shape.
 
@@ -172,7 +156,6 @@ def _research_sidecar_inputs_for_find(
     return {
         "capability_class": capability_class,
         "shape": "find",
-        "evidence_policy": evidence_policy,
         # The discovery sidecar owns the rich source list; duplicating it
         # here would create a second rendering surface.
         "sources": [],

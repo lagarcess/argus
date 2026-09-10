@@ -3099,13 +3099,16 @@ stores nothing and makes no LLM, provider, or market-data call.
 
 ### Declared tool calls and results
 
-The model-facing task intents are `explain`, `calculate`, `follow_up`, and
-`cannot`. Each declared callable supplies its own typed argument and return
-schema. The neutral transport `ToolCall` is `{tool_name, call_id, arguments}`;
-the generated model schema constrains `arguments` by the selected declaration.
-Calls are ordered, bounded by `MAX_TOOL_CALLS`, and have distinct call IDs.
-Zero calls, different tools, and repeated calls are valid. No separate question
-category selects a tool. Existing persisted intent spellings remain readable.
+The neutral transport `ToolCall` is `{tool_name, call_id, arguments}`. Each
+declaration supplies its callable's typed argument and return schemas. Calls are
+ordered, bounded by `MAX_TOOL_CALLS`, and have distinct call IDs. The dispatcher
+supports different tools and repeated calls; a local call bypasses backtest
+launch preparation. The existing validated Run action enters this dispatcher
+with its confirmed canonical strategy.
+
+The interpreter retains its seven intents, system prompt and response schema.
+It does not select calls from this catalog in this lane. The declaration-derived
+catalog is available to runtime consumers without changing the model contract.
 
 An actual invocation emits `stage_start.tool_progress` containing
 `{locale_key, interpolation_args, call_id, tool_name}`. Interpolation values are
@@ -3791,15 +3794,6 @@ final payload and persisted metadata:
       }
     ],
     "retrieved_at": "2026-08-07T15:04:05Z",
-    "evidence_policy": {
-      "data_class": "fundamentals",
-      "max_age_seconds": 7776000.0,
-      "question_kind": "company_lookup",
-      "period_start_date": null,
-      "question_as_of_date": "2026-08-07",
-      "current_survey": false,
-      "closed_period": false
-    },
     "anchor_symbols": ["NFLX"],
     "peers": [
       {"symbol": "DIS", "name": "The Walt Disney Company", "asset_class": "equity"}
@@ -3818,12 +3812,6 @@ final payload and persisted metadata:
 
 Contract rules:
 
-- Optional `evidence_policy` records the runtime's resolved cache age and
-  source-period rules. Its data class and maximum age derive from the shared
-  cache policy; its dates and survey flag are the same inputs used to select
-  sources. Retrieval age does not establish a figure's currentness. Find and
-  peer expansion record their existing age limit without inventing a same-day
-  publisher-date requirement. Historical sidecars may omit this field.
 - **Truth boundary (same standing as the S10 memory lock):** research informs
   the reader; Argus providers execute the simulation. No `finance_search`
   value may reach a backtest; a test launched from a research answer
@@ -3923,11 +3911,12 @@ Contract rules:
   reading returned tool output first and invoice counts second. A
   survey with no retrieval carries `degraded.code = "survey_not_grounded"`
   and replaces unsupported prose with the precise retrieval failure. A survey
-  that retrieved but names no resolver-verified ticker carries
+  that retrieved but names no resolver-verified ticker, or whose typed
+  answer states no cited figure at all, carries
   `degraded.code = "survey_synthesis_incomplete"` and says that sources were
   found but the requested assets could not be extracted; a survey is
-  accepted with retrieval and a verified name. Missing figures may trigger
-  the one concrete retry; they do not withhold the answer. Neither failure renders subject-dependent
+  accepted only with a figure and a verified name, on the first attempt or
+  after the one concrete retry. Neither failure renders subject-dependent
   figure or asset copy, and neither emits a runnable row.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.

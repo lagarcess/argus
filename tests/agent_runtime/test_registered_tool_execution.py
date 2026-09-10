@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from argus.agent_runtime.stages import execute
 from argus.agent_runtime.stages.interpret_types import StageResult
+from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
 from argus.agent_runtime.state.models import RunState
 from argus.domain.tool_contracts import (
     MAX_TOOL_CALLS,
@@ -96,7 +97,7 @@ def _forbid_launch(*args, **kwargs):
 @pytest.mark.asyncio()
 async def test_zero_tool_calls_do_not_invent_a_backtest(monkeypatch) -> None:
     monkeypatch.setattr(execute, "_launch_payload", _forbid_launch)
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=RunState(current_user_message=fake.sentence()),
         tool=object(),
     )
@@ -117,7 +118,7 @@ async def test_local_tools_execute_in_order_without_a_launch_payload(monkeypatch
 
     monkeypatch.setattr(execute, "_launch_payload", _forbid_launch)
     calls = [_call(index, name=name) for index, name in enumerate(names)]
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=RunState(current_user_message=fake.sentence(), tool_calls=calls),
         tool=object(),
         catalog=_catalog(*(_declaration(echo, name=name) for name in set(names))),
@@ -142,7 +143,7 @@ async def test_declared_failure_has_no_answer_or_result(monkeypatch, status):
         raise ToolInvocationError(status, code="test_bound")
 
     monkeypatch.setattr(execute, "_launch_payload", _forbid_launch)
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=RunState(current_user_message=fake.sentence(), tool_calls=[_call(0)]),
         tool=object(),
         catalog=_catalog(_declaration(bounded)),
@@ -161,7 +162,7 @@ async def test_duplicate_call_ids_fail_before_any_callable_runs(monkeypatch):
 
     monkeypatch.setattr(execute, "_launch_payload", _forbid_launch)
     call_id = fake.uuid4()
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=RunState(
             current_user_message=fake.sentence(),
             tool_calls=[_call(0, call_id=call_id), _call(1, call_id=call_id)],
@@ -182,7 +183,7 @@ async def test_oversized_batch_is_rejected_before_any_call_executes():
     state = RunState(current_user_message=fake.sentence())
     # A mutated already-validated state still cannot execute a partial batch.
     state.tool_calls.extend(_call(index) for index in range(MAX_TOOL_CALLS + 1))
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=state,
         tool=object(),
         catalog=_catalog(_declaration(echo)),
@@ -209,13 +210,13 @@ async def test_cost_policy_requires_confirmation_before_invocation(monkeypatch):
     ]
     state.tool_calls = calls
     declaration = get_backtest_declaration()
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=state,
         tool=object(),
         catalog=_catalog(declaration),
     )
     assert declaration.policy.confirmation == "required"
-    assert result.outcome == "ready_for_confirmation"
+    assert result.outcome == "execution_failed_terminally"
     assert result.patch["tool_calls"] == calls
     assert result.patch["tool_call_records"] == []
 
@@ -285,7 +286,7 @@ async def test_approved_dca_uses_the_registered_callable_and_existing_launch_own
             }
 
     state = _dca_state(approved=True)
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=state, tool=BacktestTool(), catalog=_catalog(get_backtest_declaration())
     )
 
@@ -300,20 +301,6 @@ async def test_approved_dca_uses_the_registered_callable_and_existing_launch_own
     assert result.patch["tool_call_records"][0]["tool_name"] == "backtest"
 
 
-def test_pending_calls_survive_the_existing_task_snapshot():
-    from argus.agent_runtime.graph.workflow import _build_task_snapshot
-
-    calls = [_call(0), _call(1)]
-    snapshot = _build_task_snapshot(
-        run_state=RunState(current_user_message=fake.sentence(), tool_calls=calls),
-        stage_outcome="await_approval",
-        prior_task_snapshot=None,
-        artifact_references=[],
-    )
-
-    assert snapshot.pending_tool_calls == calls
-
-
 def test_legacy_run_action_uses_the_existing_confirmation_identity():
     from argus.agent_runtime.tools.registered_backtest import approved_backtest_call
 
@@ -326,6 +313,52 @@ def test_legacy_run_action_uses_the_existing_confirmation_identity():
 
     assert first.call_id == confirmation_id
     assert replay.call_id == first.call_id
+
+
+def test_declared_arguments_preserve_the_canonical_strategy_without_reextraction():
+    from argus.agent_runtime.tools.registered_backtest import get_backtest_declaration
+
+    strategy = _dca_state(approved=True).candidate_strategy_draft
+    strategy.extra_parameters.update(
+        starting_capital=0,
+        recurring_contribution=strategy.capital_amount,
+        fee_rate=0,
+        slippage=0.0005,
+    )
+    arguments = get_backtest_declaration().validate_arguments(
+        {"strategy": strategy.model_dump(mode="json")}
+    )
+
+    assert arguments.strategy.model_dump(mode="json") == strategy.model_dump(mode="json")
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("changed_fact", ["capital", "cost"])
+async def test_changed_declared_facts_cannot_reuse_a_run_approval(
+    monkeypatch, changed_fact
+):
+    from argus.agent_runtime.tools.registered_backtest import (
+        approved_backtest_call,
+        get_backtest_declaration,
+    )
+
+    state = _dca_state(approved=True)
+    call = approved_backtest_call(state)
+    assert call is not None
+    if changed_fact == "capital":
+        call.arguments["strategy"]["capital_amount"] += 1
+    else:
+        call.arguments["strategy"]["extra_parameters"]["fee_rate"] = 0
+    state.tool_calls = [call]
+    monkeypatch.setattr(execute, "_launch_payload", _forbid_launch)
+
+    result = await execute_tool_calls_async(
+        state=state, tool=object(), catalog=_catalog(get_backtest_declaration())
+    )
+
+    assert result.outcome == "execution_failed_terminally"
+    assert result.patch["final_response_payload"]["code"] == "confirmation_required"
+    assert result.patch["tool_call_records"] == []
 
 
 @pytest.mark.parametrize("explicit_final", [True, False])
@@ -388,62 +421,23 @@ async def test_one_approval_cannot_dispatch_the_same_backtest_twice():
         for _ in range(2)
     ]
     state.tool_calls = calls
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=state, tool=BacktestTool(), catalog=_catalog(get_backtest_declaration())
     )
 
     assert len(received) == 1
-    assert result.outcome == "ready_for_confirmation"
+    assert result.outcome == "execution_failed_terminally"
     assert result.patch["tool_calls"] == calls[1:]
-    assert result.patch["confirmation_payload"] is None
+    assert result.patch["final_response_payload"]["code"] == "confirmation_required"
 
 
 @pytest.mark.asyncio()
-async def test_approval_restores_remaining_call_ids_from_the_task_snapshot(monkeypatch):
-    from argus.agent_runtime.graph import workflow
-    from argus.agent_runtime.stages.interpret_types import StageResult
-    from argus.agent_runtime.state.models import TaskSnapshot, UserState
-
-    state = _dca_state(approved=True)
-    pending = [
-        ToolCall(
-            tool_name="backtest",
-            call_id=fake.uuid4(),
-            arguments={
-                "strategy": state.candidate_strategy_draft.model_dump(mode="json")
-            },
-        ),
-        _call(0),
-    ]
-
-    async def approve(**kwargs):
-        return StageResult(
-            outcome="approved_for_execution",
-            stage_patch={"candidate_strategy_draft": state.candidate_strategy_draft},
-        )
-
-    monkeypatch.setattr(workflow, "interpret_stage_async", approve)
-    result = await workflow._interpret_node_async(
-        {
-            "run_state": state,
-            "user": UserState(user_id=fake.uuid4()),
-            "latest_task_snapshot": TaskSnapshot(pending_tool_calls=pending),
-        },
-        structured_interpreter=None,
-    )
-
-    assert [call.call_id for call in result["run_state"].tool_calls] == [
-        call.call_id for call in pending
-    ]
-
-
-@pytest.mark.asyncio()
-async def test_actual_graph_streams_each_call_before_its_handler_finishes(monkeypatch):
+async def test_graph_streams_programmatic_calls_before_handlers_finish(monkeypatch):
     import asyncio
 
+    from argus.agent_runtime.graph import workflow as workflow_module
     from argus.agent_runtime.graph.workflow import build_workflow
     from argus.agent_runtime.runtime import stream_agent_turn_events
-    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
     from argus.agent_runtime.state.models import UserState
     from langgraph.checkpoint.memory import MemorySaver
 
@@ -455,21 +449,20 @@ async def test_actual_graph_streams_each_call_before_its_handler_finishes(monkey
         await asyncio.wait_for(release.wait(), timeout=2)
         return EchoResult(value=arguments.value)
 
-    class Interpreter:
-        async def ainvoke(self, request):
-            interpreted.append(request)
-            return StructuredInterpretation(
-                intent="calculate",
-                task_relation="new_task",
-                user_goal_summary=fake.sentence(),
-                tool_calls=calls,
-            )
+    async def programmatic_calls(**kwargs):
+        interpreted.append(kwargs["state"])
+        return StageResult(
+            outcome="approved_for_execution", stage_patch={"tool_calls": calls}
+        )
+
+    # The existing interpreter has no tool-call field. This test supplies a
+    # programmatic stage patch to exercise only the graph execution boundary.
+    monkeypatch.setattr(workflow_module, "interpret_stage_async", programmatic_calls)
 
     monkeypatch.setattr(execute, "_launch_payload", _forbid_launch)
     graph = build_workflow(
         tool=object(),
         tool_catalog=_catalog(_declaration(echo)),
-        structured_interpreter=Interpreter(),
         checkpointer=MemorySaver(),
     )
     events = []
@@ -501,7 +494,7 @@ async def test_empty_call_turn_ignores_a_carried_confirmation(monkeypatch):
     state.structured_action = None
     monkeypatch.setattr(execute, "_launch_payload", _forbid_launch)
 
-    result = await execute.execute_stage_async(state=state, tool=object())
+    result = await execute_tool_calls_async(state=state, tool=object())
 
     assert result.outcome == "ready_to_respond"
     assert result.patch["tool_call_records"] == []
@@ -555,7 +548,7 @@ async def test_a_declared_confirmation_callback_owns_its_tool_policy():
         policy=ToolPolicy(execution="workflow", confirmation="required"),
         confirmation_handler=confirm,
     )
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=RunState(current_user_message=fake.sentence(), tool_calls=[_call(0)]),
         tool=object(),
         catalog=_catalog(declaration),
@@ -578,7 +571,7 @@ async def test_trusted_call_identity_reaches_sync_adapter_then_is_cleared():
             observed.append((context.call.call_id, context.artifact_id))
             return {"success": True, "payload": {"total_return": 0}}
 
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=_dca_state(approved=True),
         tool=BacktestTool(),
         catalog=_catalog(get_backtest_declaration()),
@@ -612,7 +605,7 @@ async def test_replayed_job_preserves_the_durable_call_and_card_identity():
                 },
             }
 
-    result = await execute.execute_stage_async(
+    result = await execute_tool_calls_async(
         state=_dca_state(approved=True),
         tool=ReplayedTool(),
         catalog=_catalog(get_backtest_declaration()),

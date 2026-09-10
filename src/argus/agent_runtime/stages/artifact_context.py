@@ -51,7 +51,7 @@ def decision_targets_result_artifact(
         return decision.artifact_target == "latest_result"
     if decision.semantic_turn_act == "result_followup":
         return True
-    return decision.semantic_turn_act == "result_followup"
+    return decision.intent == "results_explanation"
 
 
 def decision_allows_result_artifact_patch(
