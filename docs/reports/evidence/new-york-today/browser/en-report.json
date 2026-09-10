@@ -1,0 +1,19 @@
+{
+  "language": "en",
+  "symbol": "TSLA",
+  "frozen_at": "2026-09-09T20:17:00-04:00",
+  "process_tz": "UTC",
+  "host_date": "2026-09-10",
+  "new_york_date": "2026-09-09",
+  "rendered_compact_end": "Sep 9, 2026",
+  "rendered_period_lines": [
+    "TSLA · Buy and hold · Jan 1, 2024 – Dec 31, 2024 → Jan 1, 2024 – Sep 9, 2026 · about 2.7 years",
+    "Jan 1, 2024 → Sep 9, 2026",
+    "Jan 1, 2024 – Dec 31, 2024 → Jan 1, 2024 – Sep 9, 2026"
+  ],
+  "persisted_period_row": "January 1, 2024 - September 9, 2026",
+  "persisted_effective_date_range": {
+    "start": "2024-01-01",
+    "end": "2026-09-09"
+  }
+}

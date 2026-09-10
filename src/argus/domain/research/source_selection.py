@@ -9,11 +9,11 @@ date a question is asked on, the date every bound here is read against.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Iterable
 from urllib.parse import urlparse
 
-from argus.domain.market_data.capabilities import EASTERN
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.research.contracts import MAX_SOURCES, ResearchSource
 
 _CURRENT_SURVEY_KINDS = frozenset({"market_pulse", "screening", "sector_radar"})
@@ -25,7 +25,7 @@ _PUBLISHER_DATE_LEAD = timedelta(days=1)
 def question_date() -> date:
     """The date a research question is asked on, by the New York calendar the
     US markets it asks about keep."""
-    return datetime.now(EASTERN).date()
+    return new_york_today()
 
 
 def select_public_sources(

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
 from typing import Any
 
 from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
@@ -17,6 +16,7 @@ from argus.agent_runtime.strategy_contract import (
     normalize_date_range_candidate,
     resolve_date_range,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 
 # Money a recurring plan puts to work on day one, and money that bounds the
 # whole plan. Two different facts, so two key sets: reading them out of one
@@ -497,7 +497,7 @@ def _dca_total_capital_role_label(source: str | None) -> str:
 def _invalid_date_range_constraint(value: Any) -> UnsupportedConstraint | None:
     if value in (None, "", [], {}):
         return None
-    current_date = date.today()
+    current_date = new_york_today()
     try:
         resolution = resolve_date_range(value, today=current_date)
     except Exception:

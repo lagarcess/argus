@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from copy import deepcopy
-from datetime import date
 from typing import Any
 
 from langchain_core.messages import (
@@ -39,6 +38,7 @@ from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     executable_strategy_type_from_extracted_fields,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.nlp.natural_time import resolve_date_range_intent
 
 ResolveAssetCandidate = Callable[..., Any]
@@ -112,7 +112,7 @@ def _focused_strategy_extraction_messages(
                 "Use date_range_raw_text only as bounded evidence for the same "
                 "window, not as the executable date contract. If the user gives a "
                 "start date and says today, preserve the end as 'today' or "
-                f"{date.today().isoformat()}, not a stale model date. If the user gives "
+                f"{new_york_today().isoformat()}, not a stale model date. If the user gives "
                 "only a start or only an end, preserve only that endpoint and include "
                 "date_range in missing_required_fields; do not infer today. Preserve "
                 "language, date_range_raw_text, date_range_intent, and evidence_spans "

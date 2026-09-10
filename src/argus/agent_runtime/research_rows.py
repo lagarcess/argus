@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any, Callable, Iterable
 
 from loguru import logger
@@ -29,6 +29,7 @@ from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENTS_ROW_CAP,
     NEXT_EXPERIMENTS_VERSION,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.research.contracts import MAX_PEER_PAIRS, ResearchNamePair
 
 _PEER_VERIFY_BUDGET_SECONDS = 2.0
@@ -159,7 +160,7 @@ def _earliest_available(symbol: str, asset_class: str) -> date | None:
 
     if not tradable_history(symbol, asset_class).is_tradable:
         return None
-    end = datetime.now(timezone.utc).date()
+    end = new_york_today()
     start = end - timedelta(days=365 * TEST_WINDOW_YEARS)
     series = fetch_price_series(symbol, asset_class, start, end, "1d")
     index = getattr(series, "index", None)
@@ -182,7 +183,7 @@ def row_window(
     from datetime import timedelta
 
     resolver = probe or _earliest_available
-    end = datetime.now(timezone.utc).date()
+    end = new_york_today()
     requested_start = end - timedelta(days=365 * TEST_WINDOW_YEARS)
     latest_start: date | None = None
     for asset in assets:

@@ -18,6 +18,7 @@ from argus.domain.market_data.capabilities import (
     EquityMarketSession,
     fetch_alpaca_market_calendar,
 )
+from argus.domain.market_data.new_york_clock import new_york_now
 
 # Extended-hours bounds for US equities, Eastern. The regular open and close
 # come from the calendar per session, because half days move them.
@@ -42,10 +43,6 @@ class MarketSessionSnapshot:
 
 
 _calendar_by_date: dict[date, EquityMarketSession | None] = {}
-
-
-def _now_eastern() -> datetime:
-    return datetime.now(EASTERN)
 
 
 def _session_for(session_date: date) -> EquityMarketSession | None:
@@ -81,7 +78,7 @@ def resolve_market_session(
         os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider"
     ).strip().lower() == "synthetic_unit_fixture":
         return None
-    at = now or _now_eastern()
+    at = now or new_york_now()
     if at.tzinfo is None:
         # astimezone would read a naive value as system local time.
         raise ValueError("market_session_requires_aware_datetime")

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from datetime import date
 from typing import Any
 
 import pytest
@@ -31,6 +30,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.domain.market_data import clear_asset_cache
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.llm import openrouter
 from argus.llm.openrouter import (
     log_openrouter_failure,
@@ -1677,7 +1677,7 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
     draft = result.candidate_strategy_draft
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert "stated_run_field_fidelity_audit" in result.reason_codes

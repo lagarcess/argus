@@ -20,6 +20,7 @@ from argus.api.schemas import (
 )
 from argus.domain.display_figure import display_figure
 from argus.domain.evidence import result_metrics_summary
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.result_readout_facts import with_result_readout_facts
 from argus.domain.retest_setup import (
     has_finalized_evidence_identity,
@@ -288,7 +289,7 @@ def project_retest_action(
         # Admission rejects an unfinalized run/evidence tuple, so offering it
         # here would advertise a button that can only fail.
         return None
-    setup = retest_setup_from_run(run, today=today or date.today())
+    setup = retest_setup_from_run(run, today=today or new_york_today())
     if setup is None:
         return None
     availability = retest_dossier_availability(setup)

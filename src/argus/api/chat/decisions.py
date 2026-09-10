@@ -12,7 +12,6 @@ executing anything.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from datetime import date
 from typing import Any
 
 from argus.api import state as api_state
@@ -35,6 +34,7 @@ from argus.domain.decision_attachment import (
     computation_from_message_metadata,
     decision_computation,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.store import utcnow
 
 
@@ -148,7 +148,7 @@ def open_decision(
         else None
     )
     computation = decision_computation(decision, artifact=artifact)
-    context = RerunContext(load_run=_run_loader(user.id), today=date.today())
+    context = RerunContext(load_run=_run_loader(user.id), today=new_york_today())
     try:
         rerun = rerun_computation(computation, overrides=overrides, context=context)
     except InvalidComputationInputs as exc:

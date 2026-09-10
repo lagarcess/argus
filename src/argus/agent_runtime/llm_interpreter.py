@@ -14,6 +14,7 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from loguru import logger
 
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
     _apply_legacy_flat_edit_fields,
     _edit_plan_reshapes_non_recurring_strategy,
@@ -878,7 +879,7 @@ class OpenRouterStructuredInterpreter:
             + "When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
             "never replace them with past year, last year, or another default period. "
-            f"The current runtime date is {date.today().isoformat()}; if the user "
+            f"The current runtime date is {new_york_today().isoformat()}; if the user "
             "says today, now, or current, preserve that endpoint as 'today' or the "
             "current runtime date, not a stale model date.\n\n"
             + crossover_shorthand_prompt_clause()

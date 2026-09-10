@@ -1,4 +1,6 @@
 # ruff: noqa: F403, F405
+from argus.domain.market_data.new_york_clock import new_york_today
+
 from tests.agent_runtime._llm_interpreter_common import *
 
 
@@ -935,8 +937,8 @@ def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
     strategy = _strategy_from_llm(draft)
 
     assert strategy.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
-        "end": date.today().isoformat(),
+        "start": date(new_york_today().year - 1, new_york_today().month, new_york_today().day).isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert strategy.extra_parameters["date_range_intent"] == {
         "kind": "rolling_window",
@@ -1044,8 +1046,8 @@ def test_current_message_run_field_contract_uses_canonical_intent_not_phrase_sca
 
     assert repaired is not None
     assert repaired.candidate_strategy_draft.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
-        "end": date.today().isoformat(),
+        "start": date(new_york_today().year - 1, new_york_today().month, new_york_today().day).isoformat(),
+        "end": new_york_today().isoformat(),
     }
 
 def test_current_message_run_field_contract_recovers_supported_current_turn_window() -> None:
@@ -1097,8 +1099,8 @@ def test_current_message_run_field_contract_recovers_supported_current_turn_wind
     assert repaired.assistant_response is None
     assert repaired.missing_required_fields == []
     assert repaired.candidate_strategy_draft.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
-        "end": date.today().isoformat(),
+        "start": date(new_york_today().year - 1, new_york_today().month, new_york_today().day).isoformat(),
+        "end": new_york_today().isoformat(),
     }
 
 @pytest.mark.asyncio
@@ -3754,7 +3756,7 @@ async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
     assert draft.asset_universe == ["TSLA"]
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert draft.strategy_type == "signal_strategy"
@@ -3865,7 +3867,7 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     assert draft.asset_class == "equity"
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert draft.entry_rule == {
@@ -4151,7 +4153,7 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
     assert draft.asset_universe == ["TSLA"]
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"

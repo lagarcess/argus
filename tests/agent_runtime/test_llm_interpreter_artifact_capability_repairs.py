@@ -1,5 +1,6 @@
 # ruff: noqa: F403, F405
 from argus.agent_runtime.artifact_edit_planner import ArtifactAssumptionEditPlan
+from argus.domain.market_data.new_york_clock import new_york_today
 
 from tests.agent_runtime._llm_interpreter_common import *
 
@@ -1746,7 +1747,7 @@ async def test_llm_interpreter_repairs_silently_reshaped_launch_fields(
     assert strategy.timeframe == "1h"
     assert strategy.date_range == {
         "start": "2020-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert strategy.capital_amount == 1000
 
@@ -1840,7 +1841,7 @@ async def test_llm_interpreter_audits_timeframe_sensitive_launch_fields_when_dro
     assert strategy.timeframe == "1h"
     assert strategy.date_range == {
         "start": "2016-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
 
 

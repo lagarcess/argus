@@ -1,6 +1,5 @@
 import inspect
 import json
-from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -29,6 +28,7 @@ from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
 from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
 from argus.domain.engine_launch.models import LaunchExecutionEnvelope
+from argus.domain.market_data.new_york_clock import new_york_today
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -1787,7 +1787,7 @@ def test_execute_stage_resolves_structured_date_range_with_today(
     assert result.outcome == "execution_succeeded"
     assert tool.calls[0]["date_range"] == {
         "start": "2025-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
 
 
@@ -1811,7 +1811,7 @@ def test_execute_stage_uses_strategy_contribution_for_dca() -> None:
             "strategy_thesis": "Invest $500 in Bitcoin every month since 2021.",
             "asset_universe": ["BTC"],
             "asset_class": "crypto",
-            "date_range": {"start": "2021-01-01", "end": date.today().isoformat()},
+            "date_range": {"start": "2021-01-01", "end": new_york_today().isoformat()},
             "cadence": "monthly",
             "capital_amount": 500,
             "sizing_mode": "capital_amount",
@@ -1830,7 +1830,7 @@ def test_execute_stage_uses_strategy_contribution_for_dca() -> None:
     assert tool.calls[0]["cadence"] == "monthly"
     assert tool.calls[0]["date_range"] == {
         "start": "2021-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
 
 

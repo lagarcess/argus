@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -283,19 +282,6 @@ def run_research_turn(message: str, *, language: str = "en"):
             user=UserState(user_id=RESEARCH_USER_ID, language_preference=language),
         )
     )
-
-
-def freeze_question_clock(monkeypatch, at: datetime) -> None:
-    """Every research question in the test is asked at ``at``, read through the
-    one clock that dates a question."""
-    from argus.domain.research import source_selection
-
-    class _Frozen(datetime):
-        @classmethod
-        def now(cls, tz=None):  # type: ignore[override]
-            return at.astimezone(tz) if tz is not None else at.replace(tzinfo=None)
-
-    monkeypatch.setattr(source_selection, "datetime", _Frozen)
 
 
 # The builder run_research_turn reads at call time, so set_research_query can

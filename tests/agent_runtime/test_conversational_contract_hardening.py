@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -19,6 +19,8 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.domain.market_data.capabilities import EASTERN
+from argus.domain.market_data.new_york_clock import new_york_today
 
 
 @dataclass(frozen=True)
@@ -4540,21 +4542,16 @@ def test_fresh_complete_restatement_route_repair_handles_different_benchmark(
 )
 def test_future_end_date_blocks_confirmation_before_run(
     monkeypatch,
+    freeze_new_york_clock,
     asset: str,
     baseline: str,
     start: str,
     end: str,
     message: str,
 ) -> None:
-    from argus.agent_runtime import strategy_contract as strategy_contract_module
     from argus.agent_runtime.stages import interpret as interpret_module
 
-    class FrozenDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 6, 1)
-
-    monkeypatch.setattr(strategy_contract_module, "date", FrozenDate)
+    freeze_new_york_clock(datetime(2026, 6, 1, 20, 17, tzinfo=EASTERN))
     monkeypatch.setattr(
         interpret_module,
         "resolve_asset",
@@ -6258,11 +6255,11 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair_capital() -> Non
             strategy_thesis="Backtest TSLA when the 50 SMA crosses the 200 SMA.",
             asset_universe=["TSLA"],
             asset_class="equity",
-            date_range={"start": "2022-01-01", "end": date.today().isoformat()},
+            date_range={"start": "2022-01-01", "end": new_york_today().isoformat()},
             date_range_intent=LLMDateRangeIntent(
                 kind="explicit_range",
                 start="2022-01-01",
-                end=date.today().isoformat(),
+                end=new_york_today().isoformat(),
                 evidence="from January 2022 to today",
             ),
             capital_amount=10000,
