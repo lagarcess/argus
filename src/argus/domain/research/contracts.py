@@ -82,7 +82,7 @@ class RetrievedRow(BaseModel):
     as_of: str | None
     """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
     source_url: str | None
-    """The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."""
+    """The URL cited for this figure, or null when no citation was supplied. Figures without a citation are published with a source limitation."""
 
     @field_validator("unit")
     @classmethod
@@ -284,21 +284,29 @@ class ResearchPacket(BaseModel):
     tickers: tuple[str, ...] = ()
     sources: tuple[ResearchSource, ...] = ()
     name_pairs: tuple[ResearchNamePair, ...] = ()
-    # Figures the answer states, each cited to a page this response retrieved.
+    # Figures the answer states that carry a citation, as the model wrote it:
+    # the page URL, or null for a figure read from the provider's own finance
+    # data, whose evidence is the tool result and whose provider host is
+    # scrubbed at parse time.
     rows: tuple[RetrievedRow, ...] = ()
     # True when the answer arrived in the typed retrieval shape. Prose under a
     # typed request is still delivered, and recorded as prose.
     typed_answer: bool = False
-    # Rows whose citation matched no page retrieved in the same response,
-    # their citation dropped. Never published: the turn names the figures it
-    # will not quote and withholds the answer.
-    rejected_rows: tuple[RetrievedRow, ...] = ()
+    # Figures the model wrote with no citation at all. Published beside the
+    # cited rows; the turn names them under the answer as figures it could
+    # not tie to a source, from their own typed subject and label.
+    unsourced_rows: tuple[RetrievedRow, ...] = ()
     # Tool result items in the provider's output, by item type and in order.
     # This is the retrieval record; the invoice's tool counts are billing.
     tool_results: tuple[str, ...] = ()
     usage: ResearchUsage = Field(default_factory=ResearchUsage)
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     background_id: str | None = None
+
+    @property
+    def published_rows(self) -> tuple[RetrievedRow, ...]:
+        """All figures the answer publishes, with their original identities and citations."""
+        return (*self.rows, *self.unsourced_rows)
 
 
 class BackgroundPoll(BaseModel):

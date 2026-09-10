@@ -1,0 +1,61 @@
+{
+  "label": "nike-before",
+  "language": "en",
+  "question": "what's the price of nike today",
+  "asked_at": "2026-09-09T23:42:50Z",
+  "candidate_sha": "ba5a9fb71a2696cc7155d6c8241d20dc79bea4c7",
+  "source": "local Argus API at integration head ba5a9fb7 (memory persistence, mock auth), real interpreter and research provider; the driver crashed after the paid turn, so the stream events were not kept and the persisted turn was read back from the running server (api-log-excerpt.txt holds the turn's log lines)",
+  "conversation_id": "8ff51165-bb03-46bd-b2e2-ab003e3b8773",
+  "messages": [
+    {
+      "id": "99e0e30e-e11a-41a7-b70f-86f6a30bf7cd",
+      "role": "user",
+      "content": "what's the price of nike today"
+    },
+    {
+      "id": "a41d855b-a5a1-45cb-b8b8-718a550be4a2",
+      "role": "assistant",
+      "content": "Nike (NKE) is priced at **$37.35 per share**, as of **September 9, 2026**. The market was in after-hours trading.",
+      "research": {
+        "shape": "fast",
+        "degraded": null,
+        "rows": [
+          {
+            "subject": "NIKE, Inc.",
+            "symbol": "NKE",
+            "label": "latest share price",
+            "value": 37.35,
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-09",
+            "source_url": null
+          }
+        ],
+        "sources": [],
+        "usage": {
+          "invocations": 1,
+          "latency_ms": 7053,
+          "cost_usd": null,
+          "cache_status": "miss"
+        },
+        "anchor_symbols": [
+          "NKE"
+        ]
+      }
+    }
+  ],
+  "candidates": {
+    "items": [
+      {
+        "message_id": "a41d855b-a5a1-45cb-b8b8-718a550be4a2",
+        "question": "what's the price of nike today",
+        "kind": null,
+        "eligible": false,
+        "reason": "unsupported_shape",
+        "field": null
+      }
+    ],
+    "max_turns": 4
+  },
+  "note": "The founder's refusal did not reproduce on this run: the model cited the provider's own finance page, which the provider-host scrub nulls and the citation check kept. The invoice was rejected as rate_mismatch (log: expected 0.00041, reported 0.00032) so cost_usd is null, and the fallback recorder failed (memory mode has no ledger)."
+}

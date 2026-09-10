@@ -1,0 +1,11 @@
+{
+  "integration": "51086fda2014ddac2aba821a827c7b19234be779",
+  "public_paths_checked": 44,
+  "public_drift": [],
+  "private_attribution_exact_restore": true,
+  "protected": {
+    "src/argus/agent_runtime/stages/tool_execution.py": true,
+    "web/lib/tool-result-recompute.ts": true
+  },
+  "api_state_unchanged": true
+}

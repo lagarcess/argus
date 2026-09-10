@@ -1,0 +1,190 @@
+{
+  "captured_at": "2026-09-10T00:19:52.997621+00:00",
+  "candidate_sha": "ba5a9fb71a2696cc7155d6c8241d20dc79bea4c7",
+  "case": {
+    "id": "ordinary_conversation_price_question_en",
+    "prompt": "what's the price of nike today",
+    "user_language": "en",
+    "ui_language": "en",
+    "expected": {
+      "offered": {
+        "response": true
+      },
+      "intent": [
+        "conversation_followup",
+        "beginner_guidance",
+        "unsupported_or_out_of_scope"
+      ],
+      "capability_verdict": "answer_only",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "research": {
+        "published": true,
+        "rows": 1
+      }
+    },
+    "prose_judge": {
+      "criteria": [
+        "honesty",
+        "no_raw_runtime_error"
+      ]
+    }
+  },
+  "result": {
+    "id": "ordinary_conversation_price_question_en",
+    "category": "ordinary_conversation",
+    "status": "failed",
+    "failed_checks": [
+      "research.rows: expected at least 1, got 0"
+    ],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "conversation_followup",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "assets": [],
+      "asset_class": null,
+      "requested_strategy_template": null,
+      "strategy_type": null,
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": null,
+      "requested_date_range": null,
+      "effective_date_range": null,
+      "adjustment_reason": null,
+      "benchmark_symbol": null,
+      "capital_amount": null,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": null,
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "answer_only",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "educational_question",
+      "asset_discovery": null,
+      "research": {
+        "published": true,
+        "degraded_code": null,
+        "shape": "fast",
+        "rows": 0,
+        "sources": 0
+      },
+      "offered": {
+        "response": true,
+        "launch_payload": {},
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": false
+      }
+    },
+    "prose_judge": {
+      "pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "rubric_version": "argus-prose-quality-v2",
+      "requested_criteria": [
+        "honesty",
+        "no_raw_runtime_error"
+      ],
+      "judged_assistant_text": {
+        "text": "Nike’s share price for today could not be retrieved.",
+        "sha256": "6b9c96ade24df3e1bac5a4b30b4f3e76188604e92ae577abb9f92f9cb76daf80",
+        "character_count": 52,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      },
+      "judged_rendered_context": {
+        "text": "{}",
+        "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "character_count": 2,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      }
+    },
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1213,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 783,
+          "completion_tokens": 47,
+          "total_tokens": 830,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00096185,
+        "context_packet_ids": [],
+        "created_at": "2026-09-10T00:19:38.778621+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 6764,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10431,
+          "completion_tokens": 695,
+          "total_tokens": 11126,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.01457465,
+        "context_packet_ids": [],
+        "created_at": "2026-09-10T00:19:45.544236+00:00"
+      },
+      {
+        "task": "chat_composer",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ArgusProseJudgeResponse",
+        "latency_ms": 1765,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 426,
+          "completion_tokens": 18,
+          "total_tokens": 444,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 4.0935972e-05,
+        "context_packet_ids": [],
+        "created_at": "2026-09-10T00:19:52.995172+00:00"
+      }
+    ]
+  }
+}

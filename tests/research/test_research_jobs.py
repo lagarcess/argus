@@ -119,7 +119,9 @@ class _FakeClient:
 
 def test_memory_mode_degrades_to_a_synchronous_thorough_run(monkeypatch) -> None:
     monkeypatch.setattr(api_state, "supabase_gateway", None)
-    packet = ResearchPacket(answer_markdown="Deep synchronous answer")
+    packet = ResearchPacket(
+        answer_markdown="Deep synchronous answer", tool_results=("finance_results",)
+    )
 
     class SyncClient:
         def run_research(self, prompt: str, spec: Any) -> ResearchPacket:
@@ -174,7 +176,10 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
         execution_metadata={},
     )
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
-    packet = ResearchPacket(answer_markdown="Final research answer")
+    # A completed run always retrieved; the shared cache serves nothing that did not.
+    packet = ResearchPacket(
+        answer_markdown="Final research answer", tool_results=("finance_results",)
+    )
     client = _FakeClient(
         [
             BackgroundPoll(status="in_progress"),
@@ -236,7 +241,9 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
 
 def test_sync_fallback_composes_and_caches(monkeypatch) -> None:
     monkeypatch.setattr(api_state, "supabase_gateway", None)
-    packet = ResearchPacket(answer_markdown="Deep synchronous answer")
+    packet = ResearchPacket(
+        answer_markdown="Deep synchronous answer", tool_results=("finance_results",)
+    )
 
     class SyncClient:
         def run_research(self, prompt: str, spec: Any) -> ResearchPacket:

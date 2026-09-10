@@ -1,9 +1,9 @@
 {
   "probe": "fast_quote_typed",
   "purpose": "fast shape under the strict schema and the fallback chain",
-  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
-  "captured_at": "2026-09-09T01:20:59.388935+00:00",
-  "elapsed_s": 8.46,
+  "candidate_sha": "3140dc5f35d1f0065e5c0f91567e1610280e4c82",
+  "captured_at": "2026-09-10T00:33:32.298933+00:00",
+  "elapsed_s": 8.08,
   "request_overrides": {},
   "exchanges": [
     {
@@ -20,7 +20,7 @@
             "type": "finance_search"
           }
         ],
-        "max_steps": 2,
+        "max_steps": 4,
         "max_output_tokens": 1024,
         "language_preference": "en",
         "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
@@ -130,11 +130,11 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1788916851,
-        "created_at": 1788916851,
+        "completed_at": 1789000404,
+        "created_at": 1789000404,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_643325e1-4348-4c92-84c9-468f6a5d64d5",
+        "id": "resp_9d851cbd-4249-4e16-9c24-0ad6580185bc",
         "incomplete_details": null,
         "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
         "max_output_tokens": 1024,
@@ -154,7 +154,7 @@
             "results": [
               {
                 "category": "quote",
-                "content": "## AAPL Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency |\n| --- | --- | --- | --- | --- | --- | --- |\n| AAPL | Apple Inc. | 2026-09-08 20:00:01 UTC | 2026-09-09 01:20:53 UTC | after_hours | 316.22 | USD |\n\nData available in: `AAPL_quotes_d60bd0.csv` (row key column: symbol)",
+                "content": "## AAPL Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency |\n| --- | --- | --- | --- | --- | --- | --- |\n| AAPL | Apple Inc. | 2026-09-09 20:00:01 UTC | 2026-09-10 00:33:27 UTC | after_hours | 315.34 | USD |\n\nData available in: `AAPL_quotes_d60bd0.csv` (row key column: symbol)",
                 "sources": [
                   "https://www.perplexity.ai/finance/AAPL"
                 ],
@@ -172,11 +172,11 @@
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"**Apple (AAPL) is trading at $316.22 per share**, as of September 8, 2026.\",\"rows\":[{\"as_of\":\"2026-09-08\",\"kind\":\"currency\",\"label\":\"current share price\",\"source_url\":\"https://www.perplexity.ai/finance/AAPL\",\"subject\":\"Apple Inc.\",\"symbol\":\"AAPL\",\"unit\":\"USD\",\"value\":316.22}]}",
+                "text": "{\"answer_markdown\":\"**Apple (AAPL) is trading at $315.34 per share**, as of September 9, 2026. This was the latest available quote while the market was in after-hours trading.\",\"rows\":[{\"as_of\":\"2026-09-09\",\"kind\":\"currency\",\"label\":\"latest share price\",\"source_url\":\"https://www.perplexity.ai/finance/AAPL\",\"subject\":\"Apple Inc.\",\"symbol\":\"AAPL\",\"unit\":\"USD\",\"value\":315.34}]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_499f1cf9-d6c1-45e5-8f47-e80855849182",
+            "id": "msg_033e9515-2cd1-4afb-8a5e-23ac644d9642",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -208,26 +208,26 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.03377,
-            "cache_read_cost": 0.00365,
+            "cache_creation_cost": 0.02906,
+            "cache_read_cost": 0.00407,
             "currency": "USD",
-            "input_cost": 0.00032,
-            "output_cost": 0.00596,
+            "input_cost": 4e-05,
+            "output_cost": 0.0067,
             "tool_calls_cost": 0.005,
             "tool_calls_cost_details": {
               "finance_search": 0.005
             },
-            "total_cost": 0.0487
+            "total_cost": 0.04487
           },
-          "input_tokens": 15950,
+          "input_tokens": 15991,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 6754,
-            "cache_read_input_tokens": 9115,
-            "cached_tokens": 9115
+            "cache_creation_input_tokens": 5811,
+            "cache_read_input_tokens": 10171,
+            "cached_tokens": 10171
           },
-          "output_tokens": 298,
+          "output_tokens": 335,
           "output_tokens_details": {
-            "reasoning_tokens": 145
+            "reasoning_tokens": 167
           },
           "tool_calls_details": {
             "finance_search": {
@@ -235,7 +235,7 @@
               "invocation": 1
             }
           },
-          "total_tokens": 16248
+          "total_tokens": 16326
         },
         "user": null
       }
@@ -243,16 +243,16 @@
   ],
   "packet": {
     "typed_answer": true,
-    "uncited_rows": 0,
+    "unsourced_rows": [],
     "rows": [
       {
         "subject": "Apple Inc.",
         "symbol": "AAPL",
-        "label": "current share price",
-        "value": 316.22,
+        "label": "latest share price",
+        "value": 315.34,
         "kind": "currency",
         "unit": "USD",
-        "as_of": "2026-09-08",
+        "as_of": "2026-09-09",
         "source_url": null
       }
     ],
@@ -269,14 +269,14 @@
       "web_search_invocations": 0,
       "fetch_url_invocations": 0,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 8462,
-      "cost_usd": null,
-      "input_tokens": 15950,
-      "output_tokens": 298,
-      "cache_creation_input_tokens": 6754,
-      "cache_read_input_tokens": 9115
+      "latency_ms": 8076,
+      "cost_usd": 0.04487,
+      "input_tokens": 15991,
+      "output_tokens": 335,
+      "cache_creation_input_tokens": 5811,
+      "cache_read_input_tokens": 10171
     },
-    "answer_markdown": "**Apple (AAPL) is trading at $316.22 per share**, as of September 8, 2026."
+    "answer_markdown": "**Apple (AAPL) is trading at $315.34 per share**, as of September 9, 2026. This was the latest available quote while the market was in after-hours trading."
   },
   "error": null
 }

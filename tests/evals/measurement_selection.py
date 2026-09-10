@@ -10,14 +10,13 @@ from argus.agent_runtime.discovery.contracts import ValidatedCandidate
 from argus.agent_runtime.discovery.validation import resolution_matches_named_asset
 from argus.agent_runtime.research_tools import ResearchToolResult
 from argus.domain.market_data.assets import ResolvedAsset
-from argus.domain.research.cache import DATA_CLASS_TTL_SECONDS
 from argus.domain.research.contracts import ResearchSource
-from argus.domain.research.source_selection import select_public_sources
+from argus.domain.research.evidence_policy import ResearchEvidencePolicy
 from argus.domain.tool_contracts import ToolCall, ToolOutcome, ToolResultCard
 from argus.domain.tool_declaration import _validate_return
 from pydantic import TypeAdapter, ValidationError
 
-SELECTION_CONTRACT_VERSION = "argus-selection-evidence/v1"
+SELECTION_CONTRACT_VERSION = "argus-selection-evidence/v2"
 SELECTION_RELEVANCE = "selection_relevance"
 SELECTION_RUBRIC = f"""
 Selection contract: {SELECTION_CONTRACT_VERSION}
@@ -25,6 +24,9 @@ Additional requested criterion, selection_relevance: assess whether the delivere
 answer and selectable assets address the unchanged selection_expectations and
 the user's request. Preserve the requested category, relationship, and named
 anchors, including whether the user requested peers or a comparison. Judge the
+facts against the requested period or currentness; retrieval age alone does
+not establish that a figure is current. A model citation outside the retrieved
+drawer is retained as such, not described as a fetched page. Judge the
 collective delivery: any valid combination of operations may supply the answer.
 No operation name or input form is required. Input requests are not results.
 selection_evidence contains retained delivered facts, not additional user-visible
@@ -82,7 +84,7 @@ def _same_entity(asset: dict, *, name: str, symbol: str) -> bool:
     )
 
 
-def _completed_deliveries(
+def completed_research_deliveries(
     calls: list[dict], patch: dict
 ) -> list[tuple[ToolResultCard, ResearchToolResult, dict]]:
     from argus.domain.capability_registry import get_tool_catalog
@@ -163,10 +165,16 @@ def observe_selection(
     *, calls: list[dict], patch: dict, final_patch: dict
 ) -> dict[str, Any]:
     """Read existing publication owners; neither question nor call arguments supply facts."""
-    deliveries = _completed_deliveries(calls, patch)
+    deliveries = completed_research_deliveries(calls, patch)
     owners: list[dict] = []
     facts: list[dict] = []
     for card, result, effect in deliveries:
+        provenance = {
+            "retrieved_at": result.retrieved_at,
+            "evidence_policy": result.evidence_policy.model_dump(mode="json")
+            if result.evidence_policy is not None
+            else None,
+        }
         result_assets = {
             (item.symbol, item.name) for item in (*result.subjects, *result.peers)
         }
@@ -199,8 +207,10 @@ def observe_selection(
                     facts.append(
                         {
                             **asset,
+                            **provenance,
                             "source": source,
-                            "retrieved_at": result.retrieved_at,
+                            "citation_url": source["url"] if source else None,
+                            "citation_origin": "retrieved" if source else None,
                             "reason": candidate.reason_text,
                         }
                     )
@@ -214,8 +224,14 @@ def observe_selection(
                 {
                     "symbol": row.symbol,
                     "name": row.subject,
+                    **provenance,
                     "source": sources.get(row.source_url),
-                    "retrieved_at": result.retrieved_at,
+                    "citation_url": row.source_url,
+                    "citation_origin": "retrieved"
+                    if row.source_url in sources
+                    else "model"
+                    if row.source_url
+                    else None,
                     "figure": row.model_dump(mode="json"),
                 }
             )
@@ -301,7 +317,11 @@ def compare_selection(expected: dict, evidence: dict, failures: list[str]) -> No
             )
         if expected.get("needs_current_facts") is not True:
             continue
-        sourced = [fact for fact in asset["facts"] if fact.get("source")]
+        sourced = [
+            fact
+            for fact in asset["facts"]
+            if fact.get("source") or fact.get("citation_url")
+        ]
         if not sourced:
             failures.append(
                 f"asset_discovery: current-source evidence unproven for {identity['symbol']}"
@@ -309,21 +329,21 @@ def compare_selection(expected: dict, evidence: dict, failures: list[str]) -> No
             continue
         current = []
         for fact in sourced:
+            try:
+                policy = ResearchEvidencePolicy.model_validate(
+                    fact.get("evidence_policy")
+                )
+            except ValidationError:
+                continue
             retrieved = _timestamp(fact.get("retrieved_at"))
             if observed is None or retrieved is None:
                 continue
-            if (
-                not 0
-                <= (observed - retrieved).total_seconds()
-                <= DATA_CLASS_TTL_SECONDS["movers"]
-            ):
+            if not 0 <= (observed - retrieved).total_seconds() <= policy.max_age_seconds:
                 continue
-            source = ResearchSource.model_validate(fact["source"])
-            current.extend(
-                select_public_sources(
-                    [source], current_survey=True, question_as_of=observed.date()
-                )
+            source = ResearchSource.model_validate(
+                fact["source"] if fact.get("source") else {"url": fact["citation_url"]}
             )
+            current.extend(policy.select_sources([source]))
         if not current:
             failures.append(
                 f"asset_discovery: currentness unproven for {identity['symbol']}"

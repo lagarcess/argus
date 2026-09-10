@@ -11,7 +11,7 @@ from typing import Any
 
 from argus.api import state as api_state
 from argus.api.public_excerpt_schemas import (
-    PUBLIC_EXCERPT_MAX_TURNS,
+    PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT,
     PublicExcerptCandidate,
     PublicExcerptCandidates,
     PublicExcerptPreview,
@@ -260,12 +260,15 @@ def receipt_candidates(*, user: User, conversation_id: str) -> PublicExcerptCand
 def _selection(
     user: User, conversation_id: str, message_ids: list[str], owner_note: str | None
 ) -> tuple[SelectionContext, list[Message], list[Any], list[Any], list[str], str]:
-    if not 1 <= len(message_ids) <= PUBLIC_EXCERPT_MAX_TURNS or len(
-        set(message_ids)
-    ) != len(message_ids):
+    wanted = set(message_ids)
+    if (
+        not message_ids
+        or len(wanted) != len(message_ids)
+        or len(message_ids) > PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT
+    ):
         refuse("invalid_selection")
     context = _context(user, conversation_id)
-    chosen = [m for m in context.messages if m.id in message_ids]
+    chosen = [m for m in context.messages if m.id in wanted]
     if len(chosen) != len(message_ids):
         refuse("invalid_selection")
     leaves, artifacts, run_ids = [], [], []

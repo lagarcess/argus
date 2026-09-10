@@ -1,0 +1,339 @@
+{
+  "label": "apple-es",
+  "question": "¿A cuánto está la acción de Apple hoy y cuánto subió esta semana?",
+  "asked_at": "2026-09-10T00:13:32.633936+00:00",
+  "source": "Perplexity Agent API, question as typed, no Argus instructions or schema",
+  "request": {
+    "models": [
+      "openai/gpt-5.6-sol"
+    ],
+    "input": "¿A cuánto está la acción de Apple hoy y cuánto subió esta semana?",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search"
+      }
+    ],
+    "max_steps": 5
+  },
+  "http_status": 200,
+  "elapsed_seconds": 19.75,
+  "answer_text": "Apple (**AAPL**) cotiza a **US$315,34** según la última operación disponible, correspondiente al **9 de septiembre**.\n\nEn lo que va de semana —comparado con el cierre del viernes 4 de septiembre de **US$319,97**—:\n\n- **Variación:** **−US$4,63 por acción**\n- **Rendimiento:** **−1,447%**\n\nEs decir, **no subió: bajó 1,447% esta semana**.\n\nFuentes: [cotización de AAPL](https://www.perplexity.ai/finance/AAPL) y [precio histórico](https://ycharts.com/companies/AAPL/price).",
+  "tool_results": [
+    "finance_results",
+    "finance_results",
+    "search_results"
+  ],
+  "usage": {
+    "cost": {
+      "cache_creation_cost": 0.0483,
+      "cache_read_cost": 0.00607,
+      "currency": "USD",
+      "input_cost": 5e-05,
+      "output_cost": 0.01992,
+      "tool_calls_cost": 0.0125,
+      "tool_calls_cost_details": {
+        "finance_search": 0.01,
+        "search_web": 0.0025
+      },
+      "total_cost": 0.08684
+    },
+    "input_tokens": 24834,
+    "input_tokens_details": {
+      "cache_creation_input_tokens": 9659,
+      "cache_read_input_tokens": 15163,
+      "cached_tokens": 15163
+    },
+    "output_tokens": 996,
+    "output_tokens_details": {
+      "reasoning_tokens": 670
+    },
+    "tool_calls_details": {
+      "finance_search": {
+        "cost_usd": 0.01,
+        "invocation": 2
+      },
+      "search_web": {
+        "cost_usd": 0.0025,
+        "invocation": 1
+      }
+    },
+    "total_tokens": 25830
+  },
+  "response": {
+    "background": false,
+    "completed_at": 1788999193,
+    "created_at": 1788999193,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_a0a99911-3e05-43a3-8101-2196e86b069e",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": null,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "tickers_lookup"
+        ],
+        "results": [
+          {
+            "category": "tickers_lookup",
+            "content": "Ticker matches:\n\n| query | ticker | name |\n| --- | --- | --- |\n| Apple | AAPL | Apple Inc. |",
+            "tickers": null
+          }
+        ],
+        "tickers": null,
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## AAPL Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | previousClose |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| AAPL | Apple Inc. | 2026-09-09 20:00:01 UTC | 2026-09-10 00:13:21 UTC | after_hours | 315.34 | USD | -0.88 | -0.28 | 316.22 |\n\nData available in: `AAPL_quotes_b1f257.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/AAPL"
+            ],
+            "tickers": [
+              "AAPL"
+            ]
+          }
+        ],
+        "tickers": [
+          "AAPL"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "queries": [
+          "AAPL weekly performance September 10 2026",
+          "AAPL historical price September 4 2026",
+          "AAPL historical price September 8 2026"
+        ],
+        "results": [
+          {
+            "date": "2026-08-04",
+            "id": 1,
+            "last_updated": "2026-09-09",
+            "snippet": "312.30 -3.92 (-1.24%)\n...\nSep 09, 2025 - Sep 09, 2026\nHistorical Prices\nDaily\nCurrency in USD |Date|Open|High|Low|Close Close price adjusted for splits.|Adj Close Adju\nsted close price adjusted for splits and dividend and/or capital gain distributions.|Volume|\n|--|--|--|--|--|--|--|\n|Sep 9, 2026|315.41|318.13|310.97|312.30|312.30|32,956,869|\n|Sep 8, 2026|317.10|320.70|314.90|316.22|316.22|35,423,000|\n...\n|Apr 10, 2026|259.98|262.19|259.02|260.48|260.02|31,291,500|\n...\n|Sep 10, 2025|232.19|232.42|225.95|226.79|225.96|83,440,800|\n|Sep 9, 2025|237.00|238.78|233.36|234.35|233.49|66,313,900|",
+            "source": "web",
+            "title": "Apple Inc. (AAPL) Stock Historical Prices & Data - Yahoo Finance",
+            "url": "https://finance.yahoo.com/quote/AAPL/history/"
+          },
+          {
+            "date": "2026-09-08",
+            "id": 2,
+            "last_updated": "2026-09-09",
+            "snippet": "In the past month, the stock has increased 0.92%, reflecting recent market activity.\n...\nmillion shs$4.51 trillion08/20/2026$316.83$311.30-1.75%$320.28$310.6540.23 million shs$4.54 trillion08/19/2026$310.03$316.83+2.19\n%$319.28$309.6050.41 million shs$4.62 trillion08/18/2026$305.59$310.03+1.45%$311.49$305.7453.36 million shs$4.52 trillion08/17/2026\n$305.93$305.59-0.11%$307.66$302.9438.10 million shs$4.46 trillion08/14/2026$305.26$305.93+0.22%$307.49$304.3028.18 million shs\n...\n$300.5740.57 million shs$4.41 trillion08/11/2026$308.26$304.91-1.09%$309.97$302.7937.39 million shs$4.45 trillion08/10/2026$313.33$",
+            "source": "web",
+            "title": "Apple (AAPL) Stock Chart and Price History 2026 - MarketBeat",
+            "url": "https://www.marketbeat.com/stocks/NASDAQ/AAPL/chart/"
+          },
+          {
+            "date": "2026-09-09",
+            "id": 3,
+            "last_updated": "2026-09-09",
+            "snippet": "|$316.22|-3.75|-1.17%|\n...\nVolume: 35.48M 65 Day Avg: 54.05M\n...\n225.95 52 Week Range 344.57\n...\n|Date Date|Open|High|Low|Close|Volume|\n|--|--|--|--|--|--|\n|09/08/2026 09/08/2026|$317.10|$320.70|$314.90|$316.22|35,477,090|\n...\n|08/20/2026 08/20/2026|$317.46|$320.28|$310.65|$311.30|40,959,180|\n|08/19/2026 08/19/2026|$310.14|$319.28|$309.60|$316.83|50,505,648|",
+            "source": "web",
+            "title": "Download AAPL Data | Apple Inc. Price Data | MarketWatch",
+            "url": "https://www.marketwatch.com/investing/stock/aapl/download-data"
+          },
+          {
+            "date": "2026-08-10",
+            "id": 4,
+            "last_updated": "2026-09-09",
+            "snippet": "Time Frame\nDaily\n...\n08/10/2026 - 09/09/2026\n|Date|Price|Open|High|Low|Vol.|Change %|\n|--|--|--|--|--|--|--|\n|Sep 09, 2026|316.37|315.50|316.37|315.13|3.44M|+0.05%|\n|Sep 08, 2026|316.22|317.10|320.70|314.90|35.48M|-1.17%|\n...\n|Aug 10, 2026|308.26|306.83|308.26|304.61|44.81M|-1.62%|",
+            "source": "web",
+            "title": "Apple Stock Price History - Investing.com",
+            "url": "https://www.investing.com/equities/apple-computer-inc-historical-data"
+          },
+          {
+            "date": "2025-10-09",
+            "id": 5,
+            "last_updated": "2026-09-09",
+            "snippet": "- ##### REAL TIME 12:00 PM EDT 09/09/26\n- ^$^312.925 USD\n- -3.295 -1.04%\n...\n- 52 Week Range 225.95 - 344.5699 (09/10/25 - 07/29/26)\n...\nSep 2Sep 3Sep 4Sep 8Sep 9\n$310$320$330$340\n...\n- Open 315.485\n- Prior Close 316.22 (09/08/26)\n- 1 Day\n- AAPL -1.04%\n...\n|DATE|OPEN|HIGH|LOW|CLOSE|VOLUME|\n...\n|09/08/26|317.10|320.70|314.90|316.22|35.48 M|\n...\n|08/10/26|306.83|308.26|304.61|308.26|44.81 M|",
+            "source": "web",
+            "title": "Apple Inc. Price & News - WSJ | AAPL",
+            "url": "https://www.wsj.com/market-data/quotes/AAPL/historical-prices"
+          },
+          {
+            "date": "2026-09-09",
+            "id": 6,
+            "last_updated": "2026-09-09",
+            "snippet": "Apple Inc.$313.35-2.87 (-0.91%)10:57 AM 09/09/26\nNASDAQ | $USD | Realtime\n...\n|Date|Open|High|Low|Close|Change %|Volume|\n...\n|Sep. 08, 2026|317.10|320.70|314.90|316.22|-1.17%|35,477,090.55|\n|Sep. 04, 2026|328.31|328.93|317.86|319.97|-2.51%|39,606,884.99|\n...\n|Sep. 02, 2026|326.87|328.40|323.53|324.96|-0.05%|33,776,370.49|\n...\n|Aug. 10, 2026|306.83|308.26|304.61|308.26|-1.62%|44,812,503.01|",
+            "source": "web",
+            "title": "Apple Inc. (AAPL) Stock Historical Price Data, Closing Price",
+            "url": "https://seekingalpha.com/symbol/AAPL/historical-price-quotes"
+          },
+          {
+            "id": 7,
+            "last_updated": "2026-09-08",
+            "snippet": "319.97 -8.24 (-2.51%) USD | NASDAQ | Sep 04, 16:00\n318.82 -1.15 (-0.36%) After-Hours: 05:52\n# Apple Price : 319.97 for Sept. 4, 2026\n### Price Chart\n...\n### Historical Price Data\n|Date|Open|High|Low|Close|Volume|\n|--|--|--|--|--|--|\n|Sep 04, 2026|328.30|328.93|317.86|319.97|39.61M|\n|Sep 03, 2026|324.87|330.81|324.11|328.21|37.23M|\n|Sep 02, 2026|326.86|328.40|323.53|324.96|33.78M|\n|Sep 01, 2026|316.98|327.30|314.73|325.13|53.17M|",
+            "source": "web",
+            "title": "Apple Price Insights",
+            "url": "https://ycharts.com/companies/AAPL/price"
+          },
+          {
+            "id": 8,
+            "last_updated": "2026-09-09",
+            "snippet": "#### Prices\n|Date|Open|High|Low|Close|% Change|Volume|\n|--|--|--|--|--|--|--|\n|Sep 08, 2026|317.12|320.70|314.92|316.22|-0.28%|35028027|\n|Sep 04, 2026|328.31|328.93|317.86|319.97|-2.54%|39551800|\n...\n|Sep 02, 2026|326.87|328.40|323.53|324.96|-0.58%|33776400|\n|Sep 01, 2026|316.98|327.30|314.73|325.13|2.57%|53167400|",
+            "source": "web",
+            "title": "Apple Inc. (AAPL) - Historical data, historical prices",
+            "url": "https://twelvedata.com/markets/861640/stock/nasdaq/aapl/historical-data"
+          },
+          {
+            "date": "2026-09-08",
+            "id": 9,
+            "last_updated": "2026-09-09",
+            "snippet": "**Apple Inc stock (AAPL)**, adjusted for splits and dividends, show that the latest closing stock price as of September 08, 2026, is**$316.22**.- Apple Inc all-time high stock price is **$344.57**, occurred on July 29, 2026.\n...\n|Date|High|Low|High - Low|Volume|% Change|\n|--|--|--|--|--|--|\n|Sep 08, 2026|$320.7|$314.9|$5.80|35,000,657.0|-1.17%|\n|Sep 04, 2026|$328.9|$317.9|$11.07|38,273,728.0|-2.51%|\n...\n### Apple Inc Stock (AAPL) Price History 2026\n|Month|High|Low|High - Low|Volume|% Change|\n|--|--|--|--|--|--|\n|Sep, 2026|$330.8|$314.7|$16.08|231,375,215.0|-0.20%|\n|Aug, 2026|$322.4|$300.6|$21.80|892,517,256.0|+2.57%|",
+            "source": "web",
+            "title": "Apple Inc (AAPL) Stock Price History & Other Historical Data",
+            "url": "https://stockscan.io/stocks/AAPL/price-history"
+          },
+          {
+            "date": "2026-08-09",
+            "id": 10,
+            "last_updated": "2026-09-09",
+            "snippet": "Time Frame\nDaily\nDownload\n08/09/2026 - 09/09/2026\n|Date|Price|Open|High|Low|Vol.|Change %|\n...\n|Sep 09, 2026|316.03|316.55|319.20|310.44|501.87K|-0.16%|\n|Sep 08, 2026|316.55|320.41|320.79|315.21|143.16K|-1.21%|\n|Sep 07, 2026|320.42|320.74|321.69|319.62|39.19K|-0.10%|\n|Sep 06, 2026|320.74|321.81|322.15|320.61|18.21K|-0.33%|\n|Sep 05, 2026|321.81|320.22|322.00|320.13|14.53K|+0.50%|\n|Sep 04, 2026|320.22|328.00|328.96|318.12|170.61K|-2.37%|\n|Sep 03, 2026|328.00|324.93|330.98|323.76|141.62K|+0.94%|\n|Sep 02, 2026|324.93|325.41|328.62|323.84|132.76K|-0.15%|\n...\n|Aug 11, 2026|305.44|307.88|310.20|303.26|90.39K|-0.79%|\n|Aug 10, 2026|307.88|312.54|314.17|305.10|129.91K|-1.49%|\n|Aug 09, 2026|312.55|312.46|313.51|312.11|12.90K|+0.02%|",
+            "source": "web",
+            "title": "Apple Perpetual Stock Price History",
+            "url": "https://www.investing.com/equities/aapl-usd-perpetual-futures-historical-data"
+          },
+          {
+            "date": "2016-09-09",
+            "id": 11,
+            "last_updated": "2026-09-09",
+            "snippet": "## AAPL Historical Data\nDate Range:\n|Date|Open|Close|Adj Close|High|Low|Volume|\n|--|--|--|--|--|--|--|\n|September 08, 2026|317.1|316.22|316.22|320.7|314.9|34.92M|\n|September 04, 2026|328.31|319.97|319.97|328.93|317.86|38.01M|\n...\n|September 02, 2026|326.87|324.96|324.96|328.4|323.53|33.53M|\n...\n|August 11, 2026|307.75|304.91|304.91|309.97|302.79|36.22M|\n|August 10, 2026|306.83|308.26|308.26|308.26|304.61|43.39M|\n...\n|August 04, 2026|302.73|309.38|309.38|310.42|301.32|66.49M|",
+            "source": "web",
+            "title": "Apple Inc. - AAPL - Stock Historical Data & Price | Stoculator",
+            "url": "https://stoculator.com/stock/AAPL/historical"
+          },
+          {
+            "date": "2026-09-04",
+            "id": 12,
+            "last_updated": "2026-09-09",
+            "snippet": "316.22 -3.75 (-1.17%)\n...\n316.34 +0.12 (+0.04%)",
+            "source": "web",
+            "title": "Apple Inc. (AAPL) Stock Historical Prices & Data",
+            "url": "https://finance.yahoo.com/quote/AAPL/history?period1="
+          },
+          {
+            "id": 13,
+            "last_updated": "2026-09-09",
+            "snippet": "#### Prices\n|Date|Open|High|Low|Close|% Change|Volume|\n|--|--|--|--|--|--|--|\n|Sep 08, 2026|1.05M|1.05M|987K|1M|-4.67%|482|\n|Sep 07, 2026|976.02K|1.05M|976.02K|1.05M|7.46%|47|\n|Sep 04, 2026|976.04K|1.05M|976.04K|1.03M|5.53%|82|\n...\n|Sep 01, 2026|965.20K|1.04M|965.20K|1.03M|6.33%|524|",
+            "source": "web",
+            "title": "Apple Inc. (AAPL) - Historical data, historical prices",
+            "url": "https://twelvedata.com/markets/603024/stock/bvc/aapl/historical-data"
+          },
+          {
+            "date": "2026-08-04",
+            "id": 14,
+            "last_updated": "2026-09-09",
+            "snippet": "Sep 09, 2025 - Sep 09, 2026\n...\nDaily\nCurrency in CAD |Date|Open|High|Low|Close Close price adjusted for splits.|Adj Close Adjusted close price adjusted for splits and dividend and/or capital gain distributions.|Volume|\n...\n|Sep 8, 2026|44.61|45.05|44.33|44.53|44.53|239,240|\n...\n|Aug 10, 2026|43.23|43.46|42.95|43.45|43.45|241,900|",
+            "source": "web",
+            "title": "Apple Inc. (AAPL.TO)",
+            "url": "https://finance.yahoo.com/quote/AAPL.TO/history/"
+          },
+          {
+            "id": 15,
+            "last_updated": "2026-06-25",
+            "snippet": "|Date|Adjusted price|Real price|\n...\n|October 2007|$5.69|$189.95|",
+            "source": "web",
+            "title": "Apple Inc. ( AAPL) - Price History - Digrin",
+            "url": "https://www.digrin.com/stocks/detail/AAPL/price"
+          }
+        ],
+        "type": "search_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "Apple (**AAPL**) cotiza a **US$315,34** según la última operación disponible, correspondiente al **9 de septiembre**.\n\nEn lo que va de semana —comparado con el cierre del viernes 4 de septiembre de **US$319,97**—:\n\n- **Variación:** **−US$4,63 por acción**\n- **Rendimiento:** **−1,447%**\n\nEs decir, **no subió: bajó 1,447% esta semana**.\n\nFuentes: [cotización de AAPL](https://www.perplexity.ai/finance/AAPL) y [precio histórico](https://ycharts.com/companies/AAPL/price).",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_1d270e8b-b925-4d8d-a9d3-4b488a2bba3a",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.0483,
+        "cache_read_cost": 0.00607,
+        "currency": "USD",
+        "input_cost": 5e-05,
+        "output_cost": 0.01992,
+        "tool_calls_cost": 0.0125,
+        "tool_calls_cost_details": {
+          "finance_search": 0.01,
+          "search_web": 0.0025
+        },
+        "total_cost": 0.08684
+      },
+      "input_tokens": 24834,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 9659,
+        "cache_read_input_tokens": 15163,
+        "cached_tokens": 15163
+      },
+      "output_tokens": 996,
+      "output_tokens_details": {
+        "reasoning_tokens": 670
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "cost_usd": 0.01,
+          "invocation": 2
+        },
+        "search_web": {
+          "cost_usd": 0.0025,
+          "invocation": 1
+        }
+      },
+      "total_tokens": 25830
+    },
+    "user": null
+  }
+}

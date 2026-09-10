@@ -1335,7 +1335,7 @@ Cost model notes:
 
 ## 12.1.3 public_excerpt_snapshots
 
-A public evidence receipt: an immutable, sanitized snapshot of one to four
+A public evidence receipt: an immutable, sanitized snapshot of one or more
 eligible answers selected from one conversation, created by a registered owner
 and revocable by that owner. This extends the existing receipt table behind the
 default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
@@ -1364,10 +1364,10 @@ Fields:
   ON DELETE SET NULL)
 - `kind`: `text` (`backtest`, `research_answer`, or `mixed`; existing rows default
   to `backtest`)
-- `source_message_ids`: `uuid[]` (Private selected assistant messages; one to four
+- `source_message_ids`: `uuid[]` (Private selected assistant messages; one or more
   for new receipts, empty for legacy rows)
 - `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
-  sources, each bounded at four)
+  sources)
 - `selection_key`: `text` (Nullable for legacy rows; canonical sha256 selection
   identity, independent of note and payload content)
 - `title`: `text`
@@ -1392,7 +1392,7 @@ on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
 `content_language`, `framing`, `provenance_mark`.
 
 Version 2 is a closed outer `{schema_version: 2, kind: "turns", turns: [...]}`
-wrapper. It contains one to four per-turn payloads in conversation order. Each
+wrapper. It contains one or more per-turn payloads in conversation order. Each
 turn has a closed `kind` discriminator. The exact research leaf is specified by
 `docs/specs/conversation-sharing.md` section 4.2; no field is added to that leaf.
 The backtest leaf freezes the card's closed typed fact bank, title, visual, note,
@@ -1403,8 +1403,8 @@ same result fact and display owners as the result card.
 Every selected turn independently passes the shared eligibility and privacy audit
 at preview and creation. A refusal refuses the entire selection. The owner sees
 the exact public rendering before creation; its digest must still match when
-creation rechecks the sources. The four-turn cap and preview bound the accepted
-cross-turn inference risk; they do not eliminate it.
+creation rechecks the sources. The preview bounds the accepted cross-turn
+inference risk; it does not eliminate it.
 
 Source conversation ids, route receipts, provider or model metadata, retry
 payloads, unselected transcript content, broker or account data, and user-private

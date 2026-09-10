@@ -47,7 +47,7 @@ test("header selection and answer shortcut use the same message preview and crea
   const preview: receipts.ReceiptPreview = { payload: turnDocument(researchTurn), payload_digest: "b".repeat(64), kind: "research_answer" };
   globalThis.fetch = (async (url, init) => {
     seen.push({ url: String(url), method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : null });
-    return Response.json(String(url).endsWith("-candidates") ? { items: [], max_turns: 4 } : String(url).endsWith("-preview") ? preview : { receipt });
+    return Response.json(String(url).endsWith("-candidates") ? { items: [] } : String(url).endsWith("-preview") ? preview : { receipt });
   }) as typeof fetch;
   await receipts.listReceiptCandidates("conversation");
   const selection = { message_ids: ["message"], owner_note: "A note" };

@@ -139,8 +139,13 @@ RESEARCH_CONFIG_SPECS: dict[QuestionShape, ResearchConfigSpec] = {
     "fast": ResearchConfigSpec(
         shape="fast",
         models=(PRIMARY_MODEL, THOROUGH_MODEL),
-        # Documented as 1; probed to need 2 (skill load consumes a step).
-        max_steps=2,
+        # Documented as 1; probed 2026-08-07 to need 2 (the skill load consumes
+        # a step) and 2026-09-10 to need 4 when the ticker is not already
+        # resolved: a lookup and then the quote, or the answer is "could not
+        # be retrieved" (docs/reports/evidence/open-the-gates/probes/
+        # nike-unresolved-fast-*.json). A step budget is room, never a rule;
+        # the model stops when it has the figure.
+        max_steps=4,
         max_output_tokens=1024,
         tools=("finance_search",),
         timeout_seconds=30.0,

@@ -29,6 +29,7 @@ from argus.domain.research.contracts import (
     ResearchSource,
     RetrievedRow,
 )
+from argus.domain.research.evidence_policy import ResearchEvidencePolicy
 
 if TYPE_CHECKING:
     from argus.domain.tool_contracts import (
@@ -121,6 +122,7 @@ class ResearchToolResult(BaseModel):
     rows: tuple[RetrievedRow, ...] = ()
     sources: tuple[ResearchSource, ...] = ()
     retrieved_at: str | None = None
+    evidence_policy: ResearchEvidencePolicy | None = None
     relationship: AssetDiscoveryRelationship | None = None
     subjects: tuple[ResearchNamePair, ...] = ()
     peers: tuple[ResearchNamePair, ...] = ()
@@ -134,24 +136,32 @@ class ResearchToolResult(BaseModel):
             or self.subjects
             or self.peers
             or self.relationship is not None
+            or self.evidence_policy is not None
         ):
             raise ValueError("Pending research cannot carry completed facts")
         return self
 
 
 class ResearchFiguresResult(ResearchToolResult):
-    """Completed verified numeric rows with units and available source dates.
+    """A published nonblank answer with any typed figures the provider supplied.
 
-    Public citations may be absent for provider-grounded market-data figures.
+    Figures retain their units, dates, and authored citations. A figure
+    without a citation stays in the answer with the publisher's source
+    limitation. Public citations may be absent for market-data answers.
     """
 
     status: Literal["completed"] = "completed"
-    rows: tuple[RetrievedRow, ...] = Field(min_length=1)
+    answer: str = Field(min_length=1, pattern=r"\S")
+    rows: tuple[RetrievedRow, ...] = ()
     relationship: None = None
 
 
 class CitedResearchFiguresResult(ResearchFiguresResult):
-    """Completed verified numeric rows accompanied by retained public-source citations."""
+    """A published answer with retained public sources and optional typed figures.
+
+    The shared publication policy requires these sources. Their presence
+    does not establish that every figure cites a retrieved page.
+    """
 
     sources: tuple[ResearchSource, ...] = Field(min_length=1)
 
@@ -179,6 +189,7 @@ class ResearchPendingResult(ResearchToolResult):
     answer: None = None
     rows: tuple[()] = ()
     sources: tuple[()] = ()
+    evidence_policy: None = None
     relationship: None = None
     subjects: tuple[()] = ()
     peers: tuple[()] = ()
@@ -192,7 +203,7 @@ class ResearchWorkflowResult(
         ]
     ]
 ):
-    """A pending job receipt or completed cited numeric evidence, distinguished by status."""
+    """A pending job receipt or completed published answer, distinguished by status."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -418,6 +429,7 @@ def research_result_from_patch(patch: dict[str, Any]) -> ResearchToolResult:
         rows=tuple(RetrievedRow.model_validate(row) for row in sidecar.get("rows", [])),
         sources=tuple(ResearchSource.model_validate(source) for source in sources),
         retrieved_at=sidecar.get("retrieved_at"),
+        evidence_policy=sidecar.get("evidence_policy"),
         relationship=discovery.get("relationship"),
         subjects=tuple(
             ResearchNamePair.model_validate(item)
@@ -522,7 +534,7 @@ def get_research_declarations() -> tuple[ToolDeclaration, ...]:
     )
     domain = (
         "Research values never become simulation inputs; market data is re-grounded before a test.",
-        "Unresolved subjects are invalid; unverified or missing evidence is bounded or unavailable.",
+        "Unresolved requested subjects are invalid. The shared publisher policy owns answer availability; unverified asset identities cannot become test actions.",
         "The shared research cache, quota admission, provider pricing, and public-source filters remain authoritative.",
     )
     return (

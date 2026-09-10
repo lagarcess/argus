@@ -21,9 +21,7 @@ type Action =
   | { type: "failed"; error: unknown };
 
 export function selectAllEligibleAvailable(page: ReceiptCandidates | null): boolean {
-  if (!page) return false;
-  const count = page.items.filter((item) => item.eligible).length;
-  return count > 0 && count <= page.max_turns;
+  return Boolean(page?.items.some((item) => item.eligible));
 }
 export function receiptSelectionRequest(state: ReceiptSelectionState): ReceiptSelection {
   return { message_ids: state.selected, owner_note: state.note.trim() || null };
@@ -37,7 +35,7 @@ export async function publishReceiptSelection(conversationId: string, state: Rec
   catch (error) { dispatch({ type: "failed", error }); }
 }
 
-/** The server owns eligibility, ordering and the cap. This only records choices. */
+/** The server owns eligibility and ordering. This only records choices. */
 export function receiptSelectionReducer(state: ReceiptSelectionState, action: Action): ReceiptSelectionState {
   const invalidate = (change: Partial<ReceiptSelectionState>) => ({ ...state, ...change, preview: null, receipt: null, error: null, revision: state.revision + 1, phase: "selecting" as const });
   switch (action.type) {
@@ -45,7 +43,6 @@ export function receiptSelectionReducer(state: ReceiptSelectionState, action: Ac
     case "toggle": {
       if (!state.page?.items.some((item) => item.message_id === action.messageId && item.eligible)) return state;
       const chosen = state.selected.includes(action.messageId);
-      if (!chosen && state.selected.length >= state.page.max_turns) return state;
       return invalidate({ selected: chosen ? state.selected.filter((id) => id !== action.messageId) : [...state.selected, action.messageId] });
     }
     case "select_all": return selectAllEligibleAvailable(state.page) ? invalidate({ selected: state.page!.items.filter((item) => item.eligible).map((item) => item.message_id) }) : state;

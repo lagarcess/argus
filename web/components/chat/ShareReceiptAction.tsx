@@ -39,22 +39,20 @@ export function ReceiptCandidateChoices({ state, copy, id, onToggle, onSelectAll
 }) {
   const page = state.page;
   if (!page) return null;
-  const capReached = state.selected.length >= page.max_turns;
-  const allOverCap = page.items.filter((item) => item.eligible).length > page.max_turns;
+  const eligible = page.items.filter((item) => item.eligible).length;
   return <>
     <div className="mt-4 flex flex-wrap items-center gap-2">
-      <button type="button" className={OUTLINE_BUTTON} disabled={!selectAllEligibleAvailable(page)} aria-describedby={allOverCap ? `${id}-cap` : undefined} onClick={onSelectAll}>{copy.selection.all}</button>
+      <button type="button" className={OUTLINE_BUTTON} disabled={!selectAllEligibleAvailable(page)} onClick={onSelectAll}>{copy.selection.all}</button>
       {state.selected.length > 0 && <button type="button" className={OUTLINE_BUTTON} onClick={onClear}>{copy.selection.clear}</button>}
     </div>
-    {(allOverCap || capReached) && <p id={`${id}-cap`} className="mt-2 text-[13px] leading-relaxed text-black/55 dark:text-white/55">{interpolate(copy.selection.cap, { count: page.max_turns })}{allOverCap && <> {copy.selection.choose_individually}</>}</p>}
-    <p className="mt-2 text-[12px] text-black/50 dark:text-white/50" aria-live="polite">{interpolate(copy.selection.count, { selected: state.selected.length, max: page.max_turns })}</p>
+    <p className="mt-2 text-[12px] text-black/50 dark:text-white/50" aria-live="polite">{interpolate(copy.selection.count, { selected: state.selected.length, eligible })}</p>
     <ul className="mt-3 divide-y divide-black/10 dark:divide-white/10">
       {page.items.map((item, index) => {
         const checked = state.selected.includes(item.message_id);
         const reasonId = `${id}-reason-${index}`;
         return <li key={item.message_id} className="py-3">
           <label className="flex min-h-11 items-start gap-3">
-            <input type="checkbox" checked={checked} disabled={!item.eligible || (!checked && capReached)} aria-describedby={!item.eligible ? reasonId : !checked && capReached ? `${id}-cap` : undefined} onChange={() => onToggle(item.message_id)} className="mt-1 h-5 w-5 shrink-0 accent-[#5ba897]" />
+            <input type="checkbox" checked={checked} disabled={!item.eligible} aria-describedby={!item.eligible ? reasonId : undefined} onChange={() => onToggle(item.message_id)} className="mt-1 h-5 w-5 shrink-0 accent-[#5ba897]" />
             <span className="min-w-0 text-[14px] leading-relaxed text-black dark:text-white">{item.question || interpolate(copy.selection.turn, { count: index + 1 })}</span>
           </label>
           {!item.eligible && <p id={reasonId} className="ml-8 text-[12.5px] leading-relaxed text-black/55 dark:text-white/55">{receiptRefusalText(item, copy)}</p>}

@@ -11,10 +11,25 @@ import httpx
 import pytest
 
 RECORDED_PROBES = Path(__file__).resolve().parents[2] / "docs/reports/evidence/377/probes"
+RETRIEVAL_PROBES = (
+    Path(__file__).resolve().parents[2] / "docs/reports/evidence/545/probes"
+)
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
-def recorded_agent_response(name: str = "equity_steps2") -> dict[str, Any]:
-    """An actual captured response, including its independent invoice."""
+def recorded_agent_response(
+    name: str = "perplexity_fast_quote_2026-09-09",
+) -> dict[str, Any]:
+    """An actual captured response, including its independent invoice.
+
+    The default is a frozen copy of the 2026-09-09 fast quote, billed at the
+    schedule the provider bills today; a copy, so re-recording the probe under
+    docs/reports/evidence/545 cannot move the invoice every canned document
+    bills at. Probes there and the 2026-08-07 recordings under 377, billed at
+    the earlier published schedule, stay reachable by name."""
+    for path in (FIXTURES / f"{name}.json", RETRIEVAL_PROBES / f"{name}.json"):
+        if path.exists():
+            return json.loads(path.read_text())["exchanges"][-1]["response"]
     return json.loads((RECORDED_PROBES / f"{name}.json").read_text())["response"]
 
 

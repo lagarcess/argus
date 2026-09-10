@@ -101,6 +101,7 @@ def test_bare_ticker_cannot_override_a_contradicted_named_entity(
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("has_citation", [True, False])
 @pytest.mark.parametrize(
     "subject,publisher,can_offer_test",
     [
@@ -116,8 +117,8 @@ def test_bare_ticker_cannot_override_a_contradicted_named_entity(
         ),
     ],
 )
-async def test_screening_keeps_cited_figures_and_only_offers_the_same_entity(
-    monkeypatch, valvoline_catalog, subject, publisher, can_offer_test
+async def test_screening_requires_a_verified_named_entity_before_publishing(
+    monkeypatch, valvoline_catalog, subject, publisher, can_offer_test, has_citation
 ) -> None:
     asset, _ = valvoline_catalog
     row = retrieved_row(
@@ -127,21 +128,17 @@ async def test_screening_keeps_cited_figures_and_only_offers_the_same_entity(
         value=1.0,
         kind="count",
         unit="rank",
-        source_url=publisher,
+        source_url=publisher if has_citation else None,
     )
     answer = f"{row['subject']} ({row['symbol']}): {row['label']} {row['value']}."
-    transport = wire_grounded_client(
-        monkeypatch,
-        [
-            agent_response(
-                text=typed_answer_text(answer, [row]),
-                tickers=[asset.canonical_symbol],
-                # A bare metadata pair must not erase the row's named entity.
-                lookup_rows=[("VVV", "VVV", "VVV")],
-                sources=[publisher],
-            )
-        ],
+    document = agent_response(
+        text=typed_answer_text(answer, [row]),
+        tickers=[asset.canonical_symbol],
+        # A bare metadata pair must not erase the row's named entity.
+        lookup_rows=[("VVV", "VVV", "VVV")],
+        sources=[publisher],
     )
+    transport = wire_grounded_client(monkeypatch, [document])
     context = _context()
     for call_id in ("retrieved-screen", "cached-screen"):
         call = ToolCall(
@@ -157,22 +154,26 @@ async def test_screening_keeps_cited_figures_and_only_offers_the_same_entity(
             result.stage_patch["final_response_payload"]["tool_result_cards"][0]
         )
         effect = result.stage_patch["tool_effects"][0]["stage_patch"]
+        if not can_offer_test:
+            assert card.outcome.status == "bounded"
+            assert card.outcome.failure.code == "survey_synthesis_incomplete"
+            assert card.outcome.result is None
+            assert card.presentation.answer is None
+            assert card.presentation.narrative is None
+            assert effect["research"]["follow_up"]["subjects"] == []
+            assert not effect.get("next_experiments")
+            continue
         assert card.outcome.status == "succeeded"
         assert card.outcome.result["rows"] == [row]
         assert card.presentation.answer.value == row["value"]
-        assert card.presentation.narrative == answer
+        assert card.presentation.narrative == effect["assistant_response"]
+        assert card.presentation.narrative.startswith(answer)
         assert card.presentation.sources[0].url == publisher
-        if can_offer_test:
-            assert card.outcome.result["subjects"] == [
-                {"name": asset.name, "symbol": asset.canonical_symbol}
-            ]
-            assert effect["next_experiments"]["rows"][0]["kind"] == "research_test_single"
-        else:
-            assert card.outcome.result["subjects"] == []
-            assert card.outcome.result["peers"] == []
-            assert effect["research"]["follow_up"]["subjects"] == []
-            assert not effect.get("next_experiments")
-    assert len(transport.requests) == 1, "the second call is a shared-cache read"
+        assert card.outcome.result["subjects"] == [
+            {"name": asset.name, "symbol": asset.canonical_symbol}
+        ]
+        assert effect["next_experiments"]["rows"][0]["kind"] == "research_test_single"
+    assert len(transport.requests) == 1, "the second call uses the cache"
 
 
 def test_thorough_completion_keeps_cited_identity_without_a_collision_action(
@@ -211,11 +212,12 @@ def test_thorough_completion_keeps_cited_identity_without_a_collision_action(
 
 
 @pytest.mark.parametrize("surface", ["fresh", "cached", "completion"])
+@pytest.mark.parametrize("row_collection", ["rows", "unsourced_rows"])
 @pytest.mark.parametrize(
     "source_subject,can_offer_test", [("Venice Token", False), ("Valvoline Inc.", True)]
 )
 def test_pre_resolved_subject_must_match_the_packet_before_a_test_offer(
-    valvoline_catalog, surface, source_subject, can_offer_test
+    valvoline_catalog, surface, row_collection, source_subject, can_offer_test
 ) -> None:
     asset, _ = valvoline_catalog
     subject = {
@@ -224,9 +226,18 @@ def test_pre_resolved_subject_must_match_the_packet_before_a_test_offer(
         "asset_class": asset.asset_class,
     }
     packet = _packet(asset.canonical_symbol)
-    row = packet.rows[0].model_copy(update={"subject": source_subject})
+    row = packet.rows[0].model_copy(
+        update={
+            "subject": source_subject,
+            "source_url": (
+                None if row_collection == "unsourced_rows" else packet.rows[0].source_url
+            ),
+        }
+    )
     answer = f"{row.subject} ({row.symbol}) is {row.value} {row.unit}."
-    packet = packet.model_copy(update={"answer_markdown": answer, "rows": (row,)})
+    packet = packet.model_copy(
+        update={"answer_markdown": answer, "rows": (), row_collection: (row,)}
+    )
     if surface == "completion":
         composed = grounded.compose_completed_research(
             job_request={"capability_class": "thorough_research", "subjects": [subject]},
@@ -249,7 +260,10 @@ def test_pre_resolved_subject_must_match_the_packet_before_a_test_offer(
     outcome = research_outcome_from_patch(patch)
 
     assert outcome.status == "succeeded"
-    assert outcome.result["answer"] == answer
+    assert outcome.result["answer"].startswith(answer)
+    if row_collection == "unsourced_rows":
+        assert outcome.result["rows"][0]["source_url"] is None
+        assert len(outcome.result["answer"]) > len(answer)
     assert outcome.result["rows"][0]["subject"] == source_subject
     assert outcome.result["peers"] == []
     assert outcome.result["subjects"] == (

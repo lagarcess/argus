@@ -72,17 +72,17 @@ describe("withheld research answers keep where Argus looked", () => {
     expect(researchDegradedCodeFromMetadata({ research: { degraded: "broken" } })).toBeNull();
     expect(
       researchDegradedCodeFromMetadata(
-        researchMetadata({ code: "research_figures_unverified" }),
+        researchMetadata({ code: "survey_synthesis_incomplete" }),
       ),
-    ).toBe("research_figures_unverified");
+    ).toBe("survey_synthesis_incomplete");
   });
 
   test("a hydrated withheld turn carries its pages and its code together", () => {
     const withheld = hydrateMessagesFromApi([
-      apiMessage(researchMetadata({ code: "research_figures_unverified" })),
+      apiMessage(researchMetadata({ code: "survey_synthesis_incomplete" })),
     ]).messages[0];
     expect(withheld.researchSources).toEqual([SOURCE]);
-    expect(withheld.researchDegradedCode).toBe("research_figures_unverified");
+    expect(withheld.researchDegradedCode).toBe("survey_synthesis_incomplete");
 
     const published = hydrateMessagesFromApi([apiMessage(researchMetadata())]).messages[0];
     expect(published.researchSources).toEqual([SOURCE]);

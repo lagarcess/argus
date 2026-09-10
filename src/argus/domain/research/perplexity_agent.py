@@ -7,8 +7,10 @@ because route receipts and the cost ledger own provenance, not prose.
 
 Every request carries the retrieval parameters the spec derived for it: the
 model fallback chain, the strict typed-output schema, the response language,
-and the web search options. The answer is read back in that typed shape; a
-row is kept only when its citation is a page this same response retrieved.
+and the web search options. The answer is read back in that typed shape with
+every row the model wrote: a row's citation is the model's own, and a row
+written without one is kept apart so the turn can say the figure has no
+source.
 """
 
 from __future__ import annotations
@@ -263,9 +265,9 @@ def _packet_from_priced_response(
                         _append_public_source(parsed, annotation)
     typed = _typed_retrieval("\n\n".join(text_blocks))
     rows: list[RetrievedRow] = []
-    rejected: list[RetrievedRow] = []
+    unsourced: list[RetrievedRow] = []
     if typed is not None:
-        rows, rejected = _cited_rows(typed.rows, parsed)
+        rows, unsourced = _sourced_rows(typed.rows)
         answer = _sanitize_answer(typed.answer_markdown)
     else:
         answer = _sanitize_answer("\n\n".join(text_blocks))
@@ -287,7 +289,7 @@ def _packet_from_priced_response(
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
         rows=tuple(rows),
         typed_answer=typed is not None,
-        rejected_rows=tuple(rejected),
+        unsourced_rows=tuple(unsourced),
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
@@ -303,9 +305,6 @@ class _ParsedToolResults:
     sources: list[ResearchSource] = field(default_factory=list)
     pairs: list[ResearchNamePair] = field(default_factory=list)
     tool_results: list[str] = field(default_factory=list)
-    # Every page URL a tool result or annotation carried, provider hosts
-    # included: the record a row's citation is checked against.
-    retrieved_urls: set[str] = field(default_factory=set)
 
 
 def _typed_retrieval(text: str) -> TypedRetrieval | None:
@@ -344,31 +343,34 @@ def _typed_retrieval(text: str) -> TypedRetrieval | None:
         ) from exc
 
 
-def _cited_rows(
-    rows: list[RetrievedRow], parsed: _ParsedToolResults
+def _sourced_rows(
+    rows: list[RetrievedRow],
 ) -> tuple[list[RetrievedRow], list[RetrievedRow]]:
-    """Rows whose citation is a page this response retrieved, and the rows
-    that cited none. A row read from the provider's own finance data keeps
-    its evidence in the tool result and loses the provider URL, the way
-    every provider-host citation does. A rejected row is kept apart, its
-    citation dropped, so the turn can name the figure it will not quote."""
+    """Rows that carry a citation, and rows the model wrote without one.
+
+    A citation is kept as the model wrote it: the page it names is the
+    figure's source, whether or not this response retrieved that page. A
+    row read from the provider's own finance data keeps its evidence in the
+    tool result and loses the provider URL, the way every provider-host
+    citation does. A row with no citation at all is kept apart so the turn
+    can say, under the answer, that the figure has no source."""
     if len(rows) > MAX_PACKET_ROWS:
         # More figures than the packet carries: an answer whose evidence would
         # be cut cannot be published whole, so it is not the contract.
         raise ResearchUnavailableError(
             "malformed_response", f"typed answer carries more than {MAX_PACKET_ROWS} rows"
         )
-    kept: list[RetrievedRow] = []
-    rejected: list[RetrievedRow] = []
+    sourced: list[RetrievedRow] = []
+    unsourced: list[RetrievedRow] = []
     for row in rows:
-        url = str(row.source_url or "").strip().rstrip("/")
-        if not url or url not in parsed.retrieved_urls:
-            rejected.append(row.model_copy(update={"source_url": None}))
+        url = str(row.source_url or "").strip()
+        if not url:
+            unsourced.append(row.model_copy(update={"source_url": None}))
             continue
         if _is_provider_host(urlparse(url).netloc.lower()):
             row = row.model_copy(update={"source_url": None})
-        kept.append(row)
-    return kept, rejected
+        sourced.append(row)
+    return sourced, unsourced
 
 
 def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None:
@@ -387,11 +389,11 @@ def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None
             "Research answer arrived as prose under a typed request"
             f" shape={spec.shape} model={served or 'unknown'}"
         )
-    if packet.rejected_rows:
+    if packet.unsourced_rows:
         logger.warning(
-            "Research rows rejected for citing no retrieved page"
-            f" shape={spec.shape} rejected={len(packet.rejected_rows)}"
-            f" kept={len(packet.rows)}"
+            "Research rows written without a citation"
+            f" shape={spec.shape} unsourced={len(packet.unsourced_rows)}"
+            f" cited={len(packet.rows)}"
         )
 
 
@@ -447,8 +449,7 @@ def _read_search_results(item: dict[str, Any], parsed: _ParsedToolResults) -> No
 
 def _read_fetch_url_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
     # A page the model opened is a page it read: title, url and an excerpt,
-    # no publisher date. Typed rows cite these pages, so they must be in the
-    # retrieval record or a row read from a fetched page would be dropped.
+    # no publisher date. It is a typed source the way a search hit is.
     for content in item.get("contents") or []:
         if isinstance(content, dict):
             _append_public_source(parsed, content)
@@ -552,10 +553,13 @@ def _usage_from_response(
             provider_output_cost_usd=_required_nonnegative_decimal(
                 cost, "output_cost", path="usage.cost.output_cost"
             ),
-            provider_cache_creation_cost_usd=_required_nonnegative_decimal(
+            # A cache bucket nothing was billed in arrives absent or null, the
+            # way the documented example shows; the component check still
+            # holds a zero against the bucket's token count.
+            provider_cache_creation_cost_usd=_optional_nonnegative_decimal(
                 cost, "cache_creation_cost", path="usage.cost.cache_creation_cost"
             ),
-            provider_cache_read_cost_usd=_required_nonnegative_decimal(
+            provider_cache_read_cost_usd=_optional_nonnegative_decimal(
                 cost, "cache_read_cost", path="usage.cost.cache_read_cost"
             ),
             provider_tool_calls_cost_usd=_optional_nonnegative_decimal(
@@ -633,7 +637,7 @@ def _required_nonnegative_decimal(
 def _optional_nonnegative_decimal(
     values: dict[str, Any], key: str, *, path: str
 ) -> Decimal:
-    if key not in values:
+    if values.get(key) is None:
         return Decimal(0)
     return _nonnegative_decimal(values[key], path=path)
 
@@ -718,9 +722,8 @@ def _append_public_source(parsed: _ParsedToolResults, entry: Any) -> None:
     """One citation, bounded and scrubbed.
 
     Accepts either channel's shape: a search result, an annotation, or a
-    bare finance URL. Every retrieved page joins the retrieval record first;
-    provider-identity hosts never survive into the public sources, so Argus
-    never cites the tool that answered it.
+    bare finance URL. Provider-identity hosts never survive into the public
+    sources, so Argus never cites the tool that answered it.
     """
     if not isinstance(entry, dict):
         return
@@ -730,7 +733,6 @@ def _append_public_source(parsed: _ParsedToolResults, entry: Any) -> None:
     candidate = raw_url.strip()
     if not candidate.startswith("https://") or len(candidate) > MAX_URL_CHARS:
         return
-    parsed.retrieved_urls.add(candidate.rstrip("/"))
     sources = parsed.sources
     if _is_provider_host(urlparse(candidate).netloc.lower()):
         return

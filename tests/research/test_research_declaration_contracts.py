@@ -58,12 +58,33 @@ def _assert_boundary(declaration, payload: dict[str, Any], *, valid: bool) -> No
 @pytest.mark.parametrize(
     "tool_name", ["fast_quote", "balanced_lookup", "thorough_research", "screening"]
 )
-def test_completed_figure_returns_require_rows_and_preserve_zero(
+def test_completed_returns_publish_optional_figures_and_preserve_zero(
     declarations, tool_name: str
 ) -> None:
     payload = _figures()
     _assert_boundary(declarations[tool_name], payload, valid=True)
     payload["rows"] = []
+    _assert_boundary(declarations[tool_name], payload, valid=True)
+
+
+@pytest.mark.parametrize(
+    "tool_name", ["fast_quote", "balanced_lookup", "thorough_research", "screening"]
+)
+@pytest.mark.parametrize("answer", [None, "", " \n\t"])
+def test_completed_returns_require_a_published_nonblank_answer(
+    declarations, tool_name: str, answer: str | None
+) -> None:
+    payload = _figures()
+    payload["answer"] = answer
+    _assert_boundary(declarations[tool_name], payload, valid=False)
+
+
+@pytest.mark.parametrize(
+    "tool_name", ["fast_quote", "balanced_lookup", "thorough_research", "screening"]
+)
+def test_optional_figures_do_not_admit_invalid_numeric_rows(declarations, tool_name):
+    payload = _figures()
+    payload["rows"][0]["value"] = "unknown"
     _assert_boundary(declarations[tool_name], payload, valid=False)
 
 

@@ -4578,10 +4578,6 @@ components:
           items:
             $ref: '#/components/schemas/PublicExcerptCandidate'
           type: array
-        max_turns:
-          type: integer
-          const: 4
-          default: 4
       additionalProperties: false
       type: object
       required:
@@ -4984,7 +4980,7 @@ components:
             type: string
             format: uuid
           type: array
-          maxItems: 4
+          maxItems: 500
           minItems: 1
         owner_note:
           anyOf:
@@ -5001,7 +4997,7 @@ components:
             type: string
             format: uuid
           type: array
-          maxItems: 4
+          maxItems: 500
           minItems: 1
         owner_note:
           anyOf:
@@ -5073,7 +5069,7 @@ components:
                 backtest: '#/components/schemas/PublicExcerptBacktestTurn'
                 research_answer: '#/components/schemas/PublicExcerptResearchTurn'
           type: array
-          maxItems: 4
+          maxItems: 500
           minItems: 1
       additionalProperties: false
       type: object

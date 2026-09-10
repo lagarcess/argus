@@ -27,6 +27,7 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_registry_dispatch.py \
   tests/evals/test_measurement_registry_observation.py \
   tests/evals/test_measurement_selection.py \
+  tests/evals/test_measurement_research.py \
   tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
@@ -66,15 +67,25 @@ of which declared tools supplied it. Completed typed results, their versioned
 cards, resolved identities, retained sources and final selectable actions must
 agree. Category and relationship relevance use one additional criterion in the
 existing prose-judge invocation, with no extra model call. The versioned
-`argus-selection-evidence/v1` contract and evidence are retained in fresh results;
-missing or unavailable judgment remains unproven. Original delivery checks and
-fixture expectations remain active. No prompt-to-tool-name expectation is added.
+`argus-selection-evidence/v2` contract retains the call's resolved cache and
+source-period policy, retrieval time, and each row's citation separately from
+the retrieved source drawer. The observer applies that recorded policy instead
+of imposing a same-day publication rule on every discovery question. A model
+citation outside the drawer stays marked as a model citation. The existing judge
+also checks whether the facts support the period the user asked about; retrieval
+age alone cannot establish that. Missing or unavailable judgment remains
+unproven. Original delivery checks and fixture expectations remain active. No
+prompt-to-tool-name expectation is added.
 
 Answer-required dispatch also needs a successful typed result card with a
 typed answer or a nonblank narrative from a recorded call. A queued job with
 neither cannot pass that gate;
 composed work can deliver an answer while another call remains honestly pending.
 Existing offered-content checks still establish what the user received.
+Publication observations read the same bound, completed calls collectively.
+They retain each call's answer and optional numeric rows; an unrelated sidecar
+cannot make a missing result pass, and a retrieved narrative can publish without
+a numeric row.
 Per-call `tool_usage` retains only the research sidecar's reported cost, latency,
 invocations, and cache status. Missing or null cost stays unknown; the harness
 does not price calls or infer invoices. Historical scorecards retain the harness
@@ -83,8 +94,9 @@ as though this path had executed.
 
 Interpretation and dispatch receive the same trusted snapshot and metadata
 objects on each initial and follow-up turn. Dispatch does not reconstruct that
-context from prose. Private chat delivery accepts sourced narrative without a
-numeric headline; public receipt eligibility intentionally remains narrower.
+context from prose. Private chat delivery accepts retrieved narrative without a
+numeric headline. Public receipt eligibility belongs to the shipped sharing
+contract.
 
 ## Search Provider Evaluation (Issue #244)
 

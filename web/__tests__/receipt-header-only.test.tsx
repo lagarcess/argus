@@ -20,7 +20,7 @@ describe.each(["en", "es-419"] as const)("header-only sharing in %s", (language)
     for (const degraded of [false, true]) {
       const markup = renderToStaticMarkup(<I18nextProvider i18n={i18n}><ChatMessage
         {...oldShortcutProps}
-        message={{ id: "answer", role: "ai", kind: "text", content: researchTurn.answer, researchSources: researchTurn.sources, ...(degraded ? { researchDegradedCode: "research_figures_unverified" } : {}) }}
+        message={{ id: "answer", role: "ai", kind: "text", content: researchTurn.answer, researchSources: researchTurn.sources, ...(degraded ? { researchDegradedCode: "survey_synthesis_incomplete" } : {}) }}
       /></I18nextProvider>);
       expect(markup).not.toContain(receiptCopy(language).owner.share);
       expect(markup).toContain(degraded ? i18n.t("chat.discovery_results.sources_panel_open_withheld") : i18n.t("chat.discovery_results.sources_panel_open", { count: researchTurn.sources.length }));

@@ -58,8 +58,9 @@ def test_two_thorough_calls_do_not_alias_one_request_message(monkeypatch) -> Non
 
 
 @pytest.mark.parametrize("disable_after_submission", [False, True])
+@pytest.mark.parametrize("row_mode", ["cited", "unsourced", "none"])
 def test_background_completion_persists_the_matching_typed_tool_card(
-    monkeypatch, disable_after_submission: bool
+    monkeypatch, disable_after_submission: bool, row_mode: str
 ) -> None:
     gateway, _ = _wire(monkeypatch)
     fields = _tool_fields("source-read")
@@ -81,6 +82,17 @@ def test_background_completion_persists_the_matching_typed_tool_card(
         lambda **kwargs: evidence.append(kwargs),
     )
     packet = _packet()
+    if row_mode != "cited":
+        packet = packet.model_copy(
+            update={
+                "rows": (),
+                "unsourced_rows": (
+                    (packet.rows[0].model_copy(update={"source_url": None}),)
+                    if row_mode == "unsourced"
+                    else ()
+                ),
+            }
+        )
     asyncio.run(
         research_jobs._finalize_success(
             job_id=job["id"],
@@ -96,7 +108,15 @@ def test_background_completion_persists_the_matching_typed_tool_card(
     assert card.artifact_id == fields["tool_artifact_id"]
     assert card.outcome.status == "succeeded"
     assert card.outcome.result["status"] == "completed"
-    assert card.presentation.answer.value == packet.rows[0].value
+    assert card.outcome.result["rows"] == [
+        row.model_dump(mode="json") for row in packet.published_rows
+    ]
+    assert card.presentation.narrative.startswith(packet.answer_markdown)
+    if packet.published_rows:
+        assert card.presentation.answer.value == packet.published_rows[0].value
+    if row_mode == "unsourced":
+        assert card.outcome.result["rows"][0]["source_url"] is None
+        assert len(card.presentation.narrative) > len(packet.answer_markdown)
     assert card.arguments["request"] == fields["tool_arguments"]["request"]
     assert evidence[0]["tool_call_id"] == fields["tool_call_id"]
 

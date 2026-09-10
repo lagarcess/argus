@@ -53,10 +53,10 @@ def test_run_research_builds_documented_request_and_parses_packet() -> None:
     assert packet.usage.finance_search_invocations == 1
     assert packet.usage.web_search_invocations == 0
     assert packet.usage.fetch_url_invocations == 0
-    assert packet.usage.input_tokens == 14_166
-    assert packet.usage.output_tokens == 191
+    assert packet.usage.input_tokens == 15_950
+    assert packet.usage.output_tokens == 298
     assert packet.usage.model == "openai/gpt-5.6-sol"
-    assert packet.usage.cost_usd == pytest.approx(0.05395)
+    assert packet.usage.cost_usd == pytest.approx(0.0487)
     # Provider hosts are scrubbed; public sources survive as typed citations.
     assert [source.url for source in packet.sources] == ["https://www.sec.gov/a"]
     # NOT_FOUND and header rows never become candidates.
@@ -113,9 +113,9 @@ def test_usage_cost_matches_the_committed_live_cached_response() -> None:
 
     packet = client.run_research("quote Apple", RESEARCH_CONFIG_SPECS["fast"])
 
-    assert packet.usage.cost_usd == pytest.approx(0.05395)
-    assert packet.usage.cache_creation_input_tokens == 6_221
-    assert packet.usage.cache_read_input_tokens == 7_864
+    assert packet.usage.cost_usd == pytest.approx(0.0487)
+    assert packet.usage.cache_creation_input_tokens == 6_754
+    assert packet.usage.cache_read_input_tokens == 9_115
 
 
 def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> None:
@@ -128,13 +128,13 @@ def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> No
                 output_tokens=1_000,
                 invocations=0,
                 cost_overrides={
-                    "input_cost": 1.5,
-                    "output_cost": 0.03,
+                    "input_cost": 1.2,
+                    "output_cost": 0.02,
                     "cache_creation_cost": 0.0,
                     "cache_read_cost": 0.0,
                     "tool_calls_cost": 0.0,
                     "tool_calls_cost_details": {},
-                    "total_cost": 1.53,
+                    "total_cost": 1.22,
                 },
             )
         ]
@@ -142,7 +142,7 @@ def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> No
 
     packet = client.run_research("multi-step", RESEARCH_CONFIG_SPECS["fast"])
 
-    assert packet.usage.cost_usd == pytest.approx(1.53)
+    assert packet.usage.cost_usd == pytest.approx(1.22)
 
 
 @pytest.mark.parametrize(
@@ -245,8 +245,8 @@ def test_aggregated_multistep_tokens_accept_a_feasible_tier_blend() -> None:
 @pytest.mark.parametrize(
     ("input_cost", "output_cost", "total_cost"),
     [
-        pytest.param(1.5, 0.045, 1.545, id="short-input-long-output"),
-        pytest.param(3.0, 0.03, 3.03, id="long-input-short-output"),
+        pytest.param(1.2, 0.045, 1.245, id="short-input-long-output"),
+        pytest.param(3.0, 0.02, 3.02, id="long-input-short-output"),
     ],
 )
 def test_aggregated_multistep_tokens_reject_inconsistent_tiers(
@@ -326,7 +326,7 @@ def test_missing_required_token_usage_is_unpriced() -> None:
 @pytest.mark.parametrize(
     ("input_tokens", "input_cost", "output_cost", "expected_cost_usd"),
     [
-        (272_000, 1.36, 0.03, 1.39),
+        (272_000, 1.088, 0.02, 1.108),
         (272_001, 2.72001, 0.045, 2.76501),
     ],
 )
@@ -489,7 +489,7 @@ def test_a_response_that_ran_no_tool_reports_a_confirmed_zero() -> None:
                 cost_overrides={
                     "tool_calls_cost": 0.0,
                     "tool_calls_cost_details": {},
-                    "total_cost": 0.04895,
+                    "total_cost": 0.0437,
                 },
             )
         ]
@@ -502,7 +502,7 @@ def test_a_response_that_ran_no_tool_reports_a_confirmed_zero() -> None:
     assert packet.usage.finance_search_invocations == 0
     assert packet.usage.web_search_invocations == 0
     assert packet.usage.fetch_url_invocations == 0
-    assert packet.usage.cost_usd == pytest.approx(0.04895)
+    assert packet.usage.cost_usd == pytest.approx(0.0437)
 
 
 def test_every_tool_result_item_is_kept_in_provider_order() -> None:

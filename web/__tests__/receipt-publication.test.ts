@@ -15,7 +15,7 @@ const receipt: EvidenceReceipt = {
   kind: "research_answer", title: researchTurn.question, symbols: researchTurn.anchor_symbols, created_at: researchTurn.retrieved_at,
 };
 function previewState(existing: boolean): ReceiptSelectionState {
-  const selected = receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page: { max_turns: 4, items: [{ message_id: "answer", eligible: true }] }, messageId: "answer" });
+  const selected = receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page: { items: [{ message_id: "answer", eligible: true }] }, messageId: "answer" });
   const preview: ReceiptPreview = { payload: turnDocument({ ...researchTurn, owner_note: "The frozen note" }), payload_digest: "a".repeat(64), kind: "research_answer", ...(existing ? { existing_receipt: receipt } : {}) };
   return receiptSelectionReducer(selected, { type: "previewed", revision: selected.revision, preview });
 }

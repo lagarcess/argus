@@ -61,6 +61,12 @@ from tests.evals.measurement_registry import (
 from tests.evals.measurement_registry import (
     followup_thread_metadata as _followup_thread_metadata,
 )
+from tests.evals.measurement_research import (
+    compare_research as _compare_research,
+)
+from tests.evals.measurement_research import (
+    research_outcome as _research_outcome,
+)
 from tests.evals.measurement_selection import (
     SELECTION_RELEVANCE,
     SELECTION_RUBRIC,
@@ -138,6 +144,11 @@ class TypedExpectations:
     # says the turn went somewhere the user can act on, which is the only
     # thing a green case is supposed to promise.
     offered: dict[str, Any] | None = None
+    # A grounded turn's typed sidecar: whether the answer published (no
+    # degraded code) and, as `rows`, the least number of typed figures it
+    # carried. A research turn that withheld its answer still reaches
+    # ready_to_respond, so nothing above can see the refusal this pins.
+    research: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -523,6 +534,8 @@ def typed_expectation_failures(
             failures,
             expected_fields=vars(expected),
         )
+    if expected.research is not None:
+        _compare_research(expected.research, outcome.get("research"), failures)
     return failures
 
 
@@ -748,6 +761,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             semantic_turn_act=expected.get("semantic_turn_act"),
             asset_discovery=expected.get("asset_discovery"),
             offered=expected.get("offered"),
+            research=expected.get("research"),
         ),
         action=(
             None
@@ -931,21 +945,21 @@ def _typed_outcome(
         followup=followup_result,
         stage_results=stage_results,
     )
+    calls = [
+        call.model_dump(mode="json") if hasattr(call, "model_dump") else dict(call)
+        for call in interpret_patch.get("tool_calls", [])
+    ]
+    dispatch_patch = (
+        payload_dispatch_result.patch if payload_dispatch_result is not None else {}
+    )
     selection = None
     if (
         case.expected.asset_discovery is not None
         and case.expected.tool_dispatch is not None
     ):
         selection = observe_selection(
-            calls=[
-                call.model_dump(mode="json")
-                if hasattr(call, "model_dump")
-                else dict(call)
-                for call in interpret_patch.get("tool_calls", [])
-            ],
-            patch=payload_dispatch_result.patch
-            if payload_dispatch_result is not None
-            else {},
+            calls=calls,
+            patch=dispatch_patch,
             final_patch=final_patch,
         )
     offered = offered_to_user(
@@ -1013,6 +1027,9 @@ def _typed_outcome(
         "offered": selection_offered(offered, selection)
         if selection is not None
         else offered,
+        "research": _research_outcome(
+            final_patch, calls=calls, dispatch_patch=dispatch_patch
+        ),
     }
 
 

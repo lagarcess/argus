@@ -1,0 +1,187 @@
+{
+  "label": "nike",
+  "question": "what's the price of nike today",
+  "asked_at": "2026-09-09T23:43:28.633527+00:00",
+  "source": "Perplexity Agent API, question as typed, no Argus instructions or schema",
+  "request": {
+    "models": [
+      "openai/gpt-5.6-sol"
+    ],
+    "input": "what's the price of nike today",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search"
+      }
+    ],
+    "max_steps": 5
+  },
+  "http_status": 200,
+  "elapsed_seconds": 9.84,
+  "answer_text": "Nike (NYSE: **NKE**) closed today at **$37.35 USD**, down **$0.75 (1.97%)**. The market is currently in after-hours trading.",
+  "tool_results": [
+    "finance_results",
+    "finance_results"
+  ],
+  "usage": {
+    "cost": {
+      "cache_creation_cost": 0.02842,
+      "cache_read_cost": 0.00599,
+      "currency": "USD",
+      "input_cost": 5e-05,
+      "output_cost": 0.00272,
+      "tool_calls_cost": 0.01,
+      "tool_calls_cost_details": {
+        "finance_search": 0.01
+      },
+      "total_cost": 0.04718
+    },
+    "input_tokens": 20682,
+    "input_tokens_details": {
+      "cache_creation_input_tokens": 5684,
+      "cache_read_input_tokens": 14986,
+      "cached_tokens": 14986
+    },
+    "output_tokens": 136,
+    "output_tokens_details": {
+      "reasoning_tokens": 18
+    },
+    "tool_calls_details": {
+      "finance_search": {
+        "cost_usd": 0.01,
+        "invocation": 2
+      }
+    },
+    "total_tokens": 20818
+  },
+  "response": {
+    "background": false,
+    "completed_at": 1788997398,
+    "created_at": 1788997398,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_0cd56dce-aa61-4c1a-8f87-02572360e28f",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": null,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "tickers_lookup"
+        ],
+        "results": [
+          {
+            "category": "tickers_lookup",
+            "content": "Ticker matches:\n\n| query | ticker | name |\n| --- | --- | --- |\n| Nike | NKE | NIKE, Inc. |",
+            "tickers": null
+          }
+        ],
+        "tickers": null,
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## NKE Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| NKE | NIKE, Inc. | 2026-09-09 20:00:03 UTC | 2026-09-09 23:43:25 UTC | after_hours | 37.35 | USD | -0.75 | -1.97 |\n\nData available in: `NKE_quotes_92993a.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/NKE"
+            ],
+            "tickers": [
+              "NKE"
+            ]
+          }
+        ],
+        "tickers": [
+          "NKE"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "Nike (NYSE: **NKE**) closed today at **$37.35 USD**, down **$0.75 (1.97%)**. The market is currently in after-hours trading.",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_d1bc8dd9-44bb-4b4e-aa94-708b1f029554",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.02842,
+        "cache_read_cost": 0.00599,
+        "currency": "USD",
+        "input_cost": 5e-05,
+        "output_cost": 0.00272,
+        "tool_calls_cost": 0.01,
+        "tool_calls_cost_details": {
+          "finance_search": 0.01
+        },
+        "total_cost": 0.04718
+      },
+      "input_tokens": 20682,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 5684,
+        "cache_read_input_tokens": 14986,
+        "cached_tokens": 14986
+      },
+      "output_tokens": 136,
+      "output_tokens_details": {
+        "reasoning_tokens": 18
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "cost_usd": 0.01,
+          "invocation": 2
+        }
+      },
+      "total_tokens": 20818
+    },
+    "user": null
+  }
+}

@@ -23,7 +23,6 @@ from tests.research.conftest import (
     PROVIDER_PAGE,
     agent_response,
     request_body,
-    retrieved_row,
     run_research_turn,
     set_research_query,
     typed_answer_text,
@@ -32,7 +31,7 @@ from tests.research.conftest import (
 from tests.test_supabase_gateway import _RecordingSupabaseClient
 
 # One response's recorded invoice, the fixture every canned document bills at.
-ONE_RESPONSE_USD = 0.05395
+ONE_RESPONSE_USD = 0.0487
 # The fake clock advances this much across each provider call.
 CALL_LATENCY_MS = 250
 
@@ -225,14 +224,9 @@ def test_a_retry_the_turn_threw_away_is_billed_too(
     """A survey retry that came back no better is discarded; its invoice is
     not."""
     set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
-    # Typed, retrieved, and no row Argus can verify: the shape that earns the
-    # one survey retry.
-    figureless = agent_response(
-        text=typed_answer_text(
-            "Markets were mixed today.",
-            [retrieved_row(source_url="https://invented.example/movers")],
-        ),
-    )
+    # Typed, retrieved, and no row at all: the shape that earns the one
+    # survey retry.
+    figureless = agent_response(text=typed_answer_text("Markets were mixed today.", []))
     transport = wire_grounded_client(monkeypatch, [figureless, figureless])
 
     result = run_research_turn("Anything moving today?")

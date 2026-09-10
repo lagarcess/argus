@@ -21,12 +21,14 @@ from argus.agent_runtime.research_tools import (
 from argus.agent_runtime.stages.interpret_types import StageResult
 from argus.domain.market_data.assets import SYNTHETIC_UNIT_ASSETS
 from argus.domain.research.cache import DATA_CLASS_TTL_SECONDS
+from argus.domain.research.evidence_policy import build_research_evidence_policy
 from argus.domain.tool_contracts import ToolCall
 from argus.domain.tool_declaration import ToolPolicy
 from faker import Faker
 
 from tests.agent_runtime.test_registered_tool_execution import _catalog
 from tests.evals import measurement_eval_harness as harness
+from tests.evals.measurement_selection import SELECTION_CONTRACT_VERSION
 from tests.research.conftest import retrieved_row
 
 fake = Faker()
@@ -73,6 +75,9 @@ def _selection_patch(*, figures=True, discovery=False, action=True, symbol="BTC"
             usage={},
             period_of_interest=None,
             retrieved_rows=[row] if figures else [],
+            evidence_policy=build_research_evidence_policy(
+                question_kind="screening", question_as_of_date=observed.date()
+            ),
         ),
     }
     if discovery:
@@ -199,7 +204,7 @@ def test_alternate_and_composed_delivery_preserve_the_same_acceptance(
         "selection_relevance",
     ]
     retained = result["prose_judge"]["selection_evidence"]
-    assert retained["contract_version"] == "argus-selection-evidence/v1"
+    assert retained["contract_version"] == SELECTION_CONTRACT_VERSION
     assert retained["assets"][0]["asset_class"] == "crypto"
     assert all(call.call_id not in json.dumps(judged) for call in calls)
     assert all(call.arguments["request"] not in json.dumps(retained) for call in calls)
@@ -262,6 +267,7 @@ def test_missing_structural_evidence_cannot_be_rescued_by_the_judge(
     research = patch["research"]
     if missing == "source":
         research["sources"] = []
+        research["rows"][0]["source_url"] = None
     elif missing == "timestamp":
         research["retrieved_at"] = None
     elif missing == "stale":
@@ -290,6 +296,48 @@ def test_missing_structural_evidence_cannot_be_rescued_by_the_judge(
         for check in result["failed_checks"]
     )
     assert result["prose_judge"]["pass"] is True
+
+
+def test_current_selection_preserves_the_runtime_data_and_source_period_policy(
+    monkeypatch, selection_case
+):
+    patch = _selection_patch()
+    research = patch["research"]
+    observed = datetime.now(timezone.utc)
+    period_start = observed.date() - timedelta(days=14)
+    policy = build_research_evidence_policy(
+        question_kind=None,
+        data_class="fundamentals",
+        period_start_date=period_start,
+        question_as_of_date=observed.date(),
+    )
+    research["evidence_policy"] = policy.model_dump(mode="json")
+    research["retrieved_at"] = (observed - timedelta(minutes=10)).isoformat()
+    research["sources"][0]["source_date"] = period_start.isoformat()
+    _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+
+    result = harness.run_eval_case(selection_case)
+
+    assert result["failed_checks"] == []
+    fact = result["typed_outcome"]["asset_discovery"]["assets"][0]["facts"][0]
+    assert fact["evidence_policy"] == policy.model_dump(mode="json")
+
+
+def test_a_model_citation_outside_the_retrieved_drawer_is_retained_as_such(
+    monkeypatch, selection_case
+):
+    patch = _selection_patch()
+    citation_url = "https://www.coingecko.com/en/coins/bitcoin"
+    patch["research"]["rows"][0]["source_url"] = citation_url
+    _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+
+    result = harness.run_eval_case(selection_case)
+
+    fact = result["typed_outcome"]["asset_discovery"]["assets"][0]["facts"][0]
+    assert fact["citation_url"] == citation_url
+    assert fact["citation_origin"] == "model"
+    assert fact["source"] is None
+    assert result["failed_checks"] == []
 
 
 def test_same_ticker_wrong_asset_action_fails(monkeypatch, selection_case):

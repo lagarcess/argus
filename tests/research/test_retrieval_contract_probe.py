@@ -150,7 +150,7 @@ def test_the_vaguest_survey_never_asserts_a_figure_it_did_not_retrieve() -> None
             exchange["response"], latency_ms=0, on_unpriced=lambda _: None
         )
         assert packet.tool_results, "both attempts retrieved"
-        assert packet.rejected_rows == ()
+        assert packet.unsourced_rows == ()
     turn = recording["turn"]
     sidecar = turn["research"]
     if not sidecar["rows"]:

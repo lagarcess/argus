@@ -414,33 +414,6 @@ def test_pending_result_cannot_carry_completed_facts() -> None:
         ResearchToolResult(status="pending", answer=FAKE.sentence(), rows=_packet().rows)
 
 
-def test_registered_retrieval_withholds_prose_without_typed_figures(monkeypatch) -> None:
-    from argus.agent_runtime.research_tools import get_research_declarations
-
-    packet = _packet().model_copy(update={"rows": (), "typed_answer": False})
-    _wire(monkeypatch, packet)
-    context = _context()
-    declaration = next(
-        tool for tool in get_research_declarations() if tool.name == "fast_quote"
-    )
-    outcome = asyncio.run(
-        declaration.invoke(
-            {"request": "Read the quote", "symbols": ["AAPL"]},
-            context=context,
-        )
-    )
-    assert outcome.status == "bounded"
-    assert outcome.result is None
-    assert (
-        packet.answer_markdown
-        not in context.stage_result.stage_patch["assistant_response"]
-    )
-    assert (
-        context.stage_result.stage_patch["research"]["degraded"]["code"]
-        == "research_figures_unverified"
-    )
-
-
 @pytest.mark.parametrize(
     ("discovery_enabled", "naming_available", "code", "retryable"),
     [
