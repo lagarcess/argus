@@ -1,0 +1,31 @@
+Codex review round 1 on PR #581 (reviewed commit 2308dbe1), both P2, both
+confirmed. The tests below were written first and run against the unfixed
+write path at 2308dbe1.
+
+Finding 1 (comment 3976812511): language side effects ran outside the queue,
+so an earlier refusal could undo a newer choice.
+Finding 2 (comment 3976812519): a failed PATCH was treated as a refusal, though
+update_user can commit the write and then fail its follow-up select.
+
+cd web && bun test __tests__/profile-writes.test.ts
+
+(fail) the profile write path > a request waits for the one ahead of it, even a refused one
+(fail) the profile write path > a save whose reply failed is kept when the account holds it
+(fail) the profile write path > a save stays refused when the account cannot be asked either
+(fail) the profile write path > a refused language is shown, then put back, and nothing is handed on
+(fail) the profile write path > a language the account took stays, even when its reply failed
+(fail) the profile write path > an earlier refusal cannot undo a newer language
+ 2 pass
+ 6 fail
+
+The two passes are behaviours the code already had: a read queues behind a
+pending save, and a saved language stays.
+
+cd web && bunx playwright test e2e/profile-language-save.spec.ts -g "reply fails"
+
+  x  1 [chromium] > e2e/profile-language-save.spec.ts:218:5 > a save the account took is kept when its reply fails (6.4s)
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 0
+    Received: 1
+    > 227 |   await expect(page.getByRole("dialog")).toHaveCount(0);
+  1 failed
