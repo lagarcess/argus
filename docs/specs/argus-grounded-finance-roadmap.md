@@ -391,7 +391,7 @@ and none needs a rebase.
 | Refusal log | **LANDED** `fa69466c`, PR #559. |
 | Metering | **LANDED** `1db1aa75`, PR #561. Guest compute ceiling is silent and anti-abuse, 300 per UTC day, never projected in `/me/usage`; `PRODUCT.md` §19 amended. |
 | Decisions | **LANDED** `67facaf5`, PR #564. Four rounds, each returning one finding at the head; the last two were the same fact-ownership defect at successive layers, the durable stamp then the component copy. `decision_notes` owns both. |
-| Retrieval parameters | **LANDED** `41bf9930`, PR #562. The prose-versus-rows verifier was deleted rather than widened: a rejected row now withholds the whole answer through `_withheld_code`, the one owner of the honesty line at the composition seam, and the row declares its own subject so the audit infers nothing. #404 and #545 closed. |
+| Retrieval parameters | **LANDED** `41bf9930`, PR #562. The prose-versus-rows verifier was deleted rather than widened, and the row rejection and `_withheld_code` that replaced it were deleted in turn on 2026-09-10 (open the gates): they withheld paid quotes whenever the model's citation was not the page the response retrieved. A retrieved answer publishes, a row keeps the citation the model wrote, and a figure with no citation is named under the answer. #404 and #545 closed. |
 | Sharing on | **Done.** Evidence landed on integration. Only the flag flip remains and the founder has deferred it to the next promotion. |
 | #462 latency | **LANDED** `76937883`, PR #563. Its measurement produced the Subtract the guardrails item. |
 
@@ -648,7 +648,7 @@ founder described: the owner selects turns, only eligible ones are selectable,
 one link, one tombstone, revocable. It was sequenced, not rejected, and its
 unit is the turn. A thread share is a sequence of turn receipts, so it cannot
 exist until a turn that is not a backtest can be a receipt. Section 4.5 now
-authorizes up to four selected turns inside one conversation in Share the answer;
+authorizes selected turns inside one conversation in Share the answer;
 composition beyond that remains deferred.
 
 **Surface.** `src/argus/domain/capability_registry.py`,
@@ -697,8 +697,9 @@ readable, and eligibility is keyed on typed metadata rather than on what the
 prose looks like. The reader sees the question, the answer, and the evidence
 under it. `docs/specs/conversation-sharing.md` section 4 already specifies the
 research kind end to end. Section 4.5 authorizes section 9's closed wrapper for
-up to four selected turns inside one conversation; composition beyond that stays
-out of scope.
+selected turns inside one conversation; composition beyond that stays out of
+scope. The four-turn cap written there on 2026-09-09 was withdrawn on 2026-09-10,
+with the fast-shape sharing exclusion.
 
 **This ships with the calculations, not after them.** A calculation nobody can
 send does not distribute, and the receipt is a retrofit across every card once
