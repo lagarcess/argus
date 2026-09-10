@@ -1,9 +1,10 @@
 # Founder DOCN side-by-side
 
-Use the PR's candidate preview after its exact-head live proof is recorded.
-No hosted preview has been provisioned by this lane yet. The provider-free
-local replay at http://127.0.0.1:3219 proves rendering only and cannot run this
-comparison. Do not use it as a live Argus example.
+These exact steps are prepared for an approved PR preview. No hosted preview
+was provisioned, and the local proof servers are stopped. The completed
+targeted comparison failed the writing/truth bar; a successful founder
+side-by-side remains unproven. A provider-free replay proves rendering only
+and cannot substitute for this comparison.
 
 ## English
 

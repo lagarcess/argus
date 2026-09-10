@@ -38,8 +38,23 @@ Numeric validation folds accents internally without changing visible text and bi
 
 The figure checker verifies numeric membership and rounding, not arbitrary
 natural-language semantic entailment. The benchmark check covers explicit
-comparison wording. Targeted live measurement remains required for quality,
-language, surface distinction, and the prompt fingerprint.
+comparison wording. The completed targeted measurement failed the quality
+bar: it exposed both real false claims admitted by numeric membership and
+honest prose rejected because a benchmark name contains a number.
+
+## Observed limits at the measured candidate
+
+At `847cdd5e54e9e6256483ee2987a3f59bb79b8ebb`, the numeric check rejects
+“S&P 500” as an unsupported scalar, yet accepts a real peak equity described as
+ending equity, annualized volatility described as daily, and four executed
+fills described as four winning trades. It also accepts real global extrema
+joined into a false chronological drawdown. Those are unresolved truth defects,
+not acceptable exceptions to the founder's requirements.
+
+The [48-task reviews](targeted/README.md) preserve both accepted-text errors
+and suppressed drafts. No checker or tier was changed after this measurement.
+Full live measurement and prompt fingerprint regeneration remain explicitly
+held. This targeted scorecard cannot authorize either.
 
 ## Deterministic development evidence
 

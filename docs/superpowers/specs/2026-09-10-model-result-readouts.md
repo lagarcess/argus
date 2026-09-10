@@ -75,12 +75,16 @@ Implementation sequence:
 - [x] Test and implement matching-language frame content and clipboard parity.
 - [x] Record every validator disposition and focused verification result.
 - [x] Post a cost estimate and obtain founder approval: up to $5 total.
-- [ ] Commit targeted measured evidence and bilingual browser proof; leave the fingerprint unchanged.
+- [x] Commit targeted measured evidence and bilingual browser proof; leave the fingerprint unchanged.
 - [ ] Check merged-tree modularity, exact-head CI and final clean Codex review
   with zero unresolved threads, then write the terminal audit.
 
-The founder merges and deploys. Local tests and mocked browser checks are
-development evidence, not a substitute for the approved live proof.
+The targeted stop checkpoint is recorded in
+`docs/reports/evidence/model-result-readouts/README.md`. All 48 tasks were
+attempted and reviewed; candidate quality passed 1/24. Browser proof includes
+three UI backtests and a direct DCA fixture after its chat setup failed.
+The writing bar, exact-head green CI and final clean review remain unmet.
+This is a requested stop, not readiness. The founder merges and deploys.
 
 ## 6. Stop conditions
 
@@ -94,5 +98,3 @@ regeneration require a separate explicit founder go.
 Authority: founder's lane brief; AGENTS.md; PRODUCT.md; ARCHITECTURE.md;
 API_CONTRACT.md; DATA_MODEL.md; DESIGN.md; active grounded-finance roadmap;
 private-alpha-next-decision-memo.md EvidenceArtifact clarification.
-
-Initial live GitHub overlap check: no open PRs on 2026-09-10.

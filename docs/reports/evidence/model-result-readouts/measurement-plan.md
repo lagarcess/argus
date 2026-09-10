@@ -1,138 +1,96 @@
-# Targeted result readout measurement
+# Targeted result readout measurement: executed plan
 
-Status: **founder approved up to $5 for the targeted 48-completion comparison
-and at most four fresh browser backtests**. Execution requires genuine fixtures,
-the final clean code SHA and the price/budget guard. This targeted comparison
-does **not** authorize a fingerprint update, even after successful live results.
-Finish this lane's approved targeted proof, then stop and report. No full live
-eval or fingerprint regeneration may run without a new, explicit founder go.
+**Completed and stopped:** 48 logical tasks, 80 HTTP attempts, all cases reviewed.
+The [reviewed scorecard](targeted/scorecard.json) reports candidate quality 1/24,
+baseline 0/24. The approved targeted comparison and bounded browser proof are
+finished. No full live eval or fingerprint regeneration may run without a new,
+explicit founder go. This document records the executed plan, not permission
+to run it again.
+
+## Scope and entry points
 
 The comparison invokes each checkout's real completed-result entry point and
-`llm_result_breakdown_message`, including their production draft validation and
-complete fallback. It does not run the interpreter, fetch market data, simulate
-a run, write product history, or measure browser transport. Those boundaries
-remain explicit in its report.
+`llm_result_breakdown_message`, including production validation and complete
+fallback. It does not run the interpreter, fetch market data, simulate a run,
+write product history or measure browser transport.
 
-Quick take receives the execution envelope and sibling result card used by
-production, reconstructed from the saved canonical fields. It receives every
-stored metric and now reads the optional chart from that card. Breakdown
-receives the saved run's optional chart. The earlier free sizing probe passed
-the whole stored run as the Quick take envelope, which concealed a production
-projection gap: the chart is on the sibling card, not the execution envelope.
-Both the projection and harness were corrected before any paid comparison.
+Quick take receives the production execution envelope and sibling result card,
+reconstructed from saved canonical fields. It receives all stored metrics and
+reads the optional chart from that card. Breakdown receives the saved run's
+optional chart. An earlier free sizing probe incorrectly passed the entire run
+as the execution envelope; the production projection and harness were both
+corrected before paid comparison.
 
 ## Cases and ordering
 
-Three source-verified saved runs, each in `en` and `es-419`:
+The final [recorded fixtures](recorded-fixtures.json) contain three exact,
+source-verified saved runs, each composed in `en` and `es-419`:
 
 1. DOCN buy and hold since September 2023, benchmark SPY.
-2. DCA with an explicit recurring contribution, separate starting capital,
-   modeled fees/slippage and their persisted results.
-3. An indicator run, preserving whichever optional metrics and chart the run stored.
+2. DOCN DCA with distinct starting capital and recurring contribution, modeled
+   fees/slippage and persisted outcomes.
+3. SPY RSI with the run's full metrics and optional chart.
 
-Each case/language runs **baseline, candidate, candidate, baseline**. Each visit
-composes Quick take, then Breakdown: 24 visits, 48 task completions, two
-replicates per variant. The candidate Breakdown receives the accepted Quick
-take from its own visit. A failed Quick take gives it no partial draft.
+Each case/language runs baseline, candidate, candidate, baseline. Each visit
+composes Quick take then Breakdown: 24 visits / 48 tasks, two replicates per
+variant. Candidate Breakdown receives only the accepted Quick take from its
+own visit; a failed Quick take supplies no partial draft.
 
-The committed harness examples in `tests/evals/result_readout_fixtures.json`
-are **authored synthetic TEST ONLY data**, including their DOCN figures. None of
-these example numbers may be represented as historical performance. Paid mode
-rejects every synthetic source. A genuine saved DOCN/SPY run was subsequently
-located through a read-only database query, with no provider call. Its sanitized
-typed snapshot remains separate under `/private/tmp/`; it is not committed and
-does not change the synthetic examples into empirical evidence. Fresh DOCN and RSI fixtures are now retained under `live-browser/stored-runs/`.
-The DCA chat setup hit an unrelated capital-interpretation failure. The fourth
-simulation allowance supplied its genuine fixture through the typed engine
-path; that fixture does not represent a successful DCA browser journey.
+The synthetic examples in `tests/evals/result_readout_fixtures.json` are TEST
+ONLY and were never used as empirical performance. Paid mode rejects synthetic
+sources. Each genuine fixture hashes the complete saved source object and
+retains its metric precision, canonical configuration and optional chart.
+Sampled trade markers are not a complete ledger. The DCA fixture came through
+the direct typed engine after chat setup failed; it does not prove a successful
+DCA browser journey.
 
-For an empirical fixture, `source.kind` is `recorded_run`; `source.artifact`
-points to the approved sanitized saved-run JSON, relative to the fixture file;
-`source.sha256` hashes that source file; optional `source.json_path` locates the
-run inside it; `provider_mode` and `captured_at` record its origin. The runner
-compares the fixture run to that exact source object. Keep the run's stored
-metric precision and absent fields; do not fabricate a curve or full ledger.
+## Approval, estimate and final cost
 
-## Cost and execution bounds
+Founder authority: up to $5 for the targeted 48-task comparison and at most four
+fresh simulations. The comparison cap was $3.50; the browser's $1 guard remained
+unchanged. Three UI backtests and one direct DCA simulation used all four slots.
+There is no authorization for extra trials, a full suite or a fingerprint update.
 
-Founder-approved total allowance: **up to $5**, using **$3.50 for the 48-completion
-comparison and at most $1.50 for browser proof**, with at most four fresh
-simulations. Final usage is three UI-completed backtests and one direct typed
-DCA engine fixture after its chat setup failed. This supersedes the earlier $1 targeted measurement / $2 total
-request. No full live suite or fingerprint regeneration is included in this
-authorization.
-The recorded DOCN chart makes the earlier 8,000-byte input assumption invalid;
-the refreshed candidate preflight reaches 48,835 bytes. Keep all stored metrics and the optional
-chart, with a 60,000-byte request bound.
+All stored metrics and actual chart data were retained. The 60,000-byte input
+bound superseded an early 8,000-byte sizing assumption. Every HTTP attempt
+reserved its worst-case cost before sending; unknown rates, oversized inputs,
+excess retries or missing reservations failed closed. No payload was trimmed
+to fit an estimate. The final free preflight is retained in
+[targeted/preflight.json](targeted/preflight.json).
 
-Verified local task settings during the free preflight:
+Verified task settings during execution:
 
 | Task | Tier | Primary | Fallback | Output ceiling |
-| --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | ---: |
 | result_summary | chat | deepseek/deepseek-v4-flash | qwen/qwen3.5-9b | 700 tokens |
 | result_breakdown | context | openai/gpt-oss-120b | deepseek/deepseek-v4-flash | 2,400 tokens |
 
-Neither tier changes. The bound reserves for up to four actual HTTP attempts
-per task (two configured models, each with a possible reasoning retry).
-Requests are limited to 60,000 UTF-8 bytes, including their schema. Counting
-bytes as the input-token upper bound is deliberately conservative. No oversized
-payload is silently trimmed. Genuine long chart data can require a revised
-estimate before execution.
+Neither tier changed. Up to four actual HTTP attempts were reserved per task:
+two configured models, each with a possible reasoning retry. Input bytes were
+used as a conservative token upper bound. The refreshed
+[price snapshot](targeted/prices.json) records the rates and sources used.
 
-For each task the worst-case reservation is:
+For each task the reservation was:
 
 `4 * max_for_configured_models((60000 * input_price_per_million + output_ceiling * output_price_per_million) / 1000000)`
 
-Refreshed official maximum rate envelopes, USD per million input/output tokens:
+The total worst-case reservation was $3.482112, within the $3.50 comparison cap.
+Final provider-reported comparison cost was $0.0392605438; full reservations for
+33 unreported attempts add $0.685936, giving an accounted bound of $0.7251965438.
+Browser proof adds $0.1573110822 reported and $0.47132656 unreported reservations.
+**Combined: $0.196571626 reported, $1.353834186 conservative bound.** The bound
+is not an exact invoice; no unknown-cost attempt is treated as free.
 
-| Configured model | Input | Output | Source |
-| --- | --- | --- | --- |
-| deepseek/deepseek-v4-flash | 0.21 | 0.56 | [OpenRouter DeepSeek](https://openrouter.ai/deepseek/deepseek-v4-flash) |
-| qwen/qwen3.5-9b | 0.17 | 0.25 | [OpenRouter Qwen](https://openrouter.ai/qwen/qwen3.5-9b) |
-| openai/gpt-oss-120b | 0.35 | 0.95 | [OpenRouter GPT-OSS](https://openrouter.ai/openai/gpt-oss-120b) |
+## Execution and continuation
 
-Including all configured primary/fallback models, four attempts per completion
-and the 60,000-byte bound, the 48-completion worst-case reservation is
-**$3.482112**. The $3.50 measurement allocation covers that bound. Browser spending
-is tracked separately; its original $1 guard remains in force unless explicitly
-raised within the combined $5 allowance. The four-backtest limit is unchanged.
+The comparison ran against clean baseline
+`d0884c3de81f8c53d454ac4f68f461d3b5dd77e3` and clean candidate
+`847cdd5e54e9e6256483ee2987a3f59bb79b8ebb`. The baseline used an isolated clone
+at `/private/tmp/model-result-readouts-baseline-d088`. No environment file was
+created or edited. The normal runtime inherited existing credentials; no secret
+value is retained in evidence.
 
-Sum that for all 48 task completions. Prices may be supplied in a small JSON
-file with `verified_at`, `source`, and `models`, where each configured model has
-`input_per_million` and `output_per_million`. Refresh those public prices before
-execution; do not infer them from model names. The caller's approved
-dollar cap must cover this bound. Every actual HTTP attempt reserves against
-the remaining cap before it is sent; unknown prices, excess retries and excess
-payload/output sizes fail closed. Missing response-cost evidence retains the
-entire pre-request reservation as a conservative charge. Reports separate
-observed costs from unknown charges and never describe that bound as an exact
-bill. Cancellation and ordinary provider retries remain visible; a missing
-reservation, unpriced model, or cost exceeding its reservation stops further
-visits and preserves the observations already collected.
-
-## Ready commands
-
-Free preflight, with the lane's prepared fixture examples:
-
-```bash
-poetry run python -m tests.evals.result_readout_eval \
-  --baseline /private/tmp/model-result-readouts-baseline-d088 \
-  --candidate /Users/garces/.codex/worktrees/7c2d/private-alpha-next \
-  --output /private/tmp/model-result-readouts-preflight.json
-```
-
-An isolated baseline clone was created after the shared checkout advanced.
-The selected immutable baseline was verified at `d0884c3de81f8c53d454ac4f68f461d3b5dd77e3`
-and clean. Do not rely on that path remaining at the same commit; the runner
-records both current SHAs. The free check tolerates dirty development code and
-labels it explicitly. The separate recorded DOCN size preflight observed
-7,601 bytes on baseline and 48,835 bytes on candidate, exposing why synthetic
-fixture sizing was insufficient. The two other cases in that earlier partial fixture set were synthetic.
-The final `recorded-fixtures.json` uses three complete genuine saved runs and
-verified source hashes; its free preflight is sizing/configuration evidence.
-
-Once three genuine source-verified fixtures and final clean candidate code
-exist, the authorized targeted command is:
+The executed command was equivalent to:
 
 ```bash
 poetry run python -m tests.evals.result_readout_eval \
@@ -144,67 +102,47 @@ poetry run python -m tests.evals.result_readout_eval \
   --output /private/tmp/model-result-readouts-live.json
 ```
 
-The preparation subtask does not execute this command. No environment file is
-created or edited. The provider credential is inherited/read using the normal runtime; only its
-presence is reported. Both worktrees must stay clean at their recorded SHAs
-through every visit. Live output must stay outside both checkouts so writing
-evidence cannot dirty the measured code. Existing output files are not replaced.
+The original process stopped after 21 visits because one provider worker still
+had not settled after the composition deadline plus 105 seconds of receipt
+waiting. Its probe exited and its pending request remained fully reserved.
+Only the original three never-attempted visits continued, after process absence,
+source hashes, unchanged code and remaining budget were verified. The
+[continuation script](targeted/resume-remaining.py) and immutable original report
+are preserved. No attempted case was retried; all first 21 outcomes are unchanged.
+Live output stayed outside both measured checkouts until every call finished.
 
 ## Evidence and review
 
-The raw report preserves fixture/source hashes; checkout SHAs and cleanliness;
-runner/probe hashes; Python version; model/task/tier/timeout/temperature;
-explicit recorded-run/no-fetch provider modes; request hashes/sizes; raw model
-drafts; complete accepted or backend-fallback text; source/fallback/failure
-fields; route receipts; provider response costs; and latency. It never records
-authorization headers or environment values.
+The [raw report](targeted/raw-completed.json) preserves fixture/source hashes;
+clean checkout SHAs; runner/probe hashes; runtime/model/tier/timeout settings;
+recorded-run provider mode; request hashes/sizes; raw model drafts; complete
+accepted or backend-fallback text; source/fallback/failure fields; receipts;
+reported costs; and latency. It does not contain authorization headers or
+credential values.
 
-Baseline model drafts were private. `complete_text` on the baseline is the
-private composer's output, **not what the baseline reader showed**. Candidate
-generator output also needs separate browser proof for the language-aware
-reader. Backend fallback text is retained for generator diagnosis; the browser
-must independently prove today's template inside each unchanged frame.
+Baseline model text was private, so it is not baseline browser evidence.
+Candidate backend fallback text is diagnostic; the web renders its own current
+localized template. Browser proof is separately bound to capture SHAs in
+[live-browser/README.md](live-browser/README.md).
 
-The raw targeted scorecard starts with all 48 texts pending review and no new
-passes. Review both repetitions of every case/language/surface against its run:
-correct language, grounded figures and benchmark direction, meaning beyond the
-card, short Quick take versus deeper distinct Breakdown, no invented causes,
-forecast, advice, internal field names or em dash. Record reviewer and
-case-by-case dispositions. A complete fallback remains a model-quality failure,
-even when it is safe product behavior. Do not turn acceptance by a deterministic
-validator into a claim of good prose. No separate paid prose judge is included.
+Codex reviewed all 48 texts against their run and paired Quick take for correct
+language, grounded figures/comparisons, meaning beyond the card, complementary
+short/deep roles and absence of causes, forecasts, advice, schema leakage or em
+dashes. No fixed word cap or paid prose judge was added. Complete fallback fails
+the model-writing bar even when safe. Deterministic acceptance is not a quality
+pass. The [original language reviews](targeted/README.md) distinguish accepted
+text errors from suppressed raw-draft observations.
 
-The baseline manifest's previous full scorecard is retained as a **historical
-reference only**, by exact file hash, original totals and every original case;
-none are counted as freshly run. At initial preflight its recorded totals were
-61 passed and 1 failed. One prior case,
-`asset_discovery_not_result_followup_issue_244`, has a result_summary receipt;
-its full-turn result is historical evidence, not remeasured by this targeted
-composer probe. Cases without observed readout calls are explicitly retained
-without new-pass claims. Compare candidate and baseline per case, language,
-surface and replicate; explain any regression rather than waiving it.
+The previous full scorecard named by the baseline fingerprint is retained by
+hash, original totals (61 passed / 1 failed) and case disposition as historical
+reference only. Its prior full-turn cases were not remeasured. The targeted
+report has explicit `fingerprint_authority.eligible: false`. Never point
+`last_measured` at it or claim it satisfies the full prompt-surface gate.
 
-The captain may retain the targeted scorecard and qualitative review as
-readout evidence. **Never point the prompt fingerprint or `last_measured` at
-this targeted scorecard. Do not regenerate the fingerprint.** A clean targeted
-result is not full-suite evidence or fingerprint authority.
+## Deterministic verification
 
-Finish this lane's scope and the approved targeted/browser proof, then stop and
-report the results. **No full live eval and no fingerprint regeneration until
-an explicit founder go.** There is no automatic follow-on measurement. Preserve
-the targeted comparison and prior
-full scorecard as historical references. Founder authority for merging this
-lane and deploying remains unchanged.
-
-## Free verification
-
-```bash
-poetry run pytest tests/test_interpreter_prompt_surface.py \
-  tests/evals/test_result_readout_eval.py -q --no-cov
-```
-
-The extractor now covers inline readout message dictionaries, the Breakdown
-API owner and the shared readout instruction constant/schema. It deliberately
-does not sweep unrelated API prose into this lane. The unchanged fingerprint
-may remain red at the targeted-proof handoff. That does not authorize changing
-it: report the outstanding fingerprint gate and wait for explicit founder go.
+The mocked harness and focused composer/transport/runner tests passed. The
+extractor covers inline readout message dictionaries, the Breakdown API owner
+and shared readout instructions/schema. The fingerprint remains unchanged and
+its CI check remains red. Full live measurement and regeneration require a
+separate explicit go. The founder alone merges and deploys.

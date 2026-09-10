@@ -1,0 +1,2835 @@
+{
+  "schema_version": "targeted_readout_scorecard/v1",
+  "scope": "result_summary + result_breakdown only; not a full eval suite",
+  "fingerprint_authority": {
+    "eligible": false,
+    "reason": "Targeted readout evidence cannot authorize a fingerprint update.",
+    "required_gate": "Finish this lane's approved targeted proof, then stop and report. No full live eval or fingerprint regeneration without an explicit founder go."
+  },
+  "evaluation_mode": "preflight_no_calls",
+  "remaining_prerequisites": [],
+  "generated_at": "2026-09-10T21:03:07.998567+00:00",
+  "fixture_sha256": "b255b3b18050a6c7ca7b39fd99645ca3297a4b50a373bf109895ea4fe9793851",
+  "fixture_sources": {
+    "docn_buyhold_recorded": {
+      "kind": "recorded_run",
+      "artifact": "live-browser/stored-runs/docn-en.json",
+      "sha256": "3cce17ff8236bb110fbc8c38cade27af74e560a0f07a93a774728d098d0cca56",
+      "provider_mode": "live_provider",
+      "captured_at": "2026-09-10T21:00:24.203053+00:00",
+      "capture_time_basis": "UTC time this fixture copied and hashed the saved source JSON; original run creation time is retained separately.",
+      "run_created_at": "2026-09-10T20:12:30.572008Z",
+      "engine_candidate_sha": "c36c099316578fb03804405f24cc1600debd0f25",
+      "provider_metadata": {
+        "provider": "alpaca",
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "feed": "iex"
+      },
+      "execution_path": "Canonical chat confirmation -> real backtest engine -> stored run; local memory persistence",
+      "successful_chat_or_browser_journey": true,
+      "provenance_artifact": "live-browser/initial-c36/environment.json",
+      "provenance_sha256": "dc32d5c8fdda367eecf22629ce93c52d68414b9707079028339c14d3246638b5"
+    },
+    "dca_costs_recorded": {
+      "kind": "recorded_run",
+      "artifact": "live-browser/stored-runs/dca-costs.json",
+      "sha256": "5d788b99cee6d2519a7a717118d94a52dd89aa6755525fb5e4b768882bf9ef28",
+      "provider_mode": "live_provider",
+      "captured_at": "2026-09-10T21:00:24.203053+00:00",
+      "capture_time_basis": "UTC time this fixture copied and hashed the saved source JSON; original run creation time is retained separately.",
+      "run_created_at": "2026-09-10T20:59:04.979299Z",
+      "engine_candidate_sha": "8c657b3c74c098ec58be2a2e91e75b202d5e33d3",
+      "provider_metadata": {
+        "provider": "alpaca",
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "feed": "iex"
+      },
+      "execution_path": "canonical prepare_confirmation_launch -> RealBacktestTool -> build_backtest_run_from_result",
+      "successful_chat_or_browser_journey": false,
+      "provenance_artifact": "live-browser/direct-dca-proof.json",
+      "provenance_sha256": "9a247e9c5e776b322040ac89aad481c3167def2ea12cfe48a800c17e73c02861"
+    },
+    "rsi14_recorded": {
+      "kind": "recorded_run",
+      "artifact": "live-browser/stored-runs/indicator.json",
+      "sha256": "c5893b49a504d01b23faac9693eb3032806b37f41034046ccdc154e8f1e8a2b6",
+      "provider_mode": "live_provider",
+      "captured_at": "2026-09-10T21:00:24.203053+00:00",
+      "capture_time_basis": "UTC time this fixture copied and hashed the saved source JSON; original run creation time is retained separately.",
+      "run_created_at": "2026-09-10T20:43:08.296177Z",
+      "engine_candidate_sha": "104da766a88d04fc466285a64c622b936925d657",
+      "provider_metadata": {
+        "provider": "alpaca",
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "feed": "iex"
+      },
+      "execution_path": "Canonical chat confirmation -> real backtest engine -> stored run; local memory persistence",
+      "successful_chat_or_browser_journey": true,
+      "provenance_artifact": "live-browser/checkpoint-104/environment.json",
+      "provenance_sha256": "cc5099c38b237926b48a8921341c5fd0b3048b22de8c85444e468edae39178a1"
+    }
+  },
+  "checkouts": {
+    "baseline": {
+      "commit": "d0884c3de81f8c53d454ac4f68f461d3b5dd77e3",
+      "worktree_clean": true,
+      "checkout": "/private/tmp/model-result-readouts-baseline-d088"
+    },
+    "candidate": {
+      "commit": "847cdd5e54e9e6256483ee2987a3f59bb79b8ebb",
+      "worktree_clean": true,
+      "checkout": "/Users/garces/.codex/worktrees/7c2d/private-alpha-next"
+    }
+  },
+  "runner_sha256": "0b19c438ac67c759620339fd14235c1ef9952563211a940ebfbef4593a41a56f",
+  "probe_sha256": "e45210d5432dbf5b306a47a6b40a46327220c532182b4769d8ff36cf0ddbfbb5",
+  "prior_full_scorecard": {
+    "path": "/private/tmp/model-result-readouts-baseline-d088/docs/reports/evidence/411/live-measurement.json",
+    "evidence_role": "historical_reference_only",
+    "sha256": "4bf559741b51e670fac352c69b6e4510794b60d7f371feacf9f478e730f6151c",
+    "remeasured": false,
+    "disposition": "Prior full-suite evidence retained; no new pass claimed.",
+    "totals": {
+      "expected_failed": 0,
+      "failed": 1,
+      "passed": 61,
+      "skipped": 0,
+      "unexpected_pass": 0
+    },
+    "case_dispositions": [
+      {
+        "case_id": "action_chip_run_visible_confirmation_aapl",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_remove_aapl_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_bare_ticker_append_issue_190",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_compound_replace_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_changed_mind_capital_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "natural_language_establishes_modeled_costs_issue_271",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "action_chip_add_asset_preserves_modeled_costs_issue_271",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "compound_benchmark_start_date_preserves_confirmation_issue_339",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_category_english_issue_244",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_peer_anchor_english_issue_244",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_category_spanish_issue_244",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_recent_ipo_exact_issue_344",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_semantic_pharma_escalation_issue_344",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_not_direct_backtest_issue_244",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "asset_discovery_not_result_followup_issue_244",
+        "prior_status": "passed",
+        "disposition": "Readout reached: prior full-turn result retained, not remeasured by this generator-only probe."
+      },
+      {
+        "case_id": "asset_discovery_not_capability_question_issue_244",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "metric_correctness_eth_default_crypto_benchmark",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "capability_honesty_options_straddle_tsla",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "capability_honesty_golden_cross_control_aapl",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "capability_honesty_momentum_breakout_aapl",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "capability_honesty_news_sentiment_rule_aapl",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "capability_honesty_future_performance_nvda_golden_cross",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "capability_honesty_future_performance_btc_regression",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_crypto_weekly_btc_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_truncated_window_measures_served_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+        "prior_status": "failed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "graceful_recovery_weekly_options_aapl",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "graceful_recovery_spanish_weekly_options_aapl",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_english_opening_apple_capital_missing_period_issue_336",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_english_aapl_simple_hold_2024",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_english_company_name_multi_asset_issue_142",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_english_complete_sma_crossover_benchmark_issue_270",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_english_post_result_fact_then_capital_edit_issue_160",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_spanish_btc_hold_q1_2024",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      },
+      {
+        "case_id": "spanish_ui_english_user_msft_hold_h1_2024",
+        "prior_status": "passed",
+        "disposition": "No observed readout call: prior case retained without a new pass claim."
+      }
+    ]
+  },
+  "budget": {
+    "approved_usd": 3.5,
+    "worst_case_usd": 3.4821119999999994,
+    "max_input_bytes": 60000,
+    "max_attempts_per_task": 4,
+    "reserved_usd": 0.0,
+    "observed_cost_usd": 0,
+    "unknown_cost_reserved_usd": 0,
+    "accounted_upper_bound_usd": 0,
+    "unknown_cost_attempts": 0,
+    "cost_complete": false
+  },
+  "totals": {
+    "passed": 0,
+    "failed": 0,
+    "pending_review": 48
+  },
+  "quality_review": "Required: language, helpful interpretation beyond card, short/deep distinction, no repetition, false figures/claims, causal claims, forecasts, advice, em dashes.",
+  "results": [
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "en",
+      "variant": "baseline",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8121,
+          "payload_sha256": "0361149cfd194670c6598bee8c87c44724aaa84cff1431879bd7409a4fe03bc6"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8110,
+          "payload_sha256": "a40ac4495809a32c3fcd9bc0c176e4d5b4e69001675429ee315a675d0c9d14e5"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 5945,
+          "payload_sha256": "ed89b854340b04c4a6379ee367f6519191b9dbb99a1aeda85367d759473a94df"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 5952,
+          "payload_sha256": "4ee18d9921169de9bea7e43e850dd8817776cc40e3696a5a03d1d2214de71f40"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "9c5bdd9ab3b0889aa99703f608943bdc52d79bb68894e980a1102dd3fc14edf0",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over September 1, 2023 - September 9, 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Beat by 327.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "en",
+      "variant": "candidate",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49826,
+          "payload_sha256": "793d097e6ebd29f7f1d49e2507cf8f3b81f453a1146b48a2177cd69a004af959"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 49815,
+          "payload_sha256": "cb793ef82f070c3fd7ab791d16bff168cecf578c1fdd7e5531404e992f01888b"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 49490,
+          "payload_sha256": "cb0e40e3175191a50c6c1f41157f9b41b43343a27b93b7d0e95abe927989cee7"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49497,
+          "payload_sha256": "c9214b97016aa5a0c4087bb420fdd343599f3a08c4e95577a8a0ae76e54d1b86"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "9c5bdd9ab3b0889aa99703f608943bdc52d79bb68894e980a1102dd3fc14edf0",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over September 1, 2023 - September 9, 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Beat by 327.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "en",
+      "variant": "candidate",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49826,
+          "payload_sha256": "793d097e6ebd29f7f1d49e2507cf8f3b81f453a1146b48a2177cd69a004af959"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 49815,
+          "payload_sha256": "cb793ef82f070c3fd7ab791d16bff168cecf578c1fdd7e5531404e992f01888b"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 49490,
+          "payload_sha256": "cb0e40e3175191a50c6c1f41157f9b41b43343a27b93b7d0e95abe927989cee7"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49497,
+          "payload_sha256": "c9214b97016aa5a0c4087bb420fdd343599f3a08c4e95577a8a0ae76e54d1b86"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "9c5bdd9ab3b0889aa99703f608943bdc52d79bb68894e980a1102dd3fc14edf0",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over September 1, 2023 - September 9, 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Beat by 327.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "en",
+      "variant": "baseline",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8121,
+          "payload_sha256": "0361149cfd194670c6598bee8c87c44724aaa84cff1431879bd7409a4fe03bc6"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8110,
+          "payload_sha256": "a40ac4495809a32c3fcd9bc0c176e4d5b4e69001675429ee315a675d0c9d14e5"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 5945,
+          "payload_sha256": "ed89b854340b04c4a6379ee367f6519191b9dbb99a1aeda85367d759473a94df"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 5952,
+          "payload_sha256": "4ee18d9921169de9bea7e43e850dd8817776cc40e3696a5a03d1d2214de71f40"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "9c5bdd9ab3b0889aa99703f608943bdc52d79bb68894e980a1102dd3fc14edf0",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over September 1, 2023 - September 9, 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Beat by 327.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "es-419",
+      "variant": "baseline",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8175,
+          "payload_sha256": "97585c4bec3f314b28fadd803848c47a390c1b16347fb5337ed70310cdc6e06b"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8164,
+          "payload_sha256": "c61de8232d5f191c69536eb97b2ca734f4e614f6d0527332edc9d45498d08798"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 5978,
+          "payload_sha256": "ceec212915e4ec81038f16a72f7161c3b162a980f744f2c7f68209e069f8859a"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 5985,
+          "payload_sha256": "cea95536d36ecc29c9e593171b327e487b9c6bf7f75d4d077b56e44a448af65f"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "1091f285286655d747c07c9a076b3d61eed65700a50de1c24c6e7de94ec81d74",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over 1 de septiembre de 2023 al 9 de septiembre de 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Superó por 327.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "es-419",
+      "variant": "candidate",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49846,
+          "payload_sha256": "692324958385cec66dba82d18925fb0c75a99b42372d805ba46e387e996f13a8"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 49835,
+          "payload_sha256": "cdfb6f524f66279ba58fa86d99add7018de264b1d8e67662dbe46ea3cf31b0fe"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 49510,
+          "payload_sha256": "f6b3074a5c603363478b32df280180f7e75303a13b9d54440d4979850d8036ff"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49517,
+          "payload_sha256": "19294fcc7f71267b025cbb14e66484c23c97d0e24c036e87d18d21a4406dfa49"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "1091f285286655d747c07c9a076b3d61eed65700a50de1c24c6e7de94ec81d74",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over 1 de septiembre de 2023 al 9 de septiembre de 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Superó por 327.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "es-419",
+      "variant": "candidate",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49846,
+          "payload_sha256": "692324958385cec66dba82d18925fb0c75a99b42372d805ba46e387e996f13a8"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 49835,
+          "payload_sha256": "cdfb6f524f66279ba58fa86d99add7018de264b1d8e67662dbe46ea3cf31b0fe"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 49510,
+          "payload_sha256": "f6b3074a5c603363478b32df280180f7e75303a13b9d54440d4979850d8036ff"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 49517,
+          "payload_sha256": "19294fcc7f71267b025cbb14e66484c23c97d0e24c036e87d18d21a4406dfa49"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "1091f285286655d747c07c9a076b3d61eed65700a50de1c24c6e7de94ec81d74",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over 1 de septiembre de 2023 al 9 de septiembre de 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Superó por 327.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "language": "es-419",
+      "variant": "baseline",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8175,
+          "payload_sha256": "97585c4bec3f314b28fadd803848c47a390c1b16347fb5337ed70310cdc6e06b"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8164,
+          "payload_sha256": "c61de8232d5f191c69536eb97b2ca734f4e614f6d0527332edc9d45498d08798"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 5978,
+          "payload_sha256": "ceec212915e4ec81038f16a72f7161c3b162a980f744f2c7f68209e069f8859a"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 5985,
+          "payload_sha256": "cea95536d36ecc29c9e593171b327e487b9c6bf7f75d4d077b56e44a448af65f"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "1091f285286655d747c07c9a076b3d61eed65700a50de1c24c6e7de94ec81d74",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 396.3% while SPY returned 69.0% for the comparison window, so it outperformed by 327.3 percentage points.\n\n- Tested: DOCN buy and hold over 1 de septiembre de 2023 al 9 de septiembre de 2026. Rule: buy at the start of the period and hold through the end.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Long-only. Equal weight. No fees/slippage. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Superó por 327.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "en",
+      "variant": "baseline",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8249,
+          "payload_sha256": "6276dce754f24ba97baa4bc5ea508781854c4d930f0c9fe244696aeae9d41816"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8238,
+          "payload_sha256": "9ad023d8694d8fc461feff7fc68b180970ea284017a39f8de9e6d151e5bda291"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 6111,
+          "payload_sha256": "b36f53ca5e54f4a200ebec4cb01fa403c470766ab8181ad7ec32af14e667d260"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 6118,
+          "payload_sha256": "2f02acd6eaaf7a1ba22aa52758e6b5c341d61d1df87619cfcbcf4e2ea6cb8b3a"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "b1f10e764baba00ef2607f462ee5eaf07d3bfa88b9e38b96aff6548f38cdf6de",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over September 10, 2025 - September 9, 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: Date range, Timeframe, Benchmark, Starting capital, Starting capital, Contribution period.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Beat by 176.8 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "en",
+      "variant": "candidate",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22900,
+          "payload_sha256": "35422afc5fe4439e863702a81747ab5c3e8045db11d8e24fa1acd17b26b1e54a"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22889,
+          "payload_sha256": "8ce5634022fe54f481c0d61082b62173f3ebcf151bd2838e97b353f4730e0cfd"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 22559,
+          "payload_sha256": "49d20167469fad2969a4eee806c92a549e63ac760c06001b733baa68e84902ed"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22566,
+          "payload_sha256": "fd9aa904f54c8dcca7856432dcf536a1a60375d449da616f931b5355207ccf89"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "b1f10e764baba00ef2607f462ee5eaf07d3bfa88b9e38b96aff6548f38cdf6de",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over September 10, 2025 - September 9, 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: Date range, Timeframe, Benchmark, Starting capital, Starting capital, Contribution period.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Beat by 176.8 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "en",
+      "variant": "candidate",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22900,
+          "payload_sha256": "35422afc5fe4439e863702a81747ab5c3e8045db11d8e24fa1acd17b26b1e54a"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22889,
+          "payload_sha256": "8ce5634022fe54f481c0d61082b62173f3ebcf151bd2838e97b353f4730e0cfd"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 22559,
+          "payload_sha256": "49d20167469fad2969a4eee806c92a549e63ac760c06001b733baa68e84902ed"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22566,
+          "payload_sha256": "fd9aa904f54c8dcca7856432dcf536a1a60375d449da616f931b5355207ccf89"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "b1f10e764baba00ef2607f462ee5eaf07d3bfa88b9e38b96aff6548f38cdf6de",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over September 10, 2025 - September 9, 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: Date range, Timeframe, Benchmark, Starting capital, Starting capital, Contribution period.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Beat by 176.8 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "en",
+      "variant": "baseline",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8249,
+          "payload_sha256": "6276dce754f24ba97baa4bc5ea508781854c4d930f0c9fe244696aeae9d41816"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8238,
+          "payload_sha256": "9ad023d8694d8fc461feff7fc68b180970ea284017a39f8de9e6d151e5bda291"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 6111,
+          "payload_sha256": "b36f53ca5e54f4a200ebec4cb01fa403c470766ab8181ad7ec32af14e667d260"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 6118,
+          "payload_sha256": "2f02acd6eaaf7a1ba22aa52758e6b5c341d61d1df87619cfcbcf4e2ea6cb8b3a"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "b1f10e764baba00ef2607f462ee5eaf07d3bfa88b9e38b96aff6548f38cdf6de",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over September 10, 2025 - September 9, 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: Date range, Timeframe, Benchmark, Starting capital, Starting capital, Contribution period.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 4
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Beat by 176.8 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "es-419",
+      "variant": "baseline",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8291,
+          "payload_sha256": "2e555e30cd626b706ecec5db2b26f29495e3840d59f1a40ab7f88a7322650e52"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8280,
+          "payload_sha256": "50de346c74b3f0d753c22ef69ca025f6d406964d85be2b8d67d3b85d238b4398"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 6144,
+          "payload_sha256": "b42f33b67a1eb18b53034812dfee685d649ab4a609d9ddcf121c9d327e390900"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 6151,
+          "payload_sha256": "efbc8197aa712185e2f0782c479041169a200046dd60a0271c889aac6bf44a13"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "ce6eaf1a4d377dfe11c60c3b6b77222a288300474407bf55129a76a6d2de9b47",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: date range, temporalidad, benchmark symbol, capital amount, starting capital, cadence.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 7
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Superó por 176.8 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "es-419",
+      "variant": "candidate",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22920,
+          "payload_sha256": "828d94d317f763ef467f835ad2dd375b55e7c13b7e7e52d206c9568e1a9e2691"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22909,
+          "payload_sha256": "a978d2f9988c98c296ee9424961d7b893195ba46953c87149e4fd89648f2494c"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 22579,
+          "payload_sha256": "16fe4334b2e81820720a1bd6b7ba1d86047adb8ff73fc93c0e59e7f07f7ba597"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22586,
+          "payload_sha256": "e8dee4f476f0d1ced5ca8ba4675652fb66dd1f206331aa49a4792b6da3f90e3a"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "ce6eaf1a4d377dfe11c60c3b6b77222a288300474407bf55129a76a6d2de9b47",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: date range, temporalidad, benchmark symbol, capital amount, starting capital, cadence.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 5
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Superó por 176.8 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "es-419",
+      "variant": "candidate",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22920,
+          "payload_sha256": "828d94d317f763ef467f835ad2dd375b55e7c13b7e7e52d206c9568e1a9e2691"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22909,
+          "payload_sha256": "a978d2f9988c98c296ee9424961d7b893195ba46953c87149e4fd89648f2494c"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 22579,
+          "payload_sha256": "16fe4334b2e81820720a1bd6b7ba1d86047adb8ff73fc93c0e59e7f07f7ba597"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22586,
+          "payload_sha256": "e8dee4f476f0d1ced5ca8ba4675652fb66dd1f206331aa49a4792b6da3f90e3a"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "ce6eaf1a4d377dfe11c60c3b6b77222a288300474407bf55129a76a6d2de9b47",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: date range, temporalidad, benchmark symbol, capital amount, starting capital, cadence.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 5
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Superó por 176.8 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "language": "es-419",
+      "variant": "baseline",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8291,
+          "payload_sha256": "2e555e30cd626b706ecec5db2b26f29495e3840d59f1a40ab7f88a7322650e52"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8280,
+          "payload_sha256": "50de346c74b3f0d753c22ef69ca025f6d406964d85be2b8d67d3b85d238b4398"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 6144,
+          "payload_sha256": "b42f33b67a1eb18b53034812dfee685d649ab4a609d9ddcf121c9d327e390900"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 6151,
+          "payload_sha256": "efbc8197aa712185e2f0782c479041169a200046dd60a0271c889aac6bf44a13"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "ce6eaf1a4d377dfe11c60c3b6b77222a288300474407bf55129a76a6d2de9b47",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 188.9% while SPY returned 12.1% for the comparison window, so it outperformed by 176.8 percentage points.\n\n- Tested: DOCN recurring buys over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy recurring contributions on a monthly cadence and hold.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Contribution: $100 monthly. Starting capital: $1,000. Fractional shares, nothing left as cash. User-set options: date range, temporalidad, benchmark symbol, capital amount, starting capital, cadence.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 7
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN DCA Accumulation tested DOCN over September 10, 2025 to September 9, 2026 using the stored backtest configuration. Entry rule: buy on the monthly cadence; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +188.9%. The comparison benchmark was SPY at +12.1%. Superó por 176.8 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -42.1%, the largest peak-to-trough decline captured by the simulation. The run used Contribution: $100 monthly; Starting capital: $1,000; Fractional shares, nothing left as cash; Long-only; Equal weight.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "en",
+      "variant": "baseline",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8525,
+          "payload_sha256": "ebc31135bfca3d89f98b15f09175fe08b6adbc0a49cb6f3b5a30c1615f7be507"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8514,
+          "payload_sha256": "ae9de083a2c850e06f1c3d8bc74bf98d080809deb4c2fb07773903f82970a593"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 5980,
+          "payload_sha256": "23ca075fe5363631c9ad86bf36b1f30c35b3ddcf0516f5afb1bf4df6f1a5b1b4"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 5987,
+          "payload_sha256": "c586e2417937f3145581bd15f9abbaadc34c67140eb837ed734329d21523df08"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "695f5286e8146ba25513cc195752f39497ef1d9b3082c97c8c92fab948bbabb7",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over September 10, 2025 - September 9, 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 5
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Lagged by 8.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "en",
+      "variant": "candidate",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22517,
+          "payload_sha256": "0720a8fa9c745c7de7d672c8ca6110e863d3efe5d5e567e48a694050aa0f094f"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22506,
+          "payload_sha256": "4f2eba1bfb8e85fd764a9e9efd6bb4d683f23cd7f7f9ea930cdd98cc8339f44c"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 21910,
+          "payload_sha256": "8eb1531646a5059f98d6b0407b80f18b63c2da63d66a0e635a572f141fe57073"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 21917,
+          "payload_sha256": "d585315ced9d4ceaec58d8cb31fdde694c61f07e4dd12afa495bc228c66f58c3"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "695f5286e8146ba25513cc195752f39497ef1d9b3082c97c8c92fab948bbabb7",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over September 10, 2025 - September 9, 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 5
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Lagged by 8.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "en",
+      "variant": "candidate",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22517,
+          "payload_sha256": "0720a8fa9c745c7de7d672c8ca6110e863d3efe5d5e567e48a694050aa0f094f"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22506,
+          "payload_sha256": "4f2eba1bfb8e85fd764a9e9efd6bb4d683f23cd7f7f9ea930cdd98cc8339f44c"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 21910,
+          "payload_sha256": "8eb1531646a5059f98d6b0407b80f18b63c2da63d66a0e635a572f141fe57073"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 21917,
+          "payload_sha256": "d585315ced9d4ceaec58d8cb31fdde694c61f07e4dd12afa495bc228c66f58c3"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "695f5286e8146ba25513cc195752f39497ef1d9b3082c97c8c92fab948bbabb7",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over September 10, 2025 - September 9, 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 5
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Lagged by 8.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "en",
+      "variant": "baseline",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8525,
+          "payload_sha256": "ebc31135bfca3d89f98b15f09175fe08b6adbc0a49cb6f3b5a30c1615f7be507"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8514,
+          "payload_sha256": "ae9de083a2c850e06f1c3d8bc74bf98d080809deb4c2fb07773903f82970a593"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 5980,
+          "payload_sha256": "23ca075fe5363631c9ad86bf36b1f30c35b3ddcf0516f5afb1bf4df6f1a5b1b4"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 5987,
+          "payload_sha256": "c586e2417937f3145581bd15f9abbaadc34c67140eb837ed734329d21523df08"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "695f5286e8146ba25513cc195752f39497ef1d9b3082c97c8c92fab948bbabb7",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over September 10, 2025 - September 9, 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: Date range, Timeframe, Benchmark, Starting capital.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 5
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Lagged by 8.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "es-419",
+      "variant": "baseline",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8587,
+          "payload_sha256": "5cf9478dd160e7d5f4aa2291e259c59e21c3448b6c22c3fca6587b3d917c4e9c"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8576,
+          "payload_sha256": "a47af83a1fd6d84ae172f375a7568efbd71a9de784337d573ebdf6fc2a2e9976"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 6021,
+          "payload_sha256": "87e4a37184446c883b8f7fc3d7753e74d160e5c58885a8eb1ed8815941eeaf88"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 6028,
+          "payload_sha256": "1bf4beffe73178f2320b8029a446feba534eac070d11d0ba3a7ecdfd4511f2d7"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "d44679e3414e7bc310a4946095f3bc4472ea9b793389f73425047eaa181d8573",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Quedó por debajo por 8.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "es-419",
+      "variant": "candidate",
+      "replicate": 1,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22537,
+          "payload_sha256": "1fdb3cabe6c0b4df37e81325d59ab4eabbd26e3c30adc187a5f8c3360e4250c8"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22526,
+          "payload_sha256": "bb1c31c2e959746dfb8e8a810ec4aa7a44fc1ed5acd28b916ed94070af14222a"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 21930,
+          "payload_sha256": "e11539521b5d37ba6256dc1e5f639621d01f05d0a41c5449d130913aa6cbe846"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 21937,
+          "payload_sha256": "a6d1061d2fd446948e6e48776fdd9e3fb4d34ffdff2233d3d0a6dfcfc0f76e3e"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "d44679e3414e7bc310a4946095f3bc4472ea9b793389f73425047eaa181d8573",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Quedó por debajo por 8.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "es-419",
+      "variant": "candidate",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 22537,
+          "payload_sha256": "1fdb3cabe6c0b4df37e81325d59ab4eabbd26e3c30adc187a5f8c3360e4250c8"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 22526,
+          "payload_sha256": "bb1c31c2e959746dfb8e8a810ec4aa7a44fc1ed5acd28b916ed94070af14222a"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 21930,
+          "payload_sha256": "e11539521b5d37ba6256dc1e5f639621d01f05d0a41c5449d130913aa6cbe846"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 21937,
+          "payload_sha256": "a6d1061d2fd446948e6e48776fdd9e3fb4d34ffdff2233d3d0a6dfcfc0f76e3e"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "d44679e3414e7bc310a4946095f3bc4472ea9b793389f73425047eaa181d8573",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "invalid_draft",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Quedó por debajo por 8.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Candidate composer output; reader and template fallback require separate browser evidence."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "language": "es-419",
+      "variant": "baseline",
+      "replicate": 2,
+      "configuration": {
+        "python_version": "3.10.20",
+        "llm_mode": "preflight_no_calls",
+        "market_data_provider_mode": "recorded_run_fixture_no_fetch",
+        "asset_provider_mode": "recorded_run_fixture_no_fetch",
+        "credential_present": true,
+        "tasks": {
+          "result_summary": {
+            "tier": "chat",
+            "models": [
+              "deepseek/deepseek-v4-flash",
+              "qwen/qwen3.5-9b"
+            ],
+            "max_output_tokens": 700,
+            "timeout_seconds": 30,
+            "temperature": 0.2
+          },
+          "result_breakdown": {
+            "tier": "context",
+            "models": [
+              "openai/gpt-oss-120b",
+              "deepseek/deepseek-v4-flash"
+            ],
+            "max_output_tokens": 2400,
+            "timeout_seconds": 25,
+            "temperature": 0.2
+          }
+        }
+      },
+      "requests": [],
+      "provider_responses": [],
+      "guard_failures": [],
+      "preflight_payloads": [
+        {
+          "task": "result_summary",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 8587,
+          "payload_sha256": "5cf9478dd160e7d5f4aa2291e259c59e21c3448b6c22c3fca6587b3d917c4e9c"
+        },
+        {
+          "task": "result_summary",
+          "model": "qwen/qwen3.5-9b",
+          "bytes": 8576,
+          "payload_sha256": "a47af83a1fd6d84ae172f375a7568efbd71a9de784337d573ebdf6fc2a2e9976"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "openai/gpt-oss-120b",
+          "bytes": 6021,
+          "payload_sha256": "87e4a37184446c883b8f7fc3d7753e74d160e5c58885a8eb1ed8815941eeaf88"
+        },
+        {
+          "task": "result_breakdown",
+          "model": "deepseek/deepseek-v4-flash",
+          "bytes": 6028,
+          "payload_sha256": "1bf4beffe73178f2320b8029a446feba534eac070d11d0ba3a7ecdfd4511f2d7"
+        }
+      ],
+      "composition_mode": "fresh composition from a stored run fixture; no persistence",
+      "quick_take_input": {
+        "owner": "result_readout_with_metadata_from_backtest_payload_async",
+        "payload_sha256": "d44679e3414e7bc310a4946095f3bc4472ea9b793389f73425047eaa181d8573",
+        "resolved_launch_metadata_recorded": true
+      },
+      "quick_take": {
+        "complete_text": "The strategy returned 8.6% while SPY returned 16.9% for the comparison window, so it lagged by 8.3 percentage points.\n\n- Tested: SPY indicator threshold over 10 de septiembre de 2025 al 9 de septiembre de 2026. Rule: buy when RSI is at or below 30.0; sell when it is at or above 70.0.\n- What that means: Use this as an evidence check for the confirmed rule before refining it.\n- Assumptions: Solo largo. Peso igual. Sin comisiones/deslizamiento. User-set options: date range, temporalidad, benchmark symbol, capital amount.\n- Keep in mind: This is a return comparison, not causal attribution.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "quick_take_draft_rejected",
+        "latency_ms": 6
+      },
+      "breakdown": {
+        "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** SPY Umbral RSI tested SPY over 10 de septiembre de 2025 al 9 de septiembre de 2026 using the stored backtest configuration. Entry rule: buy when RSI(14) is at or below 30; exit rule: sell when RSI(14) is at or above 70.\n\n**How to read it.** **Total return:** +8.6%. The comparison benchmark was SPY at +16.9%. Quedó por debajo por 8.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -4.8%, the largest peak-to-trough decline captured by the simulation. The run used Solo largo; Peso igual; Sin comisiones/deslizamiento; Referencia: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
+        "accepted_text": null,
+        "source": "deterministic_fallback",
+        "fallback_used": true,
+        "failure_mode": "llm_unavailable_or_contract_rejected",
+        "latency_ms": 1
+      },
+      "provider_worker_settled": true,
+      "receipt_settlement_ms": 0,
+      "http_closed": true,
+      "route_receipts": [],
+      "reserved_usd": 0,
+      "http_attempts": 0,
+      "observed_cost_usd": 0,
+      "unknown_cost_attempts": 0,
+      "unknown_cost_reserved_usd": 0,
+      "accounted_upper_bound_usd": 0,
+      "cost_complete": false,
+      "all_attempts_reserved": true,
+      "attempt_receipts_complete": true,
+      "display_evidence_role": "Private baseline composer output; baseline reader showed the web template."
+    }
+  ]
+}

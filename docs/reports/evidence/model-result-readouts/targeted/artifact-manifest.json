@@ -1,0 +1,49 @@
+{
+  "raw_and_original_preserved_byte_for_byte": true,
+  "raw_original_prefix_equal": true,
+  "raw_task_keys_equal_review_keys": true,
+  "diagnosis_payload_hash_present_in_completed_raw": "793d097e6ebd29f7f1d49e2507cf8f3b81f453a1146b48a2177cd69a004af959",
+  "guard_diagnosis_note": "Diagnosis was captured during the first six visits; its payload hash also appears in the completed immutable raw report. The interim snapshot itself is not a separate published scorecard.",
+  "artifacts": {
+    "english-review.json": {
+      "sha256": "4a3366ecdbac47868a911ccacc7ef3d9e9dc36a4d5cad24978e00ff368a36917",
+      "bytes": 12153
+    },
+    "guard-diagnosis.json": {
+      "sha256": "655f37280bb4bfdf92fb2dd70f35dced8f203797f6d4a32ae3578d5030531302",
+      "bytes": 45330
+    },
+    "preflight.json": {
+      "sha256": "cb16d2173027450672a9a82bddcca4ce28f834101f06886e452bcbfe119e09b9",
+      "bytes": 135524
+    },
+    "prices.json": {
+      "sha256": "6f797f530981fb6f9ea6b5fdcc901c740497f9aec3505c10ef5cd1df46ca4d81",
+      "bytes": 475
+    },
+    "quality-review.json": {
+      "sha256": "2f56b13e3e0eaaea43ff6ad88d4ea3a73a3691ff820cec99f60ab37d51c3bbb4",
+      "bytes": 55046
+    },
+    "raw-completed.json": {
+      "sha256": "a8c3bb1b5a1ad7a4b804c2f33c52f4014f760d216b92402061a70980a38cea65",
+      "bytes": 292467
+    },
+    "resume-remaining.py": {
+      "sha256": "2952c4d2568897c18bf7a4c68858647e76185051d2f84336c3c3c27d5b4f4dbf",
+      "bytes": 11820
+    },
+    "scorecard.json": {
+      "sha256": "eb34efa731840685c471e00679ee77b37f4dc434fe648558563e3a9e646a7b1e",
+      "bytes": 5121
+    },
+    "spanish-review.json": {
+      "sha256": "0517baedd6674bbfc1ef4cbcb3fd712dbda999f107dc6455d7ded22ecaa6879a",
+      "bytes": 29128
+    },
+    "stopped-original.json": {
+      "sha256": "b54a293836278d688def0d6d9fbdcc414db451db63ac129f5c388e527c19c2ff",
+      "bytes": 251500
+    }
+  }
+}

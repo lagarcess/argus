@@ -1,0 +1,793 @@
+{
+  "schema_version": "result_readout_language_review/v1",
+  "status": "complete",
+  "language": "es-419",
+  "expected_tasks": 24,
+  "reviewed_tasks": 24,
+  "reviewed_visits": 12,
+  "method": "Independent qualitative assessment against recorded run metrics, configuration and chart, with no paid judge, model call or backtest. Quality pass requires truthful, useful, appropriately scoped model prose; safe fallback is a model-quality failure. No arbitrary word cap. Baseline accepted text is private composer output, not baseline UI. Candidate fallback complete_text is private deterministic prose; the reader uses its localized template.",
+  "source": "/private/tmp/model-result-readouts-live-completed.json",
+  "source_sha256": "a8c3bb1b5a1ad7a4b804c2f33c52f4014f760d216b92402061a70980a38cea65",
+  "fixture_source": "docs/reports/evidence/model-result-readouts/recorded-fixtures.json",
+  "fixture_sha256": "b255b3b18050a6c7ca7b39fd99645ca3297a4b50a373bf109895ea4fe9793851",
+  "baseline_commit": "d0884c3de81f8c53d454ac4f68f461d3b5dd77e3",
+  "candidate_commit": "847cdd5e54e9e6256483ee2987a3f59bb79b8ebb",
+  "summary": {
+    "baseline": {
+      "tasks": 12,
+      "quality_pass": 0,
+      "accepted_model_text": 9,
+      "model_fallback": 3
+    },
+    "candidate": {
+      "tasks": 12,
+      "quality_pass": 0,
+      "accepted_model_text": 5,
+      "model_fallback": 7
+    }
+  },
+  "interpretation_notes": [
+    "issues concern accepted complete text, or the generation fallback itself. raw_only_issues concern suppressed drafts and must not be reported as visible leakage.",
+    "language_ok, figures_and_benchmark_ok and compliance describe the accepted draft where present, otherwise the recorded raw draft. Null means no raw draft was available.",
+    "causal_claim includes unsupported performance attribution, such as asserting that the strategy missed the benchmark's strongest rally periods without its price path.",
+    "No accepted Spanish candidate task met the full bar: seven fell back and five had substantive incorrect historical claims. Several rejected drafts offered useful personal interpretation, but that is not a visible result.",
+    "The stopped baseline RSI visit retains unknown HTTP cost and its full reservation. This review does not reclassify production timeouts as dollar-budget failures."
+  ],
+  "assessments": [
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "baseline",
+      "replicate": 1,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "strategy_meaning",
+          "quote": "prueba de compra y venta",
+          "detail": "The stored strategy buys and holds, with one executed buy fill; this translates it as buying and selling."
+        },
+        {
+          "category": "useful_beyond_card",
+          "detail": "Restates dates, total return, benchmark return and spread, then adds a generic causality disclaimer; it does not interpret the tradeoff."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "baseline",
+      "replicate": 1,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "depth_and_complementarity",
+          "detail": "Repeats the Quick take's dates and all performance numbers, then repeats card assumptions. The five-times framing helps slightly, but the paragraph does not explain the risk in personal terms."
+        },
+        {
+          "category": "drawdown_clarity",
+          "quote": "La mayor pérdida registrada (pérdida máxima)",
+          "detail": "Labels drawdown as maximum loss without defining its decline-from-a-prior-peak basis."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "candidate",
+      "replicate": 1,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Guard rejected the whole draft as unknown_figure. Reader uses localized template; deterministic complete_text is private."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "comparison_units",
+          "quote": "una ventaja adicional del 327,27 % sobre el benchmark",
+          "detail": "The stored gap is 327.27 percentage points, not a relative percentage lead."
+        },
+        {
+          "category": "strategy_meaning",
+          "quote": "compra y venta de acciones",
+          "detail": "The stored strategy buys and holds with one buy fill."
+        },
+        {
+          "category": "first_glance_length",
+          "detail": "The draft is a long metric-heavy paragraph including annualized return and Sharpe after return, benchmark, drawdown and money illustration."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "candidate",
+      "replicate": 1,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "No accepted text; production Breakdown outer 28-second deadline returned deterministic fallback (llm_unavailable_or_contract_rejected, elapsed 28002ms). This is not a dollar-budget guard failure. Reader uses localized template."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "comparison_units",
+          "quote": "327,27 % de retorno adicional",
+          "detail": "The stored lead is in percentage points."
+        },
+        {
+          "category": "false_path_claim",
+          "quote": "terminando mucho más alto que el pico histórico de $6 784,14",
+          "detail": "Its own ending value is $4962.59, which is below the stored $6784.14 peak."
+        },
+        {
+          "category": "depth_and_complementarity",
+          "detail": "Repeats all of the rejected Quick take's main figures, although it does add executed-fill and Sharpe interpretation."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "candidate",
+      "replicate": 2,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Whole draft rejected as unknown_figure; reader uses template."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "false_path_chronology",
+          "quote": "un máximo de 6.784 dólares antes de caer hasta un mínimo de 742 dólares",
+          "detail": "The stored global minimum $741.86 occurred on 2023-11-01, before the global maximum $6784.14, not after it."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "candidate",
+      "replicate": 2,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Draft rejected by contract, elapsed 4684ms; reader uses template. This is not a dollar-budget guard failure."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "comparison_units",
+          "quote": "327.3 % de retorno acumulado, o casi 5 veces más",
+          "detail": "The gap is 327.27 percentage points, and the multiple claim is ambiguous/incorrect for DOCN versus SPY returns."
+        },
+        {
+          "category": "annualization_meaning",
+          "quote": "lo que indica un crecimiento sostenido año tras año",
+          "detail": "A historical annualized return does not establish steady growth each year."
+        },
+        {
+          "category": "volatility_period",
+          "quote": "La volatilidad diaria ... alrededor del 68.6 %",
+          "detail": "The stored 68.62% volatility is annualized, not daily."
+        },
+        {
+          "category": "drawdown_clarity",
+          "detail": "Calls the decline almost half of the historical maximum, although max drawdown does not necessarily begin at the global maximum. Money is labeled an illustration but not explicitly distinguished from actual peak-dollar loss."
+        },
+        {
+          "category": "advice",
+          "quote": "algo que cualquier inversor debe considerar al evaluar su tolerancia al riesgo",
+          "detail": "Adds prescriptive risk-tolerance commentary despite the no-advice readout boundary."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": true,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "baseline",
+      "replicate": 2,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "useful_beyond_card",
+          "detail": "Takeaway and four bullets repeatedly restate the setup, return spread and assumptions, without explaining roughness or economic meaning."
+        },
+        {
+          "category": "first_glance_length",
+          "detail": "The multi-bullet output is materially longer than a short first-glance readout."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "next_experiments",
+          "detail": "Raw schema included next_check_bullet; baseline renderer omitted it, so it is not an accepted-text issue."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "docn_buyhold_recorded",
+      "variant": "baseline",
+      "replicate": 2,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": false,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "language",
+          "quote": "Buy and Hold ... long-only",
+          "detail": "Untranslated strategy/position labels remain in otherwise Spanish prose."
+        },
+        {
+          "category": "depth_and_complementarity",
+          "detail": "Repeats the Quick take setup and performance comparison and the result card's drawdown, with little interpretation beyond those facts."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "baseline",
+      "replicate": 1,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "useful_beyond_card",
+          "detail": "Correct seed, monthly contribution and return comparison, but only restates the card/setup and a generic causality caveat."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "next_experiments",
+          "detail": "Raw next_check_bullet was omitted from rendered prose."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "baseline",
+      "replicate": 1,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "funding_and_weighting",
+          "quote": "con un peso igual para cada compra",
+          "detail": "Equal weight refers to asset allocation, not equal dollar size of every purchase; the initial purchase includes the $1000 seed plus contribution, unlike subsequent monthly purchases."
+        },
+        {
+          "category": "depth_and_complementarity",
+          "detail": "Repeats the Quick take's full return/setup comparison and mostly recites card assumptions. Adds only a generic high-return/high-drawdown interpretation."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "candidate",
+      "replicate": 1,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Whole draft rejected as unknown_figure; reader uses template."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "drawdown_dollar_claim",
+          "quote": "esa caída habría representado una pérdida temporal de 421 dólares",
+          "detail": "Presents the seed-scaled drawdown as a temporary monetary loss rather than explicitly labeling an illustration distinct from actual peak-dollar loss."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "candidate",
+      "replicate": 1,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "false_ending_value",
+          "quote": "terminó el periodo con un valor de $8,648.6",
+          "detail": "$8648.60 is the stored global peak. The ending value is $6644.07; gain $4344.07 plus contributions $2300 confirms the ending value."
+        },
+        {
+          "category": "volatility_period",
+          "quote": "La volatilidad diaria ... alrededor de 85.4 %",
+          "detail": "Stored volatility85.41% is annualized, not daily."
+        },
+        {
+          "category": "cost_drag_units",
+          "quote": "redujo el retorno neto en ≈ 0.44 %",
+          "detail": "Gross189.31% minus net188.87% is0.44 percentage points, not0.44% relative reduction."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "candidate",
+      "replicate": 2,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Whole draft rejected as unknown_figure; reader uses template despite useful raw interpretation."
+        }
+      ],
+      "raw_only_issues": [],
+      "raw_quality_note": "Raw text explains high reward/high roughness, preserves seed/contributions, and labels the $421 amount an illustration affected by later contributions. S&P500 names the benchmark rather than asserting a run metric.",
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "candidate",
+      "replicate": 2,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Whole draft rejected; no accepted text, elapsed8266ms. Reader uses template."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "wrong_return_basis",
+          "quote": "Partiendo de $1 000, el capital habría crecido a aproximadamente $2 889",
+          "detail": "Applies the return-on-contributions rate to seed capital as a hypothetical single-funded ending value; the stored run does not establish this."
+        },
+        {
+          "category": "false_ending_value",
+          "quote": "el valor final alcanzó $8 648,6",
+          "detail": "This is the stored peak; the actual ending value is$6644.07."
+        },
+        {
+          "category": "cost_drag_units",
+          "quote": "redujeron el retorno bruto en apenas 0.44 %",
+          "detail": "The drag is0.44 percentage points."
+        },
+        {
+          "category": "capital_protection_claim",
+          "quote": "sin que los descensos profundos erosionaran significativamente el capital inicial",
+          "detail": "Continuous inflows mean the portfolio-value range cannot establish preservation of the original capital separately."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "baseline",
+      "replicate": 2,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "useful_beyond_card",
+          "detail": "Repeats dates and return/benchmark/gap and a generic causality disclaimer; gives no meaningful interpretation beyond the card."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "dca_costs_recorded",
+      "variant": "baseline",
+      "replicate": 2,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Production28-second outer deadline returned deterministic fallback, elapsed28002ms. This is private baseline output and not a dollar-budget failure."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "internal_field_leakage",
+          "quote": "fact_ids ... title, symbols, date_range, total_return",
+          "detail": "The raw answer_blocks includes literal schema keys as visible paragraph content."
+        },
+        {
+          "category": "depth_and_complementarity",
+          "detail": "The prose paragraph largely repeats the Quick take and stored assumptions rather than interpreting them deeply."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "baseline",
+      "replicate": 1,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "useful_beyond_card",
+          "detail": "Correctly distinguishes the RSI strategy from holding SPY, but the takeaway and four bullets repeat rules, setup and the return comparison rather than explain the risk/reward tradeoff."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "next_experiments",
+          "detail": "Raw next_check_bullet is omitted from rendered prose."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "baseline",
+      "replicate": 1,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": null,
+      "figures_and_benchmark_ok": null,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Production28-second outer deadline returned deterministic fallback, elapsed28006ms. No model Breakdown draft is recorded; baseline UI was already template-based."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": null,
+        "causal_claim": null,
+        "advice": null,
+        "em_dash": null
+      },
+      "operational_note": "The worker remained unsettled after105seconds, forcing runner shutdown. HTTP cost is unresolved and the full reservation remains accounted. No repeated task is requested by this review."
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "candidate",
+      "replicate": 1,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "fills_vs_closed_trades",
+          "quote": "4 operaciones ... todas ganadoras",
+          "detail": "The stored four executed fills comprise two entries and two exits. Win rate100% applies to the two completed trades, not four winning trades."
+        },
+        {
+          "category": "unsupported_performance_attribution",
+          "quote": "se perdió gran parte del rally ... al estar fuera en los momentos más alcistas",
+          "detail": "The fixture supplies aggregate benchmark return, not a benchmark price path or attribution that establishes the biggest rally periods were missed."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": true,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "candidate",
+      "replicate": 1,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "false_drawdown_path",
+          "quote": "4.8 % desde el pico más alto (1085.97 USD) hasta el valle más bajo (988.28 USD)",
+          "detail": "These global extremes differ by about9%, not4.8%; the lowest value on2025-11-20 precedes the peak on2026-04-14."
+        },
+        {
+          "category": "fills_vs_closed_trades",
+          "quote": "4 operaciones (todas fueron entradas y salidas exitosas, por eso la tasa de aciertos es100%)",
+          "detail": "Four fills are two completed entry/exit trades. The win rate does not establish four successful round trips."
+        },
+        {
+          "category": "unsupported_performance_attribution",
+          "quote": "porque estuvo fuera del activo durante los periodos de mayor subida",
+          "detail": "No benchmark path or attribution supports identification of its strongest rising periods."
+        },
+        {
+          "category": "sharpe_meaning",
+          "quote": "la rentabilidad ajustada al riesgo supera la volatilidad",
+          "detail": "Sharpe1.4 is an excess-return/volatility ratio, not evidence that risk-adjusted return itself exceeds volatility."
+        },
+        {
+          "category": "depth_and_complementarity",
+          "detail": "Repeats essentially every Quick take figure and the same missed-rally claim, adding an erroneous global-extremes explanation."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": true,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "candidate",
+      "replicate": 2,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "drawdown_dollar_conflation",
+          "quote": "el portafolio bajó a988USD (una caída ilustrativa de unos48USD desde el capital inicial)",
+          "detail": "The actual seed-to-global-low difference is about$12 ($1000-$988.28);$48 is the separately scaled drawdown illustration. Attaching it to the$988 low conflates the two."
+        }
+      ],
+      "raw_only_issues": [],
+      "quality_note": "Otherwise relatively concise and useful: positive gain versus benchmark lag and personal-money framing. Rejection rests on the misleading loss relationship, not a word cap.",
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "candidate",
+      "replicate": 2,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": false,
+      "issues": [
+        {
+          "category": "comparison_units",
+          "quote": "8.3 % por debajo del mercado",
+          "detail": "The stored lag is8.29 percentage points, not8.3% relative to SPY."
+        },
+        {
+          "category": "false_drawdown_path",
+          "quote": "4.8 % desde el pico (valor más alto≈1085.97USD, valor más bajo≈988.28USD)",
+          "detail": "Places the global extremes beside the drawdown as its endpoints. They imply about9% and occur in the reverse order."
+        },
+        {
+          "category": "fills_vs_closed_trades",
+          "quote": "4 operaciones ejecutadas, todas ganadoras",
+          "detail": "There are four fills forming two completed trades, not four winning trades."
+        },
+        {
+          "category": "depth_and_complementarity",
+          "detail": "Repeats Quick take return/gain/drawdown facts; added activity interpretation incorrectly uses fills as winning trades."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "baseline",
+      "replicate": 2,
+      "surface": "quick_take",
+      "quality_pass": false,
+      "fallback_used": false,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "useful_beyond_card",
+          "detail": "Repeats the RSI setup, dates and return/gap, followed by a generic causality caveat. Does not explain the small gain versus benchmark lag and roughness in personal terms."
+        }
+      ],
+      "raw_only_issues": [],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    },
+    {
+      "case_id": "rsi14_recorded",
+      "variant": "baseline",
+      "replicate": 2,
+      "surface": "breakdown",
+      "quality_pass": false,
+      "fallback_used": true,
+      "language_ok": true,
+      "figures_and_benchmark_ok": true,
+      "issues": [
+        {
+          "category": "generation_fallback",
+          "detail": "Production28-second outer deadline returned deterministic fallback, elapsed28006ms. No accepted model text; baseline UI remains template-based."
+        }
+      ],
+      "raw_only_issues": [
+        {
+          "category": "depth_and_complementarity",
+          "detail": "Raw output repeats Quick take rules, return comparison and existing assumptions, adding only an undefined maximum-loss number."
+        },
+        {
+          "category": "ambiguous_exposure_assumption",
+          "quote": "mantener la exposición completa al activo",
+          "detail": "Without 'while a position was open', this suggests continuous exposure; the stored strategy has cash intervals between its two trades."
+        }
+      ],
+      "compliance": {
+        "forecast": false,
+        "causal_claim": false,
+        "advice": false,
+        "em_dash": false
+      }
+    }
+  ]
+}
