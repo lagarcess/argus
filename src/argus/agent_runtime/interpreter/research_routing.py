@@ -65,6 +65,16 @@ def research_turn_has_conflicting_owner(interpretation: Any) -> bool:
     )
 
 
+def scenario_is_typed(query: Any, interpretation: Any) -> bool:
+    """Whether either typed fact says this read is a computed scenario: the
+    research query's ``scenario_question`` bit, or a ``future_window`` horizon
+    the interpreter typed on the draft. Pure; the research layer records the
+    horizon-only case when it applies the contract."""
+    return bool(getattr(query, "scenario_question", False)) or (
+        strategy_draft_future_horizon(interpretation.candidate_strategy_draft) is not None
+    )
+
+
 def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
     """The primary read typed the message as a finance fact question.
 
@@ -76,14 +86,16 @@ def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
     query = getattr(interpretation, "research_query", None)
     if query is None:
         return False
-    scenario_bit = bool(getattr(query, "scenario_question", False))
-    if scenario_bit and not query.symbols:
-        # A scenario with no subject is the user's own numbers, whatever kind
-        # the read left: arithmetic, never a research turn.
+    if scenario_is_typed(query, interpretation) and not query.symbols:
+        # A scenario with no subject, by either typed fact, is the user's own
+        # numbers or a forward question with nothing to research: arithmetic
+        # or the future test-window recovery, never a research turn.
         return False
     if query.question_kind not in ("concept", "none"):
         return True
-    return scenario_bit
+    # A kind-none read is admitted only by the scenario bit with subjects; a
+    # horizon alone keeps a test asked over a future window on its recovery.
+    return bool(getattr(query, "scenario_question", False))
 
 
 def primary_research_query(interpretation: Any) -> ResearchQueryExtraction | None:

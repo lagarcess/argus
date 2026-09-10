@@ -396,3 +396,12 @@ def test_a_typed_horizon_alone_never_admits_a_kind_none_read_to_research() -> No
         research_query={"question_kind": "none", "symbols": ["NVDA"]},
     )
     assert primary_research_query(read) is None
+
+
+def test_a_subjectless_read_with_only_a_typed_horizon_is_not_a_research_turn() -> None:
+    """The admission guard reads the same typed facts as the scenario owner:
+    a read with a future horizon, a fact kind and no subject is not sent to
+    research with nothing to research; it keeps the future test-window
+    recovery."""
+    read = _question_read(research_query={"question_kind": "market_stats", "symbols": []})
+    assert primary_research_query(read) is None

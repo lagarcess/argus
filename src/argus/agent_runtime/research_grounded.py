@@ -117,12 +117,13 @@ def scenario_contract_applies(
     from argus.agent_runtime.interpreter.draft_shape import (
         strategy_draft_future_horizon,
     )
+    from argus.agent_runtime.interpreter.research_routing import scenario_is_typed
 
+    if not scenario_is_typed(query, interpretation):
+        return False
     if bool(getattr(query, "scenario_question", False)):
         return True
     horizon = strategy_draft_future_horizon(interpretation.candidate_strategy_draft)
-    if horizon is None:
-        return False
     # The horizon compensated for a primary read that left the bit unset:
     # record it, once, so the decay of that read stays visible.
     if SCENARIO_FROM_HORIZON_REASON_CODE not in interpretation.reason_codes:
@@ -271,6 +272,7 @@ async def grounded_result(
                 decision=decision,
                 reason="not_configured",
                 shape=shape,
+                survey=survey,
             )
         admission = claim_current_research_attempt()
         if not admission.available:
@@ -283,6 +285,7 @@ async def grounded_result(
                 decision=decision,
                 guest_allowance_exhausted=admission.guest_exhausted,
                 shape=shape,
+                survey=survey,
             )
         emit_substage("research_search", detail=shape)
         try:
@@ -304,6 +307,7 @@ async def grounded_result(
                 reason=exc.reason,
                 usage=spend.total,
                 shape=shape,
+                survey=survey,
             )
         retry_prompt: str | None = None
         if survey and not _has_figures(packet):
@@ -712,6 +716,7 @@ async def exhausted_result(
     user: UserState,
     guest_allowance_exhausted: bool,
     shape: QuestionShape,
+    survey: bool,
     decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     """Ceiling exhaustion is an honest, localized note, not a silent
@@ -750,10 +755,7 @@ async def exhausted_result(
         answer=answer,
         interpretation=interpretation,
         user=user,
-        capability_class=capability_class_for_shape(
-            shape,
-            screening=is_market_survey(query.question_kind),
-        ),
+        capability_class=capability_class_for_shape(shape, screening=survey),
         shape=shape,
         packet=packet,
         peers=[],
@@ -775,6 +777,7 @@ def unavailable_result(
     user: UserState,
     reason: str,
     shape: QuestionShape,
+    survey: bool,
     decision: InterpretDecision | None = None,
     usage: ResearchUsage | None = None,
 ) -> StageResult | None:
@@ -799,10 +802,7 @@ def unavailable_result(
         answer=note,
         interpretation=interpretation,
         user=user,
-        capability_class=capability_class_for_shape(
-            shape,
-            screening=is_market_survey(query.question_kind),
-        ),
+        capability_class=capability_class_for_shape(shape, screening=survey),
         shape=shape,
         packet=packet,
         peers=[],

@@ -567,3 +567,26 @@ def test_a_subjectless_scenario_stays_arithmetic_whatever_its_kind(monkeypatch) 
     transport = _wire_client(monkeypatch, [agent_response()])
     assert _run("If I save $500 a month at 5%, how much will I have in 20 years?") is None
     assert transport.requests == []
+
+
+def test_a_failed_survey_typed_scenario_is_not_filed_as_screening(monkeypatch) -> None:
+    """The derived survey fact reaches the failure paths too: a scenario
+    typed as a survey kind whose provider fails is recorded as the balanced
+    lookup it attempted, never as screening."""
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="screening",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    _wire_client(monkeypatch, [])  # the transport answers 500 to every call
+
+    result = _run("what will $10,000 in NVDA be worth in ten years?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"]["code"].startswith("research_unavailable_")
+    assert sidecar["shape"] == "balanced"
+    assert sidecar["capability_class"] == "balanced_lookup"
