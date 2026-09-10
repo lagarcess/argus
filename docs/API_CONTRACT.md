@@ -1119,15 +1119,43 @@ clients print those digits verbatim with locale separators and grouping and
 never round `metrics` for display. Legacy `saved_strategy_id` metadata remains
 readable after reload, but clients must not use it to expose a new write action.
 
-Result Quick Take, result breakdown, and dossier outcome prose render from the
-same typed run facts in the current workspace language. The figures those
+Result Quick Take and Breakdown may carry the additive, closed
+`result_readout_content` object:
+
+```json
+{
+  "schema_version": "result_readout/v1",
+  "surface": "quick_take",
+  "language": "en",
+  "text": "The complete, validated model readout."
+}
+```
+
+`surface` is `quick_take | breakdown`; `language` is `en | es-419` and records
+the workspace language at composition time. `text` is the accepted complete
+model draft, or null when generation/grounding failed. Unknown envelope fields
+are invalid. The envelope is persisted at creation, transported through live
+finals, message metadata, completed job responses and the canonical result
+card, and never reconstructed from legacy prose. Breakdown messages carry
+their own envelope. The web displays text only for a supported envelope whose
+surface and language match the frame and current workspace language.
+Missing/legacy, malformed, failed or mismatched envelopes use the existing
+typed template. Pre-lane runs remain template-only. There is no read-time
+model call, translation, historical rewrite or partial-draft display.
+`result_readout_source`, `result_readout_fallback_used` and optional
+`result_readout_failure_mode` record generation provenance for both surfaces;
+existing Breakdown provenance remains read-compatible.
+
+Template readouts and dossier outcomes render from the same typed run facts
+in the current workspace language. The figures those
 surfaces share with the result card (returns, the benchmark gap, worst drop)
 are the backend's `figures`: rounded once, from the engine's own
 `delta_vs_benchmark_pct` and returns, and printed verbatim in the workspace
 locale. No reader subtracts two rounded returns or rounds a figure a second
 time, so the card, the prose beside it, and the dossier cannot show two numbers
 for one fact. Original LLM result prose remains immutable audit/model context,
-not a presentation fallback.
+not a presentation fallback. Only the versioned, creation-time envelope above
+authorizes visible model readout text.
 Public result messages carry empty `content`; live result finals carry empty
 `assistant_response`. Public run/card payloads omit stored `quick_take`,
 `breakdown`, `result_readout`, and `audit_context`, including nested copies.
