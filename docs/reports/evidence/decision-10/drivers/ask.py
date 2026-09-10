@@ -58,15 +58,23 @@ with httpx.Client(base_url=API, timeout=600) as client:
 record["elapsed_seconds"] = round(time.monotonic() - started, 2)
 research = metadata.get("research") or {}
 clarification = metadata.get("clarification") or {}
+recovery = metadata.get("recovery") or {}
+turn = metadata.get("agent_runtime_turn") or {}
 outcomes = [e.get("outcome") or e.get("stage") for e in record["events"] if e.get("type") == "stage_outcome"]
 summary = {
     "label": label,
     "language": language,
     "elapsed_seconds": record["elapsed_seconds"],
     "stage_outcomes": outcomes,
-    "answered": bool(final.get("content")) and not clarification,
+    # Answered means a real answer reached the user: prose with neither a
+    # clarification contract nor a recovery code beside it.
+    "answered": bool(final.get("content")) and not clarification and not recovery.get("code"),
+    "recovery_code": recovery.get("code"),
     "clarification_kind": clarification.get("kind"),
     "clarification_reason_code": clarification.get("reason_code"),
+    "reason_codes": turn.get("reason_codes") if isinstance(turn, dict) else None,
+    "intent": turn.get("intent") if isinstance(turn, dict) else None,
+    "semantic_turn_act": turn.get("semantic_turn_act") if isinstance(turn, dict) else None,
     "assistant_text": final.get("content"),
     "shape": research.get("shape"),
     "degraded": research.get("degraded"),
