@@ -30,6 +30,10 @@ from argus.agent_runtime.semantic_integrity import (
     canonical_capital_role,
     strategy_semantic_facts,
 )
+from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
+    BenchmarkResolution,
+    benchmark_repair_disposition,
+)
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     SemanticTurnAct,
@@ -123,7 +127,40 @@ async def prepare_backtest_tool_input(
             response=response, base_response=before
         )
         _declare_money_roles(response.candidate_strategy_draft)
+        # Readiness owns input facts and blockers. Restore the selected call's
+        # context before interpreting either side of the fact comparison.
+        response.intent = before.intent
+        response.task_relation = before.task_relation
+        response.semantic_turn_act = before.semantic_turn_act
+        response.tool_calls = []
         conflicts = _known_input_conflicts(before, response, request=request)
+        benchmark_resolution = None
+        if any(item.field_name == "comparison_baseline" for item in conflicts):
+            from argus.agent_runtime.stages.interpret import _resolve_benchmark_symbol
+
+            strategies = tuple(
+                _strategy_for_input_facts(item, request=request)[1]
+                for item in (before, response)
+            )
+            original_resolution = _resolve_benchmark_symbol(strategies[0])
+            resolutions = (
+                original_resolution,
+                _resolve_benchmark_symbol(strategies[1], previous=original_resolution),
+            )
+            disposition = benchmark_repair_disposition(
+                before=strategies[0],
+                after=strategies[1],
+                resolutions=resolutions,
+                source=request.current_user_message,
+            )
+            if disposition is not None:
+                conflicts = [
+                    item for item in conflicts if item.field_name != "comparison_baseline"
+                ]
+                response.reason_codes.append(f"declared_benchmark_{disposition}")
+            # The chosen raw draft reaches staged validation unchanged, with
+            # this exact provider outcome. Neither path resolves it again.
+            benchmark_resolution = resolutions[0 if conflicts else 1]
         if conflicts:
             # A repair is one proposed replacement. Reject it atomically:
             # restoring one carrier can leave another overriding the same fact.
@@ -131,13 +168,12 @@ async def prepare_backtest_tool_input(
             response.ambiguous_fields.extend(conflicts)
             response.requires_clarification = True
             response.assistant_response = None
-        # Readiness owns input facts and blockers. It cannot reselect a tool,
-        # change this call's context relation, or turn preparation into approval.
-        response.intent = before.intent
-        response.task_relation = before.task_relation
-        response.semantic_turn_act = before.semantic_turn_act
-        response.tool_calls = []
-        result = await _prepared_stage(response, request=request, state=state)
+        result = await _prepared_stage(
+            response,
+            request=request,
+            state=state,
+            benchmark_resolution=benchmark_resolution,
+        )
     if result is None:
         result = await _prepared_stage(response, request=request, state=state)
     result.stage_patch["normalized_signals"] = {
@@ -169,6 +205,7 @@ async def _prepared_stage(
     *,
     request: InterpretationRequest,
     state: RunState,
+    benchmark_resolution: BenchmarkResolution | None = None,
 ) -> StageResult:
     from argus.agent_runtime.interpreter.artifact_assumption_edit import (
         _current_artifact_strategy,
@@ -198,6 +235,7 @@ async def _prepared_stage(
         interpretation=interpretation,
         capability_contract=build_default_capability_contract(),
         selected_thread_metadata=request.selected_thread_metadata,
+        benchmark_resolution=benchmark_resolution,
     )
     if result.outcome not in {"ready_for_confirmation", "needs_clarification"}:
         raise ValueError("Backtest input preparation cannot authorize execution")
@@ -286,16 +324,9 @@ def _draft_semantic_facts(
     from argus.agent_runtime.interpreter.artifact_assumption_edit import (
         _canonical_draft_date_request,
     )
-    from argus.agent_runtime.interpreter.strategy_builder import (
-        _merge_prior_strategy,
-        _strategy_from_llm,
-    )
     from argus.agent_runtime.stages.interpret import _supported_timeframes
 
-    response = response.model_copy(deep=True)
-    draft = response.candidate_strategy_draft
-    strategy = _strategy_from_llm(draft, request.current_user_message)
-    _merge_prior_strategy(strategy=strategy, request=request, response=response)
+    draft, strategy = _strategy_for_input_facts(response, request=request)
     facts = strategy_semantic_facts(
         strategy,
         selected_thread_metadata=request.selected_thread_metadata,
@@ -314,6 +345,21 @@ def _draft_semantic_facts(
         if isinstance(metadata, dict) and metadata.get("x-argus-runtime-extension"):
             facts[name] = getattr(draft, name)
     return facts
+
+
+def _strategy_for_input_facts(
+    response: LLMInterpretationResponse, *, request: InterpretationRequest
+) -> tuple[LLMStrategyDraft, StrategySummary]:
+    from argus.agent_runtime.interpreter.strategy_builder import (
+        _merge_prior_strategy,
+        _strategy_from_llm,
+    )
+
+    response = response.model_copy(deep=True)
+    draft = response.candidate_strategy_draft
+    strategy = _strategy_from_llm(draft, request.current_user_message)
+    _merge_prior_strategy(strategy=strategy, request=request, response=response)
+    return draft, strategy
 
 
 def _preserves_supplied_fact(before: Any, after: Any) -> bool:

@@ -1,0 +1,354 @@
+{
+  "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+  "cases": {
+    "metric_correctness_eth_default_crypto_benchmark": [
+      {
+        "source_line": 103,
+        "schema_name": "LLMAssetMentionExtraction",
+        "body": {
+          "all_traded_asset_mentions_included": true,
+          "asset_mentions": [
+            {
+              "raw_text": "ethereum",
+              "role": "traded_asset",
+              "mention_kind": "crypto",
+              "confidence": 0.9
+            },
+            {
+              "raw_text": "default crypto benchmark",
+              "role": "benchmark",
+              "mention_kind": "unknown",
+              "confidence": 0.7
+            }
+          ]
+        }
+      },
+      {
+        "source_line": 104,
+        "schema_name": "LLMInterpretationResponse",
+        "body": {
+          "intent": "calculate",
+          "task_relation": "new_task",
+          "user_goal_summary": "Backtest buy-and-hold of Ethereum from 2024-01-01 to 2024-03-31 against default crypto benchmark",
+          "tool_calls": [
+            {
+              "tool_name": "backtest",
+              "call_id": "backtest_001",
+              "arguments": {
+                "strategy": {
+                  "raw_user_phrasing": "backtest holding ethereum from 2024-01-01 to 2024-03-31 against the default crypto benchmark",
+                  "language": "en",
+                  "strategy_type": "buy_and_hold",
+                  "asset_universe": [
+                    "ETH"
+                  ],
+                  "asset_class": "crypto",
+                  "date_range": {
+                    "start": "2024-01-01",
+                    "end": "2024-03-31"
+                  },
+                  "date_range_raw_text": "from 2024-01-01 to 2024-03-31",
+                  "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2024-01-01",
+                    "end": "2024-03-31",
+                    "confidence": 0.95,
+                    "evidence": "from 2024-01-01 to 2024-03-31"
+                  },
+                  "comparison_baseline": "BTC",
+                  "field_provenance": {
+                    "strategy_type": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "date_range": "explicit_user",
+                    "comparison_baseline": "explicit_user",
+                    "asset_class": "explicit_user"
+                  },
+                  "evidence_spans": {
+                    "date_range": "from 2024-01-01 to 2024-03-31",
+                    "comparison_baseline": "default crypto benchmark"
+                  }
+                }
+              }
+            }
+          ],
+          "requires_clarification": false,
+          "detected_user_language": "en",
+          "candidate_strategy_draft": {},
+          "missing_required_fields": [],
+          "semantic_turn_act": "new_idea",
+          "artifact_target": "none"
+        }
+      },
+      {
+        "source_line": 105,
+        "schema_name": "FocusedStrategyExtraction",
+        "body": {
+          "is_testable_strategy": true,
+          "user_goal_summary": "Backtest holding Ethereum from 2024-01-01 to 2024-03-31 against the default crypto benchmark",
+          "raw_user_phrasing": "backtest holding ethereum from 2024-01-01 to 2024-03-31 against the default crypto benchmark",
+          "language": "en",
+          "requested_strategy_template": null,
+          "strategy_type": "buy_and_hold",
+          "strategy_thesis": null,
+          "asset_universe": [
+            "ETH"
+          ],
+          "asset_inclusions": [],
+          "asset_exclusions": [],
+          "asset_universe_operation": null,
+          "asset_class": null,
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "indicator": null,
+          "indicator_period": null,
+          "entry_threshold": null,
+          "exit_threshold": null,
+          "date_range": "2024-01-01 to 2024-03-31",
+          "date_range_raw_text": "from 2024-01-01 to 2024-03-31",
+          "date_range_intent": {
+            "kind": "explicit_range",
+            "start": "2024-01-01",
+            "end": "2024-03-31",
+            "day_offset": null,
+            "count": null,
+            "unit": null,
+            "anchor": null,
+            "year": null,
+            "endpoint": null,
+            "confidence": 1.0,
+            "evidence": "from 2024-01-01 to 2024-03-31"
+          },
+          "sizing_mode": null,
+          "capital_amount": null,
+          "recurring_contribution": null,
+          "initial_capital": null,
+          "total_capital": null,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "default crypto benchmark",
+          "refinement_of": null,
+          "field_provenance": {
+            "strategy_type": "explicit_user",
+            "asset_universe": "explicit_user",
+            "date_range": "explicit_user",
+            "comparison_baseline": "explicit_user"
+          },
+          "evidence_spans": {
+            "strategy_type": "backtest holding",
+            "asset_universe": "ethereum",
+            "date_range": "from 2024-01-01 to 2024-03-31",
+            "comparison_baseline": "against the default crypto benchmark"
+          },
+          "extra_parameters": {},
+          "resolution_provenance": [],
+          "fee_rate": null,
+          "slippage": null,
+          "requires_clarification": false,
+          "missing_required_fields": [],
+          "assistant_response": null,
+          "confidence": 0.95
+        }
+      },
+      {
+        "source_line": 106,
+        "schema_name": "FocusedDateWindowExtraction",
+        "body": {
+          "has_date_window": true,
+          "date_range_raw_text": "from 2024-01-01 to 2024-03-31",
+          "date_range_intent": {
+            "kind": "explicit_range",
+            "start": "2024-01-01",
+            "end": "2024-03-31",
+            "day_offset": null,
+            "count": null,
+            "unit": null,
+            "anchor": null,
+            "year": null,
+            "endpoint": null,
+            "confidence": 1.0,
+            "evidence": "from 2024-01-01 to 2024-03-31"
+          },
+          "date_range": {
+            "start": "2024-01-01",
+            "end": "2024-03-31"
+          },
+          "confidence": 1.0,
+          "evidence": "from 2024-01-01 to 2024-03-31"
+        }
+      }
+    ],
+    "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run": [
+      {
+        "source_line": 221,
+        "schema_name": "ClarificationResponse",
+        "body": {
+          "detail_targets": [
+            "recurring_purchase_amount"
+          ],
+          "direct_question": "Got it \u2014 buying Coca-Cola (CCEP) every month for the past five years. How much would you like to invest each month?",
+          "directly_asks_user": true,
+          "question": "Got it \u2014 buying Coca-Cola (CCEP) every month for the past five years. How much would you like to invest each month?",
+          "question_targets": [
+            "sizing_amount"
+          ]
+        }
+      },
+      {
+        "source_line": 223,
+        "schema_name": "LLMInterpretationResponse",
+        "body": {
+          "intent": "calculate",
+          "task_relation": "continue",
+          "user_goal_summary": "Test monthly DCA into CCEP with $200 recurring contribution over the last five years, benchmarked to SPY.",
+          "tool_calls": [
+            {
+              "tool_name": "backtest",
+              "call_id": "backtest_dca_ccep_200",
+              "arguments": {
+                "strategy": {
+                  "raw_user_phrasing": "What if I had bought Coca-Cola every month for five years?",
+                  "language": "en",
+                  "requested_strategy_template": "dca_accumulation",
+                  "strategy_type": "dca_accumulation",
+                  "strategy_thesis": "Simulate buying Coca-Cola every month for five years",
+                  "asset_universe": [
+                    "CCEP"
+                  ],
+                  "asset_class": "equity",
+                  "cadence": "monthly",
+                  "date_range": {
+                    "start": "2021-09-10",
+                    "end": "2026-09-10"
+                  },
+                  "date_range_raw_text": "five years",
+                  "date_range_intent": {
+                    "kind": "rolling_window",
+                    "count": 5.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "confidence": 0.9,
+                    "evidence": "five years"
+                  },
+                  "capital_amount": 200,
+                  "comparison_baseline": "SPY",
+                  "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "cadence": "explicit_user",
+                    "date_range_intent": "explicit_user",
+                    "date_range_raw_text": "explicit_user",
+                    "strategy_type": "explicit_user",
+                    "capital_amount": "explicit_user"
+                  },
+                  "evidence_spans": {
+                    "asset_universe": "Coca-Cola",
+                    "cadence": "every month",
+                    "date_range_intent": "five years",
+                    "date_range_raw_text": "five years",
+                    "strategy_type": "bought Coca-Cola every month",
+                    "capital_amount": "200$"
+                  },
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "CCEP",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "CCEP",
+                      "asset_class": "equity",
+                      "confidence": "high"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "requires_clarification": false,
+          "detected_user_language": "en",
+          "candidate_strategy_draft": {},
+          "missing_required_fields": [],
+          "assistant_response": null,
+          "uses_latest_result_context": false,
+          "confidence": 0.95,
+          "reason_codes": [
+            "capital_amount_provided"
+          ],
+          "semantic_turn_act": "answer_pending_need",
+          "artifact_target": "pending_refinement"
+        }
+      },
+      {
+        "source_line": 224,
+        "schema_name": "AssetGroundingAudit",
+        "body": {
+          "grounded_symbols": [],
+          "confidence": 0.9
+        }
+      },
+      {
+        "source_line": 225,
+        "schema_name": "DcaContractAudit",
+        "body": {
+          "is_recurring_buy_request": false,
+          "recurring_contribution_amount": null,
+          "cadence": null,
+          "total_budget_amount": null,
+          "total_budget_source": null,
+          "confidence": 0
+        }
+      },
+      {
+        "source_line": 226,
+        "schema_name": "DcaContractAudit",
+        "body": {
+          "is_recurring_buy_request": true,
+          "recurring_contribution_amount": 200,
+          "cadence": "monthly",
+          "total_budget_amount": null,
+          "total_budget_source": null,
+          "confidence": 0.95
+        }
+      },
+      {
+        "source_line": 227,
+        "schema_name": "StrategyFamilyContinuityAudit",
+        "body": {
+          "should_rebind_strategy_family": false,
+          "strategy_type": null,
+          "total_budget_not_recurring": false,
+          "confidence": 0.9
+        }
+      },
+      {
+        "source_line": 228,
+        "schema_name": "DcaContributionRoleAudit",
+        "body": {
+          "recurring_contribution_explicit": false,
+          "total_budget_not_recurring": true,
+          "confidence": 0.7
+        }
+      },
+      {
+        "source_line": 229,
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "body": {
+          "capital_amount": 200,
+          "recurring_contribution_amount": 200,
+          "cadence": null,
+          "timeframe": null,
+          "date_range": null,
+          "comparison_baseline": null,
+          "fee": null,
+          "slippage": null,
+          "confidence": 0.8
+        }
+      }
+    ]
+  }
+}

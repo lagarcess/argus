@@ -225,6 +225,9 @@ from argus.agent_runtime.stages.interpret_internal.benchmark_coverage import (
     strategy_with_benchmark_price_coverage as _strategy_with_benchmark_price_coverage,
 )
 from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
+    BenchmarkResolution,
+    resolve_benchmark_symbol,
+    strategy_with_validated_benchmark_symbol,
     default_benchmark_for_asset_class as _default_benchmark_for_asset_class,
     provenance_without_benchmark_disclosures as _without_benchmark_disclosure_provenance,
     strategy_with_default_benchmark as _strategy_with_default_benchmark,
@@ -491,6 +494,7 @@ async def _stage_result_from_interpretation(
     interpretation: StructuredInterpretation,
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
+    benchmark_resolution: BenchmarkResolution | None = None,
 ) -> StageResult:
     is_new_idea_interpretation = interpretation.semantic_turn_act == "new_idea"
     input_conflicts = declared_input_conflicts(interpretation.ambiguous_fields)
@@ -799,7 +803,9 @@ async def _stage_result_from_interpretation(
             )
         )
         strategy, validated_benchmark_reason_codes = (
-            _strategy_with_validated_benchmark_symbol(strategy)
+            _strategy_with_validated_benchmark_symbol(
+                strategy, resolution=benchmark_resolution
+            )
         )
         strategy, benchmark_coverage_reason_codes = (
             _strategy_with_benchmark_price_coverage(strategy)
@@ -3101,73 +3107,24 @@ def _strategy_with_benchmark_owner_asset_repair(
     return updated, ["current_message_asset_grounding_repaired"]
 
 
+def _resolve_benchmark_symbol(
+    strategy: StrategySummary,
+    *,
+    previous: BenchmarkResolution | None = None,
+) -> BenchmarkResolution:
+    return resolve_benchmark_symbol(
+        strategy, resolve_candidate=_resolve_asset_candidate, previous=previous
+    )
+
+
 def _strategy_with_validated_benchmark_symbol(
     strategy: StrategySummary,
+    *,
+    resolution: BenchmarkResolution | None = None,
 ) -> tuple[StrategySummary, list[str]]:
-    benchmark = _normalized_symbol(strategy.comparison_baseline)
-    if benchmark is None:
-        return strategy, []
-    scrub_reason_codes: list[str] = []
-    field_provenance = strategy.extra_parameters.get("field_provenance")
-    if (
-        isinstance(field_provenance, dict)
-        and field_provenance.get("comparison_baseline") == "explicit_user"
-    ):
-        # A benchmark the user names this turn retires any earlier
-        # reconciliation disclosure; a fresh clearing re-adds its own.
-        scrubbed = _without_benchmark_disclosure_provenance(
-            strategy.resolution_provenance
-        )
-        if len(scrubbed) != len(strategy.resolution_provenance):
-            strategy = strategy.model_copy(deep=True)
-            strategy.resolution_provenance = scrubbed
-            scrub_reason_codes = ["stale_benchmark_disclosure_retired"]
-    try:
-        resolution = provider_context_assets.resolution_from_strategy_context(
-            strategy,
-            benchmark,
-            field="comparison_baseline",
-        ) or _resolve_asset_candidate(
-            benchmark,
-            field="comparison_baseline",
-            source="llm_extraction",
-            asset_class_hint=strategy.asset_class,
-        )
-    except ValueError:
-        resolution = None
-    if (
-        resolution is not None
-        and resolution.status == "resolved"
-        and resolution.asset is not None
-    ):
-        benchmark_asset_class = resolution.asset.asset_class
-        if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
-            updated = strategy.model_copy(deep=True)
-            updated.comparison_baseline = None
-            return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
-        canonical = resolution.asset.canonical_symbol.strip().upper()
-        if canonical == benchmark:
-            return strategy, scrub_reason_codes
-        updated = strategy.model_copy(deep=True)
-        updated.comparison_baseline = canonical
-        # The stated name rides along so a later coverage clearing can
-        # disclose the user's words rather than the canonical symbol.
-        updated.resolution_provenance = _dedupe_resolution_provenance(
-            [*updated.resolution_provenance, resolution.provenance]
-        )
-        return updated, [*scrub_reason_codes, "benchmark_symbol_provider_validated"]
-    updated = strategy.model_copy(deep=True)
-    updated.comparison_baseline = None
-    if resolution is not None and resolution.status in {"unsupported", "ambiguous"}:
-        # The user named this leg and no clarification will run for it; keep
-        # its provenance so the card discloses exactly this reconciliation.
-        updated.resolution_provenance = _dedupe_resolution_provenance(
-            [
-                *_without_benchmark_disclosure_provenance(updated.resolution_provenance),
-                resolution.provenance,
-            ]
-        )
-    return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
+    return strategy_with_validated_benchmark_symbol(
+        strategy, resolution=_resolve_benchmark_symbol(strategy, previous=resolution)
+    )
 
 
 def _resolve_asset_candidate(
