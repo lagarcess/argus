@@ -175,11 +175,14 @@ def _leaves(value: object, path: str = "") -> Iterator[tuple[str, object]]:
         yield path, value
 
 
-_NUMBER = re.compile(r"(?<!\w)[-+−]?\d+(?:[.,]\d+)*(?:[eE][+-]?\d+|[kKmMbB](?!\w))?")
+_NUMBER = re.compile(
+    r"(?<!\w)[-+−]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?!\d)(?:[.,]\d+)?"
+    r"|\d+(?:[.,]\d+)*)(?:[eE][+-]?\d+|[kKmMbB](?!\w))?"
+)
 
 
 def _number(token: str, *, money: bool = False) -> tuple[float, int]:
-    token = token.replace("−", "-")
+    token = re.sub(r"[ \u00a0\u202f]", "", token.replace("−", "-"))
     suffix = re.search(r"([eE][+-]?\d+|[kKmMbB])$", token)
     exponent = 0
     if suffix:
@@ -302,7 +305,7 @@ def _quoted_unit(text: str, match: re.Match[str]) -> str:
         return "percent"
     if _BASIS_SUFFIX.match(after):
         return "basis_points"
-    if re.search(r"[$€£] ?$", before) or re.match(
+    if re.search(r"[$€£][^\S\r\n]*$", before) or re.match(
         r"\s*(?:USD|EUR|GBP|dollars?|dólares?)\b", after, re.I
     ):
         return "currency"
@@ -323,6 +326,11 @@ def _quoted_unit(text: str, match: re.Match[str]) -> str:
         (label.start(), unit)
         for unit, pattern in _QUOTED_UNITS.items()
         for label in pattern.finditer(local)
+        # A bare four-digit figure can be a calendar year. Count labels must
+        # attach locally, allowing a linking word, instead of spanning prose.
+        if unit != "count"
+        or not re.fullmatch(r"\d{4}", match.group())
+        or re.fullmatch(r"\W*(?:\w+\W*)?", local[label.end() :])
     ]
     return max(labels)[1] if labels else "scalar"
 

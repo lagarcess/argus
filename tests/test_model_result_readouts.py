@@ -291,6 +291,68 @@ async def test_readouts_understand_decimal_precision_and_typed_ratio_percentages
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+@pytest.mark.parametrize("grouping", [" ", "\u00a0", "\u202f"])
+@pytest.mark.parametrize("currency_gap", ["", " ", "\u00a0", "\u202f"])
+async def test_readouts_accept_grouped_money_and_currency_whitespace(
+    surface, grouping, currency_gap, stored_result, monkeypatch
+):
+    stored_result["metrics"]["aggregate"]["performance"]["profit"] = 1234.56
+    text = f"El capital fue ${currency_gap}10{grouping}000 y la ganancia ${currency_gap}1{grouping}234,56."
+    rendered, _ = await compose(surface, text, stored_result, monkeypatch, "es-419")
+    assert rendered == text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Holding shares in DigitalOcean (DOCN) since September 2023.",
+        "Comprar y mantener acciones de DigitalOcean (DOCN) desde septiembre de 2023.",
+        "Comprar y mantener acciones de DOCN desde septiembre de 2023.",
+        "Shares were held; the period began in September 2023.",
+    ],
+)
+async def test_readout_year_does_not_inherit_a_previous_clause_unit(
+    surface, text, stored_result, monkeypatch
+):
+    rendered, _ = await compose(surface, text, stored_result, monkeypatch)
+    assert rendered == text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+async def test_readouts_preserve_parenthetical_unit_labels(
+    surface, stored_result, monkeypatch
+):
+    text = "Capital (USD) 10,000. Sharpe (risk-adjusted) 0.456."
+    rendered, _ = await compose(surface, text, stored_result, monkeypatch)
+    assert rendered == text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+@pytest.mark.parametrize(
+    "text,accepted",
+    [
+        ("La ganancia fue $3\u202f962.", False),
+        ("La ganancia fue $3\u202f963.", True),
+        ("La volatilidad fue 68%.", False),
+        ("La volatilidad fue 69%.", True),
+    ],
+)
+async def test_readout_format_support_preserves_quoted_rounding_precision(
+    surface, text, accepted, stored_result, monkeypatch
+):
+    metrics = stored_result["metrics"]["aggregate"]
+    metrics["performance"]["profit"] = 3962.59
+    metrics["risk"]["volatility_annual_pct"] = 68.62
+    rendered, _ = await compose(surface, text, stored_result, monkeypatch, "es-419")
+    assert rendered == (text if accepted else None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
 async def test_readouts_normalize_em_dash_without_dropping_prose(
     surface, stored_result, monkeypatch
 ):
@@ -350,6 +412,12 @@ def test_readout_configuration_derives_from_executed_engine_config(
         "El saldo final fue $999k.",
         "The final balance was $1e9.",
         "There were 1e9 fills.",
+        "There were 2023 shares.",
+        "Hubo 2023 acciones.",
+        "Trades were 2023.",
+        "Sharpe was 2023.",
+        "The final balance was $2023.",
+        "Holding shares in DigitalOcean (DOCN) since September 1999.",
     ],
 )
 async def test_readouts_reject_numbers_with_wrong_units_or_unsupported_magnitudes(
