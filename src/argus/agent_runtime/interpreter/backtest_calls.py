@@ -266,8 +266,7 @@ def _known_input_conflicts(
     request: InterpretationRequest,
 ) -> list[LLMAmbiguousField]:
     facts = [
-        _draft_semantic_facts(response.candidate_strategy_draft, request=request)
-        for response in (before, after)
+        _draft_semantic_facts(response, request=request) for response in (before, after)
     ]
     return [
         LLMAmbiguousField(
@@ -282,16 +281,23 @@ def _known_input_conflicts(
 
 
 def _draft_semantic_facts(
-    draft: LLMStrategyDraft, *, request: InterpretationRequest
+    response: LLMInterpretationResponse, *, request: InterpretationRequest
 ) -> dict[str, Any]:
     from argus.agent_runtime.interpreter.artifact_assumption_edit import (
         _canonical_draft_date_request,
     )
-    from argus.agent_runtime.llm_interpreter import _strategy_from_llm
+    from argus.agent_runtime.interpreter.strategy_builder import (
+        _merge_prior_strategy,
+        _strategy_from_llm,
+    )
     from argus.agent_runtime.stages.interpret import _supported_timeframes
 
+    response = response.model_copy(deep=True)
+    draft = response.candidate_strategy_draft
+    strategy = _strategy_from_llm(draft, request.current_user_message)
+    _merge_prior_strategy(strategy=strategy, request=request, response=response)
     facts = strategy_semantic_facts(
-        _strategy_from_llm(draft.model_copy(deep=True), request.current_user_message),
+        strategy,
         selected_thread_metadata=request.selected_thread_metadata,
         supported_timeframes=_supported_timeframes(build_default_capability_contract()),
     )
