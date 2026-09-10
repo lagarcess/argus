@@ -1,0 +1,155 @@
+{
+  "seed": {
+    "tree_head": "e1f67bd0",
+    "asked_at_utc": "2026-09-10T00:17:00+00:00",
+    "question_date": "2026-09-09",
+    "composed": [
+      {
+        "turn": "spx",
+        "language": "en",
+        "degraded": null,
+        "sources": [
+          [
+            "lasvegassun.com",
+            "2026-09-09"
+          ],
+          [
+            "thestockmarketwatch.com",
+            "2026-09-09"
+          ]
+        ],
+        "rows": 12,
+        "answer_head": "**The S&P 500 is down 82.24 points, or 1.1%, so far this week.** The SPDR S&P 500 ETF Trust (**SPY**) last traded at **$"
+      },
+      {
+        "turn": "not_grounded",
+        "language": "en",
+        "degraded": {
+          "code": "research_not_grounded"
+        },
+        "sources": [],
+        "rows": 0,
+        "answer_head": "I couldn't retrieve the data to answer this question."
+      },
+      {
+        "turn": "spx",
+        "language": "es-419",
+        "degraded": null,
+        "sources": [
+          [
+            "lasvegassun.com",
+            "2026-09-09"
+          ],
+          [
+            "thestockmarketwatch.com",
+            "2026-09-09"
+          ]
+        ],
+        "rows": 12,
+        "answer_head": "**The S&P 500 is down 82.24 points, or 1.1%, so far this week.** The SPDR S&P 500 ETF Trust (**SPY**) last traded at **$"
+      },
+      {
+        "turn": "not_grounded",
+        "language": "es-419",
+        "degraded": {
+          "code": "research_not_grounded"
+        },
+        "sources": [],
+        "rows": 0,
+        "answer_head": "No pude recuperar los datos para responder esta pregunta."
+      }
+    ],
+    "provider_calls": 0,
+    "hosted_database_reads_or_writes": 0
+  },
+  "turns": [
+    {
+      "turn": "spx-week",
+      "language": "en",
+      "width": 1280,
+      "buttonText": "2 sources ›",
+      "drawerTitle": "Sources Argus read",
+      "domainsListed": [
+        "lasvegassun.com",
+        "thestockmarketwatch.com"
+      ],
+      "framedAsWhereArgusLooked": false,
+      "pageErrors": []
+    },
+    {
+      "turn": "not-grounded",
+      "language": "en",
+      "width": 1280,
+      "noteShown": true,
+      "modelProseShown": false,
+      "sourcesButtons": 0,
+      "pageErrors": []
+    },
+    {
+      "turn": "spx-week",
+      "language": "en",
+      "width": 390,
+      "buttonText": "2 sources ›",
+      "drawerTitle": "Sources Argus read",
+      "domainsListed": [
+        "lasvegassun.com",
+        "thestockmarketwatch.com"
+      ],
+      "framedAsWhereArgusLooked": false,
+      "pageErrors": []
+    },
+    {
+      "turn": "not-grounded",
+      "language": "en",
+      "width": 390,
+      "noteShown": true,
+      "modelProseShown": false,
+      "sourcesButtons": 0,
+      "pageErrors": []
+    },
+    {
+      "turn": "spx-week",
+      "language": "es-419",
+      "width": 1280,
+      "buttonText": "2 fuentes ›",
+      "drawerTitle": "Fuentes que Argus consultó",
+      "domainsListed": [
+        "lasvegassun.com",
+        "thestockmarketwatch.com"
+      ],
+      "framedAsWhereArgusLooked": false,
+      "pageErrors": []
+    },
+    {
+      "turn": "not-grounded",
+      "language": "es-419",
+      "width": 1280,
+      "noteShown": true,
+      "modelProseShown": false,
+      "sourcesButtons": 0,
+      "pageErrors": []
+    },
+    {
+      "turn": "spx-week",
+      "language": "es-419",
+      "width": 390,
+      "buttonText": "2 fuentes ›",
+      "drawerTitle": "Fuentes que Argus consultó",
+      "domainsListed": [
+        "lasvegassun.com",
+        "thestockmarketwatch.com"
+      ],
+      "framedAsWhereArgusLooked": false,
+      "pageErrors": []
+    },
+    {
+      "turn": "not-grounded",
+      "language": "es-419",
+      "width": 390,
+      "noteShown": true,
+      "modelProseShown": false,
+      "sourcesButtons": 0,
+      "pageErrors": []
+    }
+  ]
+}
