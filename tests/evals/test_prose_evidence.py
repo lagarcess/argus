@@ -448,3 +448,26 @@ def test_ordinary_prose_is_not_over_redacted(prose: str) -> None:
 
     assert redactions == []
     assert redacted == prose
+
+
+@pytest.mark.parametrize(
+    "verdict", [{"pass": False}, {"pass": False, "failed_criteria": []}]
+)
+def test_failed_judge_verdict_without_named_criteria_fails_the_case(
+    monkeypatch: pytest.MonkeyPatch, verdict: dict[str, Any]
+) -> None:
+    _stub_stages(monkeypatch, assistant_text=SPANISH_DISHONEST_PROSE)
+
+    async def actual_judge_response(**_kwargs: Any) -> harness.ProseJudgeResponse:
+        return harness.ProseJudgeResponse.model_validate(verdict)
+
+    monkeypatch.setattr(harness, "invoke_openrouter_json_schema", actual_judge_response)
+
+    result = harness.run_eval_case(_prose_case())
+
+    assert result["status"] == "failed"
+    assert result["failed_checks"] == ["prose_judge:failed_without_criteria"]
+    assert result["prose_judge"]["pass"] is False
+    assert result["prose_judge"]["failed_criteria"] == []
+    assert result["infrastructure_errors"] == []
+    assert harness.blocking_eval_results([result]) == [result]
