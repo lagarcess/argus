@@ -89,8 +89,8 @@ def test_patch_me_ignores_a_theme_and_saves_the_rest() -> None:
 
 def test_a_new_profile_is_created_without_a_theme() -> None:
     client = MagicMock()
-    client.table.return_value.upsert.return_value.execute.return_value = (
-        SimpleNamespace(data=[_row("user-9")])
+    client.table.return_value.upsert.return_value.execute.return_value = SimpleNamespace(
+        data=[_row("user-9")]
     )
     gateway = SupabaseGateway(client=client)
     gateway.private_alpha_role_for_email = MagicMock(return_value="user")
@@ -109,9 +109,7 @@ def test_the_mock_user_is_created_without_a_theme() -> None:
     profiles = client.table.return_value
     lookup = profiles.select.return_value.eq.return_value
     lookup.limit.return_value.execute.return_value = SimpleNamespace(data=[])
-    lookup.single.return_value.execute.return_value = SimpleNamespace(
-        data=_row("user-9")
-    )
+    lookup.single.return_value.execute.return_value = SimpleNamespace(data=_row("user-9"))
     gateway = SupabaseGateway(
         client=client,
         mock_user_email="developer@argus.local",

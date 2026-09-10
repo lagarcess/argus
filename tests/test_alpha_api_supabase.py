@@ -82,7 +82,6 @@ def _mock_profile(*, language: str = "en", stage: str = "ready") -> User:
         display_name="Mock Developer",
         language=language,  # type: ignore[arg-type]
         locale="es-419" if language == "es-419" else "en-US",
-        theme="dark",
         is_admin=True,
         onboarding=OnboardingState(
             completed=stage == "completed",
@@ -300,7 +299,6 @@ def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
             "display_name": "Alpha",
             "language": "es-419",
             "locale": "es-419",
-            "theme": "dark",
             "is_admin": False,
             "onboarding": OnboardingState().model_dump(),
             "created_at": now,

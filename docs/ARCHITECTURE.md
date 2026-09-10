@@ -100,7 +100,8 @@ or write path remains; durable idea/evidence recall lives in Omnisearch.
 
 ### Settings
 
-Preferences, language, theme, feedback, account actions.
+Preferences (language saved to the account, theme kept in the browser),
+feedback, account actions.
 
 ---
 

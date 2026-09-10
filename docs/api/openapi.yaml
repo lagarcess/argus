@@ -3611,13 +3611,6 @@ components:
           - en-US
           - es-419
           default: en-US
-        theme:
-          type: string
-          enum:
-          - dark
-          - light
-          - system
-          default: dark
         is_admin:
           type: boolean
           default: false
@@ -4374,14 +4367,6 @@ components:
             enum:
             - en-US
             - es-419
-          - type: 'null'
-        theme:
-          anyOf:
-          - type: string
-            enum:
-            - dark
-            - light
-            - system
           - type: 'null'
         avatar_theme:
           type: string
@@ -6058,13 +6043,6 @@ components:
           - en-US
           - es-419
           default: en-US
-        theme:
-          type: string
-          enum:
-          - dark
-          - light
-          - system
-          default: dark
         avatar_theme:
           type: string
           enum:

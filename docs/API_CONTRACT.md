@@ -929,7 +929,6 @@ Application-facing user object.
   "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
-  "theme": "dark",
   "is_admin": false,
   "onboarding": {
     "completed": false,
@@ -2488,7 +2487,6 @@ Retrieve the current authenticated user profile and preferences.
     "display_name": "Alex",
     "language": "en",
     "locale": "en-US",
-    "theme": "dark",
     "avatar_theme": "ocean",
     "is_admin": false,
     "onboarding": {
@@ -2718,7 +2716,6 @@ Update profile preferences. Partial update semantics are supported.
   "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
-  "theme": "dark",
   "avatar_theme": "plum"
 }
 ```
@@ -2742,8 +2739,9 @@ Update profile preferences. Partial update semantics are supported.
 - Avatar themes are registered-account preferences. Guests cannot update a
   profile, and guest-facing `/me` and `/auth/session` responses omit
   `avatar_theme`.
-- A legacy `onboarding` object from an old client is ignored; the API cannot
-  write onboarding state.
+- A legacy `onboarding` object or `theme` from an old client is ignored; the
+  API cannot write either. The chosen theme stays in the browser, so the
+  account holds no theme.
 
 ---
 

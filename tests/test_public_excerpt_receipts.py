@@ -92,7 +92,6 @@ OWNER = User(
     display_name="Owner",
     language="en",
     locale="en-US",
-    theme="dark",
     is_admin=False,
     created_at=utc(),
     updated_at=utc(),
