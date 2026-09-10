@@ -55,7 +55,10 @@ async def compose(surface, text, result, monkeypatch, language="en"):
     state = RunState.new(current_user_message="Explain", recent_thread_history=[])
     state.final_response_payload = {"result": result}
     state.confirmation_payload = {
-        "strategy": {"strategy_type": "buy_and_hold", "asset_universe": ["DOCN"]},
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": result["symbols"],
+        },
         "optional_parameters": {},
     }
     response = await explain.explain_stage_async(state=state, language=language)
@@ -353,6 +356,54 @@ async def test_readout_format_support_preserves_quoted_rounding_precision(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+@pytest.mark.parametrize("currency", ["dólares", "dolares", "do\u0301lares"])
+@pytest.mark.parametrize("available", [True, False])
+async def test_numeric_currency_matching_folds_accents_without_changing_text(
+    surface, currency, available, stored_result, monkeypatch
+):
+    metrics = stored_result["metrics"]["aggregate"]
+    metrics["performance"]["profit"] = 85.97 if available else 198.52
+    metrics["efficiency"]["total_trades"] = 4 if available else 86
+    text = f"La ganancia fue de unos 86 {currency}."
+    rendered, _ = await compose(surface, text, stored_result, monkeypatch, "es-419")
+    assert rendered == (text if available else None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+@pytest.mark.parametrize(
+    "text,accepted",
+    [
+        (
+            "There were 4 trades, with an entry on 18 November 2025 "
+            "and an exit on 9 December 2025.",
+            True,
+        ),
+        (
+            "Se ejecutaron 4 trades, con una entrada el 18 de noviembre de 2025 "
+            "y una salida el 9 de diciembre de 2025.",
+            True,
+        ),
+        ("There were 18 trades.", False),
+        ("Hubo 18 operaciones.", False),
+        ("El saldo fue 18 dolares.", False),
+        ("La entrada fue el 19 de noviembre de 2025.", False),
+    ],
+)
+async def test_natural_date_parts_do_not_inherit_distant_count_labels(
+    surface, text, accepted, stored_result, monkeypatch
+):
+    stored_result["metrics"]["aggregate"]["efficiency"]["total_trades"] = 4
+    stored_result["date_range"] = {"start": "2025-09-10", "end": "2026-09-09"}
+    stored_result["chart"] = {
+        "markers": [{"time": "2025-11-18"}, {"time": "2025-12-09"}]
+    }
+    rendered, _ = await compose(surface, text, stored_result, monkeypatch)
+    assert rendered == (text if accepted else None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
 async def test_readouts_normalize_em_dash_without_dropping_prose(
     surface, stored_result, monkeypatch
 ):
@@ -465,6 +516,42 @@ async def test_readouts_accept_compatible_units_and_rounded_compact_money(
 async def test_readouts_resolve_generic_benchmark_subjects_consistently(
     surface, text, accepted, stored_result, monkeypatch
 ):
+    rendered, _ = await compose(surface, text, stored_result, monkeypatch)
+    assert rendered == (text if accepted else None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+@pytest.mark.parametrize(
+    "text,accepted",
+    [
+        ("The RSI strategy in SPY lagged the SPY benchmark.", True),
+        ("La estrategia RSI en SPY quedó por detrás del índice SPY.", True),
+        ("The RSI strategy in SPY beat the SPY benchmark.", False),
+        ("La estrategia RSI en SPY superó al índice SPY.", False),
+        ("The SPY benchmark beat the RSI strategy in SPY.", True),
+        ("El índice SPY superó a la estrategia RSI en SPY.", True),
+        ("The SPY benchmark lagged the RSI strategy in SPY.", False),
+        ("El índice SPY quedó por debajo de la estrategia RSI en SPY.", False),
+        ("The RSI strategy lagged SPY.", True),
+        ("La estrategia RSI quedó por detrás de SPY.", True),
+        ("The RSI strategy beat SPY.", False),
+        ("La estrategia RSI superó a SPY.", False),
+        ("SPY beat the RSI strategy.", True),
+        ("SPY superó a la estrategia RSI.", True),
+        ("SPY lagged the RSI strategy.", False),
+        ("SPY quedó por debajo de la estrategia RSI.", False),
+    ],
+)
+async def test_shared_ticker_comparison_derives_roles_from_explicit_subjects(
+    surface, text, accepted, stored_result, monkeypatch
+):
+    original_symbol = stored_result["symbols"][0]
+    benchmark = stored_result["benchmark_symbol"]
+    by_symbol = stored_result["metrics"]["by_symbol"]
+    by_symbol[benchmark] = by_symbol.pop(original_symbol)
+    stored_result["symbols"] = [benchmark]
+    stored_result["config_snapshot"]["template"] = "rsi_mean_reversion"
     rendered, _ = await compose(surface, text, stored_result, monkeypatch)
     assert rendered == (text if accepted else None)
 

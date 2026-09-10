@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from collections.abc import Iterator
 from typing import Any
 
@@ -280,23 +281,23 @@ def _numeric_facts(facts: dict[str, Any]) -> Iterator[tuple[str, str, float]]:
 
 _QUOTED_UNITS = {
     "currency": re.compile(
-        r"[$€£]|\b(?:USD|EUR|GBP|dollars?|dólares?|capital|profit|balance|saldo|contribuci[oó]n)\b",
+        r"[$€£]|\b(?:USD|EUR|GBP|dollars?|dolares?|capital|profit|balance|saldo|contribucion)\b",
         re.I,
     ),
     "ratio": re.compile(r"\b(?:sharpe|ratio|profit factor|factor de beneficio)\b", re.I),
     "count": re.compile(
-        r"\b(?:fills?|trades?|operations?|operaciones|periods?|períodos?|days?|días?|shares?|acciones)\b",
+        r"\b(?:fills?|trades?|operations?|operaciones|periods?|periodos?|days?|dias?|shares?|acciones)\b",
         re.I,
     ),
     "percent": re.compile(
-        r"\b(?:return|rendimiento|volatility|volatilidad|drawdown|ca[ií]da)\b", re.I
+        r"\b(?:return|rendimiento|volatility|volatilidad|drawdown|caida)\b", re.I
     ),
 }
 _PERCENT_SUFFIX = re.compile(
     r"^\s*(?:%|percent(?:age points?)?\b|por ciento\b|puntos? porcentuales?\b|pp\b|pts\b)",
     re.I,
 )
-_BASIS_SUFFIX = re.compile(r"^\s*(?:bps\b|basis points?\b|puntos? b[aá]sicos?\b)", re.I)
+_BASIS_SUFFIX = re.compile(r"^\s*(?:bps\b|basis points?\b|puntos? basicos?\b)", re.I)
 
 
 def _quoted_unit(text: str, match: re.Match[str]) -> str:
@@ -306,7 +307,7 @@ def _quoted_unit(text: str, match: re.Match[str]) -> str:
     if _BASIS_SUFFIX.match(after):
         return "basis_points"
     if re.search(r"[$€£][^\S\r\n]*$", before) or re.match(
-        r"\s*(?:USD|EUR|GBP|dollars?|dólares?)\b", after, re.I
+        r"\s*(?:USD|EUR|GBP|dollars?|dolares?)\b", after, re.I
     ):
         return "currency"
     if _QUOTED_UNITS["count"].match(after.lstrip()):
@@ -326,16 +327,20 @@ def _quoted_unit(text: str, match: re.Match[str]) -> str:
         (label.start(), unit)
         for unit, pattern in _QUOTED_UNITS.items()
         for label in pattern.finditer(local)
-        # A bare four-digit figure can be a calendar year. Count labels must
-        # attach locally, allowing a linking word, instead of spanning prose.
+        # Count labels must attach locally, allowing a linking word, instead
+        # of spanning unrelated prose such as a following natural date.
         if unit != "count"
-        or not re.fullmatch(r"\d{4}", match.group())
         or re.fullmatch(r"\W*(?:\w+\W*)?", local[label.end() :])
     ]
     return max(labels)[1] if labels else "scalar"
 
 
 def _false_figure(text: str, facts: dict[str, Any]) -> bool:
+    text = "".join(
+        char
+        for char in unicodedata.normalize("NFD", text)
+        if not unicodedata.combining(char)
+    )
     allowed = list(_numeric_facts(facts))
     for match in _NUMBER.finditer(text):
         prefix = text[: match.start()].rsplit("\n", 1)[-1]
@@ -418,8 +423,9 @@ def _contradicting_comparison(text: str, facts: dict[str, Any]) -> bool:
     benchmark = str(facts.get("benchmark_symbol") or "").casefold()
     if expected is None or not benchmark:
         return False
+    strategy_symbols = {str(s).casefold() for s in facts.get("symbols") or []}
     roles = {
-        **{str(s).casefold(): "strategy" for s in facts.get("symbols") or []},
+        **{symbol: "strategy" for symbol in strategy_symbols},
         "strategy": "strategy",
         "estrategia": "strategy",
         **{
@@ -427,13 +433,18 @@ def _contradicting_comparison(text: str, facts: dict[str, Any]) -> bool:
             for alias in (benchmark, "benchmark", "referencia", "índice", "indice")
         },
     }
+    if benchmark in strategy_symbols:
+        roles[benchmark] = "shared"
     role_pattern = re.compile(
         r"(?<!\w)(?:" + "|".join(re.escape(alias) for alias in roles) + r")(?!\w)"
     )
     for clause in re.split(r"(?<!\d)[.!?;\n](?!\d)", text.casefold()):
         mentions = list(role_pattern.finditer(clause))
-        if not any(roles[mention.group()] == "benchmark" for mention in mentions):
+        if not any(roles[mention.group()] != "strategy" for mention in mentions):
             continue
+        explicit = [
+            mention for mention in mentions if roles[mention.group()] != "shared"
+        ]
         for match in _COMPARISON.finditer(clause):
             claim = (
                 1 if match.lastgroup == "beat" else -1 if match.lastgroup == "lag" else 0
@@ -441,8 +452,20 @@ def _contradicting_comparison(text: str, facts: dict[str, Any]) -> bool:
             prefix = clause[: match.start()]
             # Resolve which side is the subject, including inverted sentences
             # such as 'SPY beat DOCN' and ordinary strategy-first statements.
-            subjects = [mention for mention in mentions if mention.end() <= match.start()]
-            if subjects and roles[subjects[-1].group()] == "benchmark":
+            subjects = [mention for mention in explicit if mention.end() <= match.start()]
+            subject = roles[subjects[-1].group()] if subjects else None
+            if subject is None and benchmark in strategy_symbols:
+                # A shared ticker cannot own a side. An explicit object can
+                # disambiguate it, as in 'SPY beat the RSI strategy'.
+                objects = [
+                    mention for mention in explicit if mention.start() >= match.end()
+                ]
+                if not objects:
+                    continue
+                subject = (
+                    "strategy" if roles[objects[0].group()] == "benchmark" else "benchmark"
+                )
+            if subject == "benchmark":
                 claim *= -1
             negated = bool(re.search(r"(?:\bnot|\bno|n['’]t)\s+(?:\w+\s+){0,2}$", prefix))
             if (negated and claim == expected) or (not negated and claim != expected):

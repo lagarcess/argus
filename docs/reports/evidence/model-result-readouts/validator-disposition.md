@@ -9,7 +9,7 @@ optional. Sampled trade markers are not treated as a complete trade ledger.
 | --- | --- |
 | `_false_figure` | Keep: catches a quoted number absent from compatible stored metrics, execution inputs, dates, optional chart, or the explicit starting-capital drawdown illustration; currency, percentages/points, ratios and counts remain distinct, with tolerance determined by the quoted precision and compact/scientific scale. |
 | Ratio presentation | Keep inside the figure check: `win_rate` and `observed_ratio` may be printed as percentages; other numbers are never indiscriminately multiplied by 100. |
-| `_contradicting_comparison` | Keep: catches visible English/Spanish beat, lag or match claims that contradict canonical benchmark comparison; one role matcher identifies ticker and generic benchmark subjects in both clause selection and negated/inverted claims. |
+| `_contradicting_comparison` | Keep: catches visible English/Spanish beat, lag or match claims that contradict canonical benchmark comparison; one role matcher identifies ticker and generic benchmark subjects in both clause selection and negated/inverted claims; a shared strategy/benchmark ticker requires an explicit role on either side. |
 | `_internal_field_name` | Keep: catches visible snake-case keys, supplied camelCase keys, quoted schema fields, draft schema names, and internal fact/context/receipt terminology. |
 | `QuickTakeDraft.relative_performance_claim` self-report | Remove: model metadata is not visible truth; the shared check reads the complete visible draft instead. |
 | `_quick_take_mentions_unknown_metric_number` three-figure allowlist | Remove: rejects honest stored annualized return, risk, costs and activity; the shared numeric check accepts all stored metrics. |
@@ -33,6 +33,8 @@ The prompt additionally assigns historical, non-advisory interpretation to
 both surfaces, prohibits price-cause claims and forecasts, and makes Breakdown
 use the accepted prior Quick take as context. These are measured writing
 requirements, not another language classifier or a content quota.
+
+Numeric validation folds accents internally without changing visible text and binds count labels locally so dates do not inherit distant trade labels. Explicit incompatible units and false rounding remain rejected.
 
 The figure checker verifies numeric membership and rounding, not arbitrary
 natural-language semantic entailment. The benchmark check covers explicit
