@@ -1,0 +1,600 @@
+{
+  "case_id": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+  "historical": {
+    "17-baseline-r1": {
+      "sha": "542fcfb2432e906663160d8cb874d955faeafd16",
+      "source_file": "/private/tmp/registry-interleaved-fourth-repairs/17-baseline-r1.responses.jsonl",
+      "replies": [
+        {
+          "source_row": 2,
+          "schema_name": "LLMInterpretationResponse",
+          "message_content": {
+            "intent": "strategy_drafting",
+            "task_relation": "new_task",
+            "user_goal_summary": "Test monthly DCA into VOO using a total budget of $5000 through 2024",
+            "requires_clarification": false,
+            "detected_user_language": "en",
+            "candidate_strategy_draft": {
+              "raw_user_phrasing": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+              "language": "en",
+              "strategy_type": "dca_accumulation",
+              "asset_universe": [
+                "VOO"
+              ],
+              "cadence": "monthly",
+              "total_capital": 5000,
+              "comparison_baseline": null,
+              "field_provenance": {
+                "strategy_type": "explicit_user",
+                "asset_universe": "explicit_user",
+                "cadence": "explicit_user",
+                "total_capital": "explicit_user",
+                "date_range": "explicit_user"
+              },
+              "evidence_spans": {
+                "asset_universe": "VOO",
+                "total_capital": "I only have $5,000 to invest",
+                "cadence": "every month",
+                "date_range": "through 2024"
+              },
+              "extra_parameters": {}
+            },
+            "semantic_turn_act": "new_idea",
+            "artifact_target": "none"
+          }
+        },
+        {
+          "source_row": 3,
+          "schema_name": "FocusedStrategyExtraction",
+          "message_content": {
+            "is_testable_strategy": true,
+            "user_goal_summary": "Test monthly DCA into VOO with $5,000 total capital through 2024",
+            "requires_clarification": false,
+            "language": null,
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "VOO"
+            ],
+            "asset_class": null,
+            "timeframe": null,
+            "date_range": null,
+            "date_range_raw_text": "through 2024",
+            "date_range_intent": {
+              "kind": "calendar_year",
+              "start": null,
+              "end": null,
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": 2024,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "through 2024"
+            },
+            "comparison_baseline": null,
+            "capital_amount": 5000,
+            "recurring_contribution": 5000,
+            "cadence": "monthly",
+            "entry_logic": null,
+            "exit_logic": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "indicator": null,
+            "indicator_period": null,
+            "entry_threshold": null,
+            "exit_threshold": null,
+            "missing_required_fields": [],
+            "assistant_response": null,
+            "confidence": 0.9,
+            "evidence_spans": {
+              "capital_amount": "$5,000",
+              "recurring_contribution": "$5,000",
+              "cadence": "every month",
+              "asset_universe": "VOO",
+              "date_range_raw_text": "through 2024"
+            }
+          }
+        },
+        {
+          "source_row": 4,
+          "schema_name": "FocusedDateWindowExtraction",
+          "message_content": {
+            "has_date_window": true,
+            "date_range_raw_text": "through 2024",
+            "date_range_intent": {
+              "kind": "calendar_year",
+              "start": null,
+              "end": null,
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": 2024,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "through 2024"
+            },
+            "date_range": null,
+            "confidence": 0.9,
+            "evidence": "through 2024"
+          }
+        },
+        {
+          "source_row": 5,
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "message_content": {
+            "capital_amount": 5000,
+            "recurring_contribution_amount": null,
+            "cadence": null,
+            "timeframe": null,
+            "date_range": null,
+            "comparison_baseline": null,
+            "fee": null,
+            "slippage": null,
+            "confidence": 0.8
+          }
+        },
+        {
+          "source_row": 6,
+          "schema_name": "DcaContractAudit",
+          "message_content": {
+            "is_recurring_buy_request": false,
+            "recurring_contribution_amount": null,
+            "cadence": null,
+            "total_budget_amount": 5000,
+            "total_budget_source": "total_budget",
+            "confidence": 0.85
+          }
+        },
+        {
+          "source_row": 7,
+          "schema_name": null,
+          "message_content": {
+            "is_recurring_buy_request": true,
+            "recurring_contribution_amount": null,
+            "cadence": "monthly",
+            "total_budget_amount": 5000,
+            "total_budget_source": "starting_capital",
+            "confidence": 0.95
+          }
+        },
+        {
+          "source_row": 8,
+          "schema_name": "DcaContributionRoleAudit",
+          "message_content": {
+            "recurring_contribution_explicit": false,
+            "total_budget_not_recurring": true,
+            "confidence": 0.9
+          }
+        },
+        {
+          "source_row": 9,
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "message_content": {
+            "capital_amount": 5000,
+            "recurring_contribution_amount": null,
+            "cadence": null,
+            "timeframe": null,
+            "date_range": null,
+            "comparison_baseline": null,
+            "fee": null,
+            "slippage": null,
+            "confidence": 0.8
+          }
+        }
+      ]
+    },
+    "18-candidate-r1": {
+      "sha": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "source_file": "/private/tmp/registry-interleaved-fourth-repairs/18-candidate-r1.responses.jsonl",
+      "replies": [
+        {
+          "source_row": 2,
+          "schema_name": null,
+          "message_content": {
+            "tool_calls": [],
+            "intent": "calculate",
+            "task_relation": "new_idea",
+            "requires_clarification": true,
+            "user_goal_summary": "Test a monthly dollar-cost-accumulation plan investing in VOO with $5,000 total available through 2024.",
+            "detected_user_language": "en",
+            "candidate_strategy_draft": {
+              "raw_user_phrasing": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+              "language": "en",
+              "strategy_type": "dca_accumulation",
+              "asset_universe": [
+                "VOO"
+              ],
+              "cadence": "monthly",
+              "date_range_raw_text": "through 2024",
+              "total_capital": 5000,
+              "field_provenance": {
+                "strategy_type": "explicit_user",
+                "asset_universe": "explicit_user",
+                "cadence": "explicit_user",
+                "total_capital": "explicit_user",
+                "date_range_raw_text": "explicit_user"
+              },
+              "evidence_spans": {
+                "strategy_type": "putting money into VOO every month",
+                "asset_universe": "VOO",
+                "cadence": "every month",
+                "total_capital": "I only have $5,000"
+              }
+            },
+            "missing_required_fields": [
+              "recurring_contribution",
+              "date_range"
+            ],
+            "assistant_response": "I can test a monthly investment plan in VOO with $5,000 available. I need two details: How much would you like to invest each month, and what's your start date? Also, 'through 2024' is in the past now\u2014did you mean to test that historical period, or did you want a different window?",
+            "semantic_turn_act": "new_idea",
+            "confidence": 0.7,
+            "reason_codes": [
+              "dca_recurring_amount_missing",
+              "date_range_ambiguous_past"
+            ]
+          }
+        },
+        {
+          "source_row": 3,
+          "schema_name": "FocusedStrategyExtraction",
+          "message_content": {
+            "is_testable_strategy": true,
+            "user_goal_summary": "Test monthly DCA into VOO with $5,000 total capital through 2024",
+            "raw_user_phrasing": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+            "language": "en",
+            "requested_strategy_template": "dca_accumulation",
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "VOO"
+            ],
+            "asset_inclusions": [],
+            "asset_exclusions": [],
+            "asset_universe_operation": null,
+            "asset_class": null,
+            "timeframe": null,
+            "cadence": "monthly",
+            "entry_logic": null,
+            "exit_logic": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "indicator": null,
+            "indicator_period": null,
+            "entry_threshold": null,
+            "exit_threshold": null,
+            "date_range": null,
+            "date_range_raw_text": "through 2024",
+            "date_range_intent": {
+              "kind": "calendar_year",
+              "start": null,
+              "end": null,
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": 2024,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "through 2024"
+            },
+            "sizing_mode": null,
+            "capital_amount": 5000,
+            "recurring_contribution": null,
+            "initial_capital": null,
+            "total_capital": 5000,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "field_provenance": {
+              "strategy_type": "explicit_user",
+              "asset_universe": "explicit_user",
+              "cadence": "explicit_user",
+              "capital_amount": "explicit_user",
+              "date_range_raw_text": "explicit_user",
+              "date_range_intent": "explicit_user",
+              "total_capital": "explicit_user"
+            },
+            "evidence_spans": {
+              "strategy_type": "putting money into VOO every month",
+              "asset_universe": "VOO",
+              "cadence": "every month",
+              "capital_amount": "$5,000",
+              "date_range_raw_text": "through 2024",
+              "total_capital": "$5,000"
+            },
+            "extra_parameters": {},
+            "resolution_provenance": [],
+            "fee_rate": null,
+            "slippage": null,
+            "requires_clarification": false,
+            "missing_required_fields": [],
+            "assistant_response": null,
+            "confidence": 0.85
+          }
+        },
+        {
+          "source_row": 4,
+          "schema_name": "FocusedDateWindowExtraction",
+          "message_content": {
+            "has_date_window": true,
+            "date_range_raw_text": "through 2024",
+            "date_range_intent": {
+              "kind": "calendar_year",
+              "start": null,
+              "end": null,
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": 2024,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "through 2024"
+            },
+            "date_range": null,
+            "confidence": 0.9,
+            "evidence": "through 2024"
+          }
+        },
+        {
+          "source_row": 5,
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "message_content": {
+            "capital_amount": 5000,
+            "recurring_contribution_amount": null,
+            "cadence": null,
+            "timeframe": null,
+            "date_range": null,
+            "comparison_baseline": null,
+            "fee": null,
+            "slippage": null,
+            "confidence": 0.8
+          }
+        },
+        {
+          "source_row": 6,
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "message_content": {
+            "capital_amount": 5000,
+            "recurring_contribution_amount": null,
+            "cadence": null,
+            "timeframe": null,
+            "date_range": null,
+            "comparison_baseline": null,
+            "fee": null,
+            "slippage": null,
+            "confidence": 0.8
+          }
+        }
+      ]
+    },
+    "45-candidate-r2": {
+      "sha": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "source_file": "/private/tmp/registry-interleaved-fourth-repairs/45-candidate-r2.responses.jsonl",
+      "replies": [
+        {
+          "source_row": 2,
+          "schema_name": "LLMInterpretationResponse",
+          "message_content": {
+            "intent": "follow_up",
+            "task_relation": "new_task",
+            "user_goal_summary": "Test monthly DCA into VOO with a total $5,000 budget through 2024",
+            "tool_calls": [],
+            "requires_clarification": true,
+            "detected_user_language": "en",
+            "candidate_strategy_draft": {
+              "raw_user_phrasing": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+              "language": "en",
+              "requested_strategy_template": "dca_accumulation",
+              "strategy_type": "dca_accumulation",
+              "asset_universe": [
+                "VOO"
+              ],
+              "asset_class": "equity",
+              "cadence": "monthly",
+              "total_capital": 5000,
+              "comparison_baseline": null,
+              "field_provenance": {
+                "strategy_type": "explicit_user",
+                "asset_universe": "explicit_user",
+                "cadence": "explicit_user",
+                "total_capital": "explicit_user",
+                "date_range_raw_text": "explicit_user"
+              },
+              "evidence_spans": {
+                "asset_universe": "VOO",
+                "cadence": "every month",
+                "total_capital": "$5,000",
+                "date_range_raw_text": "through 2024"
+              },
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe",
+                  "raw_text": "VOO",
+                  "source": "user_mention",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "VOO",
+                  "asset_class": "equity",
+                  "confidence": "high"
+                }
+              ],
+              "fee_rate": null,
+              "slippage": null
+            },
+            "missing_required_fields": [
+              "recurring_contribution"
+            ],
+            "assistant_response": "To test monthly investments into VOO through 2024 with your $5,000 total, what amount would you like to put in each month?",
+            "uses_latest_result_context": false,
+            "confidence": 0.85,
+            "reason_codes": [
+              "missing_recurring_amount"
+            ],
+            "semantic_turn_act": "new_idea",
+            "artifact_target": "none"
+          }
+        },
+        {
+          "source_row": 3,
+          "schema_name": "FocusedStrategyExtraction",
+          "message_content": {
+            "is_testable_strategy": true,
+            "user_goal_summary": "Test monthly DCA into VOO with $5,000 total capital through 2024",
+            "raw_user_phrasing": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+            "language": "en",
+            "requested_strategy_template": "dca_accumulation",
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": "Monthly dollar-cost averaging into VOO with limited $5,000 capital through calendar year 2024",
+            "asset_universe": [
+              "VOO"
+            ],
+            "asset_inclusions": [],
+            "asset_exclusions": [],
+            "asset_universe_operation": null,
+            "asset_class": null,
+            "timeframe": null,
+            "cadence": "monthly",
+            "entry_logic": null,
+            "exit_logic": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "indicator": null,
+            "indicator_period": null,
+            "entry_threshold": null,
+            "exit_threshold": null,
+            "date_range": null,
+            "date_range_raw_text": "through 2024",
+            "date_range_intent": {
+              "kind": "calendar_year",
+              "start": null,
+              "end": null,
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": 2024,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "through 2024"
+            },
+            "sizing_mode": null,
+            "capital_amount": 5000,
+            "recurring_contribution": null,
+            "initial_capital": null,
+            "total_capital": 5000,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "field_provenance": {
+              "strategy_type": "explicit_user",
+              "asset_universe": "explicit_user",
+              "cadence": "explicit_user",
+              "capital_amount": "explicit_user",
+              "date_range_raw_text": "explicit_user",
+              "date_range_intent": "explicit_user",
+              "total_capital": "explicit_user"
+            },
+            "evidence_spans": {
+              "strategy_type": "putting money into VOO every month",
+              "asset_universe": "VOO",
+              "cadence": "every month",
+              "capital_amount": "$5,000",
+              "date_range_raw_text": "through 2024",
+              "date_range_intent": "through 2024",
+              "total_capital": "$5,000"
+            },
+            "extra_parameters": {},
+            "resolution_provenance": [],
+            "fee_rate": null,
+            "slippage": null,
+            "requires_clarification": false,
+            "missing_required_fields": [],
+            "assistant_response": null,
+            "confidence": 0.85
+          }
+        },
+        {
+          "source_row": 4,
+          "schema_name": "FocusedDateWindowExtraction",
+          "message_content": {
+            "has_date_window": true,
+            "date_range_raw_text": "through 2024",
+            "date_range_intent": {
+              "kind": "calendar_year",
+              "start": null,
+              "end": null,
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": 2024,
+              "endpoint": null,
+              "confidence": 0.9,
+              "evidence": "through 2024"
+            },
+            "date_range": null,
+            "confidence": 0.9,
+            "evidence": "through 2024"
+          }
+        },
+        {
+          "source_row": 5,
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "message_content": {
+            "capital_amount": 5000,
+            "recurring_contribution_amount": null,
+            "cadence": null,
+            "timeframe": null,
+            "date_range": null,
+            "comparison_baseline": null,
+            "fee": null,
+            "slippage": null,
+            "confidence": 0.8
+          }
+        },
+        {
+          "source_row": 6,
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "message_content": {
+            "capital_amount": 5000,
+            "recurring_contribution_amount": null,
+            "cadence": null,
+            "timeframe": null,
+            "date_range": null,
+            "comparison_baseline": null,
+            "fee": null,
+            "slippage": null,
+            "confidence": 0.8
+          }
+        }
+      ]
+    }
+  },
+  "authored_completion": {
+    "provenance": "Authored counterfactual audit replies for offline tests. These were not returned in candidate18; the measured result stays failed.",
+    "DcaContractAudit": {
+      "is_recurring_buy_request": false,
+      "recurring_contribution_amount": null,
+      "cadence": "monthly",
+      "total_budget_amount": 5000,
+      "total_budget_source": "total_budget",
+      "confidence": 0.95
+    },
+    "DcaContributionRoleAudit": {
+      "recurring_contribution_explicit": false,
+      "total_budget_not_recurring": true,
+      "confidence": 0.95
+    }
+  }
+}

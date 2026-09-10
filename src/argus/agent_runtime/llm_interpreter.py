@@ -567,11 +567,6 @@ class OpenRouterStructuredInterpreter:
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
-                repaired_response = await _stated_run_field_audited_response(
-                    response=repaired_response,
-                    preferred_model=candidate_models[0] if candidate_models else "",
-                    request=request,
-                )
                 return self._to_runtime_interpretation(repaired_response, request=request)
             self.last_status = "failed"
             return None
@@ -707,11 +702,6 @@ class OpenRouterStructuredInterpreter:
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
-            repaired_response = await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=fallback_model_name or primary_model_name,
-                request=request,
-            )
             return self._to_runtime_interpretation(repaired_response, request=request)
         return None
 
@@ -2049,6 +2039,14 @@ async def _dca_contract_audited_response(
             continue
         repaired = _response_from_dca_contract_audit(response=response, audit=audit)
         if repaired is not None:
+            if response.task_relation in {
+                "continue",
+                "refine",
+            } and strategy_route_expected(
+                intent=response.intent, semantic_turn_act=response.semantic_turn_act
+            ):
+                repaired.task_relation = response.task_relation
+                repaired.semantic_turn_act = response.semantic_turn_act
             return repaired
     return response
 
@@ -2425,10 +2423,8 @@ async def _audited_response_ready_for_runtime(
             asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
+            return await _focused_repair_completed_response(
+                repaired_response, preferred_model, request
             )
     if _response_needs_pre_guidance_focused_strategy_extraction(
         response=response,
@@ -2441,10 +2437,8 @@ async def _audited_response_ready_for_runtime(
             asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
+            return await _focused_repair_completed_response(
+                repaired_response, preferred_model, request
             )
     response = await _capability_side_question_audited_response(
         response=response,
@@ -2462,21 +2456,7 @@ async def _audited_response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
-    response = await _dca_contract_audited_response(
-        response=response,
-        preferred_model=preferred_model,
-        request=request,
-    )
-    response = await _strategy_family_continuity_audited_response(
-        response=response,
-        preferred_model=preferred_model,
-        request=request,
-    )
-    response = await _dca_contribution_role_audited_response(
-        response=response,
-        preferred_model=preferred_model,
-        request=request,
-    )
+    response = await _strategy_semantics_audited(response, preferred_model, request)
     _log_runtime_readiness_step("baseline_audits_completed", response=response)
     if _response_can_skip_optional_runtime_readiness_audits(
         response=response,
@@ -2569,10 +2549,8 @@ async def _audited_response_ready_for_runtime(
                 request=request,
             )
             return audited_response or supported_date_gap_response
-        return await _stated_run_field_audited_response(
-            response=supported_date_gap_response,
-            preferred_model=preferred_model,
-            request=request,
+        return await _focused_repair_completed_response(
+            supported_date_gap_response, preferred_model, request
         )
     if response.capability_question_focus is not None and (
         response.artifact_target == "none" or not _request_has_latest_result(request)
@@ -2587,10 +2565,8 @@ async def _audited_response_ready_for_runtime(
                 asset_resolution_context=asset_resolution_context,
             )
             if repaired_response is not None:
-                return await _stated_run_field_audited_response(
-                    response=repaired_response,
-                    preferred_model=preferred_model,
-                    request=request,
+                return await _focused_repair_completed_response(
+                    repaired_response, preferred_model, request
                 )
             context_response = await _unsupported_context_question_audited_response(
                 response=response,
@@ -2616,10 +2592,8 @@ async def _audited_response_ready_for_runtime(
             asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
+            return await _focused_repair_completed_response(
+                repaired_response, preferred_model, request
             )
     response = await _signal_rule_checked_response(
         response=response,
@@ -2673,10 +2647,8 @@ async def _audited_response_ready_for_runtime(
             asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
+            return await _focused_repair_completed_response(
+                repaired_response, preferred_model, request
             )
         # Entered only when the response already carries assistant text.
         return _carry_asset_blocker(response, asset_resolution_context)
@@ -2688,10 +2660,8 @@ async def _audited_response_ready_for_runtime(
             asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
+            return await _focused_repair_completed_response(
+                repaired_response, preferred_model, request
             )
     if _response_needs_testable_idea_repair(response=response, request=request):
         repaired_response = await _repair_incomplete_strategy_extraction(
@@ -2701,10 +2671,8 @@ async def _audited_response_ready_for_runtime(
             asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
+            return await _focused_repair_completed_response(
+                repaired_response, preferred_model, request
             )
         context_response = await _unsupported_context_question_audited_response(
             response=response,
@@ -2789,10 +2757,8 @@ async def _audited_response_ready_for_runtime(
         asset_resolution_context=asset_resolution_context,
     )
     if repaired_response is not None:
-        return await _stated_run_field_audited_response(
-            response=repaired_response,
-            preferred_model=preferred_model,
-            request=request,
+        return await _focused_repair_completed_response(
+            repaired_response, preferred_model, request
         )
     raise contract_recovery.incomplete_response_error(response=response, request=request)
 
@@ -3130,6 +3096,34 @@ async def _plan_artifact_edit_response(
         preferred_model=preferred_model,
         request=request,
     )
+
+
+async def _strategy_semantics_audited(
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    for audit in (
+        _dca_contract_audited_response,
+        _strategy_family_continuity_audited_response,
+        _dca_contribution_role_audited_response,
+    ):
+        response = await audit(
+            response=response, preferred_model=preferred_model, request=request
+        )
+    return response
+
+
+async def _focused_repair_completed_response(
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    # Field extraction finishes first; money-role adjudication owns the last word.
+    response = await _stated_run_field_audited_response(
+        response=response, preferred_model=preferred_model, request=request
+    )
+    return await _strategy_semantics_audited(response, preferred_model, request)
 
 
 async def _stated_run_field_audited_response(
@@ -4920,12 +4914,15 @@ async def _focused_strategy_repair_after_candidate_failures(
     # Candidates plus their audits may have spent the whole turn allowance;
     # this is the only rescue left, so its first call holds a reserved slot.
     with turn_execution.last_resort_repair_scope():
-        return await _repair_incomplete_strategy_extraction(
+        response = await _repair_incomplete_strategy_extraction(
             failed_response=seed_response,
             preferred_model=preferred_model,
             request=request,
             asset_resolution_context=asset_resolution_context,
         )
+    if response is None:
+        return None
+    return await _focused_repair_completed_response(response, preferred_model, request)
 
 
 def _response_from_focused_strategy_extraction(
