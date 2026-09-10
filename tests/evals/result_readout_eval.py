@@ -97,6 +97,24 @@ def build_schedule(
     ]
 
 
+def build_writing_schedule(case_ids: list[str]) -> list[dict[str, Any]]:
+    """One paired composition per saved run and language; no measured control arm."""
+    return [
+        {
+            "case_id": case_id,
+            "language": language,
+            "variant": "structured",
+            "replicate": 1,
+        }
+        for case_id in case_ids
+        for language in LANGUAGES
+    ]
+
+
+def attempt_limit(configuration: dict[str, Any]) -> int:
+    return 1 if configuration.get("single_attempt") is True else MAX_ATTEMPTS
+
+
 @dataclass
 class CostGuard:
     """Reserve a worst-case cost before each actual HTTP request, including retries."""
@@ -105,6 +123,7 @@ class CostGuard:
     rates: dict[str, dict[str, float]]
     max_input_bytes: int = MAX_INPUT_BYTES
     max_attempts: int = MAX_ATTEMPTS
+    primary_models: dict[str, str] | None = None
     reserved_usd: float = 0
     attempts: int = 0
     by_task: dict[str, int] = field(default_factory=dict)
@@ -118,6 +137,8 @@ class CostGuard:
         if self.by_task.get(task, 0) >= self.max_attempts:
             raise ValueError("attempt_limit")
         model = payload.get("model")
+        if self.primary_models is not None and model != self.primary_models.get(task):
+            raise ValueError("unexpected_primary_model")
         rate = self.rates.get(model)
         if rate is None:
             raise ValueError("unpriced_model")
@@ -220,10 +241,14 @@ def invoke_probe(
     rates: dict[str, Any],
     preflight: dict[str, Any] | None = None,
     max_input_bytes: int | None = None,
+    single_attempt: bool | None = None,
 ) -> dict[str, Any]:
-    preflight_limit = (
-        (preflight or {}).get("configuration", {}).get("max_input_bytes", MAX_INPUT_BYTES)
-    )
+    preflight_configuration = (preflight or {}).get("configuration", {})
+    preflight_single = preflight_configuration.get("single_attempt", False)
+    single = preflight_single if single_attempt is None else single_attempt
+    if live and single != preflight_single:
+        raise ValueError("attempt_policy_changed_after_preflight")
+    preflight_limit = preflight_configuration.get("max_input_bytes", MAX_INPUT_BYTES)
     input_limit = checked_input_limit(
         preflight_limit if max_input_bytes is None else max_input_bytes
     )
@@ -245,7 +270,7 @@ def invoke_probe(
         ]
         if any(not math.isfinite(value) or value <= 0 for value in timeouts):
             raise ValueError("invalid_task_timeout")
-        timeout_seconds = MAX_ATTEMPTS * sum(timeouts) + 60
+        timeout_seconds = attempt_limit(preflight_configuration) * sum(timeouts) + 60
 
     def lost_receipts(reason: str) -> dict[str, Any]:
         if not live:
@@ -284,6 +309,7 @@ def invoke_probe(
         "budget_usd": budget_usd,
         "rates": rates,
         "max_input_bytes": input_limit,
+        "single_attempt": single,
     }
     try:
         child = subprocess.run(
@@ -317,6 +343,9 @@ def estimate_ceiling(probes: list[dict[str, Any]], rates: dict[str, Any]) -> flo
         )
         for task, configuration in probe["configuration"]["tasks"].items():
             models = configuration["models"]
+            attempts = attempt_limit(probe["configuration"])
+            if attempts == 1:
+                models = models[:1]
             if not models or any(model not in rates for model in models):
                 raise ValueError("configured_models_need_verified_prices")
             if any(
@@ -325,7 +354,7 @@ def estimate_ceiling(probes: list[dict[str, Any]], rates: dict[str, Any]) -> flo
                 for key in ("input_per_million", "output_per_million")
             ):
                 raise ValueError("invalid_price")
-            total += MAX_ATTEMPTS * max(
+            total += attempts * max(
                 (
                     input_limit * rates[model]["input_per_million"]
                     + TASK_OUTPUT_LIMITS[task] * rates[model]["output_per_million"]
@@ -342,9 +371,9 @@ def main() -> None:
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument(
         "--comparison-mode",
-        choices=("legacy", "tiers"),
+        choices=("legacy", "tiers", "writing"),
         default="legacy",
-        help="tiers: --baseline is fixed current tiers; --candidate is the same code on structured tiers",
+        help="tiers/writing: --baseline is a current-code reference; --candidate has only the two structured-tier mappings. writing probes only --candidate once.",
     )
     parser.add_argument(
         "--fixtures",
@@ -367,8 +396,10 @@ def main() -> None:
     args = parser.parse_args()
     checked_input_limit(args.max_input_bytes)
     tier_mode = args.comparison_mode == "tiers"
+    writing_mode = args.comparison_mode == "writing"
+    verify_tiers = tier_mode or writing_mode
     fixtures = load_fixture_set(args.fixtures.resolve(), live=args.live)
-    variants = ("current", "structured") if tier_mode else ("baseline", "candidate")
+    variants = ("current", "structured") if verify_tiers else ("baseline", "candidate")
     roots = dict(
         zip(variants, (args.baseline.resolve(), args.candidate.resolve()), strict=False)
     )
@@ -377,11 +408,11 @@ def main() -> None:
     ):
         raise ValueError("live_output_must_be_outside_checkouts")
     provenance = {
-        key: checkout_provenance(path, require_clean=args.live or tier_mode)
+        key: checkout_provenance(path, require_clean=args.live or verify_tiers)
         for key, path in roots.items()
     }
     tier_proof = None
-    if tier_mode:
+    if verify_tiers:
         from tests.evals.result_readout_eval_tiers import validate_tier_checkouts
 
         tier_proof = validate_tier_checkouts(roots["current"], roots["structured"])
@@ -391,10 +422,12 @@ def main() -> None:
         if not pricing.get("verified_at") or not pricing.get("source"):
             raise ValueError("pricing_source_and_date_required")
         rates = pricing["models"]
-    schedule = build_schedule(
-        [case["id"] for case in fixtures["cases"]],
-        replicates=4 if tier_mode else 2,
-        variants=variants,
+    case_ids = [case["id"] for case in fixtures["cases"]]
+    replicates = 1 if writing_mode else 4 if tier_mode else 2
+    schedule = (
+        build_writing_schedule(case_ids)
+        if writing_mode
+        else build_schedule(case_ids, replicates=replicates, variants=variants)
     )
     task_count = len(schedule) * len(TASK_OUTPUT_LIMITS)
     cases = {case["id"]: case for case in fixtures["cases"]}
@@ -411,6 +444,7 @@ def main() -> None:
                 budget_usd=0,
                 rates=rates,
                 max_input_bytes=args.max_input_bytes,
+                single_attempt=writing_mode,
             )
     probes = [preflight[(r["variant"], r["case_id"], r["language"])] for r in schedule]
     ceiling = estimate_ceiling(probes, rates) if rates else None
@@ -439,15 +473,19 @@ def main() -> None:
         raise ValueError("preflight_payload_too_large")
     if args.live and (ceiling is None or ceiling > args.budget_usd):
         raise ValueError("approved_budget_below_worst_case_estimate")
-    prior_manifest = json.loads(
-        (roots[variants[0]] / ".agent/interpreter_prompt_fingerprint.json").read_text()
-    )
-    prior = roots[variants[0]] / prior_manifest["last_measured"]["scorecard"]
+    prior = None
+    if not writing_mode:
+        prior_manifest = json.loads(
+            (
+                roots[variants[0]] / ".agent/interpreter_prompt_fingerprint.json"
+            ).read_text()
+        )
+        prior = roots[variants[0]] / prior_manifest["last_measured"]["scorecard"]
     report = {
         "schema_version": "targeted_readout_scorecard/v1",
         "scope": "result_summary + result_breakdown only; not a full eval suite",
         "comparison_mode": args.comparison_mode,
-        "replicates_per_variant": 4 if tier_mode else 2,
+        "replicates_per_variant": replicates,
         "scheduled_task_completions": task_count,
         "tier_source_proof": tier_proof,
         "fingerprint_authority": {
@@ -465,12 +503,14 @@ def main() -> None:
         "probe_sha256": sha256(
             Path(__file__).with_name("result_readout_probe.py").read_bytes()
         ),
-        "prior_full_scorecard": retained_case_evidence(prior),
+        "prior_full_scorecard": retained_case_evidence(prior)
+        if prior is not None
+        else None,
         "budget": {
             "approved_usd": args.budget_usd,
             "worst_case_usd": ceiling,
             "max_input_bytes": args.max_input_bytes,
-            "max_attempts_per_task": MAX_ATTEMPTS,
+            "max_attempts_per_task": 1 if writing_mode else MAX_ATTEMPTS,
         },
         "totals": {"passed": 0, "failed": 0, "pending_review": task_count},
         "quality_review": "Required: language, helpful interpretation beyond card, short/deep distinction, no repetition, false figures/claims, causal claims, forecasts, advice, em dashes.",
@@ -504,7 +544,7 @@ def main() -> None:
                 **probe,
                 "display_evidence_role": (
                     "Fixed-code composer output for this tier setting; generation evidence, not browser transport proof."
-                    if tier_mode
+                    if verify_tiers
                     else "Private baseline composer output; baseline reader showed the web template."
                     if row["variant"] == "baseline"
                     else "Candidate composer output; reader and template fallback require separate browser evidence."

@@ -98,7 +98,9 @@ def test_tier_tree_proof_rejects_another_changed_file(
         tiers.validate_tier_checkouts(Path("current"), Path("structured"))
 
 
-@pytest.mark.parametrize("mode,expected_tasks", [("legacy", 48), ("tiers", 96)])
+@pytest.mark.parametrize(
+    "mode,expected_tasks", [("legacy", 48), ("tiers", 96), ("writing", 12)]
+)
 def test_runner_report_uses_mode_specific_counts_and_display_roles(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -124,10 +126,11 @@ def test_runner_report_uses_mode_specific_counts_and_display_roles(
     monkeypatch.setattr(
         tiers, "validate_tier_checkouts", lambda *args: {"test_only": True}
     )
-    monkeypatch.setattr(
-        runner,
-        "invoke_probe",
-        lambda **kwargs: {
+    probe_calls = []
+
+    def fake_probe(**kwargs):
+        probe_calls.append(kwargs)
+        return {
             "configuration": {"credential_present": True},
             "preflight_payloads": [],
             "observed_cost_usd": 0,
@@ -135,8 +138,9 @@ def test_runner_report_uses_mode_specific_counts_and_display_roles(
             "unknown_cost_reserved_usd": 0,
             "accounted_upper_bound_usd": 0,
             "cost_complete": False,
-        },
-    )
+        }
+
+    monkeypatch.setattr(runner, "invoke_probe", fake_probe)
     output = tmp_path / "report.json"
     monkeypatch.setattr(
         sys,
@@ -158,7 +162,20 @@ def test_runner_report_uses_mode_specific_counts_and_display_roles(
     assert report["scheduled_task_completions"] == expected_tasks
     assert report["totals"]["pending_review"] == expected_tasks
     assert len(report["results"]) * 2 == expected_tasks
-    if mode == "tiers":
+    if mode == "writing":
+        assert len(probe_calls) == 6
+        assert all(call["checkout"] == tmp_path / "candidate" for call in probe_calls)
+        assert all(call["single_attempt"] is True for call in probe_calls)
+        assert {row["variant"] for row in report["results"]} == {"structured"}
+        assert {row["replicate"] for row in report["results"]} == {1}
+        assert report["budget"]["max_attempts_per_task"] == 1
+        assert report["prior_full_scorecard"] is None
+        assert report["fingerprint_authority"]["eligible"] is False
+        assert all(
+            "Private baseline" not in row["display_evidence_role"]
+            for row in report["results"]
+        )
+    elif mode == "tiers":
         assert {row["variant"] for row in report["results"]} == {"current", "structured"}
         assert all(
             "Private baseline" not in row["display_evidence_role"]
@@ -168,6 +185,27 @@ def test_runner_report_uses_mode_specific_counts_and_display_roles(
         assert report["results"][0]["display_evidence_role"].startswith(
             "Private baseline"
         )
+
+
+def test_single_attempt_estimate_prices_only_primary_once() -> None:
+    from tests.evals.result_readout_eval import TASK_OUTPUT_LIMITS
+
+    probe = {
+        "configuration": {
+            "single_attempt": True,
+            "max_input_bytes": MAX_INPUT_BYTES,
+            "tasks": {
+                task: {"models": ["primary", "unpriced-blocked-fallback"]}
+                for task in TASK_OUTPUT_LIMITS
+            },
+        }
+    }
+    rates = {"primary": {"input_per_million": 1, "output_per_million": 2}}
+    expected = sum(
+        (MAX_INPUT_BYTES + 2 * output) / 1_000_000
+        for output in TASK_OUTPUT_LIMITS.values()
+    )
+    assert estimate_ceiling([probe], rates) == pytest.approx(expected)
 
 
 def test_paid_fixtures_refuse_authored_test_numbers() -> None:
@@ -426,6 +464,84 @@ def fake_live_probe_request(monkeypatch: pytest.MonkeyPatch) -> dict:
         "budget_usd": 1,
         "rates": {"fixture-model": {"input_per_million": 0.1, "output_per_million": 0.2}},
     }
+
+
+@pytest.mark.parametrize("outcome", ["accepted", "http_400", "malformed"])
+def test_single_attempt_blocks_retries_and_fallback_without_losing_other_frame(
+    monkeypatch: pytest.MonkeyPatch,
+    respx_mock,
+    fake_live_probe_request: dict,
+    outcome: str,
+) -> None:
+    import httpx
+    from argus.llm import openrouter
+
+    from tests.evals.result_readout_eval import measurement_can_continue
+    from tests.evals.result_readout_probe import run_probe
+
+    monkeypatch.setattr(
+        openrouter, "openrouter_model_tier_for_task", lambda task: "structured"
+    )
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "unpriced-blocked-fallback")
+
+    def completion(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["model"] == "fixture-model"
+        if outcome == "http_400":
+            return httpx.Response(
+                400, json={"error": {"message": "Reasoning unsupported"}}
+            )
+        content = (
+            "{invalid"
+            if outcome == "malformed"
+            else json.dumps(
+                {
+                    "language": "en",
+                    "text": "The ending gain came with a rough historical ride.",
+                    "figures": [],
+                }
+            )
+        )
+        return httpx.Response(
+            200,
+            json={
+                "model": "fixture-model",
+                "choices": [{"message": {"content": content}}],
+                "usage": {"cost": 0.0001},
+            },
+        )
+
+    route = respx_mock.post("https://openrouter.ai/api/v1/chat/completions").mock(
+        side_effect=completion
+    )
+    report = run_probe({**fake_live_probe_request, "single_attempt": True})
+    assert route.call_count == report["http_attempts"] == 2
+    assert [row["task"] for row in report["requests"]] == [
+        "result_summary",
+        "result_breakdown",
+    ]
+    assert report["configuration"]["single_attempt"] is True
+    assert report["guard_failures"] == []
+    assert measurement_can_continue(report)
+    assert bool(report["blocked_dispatches"]) is (outcome != "accepted")
+    assert all(
+        row["reason"] == "single_attempt_policy" for row in report["blocked_dispatches"]
+    )
+    for surface in ("quick_take", "breakdown"):
+        assert report[surface]["fallback_used"] is (outcome != "accepted")
+        assert report[surface]["complete_text"]
+    if outcome == "http_400":
+        assert report["unknown_cost_attempts"] == 2
+        assert report["accounted_upper_bound_usd"] == report["reserved_usd"]
+
+
+def test_single_attempt_probe_requires_structured_tier(
+    fake_live_probe_request: dict,
+) -> None:
+    from tests.evals.result_readout_probe import run_probe
+
+    with pytest.raises(ValueError, match="writing_round_requires_structured_tiers"):
+        run_probe({**fake_live_probe_request, "live": False, "single_attempt": True})
 
 
 @pytest.mark.parametrize("false_figure", [False, True])

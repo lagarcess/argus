@@ -17,19 +17,19 @@ from unittest.mock import patch
 
 try:
     from .result_readout_eval import (
-        MAX_ATTEMPTS,
         MAX_INPUT_BYTES,
         TASK_OUTPUT_LIMITS,
         CostGuard,
+        attempt_limit,
         encoded,
         sha256,
     )
 except ImportError:  # Direct script entry in the other checkout's subprocess.
     from result_readout_eval import (
-        MAX_ATTEMPTS,
         MAX_INPUT_BYTES,
         TASK_OUTPUT_LIMITS,
         CostGuard,
+        attempt_limit,
         encoded,
         sha256,
     )
@@ -57,6 +57,17 @@ def install_http_guards(
             "QuickTakeDraft": "result_summary",
             "ResultBreakdownDraft": "result_breakdown",
         }.get(schema)
+        # This round deliberately measures the first response only. A blocked
+        # retry is an expected policy outcome, not a reason to skip other tasks.
+        if guard.max_attempts == 1 and guard.by_task.get(task, 0) >= 1:
+            observations.setdefault("blocked_dispatches", []).append(
+                {
+                    "task": task,
+                    "model": payload.get("model"),
+                    "reason": "single_attempt_policy",
+                }
+            )
+            raise ValueError("single_attempt_policy")
         try:
             if observations["guard_failures"]:
                 raise ValueError("prior_guard_failure")
@@ -377,6 +388,7 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
         "asset_provider_mode": "recorded_run_fixture_no_fetch",
         "credential_present": bool(resolve_openrouter_api_key()),
         "max_input_bytes": request.get("max_input_bytes", MAX_INPUT_BYTES),
+        "single_attempt": request.get("single_attempt") is True,
         "tasks": {
             task: {
                 "tier": openrouter.openrouter_model_tier_for_task(task),
@@ -396,6 +408,10 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
             for task in TASK_OUTPUT_LIMITS
         },
     }
+    if configuration["single_attempt"] and any(
+        task["tier"] != "structured" for task in configuration["tasks"].values()
+    ):
+        raise ValueError("writing_round_requires_structured_tiers")
     if live and not configuration["credential_present"]:
         raise ValueError("missing_provider_credential")
     observations: dict[str, Any] = {
@@ -403,6 +419,7 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
         "requests": [],
         "provider_responses": [],
         "guard_failures": [],
+        "blocked_dispatches": [],
         "preflight_payloads": [],
         "composition_mode": "fresh composition from a stored run fixture; no persistence",
     }
@@ -410,11 +427,21 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
         budget_usd=request["budget_usd"],
         rates=request["rates"],
         max_input_bytes=configuration["max_input_bytes"],
+        max_attempts=attempt_limit(configuration),
+        primary_models={
+            task: profile["models"][0]
+            for task, profile in configuration["tasks"].items()
+            if profile["models"]
+        }
+        if configuration["single_attempt"]
+        else None,
     )
 
     def dry_completion(**kwargs: Any) -> None:
         task = kwargs["task"]
         models = configuration["tasks"][task]["models"] or ["UNCONFIGURED"]
+        if configuration["single_attempt"]:
+            models = models[:1]
         for model in models:
             payload = openrouter._json_schema_payload(
                 model=model,
@@ -523,7 +550,7 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
         finally:
             settlement_started = time.monotonic()
             timeout = configuration["tasks"]["result_breakdown"]["timeout_seconds"]
-            settled = tracker.settle(MAX_ATTEMPTS * timeout + 5)
+            settled = tracker.settle(attempt_limit(configuration) * timeout + 5)
             observations["provider_worker_settled"] = settled
             observations["receipt_settlement_ms"] = round(
                 (time.monotonic() - settlement_started) * 1000
