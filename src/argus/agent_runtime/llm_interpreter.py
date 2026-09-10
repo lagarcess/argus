@@ -4304,7 +4304,11 @@ def _response_needs_stated_run_field_fidelity_audit(
         )
     ):
         return False
-    if response.intent not in {"calculate"}:
+    if response.intent == "cannot":
+        return False
+    if response.intent != "calculate" and not strategy_route_expected(
+        intent=response.intent, semantic_turn_act=response.semantic_turn_act
+    ):
         return False
     if response.semantic_turn_act in {
         "approval",

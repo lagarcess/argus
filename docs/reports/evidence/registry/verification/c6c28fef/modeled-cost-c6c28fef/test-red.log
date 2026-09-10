@@ -1,0 +1,34 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/aa72/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 15 items
+
+tests/agent_runtime/test_strategy_route_cost_audit.py FF.............    [100%]
+
+=================================== FAILURES ===================================
+_ test_zero_call_strategy_costs_are_grounded_before_real_confirmation[follow_up] _
+tests/agent_runtime/test_strategy_route_cost_audit.py:134: in test_zero_call_strategy_costs_are_grounded_before_real_confirmation
+    assert {name: extras.get(name) for name in expected_costs} == expected_costs
+E   AssertionError: assert {'fee_rate': ...ippage': None} == {'fee_rate': ...page': 0.0005}
+E     
+E     Differing items:
+E     {'slippage': None} != {'slippage': 0.0005}
+E     {'fee_rate': None} != {'fee_rate': 0.001}
+E     Use -v to get more diff
+_ test_zero_call_strategy_costs_are_grounded_before_real_confirmation[explain] _
+tests/agent_runtime/test_strategy_route_cost_audit.py:134: in test_zero_call_strategy_costs_are_grounded_before_real_confirmation
+    assert {name: extras.get(name) for name in expected_costs} == expected_costs
+E   AssertionError: assert {'fee_rate': ...ippage': None} == {'fee_rate': ...page': 0.0005}
+E     
+E     Differing items:
+E     {'slippage': None} != {'slippage': 0.0005}
+E     {'fee_rate': None} != {'fee_rate': 0.001}
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/agent_runtime/test_strategy_route_cost_audit.py::test_zero_call_strategy_costs_are_grounded_before_real_confirmation[follow_up]
+FAILED tests/agent_runtime/test_strategy_route_cost_audit.py::test_zero_call_strategy_costs_are_grounded_before_real_confirmation[explain]
+========================= 2 failed, 13 passed in 1.91s =========================
