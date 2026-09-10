@@ -284,6 +284,25 @@ def test_closed_nested_models_reject_extra_source_fields(owner):
         type(result.payload).model_validate(document)
 
 
+def test_a_request_beyond_the_transport_bound_is_refused_before_any_work(owner):
+    """Five hundred ids is a request-size bound no conversation reaches, never
+    a product cap: one more is refused as an invalid selection before the
+    conversation is read, and a client is never told the number."""
+    from argus.api.public_excerpt_schemas import (
+        PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT,
+        PublicExcerptCandidates,
+    )
+
+    user, conversation = owner
+    ids = [str(uuid4()) for _ in range(PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT + 1)]
+    with pytest.raises(PublicExcerptSourceError) as error:
+        service.preview_receipt_for_messages(
+            user=user, conversation_id=conversation.id, message_ids=ids, owner_note=None
+        )
+    assert error.value.reason == "invalid_selection"
+    assert "max_turns" not in PublicExcerptCandidates.model_fields
+
+
 def test_duplicate_and_foreign_message_selection_refuses(owner):
     _, message = add_pair(owner)
     with pytest.raises(PublicExcerptSourceError):

@@ -696,7 +696,9 @@ enum, and the client displays it in the owner's language. The private message id
 is a selection input only; it never reaches a public snapshot payload.
 
 Preview takes `{message_ids: UUID[], owner_note?: string | null}`. There must be
-one or more distinct assistant message ids from this owned conversation. The
+one or more distinct assistant message ids from this owned conversation. A
+request carries at most 500 ids, a transport bound no conversation reaches and
+not a product limit; the selection screen never shows it. The
 server puts them in conversation order and returns
 `{payload, payload_digest, kind, existing_receipt}`. Every turn passes the same
 eligibility and privacy checks independently. No snapshot or funnel creation
@@ -3931,8 +3933,10 @@ Contract rules:
   identical question inside that window is answered from the record with
   `cache_status: "hit"`, the same withheld note and sources, and no provider
   spend or capacity claim. A packet without a retrieval record is never
-  stored, because a model that did not look is evidence about the model and
-  not about the world; a malformed or unavailable response has no packet to
+  stored, published or withheld, because a model that did not look is
+  evidence about the model and not about the world and the shared cache
+  holds provider packets about public markets, never one turn's prose for
+  every other user; a malformed or unavailable response has no packet to
   store; and a packet withheld for want of a required public source is not
   stored.
 - **Retrieval parameters are configuration per question shape.** Each call

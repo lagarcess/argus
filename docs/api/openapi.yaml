@@ -4934,6 +4934,7 @@ components:
             type: string
             format: uuid
           type: array
+          maxItems: 500
           minItems: 1
         owner_note:
           anyOf:
@@ -4950,6 +4951,7 @@ components:
             type: string
             format: uuid
           type: array
+          maxItems: 500
           minItems: 1
         owner_note:
           anyOf:
@@ -5021,6 +5023,7 @@ components:
                 backtest: '#/components/schemas/PublicExcerptBacktestTurn'
                 research_answer: '#/components/schemas/PublicExcerptResearchTurn'
           type: array
+          maxItems: 500
           minItems: 1
       additionalProperties: false
       type: object

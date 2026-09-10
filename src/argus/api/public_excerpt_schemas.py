@@ -194,6 +194,11 @@ class PublicExcerptPayload(BaseModel):
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
 
+# A request-size bound, not a product rule: how many message ids one
+# selection request may carry. No conversation reaches it, nothing tells the
+# owner about it, and it exists so a request of nonexistent ids cannot buy
+# unbounded work before it is refused.
+PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT = 500
 PublicExcerptKind = Literal["backtest", "research_answer", "mixed"]
 PublicExcerptRefusalReason = Literal[
     "not_completed",
@@ -267,7 +272,9 @@ class PublicExcerptTurnsPayload(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     schema_version: Literal[2] = 2
     kind: Literal["turns"] = "turns"
-    turns: list[PublicExcerptTurn] = Field(min_length=1)
+    turns: list[PublicExcerptTurn] = Field(
+        min_length=1, max_length=PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT
+    )
 
 
 PublicExcerptDocument = PublicExcerptPayload | PublicExcerptTurnsPayload
@@ -371,7 +378,9 @@ class PublicExcerptView(BaseModel):
 
 class PublicExcerptSelection(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    message_ids: list[UUID] = Field(min_length=1)
+    message_ids: list[UUID] = Field(
+        min_length=1, max_length=PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT
+    )
     owner_note: str | None = None
 
     @field_validator("message_ids")
