@@ -1646,9 +1646,16 @@ def carried_decision(
     did not."""
     if decision is None:
         return research_decision(interpretation, user, reason_code)
+    # Compensations recorded on the interpretation during dispatch and
+    # composition (a waived strategy claim, a horizon-selected contract)
+    # reach the persisted turn through the decision, not only the log.
     return decision.model_copy(
         update={
-            "reason_codes": list(dict.fromkeys([*decision.reason_codes, reason_code]))
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*decision.reason_codes, *interpretation.reason_codes, reason_code]
+                )
+            )
         }
     )
 
@@ -1668,7 +1675,7 @@ def research_decision(
         optional_parameter_opportunity=[],
         confidence=0.85,
         arbitration_mode="deterministic",
-        reason_codes=[reason_code],
+        reason_codes=list(dict.fromkeys([*interpretation.reason_codes, reason_code])),
         effective_response_profile=resolve_effective_response_profile(
             user=user,
             explicit_overrides=None,

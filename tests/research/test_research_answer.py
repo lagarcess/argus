@@ -639,6 +639,10 @@ def test_a_typed_horizon_alone_selects_the_scenario_contract(monkeypatch) -> Non
     assert result.stage_patch["research"]["degraded"] == {
         "code": "scenario_inputs_uncited"
     }
+    # The compensation reaches the persisted turn through the decision.
+    from argus.agent_runtime.research_grounded import SCENARIO_FROM_HORIZON_REASON_CODE
+
+    assert SCENARIO_FROM_HORIZON_REASON_CODE in result.decision.reason_codes
 
 
 def test_a_crypto_scenario_typed_only_by_its_horizon_is_grounded(monkeypatch) -> None:
