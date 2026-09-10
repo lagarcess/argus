@@ -26,7 +26,6 @@ def cell(summary: dict | None) -> str:
         verdict = f"recovery: {summary['recovery_code']}"
     else:
         verdict = "no answer"
-    fired = ", ".join(summary.get("reason_codes") or []) or "no reason codes"
     shape = summary.get("shape") or "no research"
     degraded = (summary.get("degraded") or {}).get("code")
     usage = summary.get("research_usage") or {}
@@ -35,7 +34,7 @@ def cell(summary: dict | None) -> str:
     text = (summary.get("assistant_text") or "").replace("\n", " ").strip()
     if len(text) > 220:
         text = text[:217] + "..."
-    parts = [verdict, fired, shape + (f" ({degraded})" if degraded else ""), f"{len(summary.get('sources') or [])} sources", cost_text, f"{summary.get('elapsed_seconds')}s", text]
+    parts = [verdict, shape + (f" ({degraded})" if degraded else ""), f"{len(summary.get('sources') or [])} sources", cost_text, f"{summary.get('elapsed_seconds')}s", text]
     return " · ".join(str(p) for p in parts)
 
 
