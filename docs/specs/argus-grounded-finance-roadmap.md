@@ -670,6 +670,71 @@ here.
 
 ---
 
+### Let the model write the readout  ·  ships in **its own promotion, after the registry**
+
+**The Quick take and Breakdown a user reads are not written by a model.** Since
+PR #551 on 2026-09-05 the web renders both from typed facts through fixed
+templates, `web/lib/result-readout-display.ts` and the `chat.result_readout`
+strings in the locale files: four sentences for the Quick take, and for the
+Breakdown the same four plus a few settings lines and a disclaimer. The model
+still writes both on every result, `result_summary` on the chat tier and
+`result_breakdown` on the context tier, and `artifact_presentation.py` strips
+that text on read as private prose. **Argus pays for an answer nobody sees.**
+Founder, 2026-09-10, on a DOCN buy-and-hold result beside Perplexity: the
+readout is shallow.
+
+**Why #551 did it.** Saved English results rendered under Spanish chrome (#531,
+#530, #528). Hiding model prose fixed the language, and it also removed the only
+part of the readout that could say something the card does not.
+
+**The drafts are gated too tight to show as they are.** `explain.py` rejects a
+Quick take that quotes any percentage other than total return, the benchmark's
+return and the gap between them, so it cannot mention the worst drop, and it
+rejects one that does not restate the benchmark comparison. The breakdown
+carries the same kinds of checks. The Quick take is handed a few figures while
+the engine computes more: annualized return, volatility, Sharpe ratio, worst
+drop and costs.
+
+**Done means.** The frames stay exactly as they are. Founder, 2026-09-10: *do
+not remove the quick take and breakdown format of the frame, my concern was just
+what's inside.* Inside them the model's text shows, written in the workspace
+language when the result is created, from every figure the run stored. Checks
+keep only what catches a false statement: a quoted figure that is not in the
+run, a beat or lag that contradicts it, an internal field name. Checks that force
+or cap content go. The templates stay as the fallback when the model fails, and
+for results saved before this lane or read in a language other than the one they
+were written in, so there is still no read-time model call and no rewritten
+history.
+
+**This does not reopen decision 5.** Decision 5 forbids hand-written prose per
+calculation, and this lane adds none; the fallback templates already exist. It
+is decision 9 at the result: the model writes the answer, Argus owns the
+numbers.
+
+**Surface.** `src/argus/agent_runtime/stages/explain.py`,
+`src/argus/api/chat/breakdown.py`, `src/argus/api/artifact_presentation.py` with
+`src/argus/domain/artifact_prose_fields.json`,
+`web/__tests__/private-artifact-prose-boundary.test.ts`,
+`web/components/chat/ChatMessage.tsx`, `web/lib/result-readout-display.ts`, both
+`common.json` locale files, `docs/API_CONTRACT.md`, and the result surface
+ownership rules in `AGENTS.md`.
+
+**Do not touch.** The result card, the frames, their labels and order. No causal
+claim about why a price moved; that needs a source and is research. No forecast
+or advice language.
+
+**Proof.** `explain.py` is fingerprinted, so a change to its model-facing text
+owes a committed scorecard: cost stated first, and a targeted interleaved
+comparison on result cases before any full run. Bilingual browser proof on a new
+result and on one saved before the lane. And the founder's side-by-side: the
+same result question to Argus and to a competitor, where Argus's readout says
+something the card does not.
+
+**Queued behind #575,** which edits `ChatMessage.tsx` and both locale files.
+Prompt written 2026-09-10.
+
+---
+
 ### Share the answer  ·  ships with **The calculations**
 
 **Promoted from a note under the registry to its own item, founder 2026-09-09.**
@@ -1086,6 +1151,15 @@ makes a live `fetch`, and it reds `backend-checks` with "the socket connection
 was closed unexpectedly". It failed once on integration `6bb73c86` and passed on
 a rerun of the same head with no code change. Rerun it; do not chase it.
 
+**The live measurement grades a failing prose judge as a pass when it names no
+criterion.** `tests/evals/measurement_eval_harness.py` adds one failed check per
+criterion the judge lists, so a verdict of `pass: false` with an empty list adds
+nothing and the case passes. It hid one failure in the scorecard the interpreter
+fingerprint names: `messy_spanish_future_performance_nvda_cruce_dorado` in
+`docs/reports/evidence/411/live-measurement.json` is a judge fail, so that
+baseline is 60 passed and 2 failed, not 61 and 1. None of the registry lane's
+four full runs hit it. PR #575 found it and its narrowed goal carries the fix.
+
 | Lane | PR | Surface it owns |
 | --- | --- | --- |
 | Subtract the guardrails | **LANDED** `695d9250`, PR #565 | done; surface released |
@@ -1109,7 +1183,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
 | Lift the loop, Lane B | The spine | **LANDED** `0ac96828`, PR #570, closing #430. Seven silent-reissue classes closed, card `kind` shipped, sixteen bilingual browser cases. `artifact_assumption_edit.py` went 1,561 to 1,507 lines, so 56 of its 75 growth lines are free again. |
-| The registry | The spine | **First half landed** as PR #567, `772aa276`: the general envelope no longer imports the strategy catalog. The tool declaration, dispatch and editable chat results are implemented in non-draft [PR #575](https://github.com/lagarcess/argus/pull/575). Public receipt/excerpt paths match integration `34866139`. The [private dependency repair](../reports/evidence/registry/verification/private-dependency-repair.md) restores provider cost attribution and moves backtest card facts into the registry. The free backend suite fails only the owed measured fingerprint; live acceptance and final review remain. The lane is not clear. |
+| The registry | The spine | **First half landed** as PR #567, `772aa276`. The catalog edge is cut: `state/models.py` now takes `RegisteredStrategyTemplate` from a new `strategy_template_contract.py` that loads the catalog only inside the validator, so a general envelope imports without it. Lane C's probes went from three passing the catalog guard to seven. **Second half in flight as PR #575, narrowed 2026-09-10.** It rewrote the interpreter's contract, cutting the response schema's field descriptions from 40 to 19 and generating a new system prompt and tool catalog, and paid for four full live runs, 43/25, 52/16, 49/19 and 58/11 passed/failed, about $10 accounted, plus a 56-run comparison the lane reports at $2.61. Its fourth run failed ten cases that had passed before. Under decision 9 that rewrite is the part being reconsidered, so the goal now lands only the declaration half: one typed tool declaration driving schema, runtime contract, cost and confirmation, result card and recompute, with every fingerprinted file byte-identical to integration and no live eval. The rewrite is to be parked on `codex/registry-interpreter-rewrite` as evidence for decision 9's reassessment. |
+| Let the model write the readout | its own promotion | **Queued behind #575.** Prompt written 2026-09-10. The Quick take and Breakdown show fixed templates since #551, while the model's text for both is generated, paid for, and hidden. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |
 
@@ -1298,6 +1373,43 @@ it would break the conversation. It never travels further: it joins the
 categorical never-store list for personalization memory, alongside broker
 credentials and raw conversation. No new storage, no new retention surface, and
 the calculations are unblocked.
+
+**9. The models orchestrate; Argus owns the inputs, the math, and what
+persists. Founder-approved 2026-09-10.** This revisits the board's earlier
+rejection of letting Perplexity orchestrate a turn, and it overturns operating
+rule 7, on purpose, rather than letting a lane route around either. Rule 7's
+text is rewritten when this direction is confirmed after the registry lands.
+
+**The evidence, from 2026-09-09.** Every defect found in competitor answers was
+an input defect: "38,000 pesos" answered for Mexico instead of the Dominican
+Republic, off by about four times; a stale previous close quoted as today's
+price; entry prices marked as estimates. Their arithmetic held each time it was
+checked. Every Argus defect was the reverse: a refusal caused by a rule we
+added, and 87 percent of provider spend using an agentic reasoning model as a
+JSON parser. The rejection's main argument, that Perplexity cannot answer in one
+second, does not hold against an Argus that takes 15.6 seconds.
+
+**The division.** The models understand the question, find the facts, and write
+the answer. Argus owns what makes an answer right for this person and what lasts:
+personalization, tested money math exposed as tools the model calls, and the
+durable layer of decisions, memory, and sharing.
+
+**Two conditions.** Money math stays in tested Python as a tool and is never
+computed in prose, per operating rule 6. And personalization means stable
+declared settings, country and currency; under decision 8 a stated salary,
+expense, or debt stays ephemeral and is never stored.
+
+**Inputs beyond text.** Perplexity's Agent API accepts `input_text` and
+`input_image` by URL or base64; file parts are not documented. Grok 4.3 accepts
+files. Argus today sends Perplexity a plain string and uses neither.
+
+**Not yet measured, and owed before this is built.** The cost and latency of an
+agent-first turn against today's pipeline. And whether a cheaper structured tier
+is good enough: PR #129 swapped that tier from mistral-small with a DeepSeek
+fallback to Grok 4.3 on 2026-06-28 as one bullet in an unrelated PR, and no
+committed scorecard ever compared them. Reassess after the registry lands.
+The registry now lands without the interpreter rewrite, which is parked with
+its live runs as the first evidence for that reassessment; see the status table.
 
 ### Still open
 
