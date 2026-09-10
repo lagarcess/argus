@@ -1,24 +1,11 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from argus.agent_runtime.stages.interpret_types import StageResult
-from argus.domain.research.contracts import ResearchSource
-from argus.domain.tool_contracts import LocalizedText, ToolCall
-from argus.domain.tool_declaration import ToolCardBinding, ToolInvocationError
-from faker import Faker
 
-from tests.agent_runtime.test_registered_tool_execution import (
-    EchoArguments,
-    EchoResult,
-    _catalog,
-    _declaration,
-    _presentation,
-)
 from tests.evals import measurement_eval_harness as harness
 from tests.evals import measurement_eval_scorecard as scorecard
 from tests.evals.prose_evidence import (
@@ -27,9 +14,6 @@ from tests.evals.prose_evidence import (
     judged_prose_evidence,
     redact_sensitive_text,
 )
-from tests.evals.test_measurement_registry_dispatch import _case, _interpreter
-
-fake = Faker()
 
 SPANISH_DISHONEST_PROSE = (
     "Puedo ejecutar ese backtest de rendimiento futuro de NVDA con el cruce "
@@ -244,94 +228,6 @@ def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
         surface, sort_keys=True
     )
     assert result["prose_judge"]["rubric_version"] == "argus-prose-quality-v2"
-
-
-@pytest.mark.parametrize("status", ["succeeded", "bounded"])
-def test_judge_sees_executed_card_presentation_without_changing_typed_checks(
-    monkeypatch, status
-):
-    from argus.domain import capability_registry
-
-    framing, narrative = fake.sentence(), fake.paragraph()
-    source = ResearchSource(url=fake.url(), title=fake.sentence())
-
-    def echo(arguments: EchoArguments, *, context) -> EchoResult:
-        context.stage_result = StageResult(
-            outcome="ready_to_respond", stage_patch={"assistant_response": framing}
-        )
-        if status == "bounded":
-            raise ToolInvocationError("bounded", code="internal_test_bound")
-        return EchoResult(value=arguments.value)
-
-    def presentation(arguments, outcome):
-        return _presentation(arguments, outcome).model_copy(
-            update={
-                "narrative": narrative if outcome.status == "succeeded" else None,
-                "sources": [source] if outcome.status == "succeeded" else [],
-                "notes": [LocalizedText(locale_key="test.echo.unavailable")]
-                if outcome.status == "bounded"
-                else [],
-            }
-        )
-
-    declaration = replace(
-        _declaration(echo),
-        card=ToolCardBinding(card_type="test_echo", version=1, presenter=presentation),
-    )
-    monkeypatch.setattr(
-        capability_registry, "get_tool_catalog", lambda **_: _catalog(declaration)
-    )
-    call = ToolCall(tool_name="echo", call_id=fake.uuid4(), arguments={"value": 0})
-    _interpreter(monkeypatch, [call])
-    case = replace(
-        _case(
-            expected={
-                "intent": "calculate",
-                "capability_verdict": "answer_only",
-                "tool_dispatch": True,
-            }
-        ),
-        prose_judge_criteria=("honesty",),
-    )
-    captured = []
-
-    async def capture_judge_call(**kwargs):
-        assert kwargs["messages"][0]["content"] == harness.PROSE_JUDGE_RUBRIC
-        captured.append(json.loads(kwargs["messages"][1]["content"]))
-        return harness.ProseJudgeResponse.model_validate(
-            {"pass": True, "failed_criteria": [], "notes": ""}
-        )
-
-    monkeypatch.setattr(harness, "invoke_openrouter_json_schema", capture_judge_call)
-
-    result = harness.run_eval_case(case)
-
-    assert len(captured) == 1
-    surface = captured[0]["rendered_beside_reply"]
-    card = result["typed_outcome"]["tool_result_cards"][0]
-    assert surface["tool_result_cards"] == [
-        {"status": status, "presentation": card["presentation"]}
-    ]
-    assert result["prose_judge"]["judged_rendered_context"]["text"] == json.dumps(
-        surface, sort_keys=True
-    )
-    assert call.call_id not in str(surface)
-    assert card["artifact_id"] not in str(surface)
-    assert "internal_test_bound" not in str(surface)
-    if status == "succeeded":
-        assert result["failed_checks"] == []
-        assert surface["tool_result_cards"][0]["presentation"]["answer"]["value"] == 0
-        assert surface["tool_result_cards"][0]["presentation"]["narrative"] == narrative
-        assert surface["tool_result_cards"][0]["presentation"]["sources"] == [
-            source.model_dump(mode="json")
-        ]
-    else:
-        # A passing prose verdict must not erase the separately measured failure.
-        assert result["status"] == "failed"
-        assert all(
-            check.startswith("tool_dispatch:") for check in result["failed_checks"]
-        )
-        assert card["outcome"]["failure"]["code"] == "internal_test_bound"
 
 
 def test_missing_assistant_text_still_records_what_was_judged(

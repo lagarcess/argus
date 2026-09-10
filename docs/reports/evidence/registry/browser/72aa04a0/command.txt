@@ -1,2 +1,0 @@
-cd /Users/garces/.codex/worktrees/aa72/private-alpha-next/web
-PLAYWRIGHT_PORT=3192 REGISTRY_SCREENSHOT_DIR=/private/tmp/registry-browser-72aa04a0 NODE_OPTIONS="--require /private/tmp/registry-browser-72aa04a0/scroll-capture.cjs" bunx playwright test e2e/tool-registry.spec.ts --grep "declared backtest keeps DCA assumptions" > /private/tmp/registry-browser-72aa04a0/browser.log 2>&1

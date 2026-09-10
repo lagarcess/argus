@@ -11,6 +11,7 @@ from typing import Any
 from argus.agent_runtime.artifacts.asset_edits import same_asset_universe
 from argus.agent_runtime.artifacts.continuity import (
     ArtifactAnchor,
+    apply_patch_to_anchor,
     patched_draft_from_candidate,
     resolve_artifact_anchor,
 )
@@ -21,6 +22,7 @@ from argus.agent_runtime.artifacts.patch_policy import (
     relevant_unsupported_constraints_for_artifact_patch,
     strategy_has_structured_non_patch_evidence,
 )
+from argus.agent_runtime.artifacts.strategy_edits import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.stages.artifact_context import (
     RESULT_FOLLOWUP_TARGET_INFERRED,
@@ -35,7 +37,6 @@ from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
     executable_strategy_type,
-    executable_strategy_type_from_extracted_fields,
 )
 from argus.agent_runtime.strategy_requirements import missing_required_fields_for_strategy
 
@@ -115,32 +116,15 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
         patch_fields=frozenset(patch_fields),
     ):
         return None
-    candidate = decision.candidate_strategy_draft
-    if (
-        canonical_strategy_type(candidate.strategy_type) in SUPPORTED_STRATEGY_TYPES
-        and executable_strategy_type_from_extracted_fields(candidate.model_dump()) is None
-        and not strategy_has_structured_non_patch_evidence(
-            strategy=candidate,
-            patch_fields=frozenset(patch_fields | {"strategy_type"}),
-        )
-    ):
-        # A bare family label cannot replace the result's executable rules.
-        # The existing date-only recovery still owns this incomplete read.
-        candidate = candidate.model_copy(update={"strategy_type": None})
-    if planned_asset_universe is not None:
-        candidate = candidate.model_copy(
-            update={
-                "extra_parameters": {
-                    **candidate.extra_parameters,
-                    "asset_universe_operation": "replace",
-                }
-            }
-        )
-    # Inherited dates do not own the rest of the call. The shared patch
-    # contract must carry every supplied edit, including money and costs.
-    patched = patched_draft_from_candidate(
-        anchor=anchor, candidate=candidate, source="user_patch"
+    patch = ArtifactPatch(
+        source="user_patch",
+        date_range=date_range,
+        asset_universe=planned_asset_universe,
+        asset_universe_operation=(
+            "replace" if planned_asset_universe is not None else None
+        ),
     )
+    patched = apply_patch_to_anchor(anchor, patch)
     if patched is None:
         return None
     return _stage_result_from_result_artifact_patch(
@@ -274,14 +258,14 @@ def _decision_allows_deterministic_result_patch(
         return False
     if decision.context_question_focus is not None:
         return False
-    if decision.intent == "cannot" or (
+    if decision.intent == "unsupported_or_out_of_scope" or (
         decision.semantic_turn_act == "unsupported_request"
     ):
         return not strategy_has_structured_non_patch_evidence(
             strategy=decision.candidate_strategy_draft,
             patch_fields=patch_fields,
         )
-    if decision.intent in {"explain", "cannot"}:
+    if decision.intent in {"beginner_guidance", "collection_management"}:
         return False
     if decision.semantic_turn_act in {
         "approval",
@@ -293,7 +277,7 @@ def _decision_allows_deterministic_result_patch(
     if decision.artifact_target == "latest_result":
         return True
     return (
-        decision.intent in {"calculate"}
+        decision.intent in {"backtest_execution", "strategy_drafting"}
         or decision.task_relation == "refine"
         or decision.semantic_turn_act
         in {"answer_pending_need", "refine_current_idea", "result_followup"}
@@ -324,7 +308,7 @@ def _stage_result_from_result_artifact_patch(
     )
     refined_decision = decision.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "backtest_execution",
             "task_relation": "refine",
             "requires_clarification": has_blocking_validation,
             "candidate_strategy_draft": patched,

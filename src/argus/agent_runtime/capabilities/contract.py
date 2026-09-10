@@ -3,15 +3,11 @@ from __future__ import annotations
 from copy import deepcopy
 from numbers import Real
 from types import MappingProxyType
-from typing import Any, get_args
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from argus.agent_runtime.state.models import (
-    CanonicalIntentName,
-    IntentName,
-    SimplificationOption,
-)
+from argus.agent_runtime.state.models import IntentName, SimplificationOption
 
 
 def freeze_contract_payload(value: Any) -> Any:
@@ -285,7 +281,11 @@ class CapabilityContract(BaseModel):
 def build_default_capability_contract() -> CapabilityContract:
     return CapabilityContract(
         version="1.0",
-        supported_intents=get_args(CanonicalIntentName),
+        supported_intents=[
+            "strategy_drafting",
+            "backtest_execution",
+            "results_explanation",
+        ],
         supported_tool_families=[
             "backtest_tools",
             "education_tools",

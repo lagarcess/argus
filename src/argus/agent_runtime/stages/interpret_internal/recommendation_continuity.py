@@ -134,7 +134,7 @@ def compare_buy_and_hold_recommendation_result(
         },
     )
     decision = InterpretDecision(
-        intent="calculate",
+        intent="backtest_execution",
         task_relation="refine",
         requires_clarification=False,
         user_goal_summary=state.current_user_message,

@@ -1,32 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Union
+from typing import Any, Literal
 
-from pydantic import (
-    AfterValidator,
-    BaseModel,
-    ConfigDict,
-    Field,
-    PrivateAttr,
-    create_model,
-    model_validator,
-)
-from pydantic.json_schema import SkipJsonSchema
+from pydantic import BaseModel, Field, PrivateAttr
 
-from argus.agent_runtime.state.models import (
-    CanonicalIntentName,
-    IntentName,
-    normalize_legacy_interpretation,
-)
-from argus.domain.tool_contracts import MAX_TOOL_CALLS, ToolCall
-
-if TYPE_CHECKING:
-    from argus.domain.tool_declaration import ToolCatalog, ToolDeclaration
-from argus.agent_runtime.backtest_input import (
-    BacktestStrategyInput,
-    LLMDateRangeIntent,  # noqa: F401 - historical import path
-    LLMRiskRule,  # noqa: F401 - historical import path
-)
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
@@ -36,6 +13,7 @@ from argus.agent_runtime.stages.interpret_types import (
     ResultFollowupFocus,
 )
 from argus.agent_runtime.state.models import ResponseProfileOverrides
+from argus.domain.capability_registry import RegisteredStrategyTemplate
 
 
 class InterpretationContractError(ValueError):
@@ -50,6 +28,12 @@ class InterpretationContractError(ValueError):
         super().__init__(reason)
         self.reason = reason
         self.corrective_hint = corrective_hint
+
+
+class LLMRiskRule(BaseModel):
+    type: str
+    value_pct: float | None = None
+    mode: str | None = None
 
 
 class LLMAssetMentionCandidate(BaseModel):
@@ -104,7 +88,72 @@ class LLMAssetMentionExtraction(BaseModel):
     )
 
 
-class LLMStrategyDraft(BacktestStrategyInput):
+class LLMDateRangeIntent(BaseModel):
+    kind: (
+        Literal[
+            "explicit_range",
+            "rolling_window",
+            "year_to_date",
+            "calendar_year",
+            "since",
+            "endpoint_patch",
+            "same_as_latest_result",
+            "future_window",
+        ]
+        | None
+    ) = Field(
+        default=None,
+        description=(
+            "Canonical, language-neutral temporal intent. Use this for relative "
+            "or semantic windows such as last 12 months or year to date instead "
+            "of asking deterministic code to parse localized prose. Use "
+            "same_as_latest_result when the user references the latest completed "
+            "test's window; the runtime binds the dates from the canonical run. "
+            "Use future_window whenever the user's period points forward from "
+            "today — in ten years, over the next 3 years, by 2031, dentro de "
+            "diez años — with count/unit or year filled and the exact phrase as "
+            "evidence. A future_window is never a historical test window: do "
+            "not emit rolling_window or calendar dates for a forward-looking "
+            "period."
+        ),
+    )
+    start: str | None = Field(
+        default=None,
+        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+    )
+    end: str | None = Field(
+        default=None,
+        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+    )
+    day_offset: int | None = Field(
+        default=None,
+        description=(
+            "Optional day offset from anchor for endpoint patches, e.g. -1 for "
+            "the previous day. This is canonical machine data, not localized text."
+        ),
+    )
+    count: float | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Quantity of unit for rolling windows; may be fractional. The "
+            "last 8.5 months is count=8.5 unit=month, and hace 2,5 meses is "
+            "count=2.5 unit=month. Never round or truncate a stated "
+            "fractional duration; deterministic date math computes from it."
+        ),
+    )
+    unit: Literal["day", "week", "month", "quarter", "year"] | None = None
+    anchor: Literal["today", "current_date"] | None = "today"
+    year: int | None = Field(default=None, ge=1900, le=2100)
+    endpoint: Literal["start", "end"] | None = None
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    evidence: str | None = Field(
+        default=None,
+        description="Short user-message span supporting this intent.",
+    )
+
+
+class LLMStrategyDraft(BaseModel):
     # Only deterministic runtime code can write this channel; model output cannot
     # reach a private attribute. A str span is fidelity-audit evidence bound to a
     # quote from the current message; a None span is typed edit-plan evidence,
@@ -113,21 +162,106 @@ class LLMStrategyDraft(BacktestStrategyInput):
         default_factory=dict
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def read_legacy_extension_fields(cls, value: Any) -> Any:
-        """Pending drafts keep their historical top-level field ownership."""
-        if not isinstance(value, dict):
-            return value
-        payload = dict(value)
-        extra = dict(payload.get("extra_parameters") or {})
-        for name, field in cls.model_fields.items():
-            metadata = field.json_schema_extra
-            if isinstance(metadata, dict) and metadata.get("x-argus-runtime-extension"):
-                if payload.get(name) is not None:
-                    extra[name] = payload[name]
-        payload["extra_parameters"] = extra
-        return payload
+    raw_user_phrasing: str | None = None
+    language: str | None = Field(
+        default=None,
+        description=(
+            "Detected user-message language as a BCP-47-style code such as en, "
+            "es, or es-419. This guides user-facing prose and bounded parsers; "
+            "executable fields still use canonical Argus values."
+        ),
+    )
+    requested_strategy_template: RegisteredStrategyTemplate | None = Field(
+        default=None,
+        description=(
+            "Canonical registered strategy-template identity requested by the user. "
+            "Set this for both executable and recognized draft-only templates. Keep "
+            "it separate from strategy_type, which is the execution family, so a "
+            "recognized non-executable template is never silently converted into a "
+            "different runnable strategy."
+        ),
+    )
+    strategy_type: str | None = None
+    strategy_thesis: str | None = None
+    asset_universe: list[str] = Field(default_factory=list)
+    asset_inclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "includes in an anchored artifact edit. Do not copy carried assets or "
+            "symbols the user excludes."
+        ),
+    )
+    asset_exclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "excludes from an anchored artifact edit. Do not treat exclusions as "
+            "members of asset_universe."
+        ),
+    )
+    asset_universe_operation: Literal["append", "add", "replace"] | None = Field(
+        default=None,
+        description=(
+            "Patch operation for asset_universe when editing an anchored artifact. "
+            "Use append/add when the user adds traded assets to the current setup, "
+            "and replace when the user swaps the traded assets."
+        ),
+    )
+    asset_class: str | None = None
+    timeframe: str | None = None
+    cadence: str | None = None
+    entry_logic: str | None = None
+    exit_logic: str | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
+    indicator: str | None = None
+    indicator_period: int | None = None
+    entry_threshold: float | None = None
+    exit_threshold: float | None = None
+    date_range: str | dict[str, str] | None = None
+    date_range_raw_text: str | None = Field(
+        default=None,
+        description=(
+            "Exact short user text span that expresses the requested date or time "
+            "window, for example 'last 8 months' or 'enero 2024 a marzo 2024'."
+        ),
+    )
+    date_range_intent: LLMDateRangeIntent | None = None
+    sizing_mode: str | None = None
+    capital_amount: float | None = None
+    recurring_contribution: float | None = None
+    initial_capital: float | None = None
+    total_capital: float | None = None
+    position_size: float | None = None
+    risk_rules: list[LLMRiskRule] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    comparison_baseline: str | None = None
+    refinement_of: str | None = None
+    field_provenance: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Origin of each populated strategy field. Use explicit_user for fields "
+            "stated by the user, inherited for carried context, and default only "
+            "for values injected without a user request. In particular, an explicit "
+            "buy-and-hold request is never a default strategy_type. Evidence spans "
+            "must support user-stated fields; missing provenance is not a default. "
+            "Preserve the existing capital-role provenance for capital fields."
+        ),
+    )
+    evidence_spans: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Short user-message spans that justify extracted canonical fields, keyed "
+            "by field name such as strategy_type, asset_universe, date_range, "
+            "capital_amount, cadence, comparison_baseline, fee_rate, or slippage. "
+            "For populated fee_rate or slippage, copy the exact bounded phrase from "
+            "the current user message into the corresponding evidence key; canonical "
+            "explicit-user provenance is derived from that evidence."
+        ),
+    )
+    extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
 class LLMSimplificationOption(BaseModel):
@@ -164,25 +298,15 @@ class LLMAmbiguousField(BaseModel):
 
 
 class LLMInterpretationResponse(BaseModel):
-    _tool_asset_resolution_context: str | None = PrivateAttr(default=None)
-    uses_tool_catalog: ClassVar[bool] = False
-    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
-    _read_legacy_intent = model_validator(mode="before")(normalize_legacy_interpretation)
-
-    @model_validator(mode="after")
-    def tool_call_ids_are_distinct(self) -> LLMInterpretationResponse:
-        call_ids = [call.call_id for call in self.tool_calls]
-        if len(call_ids) != len(set(call_ids)):
-            raise ValueError("Tool calls in a turn must have distinct call_id values")
-        if self.tool_calls and self.candidate_strategy_draft.model_dump(
-            exclude_defaults=True
-        ):
-            raise ValueError(
-                "A tool call owns its arguments; a second strategy draft is not allowed"
-            )
-        return self
-
-    intent: IntentName
+    intent: Literal[
+        "beginner_guidance",
+        "strategy_drafting",
+        "backtest_execution",
+        "results_explanation",
+        "collection_management",
+        "conversation_followup",
+        "unsupported_or_out_of_scope",
+    ]
     task_relation: Literal["new_task", "continue", "refine", "ambiguous"]
     requires_clarification: bool = False
     user_goal_summary: str
@@ -194,16 +318,7 @@ class LLMInterpretationResponse(BaseModel):
             "turn metadata, not an executable strategy field."
         ),
     )
-    candidate_strategy_draft: LLMStrategyDraft = Field(
-        default_factory=LLMStrategyDraft,
-        description=(
-            "Pending historical-test input when no tool call is emitted. Preserve "
-            "known assets, dates, money roles and unsupported rule meaning here "
-            "when a requested historical test cannot yet execute. A refusal must "
-            "not discard the user's remaining test context. Leave empty when calls "
-            "own their typed inputs or when the request is unrelated to a test."
-        ),
-    )
+    candidate_strategy_draft: LLMStrategyDraft = Field(default_factory=LLMStrategyDraft)
     research_query: ResearchQueryExtraction | None = Field(
         default=None,
         description=(
@@ -279,25 +394,129 @@ class LLMInterpretationResponse(BaseModel):
             "semantic_turn_act=result_followup."
         ),
     )
-    capability_question_focus: CapabilityQuestionFocus | None = Field(
-        default=None,
-        description=(
-            "Set the relevant scope when the user asks which Argus operations or "
-            "assets are available. The answer is composed from the effective "
-            "tool catalog. This is capability discovery, not a tool dispatch."
-        ),
-    )
+    capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None
 
 
-class FocusedStrategyExtraction(BacktestStrategyInput):
+class FocusedStrategyExtraction(BaseModel):
     is_testable_strategy: bool
     requires_clarification: bool = False
     user_goal_summary: str
+    language: str | None = None
+    strategy_type: str | None = Field(
+        default=None,
+        description=(
+            "Canonical executable strategy family selected by the current user "
+            "message. Use buy_and_hold when the user asks in any language to buy, "
+            "hold, keep, compare performance, or test one asset over a period "
+            "without a separate entry rule, including counterfactual performance "
+            "questions such as what would have happened if the user bought or owned "
+            "the asset over a period. Use dca_accumulation for recurring "
+            "fixed-amount buys and populate cadence plus recurring_contribution. "
+            "Use indicator_threshold for supported indicator threshold rules, and "
+            "signal_strategy for supported signal/crossover rules. Leave null only "
+            "when no executable family is semantically selected."
+        ),
+    )
+    strategy_thesis: str | None = None
+    asset_universe: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Primary traded/tested assets explicitly stated by the user. Include "
+            "ticker symbols or asset names in any language, such as AAPL, Apple, "
+            "ETH, or Bitcoin. Do not put benchmark/reference/comparison assets "
+            "here unless the user explicitly says to buy, hold, or test them as "
+            "traded assets."
+        ),
+    )
+    asset_class: str | None = None
+    timeframe: str | None = Field(
+        default=None,
+        description=(
+            "User-stated candle/bar interval normalized to supported notation, "
+            "for example 1h for one-hour/hourly candles, 4h for four-hour bars, "
+            "or 1D for daily candles. Leave null only when the user did not state it."
+        ),
+    )
+    date_range: str | dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "User-stated test window. Preserve today/current as 'today' or the runtime "
+            "date only when it appears as an endpoint. If the user gives only a start "
+            "or only an end, preserve only that endpoint and include date_range in "
+            "missing_required_fields."
+        ),
+    )
+    date_range_raw_text: str | None = None
+    date_range_intent: LLMDateRangeIntent | None = Field(
+        default=None,
+        description=(
+            "Canonical temporal intent for relative or semantic windows. For "
+            "phrases equivalent to last/past/previous N days, weeks, months, "
+            "quarters, or years in any language, return kind=rolling_window with "
+            "count, unit, anchor=today, confidence, and evidence. For current-year "
+            "to current-date windows in any language, return kind=year_to_date "
+            "with confidence and evidence."
+        ),
+    )
+    comparison_baseline: str | None = Field(
+        default=None,
+        description=(
+            "User-stated benchmark/comparison asset such as SPY, QQQ, BTC, or IWM. "
+            "Leave null only when the user did not state a benchmark."
+        ),
+    )
+    capital_amount: float | None = Field(
+        default=None,
+        description=(
+            "User-stated cash amount normalized as a number. For non-recurring "
+            "buy-and-hold or backtest requests, this is the starting capital to "
+            "test or invest with, even when the user says it in another language. "
+            "For recurring DCA requests, this is the recurring contribution "
+            "amount. Examples: $1k -> 1000, 10000 dollars -> 10000."
+        ),
+    )
+    recurring_contribution: float | None = Field(
+        default=None,
+        description=(
+            "User-stated contribution for each recurring DCA buy. Populate this "
+            "for recurring fixed-amount purchases; keep capital_amount equal to "
+            "the same amount unless the user separately states a total budget."
+        ),
+    )
+    cadence: str | None = Field(
+        default=None,
+        description=(
+            "Canonical recurring-buy cadence for DCA, such as daily, weekly, "
+            "biweekly, monthly, or quarterly. Leave null when no recurring cadence "
+            "is stated."
+        ),
+    )
+    entry_logic: str | None = None
+    exit_logic: str | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
+    indicator: str | None = None
+    indicator_period: int | None = None
+    entry_threshold: float | None = None
+    exit_threshold: float | None = None
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    evidence_spans: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Bounded snippets from the current user message that support populated "
+            "canonical fields. Evidence spans are provenance only and never replace "
+            "strategy_type, asset_universe, comparison_baseline, date_range_intent, "
+            "capital_amount, recurring_contribution, or cadence. If evidence "
+            "identifies a supported strategy, asset, benchmark, time window, "
+            "contribution, or cadence, the corresponding canonical field must also "
+            "be populated."
+        ),
+    )
 
 
 class FocusedDateWindowExtraction(BaseModel):
@@ -336,100 +555,4 @@ class FocusedDateWindowExtraction(BaseModel):
     evidence: str | None = Field(
         default=None,
         description="Short user-message span supporting the temporal extraction.",
-    )
-
-
-class _CatalogInterpretationResponse(LLMInterpretationResponse):
-    """The schema owner, rather than model-authored data, marks catalog selection."""
-
-    uses_tool_catalog: ClassVar[bool] = True
-
-
-def interpretation_response_model(
-    tool_catalog: ToolCatalog | None = None,
-) -> type[LLMInterpretationResponse]:
-    """Derive every call's argument schema from its callable declaration.
-
-    The list remains open to zero, multiple and repeated calls. The old research
-    shape fields remain readable on the compatibility model, never model-facing.
-    """
-    if tool_catalog is None:
-        from argus.domain.capability_registry import get_tool_catalog
-
-        tool_catalog = get_tool_catalog()
-    call_models = tuple(
-        _declared_call_model(declaration) for declaration in tool_catalog.declarations
-    )
-    if not call_models:
-        call_type = ToolCall
-        calls = Field(default_factory=list, max_length=0)
-    else:
-        call_type = (
-            call_models[0]
-            if len(call_models) == 1
-            else Annotated[Union[call_models], Field(discriminator="tool_name")]
-        )
-        calls = Field(
-            default_factory=list,
-            max_length=MAX_TOOL_CALLS,
-            description=(
-                "Ordered calls to declared tools, using only facts available now. "
-                "Use an empty list when no tool is needed. A tool may be called "
-                "more than once with distinct call_id values. Do not force a "
-                "question into one named calculation. Unknown arguments remain "
-                "null only where the tool schema permits them; zero is a value."
-            ),
-        )
-    return create_model(
-        "LLMToolInterpretationResponse",
-        __base__=_CatalogInterpretationResponse,
-        __config__=ConfigDict(
-            json_schema_extra={
-                "allOf": [
-                    {
-                        "if": {
-                            "properties": {"tool_calls": {"minItems": 1}},
-                            "required": ["tool_calls"],
-                        },
-                        "then": {
-                            "properties": {
-                                "candidate_strategy_draft": {"maxProperties": 0}
-                            }
-                        },
-                    }
-                ],
-            }
-        ),
-        intent=(CanonicalIntentName, ...),
-        tool_calls=(list[call_type], calls),
-        research_query=(SkipJsonSchema[None], None),
-        asset_discovery=(SkipJsonSchema[None], None),
-        context_question_focus=(SkipJsonSchema[None], None),
-    )
-
-
-def _declared_call_model(declaration: ToolDeclaration) -> type[BaseModel]:
-    title = declaration.name.title().replace("_", "")
-    parameters = declaration.tool_schema()["parameters"]
-    arguments_type = create_model(
-        f"{title}ToolArguments",
-        __base__=declaration.call_arguments_type,
-        __config__=ConfigDict(
-            extra="forbid",
-            json_schema_extra={"allOf": parameters["allOf"]}
-            if "allOf" in parameters
-            else {},
-        ),
-    )
-
-    def validate_rules(arguments: BaseModel) -> BaseModel:
-        declaration.validate_arguments(arguments)
-        return arguments
-
-    return create_model(
-        f"{title}ToolCall",
-        __config__=ConfigDict(extra="forbid"),
-        tool_name=(Literal[declaration.name], ...),
-        call_id=(str, Field(min_length=1, max_length=128)),
-        arguments=(Annotated[arguments_type, AfterValidator(validate_rules)], ...),
     )

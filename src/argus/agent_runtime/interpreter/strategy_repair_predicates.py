@@ -27,10 +27,10 @@ def _response_needs_artifact_context_repair(
     draft = response.candidate_strategy_draft
     if _llm_strategy_draft_has_structural_execution_fields(draft):
         return False
-    if response.intent == "cannot":
+    if response.intent == "unsupported_or_out_of_scope":
         return bool(response.assistant_response)
     return (
-        response.intent == "follow_up"
+        response.intent == "conversation_followup"
         and response.semantic_turn_act == "educational_question"
         and bool(response.assistant_response)
         and _llm_strategy_draft_has_unstructured_strategy_text(draft)
@@ -65,7 +65,7 @@ def _vague_strategy_start_as_guidance(
         return response
     return response.model_copy(
         update={
-            "intent": "explain",
+            "intent": "beginner_guidance",
             "requires_clarification": True,
             "missing_required_fields": [],
             "reason_codes": list(
@@ -85,9 +85,7 @@ def _is_vague_strategy_start_guidance(response: LLMInterpretationResponse) -> bo
 
 
 def _is_vague_strategy_start(response: LLMInterpretationResponse) -> bool:
-    if response.intent != "calculate":
-        return False
-    if not response.requires_clarification and not response.missing_required_fields:
+    if response.intent != "strategy_drafting":
         return False
     if response.capability_question_focus is not None:
         return False
@@ -106,8 +104,9 @@ def _response_needs_structured_strategy_repair(
     if not response.requires_clarification:
         return False
     if response.intent not in {
-        "calculate",
-        "cannot",
+        "strategy_drafting",
+        "backtest_execution",
+        "unsupported_or_out_of_scope",
     }:
         return False
     if response.semantic_turn_act in {

@@ -475,7 +475,7 @@ def _response_has_repairable_recovery_date_gap(
     instead of nulling it (never null, never a silent trailing-year default).
     """
 
-    if response.intent != "cannot":
+    if response.intent != "unsupported_or_out_of_scope":
         return False
     if response.semantic_turn_act != "unsupported_request":
         return False
@@ -551,7 +551,7 @@ def response_with_recovery_intent_window_materialized(
     trailing default.
     """
 
-    if response.intent != "cannot":
+    if response.intent != "unsupported_or_out_of_scope":
         return response
     draft = response.candidate_strategy_draft
     if not _llm_value_is_empty(draft.date_range):
@@ -738,7 +738,7 @@ def _response_from_focused_date_window_extraction(
     # draft, never a promotion; a constraint-carrying refusal mid date-answer is
     # stale context the pending answer may override.
     refused_turn = (
-        response.intent == "cannot"
+        response.intent == "unsupported_or_out_of_scope"
         and not response.unsupported_constraints
     )
     if raw_text:
@@ -783,7 +783,7 @@ def _response_from_focused_date_window_extraction(
     ):
         repaired.requires_clarification = False
         repaired.assistant_response = None
-        repaired.intent = "calculate"
+        repaired.intent = "backtest_execution"
         repaired.task_relation = "continue"
         repaired.semantic_turn_act = "answer_pending_need"
         repaired.result_followup_focus = None
@@ -800,7 +800,7 @@ def _response_from_focused_date_window_extraction(
     ):
         repaired.requires_clarification = False
         repaired.assistant_response = None
-        repaired.intent = "calculate"
+        repaired.intent = "backtest_execution"
     repaired.reason_codes = list(
         dict.fromkeys(
             [

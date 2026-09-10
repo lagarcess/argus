@@ -89,7 +89,7 @@ async def test_concept_question_reaches_the_runtime_with_zero_audit_calls(
     )
 
     assert calls == []
-    assert ready.intent == 'follow_up'
+    assert ready.intent == "conversation_followup"
     assert ready.semantic_turn_act == "educational_question"
     assert ready.assistant_response == response.assistant_response
     assert ready.capability_question_focus is None

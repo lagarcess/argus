@@ -32,8 +32,9 @@ def _response_needs_stated_starting_capital_recheck(
     request: InterpretationRequest,
 ) -> bool:
     if response.intent not in {
-        "calculate",
-        "cannot",
+        "strategy_drafting",
+        "backtest_execution",
+        "unsupported_or_out_of_scope",
     }:
         return False
     if response.semantic_turn_act in {

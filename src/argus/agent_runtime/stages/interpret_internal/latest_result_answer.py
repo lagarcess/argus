@@ -175,7 +175,7 @@ async def latest_result_answer_stage_result_if_applicable(
         facts["source"] = "result_followup_fact_bank"
         updated_decision = decision.model_copy(
             update={
-                "intent": "follow_up",
+                "intent": "conversation_followup",
                 "requires_clarification": False,
                 "missing_required_fields": [],
                 "semantic_turn_act": "result_followup",
@@ -227,7 +227,7 @@ async def latest_result_answer_stage_result_if_applicable(
         return LatestResultFactComposerDeclined(requested_fact_key)
     updated_decision = decision.model_copy(
         update={
-            "intent": "follow_up",
+            "intent": "conversation_followup",
             "requires_clarification": False,
             "missing_required_fields": [],
             "semantic_turn_act": "result_followup",

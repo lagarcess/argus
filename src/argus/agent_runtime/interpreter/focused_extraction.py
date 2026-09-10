@@ -8,7 +8,7 @@ import json
 from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
-from typing import Any, get_args
+from typing import Any
 
 from langchain_core.messages import (
     AIMessage,
@@ -26,7 +26,6 @@ from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_e
 from argus.agent_runtime.interpreter.shared import _llm_value_is_empty
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
-    LLMAmbiguousField,
     LLMInterpretationResponse,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
@@ -35,9 +34,9 @@ from argus.agent_runtime.rule_specs import (
     moving_average_crossover_text,
     opposite_moving_average_crossover_rule,
 )
-from argus.agent_runtime.semantic_integrity import canonical_capital_role
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.strategy_contract import (
+    canonical_strategy_type,
     executable_strategy_type_from_extracted_fields,
 )
 from argus.nlp.natural_time import resolve_date_range_intent
@@ -205,8 +204,6 @@ def _focused_extraction_field_provenance(
         extraction.comparison_baseline,
         current_message=current_message,
     )
-    provenance.update(extraction.field_provenance)
-    provenance.update(extraction.declared_capital_roles())
     evidence_spans = dict(extraction.evidence_spans or {})
     if (
         extraction.comparison_baseline
@@ -216,13 +213,12 @@ def _focused_extraction_field_provenance(
         provenance["comparison_baseline"] = "explicit_user"
     if extraction.recurring_contribution is not None:
         provenance["recurring_contribution"] = "explicit_user"
-        provenance.setdefault("capital_amount", "recurring_contribution")
+        provenance["capital_amount"] = "recurring_contribution"
     elif extraction.capital_amount is not None:
-        role = canonical_capital_role(
-            provenance.get("capital_amount"), strategy_type=resolved_strategy_type
-        )
-        if role is not None:
-            provenance.setdefault("capital_amount", role)
+        if canonical_strategy_type(resolved_strategy_type) == "dca_accumulation":
+            provenance["capital_amount"] = "recurring_contribution"
+        else:
+            provenance["capital_amount"] = "starting_capital"
     if extraction.cadence:
         provenance["cadence"] = "explicit_user"
     return provenance
@@ -234,102 +230,6 @@ def _focused_extraction_field_provenance(
 _REPAIR_MERGE_CLASSIFICATION_KEYS = frozenset({"raw_strategy_type", "template"})
 
 _REPAIR_MERGE_DICT_CHANNELS = ("extra_parameters", "field_provenance", "evidence_spans")
-
-
-def _capital_role_records(
-    draft: FocusedStrategyExtraction | LLMStrategyDraft,
-    roles: dict[str, str],
-    *,
-    resolve_known_carrier: bool = False,
-) -> list[tuple[str, str, Any, str | None]]:
-    records: list[tuple[str, str, Any, str | None]] = []
-    for name, field in type(draft).model_fields.items():
-        role = roles.get(name) or canonical_capital_role(
-            draft.field_provenance.get(name),
-            strategy_type=(
-                draft.strategy_type
-                if resolve_known_carrier and name == "capital_amount"
-                else None
-            ),
-        )
-        annotation = get_args(field.annotation)
-        if name not in roles and not (
-            type(None) in annotation
-            and any(number_type in annotation for number_type in (int, float))
-        ):
-            continue
-        value = getattr(draft, name)
-        if value is None:
-            value = draft.extra_parameters.get(name)
-        if isinstance(role, str) and role in roles.values():
-            records.append((name, role, value, draft.evidence_spans.get(name)))
-    return records
-
-
-def _accept_focused_capital_roles(
-    extraction: FocusedStrategyExtraction,
-    *,
-    base_response: LLMInterpretationResponse | None,
-    current_message: str,
-) -> tuple[FocusedStrategyExtraction, list[LLMAmbiguousField]]:
-    """A repair may retain a known role or ground a new one in its own quote.
-
-    Containment establishes evidence provenance, not the semantic meaning of
-    arbitrary text. A number already assigned to another role is not evidence
-    for a new role, even when the two values happen to be equal.
-    """
-    roles: dict[str, str] = {}
-    for name, field in type(extraction).model_fields.items():
-        metadata = field.json_schema_extra
-        role = (
-            metadata.get("x-argus-capital-role") if isinstance(metadata, dict) else None
-        )
-        if isinstance(role, str):
-            roles[name] = role
-    known = (
-        _capital_role_records(
-            base_response.candidate_strategy_draft, roles, resolve_known_carrier=True
-        )
-        if base_response is not None
-        else []
-    )
-    proposed = _capital_role_records(extraction, roles)
-    role_fields = {role: name for name, role in roles.items()}
-
-    accepted = extraction.model_copy(deep=True)
-    unresolved: list[LLMAmbiguousField] = []
-    for name, role, value, _ in proposed:
-        if value is None:
-            continue
-        if any(
-            known_role == role and known_value == value
-            for _, known_role, known_value, _ in known
-        ):
-            continue
-        if any(
-            proposed_role == role
-            and proposed_value in (None, value)
-            and span
-            and span.strip()
-            and span.strip() in current_message
-            and not any(
-                known_role != role and known_span and span.strip() in known_span
-                for _, known_role, _, known_span in known
-            )
-            for _, proposed_role, proposed_value, span in [*proposed, *known]
-        ):
-            continue
-        setattr(accepted, name, None)
-        for channel in _REPAIR_MERGE_DICT_CHANNELS:
-            getattr(accepted, channel).pop(name, None)
-        ambiguity = LLMAmbiguousField(
-            field_name=role_fields[role],
-            raw_value=str(value),
-            reason_code="financial_role_evidence_unresolved",
-        )
-        if ambiguity not in unresolved:
-            unresolved.append(ambiguity)
-    return accepted, unresolved
 
 
 def _merge_focused_repair_with_base(
@@ -448,7 +348,7 @@ def _reconcile_repaired_assets_with_provider_grounding(
 
 def _base_response_was_unsupported(response: LLMInterpretationResponse) -> bool:
     return bool(
-        response.intent == "cannot"
+        response.intent == "unsupported_or_out_of_scope"
         or response.semantic_turn_act == "unsupported_request"
         or response.unsupported_constraints
     )
@@ -575,11 +475,6 @@ def response_from_focused_strategy_extraction(
     base_response: LLMInterpretationResponse | None = None,
     resolve_asset_candidate: ResolveAssetCandidate,
 ) -> LLMInterpretationResponse:
-    extraction, capital_ambiguities = _accept_focused_capital_roles(
-        extraction,
-        base_response=base_response,
-        current_message=request.current_user_message,
-    )
     snapshot = request.latest_task_snapshot
     is_pending_strategy_answer = bool(
         snapshot
@@ -622,38 +517,45 @@ def response_from_focused_strategy_extraction(
         resolved_date_intent = resolve_date_range_intent(extraction.date_range_intent)
         if resolved_date_intent is not None:
             extraction_date_range = resolved_date_intent.payload
-    draft_payload = extraction.model_dump(
-        mode="python", include=set(LLMStrategyDraft.model_fields)
-    )
-    draft_payload.update(
-        raw_user_phrasing=request.current_user_message,
-        strategy_type=strategy_type,
-        strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
-        asset_universe=asset_universe,
-        asset_class=extraction.asset_class or resolved_asset_class,
-        date_range=extraction_date_range,
-        entry_logic=entry_logic,
-        exit_logic=exit_logic,
-        field_provenance=_focused_extraction_field_provenance(
-            extraction=extraction,
-            current_message=request.current_user_message,
-            resolved_strategy_type=strategy_type,
-        ),
-    )
-    if strategy_type is None and extraction.strategy_type:
-        draft_payload["extra_parameters"] = {
-            **draft_payload.get("extra_parameters", {}),
-            "raw_strategy_type": extraction.strategy_type,
-        }
-    draft = LLMStrategyDraft.model_validate(draft_payload)
     if strategy_type is None:
         return LLMInterpretationResponse(
-            intent="cannot",
+            intent="unsupported_or_out_of_scope",
             task_relation="new_task",
             requires_clarification=True,
             user_goal_summary=extraction.user_goal_summary,
-            candidate_strategy_draft=draft,
-            ambiguous_fields=capital_ambiguities,
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=request.current_user_message,
+                language=extraction.language,
+                strategy_thesis=extraction.strategy_thesis
+                or extraction.user_goal_summary,
+                asset_universe=asset_universe,
+                asset_class=extraction.asset_class or resolved_asset_class,
+                timeframe=extraction.timeframe,
+                date_range=extraction_date_range,
+                date_range_raw_text=extraction.date_range_raw_text,
+                date_range_intent=extraction.date_range_intent,
+                comparison_baseline=extraction.comparison_baseline,
+                capital_amount=extraction.capital_amount,
+                recurring_contribution=extraction.recurring_contribution,
+                cadence=extraction.cadence,
+                entry_logic=entry_logic,
+                exit_logic=exit_logic,
+                indicator=extraction.indicator,
+                indicator_period=extraction.indicator_period,
+                entry_threshold=extraction.entry_threshold,
+                exit_threshold=extraction.exit_threshold,
+                evidence_spans=dict(extraction.evidence_spans or {}),
+                field_provenance=_focused_extraction_field_provenance(
+                    extraction=extraction,
+                    current_message=request.current_user_message,
+                    resolved_strategy_type=strategy_type,
+                ),
+                extra_parameters={
+                    "raw_strategy_type": extraction.strategy_type,
+                }
+                if extraction.strategy_type
+                else {},
+            ),
             unsupported_constraints=[
                 LLMUnsupportedConstraint(
                     category="unsupported_strategy_logic",
@@ -677,12 +579,43 @@ def response_from_focused_strategy_extraction(
             semantic_turn_act="unsupported_request",
         )
     response = LLMInterpretationResponse(
-        intent="calculate",
+        intent="strategy_drafting"
+        if extraction.requires_clarification
+        else "backtest_execution",
         task_relation="continue" if is_pending_strategy_answer else "new_task",
         requires_clarification=extraction.requires_clarification,
         user_goal_summary=extraction.user_goal_summary,
-        candidate_strategy_draft=draft,
-        ambiguous_fields=capital_ambiguities,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=request.current_user_message,
+            language=extraction.language,
+            strategy_type=strategy_type,
+            strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
+            asset_universe=asset_universe,
+            asset_class=extraction.asset_class or resolved_asset_class,
+            timeframe=extraction.timeframe,
+            date_range=extraction_date_range,
+            date_range_raw_text=extraction.date_range_raw_text,
+            date_range_intent=extraction.date_range_intent,
+            comparison_baseline=extraction.comparison_baseline,
+            capital_amount=extraction.capital_amount,
+            recurring_contribution=extraction.recurring_contribution,
+            cadence=extraction.cadence,
+            entry_logic=entry_logic,
+            exit_logic=exit_logic,
+            entry_rule=extraction.entry_rule,
+            exit_rule=extraction.exit_rule,
+            rule_spec=extraction.rule_spec,
+            indicator=extraction.indicator,
+            indicator_period=extraction.indicator_period,
+            entry_threshold=extraction.entry_threshold,
+            exit_threshold=extraction.exit_threshold,
+            evidence_spans=dict(extraction.evidence_spans or {}),
+            field_provenance=_focused_extraction_field_provenance(
+                extraction=extraction,
+                current_message=request.current_user_message,
+                resolved_strategy_type=strategy_type,
+            ),
+        ),
         missing_required_fields=list(extraction.missing_required_fields),
         assistant_response=extraction.assistant_response,
         confidence=extraction.confidence,
@@ -704,7 +637,7 @@ def response_from_focused_strategy_extraction(
         )
     )
     if response.missing_required_fields or response.ambiguous_fields:
-        response.intent = "calculate"
+        response.intent = "strategy_drafting"
         response.requires_clarification = True
         response.assistant_response = None
     return response
@@ -738,9 +671,9 @@ def strategy_extraction_repair_is_allowed(
         if noncanonical_text_needs_repair(response=response, request=request):
             return True
         if response.intent not in {
-            "cannot",
-            "explain",
-            "follow_up",
+            "unsupported_or_out_of_scope",
+            "beginner_guidance",
+            "conversation_followup",
         }:
             return False
         if not response.unsupported_constraints:

@@ -1,6 +1,6 @@
 """Issue #159: typed guards for the unsupported-intent vs executable-draft contradiction.
 
-Invariant: an interpretation still carrying ``intent=cannot``
+Invariant: an interpretation still carrying ``intent=unsupported_or_out_of_scope``
 never admits to confirmation. Promotion to a supported intent stays LLM-owned via
 the capability-conflict audit; every non-promoted outcome fails closed into typed
 unsupported recovery."""
@@ -56,20 +56,15 @@ def requested_strategy_template_capability_clause() -> str:
         f"{template}={STRATEGY_CAPABILITIES[template].status}"
         for template in sorted(REGISTERED_STRATEGY_TEMPLATES)
     )
-    capability_details = json.dumps([
-        capability.model_dump(mode="json", exclude={"aliases", "result_chart_exploration"})
-        for capability in STRATEGY_CAPABILITIES.values()
-    ], sort_keys=True, separators=(",", ":"))
     return (
         "Named strategy capability identity is separate from execution routing. "
         "When the user names or clearly requests a registered strategy template, "
-        "set the strategy input requested_strategy_template to its canonical "
+        "set candidate_strategy_draft.requested_strategy_template to its canonical "
         f"registry key. Registered template statuses are: {capability_rows}. "
-        f"Template contracts: {capability_details}. "
         "Preserve a draft template's identity even though it is not runnable: do "
         "not relabel it as buy_and_hold, do not create a rule_spec, and do not ask "
         "the user to define custom logic as though Argus could then run it. For a "
-        "draft template, classify the turn as cannot with "
+        "draft template, classify the turn as unsupported_or_out_of_scope with "
         "semantic_turn_act=unsupported_request, preserve the user's asset, amount, "
         "and dates, explain that Argus cannot run that named strategy yet, and offer "
         "only genuinely executable alternatives. For an executable template, set "
@@ -81,12 +76,12 @@ def future_performance_capability_clause() -> str:
     """Interpreter-prompt contract for the future-performance boundary."""
 
     return (
-        "Requests to predict unknown future market performance are unsupported "
-        "in any language and for any asset, basket, strategy, or amount: what "
-        "a market investment will be worth or return over a future period ('in ten years', "
+        "Future-performance questions are a general class in any language and "
+        "for any asset, basket, strategy, or amount: what something will be "
+        "worth, return, become, or do over a future period ('in ten years', "
         "'over the next 3 years', 'by 2031', 'dentro de diez años'). Argus "
         "cannot predict future performance, so classify the request as "
-        "cannot with semantic_turn_act="
+        "unsupported_or_out_of_scope with semantic_turn_act="
         "unsupported_request, even when the user names a supported strategy "
         "such as a golden cross; a supported strategy does not make the "
         "requested future result executable. Set date_range_intent.kind="
@@ -103,10 +98,6 @@ def future_performance_capability_clause() -> str:
         "how the same idea performed over a historical period the user "
         "chooses. Offer that historical test without selecting it for the "
         "user and without presenting any historical result as a forecast.\n\n"
-        "A deterministic projection from explicitly supplied assumptions is "
-        "governed by the declared tool catalog. A future date alone does not "
-        "make that arithmetic a market prediction; only call an available "
-        "declared tool whose input contract supports the requested work.\n\n"
     )
 
 
@@ -188,7 +179,7 @@ def response_needs_inverse_capability_conflict_audit(
     ):
         return False
     if (
-        response.intent != "cannot"
+        response.intent != "unsupported_or_out_of_scope"
         and response.semantic_turn_act != "unsupported_request"
     ):
         return False
@@ -347,7 +338,7 @@ def admitted_or_blocked_confirmation_result(
     the unsupported verdict here fails closed into typed unsupported recovery."""
 
     if (
-        decision.intent != "cannot"
+        decision.intent != "unsupported_or_out_of_scope"
         and decision.semantic_turn_act != "unsupported_request"
     ):
         return StageResult(
@@ -590,7 +581,7 @@ def strategy_route_admission_result(
     if future_result is not None:
         return future_result
     has_unsupported_verdict = (
-        decision.intent == "cannot"
+        decision.intent == "unsupported_or_out_of_scope"
         or decision.semantic_turn_act == "unsupported_request"
     )
     if decision.requires_clarification and not has_unsupported_verdict:

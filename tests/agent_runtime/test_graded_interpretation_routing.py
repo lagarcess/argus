@@ -102,9 +102,6 @@ def _run_stage(interpretation: LLMInterpretationResponse, message: str) -> Any:
 
 
 def test_knowledge_turn_with_resolved_asset_is_not_interrogated(monkeypatch) -> None:
-    # This fixture exercises the pre-rail compatibility reader, independently
-    # of the developer's configured research flag.
-    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
     # The production shape: statistics question, model resolves SPY, and the
     # knowledge classifier confirms the user wants statistics, not a run.
     from argus.agent_runtime import knowledge_answer as ka

@@ -76,7 +76,7 @@ async def test_issue_453_bare_unsupported_dca_starter_repairs_to_amount_clarific
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "strategy_drafting"
     assert ready_response.requires_clarification is True
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -207,7 +207,7 @@ async def test_issue_453_pending_capital_answer_repairs_without_acknowledgment(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.semantic_turn_act == "answer_pending_need"
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -267,7 +267,7 @@ def test_issue_453_pending_dca_amount_inherits_recurring_contribution_role() -> 
         ),
     )
 
-    assert response.intent == 'calculate'
+    assert response.intent == "backtest_execution"
     assert response.missing_required_fields == []
     assert response.candidate_strategy_draft.strategy_type == "dca_accumulation"
     assert response.candidate_strategy_draft.capital_amount == 200

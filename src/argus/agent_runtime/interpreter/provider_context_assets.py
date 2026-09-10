@@ -5,7 +5,6 @@ from collections.abc import Callable
 from typing import Any
 
 from argus.agent_runtime.interpreter import unsupported_request_context
-from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.llm_interpreter_types import (
     LLMAmbiguousField,
     LLMInterpretationResponse,
@@ -16,27 +15,6 @@ from argus.agent_runtime.state.models import ResolutionProvenance
 from argus.domain.market_data.assets import ResolvedAsset
 
 _PROVIDER_RESOLVED_ASSETS_KEY = "provider_resolved_assets"
-TOOL_ASSET_CONTEXT_SIGNAL = "tool_asset_resolution_context"
-
-
-def retain_tool_asset_context(
-    response: LLMInterpretationResponse,
-    context: str | None,
-) -> LLMInterpretationResponse:
-    response._tool_asset_resolution_context = context
-    return response
-
-
-def context_for_declared_assets(context: str | None, references: list[str]) -> str | None:
-    """Filter the existing provider facts; never resolve or add another asset."""
-    rows = [
-        row
-        for row in _asset_context_rows(context)
-        if any(
-            _provider_record_matches_symbol(row, reference) for reference in references
-        )
-    ]
-    return json.dumps({"asset_resolution_candidates": rows}) if rows else None
 
 
 def response_with_runtime_context_assets(
@@ -69,9 +47,9 @@ def carry_incomplete_asset_blocker(
     """
 
     if (
-        not strategy_route_expected(
-            intent=response.intent, semantic_turn_act=response.semantic_turn_act
-        )
+        response.intent
+        not in {"strategy_drafting", "backtest_execution", "conversation_followup"}
+        or response.semantic_turn_act == "unsupported_request"
         or _all_traded_asset_mentions_accounted_for(asset_resolution_context) is not False
     ):
         return response
@@ -109,19 +87,18 @@ def response_with_provider_context_assets(
     include_unsupported_request: bool = False,
 ) -> LLMInterpretationResponse:
     response = _response_without_model_authored_provider_records(response)
-    expects_strategy_route = strategy_route_expected(
-        intent=response.intent, semantic_turn_act=response.semantic_turn_act
-    )
-    if not expects_strategy_route and not (
-        include_unsupported_request and response.intent == "cannot"
-    ):
+    supported_intents = {"strategy_drafting", "backtest_execution"}
+    if include_unsupported_request:
+        supported_intents.add("unsupported_or_out_of_scope")
+    if response.intent not in supported_intents:
         return response
     rows = _asset_context_rows(asset_resolution_context)
     all_traded_asset_mentions_accounted_for = _all_traded_asset_mentions_accounted_for(
         asset_resolution_context
     )
     incomplete_asset_context = (
-        expects_strategy_route and all_traded_asset_mentions_accounted_for is False
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and all_traded_asset_mentions_accounted_for is False
     )
     candidate_rows = [
         row
@@ -215,7 +192,7 @@ def response_with_provider_context_assets(
     # When every resolved mention is excluded, the refusal still needs its
     # asset facts for the recovery route; the edit pipeline's exclusions-win
     # guards own the contradiction, not this borrow.
-    if response.intent == "cannot":
+    if response.intent == "unsupported_or_out_of_scope":
         if not resolved_symbols:
             return response
         draft.asset_universe = traded_symbols or resolved_symbols
@@ -247,7 +224,7 @@ def response_with_provider_context_assets(
             )
         )
     resolved_missing_asset = (
-        expects_strategy_route
+        response.intent in {"strategy_drafting", "backtest_execution"}
         and "asset_universe" in response.missing_required_fields
         and bool(traded_symbols)
         and not ambiguous_fields
@@ -298,7 +275,7 @@ def response_with_provider_context_assets(
     if ambiguous_fields:
         update.update(
             {
-                "intent": "calculate",
+                "intent": "strategy_drafting",
                 "requires_clarification": True,
                 "assistant_response": None,
                 "ambiguous_fields": _dedupe_ambiguous_fields(
@@ -494,9 +471,7 @@ def response_with_canonical_interpreter_assets(
     resolve_asset_candidate: Callable[..., AssetResolution],
 ) -> LLMInterpretationResponse:
     draft = response.candidate_strategy_draft
-    if not strategy_route_expected(
-        intent=response.intent, semantic_turn_act=response.semantic_turn_act
-    ):
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return response
     if not draft.asset_universe:
         return response

@@ -10,9 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from argus.domain.tool_contracts import ToolResultCard
-from pydantic import ValidationError
-
 from tests.evals.measurement_assertions import (
     _compare_date_range,
     _compare_subset,
@@ -124,10 +121,6 @@ def rendered_beside_reply(
     rows = [row for row in rows if row]
     if rows:
         surface["discovery_rows"] = rows
-        if not discovery.get("sources"):
-            # ChatMessage renders this grounding marker from the same empty
-            # sources list; it is not part of the assistant's framing prose.
-            surface["discovery_grounding"] = "general_knowledge_not_current_search"
     sources = [
         {
             key: source[key]
@@ -186,31 +179,7 @@ def rendered_beside_reply(
             "retryable": bool(recovery.get("retryable")),
         }
 
-    cards = _rendered_tool_cards(final_patch.get("final_response_payload"))
-    if cards:
-        surface["tool_result_cards"] = cards
-
     return surface
-
-
-def _rendered_tool_cards(payload: Any) -> list[dict[str, Any]]:
-    """The delivered card owns presentation; calls and raw results stay structural."""
-    raw_cards = payload.get("tool_result_cards") if isinstance(payload, dict) else None
-    if not isinstance(raw_cards, list):
-        return []
-    cards = []
-    for raw_card in raw_cards:
-        try:
-            card = ToolResultCard.model_validate(raw_card)
-        except (ValidationError, TypeError):
-            continue
-        cards.append(
-            {
-                "status": card.outcome.status,
-                "presentation": card.presentation.model_dump(mode="json"),
-            }
-        )
-    return cards
 
 
 def _alnum(value: str) -> str:

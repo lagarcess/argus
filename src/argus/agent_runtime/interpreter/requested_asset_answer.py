@@ -144,7 +144,7 @@ def response_is_requested_asset_answer_patch(
         return False
     if response.semantic_turn_act != "answer_pending_need":
         return False
-    if response.intent != "calculate":
+    if response.intent != "backtest_execution":
         return False
     if response.assistant_response:
         return False
@@ -294,7 +294,7 @@ def _response_with_requested_asset_update(
     ]
     return response.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "strategy_drafting" if missing else "backtest_execution",
             "task_relation": "continue",
             "requires_clarification": bool(missing),
             "candidate_strategy_draft": draft,

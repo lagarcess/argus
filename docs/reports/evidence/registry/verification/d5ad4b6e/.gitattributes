@@ -1,2 +1,0 @@
-# Keep the captured terminal bytes, including progress carriage returns.
-frontend-build.log -text

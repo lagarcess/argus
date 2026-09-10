@@ -171,7 +171,7 @@ def _response_from_pending_response_option_selection_audit(
     missing_fields = replacement_result["missing_fields"]
     return response.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "strategy_drafting" if missing_fields else "backtest_execution",
             "task_relation": "continue",
             "requires_clarification": bool(missing_fields),
             "candidate_strategy_draft": replacement_result["draft"],

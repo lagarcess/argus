@@ -108,7 +108,7 @@ async def test_post_result_refine_reply_routes_to_edit_planner(
     async def invoke_stub(*, schema_model, messages=None, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMToolInterpretationResponse":
+        if schema_model.__name__ == "LLMInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",
@@ -182,7 +182,7 @@ async def test_post_result_refine_reply_routes_to_edit_planner(
 
     assert result is not None
     # Direct readiness route: no fallback or repair detours.
-    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert "artifact_assumption_edit_planned" in result.reason_codes
     draft = result.candidate_strategy_draft
     assert draft.asset_universe == ["NVDA"]
@@ -218,7 +218,7 @@ async def test_result_refine_prompt_after_fact_answer_routes_capital_edit_to_pla
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMToolInterpretationResponse":
+        if schema_model.__name__ == "LLMInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",
@@ -265,7 +265,7 @@ async def test_result_refine_prompt_after_fact_answer_routes_capital_edit_to_pla
     )
 
     assert result is not None
-    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert "artifact_assumption_edit_planned" in result.reason_codes
     assert result.artifact_target == "latest_result"
     draft = result.candidate_strategy_draft
@@ -305,7 +305,7 @@ async def test_post_result_capital_edit_with_unprovenanced_amount_uses_planner(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMToolInterpretationResponse":
+        if schema_model.__name__ == "LLMInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",
@@ -352,7 +352,7 @@ async def test_post_result_capital_edit_with_unprovenanced_amount_uses_planner(
     )
 
     assert result is not None
-    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result.artifact_target == "latest_result"
     assert result.candidate_strategy_draft.extra_parameters["initial_capital"] == 2000
 
@@ -387,7 +387,7 @@ async def test_post_result_capital_edit_with_unprovenanced_capital_amount_uses_p
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMToolInterpretationResponse":
+        if schema_model.__name__ == "LLMInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",
@@ -434,7 +434,7 @@ async def test_post_result_capital_edit_with_unprovenanced_capital_amount_uses_p
     )
 
     assert result is not None
-    assert calls == ["LLMToolInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
     assert result.artifact_target == "latest_result"
     assert result.candidate_strategy_draft.extra_parameters["initial_capital"] == 2000
 
@@ -460,7 +460,7 @@ async def test_post_result_new_idea_keeps_full_interpretation(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMToolInterpretationResponse":
+        if schema_model.__name__ == "LLMInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="new_task",
@@ -527,7 +527,7 @@ async def test_post_result_reshape_reply_keeps_full_interpretation(
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
         calls.append(schema_model.__name__)
-        if schema_model.__name__ == "LLMToolInterpretationResponse":
+        if schema_model.__name__ == "LLMInterpretationResponse":
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
                 task_relation="continue",

@@ -1,2 +1,0 @@
-{"label": "mocked-instrumentation-control", "case": "instrumentation_control", "status": "passed", "failed_checks": [], "elapsed_seconds": 0.00043704197742044926}
-{"evidence_type": "free mocked instrumentation control", "network_calls": 0, "original_arguments_and_response_identity": true, "original_patch_identity_and_grade": true, "judge_payload_retained": true, "headers_excluded": true, "final_provenance_check_and_function_restoration": true, "mocked_scorecard_deleted": true}

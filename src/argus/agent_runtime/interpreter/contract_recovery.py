@@ -57,7 +57,7 @@ def incomplete_response_error(
 ) -> InterpretationContractError:
     # Naming the actual gap: a knowledge turn has no strategy draft to be
     # incomplete, so reporting one sent readers looking in the wrong place.
-    if response.intent not in {"calculate"}:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
         reason = (
             "OpenRouter interpretation returned no assistant response for a "
             f"{response.intent} turn"
@@ -143,7 +143,6 @@ async def handle_candidate_failure(
         ready_for_runtime=ready_for_runtime,
         request=request,
         asset_resolution_context=asset_resolution_context,
-        response_model=getattr(interpreter, "response_model", LLMInterpretationResponse),
     )
     if corrected is None:
         return None
@@ -182,7 +181,6 @@ async def self_corrected_response(
     ready_for_runtime: Callable[..., Awaitable[LLMInterpretationResponse]],
     request: InterpretationRequest,
     asset_resolution_context: str | None,
-    response_model: type[LLMInterpretationResponse] = LLMInterpretationResponse,
 ) -> LLMInterpretationResponse | None:
     """Re-ask the same tier once, with the rejection fed back.
 
@@ -198,7 +196,7 @@ async def self_corrected_response(
         retried = await invoke_schema(
             task="interpretation",
             messages=corrective_messages,
-            schema_model=response_model,
+            schema_model=LLMInterpretationResponse,
             schema_name="LLMInterpretationResponse",
             model_name=candidate_model,
         )

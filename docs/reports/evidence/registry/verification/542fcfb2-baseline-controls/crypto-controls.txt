@@ -1,4 +1,0 @@
-{"control": "retained rows plus absent metadata; historical metadata is unknown", "symbols": ["PONS", "STONK", "USELESS", "VVV", "ZEC"], "candidate_inputs": 0, "published_rows": 10, "next_actions": false}
-{"control": "canonical synthetic fixture, not historical provider data", "asset": "BTC", "asset_class": "crypto", "research_accepted": [], "discovery_accepted": [{"symbol": "BTC", "name": "Bitcoin", "asset_class": "crypto", "reason_text": "", "source_indices": []}]}
-Completed with sockets forbidden; no background processes
-{"control": "identical canonical synthetic fixture through exact integration function and current function", "integration_sha": "51086fda", "integration_crypto_peers": [], "candidate_crypto_peers": [], "sockets": "forbidden"}

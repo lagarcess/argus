@@ -24,10 +24,6 @@ Run the mocked harness checks with:
 
 ```bash
 poetry run pytest tests/evals/test_measurement_eval_harness.py \
-  tests/evals/test_measurement_registry_dispatch.py \
-  tests/evals/test_measurement_registry_observation.py \
-  tests/evals/test_measurement_selection.py \
-  tests/evals/test_measurement_research.py \
   tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
@@ -42,61 +38,6 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py \
 
 This run is free. It does not call the LLM, does not spend provider tokens, and
 is safe to run anywhere.
-
-The measurement harness follows declared calls through the production execute
-stage. A fresh backtest call reaches its real confirmation and stops there;
-Run-button fixtures still stop at validated approval. Research calls execute
-through their existing provider owners in a sanctioned live run. Mocked tests
-cover zero calls, repeated calls, composed calls, the confirmation handoff, and
-bounded or unavailable results without contacting a provider.
-
-Scorecards retain the full `execution_trace`, raw `stage_outcomes`, selected
-`tool_calls`, arguments, records, and result cards. `acceptance_stage_outcomes`
-keeps the older fixture milestones comparable: it removes the interpreter's
-new dispatch-scheduling edge only after an actual registered execute stage
-returns, retaining that stage's outcome. A readiness handoff immediately before
-an actual confirmation stage requests clarification is compared at that
-clarification owner; successful confirmation readiness and all raw events remain.
-The same adjacent handoff is normalized in expected milestones. `intent` comes
-from the ordered stage patches after dispatch, while `primary_intent` preserves
-the original interpreter read. Expectations use the four canonical names;
-historical labels normalize through the state-model compatibility owner.
-Discovery's original effective `follow_up` expectation is retained. Its typed facts
-are checked against the collective delivered selection evidence, independently
-of which declared tools supplied it. Completed typed results, their versioned
-cards, resolved identities, retained sources and final selectable actions must
-agree. Category and relationship relevance use one additional criterion in the
-existing prose-judge invocation, with no extra model call. The versioned
-`argus-selection-evidence/v2` contract retains the call's resolved cache and
-source-period policy, retrieval time, and each row's citation separately from
-the retrieved source drawer. The observer applies that recorded policy instead
-of imposing a same-day publication rule on every discovery question. A model
-citation outside the drawer stays marked as a model citation. The existing judge
-also checks whether the facts support the period the user asked about; retrieval
-age alone cannot establish that. Missing or unavailable judgment remains
-unproven. Original delivery checks and fixture expectations remain active. No
-prompt-to-tool-name expectation is added.
-
-Answer-required dispatch also needs a successful typed result card with a
-typed answer or a nonblank narrative from a recorded call. A queued job with
-neither cannot pass that gate;
-composed work can deliver an answer while another call remains honestly pending.
-Existing offered-content checks still establish what the user received.
-Publication observations read the same bound, completed calls collectively.
-They retain each call's answer and optional numeric rows; an unrelated sidecar
-cannot make a missing result pass, and a retrieved narrative can publish without
-a numeric row.
-Per-call `tool_usage` retains only the research sidecar's reported cost, latency,
-invocations, and cache status. Missing or null cost stays unknown; the harness
-does not price calls or infer invoices. Historical scorecards retain the harness
-and fixture provenance under which they were measured and are never regraded
-as though this path had executed.
-
-Interpretation and dispatch receive the same trusted snapshot and metadata
-objects on each initial and follow-up turn. Dispatch does not reconstruct that
-context from prose. Private chat delivery accepts retrieved narrative without a
-numeric headline. Public receipt eligibility belongs to the shipped sharing
-contract.
 
 ## Search Provider Evaluation (Issue #244)
 

@@ -26,7 +26,7 @@ def _response_needs_launch_field_fidelity_repair(
 ) -> bool:
     if response.requires_clarification:
         return False
-    if response.intent not in {"calculate"}:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     if response.semantic_turn_act in {
         "answer_pending_need",
@@ -56,7 +56,7 @@ def _response_needs_executable_strategy_grounding_audit(
 ) -> bool:
     if response.requires_clarification:
         return False
-    if response.intent not in {"calculate"}:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     if response.task_relation != "new_task":
         return False
@@ -147,7 +147,7 @@ def _response_from_executable_strategy_grounding_audit(
     if audit.outcome != "needs_clarification" or not audit.assistant_response:
         return None
     repaired = response.model_copy(deep=True)
-    repaired.intent = "calculate"
+    repaired.intent = "strategy_drafting"
     repaired.requires_clarification = True
     repaired.assistant_response = audit.assistant_response
     repaired.missing_required_fields = list(

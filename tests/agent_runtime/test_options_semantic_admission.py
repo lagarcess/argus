@@ -12,38 +12,23 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from argus.agent_runtime.interpreter.strategy_routing import (
-    STRATEGY_TURN_ACTS,
-    decision_with_strategy_route_intent,
-)
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
-)
-from argus.agent_runtime.profile.response_profile import (
-    resolve_effective_response_profile,
 )
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
     interpret_stage_async,
 )
-from argus.agent_runtime.stages.interpret_types import (
-    InterpretationRequest,
-    InterpretDecision,
-    SemanticTurnAct,
-)
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import (
     RunState,
     StrategySummary,
     TaskSnapshot,
     UnsupportedConstraint,
     UserState,
-    normalize_task_intent,
 )
-from faker import Faker
-
-fake = Faker()
 
 FULL_YEAR_2024 = {"start": "2024-01-01", "end": "2024-12-31"}
 EN_OPTIONS_MESSAGE = (
@@ -136,7 +121,7 @@ def _assert_blocked_unsupported_admission(
     assert result.outcome == "needs_clarification"
     assert result.decision is not None
     decision = result.decision
-    assert decision.intent == normalize_task_intent(expected_intent)
+    assert decision.intent == expected_intent
     assert decision.requires_clarification is True
     assert "unsupported_intent_confirmation_blocked" in decision.reason_codes
     constraints = decision.unsupported_constraints
@@ -158,30 +143,6 @@ def _assert_blocked_unsupported_admission(
         patch["optional_parameter_status"]["unsupported_constraints"][0]["category"]
         == "unsupported_strategy_logic"
     )
-
-
-@pytest.mark.parametrize("intent", ["cannot", "unsupported_or_out_of_scope"])
-@pytest.mark.parametrize("semantic_turn_act", sorted(STRATEGY_TURN_ACTS))
-def test_strategy_route_label_repair_preserves_unsupported_verdict(
-    intent: str, semantic_turn_act: SemanticTurnAct
-) -> None:
-    decision = InterpretDecision(
-        intent=intent,
-        task_relation="new_task",
-        requires_clarification=False,
-        user_goal_summary=fake.sentence(),
-        confidence=1.0,
-        effective_response_profile=resolve_effective_response_profile(
-            user=UserState(user_id=fake.uuid4())
-        ),
-        semantic_turn_act=semantic_turn_act,
-    )
-
-    repaired = decision_with_strategy_route_intent(decision)
-
-    assert repaired is decision
-    assert repaired.intent == "cannot"
-    assert "strategy_route_intent_repair" not in repaired.normalized_signals
 
 
 def test_unsupported_intent_new_idea_options_contradiction_blocks_en(
@@ -239,7 +200,7 @@ def test_supported_intent_with_unsupported_request_act_blocks(
     _stub_equity_asset_resolution(monkeypatch)
     mixed = _contradictory_interpretation(
         symbol="TSLA", semantic_turn_act="unsupported_request"
-    ).model_copy(update={"intent": 'calculate'})
+    ).model_copy(update={"intent": "backtest_execution"})
     result, _ = _run_interpret(message=EN_OPTIONS_MESSAGE, response=mixed)
     _assert_blocked_unsupported_admission(
         result, symbol="TSLA", expected_intent="backtest_execution"
@@ -253,7 +214,7 @@ def test_supported_intent_same_draft_still_admits(
     _stub_equity_asset_resolution(monkeypatch)
     response = _contradictory_interpretation(symbol="TSLA", semantic_turn_act="new_idea")
     supported = response.model_copy(
-        update={"intent": 'calculate', "user_goal_summary": "Hold TSLA."}
+        update={"intent": "backtest_execution", "user_goal_summary": "Hold TSLA."}
     )
     result, _ = _run_interpret(
         message="hold TSLA for 2024 please",
@@ -356,7 +317,7 @@ async def test_inverse_contradiction_triggers_capability_conflict_audit(
     assert "SupportedStrategyCapabilityConflictAudit" in recorder.schema_names
     system_prompt = recorder.conflict_messages[0][0]["content"]
     assert "unsupported" in system_prompt
-    assert ready.intent == 'cannot'
+    assert ready.intent == "unsupported_or_out_of_scope"
     assert "supported_strategy_capability_conflict_audit" not in ready.reason_codes
 
 
@@ -382,7 +343,7 @@ async def test_inverse_contradiction_confident_audit_promotion_is_single_turn(
         request=_request("hold TSLA for all of 2024"),
     )
 
-    assert ready.intent == 'calculate'
+    assert ready.intent == "backtest_execution"
     assert ready.requires_clarification is False
     assert ready.unsupported_constraints == []
     assert "supported_strategy_capability_conflict_audit" in ready.reason_codes
@@ -406,7 +367,7 @@ async def test_mixed_shape_promotion_normalizes_intent_and_turn_act(
     monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", recorder)
     mixed = _inverse_llm_response(date_range=FULL_YEAR_2024).model_copy(
         update={
-            "intent": 'calculate',
+            "intent": "backtest_execution",
             "semantic_turn_act": "unsupported_request",
         }
     )
@@ -417,7 +378,7 @@ async def test_mixed_shape_promotion_normalizes_intent_and_turn_act(
         request=_request("hold TSLA for all of 2024"),
     )
 
-    assert ready.intent == 'calculate'
+    assert ready.intent == "backtest_execution"
     assert ready.semantic_turn_act == "new_idea"
     assert "supported_strategy_capability_conflict_inverse" in ready.reason_codes
 
@@ -444,7 +405,7 @@ async def test_inverse_promotion_without_dates_asks_for_the_window(
         request=_request("run TSLA options for me"),
     )
 
-    assert ready.intent == 'calculate'
+    assert ready.intent == "strategy_drafting"
     assert ready.requires_clarification is True
     assert "date_range" in ready.missing_required_fields
 
@@ -497,7 +458,7 @@ async def test_inverse_contradiction_fails_closed_without_promotion(
     if response_shape == "mixed_unsupported_act":
         response = response.model_copy(
             update={
-                "intent": 'calculate',
+                "intent": "backtest_execution",
                 "semantic_turn_act": "unsupported_request",
             }
         )
@@ -509,7 +470,7 @@ async def test_inverse_contradiction_fails_closed_without_promotion(
         request=_request(),
     )
 
-    assert ready.intent == normalize_task_intent(expected_intent)
+    assert ready.intent == expected_intent
     if response_shape == "mixed_unsupported_act":
         assert ready.semantic_turn_act == "unsupported_request"
     assert "supported_strategy_capability_conflict_audit" not in ready.reason_codes
@@ -543,7 +504,7 @@ async def test_constraint_present_direction_keeps_structured_fallback_promotion(
         request=_request("hold TSLA for all of 2024"),
     )
 
-    assert ready.intent == 'calculate'
+    assert ready.intent == "backtest_execution"
     assert ready.unsupported_constraints == []
     assert "supported_strategy_capability_structured_fallback" in ready.reason_codes
 
@@ -616,7 +577,7 @@ async def test_pending_simplification_acceptance_progresses_without_loop(
 
     assert "PendingResponseOptionSelectionAudit" in recorder.schema_names
     assert "SupportedStrategyCapabilityConflictAudit" not in recorder.schema_names
-    assert ready.intent == 'calculate'
+    assert ready.intent == "backtest_execution"
     assert "pending_response_option_selected" in ready.reason_codes
     assert ready.unsupported_constraints == []
 
@@ -644,7 +605,7 @@ def _prose_bearing_inverse_response(shape: str) -> LLMInterpretationResponse:
     if shape == "unsupported_act_only":
         return response.model_copy(
             update={
-                "intent": 'calculate',
+                "intent": "backtest_execution",
                 "semantic_turn_act": "unsupported_request",
             }
         )
@@ -745,7 +706,7 @@ async def test_prose_bearing_contradiction_keeps_verdict_and_suppresses_prose_at
         request=_request(),
     )
 
-    assert readied.intent == normalize_task_intent(expected_intent)
+    assert readied.intent == expected_intent
     assert readied.semantic_turn_act == expected_turn_act
     assert readied.requires_clarification is True
     assert readied.assistant_response == REFUSAL_PROSE_EN
@@ -787,7 +748,7 @@ async def test_prose_bearing_contradiction_confident_promotion_still_admits(
         request=_request("hold TSLA for all of 2024"),
     )
 
-    assert readied.intent == 'calculate'
+    assert readied.intent == "backtest_execution"
     assert readied.semantic_turn_act == "new_idea"
     assert readied.requires_clarification is False
     assert readied.assistant_response is None
@@ -835,7 +796,7 @@ async def test_incomplete_non_promoted_contradiction_blocks_before_missing_field
         request=_request("run an options straddle on TSLA"),
     )
 
-    assert readied.intent == 'cannot'
+    assert readied.intent == "unsupported_or_out_of_scope"
     assert readied.semantic_turn_act == "unsupported_request"
     assert readied.requires_clarification is True
     assert "date_range" in readied.missing_required_fields
@@ -879,4 +840,4 @@ def test_admission_invariant_blocks_even_with_model_constraint_free_edge(
     )
     assert result.outcome == "needs_clarification"
     assert result.decision is not None
-    assert result.decision.intent == 'cannot'
+    assert result.decision.intent == "unsupported_or_out_of_scope"

@@ -158,7 +158,7 @@ def _result_followup_decision(
         reason_codes.append(reason_code)
     return decision.model_copy(
         update={
-            "intent": "follow_up",
+            "intent": "conversation_followup",
             "requires_clarification": False,
             "candidate_strategy_draft": StrategySummary(),
             "missing_required_fields": [],
@@ -653,7 +653,7 @@ def approval_stage_result_if_applicable(
             outcome="ready_to_respond",
             decision=decision.model_copy(
                 update={
-                    "intent": "follow_up",
+                    "intent": "conversation_followup",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "candidate_strategy_draft": approved_strategy,
@@ -687,7 +687,7 @@ def approval_stage_result_if_applicable(
             outcome="ready_to_respond",
             decision=decision.model_copy(
                 update={
-                    "intent": "follow_up",
+                    "intent": "conversation_followup",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "candidate_strategy_draft": approved_strategy,
@@ -713,7 +713,7 @@ def approval_stage_result_if_applicable(
             outcome="ready_to_respond",
             decision=decision.model_copy(
                 update={
-                    "intent": "follow_up",
+                    "intent": "conversation_followup",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "candidate_strategy_draft": approved_strategy,
@@ -739,7 +739,7 @@ def approval_stage_result_if_applicable(
             outcome="ready_to_respond",
             decision=decision.model_copy(
                 update={
-                    "intent": "follow_up",
+                    "intent": "conversation_followup",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "candidate_strategy_draft": approved_strategy,
@@ -767,7 +767,7 @@ def approval_stage_result_if_applicable(
             outcome="ready_for_confirmation",
             decision=decision.model_copy(
                 update={
-                    "intent": "calculate",
+                    "intent": "backtest_execution",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "candidate_strategy_draft": approved_strategy,
@@ -785,7 +785,7 @@ def approval_stage_result_if_applicable(
         outcome="ready_to_respond",
         decision=decision.model_copy(
             update={
-                "intent": "follow_up",
+                "intent": "conversation_followup",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "candidate_strategy_draft": approved_strategy,
@@ -836,7 +836,7 @@ def retry_failed_action_stage_result_if_applicable(
 
 def _retry_failed_action_decision(*, state: RunState) -> InterpretDecision:
     return InterpretDecision(
-        intent="follow_up",
+        intent="conversation_followup",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary="Retry failed action",
@@ -880,7 +880,7 @@ def _retry_failed_action_stage_result(
             outcome="ready_to_respond",
             decision=decision.model_copy(
                 update={
-                    "intent": "follow_up",
+                    "intent": "conversation_followup",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "missing_required_fields": [],
@@ -902,7 +902,7 @@ def _retry_failed_action_stage_result(
             outcome="ready_to_respond",
             decision=decision.model_copy(
                 update={
-                    "intent": "follow_up",
+                    "intent": "conversation_followup",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "missing_required_fields": [],
@@ -922,7 +922,7 @@ def _retry_failed_action_stage_result(
             outcome="ready_to_respond",
             decision=decision.model_copy(
                 update={
-                    "intent": "follow_up",
+                    "intent": "conversation_followup",
                     "task_relation": "continue",
                     "requires_clarification": False,
                     "missing_required_fields": [],
@@ -942,7 +942,7 @@ def _retry_failed_action_stage_result(
         outcome="ready_for_confirmation",
         decision=decision.model_copy(
             update={
-                "intent": "calculate",
+                "intent": "backtest_execution",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "candidate_strategy_draft": strategy,
@@ -1026,7 +1026,7 @@ def pending_artifact_followup_stage_result_if_applicable(
         outcome="ready_to_respond",
         decision=decision.model_copy(
             update={
-                "intent": "follow_up",
+                "intent": "conversation_followup",
                 "requires_clarification": False,
                 "missing_required_fields": [],
             }

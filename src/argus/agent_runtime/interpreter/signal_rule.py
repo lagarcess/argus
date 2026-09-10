@@ -11,7 +11,6 @@ from argus.agent_runtime.interpreter.shared import (
     _llm_strategy_draft_has_extractable_fields,
     _llm_strategy_draft_has_rule_or_indicator_fields,
 )
-from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMSimplificationOption,
@@ -62,7 +61,7 @@ def _response_needs_supported_signal_rule_recovery(
         return False
     if not _response_has_signal_rule_shape(response):
         return False
-    if response.intent == "cannot":
+    if response.intent == "unsupported_or_out_of_scope":
         return True
     if response.requires_clarification and response.assistant_response:
         return True
@@ -91,7 +90,7 @@ def _supported_signal_rule_planning_response(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:
     planning = response.model_copy(deep=True)
-    planning.intent = "calculate"
+    planning.intent = "strategy_drafting"
     planning.requires_clarification = True
     planning.assistant_response = None
     planning.missing_required_fields = ["entry_logic", "exit_logic"]
@@ -227,7 +226,7 @@ def _response_from_signal_grounding_audit(
     for key in ("entry_rule", "exit_rule", "rule_spec"):
         draft.extra_parameters.pop(key, None)
 
-    repaired.intent = "calculate"
+    repaired.intent = "strategy_drafting"
     repaired.requires_clarification = True
     repaired.assistant_response = audit.assistant_response
     repaired.missing_required_fields = list(
@@ -254,7 +253,7 @@ def _response_needs_signal_rule_plan(response: LLMInterpretationResponse) -> boo
 def _response_needs_indicator_parameter_repair(
     response: LLMInterpretationResponse,
 ) -> bool:
-    if response.intent not in {"calculate"}:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     if response.semantic_turn_act in {
         "approval",
@@ -284,7 +283,7 @@ def _response_needs_indicator_default_grounding_repair(
     request: InterpretationRequest,
 ) -> bool:
     del request
-    if response.intent not in {"calculate"}:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     if response.semantic_turn_act in {
         "approval",
@@ -357,7 +356,7 @@ def _response_from_signal_rule_plan(
         draft.exit_rule = None
         draft.rule_spec = None
         draft.risk_rules = []
-        repaired.intent = "cannot"
+        repaired.intent = "unsupported_or_out_of_scope"
         repaired.semantic_turn_act = "unsupported_request"
         repaired.requires_clarification = True
         repaired.assistant_response = plan.assistant_response
@@ -396,20 +395,17 @@ def _response_from_signal_rule_plan(
         return repaired
 
     draft.strategy_type = "signal_strategy"
-    repaired.intent = "calculate"
-    if not strategy_route_expected(
-        intent=repaired.intent, semantic_turn_act=repaired.semantic_turn_act
-    ):
-        repaired.semantic_turn_act = "new_idea"
     if plan.outcome == "ready_to_confirm":
         # A ready signal-rule plan is the executable contract. Drop unrelated
         # non-executable draft fields that the planner did not ground in the rule.
         draft.risk_rules = []
+        repaired.intent = "backtest_execution"
         repaired.requires_clarification = False
         repaired.missing_required_fields = []
         repaired.assistant_response = None
         return repaired
 
+    repaired.intent = "strategy_drafting"
     repaired.requires_clarification = True
     repaired.assistant_response = plan.assistant_response
     repaired.missing_required_fields = list(

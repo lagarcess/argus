@@ -149,7 +149,7 @@ def pending_response_option_interpretation_from_typed_selection(
     strategy = _strategy_from_llm(replacement_result["draft"])
     missing_fields = list(replacement_result["missing_fields"])
     return StructuredInterpretation(
-        intent="calculate",
+        intent="strategy_drafting" if missing_fields else "backtest_execution",
         task_relation="continue",
         requires_clarification=bool(missing_fields),
         user_goal_summary=(
@@ -228,7 +228,7 @@ def draft_only_indicator_interpretation_when_interpreter_unavailable(
         },
     )
     return StructuredInterpretation(
-        intent="calculate",
+        intent="strategy_drafting",
         task_relation="new_task",
         requires_clarification=True,
         user_goal_summary=(
@@ -561,7 +561,7 @@ async def _planned_artifact_edit_interpretation(
     if disclosure is not None:
         candidate.extra_parameters["edit_disclosure"] = disclosure
     return StructuredInterpretation(
-        intent="calculate",
+        intent="backtest_execution",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary=plan.user_goal_summary or default_goal_summary,
@@ -628,7 +628,7 @@ def _interpretation_supplies_chip_artifact_edit(
         "unsupported_request",
     }:
         return False
-    if interpretation.intent not in {"calculate"}:
+    if interpretation.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     strategy = interpretation.candidate_strategy_draft
     extra_parameters = strategy.extra_parameters or {}
@@ -662,7 +662,7 @@ def structured_interpretation_has_supported_artifact_assumption_edit(
         "retry_failed_action",
     }:
         return False
-    if interpretation.intent not in {"calculate"}:
+    if interpretation.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     strategy = interpretation.candidate_strategy_draft
     extra_parameters = strategy.extra_parameters or {}

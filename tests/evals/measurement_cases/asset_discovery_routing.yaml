@@ -1,7 +1,9 @@
-# Grounded Discovery acceptance battery (issue #244). The registry migration
-# measures actual declared dispatch and keeps the original typed discovery
-# facts and delivered candidate checks. The research-enabled live profile is
-# required for discovery calls; an unavailable operation cannot pass as an answer.
+# Grounded Discovery classification battery (issue #244). The routing
+# boundary is semantic_turn_act=asset_discovery plus its typed payload; the
+# composer keys on the act alone, so intent labels stay tolerant lists where
+# they are model-shape. Stage outcome is ready_to_respond on both the
+# flag-off recovery path and the flag-on search path, so these cases hold in
+# any sanctioned environment.
 category: asset_discovery_routing
 cases:
   - id: asset_discovery_category_english_issue_244
@@ -9,9 +11,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: category
         anchor_symbols: []
@@ -29,9 +31,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: peer
         anchor_symbols: ["NVDA"]
@@ -48,9 +50,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: comparison
         anchor_symbols: ["COST"]
@@ -67,9 +69,9 @@ cases:
     user_language: es
     ui_language: es
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: category
         anchor_symbols: []
@@ -88,9 +90,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: category
         anchor_symbols: []
@@ -110,9 +112,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: category
         anchor_symbols: []
@@ -142,9 +144,9 @@ cases:
       - role: assistant
         content: "Here are resolver-verified pharmaceutical stocks from general knowledge, not a current search."
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: category
         anchor_symbols: []
@@ -164,9 +166,9 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: category
         anchor_symbols: []
@@ -194,9 +196,9 @@ cases:
       - role: assistant
         content: "Aquí tienes acciones farmacéuticas de conocimiento general, no de una búsqueda actual."
     expected:
-      intent: follow_up
+      intent: conversation_followup
       capability_verdict: answer_only
-      tool_dispatch: true
+      semantic_turn_act: asset_discovery
       asset_discovery:
         relationship: category
         anchor_symbols: []
@@ -222,7 +224,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["CRWD"]
       asset_class: equity
@@ -272,7 +274,7 @@ cases:
         min_next_experiment_rows: 1
       # Intent label is model-shape; the act boundary keeps the ordinary
       # post-result "what next" turn out of the discovery route.
-      intent: ["follow_up", "explain"]
+      intent: ["conversation_followup", "results_explanation"]
       capability_verdict: answer_only
       semantic_turn_act: result_followup
       stage_outcomes: ["ready_to_respond"]
@@ -286,7 +288,7 @@ cases:
         response: true
       # Intent label is model-shape; asking what Argus supports stays an
       # educational turn instead of invoking the discovery route.
-      intent: ["follow_up", "explain"]
+      intent: ["conversation_followup", "beginner_guidance"]
       capability_verdict: answer_only
       semantic_turn_act: educational_question
       stage_outcomes: ["ready_to_respond"]

@@ -1271,7 +1271,7 @@ async def test_artifact_edit_clarification_cannot_drop_incomplete_asset_blocker(
         ),
     )
 
-    assert planned.intent == 'follow_up'
+    assert planned.intent == "conversation_followup"
     assert planned.requires_clarification is True
     assert planned.missing_required_fields == ["asset_universe", "assumption"]
     assert planned.assistant_response is None
@@ -1333,7 +1333,7 @@ async def test_artifact_edit_unsupported_followup_keeps_planner_explanation(
         ),
     )
 
-    assert planned.intent == 'follow_up'
+    assert planned.intent == "conversation_followup"
     assert planned.semantic_turn_act == "unsupported_request"
     assert planned.assistant_response == "I cannot apply that change to this artifact."
     assert planned.missing_required_fields == []
@@ -1487,7 +1487,7 @@ async def test_artifact_edit_planning_does_not_reconcile_inherited_assets_agains
         asset_resolution_context=complete_current_message_context,
     )
 
-    assert planned.intent == 'calculate'
+    assert planned.intent == "backtest_execution"
     assert planned.requires_clarification is False
     assert planned.candidate_strategy_draft.asset_universe == ["AAPL", "MSFT"]
     assert planned.missing_required_fields == []

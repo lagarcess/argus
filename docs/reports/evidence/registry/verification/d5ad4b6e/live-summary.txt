@@ -1,2 +1,0 @@
-FAILED tests/evals/test_measurement_eval_live.py::test_measurement_live_eval_suite_writes_scorecard
-======================== 1 failed in 1590.40s (0:26:30) ========================

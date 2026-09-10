@@ -72,7 +72,7 @@ async def test_llm_interpreter_plans_no_active_pending_chip_asset_answer(
     assert calls[0]["prior_strategy"]["asset_universe"] == ["AAPL", "MSFT", "NVDA"]
     assert planned is not None
     assert planned.semantic_turn_act == "answer_pending_need"
-    assert planned.intent == 'calculate'
+    assert planned.intent == "backtest_execution"
     assert planned.candidate_strategy_draft.asset_universe == ["MSFT", "NVDA"]
     assert "artifact_assumption_edit_planned" in planned.reason_codes
 
@@ -243,7 +243,7 @@ async def test_llm_interpreter_repairs_pending_field_side_question_to_capability
         request=request,
     )
 
-    assert ready_response.intent == 'follow_up'
+    assert ready_response.intent == "conversation_followup"
     assert ready_response.semantic_turn_act == "educational_question"
     assert ready_response.capability_question_focus == "supported_indicators"
     assert ready_response.artifact_target == "none"
@@ -709,7 +709,7 @@ async def test_llm_interpreter_audits_capability_side_question_with_rule_shape(
         request=request,
     )
 
-    assert ready_response.intent == 'follow_up'
+    assert ready_response.intent == "conversation_followup"
     assert ready_response.semantic_turn_act == "educational_question"
     assert ready_response.capability_question_focus == "supported_indicators"
     assert ready_response.candidate_strategy_draft.strategy_type is None
@@ -770,7 +770,7 @@ async def test_llm_interpreter_repairs_standalone_movers_to_context_focus(
         request=request,
     )
 
-    assert ready_response.intent == 'follow_up'
+    assert ready_response.intent == "conversation_followup"
     assert ready_response.semantic_turn_act == "educational_question"
     assert ready_response.context_question_focus == "market_movers"
     assert ready_response.capability_question_focus is None
@@ -881,7 +881,7 @@ async def test_llm_interpreter_repairs_unsupported_movers_to_context_focus(
         request=request,
     )
 
-    assert ready_response.intent == 'follow_up'
+    assert ready_response.intent == "conversation_followup"
     assert ready_response.semantic_turn_act == "educational_question"
     assert ready_response.context_question_focus == "market_movers"
     assert ready_response.capability_question_focus is None
@@ -1282,7 +1282,7 @@ async def test_llm_interpreter_repairs_side_question_after_ungrounded_asset_extr
     )
 
     assert calls == ["AssetGroundingAudit", "CapabilitySideQuestionAudit"]
-    assert ready_response.intent == 'follow_up'
+    assert ready_response.intent == "conversation_followup"
     assert ready_response.semantic_turn_act == "educational_question"
     assert ready_response.capability_question_focus == "supported_strategies"
     assert ready_response.candidate_strategy_draft.asset_universe == []
@@ -1393,7 +1393,7 @@ async def test_llm_interpreter_keeps_side_question_conversational_when_audit_una
     )
 
     assert calls == ["AssetGroundingAudit", "CapabilitySideQuestionAudit"]
-    assert ready_response.intent == 'follow_up'
+    assert ready_response.intent == "conversation_followup"
     assert ready_response.semantic_turn_act == "educational_question"
     assert ready_response.artifact_target == "none"
     assert ready_response.candidate_strategy_draft.asset_universe == []
@@ -1960,7 +1960,7 @@ def test_llm_interpreter_keeps_pending_artifact_assumptions_as_followup() -> Non
         ),
     )
 
-    assert normalized.intent == 'follow_up'
+    assert normalized.intent == "conversation_followup"
     assert normalized.semantic_turn_act == "result_followup"
     assert normalized.result_followup_focus == "assumptions"
     assert normalized.assistant_response is None
@@ -2065,9 +2065,9 @@ async def test_llm_interpreter_preserves_result_followup_during_pending_refineme
         )
     )
 
-    assert calls == ["LLMToolInterpretationResponse", "LatestResultRoutingAudit"]
+    assert calls == ["LLMInterpretationResponse", "LatestResultRoutingAudit"]
     assert result is not None
-    assert result.intent == 'explain'
+    assert result.intent == "results_explanation"
     assert result.semantic_turn_act == "result_followup"
     assert result.result_followup_focus == "what_tested"
 
@@ -2122,7 +2122,7 @@ def test_focused_strategy_extraction_does_not_force_unknown_strategy_contracts()
         ),
     )
 
-    assert response.intent == 'cannot'
+    assert response.intent == "unsupported_or_out_of_scope"
     assert response.semantic_turn_act == "unsupported_request"
     assert response.requires_clarification is True
     assert response.candidate_strategy_draft.strategy_type is None
@@ -2198,7 +2198,7 @@ def test_focused_strategy_extraction_preserves_non_executable_idea_as_recovery()
         ),
     )
 
-    assert response.intent == 'cannot'
+    assert response.intent == "unsupported_or_out_of_scope"
     assert response.semantic_turn_act == "unsupported_request"
     assert response.requires_clarification is True
     assert response.candidate_strategy_draft.asset_universe == ["AAPL"]
@@ -2277,7 +2277,7 @@ async def test_underfilled_unsupported_strategy_draft_gets_structured_recovery(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert repaired.intent == 'cannot'
+    assert repaired.intent == "unsupported_or_out_of_scope"
     assert repaired.semantic_turn_act == "unsupported_request"
     assert repaired.unsupported_constraints
     assert repaired.unsupported_constraints[0].category == "unsupported_strategy_logic"
@@ -2688,7 +2688,7 @@ def test_llm_system_prompt_owns_phase_one_routing_and_quality_rules() -> None:
     assert "semantic_turn_act" in prompt
     assert "approval" in prompt
     assert "refine_current_idea" in prompt
-    assert "follow_up" in prompt
+    assert "conversation_followup" in prompt
     assert "educational" in prompt
     assert "asset_universe" in prompt
     assert "capital_amount" in prompt
@@ -3494,7 +3494,7 @@ async def test_supported_capability_recovery_rechecks_dropped_trailing_capital(
     capital_prompt = captured_starting_capital_messages[0]["content"]
     assert "standalone numeric magnitude" in capital_prompt
     assert "structured draft prose" in capital_prompt
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     draft = ready_response.candidate_strategy_draft
     assert draft.strategy_type == "buy_and_hold"
@@ -3608,7 +3608,7 @@ async def test_supported_capability_shape_beats_primary_capability_focus(
         "SupportedStrategyCapabilityConflictAudit",
     ) in calls
     assert all(schema_name != "FocusedStrategyExtraction" for _, schema_name in calls)
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.capability_question_focus is None
@@ -3730,7 +3730,7 @@ async def test_supported_shape_inside_unsupported_recovery_gets_focused_repair(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -3856,7 +3856,7 @@ async def test_unsupported_recovery_allows_focused_spanish_strategy_repair(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -4010,7 +4010,7 @@ async def test_empty_unsupported_benchmark_comparison_gets_focused_repair(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -4189,7 +4189,7 @@ async def test_underfilled_focused_repair_uses_capability_and_date_audits(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
@@ -4345,7 +4345,7 @@ async def test_supported_focused_repair_missing_date_uses_required_field_contrac
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -4463,7 +4463,7 @@ async def test_supported_partial_spanish_draft_gets_focused_schema_repair(
     )
 
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -4587,7 +4587,7 @@ async def test_supported_partial_draft_gets_schema_repair_after_date_audit_failu
 
     assert calls[0] == "FocusedDateWindowExtraction"
     assert "FocusedStrategyExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     expected_range = interpreter_module.resolve_date_range_intent(
@@ -4707,7 +4707,7 @@ async def test_supported_partial_clarification_without_missing_list_repairs(
     )
 
     assert calls[0] == "FocusedDateWindowExtraction"
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     expected_range = interpreter_module.resolve_date_range_intent(
@@ -4836,7 +4836,7 @@ async def test_spanish_supported_pending_need_without_missing_list_gets_date_aud
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -4966,7 +4966,7 @@ async def test_spanish_supported_date_clarification_with_minimal_draft_gets_audi
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -5091,7 +5091,7 @@ async def test_partial_prose_date_payload_gets_focused_date_audit(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
     draft = ready_response.candidate_strategy_draft
@@ -5311,7 +5311,7 @@ async def test_supported_date_gap_escalates_before_unrelated_audits(
         )
     )
     assert expected_range is not None
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     draft = ready_response.candidate_strategy_draft
     assert draft.date_range == expected_range.payload
@@ -5403,7 +5403,7 @@ async def test_pending_date_answer_overrides_macro_context_interpretation(
         interpreter_module.LLMDateRangeIntent(kind="calendar_year", year=2024)
     )
     assert expected_range is not None
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.task_relation == "continue"
     assert ready_response.semantic_turn_act == "answer_pending_need"
     assert ready_response.requires_clarification is False
@@ -5528,7 +5528,7 @@ async def test_pending_date_answer_overrides_stale_unsupported_atr_context(
     )
     assert expected_range is not None
     assert "FocusedDateWindowExtraction" in calls
-    assert ready_response.intent == 'calculate'
+    assert ready_response.intent == "backtest_execution"
     assert ready_response.task_relation == "continue"
     assert ready_response.semantic_turn_act == "answer_pending_need"
     assert ready_response.requires_clarification is False
@@ -5614,7 +5614,7 @@ async def test_executable_supported_fields_clear_stale_clarification_prose(
 
     assert repaired.requires_clarification is False
     assert repaired.assistant_response is None
-    assert repaired.intent == 'calculate'
+    assert repaired.intent == "backtest_execution"
     assert repaired.semantic_turn_act == "new_idea"
     assert "executable_fields_overrode_clarification_prose" in repaired.reason_codes
 

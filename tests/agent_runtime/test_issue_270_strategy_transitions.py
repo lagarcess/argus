@@ -198,7 +198,7 @@ def test_active_buy_and_hold_confirmation_accepts_typed_crossover_patch(
 
     async def invoke_stub(*, schema_model, **kwargs):
         del kwargs
-        if schema_model.__name__ == "LLMToolInterpretationResponse":
+        if schema_model.__name__ == "LLMInterpretationResponse":
             prior = _buy_and_hold_strategy()
             return LLMInterpretationResponse(
                 intent="backtest_execution",
@@ -403,7 +403,7 @@ async def test_complete_crossover_conflict_audit_does_not_invent_comparison(
     )
 
     assert repaired is not None
-    assert repaired.intent == 'calculate'
+    assert repaired.intent == "backtest_execution"
     assert repaired.requires_clarification is False
     assert repaired.unsupported_constraints == []
     assert repaired.candidate_strategy_draft.strategy_type == "signal_strategy"

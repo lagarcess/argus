@@ -7,7 +7,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["MSFT"]
       asset_class: equity

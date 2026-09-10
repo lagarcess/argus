@@ -12,7 +12,6 @@ from argus.agent_runtime.interpreter.execution_cost_capability import (
     execution_costs_enabled,
 )
 from argus.agent_runtime.llm_interpreter_types import (
-    LLMAmbiguousField,
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
@@ -55,10 +54,10 @@ def apply_cost_fidelity(
             continue
         rate = _supported_cost_rate(cost, field_name=draft_field)
         if rate is None:
-            # A user-stated unsupported number is a refusal. An audit value
-            # that disagrees with its own quote remains an ambiguity.
-            if numeric_cost_anchor_in_message(cost.rate, evidence_span):
-                refused_fields.add(draft_field)
+            # The user stated the value and it anchors in the message; the
+            # value itself cannot be modeled. That is a refusal, not an
+            # ambiguity.
+            refused_fields.add(draft_field)
             grounded_conflicts.add(draft_field)
             continue
         if not _candidate_agrees_with_cost(
@@ -82,7 +81,7 @@ def apply_cost_fidelity(
             draft._validated_execution_cost_evidence[draft_field] = validated_marker
             changed = True
 
-    unresolved_fields: dict[str, object] = {}
+    unresolved_fields: list[str] = []
     for field_name in ("fee_rate", "slippage"):
         if field_name in validated_fields:
             continue
@@ -99,9 +98,7 @@ def apply_cost_fidelity(
         if field_name in grounded_conflicts or _introduces_unowned_cost(
             draft, field_name=field_name, prior_strategy=prior_strategy
         ):
-            unresolved_fields[field_name] = draft.extra_parameters.get(
-                field_name, getattr(draft, field_name)
-            )
+            unresolved_fields.append(field_name)
         if field_name in draft.extra_parameters:
             draft.extra_parameters.pop(field_name, None)
             changed = True
@@ -113,14 +110,6 @@ def apply_cost_fidelity(
             changed = True
         draft._validated_execution_cost_evidence.pop(field_name, None)
 
-    response.ambiguous_fields = [
-        item
-        for item in response.ambiguous_fields
-        if not (
-            item.reason_code == "execution_cost_evidence_unresolved"
-            and item.field_name in validated_fields
-        )
-    ]
     if not unresolved_fields:
         return changed
     for field_name in unresolved_fields:
@@ -142,20 +131,6 @@ def apply_cost_fidelity(
         )
         return True
     response.requires_clarification = True
-    existing_blockers = {
-        item.field_name
-        for item in response.ambiguous_fields
-        if item.reason_code == "execution_cost_evidence_unresolved"
-    }
-    response.ambiguous_fields.extend(
-        LLMAmbiguousField(
-            field_name=name,
-            raw_value=str(unresolved_fields[name]),
-            reason_code="execution_cost_evidence_unresolved",
-        )
-        for name in unresolved_fields
-        if name not in refused_fields and name not in existing_blockers
-    )
     response.assistant_response = None
     response.missing_required_fields = list(
         dict.fromkeys([*response.missing_required_fields, "assumption"])
@@ -400,15 +375,6 @@ def _introduces_unowned_cost(
     if not math.isfinite(candidate_rate) or candidate_rate < 0.0:
         return True
     prior_rate = _owned_prior_cost(prior_strategy, field_name=field_name)
-    if (
-        candidate_rate == 0.0
-        and prior_rate is None
-        and not draft.field_provenance.get(field_name)
-        and not draft.evidence_spans.get(field_name)
-    ):
-        # The engine's unstated default is zero, not a user-authored cost.
-        # Omit it; a stated zero or a change to owned costs still needs proof.
-        return False
     return prior_rate is None or candidate_rate != prior_rate
 
 

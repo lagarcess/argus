@@ -26,15 +26,11 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.interpreter.strategy_routing import (
-    decision_with_strategy_route_intent,
-)
 from argus.agent_runtime.research_answer import discovery_turn_stage_result
 from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
 )
 from argus.agent_runtime.extraction import detect_unsupported_constraints
-from argus.agent_runtime.interpreter.tool_calls import catalog_stage_result
 from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter.unsupported_request_context import (
     materialized_unsupported_request_constraint,
@@ -74,9 +70,7 @@ from argus.agent_runtime.rule_specs import (
 from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,
     conserve_semantic_constraints,
-    declared_input_conflicts,
     filter_unsubstantiated_timeframe_constraints,
-    strategy_ambiguities_for_decision,
 )
 from argus.agent_runtime.stages.artifact_context import (
     RESULT_EXPLANATION_TARGET_INFERRED,
@@ -225,9 +219,6 @@ from argus.agent_runtime.stages.interpret_internal.benchmark_coverage import (
     strategy_with_benchmark_price_coverage as _strategy_with_benchmark_price_coverage,
 )
 from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
-    BenchmarkResolution,
-    resolve_benchmark_symbol,
-    strategy_with_validated_benchmark_symbol,
     default_benchmark_for_asset_class as _default_benchmark_for_asset_class,
     provenance_without_benchmark_disclosures as _without_benchmark_disclosure_provenance,
     strategy_with_default_benchmark as _strategy_with_default_benchmark,
@@ -424,15 +415,6 @@ async def interpret_stage_async(
         logger.debug("Interpret stage structured interpreter returned no result")
         failure_kind = getattr(structured_interpreter, "last_failure_kind", None)
         return await _unavailable(retryable=failure_kind != "contract_rejected")
-    catalog_result = await catalog_stage_result(
-        interpretation,
-        user=user,
-        current_user_message=state.current_user_message,
-        contract=capability_contract,
-        compose_capability_answer=_capability_answer_if_applicable,
-    )
-    if catalog_result is not None:
-        return catalog_result
     pending_response_option_interpretation = (
         _pending_response_option_interpretation_from_typed_selection(
             state=state,
@@ -494,10 +476,8 @@ async def _stage_result_from_interpretation(
     interpretation: StructuredInterpretation,
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
-    benchmark_resolution: BenchmarkResolution | None = None,
 ) -> StageResult:
     is_new_idea_interpretation = interpretation.semantic_turn_act == "new_idea"
-    input_conflicts = declared_input_conflicts(interpretation.ambiguous_fields)
     logger.debug(
         "Interpret stage post-LLM repair started",
         intent=interpretation.intent,
@@ -554,7 +534,7 @@ async def _stage_result_from_interpretation(
         route_suppression_reason_codes.append("educational_strategy_route_suppressed")
         interpretation = interpretation.model_copy(
             update={
-                "intent": "follow_up",
+                "intent": "conversation_followup",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "candidate_strategy_draft": StrategySummary(),
@@ -625,7 +605,7 @@ async def _stage_result_from_interpretation(
     if supported_indicator_simplification_applied:
         interpretation = interpretation.model_copy(
             update={
-                "intent": "calculate",
+                "intent": "strategy_drafting",
                 "task_relation": "refine",
                 "requires_clarification": False,
                 "assistant_response": None,
@@ -674,7 +654,7 @@ async def _stage_result_from_interpretation(
         expects_strategy_route = True
         interpretation = interpretation.model_copy(
             update={
-                "intent": "calculate",
+                "intent": "backtest_execution",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "assistant_response": None,
@@ -743,7 +723,7 @@ async def _stage_result_from_interpretation(
         route_suppression_reason_codes.append("unanchored_strategy_route_suppressed")
         interpretation = interpretation.model_copy(
             update={
-                "intent": "follow_up",
+                "intent": "conversation_followup",
                 "task_relation": "continue",
                 "requires_clarification": False,
                 "assistant_response": interpretation.assistant_response,
@@ -803,9 +783,7 @@ async def _stage_result_from_interpretation(
             )
         )
         strategy, validated_benchmark_reason_codes = (
-            _strategy_with_validated_benchmark_symbol(
-                strategy, resolution=benchmark_resolution
-            )
+            _strategy_with_validated_benchmark_symbol(strategy)
         )
         strategy, benchmark_coverage_reason_codes = (
             _strategy_with_benchmark_price_coverage(strategy)
@@ -882,20 +860,37 @@ async def _stage_result_from_interpretation(
                 supported_timeframes=_supported_timeframes(capability_contract),
             )
         )
+    ambiguous_fields = list(interpretation.ambiguous_fields)
+    if requested_asset_answer_applied:
+        ambiguous_fields = []
+    elif pending_resolution_applied:
+        ambiguous_fields = [
+            field
+            for field in ambiguous_fields
+            if _field_base(field.field_name) != "asset_universe"
+        ]
+    if integrity_report.evidence.normalized_date_range is not None:
+        ambiguous_fields = [
+            field
+            for field in ambiguous_fields
+            if _field_base(field.field_name) != "date_range"
+        ]
     if expects_strategy_route:
         strategy.resolution_provenance = _dedupe_resolution_provenance(
             [*strategy.resolution_provenance, *state.context_hints]
         )
-    ambiguous_fields, ambiguity_filter_reason_codes = strategy_ambiguities_for_decision(
-        fields=interpretation.ambiguous_fields,
-        input_conflicts=input_conflicts,
-        strategy=strategy,
-        requested_asset_answer_applied=requested_asset_answer_applied,
-        pending_resolution_applied=pending_resolution_applied,
-        date_range_resolved=integrity_report.evidence.normalized_date_range is not None,
-        expects_strategy_route=expects_strategy_route,
-    )
-    if expects_strategy_route:
+        ambiguous_fields = _dedupe_ambiguous_fields(
+            [
+                *ambiguous_fields,
+                *_ambiguous_fields_from_resolution(strategy.resolution_provenance),
+            ]
+        )
+        ambiguous_fields, ambiguity_filter_reason_codes = (
+            _filter_resolved_strategy_ambiguities(
+                strategy=strategy,
+                fields=ambiguous_fields,
+            )
+        )
         unsupported_constraints = _dedupe_unsupported_constraints(
             [
                 *unsupported_constraints,
@@ -1031,7 +1026,6 @@ async def _stage_result_from_interpretation(
         ),
     ]
     decision = InterpretDecision(
-        tool_calls=interpretation.tool_calls,
         intent=interpretation.intent,
         task_relation=interpretation.task_relation,
         requires_clarification=requires_clarification,
@@ -1083,7 +1077,6 @@ async def _stage_result_from_interpretation(
         artifact_target=artifact_target,
         asset_discovery=interpretation.asset_discovery,
     )
-    decision = decision_with_strategy_route_intent(decision)
     if interpretation.capability_question_focus is not None:
         decision.normalized_signals["capability_question_focus"] = (
             interpretation.capability_question_focus
@@ -1819,6 +1812,8 @@ async def _capability_answer_if_applicable(
         or requires_clarification
     ):
         return None
+    if focus in {"supported_strategies", "general"} and assistant_response:
+        return None
     composed = await _compose_natural_capability_answer(
         focus=focus,
         current_user_message=current_user_message,
@@ -1889,7 +1884,7 @@ async def _compose_natural_capability_answer(
         },
         {
             "role": "system",
-            "content": f"Declared capability facts: {fact_packet}",
+            "content": f"Supported-strategy facts: {fact_packet}",
         },
         {"role": "user", "content": current_user_message},
     ]
@@ -2126,7 +2121,7 @@ async def _compose_unanchored_strategy_recovery_answer(
                 "give investment advice."
             ),
         },
-        {"role": "system", "content": f"Declared capability facts: {fact_packet}"},
+        {"role": "system", "content": f"Supported-strategy facts: {fact_packet}"},
         {"role": "user", "content": current_user_message},
     ]
     try:
@@ -2170,9 +2165,6 @@ async def _compose_general_educational_answer(
     current_user_message: str,
     language: str = "en",
 ) -> str | None:
-    fact_packet = capability_fact_packet(
-        focus="general", contract=build_default_capability_contract()
-    )
     messages = [
         {
             "role": "system",
@@ -2183,11 +2175,10 @@ async def _compose_general_educational_answer(
                 f"{response_language_instruction(language)} "
                 "Answer in warm, plain language. Start with useful context, keep it "
                 "concise, avoid report tone, do not name data vendors, do not imply "
-                "capabilities beyond the declared facts, and do not give investment advice. End with one "
+                "live news coverage, and do not give investment advice. End with one "
                 "nearby historical experiment or recoverable next step when useful."
             ),
         },
-        {"role": "system", "content": f"Declared capability facts: {fact_packet}"},
         {"role": "user", "content": current_user_message},
     ]
     try:
@@ -2254,7 +2245,7 @@ def _multi_asset_chip_answer_operation_clarification_result(
         explicit_overrides=interpretation.response_profile_overrides,
     )
     decision = InterpretDecision(
-        intent="follow_up",
+        intent="conversation_followup",
         task_relation="continue",
         requires_clarification=True,
         user_goal_summary=interpretation.user_goal_summary,
@@ -2733,7 +2724,7 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
         explicit_overrides=None,
     )
     decision = InterpretDecision(
-        intent="follow_up",
+        intent="conversation_followup",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary=(
@@ -2788,7 +2779,7 @@ async def _latest_result_followup_when_interpreter_unavailable(
         explicit_overrides=None,
     )
     decision = InterpretDecision(
-        intent="follow_up",
+        intent="conversation_followup",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary=(
@@ -2900,7 +2891,7 @@ async def _latest_result_followup_recovery_if_applicable(
         outcome="ready_to_respond",
         decision=decision.model_copy(
             update={
-                "intent": "follow_up",
+                "intent": "conversation_followup",
                 "requires_clarification": False,
                 "missing_required_fields": [],
                 "effective_response_profile": effective_profile,
@@ -2944,7 +2935,7 @@ async def _private_alpha_save_request_result_if_applicable(
         outcome="ready_to_respond",
         decision=decision.model_copy(
             update={
-                "intent": "follow_up",
+                "intent": "conversation_followup",
                 "requires_clarification": False,
                 "missing_required_fields": [],
                 "semantic_turn_act": "result_followup",
@@ -3107,24 +3098,73 @@ def _strategy_with_benchmark_owner_asset_repair(
     return updated, ["current_message_asset_grounding_repaired"]
 
 
-def _resolve_benchmark_symbol(
-    strategy: StrategySummary,
-    *,
-    previous: BenchmarkResolution | None = None,
-) -> BenchmarkResolution:
-    return resolve_benchmark_symbol(
-        strategy, resolve_candidate=_resolve_asset_candidate, previous=previous
-    )
-
-
 def _strategy_with_validated_benchmark_symbol(
     strategy: StrategySummary,
-    *,
-    resolution: BenchmarkResolution | None = None,
 ) -> tuple[StrategySummary, list[str]]:
-    return strategy_with_validated_benchmark_symbol(
-        strategy, resolution=_resolve_benchmark_symbol(strategy, previous=resolution)
-    )
+    benchmark = _normalized_symbol(strategy.comparison_baseline)
+    if benchmark is None:
+        return strategy, []
+    scrub_reason_codes: list[str] = []
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if (
+        isinstance(field_provenance, dict)
+        and field_provenance.get("comparison_baseline") == "explicit_user"
+    ):
+        # A benchmark the user names this turn retires any earlier
+        # reconciliation disclosure; a fresh clearing re-adds its own.
+        scrubbed = _without_benchmark_disclosure_provenance(
+            strategy.resolution_provenance
+        )
+        if len(scrubbed) != len(strategy.resolution_provenance):
+            strategy = strategy.model_copy(deep=True)
+            strategy.resolution_provenance = scrubbed
+            scrub_reason_codes = ["stale_benchmark_disclosure_retired"]
+    try:
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            benchmark,
+            field="comparison_baseline",
+        ) or _resolve_asset_candidate(
+            benchmark,
+            field="comparison_baseline",
+            source="llm_extraction",
+            asset_class_hint=strategy.asset_class,
+        )
+    except ValueError:
+        resolution = None
+    if (
+        resolution is not None
+        and resolution.status == "resolved"
+        and resolution.asset is not None
+    ):
+        benchmark_asset_class = resolution.asset.asset_class
+        if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
+            updated = strategy.model_copy(deep=True)
+            updated.comparison_baseline = None
+            return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
+        canonical = resolution.asset.canonical_symbol.strip().upper()
+        if canonical == benchmark:
+            return strategy, scrub_reason_codes
+        updated = strategy.model_copy(deep=True)
+        updated.comparison_baseline = canonical
+        # The stated name rides along so a later coverage clearing can
+        # disclose the user's words rather than the canonical symbol.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [*updated.resolution_provenance, resolution.provenance]
+        )
+        return updated, [*scrub_reason_codes, "benchmark_symbol_provider_validated"]
+    updated = strategy.model_copy(deep=True)
+    updated.comparison_baseline = None
+    if resolution is not None and resolution.status in {"unsupported", "ambiguous"}:
+        # The user named this leg and no clarification will run for it; keep
+        # its provenance so the card discloses exactly this reconciliation.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [
+                *_without_benchmark_disclosure_provenance(updated.resolution_provenance),
+                resolution.provenance,
+            ]
+        )
+    return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
 
 
 def _resolve_asset_candidate(

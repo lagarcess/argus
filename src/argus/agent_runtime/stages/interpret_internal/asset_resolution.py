@@ -138,7 +138,7 @@ def _validated_artifact_target(
         reason_codes.append(RESULT_FOLLOWUP_TARGET_INFERRED)
         return "latest_result", reason_codes
     if (
-        interpretation.semantic_turn_act == "result_followup"
+        interpretation.intent == "results_explanation"
         and snapshot is not None
         and snapshot.latest_backtest_result_reference is not None
     ):
@@ -165,7 +165,7 @@ def _pending_refinement_misroute_result_if_applicable(
     )
     refined = decision.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "strategy_drafting",
             "task_relation": "refine",
             "requires_clarification": True,
             "candidate_strategy_draft": strategy,

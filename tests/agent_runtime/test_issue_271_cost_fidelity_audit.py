@@ -210,7 +210,9 @@ async def test_fidelity_audit_owns_fresh_costs_before_confirmation_and_launch(
     assert strategy.extra_parameters["fee_rate"] == 0.001
     assert strategy.extra_parameters["slippage"] == 0.0005
     assert strategy.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
-    assert strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+    assert (
+        strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+    )
 
     state = RunState.new(current_user_message=message, recent_thread_history=[])
     state.candidate_strategy_draft = strategy
@@ -445,15 +447,8 @@ async def test_unavailable_cost_fidelity_audit_requires_clarification(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("has_prior_costs", "claims_user_costs"),
-    [(False, False), (True, False), (False, True)],
-    ids=["fresh-engine-default", "cannot-clear-owned-costs", "unverified-user-claim"],
-)
-async def test_unstated_zero_defaults_cannot_clear_existing_owned_costs(
+async def test_unowned_zero_costs_require_clarification_instead_of_silent_clear(
     monkeypatch: pytest.MonkeyPatch,
-    has_prior_costs: bool,
-    claims_user_costs: bool,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -476,34 +471,15 @@ async def test_unstated_zero_defaults_cannot_clear_existing_owned_costs(
         fake_json_schema,
     )
 
-    response = _primary_cost_response(fee_rate=0.0, slippage=0.0)
-    request = _request("Test MSFT.")
-    if has_prior_costs:
-        prior = _strategy_from_llm(_primary_cost_response().candidate_strategy_draft)
-        prior.extra_parameters.update(
-            fee_rate=0.001,
-            slippage=0.0005,
-            field_provenance={"fee_rate": "explicit_user", "slippage": "explicit_user"},
-        )
-        request.latest_task_snapshot = TaskSnapshot(pending_strategy_summary=prior)
-    if claims_user_costs:
-        response.candidate_strategy_draft.field_provenance.update(
-            fee_rate="explicit_user", slippage="explicit_user"
-        )
     repaired = await interpreter_module._audit_stated_run_field_fidelity(
-        response=response,
+        response=_primary_cost_response(fee_rate=0.0, slippage=0.0),
         preferred_model="test-model",
-        request=request,
+        request=_request("Test MSFT."),
     )
 
     assert repaired is not None
-    # config._execution_realism_feature_enabled makes costs opt-in per idea;
-    # execution_cost_capability_clause says unstated costs default to zero.
-    # An unclaimed fresh default is omitted, while user claims and changes to
-    # owned costs still need evidence. Zero itself never means "missing".
-    needs_evidence = has_prior_costs or claims_user_costs
-    assert repaired.requires_clarification is needs_evidence
-    assert ("assumption" in repaired.missing_required_fields) is needs_evidence
+    assert repaired.requires_clarification is True
+    assert "assumption" in repaired.missing_required_fields
     strategy = _strategy_from_llm(
         repaired.candidate_strategy_draft,
         current_user_message="Test MSFT.",
@@ -799,7 +775,9 @@ async def test_runtime_readiness_cannot_skip_cost_fidelity_audit(
         calls.append(schema_name)
         if schema_name == "LLMInterpretationResponse":
             response = _primary_cost_response()
-            response.candidate_strategy_draft.date_range_raw_text = "calendar year 2022"
+            response.candidate_strategy_draft.date_range_raw_text = (
+                "calendar year 2022"
+            )
             response.candidate_strategy_draft.date_range_intent = LLMDateRangeIntent(
                 kind="calendar_year",
                 year=2022,
@@ -857,7 +835,9 @@ async def test_runtime_readiness_cannot_skip_cost_fidelity_audit(
     assert strategy.extra_parameters["fee_rate"] == 0.001
     assert strategy.extra_parameters["slippage"] == 0.0005
     assert strategy.extra_parameters["field_provenance"]["fee_rate"] == "explicit_user"
-    assert strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+    assert (
+        strategy.extra_parameters["field_provenance"]["slippage"] == "explicit_user"
+    )
 
 
 @pytest.mark.asyncio
@@ -875,7 +855,9 @@ async def test_runtime_blocks_confirmation_when_cost_audit_cannot_ground_values(
         del kwargs
         if schema_name == "LLMInterpretationResponse":
             response = _primary_cost_response()
-            response.candidate_strategy_draft.date_range_raw_text = "calendar year 2022"
+            response.candidate_strategy_draft.date_range_raw_text = (
+                "calendar year 2022"
+            )
             response.candidate_strategy_draft.date_range_intent = LLMDateRangeIntent(
                 kind="calendar_year",
                 year=2022,

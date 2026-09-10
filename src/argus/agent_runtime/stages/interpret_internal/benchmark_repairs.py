@@ -1,26 +1,18 @@
-"""Shared benchmark provider validation, reconciliation, and defaults."""
+"""Provider-independent benchmark repairs for interpret stage drafts.
+
+Behavior-preserving relocation from stages/interpret.py and
+interpret_internal/asset_resolution.py; resolver-backed benchmark repairs
+(owner grounding, provider validation) stay with the stage."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Literal, cast, get_args
+from typing import cast, get_args
 
-from argus.agent_runtime.interpreter import provider_context_assets
-from argus.agent_runtime.resolution import AssetResolution
-from argus.agent_runtime.run_field_contract import (
-    _contains_ordered_token_span,
-    field_fidelity_tokens,
-)
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _normalized_symbol,
     _strategy_field_provenance,
 )
-from argus.agent_runtime.state.models import (
-    ResolutionProvenance,
-    StrategySummary,
-    dedupe_resolution_provenance_items,
-)
+from argus.agent_runtime.state.models import ResolutionProvenance, StrategySummary
 from argus.domain.backtesting.config import (
     AssetClass as BacktestAssetClass,
 )
@@ -175,173 +167,3 @@ def provenance_without_benchmark_disclosures(
             and item.resolution_status in BENCHMARK_DISCLOSURE_STATUSES
         )
     ]
-
-
-@dataclass(frozen=True)
-class BenchmarkResolution:
-    """One provider outcome bound to its requested reference and class hint.
-
-    An explicit failed outcome is reusable too. This is a private preparation
-    value, never model-authored arguments or persisted provider evidence.
-    """
-
-    query: str | None
-    asset_class_hint: str | None
-    outcome: AssetResolution | None
-
-
-def resolve_benchmark_symbol(
-    strategy: StrategySummary,
-    *,
-    resolve_candidate: Callable[..., AssetResolution],
-    previous: BenchmarkResolution | None = None,
-) -> BenchmarkResolution:
-    query = _normalized_symbol(strategy.comparison_baseline)
-    if previous is not None and (
-        previous.query == query and previous.asset_class_hint == strategy.asset_class
-    ):
-        return previous
-    outcome = None
-    if query is not None:
-        try:
-            outcome = provider_context_assets.resolution_from_strategy_context(
-                strategy, query, field="comparison_baseline"
-            ) or resolve_candidate(
-                query,
-                field="comparison_baseline",
-                source="llm_extraction",
-                asset_class_hint=strategy.asset_class,
-            )
-        except ValueError:
-            pass
-    return BenchmarkResolution(query, strategy.asset_class, outcome)
-
-
-def strategy_with_validated_benchmark_symbol(
-    strategy: StrategySummary,
-    *,
-    resolution: BenchmarkResolution,
-) -> tuple[StrategySummary, list[str]]:
-    benchmark = _normalized_symbol(strategy.comparison_baseline)
-    if benchmark is None:
-        return strategy, []
-    scrub_reason_codes: list[str] = []
-    field_provenance = strategy.extra_parameters.get("field_provenance")
-    if (
-        isinstance(field_provenance, dict)
-        and field_provenance.get("comparison_baseline") == "explicit_user"
-    ):
-        # A benchmark the user names this turn retires any earlier
-        # reconciliation disclosure; a fresh clearing re-adds its own.
-        scrubbed = provenance_without_benchmark_disclosures(
-            strategy.resolution_provenance
-        )
-        if len(scrubbed) != len(strategy.resolution_provenance):
-            strategy = strategy.model_copy(deep=True)
-            strategy.resolution_provenance = scrubbed
-            scrub_reason_codes = ["stale_benchmark_disclosure_retired"]
-    outcome = resolution.outcome
-    if outcome is not None and outcome.status == "resolved" and outcome.asset is not None:
-        benchmark_asset_class = outcome.asset.asset_class
-        if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
-            updated = strategy.model_copy(deep=True)
-            updated.comparison_baseline = None
-            return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
-        canonical = outcome.asset.canonical_symbol.strip().upper()
-        if canonical == benchmark:
-            return strategy, scrub_reason_codes
-        updated = strategy.model_copy(deep=True)
-        updated.comparison_baseline = canonical
-        # The stated name rides along so a later coverage clearing can
-        # disclose the user's words rather than the canonical symbol.
-        updated.resolution_provenance = dedupe_resolution_provenance_items(
-            [*updated.resolution_provenance, outcome.provenance]
-        )
-        return updated, [*scrub_reason_codes, "benchmark_symbol_provider_validated"]
-    updated = strategy.model_copy(deep=True)
-    updated.comparison_baseline = None
-    if outcome is not None and outcome.status in {"unsupported", "ambiguous"}:
-        # The user named this leg and no clarification will run for it; keep
-        # its provenance so the card discloses exactly this reconciliation.
-        updated.resolution_provenance = dedupe_resolution_provenance_items(
-            [
-                *provenance_without_benchmark_disclosures(updated.resolution_provenance),
-                outcome.provenance,
-            ]
-        )
-    return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
-
-
-def benchmark_repair_disposition(
-    *,
-    before: StrategySummary,
-    after: StrategySummary,
-    resolutions: tuple[BenchmarkResolution, BenchmarkResolution],
-    source: str,
-) -> Literal["provider_equivalent", "disclosed_reconciliation"] | None:
-    """A provider identity can agree; a bounded refusal can be disclosed.
-
-    Fallback equality never establishes asset equivalence. A reconciliation
-    retains both reads' source binding, the actual provider refusal, and the
-    supplied effective benchmark. Other requested facts keep their own guards.
-    """
-    old_resolution, new_resolution = resolutions
-    old_outcome, new_outcome = old_resolution.outcome, new_resolution.outcome
-    if old_outcome is None or old_outcome.status != "resolved" or new_outcome is None:
-        return None
-    old_strategy, _ = strategy_with_validated_benchmark_symbol(
-        before, resolution=old_resolution
-    )
-    new_strategy, _ = strategy_with_validated_benchmark_symbol(
-        after, resolution=new_resolution
-    )
-    if old_strategy.comparison_baseline is None:
-        return None
-    if new_outcome.status == "resolved":
-        return (
-            "provider_equivalent"
-            if _normalized_symbol(new_strategy.comparison_baseline)
-            == _normalized_symbol(old_strategy.comparison_baseline)
-            and old_outcome.asset is not None
-            and new_outcome.asset is not None
-            and new_outcome.asset.asset_class == old_outcome.asset.asset_class
-            else None
-        )
-    if (
-        new_outcome.status not in {"unsupported", "ambiguous"}
-        or new_outcome.provenance not in new_strategy.resolution_provenance
-        or not _benchmark_reference_is_source_bound(
-            before=before, after=after, source=source
-        )
-    ):
-        return None
-    reconciled, _ = strategy_with_default_benchmark(new_strategy)
-    return (
-        "disclosed_reconciliation"
-        if _normalized_symbol(reconciled.comparison_baseline)
-        == _normalized_symbol(old_strategy.comparison_baseline)
-        else None
-    )
-
-
-def _benchmark_reference_is_source_bound(
-    *,
-    before: StrategySummary,
-    after: StrategySummary,
-    source: str,
-) -> bool:
-    reference_tokens = field_fidelity_tokens(
-        str(after.comparison_baseline or "").strip().casefold()
-    )
-    if not reference_tokens:
-        return False
-    for strategy in (before, after):
-        evidence = strategy.extra_parameters.get("evidence_spans")
-        span = evidence.get("comparison_baseline") if isinstance(evidence, dict) else None
-        if not isinstance(span, str) or not span.strip() or span.strip() not in source:
-            return False
-        if not _contains_ordered_token_span(
-            field_fidelity_tokens(span.casefold()), reference_tokens
-        ):
-            return False
-    return True

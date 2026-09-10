@@ -38,7 +38,7 @@ def _repair_retry_route_when_pending_need_is_active(
         return interpretation
     return interpretation.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "backtest_execution",
             "task_relation": "continue",
             "requires_clarification": False,
             "assistant_response": None,
@@ -66,10 +66,9 @@ def _repair_fresh_restatement_route_when_pending_need_is_active(
         "new_idea",
         "retry_failed_action",
         "unsupported_request",
-        "answer_pending_need",
     }:
         return interpretation
-    if interpretation.intent not in {"follow_up", "calculate"}:
+    if interpretation.intent not in {"conversation_followup", "strategy_drafting"}:
         return interpretation
     prior_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     requested_field = _field_base(
@@ -102,7 +101,7 @@ def _repair_fresh_restatement_route_when_pending_need_is_active(
         return interpretation
     return interpretation.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "backtest_execution",
             "task_relation": "new_task",
             "requires_clarification": False,
             "assistant_response": None,

@@ -175,7 +175,7 @@ def pending_date_answer_interpretation(
     if date_range_intent is not None:
         extra_parameters["date_range_intent"] = date_range_intent
     return StructuredInterpretation(
-        intent="calculate",
+        intent="backtest_execution",
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary=user_goal_summary,

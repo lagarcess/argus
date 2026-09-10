@@ -8,7 +8,7 @@ cases:
       offered:
         response: true
         clarification_matches_expected: true
-      intent: calculate
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: needs_clarification
       assets: ["AAPL"]
       asset_class: equity
@@ -24,7 +24,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["AAPL"]
       asset_class: equity
@@ -46,7 +46,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["TGT", "WMT", "COST"]
       asset_class: equity
@@ -68,7 +68,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["AAPL", "MSFT", "NVDA"]
       asset_class: equity
@@ -163,7 +163,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: backtest_execution
       capability_verdict: executable
       assets: ["AAPL"]
       asset_class: equity

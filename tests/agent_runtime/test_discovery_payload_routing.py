@@ -53,7 +53,7 @@ async def test_discovery_payload_promotes_an_explicit_educational_act(
 
     assert repaired.semantic_turn_act == "asset_discovery"
     assert repaired.asset_discovery == discovery
-    assert repaired.intent == 'follow_up'
+    assert repaired.intent == "conversation_followup"
     assert repaired.context_question_focus is None
     assert "discovery_payload_act_promoted" in repaired.reason_codes
 

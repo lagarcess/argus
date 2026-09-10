@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from argus.domain.tool_declaration import ToolCatalog
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.stages.interpret_types import CapabilityQuestionFocus
 from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.capability_registry import indicator_template
 from argus.domain.indicators import EXECUTABLE_INDICATORS
-from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
-EXECUTABLE_STRATEGY_FAMILIES: tuple[str, ...] = tuple(
-    capability.display_name
-    for capability in STRATEGY_CAPABILITIES.values()
-    if capability.status == "executable"
+# NOTE(P2.1.b): hand-maintained user-facing strategy families, also consumed by the
+# interpreter prompt (agent_runtime/stages/interpret.py). Single-sourcing these from the
+# capability registry (EXECUTABLE_TEMPLATES) belongs to the interpreter-tooling sub-slice
+# (P2.1.b); kept explicit here to avoid editing the interpreter prompt in P2.1.a. Keep in
+# sync with the registry's executable set until then.
+EXECUTABLE_STRATEGY_FAMILIES: tuple[str, ...] = (
+    "buy and hold",
+    "recurring buys/DCA",
+    "indicator threshold rules",
+    "signal rules such as moving-average, MACD, price/indicator, and Bollinger Band conditions",
 )
 
 
@@ -24,23 +25,16 @@ def capability_fact_packet(
     *,
     focus: CapabilityQuestionFocus | None,
     contract: CapabilityContract,
-    tool_catalog: ToolCatalog | None = None,
 ) -> str:
-    if tool_catalog is None:
-        from argus.domain.capability_registry import get_tool_catalog
-
-        tool_catalog = get_tool_catalog()
     if focus == "supported_indicators":
-        focused_facts = _supported_indicators_answer()
-    elif focus == "supported_strategies":
-        focused_facts = _supported_strategies_answer()
-    elif focus == "limits":
-        focused_facts = _limits_answer(contract)
-    elif focus == "assets":
-        focused_facts = _assets_answer()
-    else:
-        focused_facts = _general_answer(contract)
-    return f"Declared tools: {tool_catalog.capability_text()} {focused_facts}"
+        return _supported_indicators_answer()
+    if focus == "supported_strategies":
+        return _supported_strategies_answer()
+    if focus == "limits":
+        return _limits_answer(contract)
+    if focus == "assets":
+        return _assets_answer()
+    return _general_answer(contract)
 
 
 def _supported_indicators_answer() -> str:

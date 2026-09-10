@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, get_args
-
-from argus.agent_runtime.state.models import CanonicalIntentName
+from typing import Any
 
 from tests.evals.chat_runtime_eval_harness import (
     build_semantic_judge_messages,
@@ -93,7 +91,9 @@ def test_result_action_eval_manifest_matches_current_and_stale_action_contracts(
     assert visible_actions == ["show_breakdown", "refine_strategy"]
 
     stale_actions = [
-        step for step in qa_9["conversation_steps"] if step["actor"] == "stale_action"
+        step
+        for step in qa_9["conversation_steps"]
+        if step["actor"] == "stale_action"
     ]
     assert stale_actions == [
         {
@@ -189,7 +189,7 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
     context = capability_context_payload()
 
     assert context["contract_version"] == "1.0"
-    assert context["supported_intents"] == list(get_args(CanonicalIntentName))
+    assert "strategy_drafting" in context["supported_intents"]
     assert {"rsi", "sma", "ema", "macd", "bbands"}.issubset(
         {item["key"] for item in context["executable_indicators"]}
     )

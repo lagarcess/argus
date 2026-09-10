@@ -4,19 +4,13 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from argus.agent_runtime.rule_specs import (
-    executable_rule_spec_from_strategy,
-    indicator_parameters_from_strategy,
-)
+from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.state.models import (
-    AmbiguousField,
     SimplificationOption,
     StrategySummary,
     UnsupportedConstraint,
 )
 from argus.agent_runtime.strategy_contract import (
-    SUPPORTED_STRATEGY_TYPES,
-    canonical_strategy_type,
     executable_strategy_type,
     format_display_date,
     has_partial_explicit_date_range,
@@ -45,37 +39,10 @@ _DCA_CEILING_KEYS: tuple[str, ...] = (
     "capital_cap",
     "investment_cap",
 )
-_RECURRING_CAPITAL_KEYS: tuple[str, ...] = (
-    "recurring_contribution",
-    "contribution_amount",
-    "periodic_contribution",
-    "dca_contribution",
-)
-
-
-def canonical_capital_role(source: Any, *, strategy_type: Any = None) -> str | None:
-    """Resolve a money role from its semantic source or executable carrier."""
-    source = str(source or "").strip().casefold()
-    if source in _DCA_SEED_KEYS:
-        return "starting_capital"
-    if source in _DCA_CEILING_KEYS:
-        return "total_capital"
-    if source in _RECURRING_CAPITAL_KEYS:
-        return "recurring_contribution"
-    strategy_type = canonical_strategy_type(strategy_type)
-    if strategy_type in SUPPORTED_STRATEGY_TYPES:
-        return (
-            "recurring_contribution"
-            if strategy_type == "dca_accumulation"
-            else "starting_capital"
-        )
-    return None
-
 
 # One identity for the ceiling refusal, so the producer and every reader that
 # defers or filters it cannot drift apart under a rename.
 UNSUPPORTED_DCA_CONTRIBUTION_CEILING = "unsupported_dca_contribution_ceiling"
-DECLARED_TOOL_INPUT_CONFLICT = "declared_tool_input_conflict"
 
 
 @dataclass(frozen=True)
@@ -103,93 +70,6 @@ class SemanticIntegrityReport:
     evidence: SemanticConstraintEvidence = field(
         default_factory=SemanticConstraintEvidence
     )
-
-
-def strategy_semantic_facts(
-    strategy: StrategySummary,
-    *,
-    selected_thread_metadata: dict[str, Any],
-    supported_timeframes: tuple[str, ...] = (),
-) -> dict[str, Any]:
-    """Project supplied facts through the same owner that prepares confirmation.
-
-    Draft prose and provenance are not independent execution inputs. Optional
-    money and indicator facts derive from their canonical readers, never from
-    the raw extension slots used to transport them.
-    """
-    report = conserve_semantic_constraints(
-        strategy=strategy,
-        selected_thread_metadata=selected_thread_metadata,
-        supported_timeframes=supported_timeframes,
-    )
-    facts = report.strategy.model_dump(
-        mode="python",
-        exclude={
-            "raw_user_phrasing",
-            "strategy_thesis",
-            "entry_logic",
-            "exit_logic",
-            "assumptions",
-            "resolution_provenance",
-            "extra_parameters",
-        },
-    )
-    facts.update(report.optional_parameter_values)
-    facts["strategy_type"] = executable_strategy_type(report.strategy)
-    facts["indicator_parameters"] = indicator_parameters_from_strategy(report.strategy)
-    facts["contribution_ceiling"] = report.evidence.contribution_ceiling
-    return facts
-
-
-def declared_input_conflicts(fields: list[AmbiguousField]) -> list[AmbiguousField]:
-    """A populated slot cannot settle two contradictory supplied values."""
-    return [
-        field for field in fields if field.reason_code == DECLARED_TOOL_INPUT_CONFLICT
-    ]
-
-
-def strategy_ambiguities_for_decision(
-    *,
-    fields: list[AmbiguousField],
-    input_conflicts: list[AmbiguousField],
-    strategy: StrategySummary,
-    requested_asset_answer_applied: bool,
-    pending_resolution_applied: bool,
-    date_range_resolved: bool,
-    expects_strategy_route: bool,
-) -> tuple[list[AmbiguousField], list[str]]:
-    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
-        _ambiguous_fields_from_resolution,
-        _dedupe_ambiguous_fields,
-        _filter_resolved_strategy_ambiguities,
-    )
-    from argus.agent_runtime.stages.interpret_internal.shared import _field_base
-
-    ambiguous = list(fields)
-    if requested_asset_answer_applied:
-        ambiguous = []
-    elif pending_resolution_applied:
-        ambiguous = [
-            field
-            for field in ambiguous
-            if _field_base(field.field_name) != "asset_universe"
-        ]
-    if date_range_resolved:
-        ambiguous = [
-            field for field in ambiguous if _field_base(field.field_name) != "date_range"
-        ]
-    reason_codes: list[str] = []
-    if expects_strategy_route:
-        ambiguous = _dedupe_ambiguous_fields(
-            [
-                *ambiguous,
-                *_ambiguous_fields_from_resolution(strategy.resolution_provenance),
-            ]
-        )
-        ambiguous, reason_codes = _filter_resolved_strategy_ambiguities(
-            strategy=strategy, fields=ambiguous
-        )
-    return _dedupe_ambiguous_fields([*ambiguous, *input_conflicts]), reason_codes
 
 
 def conserve_semantic_constraints(
@@ -355,7 +235,15 @@ def _structured_money_role_evidence(
     if not isinstance(field_provenance, dict):
         field_provenance = {}
 
-    recurring = _first_number(extra, _RECURRING_CAPITAL_KEYS)
+    recurring = _first_number(
+        extra,
+        (
+            "recurring_contribution",
+            "contribution_amount",
+            "periodic_contribution",
+            "dca_contribution",
+        ),
+    )
     total_key, total = _first_number_with_key(extra, _DCA_SEED_KEYS)
     ceiling_key, ceiling = _first_number_with_key(extra, _DCA_CEILING_KEYS)
     if total is None and ceiling is not None:
@@ -364,13 +252,32 @@ def _structured_money_role_evidence(
         total_key, total = ceiling_key, ceiling
 
     capital_source = str(field_provenance.get("capital_amount") or "").strip()
-    role = canonical_capital_role(
-        capital_source, strategy_type=executable_strategy_type(strategy)
-    )
-    if role in {"starting_capital", "total_capital"}:
+    if capital_source in {
+        "initial_capital",
+        "starting_capital",
+        "starting_principal",
+        "initial_lump_sum",
+        "initial_lump",
+        "lump_sum",
+        "total_capital",
+        "total_budget",
+        "max_budget",
+        "investment_budget",
+        "cap",
+        "contribution_cap",
+        "capital_cap",
+        "investment_cap",
+    }:
         total = total if total is not None else _coerce_number(strategy.capital_amount)
         total_key = total_key or capital_source
-    elif role == "recurring_contribution":
+    elif capital_source in {
+        "recurring_contribution",
+        "contribution_amount",
+        "periodic_contribution",
+        "dca_contribution",
+        "user",
+        "explicit_user",
+    }:
         recurring = (
             recurring
             if recurring is not None

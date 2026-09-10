@@ -14,7 +14,7 @@ cases:
     expected:
       offered:
         response: true
-      intent: ["follow_up", "explain"]
+      intent: ["conversation_followup", "beginner_guidance"]
       capability_verdict: answer_only
       semantic_turn_act: educational_question
       stage_outcomes: ["ready_to_respond"]
@@ -29,7 +29,7 @@ cases:
     expected:
       offered:
         response: true
-      intent: ["follow_up", "explain"]
+      intent: ["conversation_followup", "beginner_guidance"]
       capability_verdict: answer_only
       semantic_turn_act: educational_question
       stage_outcomes: ["ready_to_respond"]
@@ -42,7 +42,7 @@ cases:
     expected:
       offered:
         response: true
-      intent: ["follow_up", "explain"]
+      intent: ["conversation_followup", "beginner_guidance"]
       capability_verdict: answer_only
       semantic_turn_act: educational_question
       stage_outcomes: ["ready_to_respond"]
@@ -57,7 +57,7 @@ cases:
     expected:
       offered:
         response: true
-      intent: ["follow_up", "explain", "calculate"]
+      intent: ["conversation_followup", "beginner_guidance", "strategy_drafting"]
       capability_verdict: answer_only
       semantic_turn_act: educational_question
       stage_outcomes: ["ready_to_respond"]
@@ -70,7 +70,7 @@ cases:
     expected:
       offered:
         response: true
-      intent: ["follow_up", "explain", "calculate"]
+      intent: ["conversation_followup", "beginner_guidance", "strategy_drafting"]
       capability_verdict: answer_only
       semantic_turn_act: educational_question
       stage_outcomes: ["ready_to_respond"]
@@ -85,8 +85,7 @@ cases:
     expected:
       offered:
         response: true
-      intent: ["follow_up", "explain", "cannot"]
-      tool_dispatch: true
+      intent: ["conversation_followup", "beginner_guidance", "unsupported_or_out_of_scope"]
       capability_verdict: answer_only
       stage_outcomes: ["ready_to_respond"]
     prose_judge:

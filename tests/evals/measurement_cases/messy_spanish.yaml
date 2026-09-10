@@ -7,7 +7,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: executable
       assets: ["BTC"]
       asset_class: crypto
@@ -60,7 +60,7 @@ cases:
     expected:
       offered:
         launch_matches_expected: true
-      intent: calculate
+      intent: backtest_execution
       capability_verdict: executable
       assets: ["BTC"]
       asset_class: crypto
@@ -79,7 +79,12 @@ cases:
       offered:
         response: true
         clarification_matches_expected: true
-      intent: ["cannot", "calculate"]
+      intent:
+        [
+          "unsupported_or_out_of_scope",
+          "backtest_execution",
+          "strategy_drafting",
+        ]
       capability_verdict: unsupported
       assets: ["NVDA"]
       asset_class: equity

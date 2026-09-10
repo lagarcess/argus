@@ -16,10 +16,8 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
     dedupe_resolution_provenance_items,
-    normalize_legacy_interpretation,
 )
-from argus.domain.tool_contracts import MAX_TOOL_CALLS, ToolCall
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, Field
 
 StageOutcome = Literal[
     "needs_clarification",
@@ -83,25 +81,16 @@ class AssetDiscoveryRequest(BaseModel):
 
     relationship: AssetDiscoveryRelationship = Field(
         description=(
-            "The purpose of candidate selection: comparison selects alternatives "
-            "to evaluate against an anchor; peer selects assets for similarity to "
-            "an anchor; category selects members of a category without a comparison "
-            "anchor. Candidates sharing a category does not change a comparison "
-            "purpose. Preserve the established purpose when only freshness changes."
+            "Classify the user's discovery goal: comparison when the user's goal "
+            "is choosing what to compare against an anchor, even when the "
+            "comparison candidates share a category; peer for assets similar to "
+            "an anchor; category only when the category itself is the discovery "
+            "goal and no comparison anchor is requested."
         )
     )
     category_description: str | None = Field(default=None, max_length=200)
     anchor_symbols: list[str] = Field(default_factory=list, max_length=5)
-    asset_class_hint: Literal["equity", "crypto", "currency_pair"] | None = Field(
-        default=None,
-        description=(
-            "The asset class established by the request or its active conversation "
-            "context. Preserve it when the user changes only another requirement, "
-            "including freshness. Null means the requested asset class remains "
-            "unspecified; it is not a default class and must not be inferred from "
-            "the candidates returned afterward."
-        ),
-    )
+    asset_class_hint: Literal["equity", "crypto", "currency_pair"] | None = None
     needs_current_facts: bool = Field(
         default=False,
         description=(
@@ -117,9 +106,6 @@ class AssetDiscoveryRequest(BaseModel):
 
 
 class InterpretDecision(BaseModel):
-    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
-    _read_legacy_intent = model_validator(mode="before")(normalize_legacy_interpretation)
-
     intent: IntentName
     task_relation: TaskRelation
     requires_clarification: bool
@@ -155,7 +141,6 @@ class InterpretDecision(BaseModel):
             for item in dedupe_resolution_provenance_items(self.resolution_provenance)
         ]
         return {
-            "tool_calls": [call.model_dump(mode="json") for call in self.tool_calls],
             "normalized_signals": self.normalized_signals,
             "intent": self.intent,
             "task_relation": self.task_relation,
@@ -216,11 +201,6 @@ class StageResult(BaseModel):
 
 
 class StructuredInterpretation(BaseModel):
-    _tool_asset_resolution_context: str | None = PrivateAttr(default=None)
-    uses_tool_catalog: bool = False
-    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=MAX_TOOL_CALLS)
-    _read_legacy_intent = model_validator(mode="before")(normalize_legacy_interpretation)
-
     research_query: ResearchQueryExtraction | None = None
     intent: IntentName
     task_relation: TaskRelation

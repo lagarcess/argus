@@ -198,7 +198,7 @@ def test_incomplete_reason_names_the_actual_gap() -> None:
 
     # A knowledge turn has no strategy draft, so it must not be blamed for one.
     assert "strategy draft" not in reason
-    assert "cannot" in reason
+    assert "unsupported_or_out_of_scope" in reason
 
 
 def test_self_correction_reasks_the_same_tier_once(monkeypatch) -> None:
@@ -207,7 +207,6 @@ def test_self_correction_reasks_the_same_tier_once(monkeypatch) -> None:
     calls: list[tuple[str, bool]] = []
 
     async def fake_invoke(**kwargs: Any) -> LLMInterpretationResponse:
-        assert kwargs["schema_model"].uses_tool_catalog is True
         messages = kwargs["messages"]
         corrective = any(
             "rejected by runtime validation" in message["content"]

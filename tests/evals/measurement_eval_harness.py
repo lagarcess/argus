@@ -19,7 +19,6 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     TaskSnapshot,
     UserState,
-    normalize_task_intent,
 )
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
@@ -48,33 +47,6 @@ from tests.evals.measurement_prose import (
     composer_unavailability,
     retain_prose_context,
     unavailable_prose_result,
-)
-from tests.evals.measurement_registry import (
-    chronological_patch,
-    compare_dispatch,
-    compare_stage_outcomes,
-    continue_turn_stages,
-    dispatch_requested_calls,
-    latest_stage_result,
-    measurement_execution_evidence,
-)
-from tests.evals.measurement_registry import (
-    followup_thread_metadata as _followup_thread_metadata,
-)
-from tests.evals.measurement_research import (
-    compare_research as _compare_research,
-)
-from tests.evals.measurement_research import (
-    research_outcome as _research_outcome,
-)
-from tests.evals.measurement_selection import (
-    SELECTION_RELEVANCE,
-    SELECTION_RUBRIC,
-    compare_selection,
-    is_selection_evidence,
-    observe_selection,
-    selection_judge_context,
-    selection_offered,
 )
 
 LOCKED_EVAL_CATEGORIES = {
@@ -139,7 +111,6 @@ class TypedExpectations:
     clarification: dict[str, Any] | None = None
     semantic_turn_act: str | None = None
     asset_discovery: dict[str, Any] | None = None
-    tool_dispatch: bool | None = None
     # What reached the user. Routing fields say a turn was understood; this
     # says the turn went somewhere the user can act on, which is the only
     # thing a green case is supposed to promise.
@@ -202,12 +173,7 @@ def run_eval_case(
         action_context=_action_payload(case.action),
     )
     if case.confirmation_payload is not None:
-        state = RunState.model_validate(
-            {
-                **state.model_dump(mode="python"),
-                "confirmation_payload": case.confirmation_payload,
-            }
-        )
+        state.confirmation_payload = case.confirmation_payload
 
     user = UserState(
         user_id="argus-eval",
@@ -222,48 +188,65 @@ def run_eval_case(
     )
     route_token = begin_openrouter_route_receipt_capture()
     confirm_result = None
-    dispatch_result = None
     clarify_result = None
     followup_result = None
-    turn_context = {
-        "latest_task_snapshot": case.snapshot,
-        "selected_thread_metadata": {
-            "ui_language": case.ui_language,
-            "last_stage_outcome": "await_approval",
-            **case.thread_metadata,
-        },
-    }
     try:
         interpret_result = interpret_stage(
             state=state,
             user=user,
-            **turn_context,
+            latest_task_snapshot=case.snapshot,
+            selected_thread_metadata={
+                "ui_language": case.ui_language,
+                "last_stage_outcome": "await_approval",
+                **case.thread_metadata,
+            },
             structured_interpreter=interpreter,
         )
-        dispatch_result = dispatch_requested_calls(
-            state=state, interpreted=interpret_result, user=user, **turn_context
-        )
-        routed_result = dispatch_result or interpret_result
-        stage_results = continue_turn_stages(
-            state=state,
-            interpreted=interpret_result,
-            dispatched=dispatch_result,
-            contract=contract,
-            language=case.user_language,
-            clarification_generator=clarifier,
-            confirm=confirm_stage,
-            clarify=clarify_stage,
-        )
-        confirm_result = latest_stage_result(stage_results, "confirm")
-        clarify_result = latest_stage_result(stage_results, "clarify")
+        if interpret_result.outcome == "ready_for_confirmation":
+            confirm_state = _state_for_confirmation(
+                case=case,
+                interpret_patch=interpret_result.patch,
+            )
+            confirm_result = confirm_stage(
+                state=confirm_state,
+                contract=contract,
+                language=case.user_language,
+            )
+            if confirm_result.outcome == "needs_clarification":
+                clarify_result = clarify_stage(
+                    state=_state_from_interpret_patch(
+                        case=case,
+                        interpret_patch={
+                            **interpret_result.patch,
+                            **confirm_result.patch,
+                        },
+                    ),
+                    contract=contract,
+                    clarification_generator=clarifier,
+                    language=case.user_language,
+                )
+        elif interpret_result.outcome == "needs_clarification":
+            clarify_state = _state_from_interpret_patch(
+                case=case,
+                interpret_patch=interpret_result.patch,
+            )
+            clarify_result = clarify_stage(
+                state=clarify_state,
+                contract=contract,
+                clarification_generator=clarifier,
+                language=case.user_language,
+                prefilled_assistant_prompt=(
+                    interpret_result.patch.get("assistant_response")
+                    or interpret_result.patch.get("assistant_prompt")
+                ),
+            )
         followup_result = _run_followup_turn_if_needed(
             case=case,
             user=user,
             contract=contract,
-            interpret_result=routed_result,
+            interpret_result=interpret_result,
             clarify_result=clarify_result,
             clarification_generator=clarifier,
-            stage_results=stage_results,
         )
     finally:
         route_receipts = [
@@ -274,33 +257,18 @@ def run_eval_case(
     typed_outcome = _typed_outcome(
         case=case,
         interpret_result=interpret_result,
-        dispatch_result=dispatch_result,
         confirm_result=confirm_result,
         clarify_result=clarify_result,
         followup_result=followup_result,
-        stage_results=stage_results,
     )
     failed_checks = typed_expectation_failures(case=case, outcome=typed_outcome)
     infrastructure_errors = composer_unavailability(route_receipts)
     judge_result = None
-    selection = typed_outcome.get("asset_discovery")
-    selection_context = (
-        selection_judge_context(selection) if is_selection_evidence(selection) else None
-    )
-    criteria = (
-        (*case.prose_judge_criteria, SELECTION_RELEVANCE)
-        if selection_context is not None
-        else case.prose_judge_criteria
-    )
-    if selection_context is not None and not run_prose_judge:
-        failed_checks.append("prose_judge:selection_relevance_unproven")
-    if run_prose_judge and criteria:
+    if run_prose_judge and case.prose_judge_criteria:
         judged_final_patch = _final_patch(
             interpret_result=interpret_result,
-            dispatch_result=dispatch_result,
             confirm_result=confirm_result,
             clarify_result=clarify_result,
-            stage_results=stage_results,
         )
         assistant_text = _assistant_text(judged_final_patch)
         rendered_surface = rendered_beside_reply(
@@ -321,11 +289,6 @@ def run_eval_case(
                     case=case,
                     assistant_text=assistant_text,
                     rendered_beside_reply=rendered_surface,
-                    **(
-                        {"selection_evidence": selection_context}
-                        if selection_context is not None
-                        else {}
-                    ),
                 )
             finally:
                 route_receipts.extend(
@@ -343,15 +306,10 @@ def run_eval_case(
                 )
         retain_prose_context(
             judge_result,
-            criteria=criteria,
+            criteria=case.prose_judge_criteria,
             text=assistant_text,
             rendered_surface=rendered_surface,
         )
-        if selection_context is not None:
-            judge_result["selection_evidence"] = selection_context
-            judge_result["selection_expectations"] = dict(
-                case.expected.asset_discovery or {}
-            )
 
     status = _result_status(failed_checks, expected_fail=case.expected_fail)
     if infrastructure_errors:
@@ -385,12 +343,6 @@ def typed_expectation_failures(
     expected = case.expected
     failures: list[str] = []
     _compare_intent(expected.intent, outcome.get("intent"), failures)
-    compare_dispatch(
-        expected.tool_dispatch,
-        outcome,
-        failures,
-        requires_answer=expected.capability_verdict == "answer_only",
-    )
     _compare(
         "capability_verdict",
         expected.capability_verdict,
@@ -501,7 +453,13 @@ def typed_expectation_failures(
             outcome.get("launch_execution_realism"),
             failures,
         )
-    compare_stage_outcomes(expected.stage_outcomes, outcome, failures)
+    if expected.stage_outcomes:
+        _compare(
+            "stage_outcomes",
+            list(expected.stage_outcomes),
+            outcome.get("stage_outcomes"),
+            failures,
+        )
     _compare(
         "requested_field",
         expected.requested_field,
@@ -565,7 +523,6 @@ def judge_prose_quality(
     case: EvalCase,
     assistant_text: str,
     rendered_beside_reply: dict[str, Any] | None = None,
-    selection_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
         response = asyncio.run(
@@ -573,7 +530,6 @@ def judge_prose_quality(
                 case=case,
                 assistant_text=assistant_text,
                 rendered_beside_reply=rendered_beside_reply or {},
-                selection_evidence=selection_evidence,
             )
         )
     except Exception as exc:
@@ -607,72 +563,126 @@ def _run_followup_turn_if_needed(
     interpret_result: Any,
     clarify_result: Any | None,
     clarification_generator: Any,
-    stage_results: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     if not case.followup_prompt:
         return None
-    last_stage_outcome = _last_stage_outcome(
-        interpret_result=interpret_result,
-        confirm_result=None,
-        clarify_result=clarify_result,
-        stage_results=stage_results,
-    )
-    if last_stage_outcome != "await_user_reply":
-        return {"skipped_reason": "initial_turn_did_not_await_user_reply"}
+    if clarify_result is None:
+        return {"skipped_reason": "initial_turn_did_not_clarify"}
 
-    initial_turn_patch = (
-        chronological_patch(stage_results)
-        if stage_results is not None
-        else _final_patch(
-            interpret_result=interpret_result,
-            confirm_result=None,
-            clarify_result=clarify_result,
-        )
-    )
-    assistant_text = _assistant_text(initial_turn_patch)
+    final_clarify_patch = {**interpret_result.patch, **clarify_result.patch}
+    assistant_text = _assistant_text(final_clarify_patch)
     state = RunState.new(
         current_user_message=case.followup_prompt,
         recent_thread_history=(
             [{"role": "assistant", "content": assistant_text}] if assistant_text else []
         ),
     )
-    turn_context = {
-        "latest_task_snapshot": case.snapshot,
-        "selected_thread_metadata": _followup_thread_metadata(
-            initial_turn_patch,
-            last_stage_outcome=last_stage_outcome,
-        ),
-    }
     followup_interpret = interpret_stage(
         state=state,
         user=user,
-        **turn_context,
+        latest_task_snapshot=case.snapshot,
+        selected_thread_metadata=_followup_thread_metadata(
+            final_clarify_patch,
+            last_stage_outcome=str(clarify_result.outcome),
+        ),
         structured_interpreter=OpenRouterStructuredInterpreter(contract=contract),
     )
     followup_confirm = None
     followup_clarify = None
-    followup_dispatch = dispatch_requested_calls(
-        state=state, interpreted=followup_interpret, user=user, **turn_context
-    )
-    followup_stages = continue_turn_stages(
-        state=state,
-        interpreted=followup_interpret,
-        dispatched=followup_dispatch,
-        contract=contract,
-        language=case.user_language,
-        clarification_generator=clarification_generator,
-        confirm=confirm_stage,
-        clarify=clarify_stage,
-    )
-    followup_confirm = latest_stage_result(followup_stages, "confirm")
-    followup_clarify = latest_stage_result(followup_stages, "clarify")
+    if followup_interpret.outcome == "ready_for_confirmation":
+        followup_confirm = confirm_stage(
+            state=_state_for_followup_confirmation(
+                prompt=case.followup_prompt,
+                interpret_patch=followup_interpret.patch,
+            ),
+            contract=contract,
+            language=case.user_language,
+        )
+        if followup_confirm.outcome == "needs_clarification":
+            followup_clarify = clarify_stage(
+                state=_state_for_followup_clarification(
+                    prompt=case.followup_prompt,
+                    interpret_patch={
+                        **followup_interpret.patch,
+                        **followup_confirm.patch,
+                    },
+                ),
+                contract=contract,
+                clarification_generator=clarification_generator,
+                language=case.user_language,
+            )
+    elif followup_interpret.outcome == "needs_clarification":
+        followup_clarify = clarify_stage(
+            state=_state_for_followup_clarification(
+                prompt=case.followup_prompt,
+                interpret_patch=followup_interpret.patch,
+            ),
+            contract=contract,
+            clarification_generator=clarification_generator,
+            language=case.user_language,
+            prefilled_assistant_prompt=(
+                followup_interpret.patch.get("assistant_response")
+                or followup_interpret.patch.get("assistant_prompt")
+            ),
+        )
     return {
         "interpret_result": followup_interpret,
-        "dispatch_result": followup_dispatch,
         "confirm_result": followup_confirm,
         "clarify_result": followup_clarify,
-        "stage_results": followup_stages,
     }
+
+
+def _followup_thread_metadata(
+    patch: dict[str, Any],
+    *,
+    last_stage_outcome: str,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"last_stage_outcome": last_stage_outcome}
+    for key in (
+        "requested_field",
+        "missing_required_fields",
+        "response_intent",
+        "clarification",
+    ):
+        value = patch.get(key)
+        if value not in (None, "", [], {}):
+            metadata[key] = value
+    return metadata
+
+
+def _state_for_followup_clarification(
+    *,
+    prompt: str,
+    interpret_patch: dict[str, Any],
+) -> RunState:
+    state = _state_for_followup_confirmation(
+        prompt=prompt,
+        interpret_patch=interpret_patch,
+    )
+    state.missing_required_fields = list(
+        interpret_patch.get("missing_required_fields") or []
+    )
+    state.requested_field = interpret_patch.get("requested_field")
+    if "response_intent" in interpret_patch:
+        state.response_intent = interpret_patch["response_intent"]
+    return state
+
+
+def _state_for_followup_confirmation(
+    *,
+    prompt: str,
+    interpret_patch: dict[str, Any],
+) -> RunState:
+    state = RunState.new(current_user_message=prompt, recent_thread_history=[])
+    if "candidate_strategy_draft" in interpret_patch:
+        state.candidate_strategy_draft = StrategySummary.model_validate(
+            interpret_patch["candidate_strategy_draft"]
+        )
+    if "optional_parameter_status" in interpret_patch:
+        state.optional_parameter_status = dict(
+            interpret_patch["optional_parameter_status"]
+        )
+    return state
 
 
 async def _judge_prose_quality_async(
@@ -680,7 +690,6 @@ async def _judge_prose_quality_async(
     case: EvalCase,
     assistant_text: str,
     rendered_beside_reply: dict[str, Any],
-    selection_evidence: dict[str, Any] | None = None,
 ) -> ProseJudgeResponse | None:
     payload = {
         "case_id": case.id,
@@ -692,16 +701,10 @@ async def _judge_prose_quality_async(
         "assistant_text": assistant_text,
         "rendered_beside_reply": rendered_beside_reply,
     }
-    rubric = PROSE_JUDGE_RUBRIC
-    if selection_evidence is not None:
-        payload["criteria"].append(SELECTION_RELEVANCE)
-        payload["selection_expectations"] = dict(case.expected.asset_discovery or {})
-        payload["selection_evidence"] = selection_evidence
-        rubric += SELECTION_RUBRIC
     result = await invoke_openrouter_json_schema(
         task="chat_composer",
         messages=[
-            {"role": "system", "content": rubric},
+            {"role": "system", "content": PROSE_JUDGE_RUBRIC},
             {"role": "user", "content": json.dumps(payload, sort_keys=True)},
         ],
         schema_model=ProseJudgeResponse,
@@ -731,7 +734,6 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
         ),
         expected=TypedExpectations(
             intent=_intent_expectation(expected["intent"]),
-            tool_dispatch=expected.get("tool_dispatch"),
             capability_verdict=str(expected["capability_verdict"]),
             assets=tuple(expected.get("assets") or ()),
             asset_class=expected.get("asset_class"),
@@ -864,24 +866,51 @@ def _action_payload(action: EvalAction | None) -> dict[str, Any] | None:
     }
 
 
+def _state_for_confirmation(
+    *,
+    case: EvalCase,
+    interpret_patch: dict[str, Any],
+) -> RunState:
+    state = RunState.new(current_user_message=case.prompt, recent_thread_history=[])
+    if "candidate_strategy_draft" in interpret_patch:
+        state.candidate_strategy_draft = StrategySummary.model_validate(
+            interpret_patch["candidate_strategy_draft"]
+        )
+    if "optional_parameter_status" in interpret_patch:
+        state.optional_parameter_status = dict(
+            interpret_patch["optional_parameter_status"]
+        )
+    return state
+
+
+def _state_from_interpret_patch(
+    *,
+    case: EvalCase,
+    interpret_patch: dict[str, Any],
+) -> RunState:
+    state = _state_for_confirmation(case=case, interpret_patch=interpret_patch)
+    state.missing_required_fields = list(
+        interpret_patch.get("missing_required_fields") or []
+    )
+    state.requested_field = interpret_patch.get("requested_field")
+    if "response_intent" in interpret_patch:
+        state.response_intent = interpret_patch["response_intent"]
+    return state
+
+
 def _typed_outcome(
     *,
     case: EvalCase,
     interpret_result: Any,
     confirm_result: Any | None,
     clarify_result: Any | None,
-    dispatch_result: Any | None = None,
     followup_result: dict[str, Any] | None = None,
-    stage_results: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any]:
     followup_interpret = (
         followup_result.get("interpret_result") if followup_result else None
     )
     followup_confirm = followup_result.get("confirm_result") if followup_result else None
     followup_clarify = followup_result.get("clarify_result") if followup_result else None
-    followup_dispatch = (
-        followup_result.get("dispatch_result") if followup_result else None
-    )
     payload_interpret_result = followup_interpret or interpret_result
     payload_confirm_result = (
         followup_confirm if followup_interpret is not None else confirm_result
@@ -889,22 +918,12 @@ def _typed_outcome(
     payload_clarify_result = (
         followup_clarify if followup_interpret is not None else clarify_result
     )
-    payload_dispatch_result = (
-        followup_dispatch if followup_interpret is not None else dispatch_result
-    )
-    payload_stage_results = (
-        followup_result.get("stage_results")
-        if followup_interpret is not None
-        else stage_results
-    )
 
     interpret_patch = payload_interpret_result.patch
     final_patch = _final_patch(
         interpret_result=payload_interpret_result,
-        dispatch_result=payload_dispatch_result,
         confirm_result=payload_confirm_result,
         clarify_result=payload_clarify_result,
-        stage_results=payload_stage_results,
     )
     confirmation_payload = final_patch.get("confirmation_payload") or {}
     launch_payload = confirmation_payload.get("launch_payload") or {}
@@ -937,41 +956,17 @@ def _typed_outcome(
         or launch_payload.get("date_range")
         or strategy.get("date_range")
     )
-    execution_evidence = measurement_execution_evidence(
-        interpreted=interpret_result,
-        dispatched=dispatch_result,
-        confirmed=confirm_result,
-        clarified=clarify_result,
-        followup=followup_result,
-        stage_results=stage_results,
-    )
-    calls = [
-        call.model_dump(mode="json") if hasattr(call, "model_dump") else dict(call)
-        for call in interpret_patch.get("tool_calls", [])
-    ]
-    dispatch_patch = (
-        payload_dispatch_result.patch if payload_dispatch_result is not None else {}
-    )
-    selection = None
-    if (
-        case.expected.asset_discovery is not None
-        and case.expected.tool_dispatch is not None
-    ):
-        selection = observe_selection(
-            calls=calls,
-            patch=dispatch_patch,
-            final_patch=final_patch,
-        )
-    offered = offered_to_user(
-        final_patch=final_patch,
-        interpret_patch=interpret_patch,
-        launch_payload=launch_payload,
-        assistant_text=_assistant_text(final_patch),
-    )
 
     return {
-        **execution_evidence,
-        "intent": _intent(case=case, patch=execution_evidence),
+        "intent": _intent(case=case, patch=interpret_patch),
+        "stage_outcomes": [
+            str(interpret_result.outcome),
+            *([] if confirm_result is None else [str(confirm_result.outcome)]),
+            *([] if clarify_result is None else [str(clarify_result.outcome)]),
+            *([] if followup_interpret is None else [str(followup_interpret.outcome)]),
+            *([] if followup_confirm is None else [str(followup_confirm.outcome)]),
+            *([] if followup_clarify is None else [str(followup_clarify.outcome)]),
+        ],
         "assets": _symbols(launch_payload=launch_payload, strategy=strategy),
         "asset_class": launch_payload.get("asset_class") or strategy.get("asset_class"),
         "requested_strategy_template": strategy.get("requested_strategy_template"),
@@ -1011,26 +1006,57 @@ def _typed_outcome(
         "capability_verdict": _capability_verdict(
             outcome=_last_stage_outcome(
                 interpret_result=payload_interpret_result,
-                dispatch_result=payload_dispatch_result,
                 confirm_result=payload_confirm_result,
                 clarify_result=payload_clarify_result,
-                stage_results=payload_stage_results,
             ),
             patch=final_patch,
         ),
         "requested_field": final_patch.get("requested_field"),
         "clarification": final_patch.get("clarification"),
         "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
-        "asset_discovery": selection
-        if selection is not None
-        else interpret_patch.get("asset_discovery"),
-        "offered": selection_offered(offered, selection)
-        if selection is not None
-        else offered,
-        "research": _research_outcome(
-            final_patch, calls=calls, dispatch_patch=dispatch_patch
+        "asset_discovery": interpret_patch.get("asset_discovery"),
+        "research": _research_outcome(final_patch),
+        "offered": offered_to_user(
+            final_patch=final_patch,
+            interpret_patch=interpret_patch,
+            launch_payload=launch_payload,
+            assistant_text=_assistant_text(final_patch),
         ),
     }
+
+
+def _research_outcome(patch: dict[str, Any]) -> dict[str, Any] | None:
+    """The typed research sidecar as the eval reads it, or None when the turn
+    took no rail: published is the absence of a degraded code, rows and
+    sources are counts of what the sidecar carries."""
+    sidecar = patch.get("research")
+    if not isinstance(sidecar, dict):
+        return None
+    degraded = sidecar.get("degraded")
+    return {
+        "published": not degraded,
+        "degraded_code": degraded.get("code") if isinstance(degraded, dict) else None,
+        "shape": sidecar.get("shape"),
+        "rows": len(sidecar.get("rows") or []),
+        "sources": len(sidecar.get("sources") or []),
+    }
+
+
+def _compare_research(expected: dict[str, Any], actual: Any, failures: list[str]) -> None:
+    if not isinstance(actual, dict):
+        failures.append(f"research: expected a research sidecar, got {actual!r}")
+        return
+    _compare(
+        "research.published", expected.get("published"), actual.get("published"), failures
+    )
+    _compare("research.shape", expected.get("shape"), actual.get("shape"), failures)
+    # An expected row count is a floor: a green case promises at least that
+    # many typed figures, and the provider is free to state more.
+    rows = expected.get("rows")
+    if rows is not None and (actual.get("rows") or 0) < rows:
+        failures.append(
+            f"research.rows: expected at least {rows}, got {actual.get('rows')!r}"
+        )
 
 
 def _final_patch(
@@ -1038,36 +1064,28 @@ def _final_patch(
     interpret_result: Any,
     confirm_result: Any | None,
     clarify_result: Any | None,
-    dispatch_result: Any | None = None,
-    stage_results: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    if stage_results is not None:
-        stage, result = stage_results[-1]
-        return chronological_patch(stage_results) if stage == "clarify" else result.patch
     if clarify_result is not None:
         return {
             **interpret_result.patch,
-            **(dispatch_result.patch if dispatch_result is not None else {}),
             **(confirm_result.patch if confirm_result is not None else {}),
             **clarify_result.patch,
         }
     if confirm_result is not None:
         return confirm_result.patch
-    if dispatch_result is not None:
-        return dispatch_result.patch
     return interpret_result.patch
 
 
 def _intent(*, case: EvalCase, patch: dict[str, Any]) -> str | None:
     if patch.get("intent"):
-        return str(normalize_task_intent(patch["intent"]))
+        return str(patch["intent"])
     if case.action is None:
         return None
     if case.action.type == "run_backtest":
-        return "calculate"
+        return "backtest_execution"
     if case.action.type in {"change_asset", "change_dates", "adjust_assumptions"}:
-        return "calculate"
-    return "follow_up"
+        return "strategy_drafting"
+    return "conversation_followup"
 
 
 def _symbols(*, launch_payload: dict[str, Any], strategy: dict[str, Any]) -> list[str]:
@@ -1088,7 +1106,7 @@ def _capability_verdict(*, outcome: str, patch: dict[str, Any]) -> str:
         return "unsupported"
     if outcome in {"needs_clarification", "await_user_reply"}:
         return "needs_clarification"
-    if normalize_task_intent(patch.get("intent")) == "cannot":
+    if patch.get("intent") == "unsupported_or_out_of_scope":
         return "unsupported"
     return "answer_only"
 
@@ -1099,11 +1117,11 @@ def _assistant_text(patch: dict[str, Any]) -> str:
 
 def _intent_expectation(raw: Any) -> str | tuple[str, ...]:
     if isinstance(raw, list):
-        intents = tuple(dict.fromkeys(str(normalize_task_intent(item)) for item in raw))
+        intents = tuple(str(item) for item in raw)
         if not intents:
             raise ValueError("intent expectation list cannot be empty")
         return intents
-    return str(normalize_task_intent(raw))
+    return str(raw)
 
 
 def _compare_intent(
@@ -1111,13 +1129,11 @@ def _compare_intent(
     actual: Any,
     failures: list[str],
 ) -> None:
-    actual = normalize_task_intent(actual)
     if isinstance(expected, tuple):
-        expected = tuple(normalize_task_intent(item) for item in expected)
         if actual not in expected:
             failures.append(f"intent: expected one of {list(expected)!r}, got {actual!r}")
         return
-    _compare("intent", normalize_task_intent(expected), actual, failures)
+    _compare("intent", expected, actual, failures)
 
 
 def _compare_asset_discovery(
@@ -1125,24 +1141,6 @@ def _compare_asset_discovery(
     actual: Any,
     failures: list[str],
 ) -> None:
-    if is_selection_evidence(actual):
-        compare_selection(expected, actual, failures)
-        return
-    # Historical scorecards and authored baseline payloads keep their input
-    # contract. Fresh catalog runs always carry the versioned result evidence.
-    if isinstance(actual, list):
-        candidate_failures = []
-        for arguments in actual:
-            argument_failures: list[str] = []
-            _compare_asset_discovery(expected, arguments, argument_failures)
-            if not argument_failures:
-                return
-            candidate_failures.append(argument_failures)
-        failures.append(
-            "asset_discovery: no legacy call payload preserved the expected "
-            f"discovery facts: {candidate_failures!r}"
-        )
-        return
     if not isinstance(actual, dict):
         failures.append(f"asset_discovery: expected payload {expected!r}, got {actual!r}")
         return
@@ -1191,17 +1189,11 @@ def _last_stage_outcome(
     interpret_result: Any,
     confirm_result: Any | None,
     clarify_result: Any | None,
-    dispatch_result: Any | None = None,
-    stage_results: list[tuple[str, Any]] | None = None,
 ) -> str:
-    if stage_results is not None:
-        return str(stage_results[-1][1].outcome)
     if clarify_result is not None:
         return str(clarify_result.outcome)
     if confirm_result is not None:
         return str(confirm_result.outcome)
-    if dispatch_result is not None:
-        return str(dispatch_result.outcome)
     return str(interpret_result.outcome)
 
 

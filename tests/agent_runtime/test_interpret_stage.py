@@ -37,7 +37,6 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.turn_execution import turn_execution_scope
 from argus.context.providers import build_alpaca_market_movers_packet
 from argus.domain.indicators import EXECUTABLE_INDICATORS
-from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import parse_date_text, shift_months
 
 
@@ -1154,9 +1153,7 @@ def test_supported_indicator_capability_contradiction_uses_locale_recovery(
         assert spec.label not in answer
 
 
-def test_strategy_family_education_keeps_llm_language_over_registry_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> None:
     response = StructuredInterpretation(
         intent="conversation_followup",
         task_relation="continue",
@@ -1170,18 +1167,6 @@ def test_strategy_family_education_keeps_llm_language_over_registry_copy(
         capability_question_focus="supported_strategies",
     )
 
-    from argus.domain.capability_registry import get_tool_catalog
-
-    captured: dict[str, Any] = {}
-
-    async def compose(**kwargs: Any) -> str:
-        captured.update(kwargs)
-        return response.assistant_response
-
-    monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion", compose
-    )
-
     result, _interpreter = run_interpret_with_llm(
         message="Can you explain dollar cost averaging like I'm completely new?",
         response=response,
@@ -1191,9 +1176,6 @@ def test_strategy_family_education_keeps_llm_language_over_registry_copy(
     assert result.outcome == "ready_to_respond"
     assert "Dollar cost averaging" in answer
     assert "Executable strategy families" not in answer
-    assert get_tool_catalog().capability_text() in " ".join(
-        message["content"] for message in captured["messages"]
-    )
 
 
 def test_supported_strategy_capability_uses_chat_tier_for_natural_language(
@@ -1231,7 +1213,7 @@ def test_supported_strategy_capability_uses_chat_tier_for_natural_language(
     assert "Dollar cost averaging" in answer
     assert "Executable strategy families" not in answer
     assert captured["task"] == "chat_composer"
-    assert STRATEGY_CAPABILITIES["dca_accumulation"].display_name in captured["messages"][1]["content"]
+    assert "recurring buys/DCA" in captured["messages"][1]["content"]
 
 
 def test_general_capability_education_uses_chat_tier_for_natural_language(
@@ -1450,7 +1432,7 @@ def test_standalone_event_context_uses_context_fact_bank_not_limits(
     assert expected_fact in fact_packet.lower()
     live_packet = captured["messages"][2]["content"]
     supported_packet = captured["messages"][3]["content"]
-    assert STRATEGY_CAPABILITIES["buy_and_hold"].display_name in supported_packet
+    assert "buy and hold" in supported_packet
     assert "Bollinger Band" in supported_packet
     assert "unregistered triggers" in supported_packet
     if focus == "market_movers":
@@ -1728,8 +1710,8 @@ def test_unanchored_strategy_route_uses_chat_tier_without_pending_draft(
     assert result.patch["assistant_response"] != response.assistant_response
     assert "buy and hold" in result.patch["assistant_response"]
     assert captured["task"] == "chat_composer"
-    assert "Declared capability facts" in captured["messages"][1]["content"]
-    assert result.decision.intent == 'follow_up'
+    assert "Supported-strategy facts" in captured["messages"][1]["content"]
+    assert result.decision.intent == "conversation_followup"
     assert result.decision.missing_required_fields == []
     assert result.decision.candidate_strategy_draft.asset_universe == []
     assert "unanchored_strategy_route_suppressed" in result.decision.reason_codes
@@ -9628,7 +9610,7 @@ def test_active_artifact_rule_answer_repairs_and_preserves_prior_asset(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert calls[:2] == ["LLMToolInterpretationResponse", "FocusedStrategyExtraction"]
+    assert calls[:2] == ["LLMInterpretationResponse", "FocusedStrategyExtraction"]
     assert set(calls[2:]).issubset(
         {
             "LLMInterpretationResponse",
@@ -9757,9 +9739,6 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
                 cadence="biweekly",
                 capital_amount=500,
                 recurring_contribution=500,
-                evidence_spans={
-                    "recurring_contribution": "recurrent biweekly buys of 500 bucks"
-                },
             )
         return LLMInterpretationResponse(
             intent="strategy_drafting",
@@ -9816,7 +9795,7 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert calls[:2] == ["LLMToolInterpretationResponse", "LLMInterpretationResponse"]
+    assert calls[:2] == ["LLMInterpretationResponse", "LLMInterpretationResponse"]
     assert set(calls[2:]).issubset(
         {
             "FocusedStrategyExtraction",

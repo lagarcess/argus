@@ -5488,7 +5488,7 @@ async def test_current_year_so_far_refusal_enters_strategy_repair(monkeypatch) -
     )
 
     assert calls == [request.current_user_message]
-    assert repaired.intent == 'calculate'
+    assert repaired.intent == "backtest_execution"
     assert repaired.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert repaired.candidate_strategy_draft.date_range == {
         "start": "2026-01-01",

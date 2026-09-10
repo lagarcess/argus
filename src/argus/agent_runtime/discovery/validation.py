@@ -6,7 +6,6 @@ from typing import Any, Callable
 
 from loguru import logger
 
-from argus.agent_runtime.asset_identity import short_display_name
 from argus.agent_runtime.asset_text_grounding import (
     asset_name_is_pair_shorthand,
     text_corroborates_resolved_asset,
@@ -27,7 +26,7 @@ def _bounded_text(value: str, limit: int) -> str:
     return cleaned.strip()[:limit]
 
 
-def resolution_matches_named_asset(
+def _resolution_matches_request(
     *,
     display_name: str,
     symbol_guess: str,
@@ -60,14 +59,6 @@ def resolution_matches_named_asset(
             # gate off for most of the catalog and let a wrong ticker guess
             # ride in under a right-sounding name.
             return asset_class_hint is not None and asset_class == asset_class_hint
-        # The shared listing-name owner removes legal boilerplate while
-        # retaining distinguishing words and share classes. Exact equality
-        # handles capitalization and legal-form variants without fuzzy names.
-        if (
-            short_display_name(display_name).casefold()
-            == short_display_name(str(getattr(resolved, "name", "") or "")).casefold()
-        ):
-            return True
         return text_corroborates_resolved_asset(display_name, resolved)
     # The extraction named no entity beyond the ticker, so there is nothing to
     # corroborate against. The request's own class hint is the only remaining
@@ -202,7 +193,7 @@ def validated_candidates(
         ):
             _note_unverified(unverified, display_name or symbol_guess)
             continue
-        if not resolution_matches_named_asset(
+        if not _resolution_matches_request(
             display_name=display_name,
             symbol_guess=symbol_guess,
             resolved=resolved,

@@ -19,7 +19,6 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
-from argus.agent_runtime.semantic_integrity import canonical_capital_role
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
@@ -48,7 +47,7 @@ def _response_needs_strategy_family_continuity_audit(
         return False
     if response.task_relation == "refine":
         return False
-    if response.intent not in {"calculate"}:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     if not request.recent_thread_history:
         return False
@@ -98,17 +97,11 @@ def _response_from_dca_contract_audit(
     extra_parameters["recurring_contribution"] = float(recurring_amount)
     extra_parameters["recurring_cadence"] = cadence
 
-    if audit.total_budget_amount is not None and audit.total_budget_amount >= 0:
+    if audit.total_budget_amount is not None and audit.total_budget_amount > 0:
         budget_source = _dca_total_budget_source(audit.total_budget_source)
-        role = canonical_capital_role(budget_source) or "total_capital"
-        field_name = next(
-            name
-            for name, field in type(draft).model_fields.items()
-            if isinstance(field.json_schema_extra, dict)
-            and field.json_schema_extra.get("x-argus-capital-role") == role
-        )
-        setattr(draft, field_name, float(audit.total_budget_amount))
-        field_provenance[field_name] = budget_source
+        draft.total_capital = float(audit.total_budget_amount)
+        field_provenance["total_capital"] = budget_source
+        extra_parameters["total_budget"] = float(audit.total_budget_amount)
 
     draft.field_provenance = field_provenance
     draft.extra_parameters = extra_parameters
@@ -119,7 +112,9 @@ def _response_from_dca_contract_audit(
     )
     return response.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "strategy_drafting"
+            if missing_required_fields
+            else "backtest_execution",
             "task_relation": "new_task",
             "requires_clarification": bool(missing_required_fields),
             "candidate_strategy_draft": draft,
@@ -487,7 +482,7 @@ def _budget_clarification_response(
 ) -> LLMInterpretationResponse:
     return response.model_copy(
         update={
-            "intent": "calculate",
+            "intent": "strategy_drafting",
             "requires_clarification": True,
             "candidate_strategy_draft": draft,
             "missing_required_fields": list(
