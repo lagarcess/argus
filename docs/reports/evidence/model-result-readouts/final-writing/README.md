@@ -81,6 +81,9 @@ retain raw structured drafts, references, failures and request receipts.
 Rejected/unavailable drafts show the full product fallback. Any complete raw
 rejected draft appears separately as diagnostic text, never as accepted prose.
 The replay is offline and cannot create model calls or backtests.
+The [prepared browser harness](browser/README.md) refuses free preflight reports
+as live outcomes, checks raw rejected prose separately from accepted frames,
+and records the source and reader hashes. No final-round screenshots exist yet.
 
 Review all twelve outcomes for acceptance/fallback, first-glance versus depth,
 meaning beyond the card, repetition, correct language and every factual error.
@@ -100,6 +103,9 @@ cost where available and full reservations for attempts with unknown cost.
 - The [writing-only source audit](writing-only-audit.json) confirms unchanged
   behavior outside the three brief strings. Bounded independent review of the
   brief and harness returned no findings.
+- Offline browser preparation passed twelve invalid-input checks, four raw-draft
+  extraction checks, Python lint/format and Node syntax validation. It started
+  zero servers and made zero provider or backtest calls.
 
 The twelve-draft check cannot authorize updating the fingerprint or claim a
 green release gate. Stop and report after the bounded proof.
