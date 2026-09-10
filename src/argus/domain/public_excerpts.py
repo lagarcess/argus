@@ -43,6 +43,9 @@ from argus.domain.backtesting.rules.signals import (
     _opposite_moving_average_crossover_rule as engine_mirrored_exit_rule,
 )
 from argus.domain.credential_shapes import credential_shape_in
+from argus.domain.result_readout_facts import (
+    engine_config_from_snapshot as _engine_config,
+)
 from argus.domain.tool_contracts import ToolResultCard
 
 PUBLIC_EXCERPT_ID_BYTES = 24
@@ -156,7 +159,14 @@ class PublicExcerptOwnerNoteError(ValueError):
 
 
 class PublicExcerptSourceError(ValueError):
-    """The artifact cannot back a receipt."""
+    """The selected source cannot back a receipt, with owner-readable typed context."""
+
+    def __init__(
+        self, message: str, *, reason: str = "unsupported_turn", field: str | None = None
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.field = field
 
 
 class PublicExcerptUnreadableError(RuntimeError):
@@ -406,24 +416,50 @@ def audit_public_excerpt_document(
 
 def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem:
     """Owner-facing row. Carries no source id, only what the owner needs to act."""
+    from argus.domain.public_excerpt_kinds import document_kind
+
+    payload = snapshot.payload
+    if payload.schema_version == 1:
+        title, symbols, dates = payload.idea_title, payload.symbols, payload.date_range
+    elif isinstance(payload, PublicToolExcerptPayload):
+        title, symbols, dates = "", [], None
+    else:
+        title = snapshot.title
+        symbols = list(
+            dict.fromkeys(
+                symbol
+                for turn in payload.turns
+                for symbol in (
+                    turn.anchor_symbols
+                    if turn.kind == "research_answer"
+                    else turn.fact_bank.symbols
+                    if turn.kind == "backtest"
+                    else []
+                )
+            )
+        )
+        dates = None
+        if len(payload.turns) == 1 and payload.turns[0].kind == "backtest":
+            config = payload.turns[0].fact_bank.config_snapshot
+            if config.date_range:
+                dates = PublicExcerptDateRange(
+                    start=config.date_range.start, end=config.date_range.end
+                )
+            elif config.start_date and config.end_date:
+                dates = PublicExcerptDateRange(
+                    start=config.start_date, end=config.end_date
+                )
     return PublicExcerptListItem(
         id=snapshot.id,
         public_id=snapshot.public_id,
         path=public_excerpt_path(snapshot.public_id),
-        title=snapshot.payload.idea_title
-        if isinstance(snapshot.payload, PublicExcerptPayload)
-        else "",
-        title_facts=(
-            snapshot.payload.presentation.title
-            if isinstance(snapshot.payload, PublicToolExcerptPayload)
-            else None
-        ),
-        symbols=list(snapshot.payload.symbols)
-        if isinstance(snapshot.payload, PublicExcerptPayload)
-        else [],
-        date_range=snapshot.payload.date_range
-        if isinstance(snapshot.payload, PublicExcerptPayload)
+        title=title,
+        title_facts=payload.presentation.title
+        if isinstance(payload, PublicToolExcerptPayload)
         else None,
+        symbols=symbols,
+        date_range=dates,
+        kind=document_kind(payload),
         created_at=snapshot.created_at,
         revoked_at=snapshot.revoked_at,
         revocation_reason=snapshot.revocation_reason,
@@ -434,9 +470,12 @@ def snapshot_public_view(snapshot: PublicExcerptSnapshot) -> PublicExcerptView:
     """Projection for an unauthenticated viewer. Revoked receipts keep nothing."""
     if snapshot.revoked_at is not None:
         return PublicExcerptView(public_id=snapshot.public_id, status="revoked")
+    from argus.domain.public_excerpt_kinds import document_kind
+
     return PublicExcerptView(
         public_id=snapshot.public_id,
         status="available",
+        kind=document_kind(snapshot.payload),
         created_at=snapshot.created_at,
         payload=snapshot.payload,
     )
@@ -725,20 +764,6 @@ def _assumptions(
     if len(assumptions) > MAX_ASSUMPTIONS:
         raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
     return assumptions
-
-
-def _engine_config(config_snapshot: object) -> dict[str, Any]:
-    """The engine config the run executed, whichever snapshot shape wraps it.
-
-    Same two shapes ``_strategy_facts`` handles. The direct engine path stores the
-    config itself; the agent path repeats part of it in ``resolved_parameters`` and
-    carries a whole copy under ``engine_config``. The run builder lifts that copy to
-    the top level and the launch envelope leaves it nested, so both places are read.
-    The copy is what the engine was actually handed, so it is merged last and wins.
-    """
-    snapshot = _mapping(config_snapshot)
-    merged = {**snapshot, **_mapping(snapshot.get("resolved_parameters"))}
-    return {**merged, **_mapping(merged.get("engine_config"))}
 
 
 def _is_recurring_contribution_run(

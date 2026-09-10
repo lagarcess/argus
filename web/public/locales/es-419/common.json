@@ -1551,7 +1551,8 @@
       "new_conversation": "Inicia sesión para conservar esta conversación y comenzar otra.",
       "new_conversation_create": "Crea una cuenta para conservar esta conversación y comenzar otra.",
       "keep_history": "Inicia sesión para conservar esta conversación y comenzar otra.",
-      "discovery_searches": "Inicia sesión para más búsquedas con fuentes."
+      "discovery_searches": "Inicia sesión para más búsquedas con fuentes.",
+      "share_result": "Crea una cuenta o inicia sesión para compartir esta respuesta y mantener el control de su enlace."
     },
     "new_conversation": {
       "title": "¿Quieres iniciar otra conversación?",
@@ -1699,7 +1700,7 @@
     "cta": {
       "headline": "¿Tienes una idea? Pruébala.",
       "detail": "Cuéntale a Argus una idea con tus propias palabras y te mostrará cómo le habría ido. Gratis y sin cuenta.",
-      "action": "Prueba tu propia idea"
+      "action": "Continuar con Argus"
     },
     "tombstone": {
       "title": "Este ya no está",
@@ -1712,7 +1713,7 @@
     },
     "owner": {
       "share": "Compartir esto",
-      "share_hint": "Crea un enlace que cualquiera puede abrir. Muestra estos números, fijos tal como están ahora. Tu chat, tu nombre y todo lo que Argus recuerda se quedan fuera.",
+      "share_hint": "Crea un enlace público a las respuestas elegidas y tu nota. Revisa la vista previa antes de compartir.",
       "note_label": "Agrega una nota si quieres",
       "note_placeholder": "¿Por qué vale la pena verlo?",
       "note_public_warning": "Cualquiera con el enlace puede leer esto. No pongas nada privado.",
@@ -1727,14 +1728,16 @@
       "errors": {
         "create": "Argus no pudo crear ese enlace. Inténtalo de nuevo.",
         "note_rejected": "Esa nota no puede ser pública. Quita cualquier clave o código largo.",
-        "rate_limited": "Has creado muchos enlaces hace poco. Inténtalo de nuevo en un rato."
+        "rate_limited": "Has creado muchos enlaces hace poco. Inténtalo de nuevo en un rato.",
+        "account_conversion_required": "Crea una cuenta o inicia sesión para compartir esta respuesta.",
+        "preview_changed": "El contenido cambió. Revisa otra vista previa antes de crear el enlace."
       }
     },
     "list": {
       "menu": "Enlaces compartidos",
       "title": "Enlaces compartidos",
       "close": "Cerrar enlaces compartidos",
-      "intro": "Todo lo que has compartido. Cada enlace muestra números fijos y nada sobre ti.",
+      "intro": "Todos los enlaces que has compartido, con sus respuestas o resultados de pruebas fijos.",
       "loading": "Cargando tus enlaces...",
       "load_error": "Tus enlaces compartidos no se cargaron.",
       "load_more": "Ver enlaces más antiguos",
@@ -1767,6 +1770,65 @@
       "signal_period": "Ventana de señal",
       "entry_threshold": "Compra en",
       "exit_threshold": "Vende en"
+    },
+    "kinds": {
+      "backtest": "Prueba histórica",
+      "research_answer": "Respuesta investigada",
+      "tool_result": "Resultado calculado",
+      "mixed": "Respuestas y pruebas"
+    },
+    "research": {
+      "stamp": "Argus consultó esto el {{date}}",
+      "preview_stamp": "Consultado el {{date}} · {{count}} fuentes",
+      "sources": "Fuentes",
+      "next_step": "Qué ofreció Argus después",
+      "research_test_single": "Argus ofreció probar comprar y mantener {{symbols}}.",
+      "research_test_versus": "Argus ofreció comparar comprar y mantener {{symbols}}.",
+      "framing": "Esto registra lo que estas fuentes reportaron en esa fecha. No es un consejo ni una predicción. Las cosas pueden haber cambiado desde entonces. Aquí no se compró ni se simuló nada.",
+      "short": "Una investigación fechada. No es un consejo.",
+      "headline": "Investigación de esa fecha, no un consejo."
+    },
+    "selection": {
+      "title": "Compartir conversación",
+      "close": "Cerrar opciones para compartir",
+      "hint": "Elige las respuestas que quieres incluir. Verás la página pública exacta antes de crear un enlace. Cualquier persona con el enlace podrá leer el contenido elegido y la nota.",
+      "all": "Seleccionar todas las elegibles",
+      "clear": "Borrar selección",
+      "cap": "Un enlace puede incluir hasta {{count}} respuestas.",
+      "choose_individually": "Elígelas de forma individual.",
+      "count": "{{selected}} de {{max}} seleccionados",
+      "turn": "Turno {{count}}",
+      "loading": "Cargando respuestas...",
+      "empty": "Todavía no hay respuestas del asistente en esta conversación.",
+      "preview": "Vista previa de la página pública",
+      "previewing": "Preparando vista previa...",
+      "edit": "Cambiar selección o nota",
+      "existing": "Esta selección ya tiene un enlace activo. La vista previa muestra su contenido y nota guardados.",
+      "reuse": "Usar este enlace",
+      "turns": "{{count}} turnos",
+      "field_refusal": "{{field}} no se puede compartir. {{reason}}",
+      "fields": {
+        "question": "La pregunta",
+        "answer": "La respuesta",
+        "owner_note": "Tu nota",
+        "sources": "El contenido de las fuentes"
+      },
+      "reasons": {
+        "not_completed": "Esta respuesta todavía no está completa.",
+        "unsupported_turn": "Este tipo de respuesta no se puede compartir.",
+        "unsupported_shape": "Este formato de investigación no se puede compartir.",
+        "missing_sources": "Esta respuesta no tiene fuentes publicadas compatibles.",
+        "degraded": "La investigación no se completó con toda su evidencia.",
+        "memory_used": "Esta respuesta usa recuerdos personales.",
+        "missing_question": "La pregunta de esta respuesta no está disponible.",
+        "text_too_long": "El texto es demasiado largo para publicarlo completo.",
+        "unsafe_text": "El texto contiene información privada o códigos.",
+        "unlisted_url": "La respuesta contiene un enlace que no aparece en sus fuentes.",
+        "invalid_selection": "Elige respuestas elegibles de esta conversación.",
+        "preview_changed": "El contenido cambió. Revisa otra vista previa antes de crear el enlace.",
+        "invalid_source": "El contenido original no está disponible o no se puede verificar.",
+        "unsupported_backtest": "Esta prueba no tiene todos los datos necesarios para compartirla."
+      }
     }
   },
   "tools": {

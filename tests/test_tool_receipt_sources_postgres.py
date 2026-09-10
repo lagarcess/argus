@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -20,14 +21,25 @@ fake = Faker()
 
 @pytest.fixture
 def source():
+    from argus.domain.tool_contracts import ToolCall, ToolOutcome
+
+    from tests.public_excerpt_tool_factories import identity_declaration
+
     owner, conversation, message, artifact = [str(uuid4()) for _ in range(4)]
     email = fake.email()
-    card = {
-        "kind": "tool_result",
-        "artifact_id": artifact,
-        "input_revision": 0,
-        "outcome": {"status": "succeeded"},
-    }
+    card = (
+        identity_declaration()
+        .result_card(
+            call=ToolCall(
+                tool_name="identity_value",
+                call_id=str(uuid4()),
+                arguments={"known": 0, "unknown": None},
+            ),
+            outcome=ToolOutcome(status="succeeded", result={"value": 0}),
+            artifact_id=artifact,
+        )
+        .model_dump(mode="json")
+    )
     with psycopg.connect(DSN) as connection:
         connection.execute(
             "insert into auth.users(id,email) values (%s,%s)", (owner, email)
@@ -50,9 +62,37 @@ def source():
         connection.execute("delete from auth.users where id=%s", (owner,))
 
 
-def insert(connection, source, *, revision=0, owner=None):
+def insert(connection, source, *, revision=0, owner=None, selected=False, bindings=None):
     owner_id, conversation, message, artifact = source
     snapshot = str(uuid4())
+    if selected:
+        bindings = (
+            bindings
+            if bindings is not None
+            else [
+                {
+                    "message_id": message,
+                    "artifact_id": artifact,
+                    "input_revision": revision,
+                }
+            ]
+        )
+        key = hashlib.sha256(json.dumps(bindings, sort_keys=True).encode()).hexdigest()
+        connection.execute(
+            "insert into public.public_excerpt_snapshots(id,public_id,owner_id,source_conversation_id,source_message_ids,source_tool_bindings,selection_key,kind,title,payload,payload_digest) values (%s,%s,%s,%s,%s,%s::jsonb,%s,'tool_result','',%s::jsonb,%s)",
+            (
+                snapshot,
+                uuid4().hex,
+                owner or owner_id,
+                conversation,
+                [message],
+                json.dumps(bindings),
+                key,
+                json.dumps({"schema_version": 2, "kind": "turns"}),
+                "a" * 64,
+            ),
+        )
+        return snapshot
     connection.execute(
         "insert into public.public_excerpt_snapshots(id,public_id,owner_id,source_conversation_id,source_message_id,source_artifact_id,source_input_revision,title,payload,payload_digest) values (%s,%s,%s,%s,%s,%s,%s,'',%s::jsonb,%s)",
         (
@@ -131,8 +171,9 @@ def test_conversation_deleted_before_insert_cannot_create_receipt(source) -> Non
 
 
 @pytest.mark.parametrize("change", ["edit", "delete_conversation"])
+@pytest.mark.parametrize("selected", [False, True])
 def test_inflight_receipt_waits_for_source_writer_and_refuses_stale_snapshot(
-    source, change
+    source, change, selected
 ) -> None:
     ready = Event()
     reader_pid: list[int] = []
@@ -142,7 +183,7 @@ def test_inflight_receipt_waits_for_source_writer_and_refuses_stale_snapshot(
             reader_pid.append(connection.info.backend_pid)
             ready.set()
             try:
-                insert(connection, source)
+                insert(connection, source, selected=selected)
             except psycopg.errors.CheckViolation as exc:
                 return str(exc)
         return "created"
@@ -178,6 +219,68 @@ def test_inflight_receipt_waits_for_source_writer_and_refuses_stale_snapshot(
             if change == "edit"
             else "public_excerpt_source_deleted" in refusal
         )
+
+
+def test_selected_tool_bindings_remain_private_immutable_provenance(source):
+    with psycopg.connect(DSN) as connection:
+        snapshot = insert(connection, source, selected=True)
+    with psycopg.connect(DSN) as connection, pytest.raises(psycopg.errors.CheckViolation):
+        connection.execute(
+            "update public.public_excerpt_snapshots set source_tool_bindings='[]'::jsonb where id=%s",
+            (snapshot,),
+        )
+    with psycopg.connect(DSN) as connection:
+        connection.execute("delete from public.messages where id=%s", (source[2],))
+        row = connection.execute(
+            "select source_message_ids,source_tool_bindings,revoked_at,revocation_reason,source_artifact_ids,source_run_ids from public.public_excerpt_snapshots where id=%s",
+            (snapshot,),
+        ).fetchone()
+        assert list(map(str, row[0])) == [source[2]]
+        assert row[1] == [
+            {"message_id": source[2], "artifact_id": source[3], "input_revision": 0}
+        ]
+        assert row[2] is not None and row[3] == "source_deleted"
+        assert row[4] == [] and row[5] == []
+
+
+@pytest.mark.parametrize(
+    "mutation", ["missing", "reordered", "duplicate", "wrong_message", "pending"]
+)
+def test_selected_snapshot_requires_every_sibling_in_exact_order(source, mutation):
+    from copy import deepcopy
+
+    with psycopg.connect(DSN) as connection:
+        metadata = connection.execute(
+            "select metadata from public.messages where id=%s", (source[2],)
+        ).fetchone()[0]
+        cards = metadata["tool_result_cards"]
+        sibling = deepcopy(cards[0])
+        sibling.update(artifact_id=str(uuid4()), call_id=str(uuid4()))
+        cards.append(sibling)
+        bindings = [
+            {
+                "message_id": source[2],
+                "artifact_id": card["artifact_id"],
+                "input_revision": 0,
+            }
+            for card in cards
+        ]
+        if mutation == "missing":
+            bindings.pop()
+        elif mutation == "reordered":
+            bindings.reverse()
+        elif mutation == "duplicate":
+            bindings[1] = bindings[0]
+        elif mutation == "wrong_message":
+            bindings[1]["message_id"] = str(uuid4())
+        else:
+            sibling["presentation"]["answer"] = None
+        connection.execute(
+            "update public.messages set metadata=%s::jsonb where id=%s",
+            (json.dumps(metadata), source[2]),
+        )
+    with psycopg.connect(DSN) as connection, pytest.raises(psycopg.errors.CheckViolation):
+        insert(connection, source, selected=True, bindings=bindings)
     with psycopg.connect(DSN) as connection:
         assert (
             connection.execute(

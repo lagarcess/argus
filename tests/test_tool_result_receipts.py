@@ -183,18 +183,37 @@ def test_nonanswers_are_never_shareable_successes(status) -> None:
 def test_owned_tool_receipt_reuses_same_revision_and_revokes_with_source(
     monkeypatch,
 ) -> None:
+    from argus.domain import public_excerpt_tool_turns
+    from argus.domain.tool_declaration import ToolCatalog
+
+    from tests.public_excerpt_tool_factories import identity_declaration
+
     monkeypatch.setenv("ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED", "true")
+    monkeypatch.setattr(
+        public_excerpt_tool_turns,
+        "get_tool_catalog",
+        lambda **_: ToolCatalog((identity_declaration(),)),
+    )
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
     owner = client.get("/api/v1/me").json()["user"]["id"]
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    create_message(
+        user_id=owner,
+        conversation_id=conversation["id"],
+        role="user",
+        content="What is the provided value?",
+    )
     card = card_document()
     message = create_message(
         user_id=owner,
         conversation_id=conversation["id"],
         role="assistant",
         content="",
-        metadata={"tool_result_cards": [card]},
+        metadata={
+            "tool_result_cards": [card],
+            "agent_runtime_turn": {"terminal": True, "status": "completed"},
+        },
     )
     url = f"/api/v1/conversations/{conversation['id']}/tool-results/{card['artifact_id']}/public-excerpt"
     request = {"message_id": message.id, "input_revision": 0, "owner_note": None}
@@ -205,9 +224,12 @@ def test_owned_tool_receipt_reuses_same_revision_and_revokes_with_source(
     receipt = first.json()["receipt"]
     snapshot = api_state.store.public_excerpt_snapshots[receipt["id"]]
     assert snapshot.evidence_artifact_id is None and snapshot.source_run_id is None
-    assert snapshot.source_message_id == message.id
-    assert snapshot.source_artifact_id == card["artifact_id"]
-    assert snapshot.source_input_revision == 0
+    assert snapshot.source_message_ids == [message.id]
+    assert snapshot.source_tool_bindings[0].model_dump(mode="json") == {
+        "message_id": message.id,
+        "artifact_id": card["artifact_id"],
+        "input_revision": 0,
+    }
     assert not api_state.store.evidence_artifacts and not api_state.store.backtest_runs
     assert (
         client.post(url, json={**request, "message_id": fake.uuid4()}).status_code == 404

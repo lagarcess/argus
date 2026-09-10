@@ -512,8 +512,7 @@ export default function ChatMessage({
           {!isUser && message.hasUnavailableToolResults ? <p role="status" className="mt-3 text-sm text-black/60 dark:text-white/60">{t("tools.card.unavailable")}</p> : null}
           {!isUser && message.toolResultCards?.filter((card) => !(card.card_type === "backtest" && message.result) && !message.toolJobs?.some((pending) => pending.artifact_id === card.artifact_id && pending.call_id === card.call_id)).map((card) => (
             <div key={`${card.artifact_id}-${card.input_revision}`} className="mt-3 w-full max-w-[min(100%,660px)]">
-              <ToolResultCard card={card} onRecompute={onToolRecompute} disabled={!toolRecomputeEligible(message.id, latestMessageId, turnInFlight || Boolean(isStreaming))}
-                shareSource={canSaveDecision && !isGuest && conversationId ? { conversationId, messageId: message.id, artifactId: card.artifact_id, inputRevision: card.input_revision } : undefined} />
+              <ToolResultCard card={card} onRecompute={onToolRecompute} disabled={!toolRecomputeEligible(message.id, latestMessageId, turnInFlight || Boolean(isStreaming))} />
             </div>
           ))}
 

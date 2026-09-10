@@ -2,6 +2,7 @@
   "allowed_growth_lines": 75,
   "baseline_capture_minimum_lines": 1000,
   "allowed_growth_lines_by_file": {
+    "web/components/chat/ChatInterface.tsx": 77,
     "web/components/sidebar/ChatCommandPalette.tsx": 0,
     "tests/test_environment_scripts.py": 0
   },

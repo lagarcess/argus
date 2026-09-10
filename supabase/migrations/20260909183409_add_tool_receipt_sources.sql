@@ -102,10 +102,6 @@ begin
 end;
 $$;
 
-create trigger revoke_public_excerpts_on_message_delete
-before delete on public.messages
-for each row execute function public.revoke_public_excerpts_for_deleted_message();
-
 revoke all on function public.enforce_public_excerpt_source_is_live()
   from public, anon, authenticated;
 revoke all on function public.prevent_public_excerpt_tool_source_update()

@@ -322,6 +322,53 @@ def test_workflow_confirmation_is_declared_independently_of_execution():
     assert policy.confirmation == "never"
 
 
+def test_public_receipts_require_explicit_declaration(declaration):
+    assert declaration.policy.public_receipt == "disabled"
+    assert declaration.tool_schema()["policy"]["public_receipt"] == "disabled"
+
+
+@pytest.mark.parametrize("public_receipt", ["disabled", "typed_facts", "cited_facts"])
+def test_public_receipt_policy_is_derived_in_the_catalog(declaration, public_receipt):
+    from argus.domain.tool_declaration import ToolCatalog
+
+    bound = replace(
+        declaration, policy=replace(declaration.policy, public_receipt=public_receipt)
+    )
+    catalog = ToolCatalog((bound,))
+    schema = json.loads(catalog.capability_text())[0]
+    assert (
+        schema["policy"]["public_receipt"]
+        == catalog.get(bound.name).policy.public_receipt
+    )
+
+
+@pytest.mark.parametrize("public_receipt", [None, True, 1, "enabled"])
+def test_public_receipt_policy_rejects_undeclared_modes(public_receipt):
+    from argus.domain.tool_declaration import ToolPolicy
+
+    with pytest.raises(ValueError, match="public receipt"):
+        ToolPolicy(public_receipt=public_receipt)
+
+
+@pytest.mark.parametrize(
+    ("name", "public_receipt"),
+    [
+        ("backtest", "typed_facts"),
+        ("balanced_lookup", "cited_facts"),
+        ("thorough_research", "cited_facts"),
+        ("screening", "cited_facts"),
+        ("fast_quote", "disabled"),
+        ("peer_expansion", "disabled"),
+    ],
+)
+def test_existing_tools_declare_their_public_receipt_evidence(name, public_receipt):
+    from argus.domain.capability_registry import get_tool_catalog
+
+    declaration = get_tool_catalog(include_unavailable=True).get(name)
+    assert declaration.policy.public_receipt == public_receipt
+    assert declaration.tool_schema()["policy"]["public_receipt"] == public_receipt
+
+
 class AmountArguments(BaseModel):
     amount: float
 

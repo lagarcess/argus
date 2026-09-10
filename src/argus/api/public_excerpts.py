@@ -1,8 +1,8 @@
 """Owner-side service for public evidence receipts.
 
-Creation is the only place private records are read. It loads the owner's
-artifact and the immutable run behind it, freezes a sanitized payload, and stores
-it. Everything after that reads the snapshot and nothing else.
+Owner candidate and preview reads resolve private sources through one selection
+service; creation rechecks and freezes that exact public document. Public readers
+hold only a snapshot reader and never resolve source records.
 """
 
 from __future__ import annotations
@@ -16,17 +16,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from argus.api import state as api_state
 from argus.api.public_excerpt_schemas import (
-    PublicExcerptPayload,
     PublicExcerptSnapshot,
+    PublicExcerptToolSource,
     PublicExcerptView,
 )
 from argus.api.schemas import Conversation, EvidenceArtifact, User
 from argus.domain.public_excerpts import (
     PublicExcerptSourceError,
-    build_public_excerpt_payload,
-    build_tool_public_excerpt_payload,
-    new_public_excerpt_id,
-    payload_digest,
     revoked_public_view,
     snapshot_public_view,
 )
@@ -104,13 +100,19 @@ def require_evidence_receipt_sharing_enabled() -> None:
 
 
 def _is_receipt_path(path: str) -> bool:
+    path = path.rstrip("/")
     if path in _RECEIPT_EXACT_PATHS:
         return True
     if any(path.startswith(prefix) for prefix in _RECEIPT_PATH_PREFIXES):
         return True
-    return path.startswith(
-        ("/api/v1/evidence-artifacts/", "/api/v1/conversations/")
-    ) and path.endswith("/public-excerpt")
+    return (
+        path.startswith("/api/v1/evidence-artifacts/")
+        and path.endswith("/public-excerpt")
+    ) or (
+        path.startswith("/api/v1/conversations/")
+        and path.rsplit("/", 1)[-1]
+        in {"public-excerpt-candidates", "public-excerpt-preview", "public-excerpt"}
+    )
 
 
 class EvidenceReceiptFlagGateMiddleware:
@@ -157,7 +159,11 @@ class MemoryPublicExcerptRepository:
     ) -> tuple[PublicExcerptSnapshot, bool]:
         with self._store.conversation_message_lock:
             source = snapshot.tool_source
-            if source is not None:
+            if snapshot.selection_key is not None:
+                existing = self.get_live_public_excerpt_for_selection(
+                    owner_id=snapshot.owner_id, selection_key=snapshot.selection_key
+                )
+            elif source is not None:
                 existing = self.get_live_public_excerpt_for_tool_result(
                     owner_id=snapshot.owner_id,
                     source_message_id=source[1],
@@ -179,6 +185,7 @@ class MemoryPublicExcerptRepository:
                     artifact_id=source[2],
                     input_revision=source[3],
                 )
+            _validate_selected_tool_sources(snapshot)
             self._store.public_excerpt_snapshots[snapshot.id] = snapshot
             return snapshot, True
 
@@ -218,6 +225,22 @@ class MemoryPublicExcerptRepository:
             ):
                 return snapshot
         return None
+
+    def get_live_public_excerpt_for_selection(
+        self, *, owner_id: str, selection_key: str | None
+    ) -> PublicExcerptSnapshot | None:
+        if selection_key is None:
+            return None
+        return next(
+            (
+                row
+                for row in self._store.public_excerpt_snapshots.values()
+                if row.owner_id == owner_id
+                and row.selection_key == selection_key
+                and row.revoked_at is None
+            ),
+            None,
+        )
 
     def list_public_excerpt_snapshots(
         self,
@@ -330,48 +353,11 @@ def create_receipt_for_artifact(
     existing link, and the caller needs to know that so a retry or a reload is not
     counted as a new receipt in the funnel.
     """
-    artifact, conversation = _owned_artifact(user_id=user.id, artifact_id=artifact_id)
-    repository = public_excerpt_repository()
-    existing = repository.get_live_public_excerpt_for_artifact(
-        owner_id=user.id,
-        evidence_artifact_id=artifact.id,
+    from argus.api.public_excerpt_selection import create_receipt_for_artifact_adapter
+
+    return create_receipt_for_artifact_adapter(
+        user=user, artifact_id=artifact_id, owner_note=owner_note
     )
-    if existing is not None:
-        return existing, False
-    run = _owned_run(user_id=user.id, run_id=artifact.source_run_id)
-    payload = build_public_excerpt_payload(
-        artifact=artifact,
-        run_chart=getattr(run, "chart", None) if run is not None else None,
-        run_config_snapshot=(
-            getattr(run, "config_snapshot", None) if run is not None else None
-        ),
-        owner_note=owner_note,
-        content_language=_artifact_content_language(conversation),
-    )
-    snapshot = PublicExcerptSnapshot(
-        id=api_state.store.new_id(),
-        public_id=new_public_excerpt_id(),
-        owner_id=user.id,
-        evidence_artifact_id=artifact.id,
-        source_conversation_id=artifact.source_conversation_id,
-        source_run_id=artifact.source_run_id,
-        title=payload.idea_title
-        if isinstance(payload, PublicExcerptPayload)
-        else payload.card_type,
-        payload=payload,
-        payload_digest=payload_digest(payload),
-        created_at=datetime.now(timezone.utc),
-    )
-    try:
-        return repository.create_public_excerpt_snapshot(snapshot=snapshot)
-    except Exception as exc:
-        # The database refuses a source that was deleted while this request was in
-        # flight, which the application check above cannot catch on its own.
-        if _is_source_refusal(exc):
-            raise EvidenceReceiptSourceMissingError(
-                "That result is not available."
-            ) from exc
-        raise
 
 
 def _owned_tool_result(
@@ -421,46 +407,73 @@ def create_receipt_for_tool_result(
     input_revision: int,
     owner_note: str | None,
 ) -> tuple[PublicExcerptSnapshot, bool]:
-    card, conversation = _owned_tool_result(
+    """Compatibility adapter: an exact card selects its whole eligible message."""
+    _owned_tool_result(
         user_id=user.id,
         conversation_id=conversation_id,
         message_id=message_id,
         artifact_id=artifact_id,
         input_revision=input_revision,
     )
-    payload = build_tool_public_excerpt_payload(
-        card=card,
+    preview = preview_receipt_for_messages(
+        user=user,
+        conversation_id=conversation_id,
+        message_ids=[message_id],
         owner_note=owner_note,
-        content_language=_artifact_content_language(conversation),
-        private_ids=(user.id, conversation_id, message_id),
     )
-    snapshot = PublicExcerptSnapshot(
-        id=api_state.store.new_id(),
-        public_id=new_public_excerpt_id(),
-        owner_id=user.id,
-        source_conversation_id=conversation_id,
-        source_message_id=message_id,
-        source_artifact_id=artifact_id,
-        source_input_revision=input_revision,
-        title=card.card_type,
-        payload=payload,
-        payload_digest=payload_digest(payload),
-        created_at=datetime.now(timezone.utc),
+    return create_receipt_for_messages(
+        user=user,
+        conversation_id=conversation_id,
+        message_ids=[message_id],
+        owner_note=owner_note,
+        expected_digest=preview.payload_digest,
+        expected_tool_source=PublicExcerptToolSource.model_validate(
+            {
+                "message_id": message_id,
+                "artifact_id": artifact_id,
+                "input_revision": input_revision,
+            }
+        ),
     )
-    try:
-        return public_excerpt_repository().create_public_excerpt_snapshot(
-            snapshot=snapshot
+
+
+def _validate_selected_tool_sources(snapshot: PublicExcerptSnapshot) -> None:
+    """Memory twin of the database's ordered sibling/revision check under lock."""
+    from argus.api.chat.tool_results import tool_cards_from_metadata
+    from argus.api.message_store import owned_conversation_message
+
+    if not snapshot.source_tool_bindings:
+        return
+    conversation = _owned_source_conversation(
+        user_id=snapshot.owner_id, conversation_id=snapshot.source_conversation_id
+    )
+    if conversation is None or conversation.deleted_at is not None:
+        raise EvidenceReceiptSourceMissingError("That source is not available.")
+    selected = {}
+    for binding in snapshot.source_tool_bindings:
+        selected.setdefault(str(binding.message_id), []).append(
+            (str(binding.artifact_id), binding.input_revision)
         )
-    except Exception as exc:
-        if _is_source_refusal(exc):
-            raise EvidenceReceiptSourceMissingError(
-                "That result is not available."
-            ) from exc
-        if "public_excerpt_source_changed" in str(exc):
-            raise EvidenceReceiptSourceChangedError(
-                "The result changed before it was shared."
-            ) from exc
-        raise
+    for message_id, expected in selected.items():
+        if message_id not in snapshot.source_message_ids:
+            raise EvidenceReceiptSourceMissingError("That source is not available.")
+        message = owned_conversation_message(
+            user_id=snapshot.owner_id,
+            conversation_id=conversation.id,
+            message_id=message_id,
+        )
+        if message is None or message.role != "assistant":
+            raise EvidenceReceiptSourceMissingError("That source is not available.")
+        try:
+            cards = tool_cards_from_metadata(message.metadata or {})
+            current = [(card.artifact_id, card.input_revision) for card in cards]
+        except ValueError as error:
+            raise EvidenceReceiptSourceChangedError("That source changed.") from error
+        if current != expected or any(
+            card.outcome.status != "succeeded" or card.presentation.answer is None
+            for card in cards
+        ):
+            raise EvidenceReceiptSourceChangedError("That source changed.")
 
 
 def revoke_receipts_for_conversation(*, user_id: str, conversation_id: str) -> int:
@@ -569,3 +582,11 @@ def _owned_run(*, user_id: str, run_id: str | None) -> Any | None:
     if api_state.store.backtest_run_owners.get(run_id) != user_id:
         return None
     return run
+
+
+# Public owner entry points, kept out of the storage and flag middleware module.
+from argus.api.public_excerpt_selection import (  # noqa: E402,F401
+    create_receipt_for_messages,
+    preview_receipt_for_messages,
+    receipt_candidates,
+)

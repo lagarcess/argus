@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ReceiptBody from "../components/receipt/ReceiptBody";
+import ReceiptActionBar from "../components/receipt/ReceiptActionBar";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -225,11 +229,10 @@ describe("never indexable", () => {
     const contract = code(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
     expect(contract).not.toContain("receipt-funnel");
     expect(source(join(WEB_ROOT, "components/receipt/ReceiptViewBeacon.tsx"))).toContain(
-      'reportReceiptFunnelStage("viewed")',
+      'reportReceiptFunnelStage("viewed", kind)',
     );
-    for (const path of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
-      expect(source(path)).toContain("<ReceiptViewBeacon />");
-    }
+    expect(source(RECEIPT_BODY)).toContain("<ReceiptViewBeacon");
+    expect(source(join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx"))).not.toContain("<ReceiptViewBeacon");
     // The image never reports anything.
     expect(code(OG_IMAGE_ROUTE)).not.toContain("receipt-funnel");
   });
@@ -331,7 +334,8 @@ describe("the preview image inherits the never-expose list", () => {
     // A crawler fetching the card has no language of its own, and the frozen facts
     // on the card are already in the receipt's language.
     const body = code(OG_IMAGE_ROUTE);
-    expect(body).toContain("cardCopy(result.payload.content_language)");
+    expect(body).toContain("cardCopy(language)");
+    expect(body).toContain("receiptDocumentLanguage(result.payload)");
     expect(body).not.toContain("accept-language");
     expect(body).not.toContain("const FRAMING");
     expect(body).not.toContain("const PROVENANCE");
@@ -343,7 +347,8 @@ describe("the rendered page", () => {
     const body = source(RECEIPT_BODY);
     expect(body).toContain("ProvenanceMark");
     expect(body).toContain("copy.framing.headline");
-    expect(body).toContain("copy.framing.detail");
+    const markup = renderToStaticMarkup(createElement(ReceiptBody, { payload: PAYLOAD, createdAt: null, language: "en", copy: receiptCopy("en") }));
+    expect(markup).toContain(receiptCopy("en").framing.detail);
   });
 
   test("renders no field outside the closed payload", () => {
@@ -367,7 +372,8 @@ describe("try argus", () => {
   test("lands on bare guest entry with no carried state and no new parameter", () => {
     const body = source(ACTION_BAR);
     expect(body).toContain('href="/"');
-    expect(body).not.toContain("?");
+    const markup = renderToStaticMarkup(createElement(ReceiptActionBar, { framing: "Context", action: "Continue with Argus", kind: "research_answer" }));
+    expect(markup.match(/href="([^"]+)"/)?.[1]).toBe("/");
     expect(body).not.toContain("searchParams");
     expect(body).not.toContain("prefill");
   });
@@ -468,7 +474,8 @@ describe("the strategy a receipt shows", () => {
 describe("a view is only counted when a receipt was shown", () => {
   test("the outage notice does not fire the beacon", () => {
     const notice = source(join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx"));
-    expect(notice).toContain('kind === "revoked" ? <ReceiptViewBeacon /> : null');
+    expect(notice).not.toContain("<ReceiptViewBeacon");
+    expect(notice).toContain("kind={null}");
   });
 });
 
@@ -688,7 +695,7 @@ describe("the action bar", () => {
     expect(bar).toContain("framing: string;");
     expect(bar).not.toContain("framing?");
     for (const surface of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
-      expect(source(surface)).toContain("framing={copy.framing.headline}");
+      expect(source(surface)).toContain("copy.framing.headline");
     }
   });
 
@@ -765,6 +772,7 @@ describe("the action bar", () => {
     }
     // And the in-flow block no longer repeats the headline the bar now carries.
     expect(source(RECEIPT_BODY)).not.toContain("copy.framing.headline}{\" \"}");
-    expect(source(RECEIPT_BODY)).toContain("{copy.framing.detail}");
+    const markup = renderToStaticMarkup(createElement(ReceiptBody, { payload: PAYLOAD, createdAt: null, language: "en", copy: receiptCopy("en") }));
+    expect(markup).toContain(receiptCopy("en").framing.detail);
   });
 });

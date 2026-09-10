@@ -73,6 +73,9 @@ class ExactlyOneUnknown:
         }
 
 
+PublicReceiptPolicy = Literal["disabled", "typed_facts", "cited_facts"]
+
+
 @dataclass(frozen=True)
 class ToolPolicy:
     execution: Literal["local", "workflow", "provider"] = "local"
@@ -80,12 +83,15 @@ class ToolPolicy:
     confirmation: Literal["never", "required"] = "never"
     editable_fields: tuple[str, ...] = ()
     retain_unknown: bool = True
+    public_receipt: PublicReceiptPolicy = "disabled"
 
     def __post_init__(self) -> None:
         if self.execution not in {"local", "workflow", "provider"}:
             raise ValueError("Unknown tool execution policy")
         if self.confirmation not in {"never", "required"} or self.external_calls < 0:
             raise ValueError("Invalid tool cost or confirmation policy")
+        if self.public_receipt not in get_args(PublicReceiptPolicy):
+            raise ValueError("Invalid tool public receipt policy")
         if self.execution == "local" and self.external_calls != 0:
             raise ValueError("A local zero-cost tool cannot make external calls")
         if self.editable_fields and (
@@ -332,6 +338,7 @@ class ToolDeclaration:
                 "execution": self.policy.execution,
                 "external_calls": self.policy.external_calls,
                 "confirmation": self.policy.confirmation,
+                "public_receipt": self.policy.public_receipt,
                 "editable_fields": list(self.policy.editable_fields),
                 "retain_unknown": self.policy.retain_unknown,
             },

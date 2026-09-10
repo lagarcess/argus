@@ -2373,6 +2373,8 @@ export default function ChatInterface() {
                 conversationId &&
                 canManageConversation ? (
                 <ChatHeaderMenu
+                  conversationId={conversationId}
+                  onShare={guestExperience.receiptSharing.request}
                   isOpen={showChatOptions}
                   onToggleOpen={() => setShowChatOptions(!showChatOptions)}
                   onRequestClose={closeChatOptions}

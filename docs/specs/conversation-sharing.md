@@ -6,15 +6,15 @@ driving the built receipt flow end to end; that assessment is at
 
 This spec widens
 [`2026-08-07-sharing-evidence-receipts.md`](../superpowers/specs/2026-08-07-sharing-evidence-receipts.md).
-Everything that spec locked stays locked except one line, §7.5's "research
-answers not at all", which section 3 asks the founder to overturn on stated
-terms. No product code ships from this lane.
+The founder approved the widening on 2026-09-09 in section 4.5, which supersedes
+the original research exclusion and sequencing below. All other freeze, privacy,
+revocation and owner boundaries remain locked.
 
 ## 0. The answer
 
-**Build the research receipt first: one grounded answer, frozen as its own
-public page on the pipeline that already exists.** Not a whole conversation,
-and not more work on the backtest receipt, which is built and verified.
+**Extend the existing receipt to grounded answers.** Section 4.5 now authorizes
+up to four independently eligible turns selected inside one conversation. The
+per-turn receipt remains the unit; broader composition remains deferred.
 
 Why that order:
 
@@ -25,19 +25,18 @@ Why that order:
 - It reuses every hard part that is already built and now proven: the
   immutable snapshot table, the closed payload discipline, the tombstone, the
   Shared links list, the funnel, the flag gate, noindex, rate limits, and the
-  revoke-on-delete triggers. The build is a second payload kind, a second
-  owner endpoint, and a second page body. One flag, one list, one tombstone.
-- Its risk is bounded to one message pair. A whole conversation is the
-  largest surface Argus could publish and the shape that produced the ChatGPT
-  and DeepSeek incidents. Argus threads are also mostly clarify-and-confirm
-  plumbing; the compelling unit is the turn, not the thread.
+  revoke-on-delete triggers. Closed payload kinds extend the existing owner
+  endpoints and one shared page body. One flag, one list, one tombstone.
+- Every selected message pair passes the same checks independently. The
+  four-turn wrapper adds the cross-turn inference risk explicitly accepted in
+  section 4.5; it does not make clarifications or confirmations eligible.
 
 The five hard questions, answered in one place. Each has its own section.
 
 | Question | Answer |
 | :--- | :--- |
 | What freezes, what stays live | Everything about the content freezes at creation: question, answer, sources with their dates, the retrieval date, symbols, the offered next step, the note. Only the chrome is live: the reader's language, the tombstone state, the call to action. Nothing is re-fetched, ever. The retrieval date is the headline fact, not a footnote. |
-| What a guest can share | Nothing. The share tap on a guest turn is a conversion hook, not a share. A public page cannot outlive its owner, a guest's owner row is deleted in seven days, and the snapshot's owner is immutable by trigger, so a guest share would either die at day seven or need the one rewrite the immutability rule forbids. |
+| What a guest can share | Nothing. The sole header entry is available to registered owners; the former guest-turn conversion hook is dormant. A public page cannot outlive its owner, a guest's owner row is deleted in seven days, and the snapshot's owner is immutable by trigger, so a guest share would either die at day seven or need the one rewrite the immutability rule forbids. |
 | The shared link when the source is gone | The link becomes the tombstone, on the same trigger that already handles backtest receipts. Deleting the chat revokes; account deletion and guest cleanup cascade; restoring a deleted chat does not un-revoke. Argus gains its own takedown reason. |
 | What is redacted | The payload is closed and every field is named. Refused, never redacted: a turn whose question or answer carries an identifier or a credential shape, a turn that used memory, a degraded turn, a turn with no typed sources. Dropped by construction: usage, cost, latency, provider and tool names, capability class, shape, peers, follow-up, every id. |
 | Can a recipient fork it | No. No fork, no copy, no prefilled prompt. The page shows what Argus offered to test next as text, and the one action lands on guest entry, exactly as the backtest receipt does. A typed "test this yourself" seed is the only fork that fits Argus and is deferred until the funnel shows readers want it. |
@@ -221,10 +220,9 @@ is a legitimate state and is marked with `lang`.
 
 ### 4.4 The owner's side
 
-The share action appears on an eligible research answer where the backtest
-action appears on a result card: same component, a second kind, never a
-second vocabulary. Two additions because prose is not structurally closed the
-way run facts are:
+The header chain-link opens selection, following the founder's final placement
+decision in section 4.5. Sharing one answer means selecting one turn there. Two
+additions because prose is not structurally closed the way run facts are:
 
 - **A preview before "Make the link".** The owner sees the exact public
   rendering, on their own screen, before anything is written. The backtest
@@ -253,6 +251,16 @@ says it shares the conversation rather than that it creates a link, because the
 click opens selection and no link exists until turns are chosen. Selecting
 turns, then one link, is the DeepSeek shape and it is the one we want.
 
+**Final placement decision. Founder, 2026-09-09.** Sharing has exactly one entry
+point: the header chain-link. It opens selection; sharing a single answer means
+one checked turn on that screen. Remove persistent share pills, add no share item
+to message overflow, and remove the visible share control from
+`StrategyResultCard`. Sharing is flag-off in production, so preserving the card's
+button does not protect an existing user flow. `ShareReceiptAction`'s creation
+logic stays behind the selection screen: one creation owner, one place showing
+why turns are ineligible, and one user path to verify. This supersedes the earlier
+card exception and the proposed message-overflow shortcut.
+
 **Selection within one conversation supersedes section 9's deferral. Founder,
 2026-09-09.** Section 4.2 defines one question and answer pair and section 9
 defers composition; this resolves that conflict rather than leaving it to the
@@ -276,13 +284,12 @@ sources. **An ineligible turn renders unselectable with a reason the owner can
 read**, in their language, or the screen looks broken and sharing reads as
 flaky. "Select all" means all eligible and says so.
 
-**The card keeps its own share control, and it is the same mechanism.** The
-button on the result card is the moment of intent and removing it would regress
-the only flow that works today. It becomes a shortcut that shares that one
-turn, producing the same record, through the same eligibility check, listed in
-the same place. Today it shares an `evidence_artifact_id` while turn sharing
-shares a message; if those stay separate the product grows two receipt
-lineages and they will drift.
+**One creation owner.** The existing receipt creation logic now serves the
+selection screen. The artifact endpoint adapts into the same message eligibility
+and singleton identity, so an existing receipt is reused rather than creating
+another lineage. The result card's visible control is removed under the final
+placement decision above. Records, ownership, Settings and revocation stay in the
+existing receipt system.
 
 **The public page stays a receipt, not a rendered card.** `ReceiptBody`'s form
 is deliberate: ruled rows and a record stamp, because the page has to argue for
@@ -325,12 +332,12 @@ said. The framing states that plainly rather than pretending otherwise.
 
 ## 6. Guests and the seven-day workspace
 
-A guest cannot create a share of any kind. The share tap on a guest's
-eligible turn is a conversion hook: it raises the existing
-`account_conversion_required` flow with a new `GuestConversionReason`
-`share_result` and a pending action that names the message, so that after the
-claim the share panel reopens on that turn and the receipt is created under
-the permanent account.
+A guest cannot create a share of any kind. The final header-only design removes
+the former per-turn conversion entry: the existing owner header is available
+after registration, and the owner then selects answers normally. The typed
+`share_result` pending action and its verified message-target resume remain
+compatible but dormant; the header does not invent a message target for a guest.
+There is no visible guest share control in this lane.
 
 Three facts decide this:
 
@@ -355,9 +362,10 @@ ids do not change on claim (`docs/DATA_MODEL.md` §5.2). Nothing about the
 workspace clock touches a receipt, because a receipt can only exist once the
 clock no longer applies.
 
-The current UI hides the action from guests. This spec replaces hiding with
-the conversion prompt, and fixes the 403 mapping in `receiptFailureReason` so
-the answer is honest rather than "try again".
+The registered-owner header is the sole entry. The 403 mapping in
+`receiptFailureReason` still distinguishes account conversion from a retryable
+error for compatibility callers. A new visible guest conversion hook would be
+a separate placement decision; it must not restore a per-turn control.
 
 ## 7. When the source goes away
 
@@ -370,7 +378,7 @@ the answer is honest rather than "try again".
 | Owner deletes the account | Cascade removes the row; the link answers as unknown, which is the tombstone | Same |
 | Guest cleanup hard-deletes a chat | Trigger revokes, then cascade removes | Same |
 | A run is deleted | Not a user action; runs are immutable. Ops deletion revokes by trigger | Not applicable; a research answer has no run |
-| A message is deleted | Not a user action; messages are immutable | Same. `source_message_id` is `on delete set null` so a tombstone outlives whatever it pointed at, matching the other source columns |
+| A message is deleted | Not a user action; messages are immutable | Every selected message participates in the existing revocation function. The frozen snapshot and private provenance remain so the tombstone outlives the source |
 | A source retracts or a claim proves wrong | Not applicable | Revocation by owner or by Argus (`removed_by_argus`). The date stamp is the standing correction; the page never edits |
 | The owner re-runs or re-asks | The old receipt does not move | Same |
 
@@ -405,7 +413,9 @@ first thing carried across the hop that §7.2 kept empty.
 
 ## 9. Whole conversation, if ever
 
-Not now. If it is ever built, it is a composition of turn receipts, and the
+Selection of up to four turns inside one conversation is authorized by section
+4.5. Everything beyond that remains deferred. Any future wider composition is
+still a composition of turn receipts, and the
 archived Slice 7 design in
 `docs/archive/private-alpha-conversation-trust.md` is the shape to reuse with
 one change: no raw card payloads, only per-turn closed payloads.
@@ -425,42 +435,58 @@ at volume rather than on fixtures.
 
 ## 10. Contract changes this needs
 
-Recorded here so the build lane starts from a contract, per
-`docs/API_CONTRACT.md` first. No code in this lane.
+The implementation contract follows the founder's section 4.5 selection decision.
+`docs/API_CONTRACT.md`, `docs/DATA_MODEL.md` section 12.1.3, and generated OpenAPI
+describe the concrete API and persistence shapes. Exposure remains a separate
+founder decision; these contracts do not enable the flags.
 
 **Data model, `public_excerpt_snapshots`:**
 
-- `kind text not null default 'backtest' check (kind in ('backtest', 'research_answer'))`.
-- `source_message_id uuid null references messages(id) on delete set null`.
-- Partial unique index on `(owner_id, source_message_id) where revoked_at is
-  null and source_message_id is not null`: one live receipt per turn,
-  re-share after revoke mints a new link, exactly as for artifacts.
+- `kind text not null default 'backtest'`, closed to `backtest`,
+  `research_answer`, and `mixed`.
+- Private immutable `source_message_ids`, `source_run_ids` and
+  `source_artifact_ids` arrays, bounded by the four-turn selection. The existing
+  scalar source columns remain for version 1 compatibility and singleton identity.
+- A canonical `selection_key` and partial unique index on `(owner_id,
+  selection_key)` for live selections. The existing live-artifact uniqueness
+  remains, so both singleton entry points resolve the same record. Re-share after
+  revoke mints a new link.
 - `revocation_reason` check gains `removed_by_argus`.
-- `prevent_public_excerpt_immutable_update` covers `kind` and
-  `source_message_id`.
-- No new revocation trigger: the conversation triggers already key on
-  `source_conversation_id`, and messages are never deleted on their own.
+- `prevent_public_excerpt_immutable_update` covers `kind`, selection identity
+  and all selected source arrays.
+- The existing source-liveness and revocation functions cover every selected
+  source. A message deletion trigger joins the same function; the conversation
+  triggers continue to key on `source_conversation_id`.
 
-**Schemas:** `PublicExcerptPayload` becomes a discriminated union on `kind`
-with `schema_version` 2 for the research kind; version 1 stays the backtest
-payload. The public view, the owner list item and the funnel stage each gain
+**Schemas:** version 1 `PublicExcerptPayload` stays the concrete backtest payload.
+Version 2 is a closed `{schema_version: 2, kind: "turns", turns: [...]}` wrapper
+whose one to four leaves discriminate on `kind`. Every research leaf is exactly
+section 4.2. New singleton shares use the same wrapper. The public view, the owner
+list item and the funnel stage each gain
 `kind`. `RevocationReason` gains `removed_by_argus`. `GuestConversionReason`
 gains `share_result`.
 
 **Endpoints, all behind the same flag and the same 404 byte identity:**
 
-- `POST /messages/{message_id}/public-excerpt`, owner, registered only, same
-  body and rate limits as the artifact route, same idempotency on a live
-  receipt, same error codes plus `receipt_source_unsupported` for an
-  ineligible turn with the field named in `detail`.
+- Owner-scoped candidate, preview and create endpoints under
+  `/conversations/{conversation_id}/public-excerpt-candidates`,
+  `/conversations/{conversation_id}/public-excerpt-preview`, and
+  `/conversations/{conversation_id}/public-excerpt`. Preview/create name one to
+  four distinct message ids. Create requires the preview digest and rechecks all
+  sources. Typed refusal reason and field appear in the Problem Details context.
+  The artifact endpoint adapts into this same service and singleton identity.
 - `GET /public-excerpts`, `DELETE /public-excerpts/{id}` and the public read
   are unchanged in shape and gain `kind`.
 - An admin-only revoke with reason `removed_by_argus` is specified with the
   report path, not here.
 
-**Web:** `/r/[receiptId]` branches on `kind`; the share action generalises to
-the research answer message; Shared links shows the kind; the preview image
-renders the research card; the 403 mapping becomes the conversion prompt.
+**Web:** one `ReceiptBody` consumes the versioned document through typed
+presentation adapters, with unchanged version 1 rendering. The header is the sole
+entry point and opens selection, which alone displays disabled turns and their
+localized reasons. No message-overflow item, assistant-bubble pill or result-card
+share control remains. Shared
+links shows the kind; the existing preview image supports research. The typed
+403 conversion/resume mapping remains compatible, with no visible guest entry.
 
 **Flags:** none new. `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and its
 `NEXT_PUBLIC_` twin gate both kinds. A research receipt additionally requires
@@ -487,7 +513,8 @@ the rail, because a sidecar cannot exist without it, and the rail is on.
   and stronger than the app's; no em dashes in any user-facing copy.
 - Deleting the chat revokes; re-sharing after deletion refuses; restoring does
   not un-revoke. Proven against Postgres, as the existing 21 tests do.
-- A guest's share tap raises the conversion prompt and nothing is written.
+- Guests have no share entry and cannot create receipts; previously guest-owned
+  turns can be selected after the normal account claim.
 - Funnel events carry `kind` and the view is counted once per rendered page.
 - Flag-off byte identity holds for the new route.
 

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { Children, isValidElement } from "react";
 
 import GuestExperienceSurfaces from "../components/guest/GuestExperienceSurfaces";
+import GuestConversionModal from "../components/guest/GuestConversionModal";
 import type { GuestExperience } from "../components/guest/useGuestExperience";
 import {
   dossierDecisionResumeTarget,
@@ -39,6 +41,7 @@ function guestExperienceSurfaceFixture({
       startOver: async () => undefined,
       convert: () => undefined,
     },
+    receiptSharing: { target: null, close: () => undefined },
   } as unknown as GuestExperience;
 }
 
@@ -293,8 +296,11 @@ describe("guest conversion contract", () => {
       }),
     });
 
-    expect(closed.props.children[0]).toBe(false);
-    expect(publicOpen.props.children[0].props.initialMode).toBe("signup");
+    const modal = (surface: typeof closed) => Children.toArray(surface.props.children)
+      .find((child) => isValidElement(child) && child.type === GuestConversionModal);
+    expect(modal(closed)).toBeUndefined();
+    const openModal = modal(publicOpen);
+    expect(isValidElement<{ initialMode: string }>(openModal) && openModal.props.initialMode).toBe("signup");
   });
 
   test("localizes staged and public New-chat choices in English and Spanish", () => {

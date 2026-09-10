@@ -4,6 +4,7 @@ import type { DecisionState } from "@/lib/run-dossier-contract";
 export type GuestConversionReason =
   | "simulation_limit"
   | "save_decision"
+  | "share_result"
   | "new_conversation"
   | "keep_history"
   | "discovery_searches";
@@ -41,6 +42,7 @@ type GuestPendingActionBase = {
 };
 
 export type GuestPendingAction =
+  | (GuestPendingActionBase & { reason: "share_result"; messageId: string })
   | (GuestPendingActionBase & {
       reason: "simulation_limit";
       action: ChatActionOption;
@@ -58,6 +60,7 @@ export type GuestPendingActionSummary = {
   conversation_id: string;
   action_id: string;
   artifact_id?: string;
+  message_id?: string;
 };
 
 export function guestConversionBenefitKey(
@@ -86,6 +89,7 @@ export function pendingGuestActionSummary(
     ...(action.reason === "save_decision"
       ? { artifact_id: action.target.artifactId }
       : {}),
+    ...(action.reason === "share_result" ? { message_id: action.messageId } : {}),
   };
 }
 
@@ -123,4 +127,37 @@ export class SingleUseGuestAction {
     this.action = null;
     return action;
   }
+}
+
+type GuestClaim = {
+  conversation_id: string;
+  pending_action: {
+    reason: string;
+    conversation_id: string;
+    action_id: string;
+    message_id?: string;
+  } | null;
+};
+
+export function verifiedClaimAction(
+  claimed: GuestClaim,
+  conversationId: string,
+  latch: SingleUseGuestAction | null,
+) {
+  if (claimed.conversation_id !== conversationId) {
+    throw new Error("The temporary conversation could not be verified.");
+  }
+  const expected = latch?.take() ?? null;
+  if (!expected) return null;
+  const claimedAction = claimed.pending_action;
+  if (
+    !claimedAction ||
+    claimedAction.action_id !== expected.actionId ||
+    claimedAction.conversation_id !== expected.conversationId ||
+    claimedAction.reason !== expected.reason ||
+    (expected.reason === "share_result" && claimedAction.message_id !== expected.messageId)
+  ) {
+    throw new Error("The pending action could not be verified.");
+  }
+  return expected;
 }

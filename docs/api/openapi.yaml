@@ -1018,6 +1018,111 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/public-excerpt:
+    post:
+      tags:
+      - evidence-receipts
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicExcerptSelectionCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptCreateResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/public-excerpt-candidates:
+    get:
+      tags:
+      - evidence-receipts
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptCandidates'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/public-excerpt-preview:
+    post:
+      tags:
+      - evidence-receipts
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicExcerptSelection'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptPreview'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/run-dossiers:
     get:
       tags:
@@ -3467,6 +3572,7 @@ components:
             - new_conversation
             - keep_history
             - discovery_searches
+            - share_result
           - type: 'null'
         terminal_outcome:
           type: string
@@ -3539,6 +3645,7 @@ components:
           - new_conversation
           - keep_history
           - discovery_searches
+          - share_result
         conversation_id:
           type: string
           maxLength: 128
@@ -3548,6 +3655,12 @@ components:
           maxLength: 128
           minLength: 1
         artifact_id:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+        message_id:
           anyOf:
           - type: string
             maxLength: 128
@@ -4434,6 +4547,109 @@ components:
 
 
         Keys with nothing to measure carry no value: ``long_only`` is the whole fact.'
+    PublicExcerptBacktestTurn:
+      properties:
+        kind:
+          type: string
+          const: backtest
+          default: backtest
+        idea_title:
+          type: string
+        fact_bank:
+          $ref: '#/components/schemas/PublicExcerptFactBank'
+        visual:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptVisual'
+          - type: 'null'
+        owner_note:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+        content_language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        framing:
+          type: string
+          const: historical_simulation_not_advice
+          default: historical_simulation_not_advice
+        provenance_mark:
+          type: string
+          const: tested_with_argus
+          default: tested_with_argus
+      additionalProperties: false
+      type: object
+      required:
+      - idea_title
+      - fact_bank
+    PublicExcerptCandidate:
+      properties:
+        message_id:
+          type: string
+        question:
+          anyOf:
+          - type: string
+          - type: 'null'
+        kind:
+          anyOf:
+          - type: string
+            enum:
+            - backtest
+            - research_answer
+            - tool_result
+          - type: 'null'
+        eligible:
+          type: boolean
+        reason:
+          anyOf:
+          - type: string
+            enum:
+            - not_completed
+            - unsupported_turn
+            - unsupported_shape
+            - missing_sources
+            - degraded
+            - memory_used
+            - missing_question
+            - text_too_long
+            - unsafe_text
+            - unlisted_url
+            - invalid_selection
+            - preview_changed
+            - invalid_source
+            - unsupported_backtest
+          - type: 'null'
+        field:
+          anyOf:
+          - type: string
+            enum:
+            - question
+            - answer
+            - owner_note
+            - sources
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - message_id
+      - eligible
+    PublicExcerptCandidates:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/PublicExcerptCandidate'
+          type: array
+        max_turns:
+          type: integer
+          const: 4
+          default: 4
+      additionalProperties: false
+      type: object
+      required:
+      - items
     PublicExcerptCreate:
       properties:
         owner_note:
@@ -4470,6 +4686,39 @@ components:
         a receipt is opened by strangers whose language has nothing to do with the
 
         author''s. Two ISO dates carry the same fact and can be spoken by anyone.'
+    PublicExcerptFactBank:
+      properties:
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+        config_snapshot:
+          $ref: '#/components/schemas/ReceiptConfig'
+        figures:
+          $ref: '#/components/schemas/ReceiptFigures'
+        result_card:
+          $ref: '#/components/schemas/ReceiptCardFacts'
+      additionalProperties: false
+      type: object
+      required:
+      - symbols
+      - config_snapshot
+      - figures
+      - result_card
     PublicExcerptFunnelStage:
       properties:
         stage:
@@ -4477,6 +4726,14 @@ components:
           enum:
           - viewed
           - try_argus
+        kind:
+          type: string
+          enum:
+          - backtest
+          - research_answer
+          - tool_result
+          - mixed
+          default: backtest
       additionalProperties: false
       type: object
       required:
@@ -4509,6 +4766,14 @@ components:
           anyOf:
           - $ref: '#/components/schemas/LocalizedText'
           - type: 'null'
+        kind:
+          type: string
+          enum:
+          - backtest
+          - research_answer
+          - tool_result
+          - mixed
+          default: backtest
         created_at:
           type: string
           format: date-time
@@ -4523,6 +4788,7 @@ components:
             enum:
             - owner_revoked
             - source_deleted
+            - removed_by_argus
           - type: 'null'
       additionalProperties: false
       type: object
@@ -4581,6 +4847,24 @@ components:
         exception and carries a bare signed number, because its unit is percentage
 
         points and every way of writing that unit is a word. The page supplies the word.'
+    PublicExcerptOfferedNextStep:
+      properties:
+        kind:
+          type: string
+          enum:
+          - research_test_single
+          - research_test_versus
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - symbols
     PublicExcerptPayload:
       properties:
         schema_version:
@@ -4647,6 +4931,116 @@ components:
       - idea_title
       - date_range
       description: The closed receipt payload. Adding a field here is a product decision.
+    PublicExcerptPreview:
+      properties:
+        payload:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptPayload'
+          - $ref: '#/components/schemas/PublicExcerptTurnsPayload'
+          - $ref: '#/components/schemas/PublicToolExcerptPayload'
+        payload_digest:
+          type: string
+        kind:
+          type: string
+          enum:
+          - backtest
+          - research_answer
+          - tool_result
+          - mixed
+        existing_receipt:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptListItem'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - payload
+      - payload_digest
+      - kind
+    PublicExcerptResearchSource:
+      properties:
+        title:
+          type: string
+        domain:
+          type: string
+        url:
+          type: string
+        source_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - domain
+      - url
+    PublicExcerptResearchTurn:
+      properties:
+        kind:
+          type: string
+          const: research_answer
+          default: research_answer
+        question:
+          type: string
+          maxLength: 500
+          minLength: 1
+        answer:
+          type: string
+          maxLength: 4000
+          minLength: 1
+        sources:
+          items:
+            $ref: '#/components/schemas/PublicExcerptResearchSource'
+          type: array
+          maxItems: 5
+          minItems: 1
+        retrieved_at:
+          type: string
+          format: date-time
+        anchor_symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+        offered_next_step:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptOfferedNextStep'
+          - type: 'null'
+        owner_note:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+        content_language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        framing:
+          type: string
+          const: research_snapshot_not_advice
+          default: research_snapshot_not_advice
+        provenance_mark:
+          type: string
+          const: tested_with_argus
+          default: tested_with_argus
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      - answer
+      - sources
+      - retrieved_at
     PublicExcerptRevokeResponse:
       properties:
         receipt:
@@ -4655,6 +5049,44 @@ components:
       type: object
       required:
       - receipt
+    PublicExcerptSelection:
+      properties:
+        message_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 4
+          minItems: 1
+        owner_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - message_ids
+    PublicExcerptSelectionCreate:
+      properties:
+        message_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 4
+          minItems: 1
+        owner_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        payload_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+      additionalProperties: false
+      type: object
+      required:
+      - message_ids
+      - payload_digest
     PublicExcerptStrategyFact:
       properties:
         key:
@@ -4692,6 +5124,93 @@ components:
         alternative, freezing an English label, would put untranslatable chrome inside
 
         the payload.'
+    PublicExcerptToolCard:
+      properties:
+        card_type:
+          type: string
+          minLength: 1
+        card_version:
+          type: integer
+          minimum: 1.0
+        presentation:
+          $ref: '#/components/schemas/ToolCardPresentation'
+      additionalProperties: false
+      type: object
+      required:
+      - card_type
+      - card_version
+      - presentation
+      description: A frozen declared presentation with no private execution envelope.
+    PublicExcerptToolTurn:
+      properties:
+        kind:
+          type: string
+          const: tool_result
+          default: tool_result
+        question:
+          type: string
+          maxLength: 500
+          minLength: 1
+        cards:
+          items:
+            $ref: '#/components/schemas/PublicExcerptToolCard'
+          type: array
+          maxItems: 8
+          minItems: 1
+        owner_note:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+        content_language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        framing:
+          type: string
+          const: computed_result_not_advice
+          default: computed_result_not_advice
+        provenance_mark:
+          type: string
+          const: computed_with_argus
+          default: computed_with_argus
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      - cards
+      description: One selected assistant message, preserving all its ordered tool answers.
+    PublicExcerptTurnsPayload:
+      properties:
+        schema_version:
+          type: integer
+          const: 2
+          default: 2
+        kind:
+          type: string
+          const: turns
+          default: turns
+        turns:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/PublicExcerptResearchTurn'
+            - $ref: '#/components/schemas/PublicExcerptBacktestTurn'
+            - $ref: '#/components/schemas/PublicExcerptToolTurn'
+            discriminator:
+              propertyName: kind
+              mapping:
+                backtest: '#/components/schemas/PublicExcerptBacktestTurn'
+                research_answer: '#/components/schemas/PublicExcerptResearchTurn'
+                tool_result: '#/components/schemas/PublicExcerptToolTurn'
+          type: array
+          maxItems: 4
+          minItems: 1
+      additionalProperties: false
+      type: object
+      required:
+      - turns
     PublicExcerptView:
       properties:
         public_id:
@@ -4701,6 +5220,15 @@ components:
           enum:
           - available
           - revoked
+        kind:
+          anyOf:
+          - type: string
+            enum:
+            - backtest
+            - research_answer
+            - tool_result
+            - mixed
+          - type: 'null'
         indexing:
           type: string
           const: noindex, nofollow
@@ -4712,14 +5240,9 @@ components:
           - type: 'null'
         payload:
           anyOf:
-          - oneOf:
-            - $ref: '#/components/schemas/PublicExcerptPayload'
-            - $ref: '#/components/schemas/PublicToolExcerptPayload'
-            discriminator:
-              propertyName: schema_version
-              mapping:
-                '1': '#/components/schemas/PublicExcerptPayload'
-                '2': '#/components/schemas/PublicToolExcerptPayload'
+          - $ref: '#/components/schemas/PublicExcerptPayload'
+          - $ref: '#/components/schemas/PublicExcerptTurnsPayload'
+          - $ref: '#/components/schemas/PublicToolExcerptPayload'
           - type: 'null'
       additionalProperties: false
       type: object
@@ -4816,7 +5339,374 @@ components:
       - card_type
       - card_version
       - presentation
-      description: Version two freezes the same card facts, never private execution inputs.
+      description: Read compatibility for frozen registry-preview receipts; never a new writer.
+    ReceiptCardFacts:
+      properties:
+        execution_costs:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptCosts'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptConfig:
+      properties:
+        template:
+          anyOf:
+          - type: string
+          - type: 'null'
+        start_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+        end_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+        date_range:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptDates'
+          - type: 'null'
+        starting_capital:
+          anyOf:
+          - type: number
+          - type: 'null'
+        timeframe:
+          anyOf:
+          - type: string
+          - type: 'null'
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+        resolved_strategy:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptStrategy'
+          - type: 'null'
+        resolved_parameters:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptParameters'
+          - type: 'null'
+        parameters:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptParameters'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptCosts:
+      properties:
+        fee_bps:
+          anyOf:
+          - type: number
+          - type: 'null'
+        slippage_bps:
+          anyOf:
+          - type: number
+          - type: 'null'
+        benchmark_treatment:
+          anyOf:
+          - type: string
+            const: same_modeled_costs
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptDates:
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - start
+      - end
+    ReceiptFigures:
+      properties:
+        total_return_pct:
+          anyOf:
+          - type: number
+          - type: 'null'
+        benchmark_return_pct:
+          anyOf:
+          - type: number
+          - type: 'null'
+        delta_vs_benchmark_pct:
+          anyOf:
+          - type: number
+          - type: 'null'
+        benchmark_comparison_claim:
+          anyOf:
+          - type: string
+            enum:
+            - beat_benchmark
+            - lagged_benchmark
+            - matched_benchmark
+            - unknown
+          - type: 'null'
+        max_drawdown_pct:
+          anyOf:
+          - type: number
+          - type: 'null'
+        gross_total_return_pct:
+          anyOf:
+          - type: number
+          - type: 'null'
+        net_total_return_pct:
+          anyOf:
+          - type: number
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptLegacyRule:
+      properties:
+        type:
+          anyOf:
+          - type: string
+          - type: 'null'
+        indicator:
+          anyOf:
+          - type: string
+          - type: 'null'
+        period:
+          anyOf:
+          - type: number
+          - type: 'null'
+        threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+        direction:
+          anyOf:
+          - type: string
+          - type: 'null'
+        fast_indicator:
+          anyOf:
+          - type: string
+          - type: 'null'
+        fast_period:
+          anyOf:
+          - type: number
+          - type: 'null'
+        slow_indicator:
+          anyOf:
+          - type: string
+          - type: 'null'
+        slow_period:
+          anyOf:
+          - type: number
+          - type: 'null'
+        signal_period:
+          anyOf:
+          - type: number
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptParameters:
+      properties:
+        strategy_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+        starting_capital:
+          anyOf:
+          - type: number
+          - type: 'null'
+        recurring_contribution:
+          anyOf:
+          - type: number
+          - type: 'null'
+        cadence:
+          anyOf:
+          - type: string
+          - type: 'null'
+        timeframe:
+          anyOf:
+          - type: string
+          - type: 'null'
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+        indicator:
+          anyOf:
+          - type: string
+          - type: 'null'
+        indicator_period:
+          anyOf:
+          - type: number
+          - type: 'null'
+        entry_threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+        exit_threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+        rule_spec:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptRuleSpec'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptRuleCondition:
+      properties:
+        left:
+          anyOf:
+          - type: number
+          - $ref: '#/components/schemas/ReceiptRuleSeries'
+        right:
+          anyOf:
+          - type: number
+          - $ref: '#/components/schemas/ReceiptRuleSeries'
+        operator:
+          type: string
+          enum:
+          - lt
+          - lte
+          - gt
+          - gte
+          - cross_above
+          - cross_below
+      additionalProperties: false
+      type: object
+      required:
+      - left
+      - right
+      - operator
+    ReceiptRuleGroup:
+      properties:
+        combinator:
+          type: string
+          enum:
+          - all
+          - any
+          default: all
+        conditions:
+          items:
+            $ref: '#/components/schemas/ReceiptRuleCondition'
+          type: array
+          maxItems: 20
+          minItems: 1
+      additionalProperties: false
+      type: object
+      required:
+      - conditions
+    ReceiptRuleParameters:
+      properties:
+        fast:
+          anyOf:
+          - type: number
+          - type: 'null'
+        slow:
+          anyOf:
+          - type: number
+          - type: 'null'
+        signal:
+          anyOf:
+          - type: number
+          - type: 'null'
+        length:
+          anyOf:
+          - type: number
+          - type: 'null'
+        std:
+          anyOf:
+          - type: number
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptRuleSeries:
+      properties:
+        kind:
+          type: string
+          enum:
+          - price
+          - volume
+          - indicator
+        key:
+          anyOf:
+          - type: string
+            pattern: ^[a-z][a-z0-9_]{0,31}$
+          - type: 'null'
+        field:
+          anyOf:
+          - type: string
+            enum:
+            - open
+            - high
+            - low
+            - close
+          - type: 'null'
+        period:
+          anyOf:
+          - type: number
+          - type: 'null'
+        output:
+          anyOf:
+          - type: string
+            pattern: ^[a-z_]{1,24}$
+          - type: 'null'
+        parameters:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptRuleParameters'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+    ReceiptRuleSpec:
+      properties:
+        entry:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptRuleGroup'
+          - type: 'null'
+        exit:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptRuleGroup'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    ReceiptStrategy:
+      properties:
+        strategy_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+        initial_capital:
+          anyOf:
+          - type: number
+          - type: 'null'
+        capital_amount:
+          anyOf:
+          - type: number
+          - type: 'null'
+        recurring_contribution:
+          anyOf:
+          - type: number
+          - type: 'null'
+        contribution_period:
+          anyOf:
+          - type: string
+          - type: 'null'
+        cadence:
+          anyOf:
+          - type: string
+          - type: 'null'
+        entry_rule:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptLegacyRule'
+          - type: 'null'
+        exit_rule:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptLegacyRule'
+          - type: 'null'
+        rule_spec:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptRuleSpec'
+          - type: 'null'
+      additionalProperties: false
+      type: object
     ResearchSource:
       properties:
         url:

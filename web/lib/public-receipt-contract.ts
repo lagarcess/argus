@@ -1,7 +1,7 @@
-import { parseToolPresentation, type ToolCardPresentation } from "./tool-result-card";
 import { cache } from "react";
 import type { AssetClass } from "./argus-types";
 import { ARGUS_API_BASE_URL } from "./argus-api-transport";
+import { receiptDocumentSupported, type PublicReceiptDocument, type ReceiptKind } from "./public-receipt-turns";
 import type { EvidenceVisual, EvidenceVisualPoint } from "./evidence-visual";
 
 /**
@@ -91,7 +91,7 @@ export type PublicReceiptMetric = {
 export type PublicReceiptVisualPoint = EvidenceVisualPoint;
 export type PublicReceiptVisual = EvidenceVisual;
 
-export type PublicBacktestReceiptPayload = {
+export type PublicReceiptPayload = {
   schema_version: 1;
   idea_title: string;
   asset_class?: AssetClass | null;
@@ -108,26 +108,16 @@ export type PublicBacktestReceiptPayload = {
   provenance_mark: "tested_with_argus";
 };
 
-export type PublicToolReceiptPayload = {
-  schema_version: 2;
-  card_type: string;
-  card_version: 1;
-  presentation: ToolCardPresentation;
-  owner_note?: string | null;
-  content_language: "en" | "es-419";
-  framing: "computed_result_not_advice";
-  provenance_mark: "computed_with_argus";
-};
-
-export type PublicReceiptPayload = PublicBacktestReceiptPayload | PublicToolReceiptPayload;
-
 export type PublicReceiptView = {
   public_id: string;
   status: "available" | "revoked";
+  kind?: ReceiptKind | null;
   indexing: "noindex, nofollow";
   created_at?: string | null;
-  payload?: PublicReceiptPayload | null;
+  payload?: PublicReceiptDocument | null;
 };
+
+export type PublicBacktestReceiptPayload = PublicReceiptPayload;
 
 export const PUBLIC_RECEIPT_PATH_PREFIX = "/r/";
 export const PUBLIC_RECEIPT_MAX_ID_LENGTH = 64;
@@ -148,7 +138,7 @@ export function publicReceiptPath(publicId: string): string {
  * telling a viewer their link is dead when it is not would be a lie.
  */
 export type PublicReceiptResult =
-  | { kind: "available"; payload: PublicReceiptPayload; createdAt: string | null }
+  | { kind: "available"; payload: PublicReceiptDocument; createdAt: string | null }
   | { kind: "revoked" }
   | { kind: "unavailable" };
 
@@ -188,18 +178,13 @@ export async function fetchPublicReceipt(
     if (view.status === "revoked") {
       return { kind: "revoked" };
     }
-    if (view.status !== "available" || !view.payload) {
+    if (view.status !== "available" || !view.payload || !receiptDocumentSupported(view.payload)) {
       // A shape we do not recognise is not evidence that anything was revoked.
-      return { kind: "unavailable" };
-    }
-    const payload = view.payload;
-    if (payload.schema_version !== 1 && (payload.schema_version !== 2 ||
-      payload.card_version !== 1 || !payload.card_type || !parseToolPresentation(payload.presentation))) {
       return { kind: "unavailable" };
     }
     return {
       kind: "available",
-      payload,
+      payload: view.payload,
       createdAt: view.created_at ?? null,
     };
   } catch {
@@ -210,7 +195,6 @@ export async function fetchPublicReceipt(
 export function headlineReceiptMetric(
   payload: PublicReceiptPayload,
 ): PublicReceiptMetric | null {
-  if (payload.schema_version !== 1) return null;
   // A run freezes exactly one of these: total_return_pct for one-bankroll
   // templates, contribution_return_pct for recurring plans.
   const preferred: PublicReceiptMetricKey[] = [

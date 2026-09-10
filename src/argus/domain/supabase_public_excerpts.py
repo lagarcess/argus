@@ -41,6 +41,12 @@ OWNER_COLUMNS = (
     "source_message_id",
     "source_artifact_id",
     "source_input_revision",
+    "source_tool_bindings",
+    "source_message_ids",
+    "source_run_ids",
+    "source_artifact_ids",
+    "selection_key",
+    "kind",
     "title",
     "payload",
     "payload_digest",
@@ -109,6 +115,10 @@ class SupabasePublicExcerptMixin:
     def _live_receipt_for_source(
         self, snapshot: PublicExcerptSnapshot
     ) -> PublicExcerptSnapshot | None:
+        if snapshot.selection_key is not None:
+            return self.get_live_public_excerpt_for_selection(
+                owner_id=snapshot.owner_id, selection_key=snapshot.selection_key
+            )
         source = snapshot.tool_source
         if source is not None:
             return self.get_live_public_excerpt_for_tool_result(
@@ -159,6 +169,49 @@ class SupabasePublicExcerptMixin:
         )
         rows = _rows(result)
         return _snapshot_from_row(rows[0]) if rows else None
+
+    def get_live_public_excerpt_for_selection(
+        self, *, owner_id: str, selection_key: str | None
+    ) -> PublicExcerptSnapshot | None:
+        if selection_key is None:
+            return None
+        result = (
+            self.client.table(TABLE)
+            .select(",".join(OWNER_COLUMNS))
+            .eq("owner_id", owner_id)
+            .eq("selection_key", selection_key)
+            .is_("revoked_at", "null")
+            .limit(1)
+            .execute()
+        )
+        rows = _rows(result)
+        return _snapshot_from_row(rows[0]) if rows else None
+
+    def public_excerpt_source_records(
+        self, *, owner_id: str, conversation_id: str
+    ) -> tuple[list[dict[str, Any]], list[Any]]:
+        from argus.api.schemas import EvidenceArtifact
+
+        def all_rows(table: str, conversation_field: str) -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            while True:
+                page = _rows(
+                    self.client.table(table)
+                    .select("*")
+                    .eq("user_id", owner_id)
+                    .eq(conversation_field, conversation_id)
+                    .order("id")
+                    .range(len(rows), len(rows) + 499)
+                    .execute()
+                )
+                rows.extend(page)
+                if len(page) < 500:
+                    return rows
+
+        return all_rows("backtest_jobs", "conversation_id"), [
+            EvidenceArtifact.model_validate(row)
+            for row in all_rows("evidence_artifacts", "source_conversation_id")
+        ]
 
     def list_public_excerpt_snapshots(
         self,
@@ -303,9 +356,12 @@ def _public_view_from_row(public_id: str, row: dict[str, Any]) -> PublicExcerptV
         raise PublicExcerptUnreadableError(
             "That receipt could not be read right now."
         ) from error
+    from argus.domain.public_excerpt_kinds import document_kind
+
     return PublicExcerptView(
         public_id=public_id,
         status="available",
+        kind=document_kind(payload),
         created_at=row.get("created_at"),
         payload=payload,
     )

@@ -28,7 +28,7 @@ async function translate(language: "en" | "es-419") {
 }
 
 describe("declaration-owned result cards", () => {
-  test("Share requires a completed answer fact and accepts a zero answer", () => {
+  test("tool cards retain their answers while the header owns sharing", () => {
     // The flag is a build-time constant; isolate the enabled render from default-off tests.
     const result = Bun.spawnSync({
       cmd: [process.execPath, "-e", `
@@ -57,7 +57,9 @@ describe("declaration-owned result cards", () => {
     });
     expect(result.exitCode).toBe(0);
     const [completed, pending, missing] = JSON.parse(result.stdout.toString()) as string[];
-    expect(completed).toContain(en.receipt.owner.share);
+    expect(completed).toContain("data-tool-answer");
+    expect(completed).not.toContain(en.receipt.selection.title);
+    expect(completed).not.toContain(en.receipt.owner.share);
     expect(pending).not.toContain(en.receipt.owner.share);
     expect(missing).not.toContain(en.receipt.owner.share);
   });

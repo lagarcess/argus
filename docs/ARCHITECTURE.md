@@ -479,6 +479,8 @@ SSE stream: done event with final payload
 Each declaration binds a real callable's typed argument and return models to its
 description, cross-argument rules, domain and units, failure semantics, execution
 cost, confirmation callback, progress template, and versioned card presenter.
+Its public-receipt policy also owns whether sanitized typed facts may be shared,
+whether citations are required, or whether sharing is disabled.
 The model-facing schema, capability text, runtime dispatch and result projection
 derive from those declarations. Availability derives from the same feature-flag
 owner that guards execution. Strategy templates retain their existing registry
@@ -523,8 +525,12 @@ cost-ledger and backtest persistence owners remain authoritative. The shared car
 presenter owns display facts and units, while the callable owns the typed result.
 Local editable tools recompute through the existing guarded message-artifact
 writer; the original unknown remains blank and the input revision advances with
-the result. Public receipt v2 freezes a sanitized projection of that same card
-binding, with private narrative and request input excluded.
+the result. Public receipt v2 freezes sanitized projections of those same card
+bindings within one selected-turn document, with private narrative and request
+input excluded. Ordered sibling calls remain within their selected message.
+Every sibling passes its declaration's public-receipt policy and shared source,
+privacy and revision checks. Old bare v2 tool payloads remain strictly readable;
+new writes use the shared selected-turn contract.
 
 Progress is a declaration locale key with typed argument interpolation emitted
 when its call executes. Graph-stage events retain operational meaning and cannot

@@ -5,14 +5,14 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ReceiptBody from "../components/receipt/ReceiptBody";
 import { parseToolResultCard, type ToolResultCard } from "../lib/tool-result-card";
-import type { PublicToolReceiptPayload } from "../lib/public-receipt-contract";
+import { receiptDocumentSupported, type SelectedReceiptDocument } from "../lib/public-receipt-turns";
 import { receiptCopy } from "../lib/receipt-copy";
 import en from "../public/locales/en/common.json";
 import es from "../public/locales/es-419/common.json";
 
 const fixtures = JSON.parse(readFileSync(path.resolve(import.meta.dir,
   "../../docs/reports/evidence/registry/backtest-cards.json"), "utf8")) as Record<string, {
-  card: ToolResultCard; receipt: PublicToolReceiptPayload;
+  card: ToolResultCard; receipt: SelectedReceiptDocument;
 }>;
 
 describe("canonical backtest presentation in a v2 receipt", () => {
@@ -20,7 +20,10 @@ describe("canonical backtest presentation in a v2 receipt", () => {
     test(`preserves the DCA result, zero, costs and plot in ${language}`, () => {
       const { card, receipt } = fixtures[language];
       expect(parseToolResultCard(card)).not.toBeNull();
-      expect(receipt.presentation.visual).toEqual(card.presentation.visual);
+      expect(receiptDocumentSupported(receipt)).toBe(true);
+      const turn = receipt.turns[0];
+      if (turn.kind !== "tool_result") throw new Error("Expected the declaration-owned result binding");
+      expect(turn.cards[0].presentation.visual).toEqual(card.presentation.visual);
       const html = renderToStaticMarkup(<ReceiptBody payload={receipt} createdAt={null}
         copy={receiptCopy(language)} language={language} />);
       const copy = (language === "en" ? en : es).receipt;

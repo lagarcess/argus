@@ -1321,18 +1321,25 @@ Cost model notes:
 
 ## 12.1.3 public_excerpt_snapshots
 
-A public evidence receipt: an immutable, sanitized snapshot of one completed
-backtest or successful declared tool result, created by its owner and revocable
-by its owner. Behind the default-off
-`ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
+A public evidence receipt: an immutable, sanitized snapshot of one to four
+eligible answers selected from one conversation, created by a registered owner
+and revocable by that owner. This extends the existing receipt table behind the
+default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
 
-Backtest v1 follows `EvidenceArtifact -> PublicExcerptSnapshot -> PublicExcerptView`.
-Tool v2 follows the owned message's exact tool-card revision into the same
-snapshot and view; it creates no placeholder run or evidence artifact.
+The pipeline is `owned assistant messages -> PublicExcerptSnapshot ->
+PublicExcerptView`. Backtest messages resolve their canonical EvidenceArtifact
+and run through this same boundary. The artifact endpoint is a compatibility
+adapter to that same selection service and singleton identity. The header opens
+the sole user-facing selection flow. Existing live version 1 receipts are reused
+unchanged.
+
+Generic tool results use their owned message's exact card revisions at this
+same boundary. They create no placeholder run or EvidenceArtifact. Ordered
+sibling cards stay within one selected turn, and every sibling must be eligible.
+
 The snapshot is frozen at creation and the public read never queries the source
-conversation. Immutable means the numbers never move: re-running the idea later
-produces a new artifact and leaves the receipt showing what it showed the day it
-was shared.
+conversation, message, run or provider. Asking again or rerunning produces new
+source material and leaves the earlier receipt unchanged.
 
 Fields:
 - `id`: `uuid` (Primary Key)
@@ -1345,21 +1352,34 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
-- `source_message_id`: `uuid` (Nullable, references `messages.id`
-  ON DELETE SET NULL; tool v2 only)
-- `source_artifact_id`: `uuid` (Nullable; the tool card identity)
+- `source_message_id`: `uuid` (Nullable legacy tool source, references
+  `messages.id` ON DELETE SET NULL)
+- `source_artifact_id`: `uuid` (Nullable legacy tool-card identity)
 - `source_input_revision`: `integer` (Nullable, nonnegative; paired with the
-  source artifact identity)
+  legacy tool-card identity)
+- `kind`: `text` (`backtest`, `research_answer`, `tool_result`, or `mixed`; existing rows default
+  to `backtest`)
+- `source_message_ids`: `uuid[]` (Private selected assistant messages; one to four
+  for new receipts, empty for legacy rows)
+- `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
+  sources, each bounded at four)
+- `source_tool_bindings`: `jsonb` (Private ordered tool sources, each containing
+  `message_id`, `artifact_id`, and nonnegative `input_revision`; bounded by the
+  selected-turn and declared-call limits, empty for legacy rows)
+- `selection_key`: `text` (Nullable for legacy rows; canonical sha256 selection
+  identity, independent of note and payload content)
 - `title`: `text`
 - `payload`: `jsonb` (the closed public payload; see below)
 - `payload_digest`: `text` (`^[0-9a-f]{64}$`, sha256 over the canonical payload)
 - `created_at`: `timestamptz`
 - `revoked_at`: `timestamptz` (Nullable)
-- `revocation_reason`: `text` (Nullable, `owner_revoked` or `source_deleted`)
+- `revocation_reason`: `text` (Nullable, `owner_revoked`, `source_deleted`, or
+  `removed_by_argus`)
 
-The source references are `ON DELETE SET NULL` rather than cascade so a tombstone
-outlives whatever it pointed at. They exist only for revocation and the owner's
-audit list; the public read never selects them.
+The legacy scalar source references are `ON DELETE SET NULL` rather than cascade
+so a tombstone outlives whatever it pointed at. The new private source arrays are
+immutable provenance; insert and deletion triggers enforce their ownership and
+liveness. These source identifiers never enter the public read or public payload.
 
 ### Closed payload
 
@@ -1369,28 +1389,43 @@ on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
 `date_range`, `metrics`, `benchmark_symbol`, `visual`, `owner_note`,
 `content_language`, `framing`, `provenance_mark`.
 
-Version 2 contains `schema_version`, `card_type`, `card_version`, `presentation`,
-`owner_note`, `content_language`, `framing`, and `provenance_mark`. Presentation
-comes from the same declaration-bound projection as chat, with private narrative
-and private input facts removed by the public sanitizer. Input visibility is
-declared and defaults to private. Validated public citations and the existing
-typed visual remain attached to its facts. Raw tool arguments/outcomes and call identities
-are never public. A unique partial index permits one live receipt per owner,
-source message, artifact and input revision. Insert guards lock the conversation
-and source message, verify ownership and the successful current revision, and
-reject deletion/recompute races. Source identity and revision are immutable;
-source deletion revokes the receipt before foreign-key cleanup.
+Version 2 is a closed outer `{schema_version: 2, kind: "turns", turns: [...]}`
+wrapper. It contains one to four per-turn payloads in conversation order. Each
+turn has a closed `kind` discriminator. The exact research leaf is specified by
+`docs/specs/conversation-sharing.md` section 4.2; no field is added to that leaf.
+The backtest leaf freezes the card's closed typed fact bank, title, visual, note,
+content language, framing and provenance. `public_excerpt_fact_schemas.py` closes
+every nested config, rule, figure and cost field. The public renderer reads the
+same result fact and display owners as the result card.
+
+Generic tool-result turns contain ordered, declaration-bound card presentations.
+Their closed leaf contains `kind: "tool_result"`, `question`, `cards`,
+`owner_note`, `content_language`, `framing: "computed_result_not_advice"`, and
+`provenance_mark: "computed_with_argus"`. Each card contains only `card_type`,
+`card_version`, and `presentation`; call limits bound the sibling list.
+The same public sanitizer removes private narrative and private input facts;
+input visibility is declared and defaults to private. Validated citations and
+typed visuals remain attached to their facts. Raw tool arguments, outcomes and
+call identities never reach the public document. Previously frozen bare version
+2 tool receipts remain strictly readable; their payloads and digests never
+change during migration.
+
+Every selected turn independently passes the shared eligibility and privacy audit
+at preview and creation. A refusal refuses the entire selection. The owner sees
+the exact public rendering before creation; its digest must still match when
+creation rechecks the sources. The four-turn cap and preview bound the accepted
+cross-turn inference risk; they do not eliminate it.
 
 Source conversation ids, route receipts, provider or model metadata, retry
-payloads, raw transcripts, broker or account data, and user-private memory are
-never present. `argus.domain.public_excerpts.audit_public_excerpt_payload` audits
+payloads, unselected transcript content, broker or account data, and user-private
+memory are never present. `argus.domain.public_excerpts.audit_public_excerpt_payload` audits
 keys and values before any receipt is written and fails closed, so a payload that
 cannot be proven clean is never stored.
 
-### Nothing rendered is frozen
+### Version 1 display values remain unchanged
 
-A receipt is read by strangers, so the payload freezes facts and never sentences.
-For v1, `strategy_facts`, `assumptions`, and `metrics` are each a list of `{key, value}`
+The version 1 backtest payload freezes typed facts rather than rendered labels.
+`strategy_facts`, `assumptions`, and `metrics` are each a list of `{key, value}`
 under a closed key enum (`StrategyFactKey`, `AssumptionKey`, `MetricKey`), where
 `value` is the bare scalar the run reported, and `date_range` is `{start, end}` as
 ISO dates. Labels, sentences, thousands separators, and date formats are all
@@ -1435,10 +1470,13 @@ about a live link. Owner-side reads are not wrapped this way; an owner's list is
 the only place a receipt can be revoked, so a row it cannot parse should surface
 loudly rather than vanish from that list.
 
-`idea_title` and `owner_note` are the only author-written fields, and
-`content_language` names the language they are in. `owner_note` is also the only
-free-text field: bounded at 280 characters, stripped of control characters, and
-refused if it contains an identifier or a credential-shaped token.
+Version 1 author text remains `idea_title` and `owner_note`. A research leaf also
+carries its whitespace-normalized question (at most 500 characters) and answer
+markdown (at most 4,000). A note is bounded at 280. Each field is audited and
+refused with a named field if it contains an identifier, credential shape, private
+id or never-expose marker. Answers with prose URLs absent verbatim from typed
+sources are refused. No redaction or truncation repairs an ineligible answer.
+`content_language` names the author's language; reader chrome remains live.
 
 `visual` freezes the run's equity series, downsampled to at most 500 points with
 the endpoints preserved. The public view renders it client side; nothing is
@@ -1448,7 +1486,9 @@ fetched at view time.
 
 `prevent_public_excerpt_immutable_update` rejects any change to `id`,
 `public_id`, `owner_id`, `title`, `payload`, `payload_digest`, or `created_at`,
-and rejects any change to the revocation columns once `revoked_at` is set.
+and also freezes `kind`, `selection_key`, private source arrays and tool
+revision bindings. It
+rejects any change to the revocation columns once `revoked_at` is set.
 Revocation is one way.
 
 `enforce_public_excerpt_source_is_live` refuses an insert whose source conversation
@@ -1460,10 +1500,23 @@ application check cannot do: a check-then-insert could pass and have the delete
 commit before the insert lands, whereas the lock makes a concurrent soft delete block
 the insert, which then reads the delete's result and refuses.
 
+For selected turns, the same insert trigger locks and verifies every named
+assistant message, run and artifact against the same owner and conversation.
+It acquires source locks in deterministic order. No selected source can disappear
+between an application check and publication without either refusing creation or
+revoking the snapshot.
+
+Tool-source checks also bind each card's successful current input revision.
+Recomputation produces a new selection identity and cannot alter a frozen
+receipt. Tool-card ids remain separate from EvidenceArtifact source arrays.
+The legacy singular tool source remains readable and participates in deletion
+revocation alongside selected message sources.
+
 `revoke_public_excerpts_for_deleted_source` revokes a receipt when its source
 goes away, so deleting a chat cannot leave a live public page behind:
 - `conversations` soft delete (`deleted_at` null to not null)
-- `conversations`, `backtest_runs`, or `evidence_artifacts` hard delete
+- `conversations`, `messages`, `backtest_runs`, or `evidence_artifacts` hard delete;
+  every selected source participates, not only the first turn
 
 Every branch skips rows whose owner profile is already gone. Account deletion
 cascades to conversations and fires the purge trigger while the profile no longer
@@ -1474,6 +1527,10 @@ A partial unique index on `(owner_id, evidence_artifact_id) where revoked_at is
 null` allows at most one live receipt per result, so re-sharing returns the
 existing link instead of minting a second page the owner must revoke twice.
 Revoked rows are excluded, so revoking does not forbid sharing that result again.
+A second partial unique index on `(owner_id, selection_key)` gives all new
+selections the same insert-race recovery. A new singleton backtest retains its
+artifact identity too, so the compatibility endpoint and message selection return
+the same live record. A different multi-turn selection is a different receipt.
 
 Note a pre-existing constraint: a conversation with a captured idea spine cannot
 be hard deleted at all, because `idea_versions.source_conversation_id` is

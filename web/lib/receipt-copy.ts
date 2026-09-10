@@ -1,8 +1,6 @@
-import { createInstance } from "i18next";
-import { localizedToolText, toolFactValue, type ToolTranslator } from "./tool-result-card";
-import type { PublicToolReceiptPayload } from "./public-receipt-contract";
 import enCommon from "@/public/locales/en/common.json";
 import esCommon from "@/public/locales/es-419/common.json";
+import { createInstance } from "i18next";
 import { SPANISH_ENABLED, type ArgusLanguage } from "./language-features";
 
 /**
@@ -47,6 +45,15 @@ export function receiptLanguageFromAcceptLanguage(
 export function receiptCopy(language: ArgusLanguage): ReceiptCopy {
   return COPY[language] ?? COPY.en;
 }
+
+// The card's display owners need the same catalog translator on the standalone
+// SSR page and inside the owner's preview, without a browser i18n provider.
+const receiptI18n = createInstance();
+void receiptI18n.init({
+  initAsync: false, fallbackLng: "en", interpolation: { escapeValue: false },
+  resources: { en: { translation: enCommon }, "es-419": { translation: esCommon } },
+});
+export const receiptTranslator = (language: ArgusLanguage) => receiptI18n.getFixedT(language);
 
 export function formatReceiptDate(
   value: string | null | undefined,
@@ -122,24 +129,4 @@ export function interpolate(
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) =>
     key in values ? String(values[key]) : match,
   );
-}
-
-/** The server receipt and client card resolve the same locale keys and values. */
-export function receiptToolTranslator(language: ArgusLanguage): ToolTranslator {
-  const instance = createInstance();
-  void instance.init({ lng: language, initAsync: false, fallbackLng: "en",
-    resources: { en: { translation: enCommon }, "es-419": { translation: esCommon } },
-    interpolation: { escapeValue: false },
-  });
-  return (key, values) => instance.t(key, values);
-}
-
-export function toolReceiptSummary(payload: PublicToolReceiptPayload, language: ArgusLanguage) {
-  const t = receiptToolTranslator(language);
-  return {
-    title: localizedToolText(payload.presentation.title, t),
-    answer: payload.presentation.answer ? toolFactValue(payload.presentation.answer, t, language) : "",
-    label: payload.presentation.answer ? localizedToolText(payload.presentation.answer.label, t) : "",
-    provenance: t("tools.receipt.provenance"), framing: t("tools.receipt.framing"),
-  };
 }

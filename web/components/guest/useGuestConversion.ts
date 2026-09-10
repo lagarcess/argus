@@ -15,43 +15,13 @@ import type { UserResponse } from "@/lib/guest-account";
 import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import {
   pendingGuestActionSummary,
+  verifiedClaimAction,
   SingleUseGuestAction,
   type GuestConversionMode,
   type GuestConversionReason,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
 import { randomId } from "@/lib/random-id";
-
-type GuestClaim = {
-  conversation_id: string;
-  pending_action: {
-    reason: string;
-    conversation_id: string;
-    action_id: string;
-  } | null;
-};
-
-function verifiedClaimAction(
-  claimed: GuestClaim,
-  conversationId: string,
-  latch: SingleUseGuestAction | null,
-) {
-  if (claimed.conversation_id !== conversationId) {
-    throw new Error("The temporary conversation could not be verified.");
-  }
-  const expected = latch?.take() ?? null;
-  if (!expected) return null;
-  const claimedAction = claimed.pending_action;
-  if (
-    !claimedAction ||
-    claimedAction.action_id !== expected.actionId ||
-    claimedAction.conversation_id !== expected.conversationId ||
-    claimedAction.reason !== expected.reason
-  ) {
-    throw new Error("The pending action could not be verified.");
-  }
-  return expected;
-}
 
 type UseGuestConversionInput = {
   account: UserResponse | null;

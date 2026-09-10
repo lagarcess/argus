@@ -1,11 +1,10 @@
 import { ImageResponse } from "next/og";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
-import { receiptCopy, toolReceiptSummary } from "@/lib/receipt-copy";
-import { benchmarkVerdict } from "@/lib/receipt-plan";
+import { receiptCopy } from "@/lib/receipt-copy";
+import { receiptPreviewFacts } from "@/lib/receipt-preview-facts";
+import { receiptDocumentLanguage } from "@/lib/public-receipt-turns";
 import {
   readPublicReceipt,
-  headlineReceiptMetric,
-  type PublicReceiptPayload,
 } from "@/lib/public-receipt-contract";
 
 /**
@@ -39,8 +38,6 @@ export const alt = "Tested with Argus";
 export const PREVIEW_FIELDS = [
   "headline_metric.value",
   "benchmark_verdict",
-  "presentation.answer.value",
-  "presentation.answer.label",
 ] as const;
 
 // The card is a public artifact too: never indexed, and never cached by Argus so
@@ -67,17 +64,6 @@ function cardCopy(language: "en" | "es-419") {
     provenance: copy.provenance,
     gone: copy.tombstone.title,
     wordmark: copy.wordmark,
-  };
-}
-
-function previewFacts(payload: PublicReceiptPayload, language: "en" | "es-419") {
-  if (payload.schema_version === 2) {
-    const summary = toolReceiptSummary(payload, language);
-    return { metricValue: summary.answer, verdict: summary.label };
-  }
-  return {
-    metricValue: headlineReceiptMetric(payload)?.value ?? "",
-    verdict: benchmarkVerdict(payload, receiptCopy(language)) ?? "",
   };
 }
 
@@ -168,13 +154,21 @@ export default async function Image({
     );
   }
 
-  const copy = cardCopy(result.payload.content_language);
-  if (result.payload.schema_version === 2) {
-    const summary = toolReceiptSummary(result.payload, result.payload.content_language);
-    copy.provenance = summary.provenance;
-    copy.framing = summary.framing;
+  const language = receiptDocumentLanguage(result.payload);
+  const copy = cardCopy(language);
+  const facts = receiptPreviewFacts(result.payload, language);
+  if (facts.research) {
+    return new ImageResponse((
+      <Frame>
+        <div style={{ display: "flex", fontSize: 46, fontWeight: 500, letterSpacing: 1, color: FOREGROUND }}>{copy.wordmark}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ display: "flex", fontSize: 62, fontWeight: 500, lineHeight: 1.1, color: FOREGROUND }}>{facts.imageTitle}</div>
+          <div style={{ display: "flex", fontSize: 30, color: MUTED }}>{[facts.stamp, facts.countText].filter(Boolean).join(" · ")}</div>
+        </div>
+        <div style={{ display: "flex", fontSize: 36, color: MUTED }}>{facts.framing}</div>
+      </Frame>
+    ), { ...size, headers: IMAGE_HEADERS });
   }
-  const facts = previewFacts(result.payload, result.payload.content_language);
   const negative = facts.metricValue.trim().startsWith("-");
   return new ImageResponse(
     (
@@ -218,6 +212,7 @@ export default async function Image({
           ) : null}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {facts.countText && <div style={{ display: "flex", fontSize: 24, color: MUTED }}>{facts.countText}</div>}
           {facts.verdict ? (
             <div
               style={{
@@ -232,7 +227,7 @@ export default async function Image({
             </div>
           ) : null}
           <div style={{ display: "flex", fontSize: 44, color: MUTED }}>
-            {copy.framing}
+            {facts.framing}
           </div>
         </div>
       </Frame>

@@ -542,7 +542,10 @@ def get_research_declarations() -> tuple[ToolDeclaration, ...]:
             description="Retrieve cited facts and figures from public sources, with typed subjects, time period, and freshness requirements.",
             handler=balanced_lookup,
             policy=ToolPolicy(
-                execution="provider", external_calls=2, confirmation="never"
+                execution="provider",
+                external_calls=2,
+                confirmation="never",
+                public_receipt="cited_facts",
             ),
             progress=ToolProgressTemplate(
                 "chat.tools.progress.balanced_lookup", ("request",)
@@ -555,7 +558,10 @@ def get_research_declarations() -> tuple[ToolDeclaration, ...]:
             description="Research a deeper source-backed comparison or analysis. Uses an existing background job and returns a pending receipt until it completes.",
             handler=thorough_research,
             policy=ToolPolicy(
-                execution="workflow", external_calls=1, confirmation="never"
+                execution="workflow",
+                external_calls=1,
+                confirmation="never",
+                public_receipt="cited_facts",
             ),
             progress=ToolProgressTemplate(
                 "chat.tools.progress.thorough_research", ("request",)
@@ -568,7 +574,10 @@ def get_research_declarations() -> tuple[ToolDeclaration, ...]:
             description="Retrieve candidate assets and the cited figures that establish whether every explicit condition holds.",
             handler=screening,
             policy=ToolPolicy(
-                execution="provider", external_calls=3, confirmation="never"
+                execution="provider",
+                external_calls=3,
+                confirmation="never",
+                public_receipt="cited_facts",
             ),
             progress=ToolProgressTemplate("chat.tools.progress.screening", ("request",)),
             card=binding,

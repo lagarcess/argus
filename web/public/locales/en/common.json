@@ -1551,7 +1551,8 @@
       "new_conversation": "Sign in to keep this conversation and start another.",
       "new_conversation_create": "Create an account to keep this conversation and start another.",
       "keep_history": "Sign in to keep this conversation and start another.",
-      "discovery_searches": "Sign in for more grounded searches with sources."
+      "discovery_searches": "Sign in for more grounded searches with sources.",
+      "share_result": "Create an account or sign in to share this answer and keep control of its link."
     },
     "new_conversation": {
       "title": "Start a new conversation?",
@@ -1699,7 +1700,7 @@
     "cta": {
       "headline": "Got an idea? Try it.",
       "detail": "Tell Argus an idea in your own words and it will show you how it would have gone. Free to try, no account needed.",
-      "action": "Test your own idea"
+      "action": "Continue with Argus"
     },
     "tombstone": {
       "title": "This one is gone",
@@ -1712,7 +1713,7 @@
     },
     "owner": {
       "share": "Share this",
-      "share_hint": "Makes a link anyone can open. It shows these numbers, locked as they are right now. Your chat, your name, and anything Argus remembers all stay out of it.",
+      "share_hint": "Makes a public link to the selected answers and your note. Review the preview before sharing.",
       "note_label": "Add a note if you want",
       "note_placeholder": "Why is this worth a look?",
       "note_public_warning": "Anyone with the link can read this. Keep it free of anything private.",
@@ -1727,14 +1728,16 @@
       "errors": {
         "create": "Argus could not make that link. Try again.",
         "note_rejected": "That note cannot go public. Take out any keys or long codes.",
-        "rate_limited": "You have made a lot of links just now. Try again shortly."
+        "rate_limited": "You have made a lot of links just now. Try again shortly.",
+        "account_conversion_required": "Create an account or sign in to share this answer.",
+        "preview_changed": "The content changed. Preview it again before making the link."
       }
     },
     "list": {
       "menu": "Shared links",
       "title": "Shared links",
       "close": "Close shared links",
-      "intro": "Everything you have shared. Each link shows locked numbers and nothing about you.",
+      "intro": "Every link you have shared, with its frozen answers or test results.",
       "loading": "Loading your links...",
       "load_error": "Your shared links did not load.",
       "load_more": "Show older links",
@@ -1767,6 +1770,65 @@
       "signal_period": "Signal window",
       "entry_threshold": "Buys at",
       "exit_threshold": "Sells at"
+    },
+    "kinds": {
+      "backtest": "Historical test",
+      "research_answer": "Research answer",
+      "tool_result": "Computed result",
+      "mixed": "Answers and tests"
+    },
+    "research": {
+      "stamp": "Argus looked this up on {{date}}",
+      "preview_stamp": "Looked up {{date}} · {{count}} sources",
+      "sources": "Sources",
+      "next_step": "What Argus offered next",
+      "research_test_single": "Argus offered to test buying and holding {{symbols}}.",
+      "research_test_versus": "Argus offered to compare buying and holding {{symbols}}.",
+      "framing": "This records what these sources reported on that date. It is not advice or a prediction. Things may have changed since. Nothing was bought or simulated here.",
+      "short": "A dated research snapshot. Not a tip.",
+      "headline": "Research from that date, not advice."
+    },
+    "selection": {
+      "title": "Share conversation",
+      "close": "Close sharing",
+      "hint": "Choose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.",
+      "all": "Select all eligible",
+      "clear": "Clear selection",
+      "cap": "A link can include up to {{count}} answers.",
+      "choose_individually": "Choose them individually.",
+      "count": "{{selected}} of {{max}} selected",
+      "turn": "Turn {{count}}",
+      "loading": "Loading answers...",
+      "empty": "There are no assistant answers in this conversation yet.",
+      "preview": "Preview public page",
+      "previewing": "Preparing preview...",
+      "edit": "Change selection or note",
+      "existing": "This selection already has a live link. The preview shows its saved content and note.",
+      "reuse": "Use this link",
+      "turns": "{{count}} turns",
+      "field_refusal": "{{field}} cannot be shared. {{reason}}",
+      "fields": {
+        "question": "The question",
+        "answer": "The answer",
+        "owner_note": "Your note",
+        "sources": "The sources"
+      },
+      "reasons": {
+        "not_completed": "This answer is not complete yet.",
+        "unsupported_turn": "This type of answer cannot be shared.",
+        "unsupported_shape": "This research format cannot be shared.",
+        "missing_sources": "This answer has no supported publisher sources.",
+        "degraded": "The research did not complete with full supporting evidence.",
+        "memory_used": "This answer uses personal memory.",
+        "missing_question": "The question for this answer is unavailable.",
+        "text_too_long": "The text is too long to publish in full.",
+        "unsafe_text": "The text contains private information or codes.",
+        "unlisted_url": "The answer contains a link outside its listed sources.",
+        "invalid_selection": "Choose eligible answers from this conversation.",
+        "preview_changed": "The content changed. Preview it again before making the link.",
+        "invalid_source": "The source content is unavailable or cannot be verified.",
+        "unsupported_backtest": "This test does not have all the facts needed for sharing."
+      }
     }
   },
   "tools": {

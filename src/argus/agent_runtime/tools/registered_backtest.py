@@ -69,7 +69,10 @@ def get_backtest_declaration() -> ToolDeclaration:
         handler=run_registered_backtest,
         confirmation_handler=prepare_backtest_confirmation,
         policy=ToolPolicy(
-            execution="workflow", external_calls=1, confirmation="required"
+            execution="workflow",
+            external_calls=1,
+            confirmation="required",
+            public_receipt="typed_facts",
         ),
         progress=ToolProgressTemplate(
             locale_key="chat.tools.progress.backtest",

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PublicBacktestReceiptPayload as PublicReceiptPayload } from "../lib/public-receipt-contract";
+import { receiptPresentations } from "../lib/receipt-presentation";
+import { receiptPreviewFacts } from "../lib/receipt-preview-facts";
+import type { PublicReceiptPayload } from "../lib/public-receipt-contract";
 import {
   formatReceiptDateRange,
   formatReceiptNumber,
@@ -210,8 +212,9 @@ describe("the tested window", () => {
     const body = code(RECEIPT_BODY);
     expect(route).not.toContain("date_range.display");
     expect(body).not.toContain("date_range.display");
-    expect(route).toContain("formatReceiptDateRange");
-    expect(body).toContain("formatReceiptDateRange");
+    const formatted = formatReceiptDateRange(PAYLOAD.date_range, receiptCopy("es-419"), "es-419");
+    expect(receiptPresentations(PAYLOAD, null, "es-419")[0].rows.map((row) => row.value)).toContain(formatted);
+    expect(receiptPreviewFacts(PAYLOAD, "es-419").description).toContain(formatted);
   });
 });
 
@@ -221,8 +224,8 @@ describe("metric labels", () => {
     const route = code(RECEIPT_ROUTE);
     expect(body).not.toContain("entry.label");
     expect(route).not.toContain("headline.label");
-    expect(body).toContain("copy.metric_labels");
-    expect(route).toContain("metric_labels");
+    expect(receiptPresentations(PAYLOAD, null, "es-419")[0].rows.map((row) => row.label)).toContain(receiptCopy("es-419").metric_labels.max_drawdown_pct);
+    expect(receiptPreviewFacts(PAYLOAD, "es-419").description).toContain(receiptCopy("es-419").metric_labels.total_return_pct);
   });
 
   test("both locales label every key the payload can carry", () => {

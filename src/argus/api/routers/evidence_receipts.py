@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -18,10 +19,14 @@ from argus.api.dependencies import current_user, problem, require_account_capabi
 from argus.api.guest_access import client_identity
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.public_excerpt_schemas import (
+    PublicExcerptCandidates,
     PublicExcerptCreate,
     PublicExcerptCreateResponse,
     PublicExcerptListResponse,
+    PublicExcerptPreview,
     PublicExcerptRevokeResponse,
+    PublicExcerptSelection,
+    PublicExcerptSelectionCreate,
     PublicExcerptSnapshot,
     PublicToolExcerptCreate,
 )
@@ -33,8 +38,11 @@ from argus.api.public_excerpts import (
     EvidenceReceiptSourceChangedError,
     EvidenceReceiptSourceMissingError,
     create_receipt_for_artifact,
+    create_receipt_for_messages,
     create_receipt_for_tool_result,
+    preview_receipt_for_messages,
     public_excerpt_repository,
+    receipt_candidates,
     require_evidence_receipt_sharing_enabled,
 )
 from argus.api.rate_limits import SlidingWindowLimiter
@@ -231,13 +239,7 @@ def _create_receipt_response(
             detail="That result is not available.",
         ) from exc
     except PublicExcerptSourceError as exc:
-        raise problem(
-            request,
-            status_code=422,
-            code="receipt_source_unsupported",
-            title="Not Shareable",
-            detail=str(exc),
-        ) from exc
+        raise _selection_error(request, exc) from exc
     except PublicExcerptSanitizationError as exc:
         # Fail closed. A payload that cannot be proven clean is never published.
         logger.error("Receipt payload failed the never-expose audit", error=str(exc))
@@ -256,7 +258,10 @@ def _create_receipt_response(
             "receipt_created",
             user_id=user.id,
             status="created",
-            attributes={"receipt_digest": snapshot.payload_digest[:16]},
+            attributes={
+                "receipt_digest": snapshot.payload_digest[:16],
+                "kind": snapshot.kind,
+            },
         )
     return PublicExcerptCreateResponse(receipt=snapshot_list_item(snapshot))
 
@@ -336,3 +341,107 @@ def revoke_public_excerpt(
         # append-only evidence.
         capture_product_event("receipt_revoked", user_id=user.id, status="revoked")
     return PublicExcerptRevokeResponse(receipt=snapshot_list_item(snapshot))
+
+
+def _selection_error(request: Request, error: Exception) -> Exception:
+    if isinstance(error, EvidenceReceiptSourceMissingError):
+        return problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="That conversation is not available.",
+        )
+    assert isinstance(error, PublicExcerptSourceError)
+    return problem(
+        request,
+        status_code=409 if error.reason == "preview_changed" else 422,
+        code="receipt_preview_changed"
+        if error.reason == "preview_changed"
+        else "receipt_source_unsupported",
+        title="Not Shareable",
+        detail="That selection cannot be shared.",
+        context={"reason": error.reason, "field": error.field},
+    )
+
+
+def _selection_owner(request: Request, conversation_id: str) -> str:
+    require_evidence_receipt_sharing_enabled()
+    require_account_capability(
+        request,
+        "can_save_decision",
+        detail="Sign in to share an answer.",
+        reason="share_result",
+    )
+    return _require_uuid(conversation_id, request)
+
+
+@router.get(
+    "/conversations/{conversation_id}/public-excerpt-candidates",
+    response_model=PublicExcerptCandidates,
+)
+def public_excerpt_candidates(
+    conversation_id: str, request: Request, user: Annotated[User, Depends(current_user)]
+) -> PublicExcerptCandidates:  # noqa: B008
+    owned_id = _selection_owner(request, conversation_id)
+    try:
+        return receipt_candidates(user=user, conversation_id=owned_id)
+    except (EvidenceReceiptSourceMissingError, PublicExcerptSourceError) as error:
+        raise _selection_error(request, error) from error
+
+
+@router.post(
+    "/conversations/{conversation_id}/public-excerpt-preview",
+    response_model=PublicExcerptPreview,
+)
+def preview_public_excerpt(
+    conversation_id: str,
+    payload: PublicExcerptSelection,
+    request: Request,
+    user: Annotated[User, Depends(current_user)],
+) -> PublicExcerptPreview:  # noqa: B008
+    owned_id = _selection_owner(request, conversation_id)
+    try:
+        return preview_receipt_for_messages(
+            user=user,
+            conversation_id=owned_id,
+            message_ids=[str(value) for value in payload.message_ids],
+            owner_note=payload.owner_note,
+        )
+    except (EvidenceReceiptSourceMissingError, PublicExcerptSourceError) as error:
+        raise _selection_error(request, error) from error
+
+
+@router.post(
+    "/conversations/{conversation_id}/public-excerpt",
+    response_model=PublicExcerptCreateResponse,
+)
+def create_selected_public_excerpt(
+    conversation_id: str,
+    payload: PublicExcerptSelectionCreate,
+    request: Request,
+    user: Annotated[User, Depends(current_user)],
+) -> PublicExcerptCreateResponse:  # noqa: B008
+    owned_id = _selection_owner(request, conversation_id)
+    _enforce_create_rate_limit(request, user=user)
+    try:
+        snapshot, created = create_receipt_for_messages(
+            user=user,
+            conversation_id=owned_id,
+            message_ids=[str(value) for value in payload.message_ids],
+            owner_note=payload.owner_note,
+            expected_digest=payload.payload_digest,
+        )
+    except (EvidenceReceiptSourceMissingError, PublicExcerptSourceError) as error:
+        raise _selection_error(request, error) from error
+    if created:
+        capture_product_event(
+            "receipt_created",
+            user_id=user.id,
+            status="created",
+            attributes={
+                "receipt_digest": snapshot.payload_digest[:16],
+                "kind": snapshot.kind,
+            },
+        )
+    return PublicExcerptCreateResponse(receipt=snapshot_list_item(snapshot))
