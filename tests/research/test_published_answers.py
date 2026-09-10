@@ -284,6 +284,46 @@ def test_no_answer_is_withheld_for_its_rows(
     assert result.stage_patch["next_experiments"]["rows"]
 
 
+def test_an_answer_that_never_retrieved_publishes_but_serves_nobody_else(
+    monkeypatch,
+) -> None:
+    """A typed answer with no retrieval record publishes as the founder asked,
+    with its figure named as unsourced beneath it; it is never stored, so one
+    turn's prose from memory is not what the shared cache serves the next
+    user who asks."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
+    )
+    document = agent_response(
+        text=typed_answer_text(
+            "AAPL is **$200** today.",
+            [
+                retrieved_row(
+                    subject="Apple",
+                    symbol="AAPL",
+                    label="price",
+                    value=200.0,
+                    kind="currency",
+                    unit="USD",
+                    source_url=None,
+                )
+            ],
+        ),
+        invocations=0,
+    )
+    transport = _wire(monkeypatch, [document, document])
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    assert "degraded" not in result.stage_patch["research"]
+    assert result.stage_patch["assistant_response"].endswith(
+        "I couldn't tie Apple price to a source."
+    )
+    _run("What is Apple at?")
+    assert len(transport.requests) == 2, "an unretrieved answer is never served again"
+
+
 def test_a_survey_that_never_retrieved_is_still_not_grounded(monkeypatch) -> None:
     """The one withholding that survives is the survey's own, from before
     #562: a model that did not look is evidence about the model, not the

@@ -941,9 +941,12 @@ def _cache_ttl(
 
     One owner for both composition paths, fed by what composition actually
     produced: a published packet serves for its class TTL, a withheld packet
-    that retrieved for that TTL capped at a day, and a withheld packet that
-    never retrieved is not stored."""
-    if withheld and not _retrieval_happened(packet):
+    that retrieved for that TTL capped at a day, and a packet that never
+    retrieved is not stored, published or not: a model that did not look is
+    evidence about the model and not about the world, and the shared cache
+    holds provider packets about public markets, never one turn's prose for
+    every other user."""
+    if not _retrieval_happened(packet):
         return None
     return ttl_for_packet(
         question_kind=question_kind,
