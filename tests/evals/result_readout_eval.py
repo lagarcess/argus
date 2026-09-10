@@ -95,7 +95,7 @@ class CostGuard:
     attempts: int = 0
     by_task: dict[str, int] = field(default_factory=dict)
 
-    def reserve(self, payload: dict[str, Any], *, task: str) -> None:
+    def reserve(self, payload: dict[str, Any], *, task: str) -> float:
         if not math.isfinite(self.budget_usd) or self.budget_usd <= 0:
             raise ValueError("positive_finite_budget_required")
         if self.by_task.get(task, 0) >= self.max_attempts:
@@ -128,6 +128,7 @@ class CostGuard:
         self.reserved_usd += reservation
         self.attempts += 1
         self.by_task[task] = self.by_task.get(task, 0) + 1
+        return reservation
 
 
 def checkout_provenance(checkout: Path, *, require_clean: bool) -> dict[str, Any]:
@@ -179,8 +180,16 @@ def retained_case_evidence(path: Path) -> dict[str, Any]:
         "disposition": "Prior full-suite evidence retained; no new pass claimed.",
         "totals": scorecard["totals"],
         "case_dispositions": dispositions,
-        "results": rows,
     }
+
+
+def measurement_can_continue(probe: dict[str, Any]) -> bool:
+    """Unknown actual cost is allowed only when every attempt was fully reserved."""
+    return (
+        probe.get("all_attempts_reserved") is True
+        and not probe.get("guard_failures")
+        and not probe.get("stop_requested")
+    )
 
 
 def invoke_probe(
@@ -192,7 +201,46 @@ def invoke_probe(
     live: bool,
     budget_usd: float,
     rates: dict[str, Any],
+    preflight: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    timeout_seconds = 180.0
+    visit_reservation = 0.0
+    if live:
+        if preflight is None:
+            raise ValueError("live_probe_requires_preflight")
+        visit_reservation = estimate_ceiling([preflight], rates)
+        if visit_reservation > budget_usd:
+            raise ValueError("budget_exceeded")
+        # Include every configured attempt, then allow the production outer
+        # deadline and receipt settlement to finish before this process stops.
+        timeouts = [
+            task["timeout_seconds"]
+            for task in preflight["configuration"]["tasks"].values()
+        ]
+        if any(not math.isfinite(value) or value <= 0 for value in timeouts):
+            raise ValueError("invalid_task_timeout")
+        timeout_seconds = MAX_ATTEMPTS * sum(timeouts) + 60
+
+    def lost_receipts(reason: str) -> dict[str, Any]:
+        if not live:
+            raise ValueError(reason)
+        # The visit was bounded before launch. If the isolated process cannot
+        # deliver its ledger, retain that entire ceiling and stop without retry.
+        return {
+            "guard_failures": [reason],
+            "stop_requested": True,
+            "attempt_receipts_complete": False,
+            "all_attempts_reserved": False,
+            "reserved_usd": visit_reservation,
+            "reservation_basis": "preflight maximum for this visit; attempt receipts unavailable",
+            "observed_cost_usd": 0,
+            "unknown_cost_attempts": None,
+            "unknown_cost_reserved_usd": visit_reservation,
+            "accounted_upper_bound_usd": visit_reservation,
+            "http_attempts": None,
+            "cost_complete": False,
+        }
+
     environment = dict(os.environ)
     environment.update(
         {
@@ -210,21 +258,27 @@ def invoke_probe(
         "budget_usd": budget_usd,
         "rates": rates,
     }
-    child = subprocess.run(
-        [python, str(Path(__file__).with_name("result_readout_probe.py"))],
-        input=json.dumps(request),
-        capture_output=True,
-        text=True,
-        cwd=checkout,
-        env=environment,
-        timeout=180,
-    )
+    try:
+        child = subprocess.run(
+            [python, str(Path(__file__).with_name("result_readout_probe.py"))],
+            input=json.dumps(request),
+            capture_output=True,
+            text=True,
+            cwd=checkout,
+            env=environment,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return lost_receipts("probe_subprocess_timeout")
     if child.returncode:
         # Child output can include third-party configuration logs. Do not echo it.
-        raise ValueError(f"probe_subprocess_failed:exit_{child.returncode}")
-    result = json.loads(child.stdout)
+        return lost_receipts(f"probe_subprocess_failed:exit_{child.returncode}")
+    try:
+        result = json.loads(child.stdout)
+    except ValueError:
+        return lost_receipts("probe_subprocess_invalid_output")
     if result.get("error"):
-        raise ValueError(f"probe_refused:{result['error']}")
+        return lost_receipts("probe_refused")
     return result
 
 
@@ -378,6 +432,7 @@ def main() -> None:
                 live=True,
                 budget_usd=args.budget_usd - reserved,
                 rates=rates,
+                preflight=dry_probe,
             )
             reserved += probe["reserved_usd"]
         report["results"].append(
@@ -392,8 +447,21 @@ def main() -> None:
             }
         )
         report["budget"]["reserved_usd"] = reserved
+        for key in (
+            "observed_cost_usd",
+            "unknown_cost_reserved_usd",
+            "accounted_upper_bound_usd",
+        ):
+            report["budget"][key] = sum(item[key] for item in report["results"])
+        counts = [item["unknown_cost_attempts"] for item in report["results"]]
+        report["budget"]["unknown_cost_attempts"] = (
+            None if any(count is None for count in counts) else sum(counts)
+        )
+        report["budget"]["cost_complete"] = all(
+            item["cost_complete"] for item in report["results"]
+        )
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
-        if args.live and (probe.get("guard_failures") or not probe["cost_complete"]):
+        if args.live and not measurement_can_continue(probe):
             raise ValueError("measurement_stopped_preserved_partial_evidence")
     sys.stdout.write(
         json.dumps(

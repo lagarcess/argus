@@ -117,6 +117,47 @@ def test_full_comparison_bound_prices_all_configured_fallbacks() -> None:
     assert estimate_ceiling([probe for _ in schedule], rates) == pytest.approx(3.482112)
 
 
+def test_probe_timeout_preserves_the_reserved_visit_upper_bound(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import subprocess
+    import sys
+
+    from tests.evals.result_readout_eval import MAX_ATTEMPTS, measurement_can_continue
+
+    configuration = {
+        "tasks": {
+            "result_summary": {"models": ["fixture-model"], "timeout_seconds": 30},
+            "result_breakdown": {"models": ["fixture-model"], "timeout_seconds": 25},
+        }
+    }
+    preflight = {"configuration": configuration}
+    rates = {"fixture-model": {"input_per_million": 0.1, "output_per_million": 0.2}}
+
+    def timeout(*args, **kwargs):
+        assert kwargs["timeout"] > MAX_ATTEMPTS * (30 + 25)
+        raise subprocess.TimeoutExpired("probe", kwargs["timeout"])
+
+    monkeypatch.setattr(subprocess, "run", timeout)
+    report = invoke_probe(
+        python=sys.executable,
+        checkout=tmp_path,
+        case={},
+        language="en",
+        live=True,
+        budget_usd=4,
+        rates=rates,
+        preflight=preflight,
+    )
+    assert report["reserved_usd"] == estimate_ceiling([preflight], rates)
+    assert report["accounted_upper_bound_usd"] == report["reserved_usd"]
+    assert report["http_attempts"] is None
+    assert report["unknown_cost_attempts"] is None
+    assert not report["attempt_receipts_complete"]
+    assert not report["cost_complete"]
+    assert not measurement_can_continue(report)
+
+
 def test_retained_scorecard_preserves_old_failed_cases_without_claiming_rerun(
     tmp_path: Path,
 ) -> None:
@@ -132,7 +173,8 @@ def test_retained_scorecard_preserves_old_failed_cases_without_claiming_rerun(
     retained = retained_case_evidence(path)
     assert retained["remeasured"] is False
     assert retained["totals"]["failed"] == 1
-    assert retained["results"][0]["case_id"] == "honest-old-failure"
+    assert retained["case_dispositions"][0]["case_id"] == "honest-old-failure"
+    assert "results" not in retained
     assert len(retained["sha256"]) == 64
 
 
@@ -170,12 +212,19 @@ def test_preflight_runs_actual_composers_without_a_provider_call(
 
 
 @pytest.mark.parametrize("false_figure", [False, True])
+@pytest.mark.parametrize("reasoning_rejection", [False, True])
+@pytest.mark.parametrize("late_response", [False, True])
 def test_probe_retains_raw_drafts_receipts_and_complete_accepted_text(
     monkeypatch: pytest.MonkeyPatch,
     respx_mock,
     false_figure: bool,
+    reasoning_rejection: bool,
+    late_response: bool,
 ) -> None:
+    import time
+
     import httpx
+    from argus.api.chat import breakdown
     from argus.llm import openrouter, openrouter_key_policy
 
     from tests.evals.result_readout_probe import run_probe
@@ -187,10 +236,33 @@ def test_probe_retains_raw_drafts_receipts_and_complete_accepted_text(
     for tier in ("CHAT", "CONTEXT"):
         monkeypatch.setenv(f"ARGUS_{tier}_MODEL", "fixture-model")
         monkeypatch.setenv(f"ARGUS_{tier}_FALLBACK_MODEL", "")
+    if late_response:
+        actual_breakdown = breakdown.llm_result_breakdown_message
+
+        def short_deadline(*args, **kwargs):
+            return actual_breakdown(*args, **kwargs, timeout_seconds=0.1)
+
+        monkeypatch.setattr(breakdown, "llm_result_breakdown_message", short_deadline)
 
     def completion(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
         name = payload["response_format"]["json_schema"]["name"]
+        if late_response and name == "ResultBreakdownDraft" and "reasoning" in payload:
+            time.sleep(0.2)
+        if (
+            reasoning_rejection
+            and name == "ResultBreakdownDraft"
+            and "reasoning" in payload
+        ):
+            return httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "code": 400,
+                        "message": "Reasoning unsupported; secret-test-value",
+                    }
+                },
+            )
         body = (
             "The ending gain came with a rough historical ride."
             if name == "QuickTakeDraft"
@@ -224,21 +296,30 @@ def test_probe_retains_raw_drafts_receipts_and_complete_accepted_text(
             },
         }
     )
-    assert route.call_count == 2
-    assert report["http_attempts"] == 2
-    assert report["cost_complete"] is True
+    expected_attempts = 3 if reasoning_rejection else 2
+    assert route.call_count == expected_attempts
+    assert report["http_attempts"] == expected_attempts
+    assert report["cost_complete"] is (not reasoning_rejection)
     assert report["observed_cost_usd"] == pytest.approx(0.0002)
     assert len(report["route_receipts"]) == 2
-    assert len(report["provider_responses"]) == 2
+    assert len(report["provider_responses"]) == expected_attempts
+    assert "secret-test-value" not in json.dumps(report)
     assert report["provider_responses"][0]["raw_drafts"]
+    assert report["provider_worker_settled"] is True
+    assert all(row["outcome"] != "pending" for row in report["requests"])
+    if late_response:
+        assert report["receipt_settlement_ms"] > 0
+        assert report["breakdown"]["fallback_used"] is True
+        assert report["breakdown"]["accepted_text"] is None
     for surface in ("quick_take", "breakdown"):
-        if false_figure:
+        expected_fallback = false_figure or (surface == "breakdown" and late_response)
+        if expected_fallback:
             assert report[surface]["accepted_text"] is None
             assert "99876.5" not in report[surface]["complete_text"]
             assert report[surface]["complete_text"]
         else:
             assert report[surface]["accepted_text"] == report[surface]["complete_text"]
-        assert report[surface]["fallback_used"] is false_figure
+        assert report[surface]["fallback_used"] is expected_fallback
 
 
 def test_recorded_fixture_must_match_immutable_source_bytes(tmp_path: Path) -> None:

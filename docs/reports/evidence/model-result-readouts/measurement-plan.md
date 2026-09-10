@@ -7,11 +7,19 @@ does **not** authorize a fingerprint update, even after successful live results.
 Finish this lane's approved targeted proof, then stop and report. No full live
 eval or fingerprint regeneration may run without a new, explicit founder go.
 
-The comparison invokes each checkout's real `explain_stage_async` and
+The comparison invokes each checkout's real completed-result entry point and
 `llm_result_breakdown_message`, including their production draft validation and
 complete fallback. It does not run the interpreter, fetch market data, simulate
 a run, write product history, or measure browser transport. Those boundaries
 remain explicit in its report.
+
+Quick take receives the execution envelope and sibling result card used by
+production, reconstructed from the saved canonical fields. It receives every
+stored metric and now reads the optional chart from that card. Breakdown
+receives the saved run's optional chart. The earlier free sizing probe passed
+the whole stored run as the Quick take envelope, which concealed a production
+projection gap: the chart is on the sibling card, not the execution envelope.
+Both the projection and harness were corrected before any paid comparison.
 
 ## Cases and ordering
 
@@ -20,7 +28,7 @@ Three source-verified saved runs, each in `en` and `es-419`:
 1. DOCN buy and hold since September 2023, benchmark SPY.
 2. DCA with an explicit recurring contribution, separate starting capital,
    modeled fees/slippage and their persisted results.
-3. An indicator run with sparse optional metrics or absent chart data.
+3. An indicator run, preserving whichever optional metrics and chart the run stored.
 
 Each case/language runs **baseline, candidate, candidate, baseline**. Each visit
 composes Quick take, then Breakdown: 24 visits, 48 task completions, two
@@ -91,7 +99,11 @@ file with `verified_at`, `source`, and `models`, where each configured model has
 execution; do not infer them from model names. The caller's approved
 dollar cap must cover this bound. Every actual HTTP attempt reserves against
 the remaining cap before it is sent; unknown prices, excess retries and excess
-payload/output sizes fail closed. Missing response-cost evidence stops further
+payload/output sizes fail closed. Missing response-cost evidence retains the
+entire pre-request reservation as a conservative charge. Reports separate
+observed costs from unknown charges and never describe that bound as an exact
+bill. Cancellation and ordinary provider retries remain visible; a missing
+reservation, unpriced model, or cost exceeding its reservation stops further
 visits and preserves the observations already collected.
 
 ## Ready commands
