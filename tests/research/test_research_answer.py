@@ -703,6 +703,30 @@ def test_a_crypto_scenario_typed_only_by_its_horizon_is_grounded(monkeypatch) ->
     }
 
 
+def test_a_failed_scenario_records_the_shape_it_was_selected_for(monkeypatch) -> None:
+    """A crypto scenario forced onto the balanced shape that then fails on the
+    provider is recorded as the balanced lookup it attempted, not as the
+    thorough research its question kind would map to."""
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="cross_company",
+        symbols=["BTC", "ETH"],
+        asset_class_hint="crypto",
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    _wire_client(monkeypatch, [])  # the transport answers 500 to every call
+
+    result = _run("Which of BTC or ETH will be worth more in ten years?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"]["code"].startswith("research_unavailable_")
+    assert sidecar["shape"] == "balanced"
+    assert sidecar["capability_class"] == "balanced_lookup"
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:

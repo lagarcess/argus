@@ -253,6 +253,7 @@ async def grounded_result(
                 user=user,
                 decision=decision,
                 reason="not_configured",
+                shape=shape,
             )
         admission = claim_current_research_attempt()
         if not admission.available:
@@ -264,6 +265,7 @@ async def grounded_result(
                 user=user,
                 decision=decision,
                 guest_allowance_exhausted=admission.guest_exhausted,
+                shape=shape,
             )
         emit_substage("research_search", detail=shape)
         try:
@@ -284,6 +286,7 @@ async def grounded_result(
                 decision=decision,
                 reason=exc.reason,
                 usage=spend.total,
+                shape=shape,
             )
         retry_prompt: str | None = None
         if is_market_survey(query.question_kind) and not _has_figures(packet):
@@ -684,11 +687,14 @@ async def exhausted_result(
     state: RunState,
     user: UserState,
     guest_allowance_exhausted: bool,
+    shape: QuestionShape,
     decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     """Ceiling exhaustion is an honest, localized note, not a silent
     disappearance: the answer still comes from Argus's own data or model
-    knowledge, and still ends somewhere runnable."""
+    knowledge, and still ends somewhere runnable. ``shape`` is the shape the
+    turn was actually selected for, so the sidecar and the ledger record the
+    work that was attempted rather than a shape re-derived from the query."""
     language = language_tag(user.language_preference)
     note = research_capacity_exhausted_note(
         language,
@@ -716,7 +722,6 @@ async def exhausted_result(
         answer = f"{answer}\n\n*{note}*"
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     packet = ResearchPacket(answer_markdown=answer)
-    shape = shape_for_query(query)
     return research_stage_result(
         answer=answer,
         interpretation=interpretation,
@@ -745,6 +750,7 @@ def unavailable_result(
     state: RunState,
     user: UserState,
     reason: str,
+    shape: QuestionShape,
     decision: InterpretDecision | None = None,
     usage: ResearchUsage | None = None,
 ) -> StageResult | None:
@@ -765,7 +771,6 @@ def unavailable_result(
     packet = ResearchPacket(
         answer_markdown=note, usage=usage if usage is not None else ResearchUsage()
     )
-    shape = shape_for_query(query)
     return research_stage_result(
         answer=note,
         interpretation=interpretation,
