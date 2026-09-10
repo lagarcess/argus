@@ -104,11 +104,8 @@ class PeerExpansionArguments(AssetDiscoveryRequest, ResearchArguments):
 
     @model_validator(mode="after")
     def _has_subject(self) -> PeerExpansionArguments:
-        if (
-            not any(symbol.strip() for symbol in self.anchor_symbols)
-            and not self.category_description
-        ):
-            raise ValueError("peer expansion needs an anchor or category")
+        for rule in self.execution_requirements:
+            rule.validate(self)
         return self
 
 
@@ -599,6 +596,7 @@ def get_research_declarations() -> tuple[ToolDeclaration, ...]:
             name="peer_expansion",
             description="Find resolver-verified candidate assets related to named anchors or a category, using current sources when requested.",
             handler=peer_expansion,
+            rules=PeerExpansionArguments.execution_requirements,
             policy=ToolPolicy(
                 execution="provider", external_calls=1, confirmation="never"
             ),
