@@ -318,6 +318,26 @@ both trees with the same failure classes (no actionable discovery, no rows):
 the discovery path was failing on the provider this afternoon with or without
 this lane's changes, the flake PR #565 recorded on the sibling pharma cases.
 
+
+**Second re-run, founder-requested before merge** (`live-measurement-retry-2.json`):
+seven commits after the first retry changed discovery routing, so the three
+discovery cases were re-run once at the exact head `355eebb1` and once on
+current integration `f03834d0`, after a provider health check passed.
+
+| Case | Head `355eebb1` | Integration `f03834d0` | Match |
+| --- | --- | --- | --- |
+| `asset_discovery_category_spanish_issue_244` | failed | failed | yes, identical checks |
+| `asset_discovery_not_result_followup_issue_244` | failed | failed | yes, identical checks |
+| `asset_discovery_old_pharma_escalation_exact_issue_344` | failed | failed | yes, identical checks |
+
+**Head matches integration on all three.** Each fails on both trees with
+the identical failed-check strings: no actionable discovery for the Spanish
+category and the pharma escalation, no next-experiment row for the
+not-a-follow-up case. The one difference is inside the not-a-follow-up
+case's failed result-summary step, a timeout at the head against a rejected
+claim at integration, both provider-side failures of the same step with the
+same outcome. The discovery path fails today without this lane's changes.
+
 ## Browser proof
 
 `browser/` holds Playwright captures of the recorded after conversations in
