@@ -27,6 +27,7 @@ from argus.agent_runtime.llm_interpreter_types import (
 )
 from argus.agent_runtime.semantic_integrity import (
     DECLARED_TOOL_INPUT_CONFLICT,
+    canonical_capital_role,
     strategy_semantic_facts,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -34,7 +35,12 @@ from argus.agent_runtime.stages.interpret_types import (
     SemanticTurnAct,
     StageResult,
 )
-from argus.agent_runtime.state.models import RunState, TaskSnapshot, UserState
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
 from argus.domain.tool_contracts import ToolCall
 from argus.llm.openrouter import tool_call_receipt_scope
@@ -164,10 +170,17 @@ async def _prepared_stage(
     request: InterpretationRequest,
     state: RunState,
 ) -> StageResult:
+    from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+        _current_artifact_strategy,
+    )
     from argus.agent_runtime.llm_interpreter import canonical_strategy_interpretation
     from argus.agent_runtime.stages.interpret import _stage_result_from_interpretation
 
-    _ground_declared_costs(response, current_message=request.current_user_message)
+    _ground_declared_costs(
+        response,
+        current_message=request.current_user_message,
+        prior_strategy=_current_artifact_strategy(request),
+    )
     interpretation = canonical_strategy_interpretation(response, request=request)
     preparation_state = state.model_copy(
         update={
@@ -311,15 +324,23 @@ def _preserves_supplied_fact(before: Any, after: Any) -> bool:
 def _declare_money_roles(draft: LLMStrategyDraft) -> None:
     """Typed argument identity owns the role; zero remains a supplied fact."""
     draft.field_provenance.update(draft.declared_capital_roles())
+    if draft.capital_amount is not None:
+        role = canonical_capital_role(
+            draft.field_provenance.get("capital_amount"),
+            strategy_type=draft.strategy_type,
+        )
+        if role is not None:
+            draft.field_provenance.setdefault("capital_amount", role)
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
-        if draft.capital_amount is not None:
-            draft.field_provenance.setdefault("capital_amount", "recurring_contribution")
         if draft.cadence is not None:
             draft.field_provenance.setdefault("cadence", "explicit_user")
 
 
 def _ground_declared_costs(
-    response: LLMInterpretationResponse, *, current_message: str
+    response: LLMInterpretationResponse,
+    *,
+    current_message: str,
+    prior_strategy: StrategySummary | None = None,
 ) -> None:
     draft = response.candidate_strategy_draft
     costs: dict[str, StatedExecutionCost] = {}
@@ -341,5 +362,5 @@ def _ground_declared_costs(
         response,
         StatedRunFieldFidelityAudit.model_validate(costs),
         current_message,
-        prior_strategy=None,
+        prior_strategy=prior_strategy,
     )

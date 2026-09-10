@@ -15,6 +15,8 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
 )
 from argus.agent_runtime.strategy_contract import (
+    SUPPORTED_STRATEGY_TYPES,
+    canonical_strategy_type,
     executable_strategy_type,
     format_display_date,
     has_partial_explicit_date_range,
@@ -43,6 +45,32 @@ _DCA_CEILING_KEYS: tuple[str, ...] = (
     "capital_cap",
     "investment_cap",
 )
+_RECURRING_CAPITAL_KEYS: tuple[str, ...] = (
+    "recurring_contribution",
+    "contribution_amount",
+    "periodic_contribution",
+    "dca_contribution",
+)
+
+
+def canonical_capital_role(source: Any, *, strategy_type: Any = None) -> str | None:
+    """Resolve a money role from its semantic source or executable carrier."""
+    source = str(source or "").strip().casefold()
+    if source in _DCA_SEED_KEYS:
+        return "starting_capital"
+    if source in _DCA_CEILING_KEYS:
+        return "total_capital"
+    if source in _RECURRING_CAPITAL_KEYS:
+        return "recurring_contribution"
+    strategy_type = canonical_strategy_type(strategy_type)
+    if strategy_type in SUPPORTED_STRATEGY_TYPES:
+        return (
+            "recurring_contribution"
+            if strategy_type == "dca_accumulation"
+            else "starting_capital"
+        )
+    return None
+
 
 # One identity for the ceiling refusal, so the producer and every reader that
 # defers or filters it cannot drift apart under a rename.
@@ -327,15 +355,7 @@ def _structured_money_role_evidence(
     if not isinstance(field_provenance, dict):
         field_provenance = {}
 
-    recurring = _first_number(
-        extra,
-        (
-            "recurring_contribution",
-            "contribution_amount",
-            "periodic_contribution",
-            "dca_contribution",
-        ),
-    )
+    recurring = _first_number(extra, _RECURRING_CAPITAL_KEYS)
     total_key, total = _first_number_with_key(extra, _DCA_SEED_KEYS)
     ceiling_key, ceiling = _first_number_with_key(extra, _DCA_CEILING_KEYS)
     if total is None and ceiling is not None:
@@ -344,32 +364,13 @@ def _structured_money_role_evidence(
         total_key, total = ceiling_key, ceiling
 
     capital_source = str(field_provenance.get("capital_amount") or "").strip()
-    if capital_source in {
-        "initial_capital",
-        "starting_capital",
-        "starting_principal",
-        "initial_lump_sum",
-        "initial_lump",
-        "lump_sum",
-        "total_capital",
-        "total_budget",
-        "max_budget",
-        "investment_budget",
-        "cap",
-        "contribution_cap",
-        "capital_cap",
-        "investment_cap",
-    }:
+    role = canonical_capital_role(
+        capital_source, strategy_type=executable_strategy_type(strategy)
+    )
+    if role in {"starting_capital", "total_capital"}:
         total = total if total is not None else _coerce_number(strategy.capital_amount)
         total_key = total_key or capital_source
-    elif capital_source in {
-        "recurring_contribution",
-        "contribution_amount",
-        "periodic_contribution",
-        "dca_contribution",
-        "user",
-        "explicit_user",
-    }:
+    elif role == "recurring_contribution":
         recurring = (
             recurring
             if recurring is not None

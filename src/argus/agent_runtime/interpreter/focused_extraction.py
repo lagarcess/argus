@@ -35,9 +35,9 @@ from argus.agent_runtime.rule_specs import (
     moving_average_crossover_text,
     opposite_moving_average_crossover_rule,
 )
+from argus.agent_runtime.semantic_integrity import canonical_capital_role
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.strategy_contract import (
-    canonical_strategy_type,
     executable_strategy_type_from_extracted_fields,
 )
 from argus.nlp.natural_time import resolve_date_range_intent
@@ -218,10 +218,11 @@ def _focused_extraction_field_provenance(
         provenance["recurring_contribution"] = "explicit_user"
         provenance.setdefault("capital_amount", "recurring_contribution")
     elif extraction.capital_amount is not None:
-        if canonical_strategy_type(resolved_strategy_type) == "dca_accumulation":
-            provenance.setdefault("capital_amount", "recurring_contribution")
-        else:
-            provenance.setdefault("capital_amount", "starting_capital")
+        role = canonical_capital_role(
+            provenance.get("capital_amount"), strategy_type=resolved_strategy_type
+        )
+        if role is not None:
+            provenance.setdefault("capital_amount", role)
     if extraction.cadence:
         provenance["cadence"] = "explicit_user"
     return provenance
@@ -236,11 +237,21 @@ _REPAIR_MERGE_DICT_CHANNELS = ("extra_parameters", "field_provenance", "evidence
 
 
 def _capital_role_records(
-    draft: FocusedStrategyExtraction | LLMStrategyDraft, roles: dict[str, str]
+    draft: FocusedStrategyExtraction | LLMStrategyDraft,
+    roles: dict[str, str],
+    *,
+    resolve_known_carrier: bool = False,
 ) -> list[tuple[str, str, Any, str | None]]:
     records: list[tuple[str, str, Any, str | None]] = []
     for name, field in type(draft).model_fields.items():
-        role = roles.get(name, draft.field_provenance.get(name))
+        role = roles.get(name) or canonical_capital_role(
+            draft.field_provenance.get(name),
+            strategy_type=(
+                draft.strategy_type
+                if resolve_known_carrier and name == "capital_amount"
+                else None
+            ),
+        )
         annotation = get_args(field.annotation)
         if name not in roles and not (
             type(None) in annotation
@@ -250,7 +261,7 @@ def _capital_role_records(
         value = getattr(draft, name)
         if value is None:
             value = draft.extra_parameters.get(name)
-        if isinstance(role, str) and role in roles.values() and value is not None:
+        if isinstance(role, str) and role in roles.values():
             records.append((name, role, value, draft.evidence_spans.get(name)))
     return records
 
@@ -276,7 +287,9 @@ def _accept_focused_capital_roles(
         if isinstance(role, str):
             roles[name] = role
     known = (
-        _capital_role_records(base_response.candidate_strategy_draft, roles)
+        _capital_role_records(
+            base_response.candidate_strategy_draft, roles, resolve_known_carrier=True
+        )
         if base_response is not None
         else []
     )
@@ -286,6 +299,8 @@ def _accept_focused_capital_roles(
     accepted = extraction.model_copy(deep=True)
     unresolved: list[LLMAmbiguousField] = []
     for name, role, value, _ in proposed:
+        if value is None:
+            continue
         if any(
             known_role == role and known_value == value
             for _, known_role, known_value, _ in known
@@ -293,7 +308,7 @@ def _accept_focused_capital_roles(
             continue
         if any(
             proposed_role == role
-            and proposed_value == value
+            and proposed_value in (None, value)
             and span
             and span.strip()
             and span.strip() in current_message
@@ -301,7 +316,7 @@ def _accept_focused_capital_roles(
                 known_role != role and known_span and span.strip() in known_span
                 for _, known_role, _, known_span in known
             )
-            for _, proposed_role, proposed_value, span in proposed
+            for _, proposed_role, proposed_value, span in [*proposed, *known]
         ):
             continue
         setattr(accepted, name, None)

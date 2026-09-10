@@ -213,7 +213,12 @@ def test_unresolved_cost_preserves_candidate_in_canonical_ambiguity(
         task_relation="new_task",
         semantic_turn_act="new_idea",
         user_goal_summary="Review execution cost assumptions.",
-        candidate_strategy_draft=LLMStrategyDraft(**values),
+        candidate_strategy_draft=LLMStrategyDraft(
+            **values,
+            # A claimed user cost needs evidence even when the rate is zero;
+            # an unclaimed zero on a fresh idea is only the engine default.
+            field_provenance={field_name: "explicit_user"},
+        ),
     )
     request = InterpretationRequest(
         current_user_message="Review these execution cost assumptions.",

@@ -2460,7 +2460,7 @@ async def test_dca_contract_audit_preserves_optional_cap_on_ready_dca_shape(
     assert draft.total_capital == 3000
     assert draft.field_provenance["capital_amount"] == "recurring_contribution"
     assert draft.field_provenance["total_capital"] == "cap"
-    assert draft.extra_parameters["total_budget"] == 3000
+    assert "total_budget" not in draft.extra_parameters
     assert "dca_contract_audit" in repaired.reason_codes
 
 
