@@ -1,0 +1,82 @@
+[
+  {
+    "label": "ahorro-5000-6pct",
+    "language": "es-419",
+    "width": 1280,
+    "screenshot": "ahorro-5000-6pct-1280-es-419.png",
+    "errors": [],
+    "textChars": 730,
+    "mentionsScenario": false,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "ahorro-5000-6pct",
+    "language": "es-419",
+    "width": 390,
+    "screenshot": "ahorro-5000-6pct-390-es-419.png",
+    "errors": [],
+    "textChars": 688,
+    "mentionsScenario": false,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "nvda-future-value",
+    "language": "en",
+    "width": 1280,
+    "screenshot": "nvda-future-value-1280-en.png",
+    "errors": [],
+    "textChars": 1380,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "nvda-future-value",
+    "language": "en",
+    "width": 390,
+    "screenshot": "nvda-future-value-390-en.png",
+    "errors": [],
+    "textChars": 1341,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "nvda-grow-into-es",
+    "language": "es-419",
+    "width": 1280,
+    "screenshot": "nvda-grow-into-es-1280-es-419.png",
+    "errors": [],
+    "textChars": 1034,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "nvda-grow-into-es",
+    "language": "es-419",
+    "width": 390,
+    "screenshot": "nvda-grow-into-es-390-es-419.png",
+    "errors": [],
+    "textChars": 992,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "savings-500-5pct",
+    "language": "en",
+    "width": 1280,
+    "screenshot": "savings-500-5pct-1280-en.png",
+    "errors": [],
+    "textChars": 659,
+    "mentionsScenario": false,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "savings-500-5pct",
+    "language": "en",
+    "width": 390,
+    "screenshot": "savings-500-5pct-390-en.png",
+    "errors": [],
+    "textChars": 620,
+    "mentionsScenario": false,
+    "mentionsCannotPredict": false
+  }
+]

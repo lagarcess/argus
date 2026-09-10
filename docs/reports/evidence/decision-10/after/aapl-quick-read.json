@@ -1,0 +1,527 @@
+{
+  "label": "aapl-quick-read",
+  "language": "en",
+  "question": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+  "asked_at": "2026-09-10T20:44:47.589641+00:00",
+  "tree": "head-rerun",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "**Quick read:** Apple’s fundamentals are strong, but its valuation is demanding and sentiment is positive but divided.\n\n| Area | Read |\n|---|---|\n| Fundamentals | Fiscal third-quarter revenue was **$109,417,000,000**, up **16%** year over year, while net income was **$29,789,000,000** and net margin was **27%**. Apple said tariff refunds boosted gross margin and earnings, so part of the quarter’s strength was non-recurring. |\n| Valuation | As of **2026-09-10**, AAPL traded at **$326.57**, with a market capitalization of **$4,796,449,848,920** and a P/E ratio of **37.41x**. That is a premium valuation and leaves less room for execution disappointments. |\n| Sentiment | Analyst sentiment was a mixed-positive “Moderate Buy”: **22** Buy, **12** Hold and **4** Sell ratings, with an average target of **$330.61**. The target sits only slightly above the current share price, while published concerns center on valuation and AI execution. |\n\n**Bottom line:** Apple is delivering healthy growth and high profitability, but the share price already reflects substantial optimism. This is an informational snapshot, not investment advice."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "**Quick read:** Apple’s fundamentals are strong, but its valuation is demanding and sentiment is positive but divided.\n\n| Area | Read |\n|---|---|\n| Fundamentals | Fiscal third-quarter revenue was **$109,417,000,000**, up **16%** year over year, while net income was **$29,789,000,000** and net margin was **27%**. Apple said tariff refunds boosted gross margin and earnings, so part of the quarter’s strength was non-recurring. |\n| Valuation | As of **2026-09-10**, AAPL traded at **$326.57**, with a market capitalization of **$4,796,449,848,920** and a P/E ratio of **37.41x**. That is a premium valuation and leaves less room for execution disappointments. |\n| Sentiment | Analyst sentiment was a mixed-positive “Moderate Buy”: **22** Buy, **12** Hold and **4** Sell ratings, with an average target of **$330.61**. The target sits only slightly above the current share price, while published concerns center on valuation and AI execution. |\n\n**Bottom line:** Apple is delivering healthy growth and high profitability, but the share price already reflects substantial optimism. This is an informational snapshot, not investment advice.",
+        "next_experiments": {
+          "version": "argus_next_experiments/v1",
+          "rows": [
+            {
+              "kind": "research_test_single",
+              "label": "Test Apple (AAPL) over the last 3 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Apple"
+                },
+                {
+                  "type": "ticker",
+                  "value": "AAPL"
+                },
+                {
+                  "type": "text",
+                  "value": " over the last 3 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding AAPL over the last three years"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Apple reports third quarter results",
+              "domain": "www.apple.com",
+              "url": "https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/",
+              "source_date": "2026-07-30"
+            },
+            {
+              "title": "Earnings call transcript: Apple beats Q3 2026 estimates ...",
+              "domain": "www.investing.com",
+              "url": "https://www.investing.com/news/transcripts/earnings-call-transcript-apple-beats-q3-2026-estimates-shares-fall-after-hours-93CH-4826459",
+              "source_date": "2026-07-30"
+            },
+            {
+              "title": "Apple (AAPL) Investor Relations, Earnings Summary & ...",
+              "domain": "quartr.com",
+              "url": "https://quartr.com/companies/apple-inc_4742",
+              "source_date": "2026-05-20"
+            },
+            {
+              "title": "Apple's (AAPL) Neutral Rating Reaffirmed at DA Davidson",
+              "domain": "www.marketbeat.com",
+              "url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/",
+              "source_date": "2026-09-02"
+            },
+            {
+              "title": "AAPL Maintained by Rosenblatt -- Price Target Raised to $303",
+              "domain": "www.gurufocus.com",
+              "url": "https://www.gurufocus.com/news/9061711/aapl-maintained-by-rosenblatt-price-target-raised-to-303",
+              "source_date": "2026-09-01"
+            }
+          ],
+          "rows": [
+            {
+              "subject": "Apple Inc.",
+              "symbol": "AAPL",
+              "label": "fiscal third-quarter revenue",
+              "value": 109417000000.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-06-27",
+              "source_url": null
+            },
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "fiscal third-quarter revenue growth year over year",
+              "value": 16.0,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-06-27",
+              "source_url": "https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/"
+            },
+            {
+              "subject": "Apple Inc.",
+              "symbol": "AAPL",
+              "label": "fiscal third-quarter net income attributable to common shareholders",
+              "value": 29789000000.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-06-27",
+              "source_url": null
+            },
+            {
+              "subject": "Apple Inc.",
+              "symbol": "AAPL",
+              "label": "fiscal third-quarter net profit margin",
+              "value": 27.0,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-06-27",
+              "source_url": null
+            },
+            {
+              "subject": "Apple Inc.",
+              "symbol": "AAPL",
+              "label": "share price",
+              "value": 326.57,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-10",
+              "source_url": null
+            },
+            {
+              "subject": "Apple Inc.",
+              "symbol": "AAPL",
+              "label": "market capitalization",
+              "value": 4796449848920.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-10",
+              "source_url": null
+            },
+            {
+              "subject": "Apple Inc.",
+              "symbol": "AAPL",
+              "label": "price-to-earnings ratio",
+              "value": 37.41,
+              "kind": "multiple",
+              "unit": "x",
+              "as_of": "2026-09-10",
+              "source_url": null
+            },
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "analyst Buy ratings",
+              "value": 22.0,
+              "kind": "count",
+              "unit": "ratings",
+              "as_of": "2026-09-02",
+              "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+            },
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "analyst Hold ratings",
+              "value": 12.0,
+              "kind": "count",
+              "unit": "ratings",
+              "as_of": "2026-09-02",
+              "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+            },
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "analyst Sell ratings",
+              "value": 4.0,
+              "kind": "count",
+              "unit": "ratings",
+              "as_of": "2026-09-02",
+              "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+            },
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "average analyst price target",
+              "value": 330.61,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-02",
+              "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+            }
+          ],
+          "retrieved_at": "2026-09-10T20:45:55.354409+00:00",
+          "anchor_symbols": [
+            "AAPL"
+          ],
+          "peers": [],
+          "usage": {
+            "invocations": 4,
+            "latency_ms": 55960,
+            "cost_usd": 0.2609,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [
+              {
+                "symbol": "AAPL",
+                "name": "Apple Inc. Common Stock",
+                "asset_class": "equity"
+              }
+            ],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            }
+          }
+        },
+        "message_id": "7a6240f3-a4d3-4262-9155-e3d6e1853a5f",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "6712c77a-60db-456e-8a18-502505cbfc9f",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "26bd1d9a-1d52-47f7-be74-0418991f8083",
+        "conversation_id": "6712c77a-60db-456e-8a18-502505cbfc9f",
+        "role": "user",
+        "content": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+        "created_at": "2026-09-10T20:44:47.623578Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "6712c77a-60db-456e-8a18-502505cbfc9f",
+            "request_id": "0fb9c7ae-dad2-484d-b8dc-a914eb1986df",
+            "started_at": "2026-09-10T20:44:47.623570+00:00"
+          }
+        }
+      },
+      {
+        "id": "7a6240f3-a4d3-4262-9155-e3d6e1853a5f",
+        "conversation_id": "6712c77a-60db-456e-8a18-502505cbfc9f",
+        "role": "assistant",
+        "content": "**Quick read:** Apple’s fundamentals are strong, but its valuation is demanding and sentiment is positive but divided.\n\n| Area | Read |\n|---|---|\n| Fundamentals | Fiscal third-quarter revenue was **$109,417,000,000**, up **16%** year over year, while net income was **$29,789,000,000** and net margin was **27%**. Apple said tariff refunds boosted gross margin and earnings, so part of the quarter’s strength was non-recurring. |\n| Valuation | As of **2026-09-10**, AAPL traded at **$326.57**, with a market capitalization of **$4,796,449,848,920** and a P/E ratio of **37.41x**. That is a premium valuation and leaves less room for execution disappointments. |\n| Sentiment | Analyst sentiment was a mixed-positive “Moderate Buy”: **22** Buy, **12** Hold and **4** Sell ratings, with an average target of **$330.61**. The target sits only slightly above the current share price, while published concerns center on valuation and AI execution. |\n\n**Bottom line:** Apple is delivering healthy growth and high profitability, but the share price already reflects substantial optimism. This is an informational snapshot, not investment advice.",
+        "created_at": "2026-09-10T20:45:55.592877Z",
+        "metadata": {
+          "conversation_mode": "guide",
+          "agent_runtime_stage_outcome": "ready_to_respond",
+          "next_experiments": {
+            "version": "argus_next_experiments/v1",
+            "rows": [
+              {
+                "kind": "research_test_single",
+                "label": "Test Apple (AAPL) over the last 3 years",
+                "label_parts": [
+                  {
+                    "type": "text",
+                    "value": "Test "
+                  },
+                  {
+                    "type": "text",
+                    "value": "Apple"
+                  },
+                  {
+                    "type": "ticker",
+                    "value": "AAPL"
+                  },
+                  {
+                    "type": "text",
+                    "value": " over the last 3 years"
+                  }
+                ],
+                "label_key": "chat.next_experiments.labels.research_dynamic",
+                "send_text": "Test buying and holding AAPL over the last three years"
+              }
+            ]
+          },
+          "research": {
+            "schema_version": "argus_research/v1",
+            "capability_class": "balanced_lookup",
+            "shape": "balanced",
+            "sources": [
+              {
+                "title": "Apple reports third quarter results",
+                "domain": "www.apple.com",
+                "url": "https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/",
+                "source_date": "2026-07-30"
+              },
+              {
+                "title": "Earnings call transcript: Apple beats Q3 2026 estimates ...",
+                "domain": "www.investing.com",
+                "url": "https://www.investing.com/news/transcripts/earnings-call-transcript-apple-beats-q3-2026-estimates-shares-fall-after-hours-93CH-4826459",
+                "source_date": "2026-07-30"
+              },
+              {
+                "title": "Apple (AAPL) Investor Relations, Earnings Summary & ...",
+                "domain": "quartr.com",
+                "url": "https://quartr.com/companies/apple-inc_4742",
+                "source_date": "2026-05-20"
+              },
+              {
+                "title": "Apple's (AAPL) Neutral Rating Reaffirmed at DA Davidson",
+                "domain": "www.marketbeat.com",
+                "url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/",
+                "source_date": "2026-09-02"
+              },
+              {
+                "title": "AAPL Maintained by Rosenblatt -- Price Target Raised to $303",
+                "domain": "www.gurufocus.com",
+                "url": "https://www.gurufocus.com/news/9061711/aapl-maintained-by-rosenblatt-price-target-raised-to-303",
+                "source_date": "2026-09-01"
+              }
+            ],
+            "rows": [
+              {
+                "subject": "Apple Inc.",
+                "symbol": "AAPL",
+                "label": "fiscal third-quarter revenue",
+                "value": 109417000000.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-06-27",
+                "source_url": null
+              },
+              {
+                "subject": "Apple",
+                "symbol": "AAPL",
+                "label": "fiscal third-quarter revenue growth year over year",
+                "value": 16.0,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-06-27",
+                "source_url": "https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/"
+              },
+              {
+                "subject": "Apple Inc.",
+                "symbol": "AAPL",
+                "label": "fiscal third-quarter net income attributable to common shareholders",
+                "value": 29789000000.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-06-27",
+                "source_url": null
+              },
+              {
+                "subject": "Apple Inc.",
+                "symbol": "AAPL",
+                "label": "fiscal third-quarter net profit margin",
+                "value": 27.0,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-06-27",
+                "source_url": null
+              },
+              {
+                "subject": "Apple Inc.",
+                "symbol": "AAPL",
+                "label": "share price",
+                "value": 326.57,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-09-10",
+                "source_url": null
+              },
+              {
+                "subject": "Apple Inc.",
+                "symbol": "AAPL",
+                "label": "market capitalization",
+                "value": 4796449848920.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-09-10",
+                "source_url": null
+              },
+              {
+                "subject": "Apple Inc.",
+                "symbol": "AAPL",
+                "label": "price-to-earnings ratio",
+                "value": 37.41,
+                "kind": "multiple",
+                "unit": "x",
+                "as_of": "2026-09-10",
+                "source_url": null
+              },
+              {
+                "subject": "Apple",
+                "symbol": "AAPL",
+                "label": "analyst Buy ratings",
+                "value": 22.0,
+                "kind": "count",
+                "unit": "ratings",
+                "as_of": "2026-09-02",
+                "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+              },
+              {
+                "subject": "Apple",
+                "symbol": "AAPL",
+                "label": "analyst Hold ratings",
+                "value": 12.0,
+                "kind": "count",
+                "unit": "ratings",
+                "as_of": "2026-09-02",
+                "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+              },
+              {
+                "subject": "Apple",
+                "symbol": "AAPL",
+                "label": "analyst Sell ratings",
+                "value": 4.0,
+                "kind": "count",
+                "unit": "ratings",
+                "as_of": "2026-09-02",
+                "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+              },
+              {
+                "subject": "Apple",
+                "symbol": "AAPL",
+                "label": "average analyst price target",
+                "value": 330.61,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-09-02",
+                "source_url": "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/"
+              }
+            ],
+            "retrieved_at": "2026-09-10T20:45:55.354409+00:00",
+            "anchor_symbols": [
+              "AAPL"
+            ],
+            "peers": [],
+            "usage": {
+              "invocations": 4,
+              "latency_ms": 55960,
+              "cost_usd": 0.2609,
+              "cache_status": "miss"
+            },
+            "follow_up": {
+              "schema_version": "argus_research_follow_up/v1",
+              "subjects": [
+                {
+                  "symbol": "AAPL",
+                  "name": "Apple Inc. Common Stock",
+                  "asset_class": "equity"
+                }
+              ],
+              "comparison_set": [],
+              "peer_suggestions": [],
+              "open_thread": {
+                "shape": "balanced",
+                "period_of_interest": null
+              }
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "26bd1d9a-1d52-47f7-be74-0418991f8083",
+            "request_id": "0fb9c7ae-dad2-484d-b8dc-a914eb1986df",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 68.01,
+  "summary": {
+    "label": "aapl-quick-read",
+    "language": "en",
+    "elapsed_seconds": 68.01,
+    "stage_outcomes": [
+      "ready_to_respond"
+    ],
+    "answered": true,
+    "recovery_code": null,
+    "clarification_kind": null,
+    "clarification_reason_code": null,
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "**Quick read:** Apple’s fundamentals are strong, but its valuation is demanding and sentiment is positive but divided.\n\n| Area | Read |\n|---|---|\n| Fundamentals | Fiscal third-quarter revenue was **$109,417,000,000**, up **16%** year over year, while net income was **$29,789,000,000** and net margin was **27%**. Apple said tariff refunds boosted gross margin and earnings, so part of the quarter’s strength was non-recurring. |\n| Valuation | As of **2026-09-10**, AAPL traded at **$326.57**, with a market capitalization of **$4,796,449,848,920** and a P/E ratio of **37.41x**. That is a premium valuation and leaves less room for execution disappointments. |\n| Sentiment | Analyst sentiment was a mixed-positive “Moderate Buy”: **22** Buy, **12** Hold and **4** Sell ratings, with an average target of **$330.61**. The target sits only slightly above the current share price, while published concerns center on valuation and AI execution. |\n\n**Bottom line:** Apple is delivering healthy growth and high profitability, but the share price already reflects substantial optimism. This is an informational snapshot, not investment advice.",
+    "shape": "balanced",
+    "degraded": null,
+    "rows": 11,
+    "sources": [
+      "https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/",
+      "https://www.investing.com/news/transcripts/earnings-call-transcript-apple-beats-q3-2026-estimates-shares-fall-after-hours-93CH-4826459",
+      "https://quartr.com/companies/apple-inc_4742",
+      "https://www.marketbeat.com/instant-alerts/analyst-apples-aapl-neutral-rating-reaffirmed-at-da-davidson-2026-09-02/",
+      "https://www.gurufocus.com/news/9061711/aapl-maintained-by-rosenblatt-price-target-raised-to-303"
+    ],
+    "research_usage": {
+      "invocations": 4,
+      "latency_ms": 55960,
+      "cost_usd": 0.2609,
+      "cache_status": "miss"
+    },
+    "next_experiments": [
+      "Test Apple (AAPL) over the last 3 years"
+    ]
+  }
+}

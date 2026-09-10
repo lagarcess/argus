@@ -42,5 +42,5 @@ for (const file of readdirSync(AFTER).filter((name) => name.endsWith(".json"))) 
   }
 }
 await browser.close();
-writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
+writeFileSync(`${OUT}/${process.env.D10_REPORT || "report.json"}`, JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
