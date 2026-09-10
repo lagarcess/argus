@@ -147,6 +147,57 @@ async def test_readout_model_inputs_omit_provenance_and_preserve_run_evidence(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("with_chart", [True, False])
+async def test_production_quick_take_uses_optional_card_chart_for_ending_value(
+    with_chart, stored_result, monkeypatch
+):
+    from argus.agent_runtime.result_readout import (
+        result_readout_with_metadata_from_backtest_payload_async,
+    )
+
+    captured = {}
+    text = "The ending value was $11,513."
+
+    async def draft(**kwargs):
+        captured.update(kwargs)
+        return {"text": text}
+
+    monkeypatch.setattr(explain, "invoke_openrouter_json_schema", draft)
+    card = {}
+    if with_chart:
+        card["chart"] = {
+            "kind": "portfolio_equity",
+            "currency": "USD",
+            "series": [
+                {"time": stored_result["date_range"]["start"], "value": 10000},
+                {"time": stored_result["date_range"]["end"], "value": 11512.6},
+            ],
+        }
+    response = await result_readout_with_metadata_from_backtest_payload_async(
+        request={"symbols": stored_result["symbols"], "strategy_type": "buy_and_hold"},
+        envelope={
+            "metrics": stored_result["metrics"],
+            "resolved_strategy": {"strategy_type": "buy_and_hold"},
+            "resolved_parameters": {
+                **stored_result["config_snapshot"],
+                "benchmark_symbol": stored_result["benchmark_symbol"],
+                "date_range": stored_result["date_range"],
+            },
+        },
+        result_card=card,
+        explanation_context=None,
+    )
+    facts = json.loads(captured["messages"][1]["content"])["run_facts"]
+    assert response.fallback_used is not with_chart
+    if with_chart:
+        assert response.text == text
+        assert facts["chart"] == card["chart"]
+    else:
+        assert "chart" not in facts
+        assert response.failure_mode == "unknown_figure"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
 @pytest.mark.parametrize(
     "text",

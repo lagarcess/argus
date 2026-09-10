@@ -270,6 +270,12 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
+    result_card = explanation_context.get("result_card")
+    chart = (
+        result_card.get("chart")
+        if isinstance(result_card, dict)
+        else result_payload.get("chart")
+    )
     facts = stored_readout_facts(
         metrics=result_facts.get("metrics"),
         config_snapshot=result_payload.get(
@@ -282,7 +288,7 @@ async def _llm_explanation(
         symbols=benchmark["tested_symbols"],
         benchmark_symbol=benchmark["benchmark_symbol"],
         date_range=result_payload.get("date_range", strategy.get("date_range")),
-        chart=result_payload.get("chart"),
+        chart=chart,
         comparison_metrics={
             "total_return_pct": returns.total_return,
             "benchmark_return_pct": returns.benchmark_return,
