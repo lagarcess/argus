@@ -374,9 +374,45 @@ def test_an_answer_that_retrieved_nothing_is_not_grounded(
     assert len(transport.requests) == 2, "a turn that retrieved nothing is never stored"
 
 
-def test_the_thorough_path_withholds_an_answer_that_retrieved_nothing() -> None:
+@pytest.mark.parametrize(
+    ("question_kind", "requires_publisher_sources"),
+    [("current_external", False), ("company_lookup", False), ("live_quote", True)],
+    ids=["current_external", "company_lookup", "quote-with-a-claim"],
+)
+def test_a_claim_that_retrieved_nothing_is_not_grounded_before_it_lacks_a_publisher(
+    monkeypatch, question_kind: str, requires_publisher_sources: bool
+) -> None:
+    """A claim-shaped answer that retrieved nothing never had a page to find a
+    publisher on, so it is the retrieval failure rather than a missing public
+    source, after the one publisher retry that still runs."""
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind=question_kind,
+        symbols=["NVDA"],
+        requires_publisher_sources=requires_publisher_sources,
+    )
+    document = agent_response(
+        text=typed_answer_text("NVIDIA fell **4.3%** this week.", []), invocations=0
+    )
+    transport = _wire(monkeypatch, [document, document])
+
+    result = _run("Why is NVDA moving this week?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_not_grounded"}
+    assert result.stage_patch["assistant_response"] == NOT_GROUNDED_NOTES["en"]
+    assert len(transport.requests) == 2, "the one publisher retry still runs"
+
+
+@pytest.mark.parametrize("requires_publisher_sources", [False, True])
+def test_the_thorough_path_withholds_an_answer_that_retrieved_nothing(
+    requires_publisher_sources: bool,
+) -> None:
     """The background run composes through the same gate: a thorough answer
-    whose response used no retrieval tool is not published, and not stored."""
+    whose response used no retrieval tool is not published and not stored,
+    whether or not its claim needed a publisher."""
     from argus.domain.research.cache import cache_get, research_cache_key
     from argus.domain.research.perplexity_agent import _packet_from_response
 
@@ -400,6 +436,7 @@ def test_the_thorough_path_withholds_an_answer_that_retrieved_nothing() -> None:
         "capability_class": "thorough_research",
         "language": "es-419",
         "question_kind": "cross_company",
+        "requires_publisher_sources": requires_publisher_sources,
         "subjects": [{"symbol": "NFLX", "name": "Netflix", "asset_class": "equity"}],
         "cache_key": key,
     }

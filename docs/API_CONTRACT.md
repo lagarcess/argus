@@ -3841,7 +3841,8 @@ Contract rules:
   finance citation channel. If none survives sanitization and question-aware
   selection after that retry, Argus emits
   `research_unavailable_missing_public_sources` and does not publish the
-  unsupported claim.
+  unsupported claim. A response that retrieved nothing at all has no page to
+  select from and is `research_not_grounded` instead.
 - Section 2's five shapes are one rail. Market pulse ("what's moving
   today"), screening ("semiconductor stocks under a 20 P/E"), and sector
   radar ("what's happening in cybersecurity") use the balanced tier and
@@ -3865,8 +3866,8 @@ Contract rules:
   accepted only with a figure and a verified name, on the first attempt or
   after the one concrete retry. Neither failure renders subject-dependent
   figure or asset copy, and neither emits a runnable row. The same retrieval
-  record decides every other research answer, inline or background: a
-  response that retrieved nothing carries
+  record decides every other research answer, inline or background, before
+  any publisher requirement: a response that retrieved nothing carries
   `degraded.code = "research_not_grounded"`, replaces its prose with the
   retrieval failure and carries no rows, while the subjects the user named
   stay testable.

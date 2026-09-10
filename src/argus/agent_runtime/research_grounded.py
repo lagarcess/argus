@@ -384,14 +384,15 @@ def _packet_stage_result(
     sidecar. One composition whether the packet came from the provider or the
     shared cache, for any shape.
 
-    A retrieved answer publishes. ``withheld_code`` is a reason the caller
-    already established and the packet cannot show for itself, such as a
-    claim whose retrieval kept no public publisher; otherwise an answer is
-    withheld only when it did not retrieve, or when a survey names nothing
-    the resolver verifies."""
+    A retrieved answer publishes. A packet that did not retrieve is withheld
+    for that first, since it has no page to find a publisher on.
+    ``withheld_code`` is a reason the caller already established and the
+    packet cannot show for itself, such as a claim whose retrieval kept no
+    public publisher; a survey is also withheld when it names nothing the
+    resolver verifies."""
     survey = is_market_survey(question_kind)
     answer = published_answer(packet, language)
-    degraded_code = withheld_code or _not_grounded_code(packet, survey=survey)
+    degraded_code = _not_grounded_code(packet, survey=survey) or withheld_code
     peers: list[dict[str, str]] = []
     if degraded_code is None:
         # A withheld answer shows no peer, so a reason already established
@@ -1353,10 +1354,12 @@ def compose_completed_research(
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
-    degraded_code = (
+    degraded_code = _not_grounded_code(
+        packet, survey=is_market_survey(question_kind)
+    ) or (
         "research_unavailable_missing_public_sources"
         if job_request.get("requires_publisher_sources") and not sources
-        else _not_grounded_code(packet, survey=is_market_survey(question_kind))
+        else None
     )
     peers = (
         []
