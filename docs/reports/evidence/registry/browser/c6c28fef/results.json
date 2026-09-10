@@ -1,0 +1,41 @@
+{
+  "head": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+  "repository_clean_after": true,
+  "cases_passed": 2,
+  "cases_failed": 0,
+  "provider_calls": 0,
+  "backtest_calls": 0,
+  "real_api_calls": 0,
+  "server_port": 3193,
+  "server_stopped": true,
+  "network": {
+    "en": {
+      "api_interceptions": 12,
+      "message_reads": 2,
+      "blocked_external_requests": [],
+      "page_errors": [],
+      "phases": [
+        "initial",
+        "reload"
+      ]
+    },
+    "es-419": {
+      "api_interceptions": 12,
+      "message_reads": 2,
+      "blocked_external_requests": [],
+      "page_errors": [],
+      "phases": [
+        "initial",
+        "reload"
+      ]
+    }
+  },
+  "visual_inspection": {
+    "rowless-en.png": "Complete narrative, localized card/input/source chrome, both source titles and dates, no numeric answer block or clipping.",
+    "rowless-es-419.png": "Complete Spanish narrative, localized card/input/source chrome, both source titles and dates, no numeric answer block or clipping."
+  },
+  "screenshots_sha256": {
+    "rowless-en.png": "ec7c632d20012541c82e91fd44860ab19144439a972479e30dbb7d20f526b5f1",
+    "rowless-es-419.png": "3f7561b5df4513f616990ce22548839808b54ef63978e8a9962928436e30e85a"
+  }
+}

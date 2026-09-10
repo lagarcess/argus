@@ -1,0 +1,21 @@
+{
+  "head": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+  "source": "temp/registry-openrouter-responses-c6c28fef.jsonl",
+  "retained_source_lines": [
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70
+  ],
+  "source_is_append_in_progress": true,
+  "source_hash_scope": "Individual retained source line; whole source file is still growing.",
+  "provider_calls": 0,
+  "checkout_edits": false,
+  "probe": "build_research_evidence_policy + selection_judge_context pure functions only"
+}

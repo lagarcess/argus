@@ -1,0 +1,35 @@
+{
+  "intent": "follow_up",
+  "task_relation": "new_task",
+  "user_goal_summary": "Prepare a daily buy-and-hold confirmation for MSFT with $12,000 from January 3, 2023 through December 31, 2024, benchmark SPY, a 10 bps fee, and 5 bps slippage.",
+  "tool_calls": [],
+  "requires_clarification": false,
+  "detected_user_language": "en",
+  "candidate_strategy_draft": {
+    "raw_user_phrasing": "Prepare a daily buy-and-hold confirmation for MSFT with $12,000 from January 3, 2023 through December 31, 2024, benchmark SPY, a 10 bps fee, and 5 bps slippage.",
+    "language": "en",
+    "requested_strategy_template": "buy_and_hold",
+    "strategy_type": "buy_and_hold",
+    "asset_universe": [
+      "MSFT"
+    ],
+    "asset_class": "equity",
+    "timeframe": "1D",
+    "date_range": {
+      "start": "2023-01-03",
+      "end": "2024-12-31"
+    },
+    "date_range_raw_text": "from January 3, 2023 through December 31, 2024",
+    "capital_amount": 12000,
+    "comparison_baseline": "SPY",
+    "fee_rate": 0.001,
+    "slippage": 0.0005
+  },
+  "missing_required_fields": [],
+  "assistant_response": "Here's the prepared confirmation for your MSFT buy-and-hold strategy with the details you provided.",
+  "uses_latest_result_context": false,
+  "confidence": 0.9,
+  "reason_codes": [],
+  "semantic_turn_act": "new_idea",
+  "artifact_target": "active_confirmation"
+}

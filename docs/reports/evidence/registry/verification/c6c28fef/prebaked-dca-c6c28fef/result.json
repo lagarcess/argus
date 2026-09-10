@@ -1,0 +1,398 @@
+{
+  "case_id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+  "scope_control": false,
+  "actual_call_id": "backtest_dca_ccep_200",
+  "context_note": "Existing fixture KO snapshot and actual first clarification; pending amount metadata follows that clarification.",
+  "snapshot_assets": [
+    "KO"
+  ],
+  "actual_initial_clarification": {
+    "detail_targets": [
+      "recurring_purchase_amount"
+    ],
+    "direct_question": "Got it \u2014 buying Coca-Cola (CCEP) every month for the past five years. How much would you like to invest each month?",
+    "directly_asks_user": true,
+    "question": "Got it \u2014 buying Coca-Cola (CCEP) every month for the past five years. How much would you like to invest each month?",
+    "question_targets": [
+      "sizing_amount"
+    ]
+  },
+  "calls": [
+    {
+      "schema": "AssetGroundingAudit",
+      "retained_line": 224
+    },
+    {
+      "schema": "DcaContractAudit",
+      "retained_line": 225
+    },
+    {
+      "schema": "DcaContractAudit",
+      "retained_line": 226
+    },
+    {
+      "schema": "StrategyFamilyContinuityAudit",
+      "retained_line": 227
+    },
+    {
+      "schema": "DcaContributionRoleAudit",
+      "retained_line": 228
+    },
+    {
+      "schema": "StatedRunFieldFidelityAudit",
+      "retained_line": 229
+    }
+  ],
+  "events": [
+    {
+      "owner": "_asset_grounding_audited_response",
+      "before": {
+        "intent": "calculate",
+        "act": "answer_pending_need",
+        "relation": "continue",
+        "assets": [
+          "CCEP"
+        ],
+        "capital_amount": 200.0,
+        "recurring_contribution": null,
+        "missing": [],
+        "requires_clarification": false,
+        "ambiguities": [],
+        "reason_codes": []
+      },
+      "after": {
+        "intent": "calculate",
+        "act": "answer_pending_need",
+        "relation": "continue",
+        "assets": [],
+        "capital_amount": 200.0,
+        "recurring_contribution": null,
+        "missing": [
+          "asset_universe"
+        ],
+        "requires_clarification": true,
+        "ambiguities": [],
+        "reason_codes": [
+          "asset_grounding_audit_removed_unsubstantiated_symbols"
+        ]
+      }
+    },
+    {
+      "owner": "_dca_contract_audited_response",
+      "before": {
+        "intent": "calculate",
+        "act": "answer_pending_need",
+        "relation": "continue",
+        "assets": [],
+        "capital_amount": 200.0,
+        "recurring_contribution": null,
+        "missing": [
+          "asset_universe"
+        ],
+        "requires_clarification": true,
+        "ambiguities": [],
+        "reason_codes": [
+          "asset_grounding_audit_removed_unsubstantiated_symbols"
+        ]
+      },
+      "after": {
+        "intent": "calculate",
+        "act": "new_idea",
+        "relation": "new_task",
+        "assets": [],
+        "capital_amount": 200.0,
+        "recurring_contribution": 200.0,
+        "missing": [
+          "asset_universe"
+        ],
+        "requires_clarification": true,
+        "ambiguities": [],
+        "reason_codes": [
+          "asset_grounding_audit_removed_unsubstantiated_symbols",
+          "dca_contract_audit"
+        ]
+      }
+    },
+    {
+      "owner": "_dca_contribution_role_audited_response",
+      "before": {
+        "intent": "calculate",
+        "act": "new_idea",
+        "relation": "new_task",
+        "assets": [],
+        "capital_amount": 200.0,
+        "recurring_contribution": 200.0,
+        "missing": [
+          "asset_universe"
+        ],
+        "requires_clarification": true,
+        "ambiguities": [],
+        "reason_codes": [
+          "asset_grounding_audit_removed_unsubstantiated_symbols",
+          "dca_contract_audit"
+        ]
+      },
+      "after": {
+        "intent": "calculate",
+        "act": "new_idea",
+        "relation": "new_task",
+        "assets": [],
+        "capital_amount": 200.0,
+        "recurring_contribution": 200.0,
+        "missing": [
+          "asset_universe"
+        ],
+        "requires_clarification": true,
+        "ambiguities": [],
+        "reason_codes": [
+          "asset_grounding_audit_removed_unsubstantiated_symbols",
+          "dca_contract_audit",
+          "dca_contribution_provenance_kept_over_budget_audit"
+        ]
+      }
+    },
+    {
+      "owner": "known_input_conflicts",
+      "scope_control": false,
+      "inputs": {
+        "before": {
+          "intent": "calculate",
+          "act": "answer_pending_need",
+          "relation": "continue",
+          "assets": [
+            "CCEP"
+          ],
+          "capital_amount": 200.0,
+          "recurring_contribution": null,
+          "missing": [],
+          "requires_clarification": false,
+          "ambiguities": [],
+          "reason_codes": []
+        },
+        "after": {
+          "intent": "calculate",
+          "act": "new_idea",
+          "relation": "new_task",
+          "assets": [
+            "CCEP"
+          ],
+          "capital_amount": 200.0,
+          "recurring_contribution": 200.0,
+          "missing": [
+            "asset_universe"
+          ],
+          "requires_clarification": true,
+          "ambiguities": [],
+          "reason_codes": [
+            "asset_grounding_audit_removed_unsubstantiated_symbols",
+            "dca_contract_audit",
+            "dca_contribution_provenance_kept_over_budget_audit",
+            "focused_repair_preserved_structured_context"
+          ]
+        }
+      },
+      "conflicts": [
+        {
+          "field_name": "asset_universe",
+          "raw_value": "['KO']",
+          "candidate_normalized_value": [
+            "CCEP"
+          ],
+          "reason_code": "declared_tool_input_conflict"
+        }
+      ]
+    },
+    {
+      "owner": "_prepared_stage",
+      "before": {
+        "intent": "calculate",
+        "act": "answer_pending_need",
+        "relation": "continue",
+        "assets": [
+          "CCEP"
+        ],
+        "capital_amount": 200.0,
+        "recurring_contribution": null,
+        "missing": [],
+        "requires_clarification": true,
+        "ambiguities": [
+          {
+            "field_name": "asset_universe",
+            "raw_value": "['KO']",
+            "candidate_normalized_value": [
+              "CCEP"
+            ],
+            "reason_code": "declared_tool_input_conflict"
+          }
+        ],
+        "reason_codes": [
+          "pending_non_asset_answer_preserved_prior_asset"
+        ]
+      },
+      "after": null
+    }
+  ],
+  "outcome": "needs_clarification",
+  "patch": {
+    "tool_calls": [],
+    "normalized_signals": {
+      "tool_input_repair": {
+        "call_id": "backtest_dca_ccep_200",
+        "repair_attempted": true,
+        "schema_version": "argus_repair_effect/v1",
+        "trigger_reason": "declared_backtest_input",
+        "repair_applied": true,
+        "changed_fields": [
+          "ambiguous_fields",
+          "requires_clarification"
+        ],
+        "before_fingerprint": "aaaf4b9a3d2420cfe141620c7eb2307d003e508984a382910513a35620ec2747",
+        "after_fingerprint": "98f5d038d8d1e7b8f168fd057f6d49b464fc76571d5f89bed0278ac293df36ea",
+        "no_op_reason": null
+      }
+    },
+    "intent": "calculate",
+    "task_relation": "continue",
+    "requires_clarification": true,
+    "user_goal_summary": "Simulate buying Coca-Cola every month for five years",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+      "raw_user_phrasing": "200$",
+      "requested_strategy_template": "dca_accumulation",
+      "strategy_type": "dca_accumulation",
+      "strategy_thesis": "Buy Coca-Cola every month for the last five years.",
+      "asset_universe": [
+        "KO"
+      ],
+      "asset_class": "equity",
+      "timeframe": null,
+      "cadence": "monthly",
+      "entry_logic": null,
+      "exit_logic": null,
+      "date_range": {
+        "start": "2021-09-10",
+        "end": "2026-09-10"
+      },
+      "sizing_mode": null,
+      "capital_amount": 200.0,
+      "position_size": null,
+      "risk_rules": [],
+      "assumptions": [],
+      "comparison_baseline": "SPY",
+      "refinement_of": null,
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "resolution_provenance": [
+        {
+          "field": "asset_universe[0]",
+          "raw_text": "KO",
+          "source": "llm_extraction",
+          "candidate_kind": "asset",
+          "resolution_status": "resolved",
+          "canonical_symbol": "KO",
+          "asset_class": "equity",
+          "validated_by": "provider_catalog",
+          "confidence": "high"
+        }
+      ],
+      "extra_parameters": {
+        "language": "en",
+        "date_range_raw_text": "five years",
+        "date_range_intent": {
+          "kind": "rolling_window",
+          "start": null,
+          "end": null,
+          "day_offset": null,
+          "count": 5.0,
+          "unit": "year",
+          "anchor": "today",
+          "year": null,
+          "endpoint": null,
+          "confidence": 0.9,
+          "evidence": "five years"
+        },
+        "evidence_spans": {
+          "asset_universe": "Coca-Cola",
+          "cadence": "every month",
+          "date_range_intent": "five years",
+          "date_range_raw_text": "five years",
+          "strategy_type": "bought Coca-Cola every month",
+          "capital_amount": "200$"
+        },
+        "recurring_cadence": "monthly",
+        "field_provenance": {
+          "asset_universe": "explicit_user",
+          "cadence": "explicit_user",
+          "date_range_intent": "explicit_user",
+          "date_range_raw_text": "explicit_user",
+          "strategy_type": "explicit_user",
+          "capital_amount": "explicit_user"
+        },
+        "raw_strategy_type": "dca_accumulation"
+      }
+    },
+    "missing_required_fields": [],
+    "optional_parameter_status": {
+      "optional_parameter_opportunity": [
+        "initial_capital",
+        "timeframe",
+        "fees",
+        "slippage",
+        "engine_options"
+      ],
+      "user_preference_overridden_for_turn": false,
+      "confidence": 0.8,
+      "arbitration_mode": "structured_arbitration",
+      "ambiguous_fields": [
+        {
+          "field_name": "asset_universe",
+          "raw_value": "['KO']",
+          "candidate_normalized_value": [
+            "CCEP"
+          ],
+          "reason_code": "declared_tool_input_conflict"
+        }
+      ],
+      "unsupported_constraints": []
+    },
+    "effective_response_profile": "effective_tone='friendly' effective_verbosity='medium' effective_expertise_mode='beginner'",
+    "reason_codes": [
+      "llm_interpreter_used",
+      "semantic_date_constraint_preserved",
+      "semantic_recurring_contribution_preserved",
+      "semantic_recurring_cadence_preserved",
+      "pending_non_asset_answer_preserved_prior_asset"
+    ],
+    "ambiguous_fields": [
+      {
+        "field_name": "asset_universe",
+        "raw_value": "['KO']",
+        "candidate_normalized_value": [
+          "CCEP"
+        ],
+        "reason_code": "declared_tool_input_conflict"
+      }
+    ],
+    "unsupported_constraints": [],
+    "resolution_provenance": [
+      {
+        "field": "asset_universe[0]",
+        "raw_text": "KO",
+        "source": "llm_extraction",
+        "candidate_kind": "asset",
+        "resolution_status": "resolved",
+        "canonical_symbol": "KO",
+        "asset_class": "equity",
+        "validated_by": "provider_catalog",
+        "confidence": "high"
+      }
+    ],
+    "semantic_turn_act": "answer_pending_need",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "asset_discovery": null
+  }
+}

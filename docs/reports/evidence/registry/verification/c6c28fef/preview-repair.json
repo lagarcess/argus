@@ -1,0 +1,331 @@
+{
+  "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+  "preview": {
+    "branch_id": "52d8abcd-ec52-4cef-a999-307a59489ba2",
+    "project_ref": "uroloahldpyxqozkwvlq",
+    "pull_request": 575,
+    "is_default": false,
+    "persistent": false,
+    "with_data": false
+  },
+  "pre_reset": {
+    "remoteOnly": [
+      {
+        "version": "20260909183409",
+        "name": "add_tool_receipt_sources"
+      }
+    ],
+    "localOnly": [
+      "20260910003000",
+      "20260909183646",
+      "20260909225701"
+    ],
+    "remoteCount": 71,
+    "localCount": 73,
+    "product_rows": 0,
+    "auth_users": 0,
+    "storage_objects": 0,
+    "allowlist_rows": 2,
+    "allowlist_seed_checksum_md5": "6dec7994ac1c25fb2a9fdcc937992273"
+  },
+  "action": "Reset this disposable empty PR preview; production was not changed",
+  "post_reset": {
+    "status": "FUNCTIONS_DEPLOYED",
+    "health": "ACTIVE_HEALTHY",
+    "github_supabase_preview": "SUCCESS",
+    "migrations": [
+      {
+        "version": "20260424000001",
+        "name": "alpha_core"
+      },
+      {
+        "version": "20260505000001",
+        "name": "add_currency_pair_asset_class"
+      },
+      {
+        "version": "20260519000001",
+        "name": "add_context_packets_route_receipts"
+      },
+      {
+        "version": "20260520000001",
+        "name": "add_route_receipt_usage_context_ids"
+      },
+      {
+        "version": "20260530000001",
+        "name": "private_alpha_allowlist"
+      },
+      {
+        "version": "20260530000002",
+        "name": "simplify_private_alpha_allowlist"
+      },
+      {
+        "version": "20260606000001",
+        "name": "add_backtest_jobs"
+      },
+      {
+        "version": "20260607000001",
+        "name": "add_account_deletion_feedback_type"
+      },
+      {
+        "version": "20260608041032",
+        "name": "secure_checkpoint_rls"
+      },
+      {
+        "version": "20260616091955",
+        "name": "expand_usage_counter_resources"
+      },
+      {
+        "version": "20260619000001",
+        "name": "p1_evidence_decision_spine"
+      },
+      {
+        "version": "20260621053126",
+        "name": "enforce_p1_evidence_immutability"
+      },
+      {
+        "version": "20260702000001",
+        "name": "add_cost_ledger_entries"
+      },
+      {
+        "version": "20260713000001",
+        "name": "finalize_backtest_completion"
+      },
+      {
+        "version": "20260717000001",
+        "name": "serialize_conversation_message_append"
+      },
+      {
+        "version": "20260722000001",
+        "name": "settle_message_allowance"
+      },
+      {
+        "version": "20260722000002",
+        "name": "atomic_backtest_admission"
+      },
+      {
+        "version": "20260722000003",
+        "name": "replay_legacy_reservations"
+      },
+      {
+        "version": "20260722000004",
+        "name": "serialize_direct_success"
+      },
+      {
+        "version": "20260723000001",
+        "name": "add_chat_turn_lifecycles"
+      },
+      {
+        "version": "20260723000002",
+        "name": "chat_turn_acceptance_and_reconciliation"
+      },
+      {
+        "version": "20260723000003",
+        "name": "chat_turn_option_acceptance_and_finalization"
+      },
+      {
+        "version": "20260724101324",
+        "name": "add_guest_workspaces"
+      },
+      {
+        "version": "20260724102309",
+        "name": "add_guest_session_allowances"
+      },
+      {
+        "version": "20260724102645",
+        "name": "guest_conversation_and_cleanup"
+      },
+      {
+        "version": "20260724110000",
+        "name": "restore_settle_only_usage"
+      },
+      {
+        "version": "20260724110100",
+        "name": "serialize_guest_feedback"
+      },
+      {
+        "version": "20260724110200",
+        "name": "align_guest_cleanup_candidates"
+      },
+      {
+        "version": "20260724211312",
+        "name": "guest_workspace_handoffs"
+      },
+      {
+        "version": "20260724214312",
+        "name": "idempotent_chat_turn_finalization"
+      },
+      {
+        "version": "20260724223000",
+        "name": "replace_guest_conversation"
+      },
+      {
+        "version": "20260724230000",
+        "name": "harden_guest_public_boundaries"
+      },
+      {
+        "version": "20260725220148",
+        "name": "fix_expired_guest_complete_graph_cleanup"
+      },
+      {
+        "version": "20260726001954",
+        "name": "isolate_guest_cleanup_candidates"
+      },
+      {
+        "version": "20260726001955",
+        "name": "enforce_guest_terminal_message_limit"
+      },
+      {
+        "version": "20260726002158",
+        "name": "respect_permanent_conversation_ownership"
+      },
+      {
+        "version": "20260726014754",
+        "name": "isolate_poisoned_guest_orphans"
+      },
+      {
+        "version": "20260726185021",
+        "name": "harden_guest_lifecycle_ownership"
+      },
+      {
+        "version": "20260727000001",
+        "name": "add_bounded_read_indexes"
+      },
+      {
+        "version": "20260727144043",
+        "name": "add_search_trigram_indexes"
+      },
+      {
+        "version": "20260727161406",
+        "name": "add_history_state_page_indexes"
+      },
+      {
+        "version": "20260727230000",
+        "name": "add_visitor_usage_counters"
+      },
+      {
+        "version": "20260728120000",
+        "name": "visitor_keyed_guest_settlement"
+      },
+      {
+        "version": "20260729221458",
+        "name": "add_message_recall_index"
+      },
+      {
+        "version": "20260729225600",
+        "name": "add_personalization_memory_persistence"
+      },
+      {
+        "version": "20260730042500",
+        "name": "add_decision_recall_index"
+      },
+      {
+        "version": "20260730070000",
+        "name": "add_asset_symbol_prefix_indexes"
+      },
+      {
+        "version": "20260731080154",
+        "name": "add_requested_private_alpha_access"
+      },
+      {
+        "version": "20260731093703",
+        "name": "add_avatar_theme"
+      },
+      {
+        "version": "20260801000000",
+        "name": "add_conversation_activity_read_states"
+      },
+      {
+        "version": "20260802090000",
+        "name": "raise_guest_simulation_allowance"
+      },
+      {
+        "version": "20260803110000",
+        "name": "accept_simulation_limit_handoff_reason"
+      },
+      {
+        "version": "20260805120000",
+        "name": "enforce_memory_candidate_sensitivity_flags_require_restricted"
+      },
+      {
+        "version": "20260807000001",
+        "name": "add_research_operation_scope"
+      },
+      {
+        "version": "20260807120000",
+        "name": "add_memory_semantic_recall_index"
+      },
+      {
+        "version": "20260807170000",
+        "name": "allow_unproven_memory_projection"
+      },
+      {
+        "version": "20260807190000",
+        "name": "add_public_excerpt_snapshots"
+      },
+      {
+        "version": "20260808120000",
+        "name": "add_guest_funnel_milestones"
+      },
+      {
+        "version": "20260809140000",
+        "name": "add_preferred_name"
+      },
+      {
+        "version": "20260810150000",
+        "name": "serialize_message_artifact_update"
+      },
+      {
+        "version": "20260811210000",
+        "name": "delete_withheld_backtest_result"
+      },
+      {
+        "version": "20260812142717",
+        "name": "add_access_welcome_deliveries"
+      },
+      {
+        "version": "20260812173805",
+        "name": "claim_access_welcome_delivery"
+      },
+      {
+        "version": "20260812183000",
+        "name": "guest_account_signup_handoffs"
+      },
+      {
+        "version": "20260816150000",
+        "name": "scope_access_welcome_enforcement"
+      },
+      {
+        "version": "20260822000000",
+        "name": "research_job_activity_settles"
+      },
+      {
+        "version": "20260903000000",
+        "name": "claim_research_usage"
+      },
+      {
+        "version": "20260905000000",
+        "name": "workflow_proof_jobs_leave_conversations"
+      },
+      {
+        "version": "20260908120000",
+        "name": "decision_notes_attach_to_computations"
+      },
+      {
+        "version": "20260908205041",
+        "name": "add_refusal_observations"
+      },
+      {
+        "version": "20260909183646",
+        "name": "share_answer_receipt_selections"
+      },
+      {
+        "version": "20260909225701",
+        "name": "retire_research_rail_ledger_status"
+      },
+      {
+        "version": "20260910003000",
+        "name": "lift_receipt_selection_cap"
+      }
+    ]
+  }
+}

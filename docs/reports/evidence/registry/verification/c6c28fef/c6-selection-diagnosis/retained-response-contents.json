@@ -1,0 +1,102 @@
+[
+  {
+    "source_line": 61,
+    "source_line_sha256": "616835d0a246dbc718a14ecd018a410e421cc0489dfcffcc8158cb20899da3c5",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+    "task": "asset_mention_preflight",
+    "schema_name": "LLMAssetMentionExtraction",
+    "http_status": 200,
+    "content": "{\"all_traded_asset_mentions_included\": true, \"asset_mentions\": [{\"raw_text\": \"Costco\", \"role\": \"benchmark\", \"mention_kind\": \"company_name\", \"confidence\": 0.9}]}"
+  },
+  {
+    "source_line": 62,
+    "source_line_sha256": "d318b75d4ac5a4e10f0d1eab9a0398417744ade306e8d15ca586829772998799",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+    "task": "interpretation",
+    "schema_name": "LLMInterpretationResponse",
+    "http_status": 200,
+    "content": "{\n  \"intent\": \"explain\",\n  \"task_relation\": \"new_task\",\n  \"user_goal_summary\": \"Find other assets in Costco's category for comparison\",\n  \"tool_calls\": [\n    {\n      \"tool_name\": \"peer_expansion\",\n      \"call_id\": \"peer_001\",\n      \"arguments\": {\n        \"request\": \"what else in Costco's category could I compare it against?\",\n        \"relationship\": \"peer\",\n        \"anchor_symbols\": [\"COST\"],\n        \"asset_class_hint\": \"equity\",\n        \"needs_current_facts\": false\n      }\n    }\n  ],\n  \"requires_clarification\": false,\n  \"detected_user_language\": \"en\",\n  \"candidate_strategy_draft\": {},\n  \"missing_required_fields\": [],\n  \"assistant_response\": null,\n  \"uses_latest_result_context\": false,\n  \"confidence\": 0.85,\n  \"reason_codes\": [],\n  \"ambiguous_fields\": [],\n  \"unsupported_constraints\": [],\n  \"semantic_turn_act\": \"asset_discovery\",\n  \"artifact_target\": \"none\"\n}"
+  },
+  {
+    "source_line": 63,
+    "source_line_sha256": "8521ab5765083cd29e2fe23dd489cd7e732988e448574bf23a6e90a47ce8103c",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+    "task": "discovery_model_knowledge",
+    "schema_name": "discovery_model_knowledge",
+    "http_status": 200,
+    "content": "{\"candidates\":[{\"name\":\"Walmart\",\"symbol_guess\":\"WMT\",\"reason_text\":\"Large-scale U.S. retailer with a warehouse-club format that competes directly with Costco on groceries and general merchandise.\",\"source_indices\":[]},{\"name\":\"Target\",\"symbol_guess\":\"TGT\",\"reason_text\":\"National big-box retailer offering similar consumer staples and discretionary goods, competing on price and assortment.\",\"source_indices\":[]},{\"name\":\"BJ's Wholesale Club\",\"symbol_guess\":\"BJ\",\"reason_text\":\"Membership warehouse club operating in the same retail segment as Costco, focused on bulk goods.\",\"source_indices\":[]},{\"name\":\"Amazon.com\",\"symbol_guess\":\"AMZN\",\"reason_text\":\"E-commerce giant whose grocery and membership offerings (Amazon Fresh/Prime) compete with Costco's value proposition.\",\"source_indices\":[]},{\"name\":\"Kroger\",\"symbol_guess\":\"KR\",\"reason_text\":\"Major U.S. supermarket chain that overlaps with Costco on groceries and household essentials.\",\"source_indices\":[]},{\"name\":\"Dollar General\",\"symbol_guess\":\"DG\",\"reason_text\":\"Discount retailer serving price-sensitive consumers, competing on everyday low prices for staples.\",\"source_indices\":[]},{\"name\":\"Walgreens Boots Alliance\",\"symbol_guess\":\"WBA\",\"reason_text\":\"National pharmacy and convenience retailer that competes on health, beauty, and everyday essentials.\",\"source_indices\":[]},{\"name\":\"Home Depot\",\"symbol_guess\":\"HD\",\"reason_text\":\"Leading home-improvement retailer whose bulk building-supply sales overlap with Costco's merchandise mix.\",\"source_indices\":[]}]}"
+  },
+  {
+    "source_line": 64,
+    "source_line_sha256": "c1ba5afd38bdea44a595e77af0eabd39d57368b24c3e86d2011825ac3b18a8e7",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+    "task": "discovery_voicing",
+    "schema_name": null,
+    "http_status": 200,
+    "content": "These verified candidates represent the closest competitors in Costco's retail category."
+  },
+  {
+    "source_line": 65,
+    "source_line_sha256": "5a91f5d53e9c2e721b930a3727b2f2e64667f5e93619e9ad07abd32748a9fba2",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+    "task": "chat_composer",
+    "schema_name": "ArgusProseJudgeResponse",
+    "http_status": 200,
+    "content": "{\n  \"pass\": false,\n  \"failed_criteria\": [\"selection_relevance\"],\n  \"notes\": \"The user asked for competitors in Costco's category. The delivered assets (WMT, TGT, AMZN, KR, DG) are plausible retail competitors, but Dollar General is a discount dollar-store chain, not a warehouse club or big-box retailer comparable to Costco. Including DG weakens the category relevance. Additionally, the prose claims 'verified candidates' and 'closest competitors' but the discovery_grounding is 'general_knowledge_not_current_search', so the 'verified' framing is unsupported by the rendered surface.\"\n}"
+  },
+  {
+    "source_line": 66,
+    "source_line_sha256": "28f9b8e2098efba680c052c216192b9934a9e1541581a68dad2e01ff903de5fc",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_category_spanish_issue_244",
+    "task": "asset_mention_preflight",
+    "schema_name": "LLMAssetMentionExtraction",
+    "http_status": 200,
+    "content": "{\"all_traded_asset_mentions_included\": true, \"asset_mentions\": []}"
+  },
+  {
+    "source_line": 67,
+    "source_line_sha256": "2d7a678eeed40ed546bff75b0d31be3ed738a6922d3e387166cfa954ff5c5362",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_category_spanish_issue_244",
+    "task": "interpretation",
+    "schema_name": "LLMInterpretationResponse",
+    "http_status": 200,
+    "content": "{\n  \"intent\": \"explain\",\n  \"task_relation\": \"new_task\",\n  \"user_goal_summary\": \"Identificar acciones de ciberseguridad para probar en una estrategia de inversión\",\n  \"tool_calls\": [\n    {\n      \"tool_name\": \"peer_expansion\",\n      \"call_id\": \"peer_cyber_001\",\n      \"arguments\": {\n        \"request\": \"¿qué acciones de ciberseguridad podría probar?\",\n        \"relationship\": \"category\",\n        \"category_description\": \"ciberseguridad\",\n        \"asset_class_hint\": \"equity\",\n        \"needs_current_facts\": false\n      }\n    }\n  ],\n  \"requires_clarification\": false,\n  \"detected_user_language\": \"es\",\n  \"candidate_strategy_draft\": {},\n  \"missing_required_fields\": [],\n  \"assistant_response\": null,\n  \"uses_latest_result_context\": false,\n  \"confidence\": 0.85,\n  \"reason_codes\": [],\n  \"ambiguous_fields\": [],\n  \"unsupported_constraints\": [],\n  \"semantic_turn_act\": \"asset_discovery\",\n  \"artifact_target\": \"none\"\n}"
+  },
+  {
+    "source_line": 68,
+    "source_line_sha256": "134e434c909b5c6405342efb9423e767646a2317cce1b1d02653bd366f649dbb",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_category_spanish_issue_244",
+    "task": "discovery_model_knowledge",
+    "schema_name": "discovery_model_knowledge",
+    "http_status": 200,
+    "content": "{\n  \"candidates\": [\n    {\n      \"name\": \"CrowdStrike Holdings\",\n      \"symbol_guess\": \"CRWD\",\n      \"reason_text\": \"Empresa líder en ciberseguridad con soluciones de detección y respuesta en la nube.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Palo Alto Networks\",\n      \"symbol_guess\": \"PANW\",\n      \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Fortinet\",\n      \"symbol_guess\": \"FTNT\",\n      \"reason_text\": \"Especialista en seguridad de redes y soluciones de ciberseguridad integradas.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Zscaler\",\n      \"symbol_guess\": \"ZS\",\n      \"reason_text\": \"Ofrece seguridad en la nube y protección de accesos remotos.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"CyberArk Software\",\n      \"symbol_guess\": \"CYBR\",\n      \"reason_text\": \"Líder en gestión de identidades y accesos privilegiados.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Check Point Software\",\n      \"symbol_guess\": \"CHKP\",\n      \"reason_text\": \"Empresa israelí de soluciones de ciberseguridad para empresas y gobiernos.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Splunk\",\n      \"symbol_guess\": \"SPLK\",\n      \"reason_text\": \"Plataforma de análisis de datos y detección de amenazas de seguridad.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Okta\",\n      \"symbol_guess\": \"OKTA\",\n      \"reason_text\": \"Especialista en gestión de identidades y autenticación en la nube.\",\n      \"source_indices\": []\n    }\n  ]\n}"
+  },
+  {
+    "source_line": 69,
+    "source_line_sha256": "26c6f0ddf6e2d075765fdfa05c4d68594c8a9d2962b3cc9d86cdfc96b31b883d",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_category_spanish_issue_244",
+    "task": "discovery_voicing",
+    "schema_name": null,
+    "http_status": 200,
+    "content": "Puedes explorar varias opciones en ciberseguridad para empezar a hacer pruebas."
+  },
+  {
+    "source_line": 70,
+    "source_line_sha256": "f37cbc16045092490737f07fd2e15ab9961f8be640bfa2dc3dd12749c7c82c2f",
+    "candidate_sha": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+    "case_id": "asset_discovery_category_spanish_issue_244",
+    "task": "chat_composer",
+    "schema_name": "ArgusProseJudgeResponse",
+    "http_status": 200,
+    "content": "{\n  \"pass\": false,\n  \"failed_criteria\": [\n    \"selection_relevance\"\n  ],\n  \"notes\": \"The user asked for 'acciones de ciberseguridad' (cybersecurity stocks) and the selection_expectations require a category relationship with cybersecurity. The delivered assets are all equity securities of cybersecurity companies, matching the requested category. However, the selection_evidence shows that all facts were retrieved under an evidence_policy with data_class 'movers' and a max_age_seconds of 300, meaning the system treated the request as a movers query rather than a category discovery. The rendered discovery_rows and tool_result_cards present the assets as a category discovery, but the evidence_policy indicates the retrieval was for movers, not for a category. This mismatch means the delivered answer does not faithfully address the unchanged selection_expectations for a category relationship; the retrieval was scoped to movers, not to a general category list. Therefore selection_relevance fails.\"\n}"
+  }
+]

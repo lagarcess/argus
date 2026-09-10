@@ -1,0 +1,4 @@
+Exact source preparation: git archive c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2 web, extracted under checkout/web. Existing web/node_modules linked for dependencies; no installs.
+Fixture: PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/garces/.codex/worktrees/aa72/private-alpha-next/src:/Users/garces/.codex/worktrees/aa72/private-alpha-next /Users/garces/.codex/worktrees/aa72/private-alpha-next/.venv/bin/python /private/tmp/registry-rowless-browser-c6c28fef/generate_fixture.py
+Browser: /private/tmp/registry-rowless-browser-c6c28fef/node_modules/.bin/playwright test --config /private/tmp/registry-rowless-browser-c6c28fef/rowless.playwright.config.ts
+Initial sandbox listener failed EPERM before application requests; bounded loopback/browser escalation approved and the same two cases passed.
