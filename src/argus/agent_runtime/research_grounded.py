@@ -100,6 +100,9 @@ RESEARCH_SIDECAR_KEYS = frozenset(
     }
 )
 SURVEY_CANDIDATE_SCAN_LIMIT = 32
+# Recorded on the interpretation when a typed future horizon selected the
+# scenario contract because the primary read left scenario_question unset.
+SCENARIO_FROM_HORIZON_REASON_CODE = "scenario_contract_from_horizon"
 
 
 def scenario_contract_applies(
@@ -115,9 +118,21 @@ def scenario_contract_applies(
         strategy_draft_future_horizon,
     )
 
-    return bool(getattr(query, "scenario_question", False)) or (
-        strategy_draft_future_horizon(interpretation.candidate_strategy_draft) is not None
-    )
+    if bool(getattr(query, "scenario_question", False)):
+        return True
+    horizon = strategy_draft_future_horizon(interpretation.candidate_strategy_draft)
+    if horizon is None:
+        return False
+    # The horizon compensated for a primary read that left the bit unset:
+    # record it, once, so the decay of that read stays visible.
+    if SCENARIO_FROM_HORIZON_REASON_CODE not in interpretation.reason_codes:
+        interpretation.reason_codes.append(SCENARIO_FROM_HORIZON_REASON_CODE)
+        logger.info(
+            "Scenario contract selected by the typed horizon, not the scenario bit"
+            f" kind={query.question_kind} horizon={horizon.get('evidence')}",
+            failure_classification=SCENARIO_FROM_HORIZON_REASON_CODE,
+        )
+    return True
 
 
 def _cache_key_for(

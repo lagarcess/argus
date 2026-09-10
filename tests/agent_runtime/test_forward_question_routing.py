@@ -373,6 +373,14 @@ def test_the_scenario_contract_applies_on_either_typed_fact() -> None:
         research_query=plain_query.model_dump(mode="json"),
         candidate_strategy_draft=StrategySummary(),
     )
+    from argus.agent_runtime.research_grounded import SCENARIO_FROM_HORIZON_REASON_CODE
+
     assert scenario_contract_applies(query_only, without)
+    assert SCENARIO_FROM_HORIZON_REASON_CODE not in without.reason_codes
     assert scenario_contract_applies(plain_query, with_horizon)
+    # The horizon compensated for the primary read; that is recorded, once.
+    assert with_horizon.reason_codes.count(SCENARIO_FROM_HORIZON_REASON_CODE) == 1
+    assert scenario_contract_applies(plain_query, with_horizon)
+    assert with_horizon.reason_codes.count(SCENARIO_FROM_HORIZON_REASON_CODE) == 1
     assert not scenario_contract_applies(plain_query, without)
+    assert SCENARIO_FROM_HORIZON_REASON_CODE not in without.reason_codes
