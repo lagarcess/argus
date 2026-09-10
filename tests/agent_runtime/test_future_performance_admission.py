@@ -7,11 +7,12 @@ inherited dates after an explicit supported-alternative selection, because
 that market data does not exist. The horizon survives only as original-intent
 evidence; compatible asset, capital, and strategy facts are preserved.
 
-What the horizon no longer does (decision 10, 2026-09-10): force a question
-about the future onto the strategy route. A forward-looking question is
-answered, by research when the read carries a question shape and otherwise as
-the model's own prose; the refusal copy survives only for a test asked over a
-future window. See ``test_forward_question_routing.py`` for the research half.
+What changed (decision 10, 2026-09-10): a question read that carries a
+research query is answered by research before this stage runs
+(``test_forward_question_routing.py``). A typed horizon that still reaches
+this stage belongs to a turn research did not claim, and it keeps the
+deterministic recovery, which now offers the historical test and analyst
+research; the model's own forecast prose never reaches the user.
 """
 
 from __future__ import annotations
@@ -696,12 +697,15 @@ FORECAST_PROSE = (
 )
 
 
-def test_educational_label_with_future_window_is_answered_not_refused(
+def test_educational_label_with_future_window_keeps_its_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Decision 10: a question about the future is a question. The typed
-    horizon no longer forces the strategy route; the educational label keeps
-    its ordinary suppression and the answer reaches the user."""
+    """A future horizon research did not claim never ships the model's own
+    forecast as prose. Research claims a question read before this stage
+    (test_forward_question_routing.py); here the read carries no research
+    query, so the typed horizon keeps the strategy route and the future
+    test-window recovery owns the turn, offering the historical test and the
+    analyst research instead of a number."""
 
     _stub_equity_asset_resolution(monkeypatch)
     result = _run_interpret(
@@ -713,16 +717,14 @@ def test_educational_label_with_future_window_is_answered_not_refused(
             assistant_response=FORECAST_PROSE,
         ),
     )
-    assert result.outcome == "ready_to_respond"
-    assert result.patch.get("assistant_response") == FORECAST_PROSE
-    assert result.patch.get("confirmation_payload") is None
-    assert FUTURE_PERFORMANCE_ADMISSION_BLOCKED not in result.decision.reason_codes
+    _assert_future_blocked(result, evidence="in ten years")
+    assert result.patch.get("assistant_response") is None
 
 
-def test_followup_label_with_future_window_is_answered_not_refused(
+def test_followup_label_with_future_window_keeps_its_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A follow-up question about the future after a result is answered."""
+    """A follow-up forecast with no research query is recovered, not voiced."""
 
     _stub_equity_asset_resolution(monkeypatch)
     result = _run_interpret(
@@ -734,9 +736,8 @@ def test_followup_label_with_future_window_is_answered_not_refused(
             assistant_response=FORECAST_PROSE,
         ),
     )
-    assert result.outcome == "ready_to_respond"
-    assert result.patch.get("assistant_response") == FORECAST_PROSE
-    assert result.patch.get("confirmation_payload") is None
+    _assert_future_blocked(result, evidence="in ten years")
+    assert result.patch.get("assistant_response") is None
 
 
 def test_plain_educational_question_stays_suppressed(

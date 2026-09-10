@@ -318,3 +318,39 @@ def test_the_research_query_types_the_scenario_signal() -> None:
     assert field.default is False
     assert "will be worth" in str(field.description)
     assert "grow into" in str(field.description)
+
+
+def test_a_scenario_question_always_requires_publisher_sources() -> None:
+    """Whatever kind the question was typed as, a computed scenario is
+    grounded on published inputs, so the missing-publisher retry and the
+    withhold both apply to it."""
+    from argus.agent_runtime.research_grounded import requires_publisher_sources
+
+    scenario = ResearchQueryExtraction(
+        question_kind="cross_company", symbols=["NVDA", "AMD"], scenario_question=True
+    )
+    plain = ResearchQueryExtraction(
+        question_kind="cross_company", symbols=["NVDA", "AMD"]
+    )
+    assert requires_publisher_sources(scenario)
+    assert not requires_publisher_sources(plain)
+
+
+def test_a_future_horizon_without_a_research_query_never_voices_a_forecast(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The one read research cannot claim: a typed horizon and no question
+    shape. The model's forecast prose stays out; the recovery offers the
+    historical test and the analyst research."""
+    result, dispatched = _run_turn(
+        monkeypatch,
+        _question_read(
+            research_query={"question_kind": "none"},
+            assistant_response="Your $10,000 could be worth about $150,000 in ten years.",
+        ),
+        message=NVDA_FUTURE_QUESTION,
+    )
+    assert dispatched == []
+    assert result.outcome == "needs_clarification"
+    assert FUTURE_PERFORMANCE_ADMISSION_BLOCKED in result.decision.reason_codes
+    assert result.patch.get("assistant_response") is None

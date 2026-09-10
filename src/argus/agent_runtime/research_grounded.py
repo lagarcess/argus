@@ -774,8 +774,12 @@ def requires_publisher_sources(query: ResearchQueryExtraction) -> bool:
     multilingual escape hatch for a mixed quote plus narrative request that
     might otherwise retain the quote kind.
     """
-    return bool(getattr(query, "requires_publisher_sources", False)) or (
-        query.question_kind in ("company_lookup", "current_external")
+    return (
+        bool(getattr(query, "requires_publisher_sources", False))
+        # A computed scenario is grounded on published inputs, whatever kind
+        # the question was typed as (decision 10).
+        or bool(getattr(query, "scenario_question", False))
+        or query.question_kind in ("company_lookup", "current_external")
     )
 
 

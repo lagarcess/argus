@@ -20,9 +20,13 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   that told every interpretation to classify a future-value question as
   unsupported is replaced by `future_test_window_capability_clause()`, which
   sends forward-looking and valuation questions to research and keeps only a
-  test asked over a future window on the strategy route. The forced strategy
-  route for a typed future horizon (`strategy_route_flags_with_future_precedence`)
-  is deleted.
+  test asked over a future window on the strategy route. The typed horizon
+  still forces the strategy route on the turns research did not claim
+  (`strategy_route_flags_with_future_precedence`): research claims a question
+  read before that stage runs, so a horizon that reaches it belongs to a read
+  with no question shape, and the recovery offering the historical test and
+  analyst research is what the user sees instead of the model's own forecast
+  (Codex round 1, P1).
 - `src/argus/agent_runtime/interpreter/research_routing.py`: a strategy claim
   whose horizon points forward is not a runnable test, so it no longer outranks
   a question payload; when that waiver decides the route it is recorded as

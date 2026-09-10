@@ -39,6 +39,7 @@ from argus.agent_runtime.interpreter.unsupported_request_context import (
 from argus.agent_runtime.interpreter.unsupported_admission import (
     strategy_draft_future_horizon,
     strategy_route_admission_result,
+    strategy_route_flags_with_future_precedence,
 )
 from argus.agent_runtime.presentation_i18n import (
     asset_universe_operation_clarification_message,
@@ -134,7 +135,6 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.knowledge_answer import knowledge_answer_stage_result
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # noqa: F401
-    _educational_turn_has_strategy_baggage,
     _USER_GROUNDED_CADENCE_SOURCES,
     _USER_GROUNDED_CAPITAL_SOURCES,
     STRATEGY_TURN_ACTS,
@@ -523,7 +523,10 @@ async def _stage_result_from_interpretation(
         interpretation.semantic_turn_act != "result_followup"
         and strategy_has_execution_evidence(interpretation.candidate_strategy_draft)
     )
-    educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
+    (
+        expects_strategy_route,
+        educational_turn_has_strategy_baggage,
+    ) = strategy_route_flags_with_future_precedence(
         interpretation=interpretation,
         expects_strategy_route=expects_strategy_route,
     )

@@ -19,6 +19,7 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+    _educational_turn_has_strategy_baggage,
     _optional_parameter_stage_patch,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -441,6 +442,27 @@ def _draft_with_conserved_resolved_assets(draft: Any) -> Any:
     if not draft_class and classes:
         update["asset_class"] = next(iter(classes))
     return draft.model_copy(update=update)
+
+
+def strategy_route_flags_with_future_precedence(
+    *,
+    interpretation: Any,
+    expects_strategy_route: bool,
+) -> tuple[bool, bool]:
+    """A typed future horizon research did not answer keeps its recovery.
+
+    Research claims a question read before this stage runs (decision 10), so a
+    future horizon still here belongs to a turn with no grounded answer. Forcing
+    the strategy route and disabling educational suppression sends it to the
+    future test-window recovery, which offers the historical test and analyst
+    research, instead of returning the model's own forecast as prose."""
+
+    if strategy_draft_future_horizon(interpretation.candidate_strategy_draft):
+        return True, False
+    return expects_strategy_route, _educational_turn_has_strategy_baggage(
+        interpretation=interpretation,
+        expects_strategy_route=expects_strategy_route,
+    )
 
 
 def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
