@@ -53,8 +53,9 @@ work and do not establish acceptance of this reduced tree.
 Work stops at this boundary rather than modifying the preserved implementation
 or restoring the excluded files. General tool publication remains a follow-up
 against the shipped receipt contract. These import gaps prevent a green runtime
-or CI claim; no post-reset suite, browser capture, provider measurement or review
-round was started. The existing open review thread remains unresolved.
+or CI claim. At the reset checkpoint no local post-reset suite, browser capture,
+provider measurement or review round had started. The existing open review
+thread remains unresolved.
 
 ## Verification and cleanup
 
@@ -67,3 +68,24 @@ The follow-up local database work stopped before its test suites started.
 Both registry-owned stacks and their temporary credentials are removed; the
 other preexisting local project was preserved. Uncommitted receipt evidence was
 moved outside the repository. All participating agents are idle.
+
+## CI observation and remaining public test cleanup
+
+The completed runtime check on `073d8e0c` confirms
+`ModuleNotFoundError: No module named 'argus.llm.tool_call_receipts'` during
+collection. The backend CI job stops at the modularity gate:
+`ChatInterface.tsx` is 2,603 lines, three above its 2,600-line limit after the
+shipped share-panel placement was restored. These are actual CI failures,
+not inferred acceptance claims.
+
+The frontend check found two public-receipt rendering cases still embedded in
+`web/__tests__/tool-result-card.test.tsx`. They expected the excluded bare v2
+tool receipt shape. That block and its related public-sharing fixture were
+removed under the same scope correction; no product or preserved core file
+changed. The remaining full frontend suite passes 1,682 tests with zero failures
+and two snapshots; changed-file ESLint and the diff check pass. This does not
+establish green current-head CI.
+
+Clarification is pending on restoring the explicitly excluded internal cost
+module and decoupling the retained presenter from the removed public helper.
+No provider calls or public surface changes are part of this follow-up.

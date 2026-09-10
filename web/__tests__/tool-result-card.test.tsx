@@ -15,8 +15,6 @@ import {
 import { hydrateMessagesFromApi, messageStreamPresentation } from "../components/chat/chat-message-projection";
 import { parseChatStreamFrame } from "../lib/argus-api";
 import { toolCardFixture, toolMessageFixture } from "./fixtures/tool-result-card";
-import ReceiptBody from "../components/receipt/ReceiptBody";
-import { receiptCopy } from "../lib/receipt-copy";
 import { toolResultRecomputeHandler } from "../lib/tool-result-recompute";
 
 async function translate(language: "en" | "es-419") {
@@ -28,42 +26,6 @@ async function translate(language: "en" | "es-419") {
 }
 
 describe("declaration-owned result cards", () => {
-  test("tool cards retain their answers while the header owns sharing", () => {
-    // The flag is a build-time constant; isolate the enabled render from default-off tests.
-    const result = Bun.spawnSync({
-      cmd: [process.execPath, "-e", `
-        import React from "react";
-        import { renderToStaticMarkup } from "react-dom/server";
-        import { createInstance } from "i18next";
-        import { I18nextProvider } from "react-i18next";
-        import en from "./public/locales/en/common.json";
-        import ToolResultCard from "./components/chat/ToolResultCard";
-        import { toolCardFixture, toolMessageFixture } from "./__tests__/fixtures/tool-result-card";
-        const i18n = createInstance();
-        await i18n.init({ lng: "en", resources: { en: { translation: en } } });
-        const completed = toolCardFixture();
-        const message = toolMessageFixture([completed]);
-        const shareSource = { conversationId: message.conversation_id, messageId: message.id,
-          artifactId: completed.artifact_id, inputRevision: completed.input_revision };
-        const pending = toolCardFixture({ outcome: { status: "succeeded", result: { status: "pending" }, failure: null },
-          presentation: { ...completed.presentation, answer: null } });
-        const missing = toolCardFixture({ presentation: { ...completed.presentation, answer: undefined } });
-        console.log(JSON.stringify([completed, pending, missing].map(card => renderToStaticMarkup(
-          React.createElement(I18nextProvider, { i18n }, React.createElement(ToolResultCard, { card, shareSource }))
-        ))));
-      `],
-      cwd: new URL("..", import.meta.url).pathname,
-      env: { ...process.env, NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED: "true" },
-    });
-    expect(result.exitCode).toBe(0);
-    const [completed, pending, missing] = JSON.parse(result.stdout.toString()) as string[];
-    expect(completed).toContain("data-tool-answer");
-    expect(completed).not.toContain(en.receipt.selection.title);
-    expect(completed).not.toContain(en.receipt.owner.share);
-    expect(pending).not.toContain(en.receipt.owner.share);
-    expect(missing).not.toContain(en.receipt.owner.share);
-  });
-
   test("a queued handler checks current source identity and submission state before dispatch", async () => {
     let latestMessageId = "later-user";
     let busy = false;
@@ -161,18 +123,6 @@ describe("declaration-owned result cards", () => {
       expect(html).toContain(language === "en" ? "Solved value" : "Valor calculado");
       expect(html).not.toContain("Benchmark");
       expect(html).not.toContain("Run test");
-    });
-    test(`receipt v2 renders the same sanitized facts in ${language}`, () => {
-      const card = toolCardFixture();
-      const html = renderToStaticMarkup(<ReceiptBody payload={{ schema_version: 2,
-        card_type: card.card_type, card_version: 1, presentation: card.presentation,
-        content_language: "en", framing: "computed_result_not_advice", provenance_mark: "computed_with_argus",
-      }} createdAt={null} copy={receiptCopy(language)} language={language} />);
-      expect(html).toContain("data-tool-answer");
-      expect(html).toContain(language === "en" ? "Solved value" : "Valor calculado");
-      expect(html).not.toContain("artifact-1");
-      expect(html).not.toContain("call-1");
-      expect(html).not.toContain("historical simulation");
     });
   }
 
