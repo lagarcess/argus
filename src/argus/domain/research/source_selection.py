@@ -3,18 +3,29 @@
 Provider parsing retains a bounded evidence pool. This module is the one
 public selection step: it removes citations that cannot plausibly describe
 the question's period, keeps one page per publisher, then applies the drawer
-cap. Retrieval order is preserved among eligible publishers.
+cap. Retrieval order is preserved among eligible publishers. It also owns the
+date a question is asked on, the date every bound here is read against.
 """
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Iterable
 from urllib.parse import urlparse
 
+from argus.domain.market_data.capabilities import EASTERN
 from argus.domain.research.contracts import MAX_SOURCES, ResearchSource
 
 _CURRENT_SURVEY_KINDS = frozenset({"market_pulse", "screening", "sector_radar"})
+# No civil clock is a full day ahead of New York, so a publisher stamping pages
+# in its own zone, UTC included, dates a page at most one day past the question.
+_PUBLISHER_DATE_LEAD = timedelta(days=1)
+
+
+def question_date() -> date:
+    """The date a research question is asked on, by the New York calendar the
+    US markets it asks about keep."""
+    return datetime.now(EASTERN).date()
 
 
 def select_public_sources(
@@ -27,10 +38,11 @@ def select_public_sources(
     """Return period-plausible, publisher-unique sources for the drawer.
 
     A dated source published before the asked-for period cannot describe that
-    period. A source with no publisher date remains eligible because a live
-    page can plausibly be current. A non-empty but malformed date is not
-    evidence of freshness and is therefore excluded when the question has a
-    freshness bound.
+    period, and one dated past what any publisher's calendar could read on
+    the question date is not a real date. A source with no publisher date
+    remains eligible because a live page can plausibly be current. A
+    non-empty but malformed date is not evidence of freshness and is
+    therefore excluded when the question has a freshness bound.
     """
     effective_start = period_start
     if effective_start is None and question_kind in _CURRENT_SURVEY_KINDS:
@@ -75,7 +87,7 @@ def _period_plausible(
         return False
     if published < period_start:
         return False
-    return question_as_of is None or published <= question_as_of
+    return question_as_of is None or published <= question_as_of + _PUBLISHER_DATE_LEAD
 
 
 def _publisher_key(url: str) -> str:

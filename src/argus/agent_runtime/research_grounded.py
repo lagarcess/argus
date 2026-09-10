@@ -69,7 +69,10 @@ from argus.domain.research.contracts import (
     ResearchUsage,
     combined_research_usage,
 )
-from argus.domain.research.source_selection import select_public_sources
+from argus.domain.research.source_selection import (
+    question_date,
+    select_public_sources,
+)
 
 if TYPE_CHECKING:
     from argus.agent_runtime.research_answer import ResearchQueryExtraction
@@ -169,7 +172,7 @@ async def grounded_result(
     decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     publisher_sources_required = requires_publisher_sources(query)
-    question_as_of_date = datetime.now(timezone.utc).date()
+    question_as_of_date = question_date()
     capability_class = capability_class_for_shape(
         shape, screening=is_market_survey(query.question_kind)
     )
@@ -512,7 +515,7 @@ def thorough_job_result(
             period_of_interest=query.period_of_interest,
             question_kind=query.question_kind,
             period_start_date=_coerce_date(query.period_start_date),
-            question_as_of_date=datetime.now(timezone.utc).date(),
+            question_as_of_date=question_date(),
             decision=decision,
         )
     subject_labels = ", ".join(f"{s['name']} [{s['symbol']}]" for s in subjects[:3])
@@ -552,7 +555,7 @@ def thorough_job_result(
                     if query.period_start_date is not None
                     else None
                 ),
-                "question_as_of_date": datetime.now(timezone.utc).date().isoformat(),
+                "question_as_of_date": question_date().isoformat(),
                 "question_kind": query.question_kind,
                 "requires_publisher_sources": requires_publisher_sources(query),
                 # The exact key computed at classification time; completion

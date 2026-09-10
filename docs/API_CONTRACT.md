@@ -3876,10 +3876,17 @@ Contract rules:
   dated source published before the period implied by the question, keeps at
   most one page per publisher, and caps the drawer at five. An undated live
   page remains eligible because it can plausibly describe the current period.
-  When a current market pulse, screen, or sector radar has no explicit period,
-  the question date is its freshness lower bound. Classifier-supplied period
-  lower bounds are ISO-date typed; a malformed value is rejected instead of
-  turning a bounded question into an unbounded one.
+  The question date is the date the question is asked on by the New York
+  calendar, never the server's date or UTC's; one owner dates it for the
+  inline turn and for the background job request, which carries it to
+  completion. When a current market pulse, screen, or sector radar has no
+  explicit period, the question date is its freshness lower bound. Wherever a
+  lower bound applies, a source dated more than one day past the question
+  date is dropped: no civil clock is a full day ahead of New York, so a
+  publisher stamping pages in UTC can date a page one day ahead and no
+  further. Classifier-supplied period lower bounds are ISO-date typed; a
+  malformed value is rejected instead of turning a bounded question into an
+  unbounded one.
 - **Retrieval produces typed rows, never prose** (grounded-finance board,
   operating rule 4). Every provider call requests a strict `json_schema`
   response: the answer prose plus `rows`, one per figure the answer states,
