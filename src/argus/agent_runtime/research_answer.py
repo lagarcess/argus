@@ -200,9 +200,12 @@ async def _dispatch(
     if query.question_kind in ("concept", "none"):
         return None
     subjects = _resolved_subjects(query)
+    # One owner decides whether this turn is a computed scenario (decision
+    # 10); every branch below reads it rather than the query's bit alone.
+    scenario = grounded.scenario_contract_applies(query, interpretation)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
     if off_coverage or query.asset_class_hint in ("crypto", "currency_pair"):
-        if not grounded.requires_publisher_sources(query):
+        if not (grounded.requires_publisher_sources(query) or scenario):
             return await grounded.off_coverage_result(
                 query=query,
                 subjects=subjects,
@@ -226,7 +229,7 @@ async def _dispatch(
             provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
-    if shape == "fast" and grounded.scenario_contract_applies(query, interpretation):
+    if shape == "fast" and scenario:
         # A computed scenario is never a quote: it needs public pages.
         shape = "balanced"
     if shape == "thorough":

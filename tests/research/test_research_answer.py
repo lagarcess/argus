@@ -641,6 +641,68 @@ def test_a_typed_horizon_alone_selects_the_scenario_contract(monkeypatch) -> Non
     }
 
 
+def test_a_crypto_scenario_typed_only_by_its_horizon_is_grounded(monkeypatch) -> None:
+    """The off-coverage branch reads the shared scenario owner: a crypto
+    comparison with a typed future horizon and no scenario bit is grounded on
+    public pages under the scenario contract, never answered with closes."""
+    from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
+
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="cross_company",
+        symbols=["BTC", "ETH"],
+        asset_class_hint="crypto",
+        period_of_interest="ten years",
+    )
+    original = globals()["_interpretation"]
+
+    def with_horizon(*args, **kwargs):
+        return original(*args, **kwargs).model_copy(
+            update={
+                "candidate_strategy_draft": StrategySummary(
+                    extra_parameters={
+                        "date_range_intent": {
+                            "kind": "future_window",
+                            "count": 10,
+                            "unit": "year",
+                            "anchor": "today",
+                            "confidence": 0.9,
+                            "evidence": "in ten years",
+                        }
+                    }
+                )
+            }
+        )
+
+    monkeypatch.setitem(globals(), "_interpretation", with_horizon)
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "Bear to bull ranges.", _scenario_rows(cited=True)
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["BTC"],
+            )
+        ],
+    )
+
+    result = _run("Which of BTC or ETH will be worth more in ten years?")
+
+    assert result is not None
+    assert len(transport.requests) == 1
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "finance_search" not in [tool["type"] for tool in body["tools"]]
+    assert result.stage_patch["research"].get("degraded") != {
+        "code": "asset_class_not_covered"
+    }
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:

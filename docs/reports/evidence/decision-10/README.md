@@ -46,7 +46,9 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   `research_query.scenario_question` for a question whose answer is a value,
   target or fair value to compute; a `future_window` horizon typed on the
   draft is the second, independent fact, and `scenario_contract_applies()`
-  is the one owner that reads either (Codex round 4). `retrieval_spec(scenario=True)` then sends
+  is the one owner that reads either (Codex round 4), including the
+  off-coverage branch of the dispatch, so a crypto scenario typed only by its
+  horizon is grounded rather than answered with closes (Codex round 5). `retrieval_spec(scenario=True)` then sends
   `SCENARIO_RETRIEVAL_INSTRUCTIONS`, the recorded retrieval contract plus the
   carve-out that the inputs are the retrieved figures and are rowed while the
   scenario values are the model's arithmetic and are never rowed. Every other
