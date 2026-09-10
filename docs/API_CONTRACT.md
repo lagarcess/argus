@@ -3894,7 +3894,8 @@ Contract rules:
   finance citation channel. If none survives sanitization and question-aware
   selection after that retry, Argus emits
   `research_unavailable_missing_public_sources` and does not publish the
-  unsupported claim.
+  unsupported claim. A response that retrieved nothing at all has no page to
+  select from and is `research_not_grounded` instead.
 - Section 2's five shapes are one rail. Market pulse ("what's moving
   today"), screening ("semiconductor stocks under a 20 P/E"), and sector
   radar ("what's happening in cybersecurity") use the balanced tier and
@@ -3917,7 +3918,12 @@ Contract rules:
   found but the requested assets could not be extracted; a survey is
   accepted only with a figure and a verified name, on the first attempt or
   after the one concrete retry. Neither failure renders subject-dependent
-  figure or asset copy, and neither emits a runnable row.
+  figure or asset copy, and neither emits a runnable row. The same retrieval
+  record decides every other research answer, inline or background, before
+  any publisher requirement: a response that retrieved nothing carries
+  `degraded.code = "research_not_grounded"`, replaces its prose with the
+  retrieval failure and carries no rows, while the subjects the user named
+  stay testable.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
@@ -3929,10 +3935,17 @@ Contract rules:
   dated source published before the period implied by the question, keeps at
   most one page per publisher, and caps the drawer at five. An undated live
   page remains eligible because it can plausibly describe the current period.
-  When a current market pulse, screen, or sector radar has no explicit period,
-  the question date is its freshness lower bound. Classifier-supplied period
-  lower bounds are ISO-date typed; a malformed value is rejected instead of
-  turning a bounded question into an unbounded one.
+  The question date is the date the question is asked on by the New York
+  calendar, never the server's date or UTC's; one owner dates it for the
+  inline turn and for the background job request, which carries it to
+  completion. When a current market pulse, screen, or sector radar has no
+  explicit period, the question date is its freshness lower bound. Wherever a
+  lower bound applies, a source dated more than one day past the question
+  date is dropped: no civil clock is a full day ahead of New York, so a
+  publisher stamping pages in UTC can date a page one day ahead and no
+  further. Classifier-supplied period lower bounds are ISO-date typed; a
+  malformed value is rejected instead of turning a bounded question into an
+  unbounded one.
 - **Retrieval produces typed rows, never prose** (grounded-finance board,
   operating rule 4). Every provider call requests a strict `json_schema`
   response: the answer prose plus `rows`, one per figure the answer states,
@@ -3951,9 +3964,11 @@ Contract rules:
   `source_url: null`, after the cited rows, and the turn says so beneath the
   answer, naming the figure from the row's own typed subject and label
   ("I couldn't tie Apple analyst target price to a source."). **A retrieved
-  answer publishes.** No answer is withheld for a row, a missing row or a
-  missing retrieval record: the strict schema is what keeps a figure from
-  memory unrepresentable, and composition does not second-guess it. `rows`
+  answer publishes.** No retrieved answer is withheld for a row or a missing
+  row: the strict schema is what keeps a figure from memory unrepresentable,
+  and composition does not second-guess it. A response that retrieved nothing
+  has no source for anything it says, so it is withheld as
+  `research_not_grounded`, or `survey_not_grounded` for a survey. `rows`
   is additive on the sidecar and may be empty; a degraded turn always
   carries an empty list, enforced by the sidecar builder. A JSON-shaped
   answer that is not the schema (an invalid row, an answer the output budget
@@ -3962,15 +3977,18 @@ Contract rules:
   completed background run carrying one fails its job. Genuine prose under a
   typed request is delivered and recorded as prose.
 - **A withheld survey keeps its retrieval record and is cached like an
-  answer.** The only withholding left is the survey's own, unchanged from
-  before the typed contract: `survey_synthesis_incomplete` when the survey
-  retrieved but its prose names no asset the resolver verifies,
-  `survey_not_grounded` when it never retrieved. Whatever withholds the
+  answer.** The withholding left is the survey's own, unchanged from before
+  the typed contract, and the same no-retrieval rule for every other answer:
+  `survey_synthesis_incomplete` when the survey retrieved but its prose names
+  no asset the resolver verifies, `survey_not_grounded` when a survey never
+  retrieved, and `research_not_grounded` when any other answer never
+  retrieved. Whatever withholds the
   prose, the turn's `sources` are the pages the response actually retrieved,
   selected exactly as for a published answer (period-plausible, one page per
   publisher, retrieval order, at most five): no ranking, no content check,
   and nothing the packet did not return. `survey_synthesis_incomplete`
-  carries them because it retrieved. `survey_not_grounded` never retrieved,
+  carries them because it retrieved. `survey_not_grounded` and
+  `research_not_grounded` never retrieved,
   the other `research_unavailable_*` codes have no packet,
   `research_capacity_exhausted` and `asset_class_not_covered` ran no provider
   call, and `research_unavailable_missing_public_sources` composes from its
