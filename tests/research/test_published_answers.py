@@ -7,7 +7,8 @@ cites a different plausible page instead, and every such quote was paid for
 and thrown away. These locks pin the reverse: a row keeps the citation the
 model wrote, a figure written with no citation is named under the answer, the
 answer itself is never withheld for a row, and the only withholding left is a
-survey that did not retrieve or names nothing the resolver verifies.
+turn that retrieved nothing (#580) or a survey that names nothing the resolver
+verifies.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from tests.research.conftest import (
     PROVIDER_PAGE,
     PUBLISHER,
     agent_response,
+    fetch_url_results_item,
     retrieved_row,
     rows_with_one_rejected,
     run_research_turn,
@@ -231,42 +233,15 @@ def test_the_thorough_path_composes_the_same_published_answer() -> None:
             lambda: agent_response(text=typed_answer_text("AAPL is **$200** today.", [])),
             "200",
         ),
-        (
-            "live_quote",
-            lambda: agent_response(
-                text=typed_answer_text("AAPL is **$200** today.", []), invocations=0
-            ),
-            "200",
-        ),
-        (
-            "live_quote",
-            lambda: agent_response(
-                text=typed_answer_text(
-                    "AAPL is **$200** today.",
-                    [
-                        retrieved_row(
-                            subject="Apple",
-                            symbol="AAPL",
-                            label="price",
-                            value=200.0,
-                            kind="currency",
-                            unit="USD",
-                        )
-                    ],
-                ),
-                invocations=0,
-            ),
-            "200",
-        ),
     ],
 )
 def test_no_answer_is_withheld_for_its_rows(
     monkeypatch, question_kind: str, document, figure: str
 ) -> None:
-    """Every shape #562 withheld for a row, a missing row, or a missing
-    retrieval record now publishes what the provider wrote. The strict
-    schema is what keeps a figure from memory unrepresentable; composition
-    does not second-guess it."""
+    """Every retrieved shape #562 withheld for a row or a missing row now
+    publishes what the provider wrote. The strict schema is what keeps a
+    figure from memory unrepresentable; composition does not second-guess
+    it."""
     set_research_query(
         monkeypatch,
         globals(),
@@ -284,18 +259,76 @@ def test_no_answer_is_withheld_for_its_rows(
     assert result.stage_patch["next_experiments"]["rows"]
 
 
-def test_an_answer_that_never_retrieved_publishes_but_serves_nobody_else(
-    monkeypatch,
+APPLE_PAGE = "https://www.cnbc.com/quotes/AAPL"
+
+
+@pytest.mark.parametrize(
+    ("counts", "retrieved"),
+    [
+        ({"invocations": 1}, None),
+        (
+            {"invocations": 0, "web_search_invocations": 1},
+            search_results_item({"url": APPLE_PAGE, "title": "Apple stock"}),
+        ),
+        (
+            {"invocations": 0, "fetch_url_invocations": 1},
+            fetch_url_results_item(
+                {"url": APPLE_PAGE, "title": "Apple stock", "snippet": "AAPL $200"}
+            ),
+        ),
+    ],
+    ids=["finance_search", "web_search", "fetch_url"],
+)
+def test_an_answer_that_retrieved_through_any_tool_publishes(
+    monkeypatch, counts: dict, retrieved: dict | None
 ) -> None:
-    """A typed answer with no retrieval record publishes as the founder asked,
-    with its figure named as unsourced beneath it; it is never stored, so one
-    turn's prose from memory is not what the shared cache serves the next
-    user who asks."""
+    """The gate asks whether the response retrieved, not through which tool:
+    one retrieval of any kind and the answer publishes as written."""
     set_research_query(
         monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
     )
+    prose = "AAPL is **$200** today."
     document = agent_response(
         text=typed_answer_text(
+            prose,
+            [
+                retrieved_row(
+                    subject="Apple",
+                    symbol="AAPL",
+                    label="price",
+                    value=200.0,
+                    kind="currency",
+                    unit="USD",
+                    source_url=APPLE_PAGE,
+                )
+            ],
+        ),
+        **counts,
+    )
+    if retrieved is not None:
+        document["output"].insert(1, retrieved)
+    _wire(monkeypatch, [document])
+
+    result = _run("What is Apple at?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert "degraded" not in sidecar
+    assert result.stage_patch["assistant_response"] == prose
+    assert [row["source_url"] for row in sidecar["rows"]] == [APPLE_PAGE]
+
+
+NOT_GROUNDED_NOTES = {
+    "en": "I couldn't retrieve the data to answer this question.",
+    "es-419": "No pude recuperar los datos para responder esta pregunta.",
+}
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+@pytest.mark.parametrize(
+    "text",
+    [
+        typed_answer_text(
             "AAPL is **$200** today.",
             [
                 retrieved_row(
@@ -309,19 +342,76 @@ def test_an_answer_that_never_retrieved_publishes_but_serves_nobody_else(
                 )
             ],
         ),
-        invocations=0,
+        typed_answer_text("AAPL is **$200** today.", []),
+        "AAPL is **$200** today.",
+    ],
+    ids=["typed-with-a-row", "typed-without-rows", "prose"],
+)
+def test_an_answer_that_retrieved_nothing_is_not_grounded(
+    monkeypatch, language: str, text: str
+) -> None:
+    """#580: a response that used no retrieval tool has no source for anything
+    it says, whatever form its text takes. It is withheld the way a survey
+    that never looked is: the note says so, the subject stays testable, and
+    nothing is stored for the next user who asks."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
     )
+    document = agent_response(text=text, invocations=0)
     transport = _wire(monkeypatch, [document, document])
 
-    result = _run("What is Apple at?")
+    result = _run("What is Apple at?", language=language)
 
     assert result is not None
-    assert "degraded" not in result.stage_patch["research"]
-    assert result.stage_patch["assistant_response"].endswith(
-        "I couldn't tie Apple price to a source."
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "research_not_grounded"}
+    assert result.stage_patch["assistant_response"] == NOT_GROUNDED_NOTES[language]
+    assert sidecar["rows"] == [] and sidecar["sources"] == []
+    assert sidecar["anchor_symbols"] == ["AAPL"]
+    assert result.stage_patch["next_experiments"]["rows"]
+
+    _run("What is Apple at?", language=language)
+    assert len(transport.requests) == 2, "a turn that retrieved nothing is never stored"
+
+
+def test_the_thorough_path_withholds_an_answer_that_retrieved_nothing() -> None:
+    """The background run composes through the same gate: a thorough answer
+    whose response used no retrieval tool is not published, and not stored."""
+    from argus.domain.research.cache import cache_get, research_cache_key
+    from argus.domain.research.perplexity_agent import _packet_from_response
+
+    packet = _packet_from_response(
+        agent_response(
+            text=typed_answer_text("Netflix grew **16%** last year.", []),
+            invocations=0,
+        ),
+        latency_ms=1,
+        on_unpriced=lambda _: None,
     )
-    _run("What is Apple at?")
-    assert len(transport.requests) == 2, "an unretrieved answer is never served again"
+    key = research_cache_key(
+        capability_class="thorough_research",
+        shape="thorough",
+        symbols=("NFLX",),
+        period_key="current",
+        question_fingerprint="growth",
+        language="es-419",
+    )
+    job_request = {
+        "capability_class": "thorough_research",
+        "language": "es-419",
+        "question_kind": "cross_company",
+        "subjects": [{"symbol": "NFLX", "name": "Netflix", "asset_class": "equity"}],
+        "cache_key": key,
+    }
+
+    composed = grounded.compose_completed_research(job_request=job_request, packet=packet)
+    grounded.store_research_packet_for_job(job_request, packet, composed)
+
+    assert composed["research"]["degraded"] == {"code": "research_not_grounded"}
+    assert composed["answer"].startswith(NOT_GROUNDED_NOTES["es-419"])
+    assert "16" not in composed["answer"]
+    assert composed["research"]["rows"] == []
+    assert cache_get(key) is None
 
 
 def test_a_survey_that_never_retrieved_is_still_not_grounded(monkeypatch) -> None:
@@ -547,3 +637,29 @@ def test_the_recorded_local_probe_publishes_what_it_found(monkeypatch) -> None:
     assert served is not None
     assert len(transport.requests) == 1
     assert served.stage_patch["research"]["usage"]["cache_status"] == "hit"
+
+
+RECORDED_NIKE_QUOTE = (
+    Path(__file__).resolve().parents[2]
+    / "docs/reports/evidence/open-the-gates/probes/nike-fast-1.json"
+)
+
+
+def test_the_recorded_nike_quote_still_publishes(monkeypatch) -> None:
+    """The quote #578 reopened: one finance lookup and the provider's own page
+    as its evidence. It retrieved, so the gate on a turn that retrieved
+    nothing leaves it as it was."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="live_quote", symbols=["NKE"]
+    )
+    recorded = json.loads(RECORDED_NIKE_QUOTE.read_text())["response"]
+    assert recorded["usage"]["tool_calls_details"]["finance_search"]["invocation"] == 1
+    _wire(monkeypatch, [recorded])
+
+    result = _run("what's the price of nike today")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert "degraded" not in sidecar
+    assert "$37.35" in result.stage_patch["assistant_response"]
+    assert [row["value"] for row in sidecar["rows"]] == [37.35]

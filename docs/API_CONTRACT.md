@@ -3864,7 +3864,12 @@ Contract rules:
   found but the requested assets could not be extracted; a survey is
   accepted only with a figure and a verified name, on the first attempt or
   after the one concrete retry. Neither failure renders subject-dependent
-  figure or asset copy, and neither emits a runnable row.
+  figure or asset copy, and neither emits a runnable row. The same retrieval
+  record decides every other research answer, inline or background: a
+  response that retrieved nothing carries
+  `degraded.code = "research_not_grounded"`, replaces its prose with the
+  retrieval failure and carries no rows, while the subjects the user named
+  stay testable.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
@@ -3905,9 +3910,11 @@ Contract rules:
   `source_url: null`, after the cited rows, and the turn says so beneath the
   answer, naming the figure from the row's own typed subject and label
   ("I couldn't tie Apple analyst target price to a source."). **A retrieved
-  answer publishes.** No answer is withheld for a row, a missing row or a
-  missing retrieval record: the strict schema is what keeps a figure from
-  memory unrepresentable, and composition does not second-guess it. `rows`
+  answer publishes.** No retrieved answer is withheld for a row or a missing
+  row: the strict schema is what keeps a figure from memory unrepresentable,
+  and composition does not second-guess it. A response that retrieved nothing
+  has no source for anything it says, so it is withheld as
+  `research_not_grounded`, or `survey_not_grounded` for a survey. `rows`
   is additive on the sidecar and may be empty; a degraded turn always
   carries an empty list, enforced by the sidecar builder. A JSON-shaped
   answer that is not the schema (an invalid row, an answer the output budget
@@ -3916,15 +3923,18 @@ Contract rules:
   completed background run carrying one fails its job. Genuine prose under a
   typed request is delivered and recorded as prose.
 - **A withheld survey keeps its retrieval record and is cached like an
-  answer.** The only withholding left is the survey's own, unchanged from
-  before the typed contract: `survey_synthesis_incomplete` when the survey
-  retrieved but its prose names no asset the resolver verifies,
-  `survey_not_grounded` when it never retrieved. Whatever withholds the
+  answer.** The withholding left is the survey's own, unchanged from before
+  the typed contract, and the same no-retrieval rule for every other answer:
+  `survey_synthesis_incomplete` when the survey retrieved but its prose names
+  no asset the resolver verifies, `survey_not_grounded` when a survey never
+  retrieved, and `research_not_grounded` when any other answer never
+  retrieved. Whatever withholds the
   prose, the turn's `sources` are the pages the response actually retrieved,
   selected exactly as for a published answer (period-plausible, one page per
   publisher, retrieval order, at most five): no ranking, no content check,
   and nothing the packet did not return. `survey_synthesis_incomplete`
-  carries them because it retrieved. `survey_not_grounded` never retrieved,
+  carries them because it retrieved. `survey_not_grounded` and
+  `research_not_grounded` never retrieved,
   the other `research_unavailable_*` codes have no packet,
   `research_capacity_exhausted` and `asset_class_not_covered` ran no provider
   call, and `research_unavailable_missing_public_sources` composes from its

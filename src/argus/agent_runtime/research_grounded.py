@@ -386,11 +386,12 @@ def _packet_stage_result(
 
     A retrieved answer publishes. ``withheld_code`` is a reason the caller
     already established and the packet cannot show for itself, such as a
-    claim whose retrieval kept no public publisher; a survey is withheld
-    only when it did not retrieve or names nothing the resolver verifies."""
+    claim whose retrieval kept no public publisher; otherwise an answer is
+    withheld only when it did not retrieve, or when a survey names nothing
+    the resolver verifies."""
     survey = is_market_survey(question_kind)
     answer = published_answer(packet, language)
-    degraded_code = withheld_code
+    degraded_code = withheld_code or _not_grounded_code(packet, survey=survey)
     peers: list[dict[str, str]] = []
     if degraded_code is None:
         # A withheld answer shows no peer, so a reason already established
@@ -422,22 +423,16 @@ def _packet_stage_result(
             scan_limit=SURVEY_CANDIDATE_SCAN_LIMIT if survey else MAX_PEER_PAIRS,
         )
     if degraded_code is None and survey:
-        # A survey is grounded when it retrieved and its prose names an
-        # asset the resolver verifies; the model's word that it looked, or
-        # a name nothing here can trade, is neither.
-        retrieved = _retrieval_happened(packet)
-        named_symbols = (
-            _named_verified_symbols(packet.answer_markdown, [*subjects, *peers])
-            if retrieved
-            else set()
+        # A survey that retrieved is grounded when its prose names an asset
+        # the resolver verifies; a name nothing here can trade is not one.
+        named_symbols = _named_verified_symbols(
+            packet.answer_markdown, [*subjects, *peers]
         )
         if named_symbols:
             subjects = [s for s in subjects if s["symbol"] in named_symbols]
             peers = [p for p in peers if p["symbol"] in named_symbols]
         else:
-            degraded_code = (
-                "survey_synthesis_incomplete" if retrieved else "survey_not_grounded"
-            )
+            degraded_code = "survey_synthesis_incomplete"
     if degraded_code is not None:
         # The subjects the user named stay testable; a survey named none.
         answer = _withheld_note(language, code=degraded_code, question_kind=question_kind)
@@ -974,10 +969,20 @@ def published_answer(packet: ResearchPacket, language: str) -> str:
     return f"{packet.answer_markdown}\n\n{note}"
 
 
+def _not_grounded_code(packet: ResearchPacket, *, survey: bool) -> str | None:
+    """The withholding a packet shows for itself, on either composition path: a
+    response that retrieved nothing has no source for anything it says."""
+    if _retrieval_happened(packet):
+        return None
+    return "survey_not_grounded" if survey else "research_not_grounded"
+
+
 def _withheld_note(language: str, *, code: str, question_kind: str | None) -> str:
     """The honest line for a withheld answer, keyed by its degraded code."""
     if code == "research_unavailable_missing_public_sources":
         return _missing_public_source_note(language)
+    if code == "research_not_grounded":
+        return _not_grounded_note(language)
     return _survey_recovery_note(
         language,
         question_kind=question_kind,
@@ -1234,6 +1239,12 @@ def _missing_public_source_note(language: str) -> str:
     )
 
 
+def _not_grounded_note(language: str) -> str:
+    if language == "es-419":
+        return "No pude recuperar los datos para responder esta pregunta."
+    return "I couldn't retrieve the data to answer this question."
+
+
 def _unsourced_figure_note(language: str, *, figures: list[str]) -> str:
     """The line under an answer naming the figures it could not tie to a
     source. The figures stay in the answer; only their standing is said."""
@@ -1345,7 +1356,7 @@ def compose_completed_research(
     degraded_code = (
         "research_unavailable_missing_public_sources"
         if job_request.get("requires_publisher_sources") and not sources
-        else None
+        else _not_grounded_code(packet, survey=is_market_survey(question_kind))
     )
     peers = (
         []
