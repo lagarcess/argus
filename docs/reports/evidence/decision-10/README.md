@@ -55,7 +55,11 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   derives the scenario fact before every kind branch, so a scenario typed as
   market statistics, a survey or an asset search runs on the balanced shape
   rather than being voiced from history; only a named multi-company comparison
-  keeps the thorough job (Codex round 10). `retrieval_spec(scenario=True)` then sends
+  keeps the thorough job (Codex round 10). A read that says the answer is a
+  scenario about named subjects is a fact question whatever kind it left; a
+  scenario bit with no subject stays a projection answered as arithmetic, and
+  a typed horizon alone never admits, so a test asked over a future window
+  keeps its recovery (Codex round 11). `retrieval_spec(scenario=True)` then sends
   `SCENARIO_RETRIEVAL_INSTRUCTIONS`, the recorded retrieval contract plus the
   carve-out that the inputs are the retrieved figures and are rowed while the
   scenario values are the model's arithmetic and are never rowed. Every other

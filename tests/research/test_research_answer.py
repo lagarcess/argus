@@ -772,6 +772,51 @@ def test_a_scenario_typed_as_market_stats_is_grounded_not_voiced_from_history(
     assert "Bear" in result.stage_patch["assistant_response"]
 
 
+def test_a_scenario_about_named_subjects_is_a_fact_question_whatever_its_kind(
+    monkeypatch,
+) -> None:
+    """The scenario bit on a read left at kind none still reaches the
+    scenario owner when it names its subjects; without subjects it is a
+    projection on the user's own numbers and stays arithmetic."""
+    from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
+
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="none",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "Bear to bull ranges.", _scenario_rows(cited=True)
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+
+    result = _run("what will $10,000 in NVDA be worth in ten years?")
+
+    assert result is not None
+    assert len(transport.requests) == 1
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert result.stage_patch["research"]["shape"] == "balanced"
+
+    set_research_query(
+        monkeypatch, globals(), question_kind="none", symbols=[], scenario_question=True
+    )
+    assert _run("If I save $500 a month at 5%, how much will I have in 20 years?") is None
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:

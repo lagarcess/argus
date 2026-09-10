@@ -66,9 +66,19 @@ def research_turn_has_conflicting_owner(interpretation: Any) -> bool:
 
 
 def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
-    """The primary read typed the message as a finance fact question."""
+    """The primary read typed the message as a finance fact question.
+
+    A read that says the answer is a computed scenario about named subjects is
+    a fact question whatever kind it left (decision 10): the scenario owner
+    must see it. A scenario bit with no subject is a projection on the user's
+    own numbers and stays arithmetic; a typed horizon alone never admits, so a
+    test asked over a future window keeps its recovery."""
     query = getattr(interpretation, "research_query", None)
-    return query is not None and query.question_kind not in ("concept", "none")
+    if query is None:
+        return False
+    if query.question_kind not in ("concept", "none"):
+        return True
+    return bool(getattr(query, "scenario_question", False)) and bool(query.symbols)
 
 
 def primary_research_query(interpretation: Any) -> ResearchQueryExtraction | None:

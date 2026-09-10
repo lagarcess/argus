@@ -202,7 +202,7 @@ async def _dispatch(
             state=state,
             user=user,
         )
-    if query.question_kind in ("concept", "none"):
+    if query.question_kind in ("concept", "none") and not scenario:
         return None
     subjects = _resolved_subjects(query)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]

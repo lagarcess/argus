@@ -384,3 +384,15 @@ def test_the_scenario_contract_applies_on_either_typed_fact() -> None:
     assert with_horizon.reason_codes.count(SCENARIO_FROM_HORIZON_REASON_CODE) == 1
     assert not scenario_contract_applies(plain_query, without)
     assert SCENARIO_FROM_HORIZON_REASON_CODE not in without.reason_codes
+
+
+def test_a_typed_horizon_alone_never_admits_a_kind_none_read_to_research() -> None:
+    """The one refusal decision 10 keeps: a test asked over a future window.
+    Its read carries the horizon and no question shape, and it must reach the
+    recovery, not research."""
+    read = _question_read(
+        intent="backtest_execution",
+        semantic_turn_act="new_idea",
+        research_query={"question_kind": "none", "symbols": ["NVDA"]},
+    )
+    assert primary_research_query(read) is None
