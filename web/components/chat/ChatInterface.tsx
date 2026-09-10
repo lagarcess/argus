@@ -158,7 +158,6 @@ import {
 } from "@/lib/chat-transcript-session-cache";
 import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
-import SettingsView from "../views/SettingsView";
 import ChatHeaderMenu from "./ChatHeaderMenu";
 import { ShareReceiptPanel } from "./ShareReceiptAction";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
@@ -2542,24 +2541,6 @@ export default function ChatInterface() {
               </>
             )}
           </div>
-        )}
-
-        {currentView === "settings" && (
-          <SettingsView
-            onClose={() => setCurrentView("chat")}
-            onLogout={() => {
-              void handleLogout();
-            }}
-            onHistoryMutated={refreshHistory}
-            onFeedback={(type, context) => {
-              setFeedbackState({
-                isOpen: true,
-                type,
-                context: { ...context, conversation_id: conversationId },
-              });
-              setIsSidebarOpen(false);
-            }}
-          />
         )}
 
         <ChatToast

@@ -122,8 +122,8 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
     );
-    const settings = readFileSync(
-      join(root, "components/views/SettingsView.tsx"),
+    const deleted = readFileSync(
+      join(root, "components/settings/DeletedItemsView.tsx"),
       "utf-8",
     );
     const palette = readFileSync(
@@ -143,11 +143,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain("CollectionsView");
     expect(chat).not.toContain("CollectionPicker");
     expect(sidebar).not.toContain("Collections");
-    expect(settings).not.toContain("collection");
-    expect(settings).toContain("items.filter(isDeletedItemVisible)");
-    expect(settings).not.toContain("strategy");
-    expect(settings).not.toContain("<Layers");
-    expect(settings).not.toContain("{item.type}");
+    expect(deleted).not.toContain("collection");
+    expect(deleted).toContain("items.filter(isDeletedItemVisible)");
+    expect(deleted).not.toContain("strategy");
+    expect(deleted).not.toContain("<Layers");
+    expect(deleted).not.toContain("{item.type}");
     expect(palette).toContain("item.canManageConversation");
     expect(
       existsSync(join(root, "components/views/CollectionsView.tsx")),
@@ -2893,14 +2893,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(page).toContain('params.get("preview") === "true"');
   });
 
-  test("settings subscription section is feature-flagged off by default", () => {
-    const settings = readFileSync(
-      join(root, "components/views/SettingsView.tsx"),
-      "utf-8",
+  test("no settings surface offers a subscription", () => {
+    // The only subscription section lived in the unreachable full-page view.
+    expect(existsSync(join(root, "components/views/SettingsView.tsx"))).toBe(
+      false,
     );
-
-    expect(settings).toContain("NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION");
-    expect(settings).toContain("{showSubscriptionSection && (");
+    expect(readFileSync(join(root, ".env.local.example"), "utf-8")).not.toContain(
+      "NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION",
+    );
   });
 
   test("sidebar keeps omnisearch enabled without legacy strategy navigation", () => {
