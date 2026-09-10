@@ -341,6 +341,7 @@ async def grounded_result(
             packet,
             query=query,
             question_as_of_date=question_as_of_date,
+            survey=survey,
         ):
             # A narrative turn can land on finance-only evidence even though
             # balanced retrieval exposes public search. Retry once with that
@@ -365,12 +366,14 @@ async def grounded_result(
                 retried,
                 query=query,
                 question_as_of_date=question_as_of_date,
+                survey=survey,
             ):
                 packet = retried
     if publisher_sources_required and not _packet_has_public_sources(
         packet,
         query=query,
         question_as_of_date=question_as_of_date,
+        survey=survey,
     ):
         # The claim is not publishable, but the packet is real and was paid
         # for: compose the honest note from it the way the thorough path
@@ -541,7 +544,7 @@ def _packet_stage_result(
         cache_status=cache_status,
         period_of_interest=period_of_interest,
         degraded_code=degraded_code,
-        question_kind=question_kind,
+        question_kind=freshness_kind(question_kind, survey=survey),
         decision=decision,
         period_start_date=period_start_date,
         question_as_of_date=question_as_of_date,
@@ -1104,11 +1107,12 @@ def _packet_has_public_sources(
     *,
     query: ResearchQueryExtraction,
     question_as_of_date: date,
+    survey: bool,
 ) -> bool:
     return bool(
         select_public_sources(
             packet.sources,
-            question_kind=query.question_kind,
+            question_kind=freshness_kind(query.question_kind, survey=survey),
             period_start=_coerce_date(query.period_start_date),
             question_as_of=question_as_of_date,
         )
@@ -1117,6 +1121,14 @@ def _packet_has_public_sources(
 
 def is_market_survey(question_kind: str | None) -> bool:
     return str(question_kind or "") in _SURVEY_GUIDANCE
+
+
+def freshness_kind(question_kind: str | None, *, survey: bool) -> str | None:
+    """The kind source selection dates pages by: a survey kind the turn is not
+    handling as a survey (a scenario typed as one) carries no same-day bound."""
+    if is_market_survey(question_kind) and not survey:
+        return None
+    return question_kind
 
 
 def _research_prompt(
@@ -1483,13 +1495,15 @@ def compose_completed_research(
         if isinstance(s, dict) and s.get("symbol")
     ]
     question_kind = str(job_request.get("question_kind") or "cross_company")
+    scenario = bool(job_request.get("scenario_question"))
     sources = typed_sources(
         packet,
-        question_kind=question_kind,
+        question_kind=freshness_kind(
+            question_kind, survey=is_market_survey(question_kind) and not scenario
+        ),
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
-    scenario = bool(job_request.get("scenario_question"))
     degraded_code = (
         _not_grounded_code(
             packet, survey=is_market_survey(question_kind) and not scenario

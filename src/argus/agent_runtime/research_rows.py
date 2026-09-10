@@ -392,10 +392,13 @@ def _send_text(symbols: str, spanish: bool, window: RowWindow) -> str:
 
 
 def _crossover_rule(entry_rule: dict[str, Any] | None) -> dict[str, Any] | None:
-    """The typed moving-average crossover a question named, or nothing.
+    """The complete typed moving-average crossover a question named, or nothing.
 
     Only the crossover family is offered as a row: its send text is the
-    shorthand the interpreter already reads, so a tap needs no clarification."""
+    shorthand the interpreter already reads, so a tap needs no clarification.
+    Direction and both averages are kept: a row that offered a bullish SMA
+    cross for a bearish or mixed-average question would launch a different
+    strategy from the one the user asked about."""
     if not isinstance(entry_rule, dict):
         return None
     if str(entry_rule.get("type") or "") != "moving_average_crossover":
@@ -407,38 +410,56 @@ def _crossover_rule(entry_rule: dict[str, Any] | None) -> dict[str, Any] | None:
         return None
     if fast <= 0 or slow <= 0 or fast >= slow:
         return None
-    indicator = str(entry_rule.get("fast_indicator") or "sma").strip().lower()
+    direction = str(entry_rule.get("direction") or "").strip().lower()
+    if direction not in ("bullish", "bearish"):
+        return None
+    averages = []
+    for key in ("fast_indicator", "slow_indicator"):
+        average = str(entry_rule.get(key) or "").strip().lower()
+        if average not in ("sma", "ema"):
+            return None
+        averages.append(average)
     return {
         "fast": fast,
         "slow": slow,
-        "indicator": "ema" if indicator == "ema" else "sma",
+        "fast_indicator": averages[0],
+        "slow_indicator": averages[1],
+        "direction": direction,
     }
 
 
 def _crossover_label(rule: dict[str, Any], spanish: bool) -> str:
-    average = rule["indicator"].upper()
+    fast, slow = rule["fast_indicator"].upper(), rule["slow_indicator"].upper()
+    bearish = rule["direction"] == "bearish"
     if spanish:
-        return f"el cruce {average} {rule['fast']}/{rule['slow']}"
-    return f"the {rule['fast']}/{rule['slow']} {average} crossover"
+        averages = fast if fast == slow else f"{fast}/{slow}"
+        sentido = "hacia abajo" if bearish else "hacia arriba"
+        return f"el cruce {averages} {rule['fast']}/{rule['slow']} {sentido}"
+    averages = fast if fast == slow else f"{fast} over {slow}"
+    sense = "below" if bearish else "above"
+    return f"the {rule['fast']}/{rule['slow']} {averages} cross {sense}"
 
 
 def _crossover_send_text(
     symbol: str, rule: dict[str, Any], spanish: bool, window: RowWindow
 ) -> str:
-    average = rule["indicator"].upper()
+    fast, slow = rule["fast_indicator"].upper(), rule["slow_indicator"].upper()
+    bearish = rule["direction"] == "bearish"
     if spanish:
+        sentido = "por debajo" if bearish else "por encima"
         trigger = (
-            f"comprar {symbol} cuando la {average} de {rule['fast']} días cruza "
-            f"por encima de la de {rule['slow']} días"
+            f"comprar {symbol} cuando la {fast} de {rule['fast']} días cruza "
+            f"{sentido} de la {slow} de {rule['slow']} días"
         )
         if window.is_full:
             return f"Prueba {trigger} durante los últimos tres años"
         if window.start is not None:
             return f"Prueba {trigger} desde {window.start.isoformat()} hasta hoy"
         return f"Prueba {trigger} en su historial disponible"
+    sense = "below" if bearish else "above"
     trigger = (
-        f"buying {symbol} when the {rule['fast']}-day {average} crosses above "
-        f"the {rule['slow']}-day {average}"
+        f"buying {symbol} when the {rule['fast']}-day {fast} crosses {sense} "
+        f"the {rule['slow']}-day {slow}"
     )
     if window.is_full:
         return f"Test {trigger} over the last three years"

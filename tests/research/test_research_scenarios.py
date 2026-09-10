@@ -590,3 +590,92 @@ def test_a_failed_survey_typed_scenario_is_not_filed_as_screening(monkeypatch) -
     assert sidecar["degraded"]["code"].startswith("research_unavailable_")
     assert sidecar["shape"] == "balanced"
     assert sidecar["capability_class"] == "balanced_lookup"
+
+
+def test_a_discovery_act_with_a_named_scenario_is_dispatched_not_found(
+    monkeypatch,
+) -> None:
+    """The discovery entry reads the scenario owner before its kind diversion:
+    a discovery act carrying a screening-typed scenario about a named subject
+    is a scenario, never the find operation."""
+    from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
+
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="screening",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "Bear to bull ranges.", _scenario_rows(cited=True)
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    interpretation = _interpretation().model_copy(
+        update={"semantic_turn_act": "asset_discovery"}
+    )
+    decision = grounded.research_decision(interpretation, USER, "test").model_copy(
+        update={"semantic_turn_act": "asset_discovery"}
+    )
+
+    result = asyncio.run(
+        ra.discovery_turn_stage_result(
+            interpretation=interpretation,
+            decision=decision,
+            state=_state("what will $10,000 in NVDA be worth in ten years?"),
+            user=USER,
+        )
+    )
+
+    assert result is not None
+    assert len(transport.requests) == 1
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert result.stage_patch["research"]["shape"] == "balanced"
+
+
+def test_a_survey_typed_scenario_keeps_a_dated_analyst_page(monkeypatch) -> None:
+    """Source freshness reads the derived survey fact: a scenario typed as a
+    survey kind keeps a publisher page dated before the question day instead
+    of being withheld for missing public sources."""
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="market_pulse",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "Bear to bull ranges.", _scenario_rows(cited=True)
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+
+    result = _run("what will $10,000 in NVDA be worth in ten years?")
+
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert "degraded" not in sidecar
+    assert sidecar["sources"], "the dated analyst page is kept"

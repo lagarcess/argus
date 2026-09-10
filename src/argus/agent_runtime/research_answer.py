@@ -21,6 +21,7 @@ from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.interpreter.research_routing import (
     primary_research_query,
     research_turn_has_conflicting_owner,
+    scenario_is_typed,
 )
 
 # Re-exported composition surface: the job lifecycle and tests reach these
@@ -104,6 +105,18 @@ async def discovery_turn_stage_result(
         return None
     query = interpretation.research_query
     request = decision.asset_discovery
+    if query is not None and query.symbols and scenario_is_typed(query, interpretation):
+        # A discovery act that names its subjects and asks for a computed
+        # scenario is a scenario, whatever survey or find kind it was typed
+        # as: the dispatch applies the scenario owner, never the find run.
+        return await _dispatch(
+            query,
+            interpretation=interpretation,
+            state=state,
+            user=user,
+            discovery_request=request,
+            decision=decision,
+        )
     if query is None or query.question_kind not in _TYPED_DISCOVERY_DIVERT_KINDS:
         # No primary question shape, or the turn stays discovery-shaped: the
         # find operation runs with the interpreter's typed request, so a

@@ -228,7 +228,7 @@ def test_a_named_crossover_is_offered_beside_the_plain_hold() -> None:
         "research_test_rule",
         "research_test_single",
     ]
-    assert rows["rows"][0]["label"] == "Test the 50/200 SMA crossover on NVIDIA (NVDA)"
+    assert rows["rows"][0]["label"] == "Test the 50/200 SMA cross above on NVIDIA (NVDA)"
     assert rows["rows"][0]["send_text"] == (
         "Test buying NVDA when the 50-day SMA crosses above the 200-day SMA "
         "over its available history"
@@ -241,7 +241,9 @@ def test_a_named_crossover_is_offered_beside_the_plain_hold() -> None:
         entry_rule=rule,
     )
     assert spanish is not None
-    assert spanish["rows"][0]["label"] == "Probar el cruce SMA 50/200 en NVIDIA (NVDA)"
+    assert spanish["rows"][0]["label"] == (
+        "Probar el cruce SMA 50/200 hacia arriba en NVIDIA (NVDA)"
+    )
     assert "cruza por encima" in spanish["rows"][0]["send_text"]
 
 
@@ -262,3 +264,44 @@ def test_only_a_complete_crossover_earns_a_rule_row() -> None:
         )
         assert rows is not None
         assert [row["kind"] for row in rows["rows"]] == ["research_test_single"]
+
+
+def test_the_crossover_row_keeps_direction_and_both_averages() -> None:
+    """A bearish or mixed-average cross is offered as exactly that, and an
+    incomplete rule earns no row: the tap must launch the strategy asked about."""
+    subjects = [{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}]
+    bearish_mixed = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "ema",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    rows = research_next_experiment_rows(
+        subjects=subjects,
+        peers=[],
+        language="en",
+        coverage_probe=lambda symbol, asset_class: None,
+        entry_rule=bearish_mixed,
+    )
+    assert rows is not None
+    row = rows["rows"][0]
+    assert row["kind"] == "research_test_rule"
+    assert row["label"] == "Test the 50/200 EMA over SMA cross below on NVIDIA (NVDA)"
+    assert row["send_text"] == (
+        "Test buying NVDA when the 50-day EMA crosses below the 200-day SMA "
+        "over its available history"
+    )
+    for incomplete in (
+        {**bearish_mixed, "direction": None},
+        {**bearish_mixed, "slow_indicator": "wma"},
+    ):
+        rows = research_next_experiment_rows(
+            subjects=subjects,
+            peers=[],
+            language="en",
+            coverage_probe=lambda symbol, asset_class: None,
+            entry_rule=incomplete,
+        )
+        assert [r["kind"] for r in rows["rows"]] == ["research_test_single"]
