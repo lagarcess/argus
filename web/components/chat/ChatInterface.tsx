@@ -1316,6 +1316,7 @@ export default function ChatInterface() {
           typeof finalPayload.message_id === "string"
             ? finalPayload.message_id
             : undefined;
+        const finalAssistantId = finalMessageId ?? assistantId;
         setMessages((prev) =>
           applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
         );
@@ -1330,6 +1331,8 @@ export default function ChatInterface() {
         const finalToolCardsUnavailable = hasUnavailableToolCards(finalPayload);
         const finalToolJobs = toolJobsFromMetadata(finalPayload);
         const finalMemoryRecalls = memoryRecallsFromFinalPayload(finalPayload);
+        const finalNextExperiments =
+          nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1359,11 +1362,8 @@ export default function ChatInterface() {
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
         const confirmation = pendingArtifactCardFromPayload(event.data.confirmation);
         if (confirmation) {
-          const finalAssistantId = finalMessageId ?? assistantId;
           // Researched peer adds ride the ordinary Try-next surface below
           // the card's turn (research rail, spec section 6).
-          const confirmationNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1376,14 +1376,13 @@ export default function ChatInterface() {
                   confirmation,
                   strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
-                  nextExperiments: confirmationNextExperiments,
+                  nextExperiments: finalNextExperiments,
                 }),
               ),
             ),
           );
         } else if (event.data.run) {
           const run = event.data.run as BacktestRun;
-          const finalAssistantId = finalMessageId ?? assistantId;
           const baseCard = resultCardFromRun(run);
           const resultActions = hydrateResultActionsForRun(
             baseCard.actions ?? [],
@@ -1394,8 +1393,6 @@ export default function ChatInterface() {
             savedStrategyId: run.strategy_id ?? null,
             actions: resultActions,
           };
-          const finalNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1415,7 +1412,6 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalBacktestJob) {
-          const finalAssistantId = finalMessageId ?? assistantId;
           const finalBacktestJobMessage = { ...backtestJobMessage({
             id: finalAssistantId,
             content: finalText || undefined,
@@ -1439,15 +1435,12 @@ export default function ChatInterface() {
         } else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {
           const finalFactHeadingKey =
             resultFactHeadingKeyFromMetadata(finalPayload);
-          const finalTextNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
           const finalResearchDegradedCode =
             researchDegradedCodeFromMetadata(finalPayload);
           const finalTextPresentation =
             action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
-            const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
               prev.map((m) =>
                 mergeFinalTextMessage(m, {
@@ -1462,7 +1455,7 @@ export default function ChatInterface() {
                   memoryRecalls: finalMemoryRecalls,
                   researchSources: finalResearchSources,
                   researchDegradedCode: finalResearchDegradedCode,
-                  nextExperiments: finalTextNextExperiments,
+                  nextExperiments: finalNextExperiments,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
                 }),
@@ -1483,7 +1476,7 @@ export default function ChatInterface() {
                 memoryRecalls: finalMemoryRecalls,
                 researchSources: finalResearchSources,
                 researchDegradedCode: finalResearchDegradedCode,
-                nextExperiments: finalTextNextExperiments,
+                nextExperiments: finalNextExperiments,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
               },
