@@ -64,8 +64,12 @@ describe("what Argus calls the user", () => {
 
     expect(dialog).toContain("settings.profile.preferred_name");
     expect(dialog).toContain("argus-profile-preferred-name");
-    expect(menu).toContain("patchMe({ preferred_name: trimmed || null })");
-    expect(menu).toContain("patchMe({ display_name: trimmed })");
+    expect(menu).toContain(
+      "saveProfile({ preferred_name: trimmed || null }, applyPatchedProfile)",
+    );
+    expect(menu).toContain(
+      "saveProfile({ display_name: trimmed }, applyPatchedProfile)",
+    );
     // Blank clears it, which is how a user opts out after opting in.
     expect(en.settings.profile.preferred_name).toBe(
       "What should Argus call you?",

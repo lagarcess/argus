@@ -1,0 +1,45 @@
+code SHA: 0d86cc95c91f30b2d6c09926b75477c558e6b5ff (tracked tree clean)
+command: PROFILE_WRITE_EVIDENCE_DIR=docs/reports/evidence/profile-write-pattern bunx playwright test e2e/profile-language-save.spec.ts --reporter=list
+
+(node:38669) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Running 6 tests using 2 workers
+
+[WebServer] (node:38691) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[WebServer] (Use `node --trace-deprecation ...` to show where the warning was created)
+(node:38689) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:38690) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] [browser] Failed to update language Error: Profile store unavailable
+[WebServer]     at apiFetch (lib/argus-api-transport.ts:64:19)
+[WebServer]     at async patchProfile (lib/profile-writes.ts:41:22)
+[WebServer]     at async (lib/profile-writes.ts:92:14)
+[WebServer]   62 |         : detail;
+[WebServer]   63 |
+[WebServer] > 64 |     const error = new Error(
+[WebServer]      |                   ^
+[WebServer]   65 |       (errorMsg as string) ?? `API error ${response.status}`,
+[WebServer]   66 |     ) as Error & { status: number; code: string; context?: unknown };
+[WebServer]   67 |     error.status = response.status; (lib/profile-writes.ts:97:15)
+[WebServer] [browser] Failed to update language Error: Profile store unavailable
+[WebServer]     at apiFetch (lib/argus-api-transport.ts:64:19)
+[WebServer]     at async patchProfile (lib/profile-writes.ts:41:22)
+[WebServer]     at async (lib/profile-writes.ts:92:14)
+[WebServer]   62 |         : detail;
+[WebServer]   63 |
+[WebServer] > 64 |     const error = new Error(
+[WebServer]      |                   ^
+[WebServer]   65 |       (errorMsg as string) ?? `API error ${response.status}`,
+[WebServer]   66 |     ) as Error & { status: number; code: string; context?: unknown };
+[WebServer]   67 |     error.status = response.status; (lib/profile-writes.ts:97:15)
+  ✓  2 [chromium] › e2e/profile-language-save.spec.ts:168:7 › a refused save is shown and put back (en account picks es-419) (1.9s)
+  ✓  1 [chromium] › e2e/profile-language-save.spec.ts:168:7 › a refused save is shown and put back (es-419 account picks en) (1.9s)
+  ✓  4 [chromium] › e2e/profile-language-save.spec.ts:218:5 › a save the account took is kept when its reply fails (956ms)
+  ✓  3 [chromium] › e2e/profile-language-save.spec.ts:196:5 › a saved language reaches the account and survives a reload (1.6s)
+  ✓  5 [chromium] › e2e/profile-language-save.spec.ts:236:5 › a save that outlives its panel cannot close the panel that replaced it (857ms)
+  ✓  6 [chromium] › e2e/profile-language-save.spec.ts:271:5 › the front door keeps a language in this browser and writes no profile (835ms)
+
+  6 passed (5.2s)
+exit=0

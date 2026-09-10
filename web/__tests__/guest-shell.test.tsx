@@ -155,12 +155,12 @@ describe("guest shell contract", () => {
 
     expect(settings).not.toContain('"settings.appearance.title"');
     expect(settings).toContain("<LanguageModal");
-    expect(settings).toContain("persistProfile={false}");
+    // A guest has no account to save to, so the modal keeps the choice here.
+    expect(settings).not.toContain("onProfileSaved");
     expect(settings).toContain('role="group"');
     expect(settings.match(/role="menuitem"/g)?.length).toBe(2);
     expect(settings).not.toContain('role="menuitemradio"');
-    expect(languageModal).toContain("persistProfile = true");
-    expect(languageModal).toContain("if (persistProfile)");
+    expect(languageModal).toContain("if (!onProfileSaved)");
   });
 
   test("keeps English and Spanish guest shell keys in parity", () => {

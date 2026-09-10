@@ -47,7 +47,12 @@ import {
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
+import { postFeedback, type ApiUser } from "@/lib/argus-api";
+import {
+  readProfile,
+  saveProfile,
+  saveProfileLanguage,
+} from "@/lib/profile-writes";
 import {
   DISPLAY_NAME_MAX_LENGTH,
   PREFERRED_NAME_MAX_LENGTH,
@@ -244,27 +249,6 @@ export default function ProfileMenu({
   }, [stopEditingName, stopEditingPreferredName]);
 
   // The one way a saved profile leaves this menu.
-  /*
-   * One record, one request at a time.
-   *
-   * Every read and write of the profile queues here, so responses arrive in the
-   * order they were issued and the last one is the newest. Reconciling the
-   * interleaving instead needs a generation per field, and a field added later
-   * would not have one.
-   */
-  const profileRequestChainRef = useRef<Promise<unknown>>(Promise.resolve());
-  const serializeProfileRequest = useCallback(
-    <T,>(request: () => Promise<T>): Promise<T> => {
-      const queued = profileRequestChainRef.current.then(request, request);
-      profileRequestChainRef.current = queued.then(
-        () => undefined,
-        () => undefined,
-      );
-      return queued;
-    },
-    [],
-  );
-
   const applyPatchedProfile = useCallback(
     (user: ApiUser) => {
       setProfile(user);
@@ -290,14 +274,14 @@ export default function ProfileMenu({
       setLanguageError(null);
       // Queued too, so it cannot snapshot a row before a pending write and
       // answer after it.
-      serializeProfileRequest(() => getMe())
+      readProfile()
         .then(({ user, account_kind }) => {
           applyPatchedProfile(user);
           setAccountKind(account_kind);
         })
         .catch(() => null);
     }
-  }, [applyPatchedProfile, isOpen, serializeProfileRequest]);
+  }, [applyPatchedProfile, isOpen]);
 
   // Reset submenu state when menu closes
   useEffect(() => {
@@ -516,10 +500,9 @@ export default function ProfileMenu({
     setIsSavingName(true);
     setNameError(null);
     try {
-      const { user } = await serializeProfileRequest(() => patchMe({ display_name: trimmed }));
-      // Ordered by generation, not by the edit session: a save that outlived
-      // its dialog still happened.
-      applyPatchedProfile(user);
+      // Handed on whatever the edit session: a save that outlived its dialog
+      // still happened.
+      await saveProfile({ display_name: trimmed }, applyPatchedProfile);
       if (isCurrentEditSession(session)) stopEditingName();
     } catch (err) {
       console.error("Failed to update display name", err);
@@ -539,7 +522,6 @@ export default function ProfileMenu({
     isCurrentEditSession,
     nameValue,
     profile,
-    serializeProfileRequest,
     stopEditingName,
     t,
   ]);
@@ -565,8 +547,7 @@ export default function ProfileMenu({
     setIsSavingPreferredName(true);
     setPreferredNameError(null);
     try {
-      const { user } = await serializeProfileRequest(() => patchMe({ preferred_name: trimmed || null }));
-      applyPatchedProfile(user);
+      await saveProfile({ preferred_name: trimmed || null }, applyPatchedProfile);
       if (isCurrentEditSession(session)) stopEditingPreferredName();
     } catch (err) {
       console.error("Failed to update preferred name", err);
@@ -586,7 +567,6 @@ export default function ProfileMenu({
     isCurrentEditSession,
     preferredNameValue,
     profile,
-    serializeProfileRequest,
     stopEditingPreferredName,
     t,
   ]);
@@ -612,68 +592,31 @@ export default function ProfileMenu({
       : undefined;
   const handleLanguageSelect = useCallback(
     async (code: string) => {
-      const nextLanguage = normalizeEnabledLanguage(code);
-      const previousLanguage = normalizeEnabledLanguage(
-        profile?.language ?? i18n.language,
-      );
       if (isSavingLanguage) return;
 
       const session = editSessionRef.current;
-        setIsSavingLanguage(true);
+      setIsSavingLanguage(true);
       setLanguageError(null);
-      setProfile((current) =>
-        current
-          ? {
-              ...current,
-              language: nextLanguage,
-              locale: localeForLanguage(nextLanguage),
-            }
-          : current,
-      );
-      await i18n.changeLanguage(nextLanguage);
-
-      try {
-        const { user } = await serializeProfileRequest(() =>
-          patchMe({
-            language: nextLanguage,
-            locale: localeForLanguage(nextLanguage),
-          }),
-        );
-        applyPatchedProfile(user);
-        if (isCurrentEditSession(session)) setIsLanguagePickerOpen(false);
-      } catch (err) {
-        console.error("Failed to update language", err);
-        await i18n.changeLanguage(previousLanguage);
-        setProfile((current) =>
-          current
-            ? {
-                ...current,
-                language: previousLanguage,
-                locale: localeForLanguage(previousLanguage),
-              }
-            : current,
-        );
-        if (isCurrentEditSession(session)) {
-          setLanguageError(
-            t(
-              "settings.profile.language_save_error",
-              "Could not update language yet.",
-            ),
-          );
-        }
-      } finally {
-        setIsSavingLanguage(false);
+      const saved = await saveProfileLanguage(i18n, code, {
+        onShown: (language) =>
+          setProfile((current) =>
+            current
+              ? { ...current, language, locale: localeForLanguage(language) }
+              : current,
+          ),
+        onSaved: applyPatchedProfile,
+      });
+      setIsSavingLanguage(false);
+      if (!isCurrentEditSession(session)) return;
+      if (saved) {
+        setIsLanguagePickerOpen(false);
+        return;
       }
+      setLanguageError(
+        t("settings.profile.language_save_error", "Could not update language yet."),
+      );
     },
-    [
-      applyPatchedProfile,
-      i18n,
-      isCurrentEditSession,
-      isSavingLanguage,
-      profile,
-      serializeProfileRequest,
-      t,
-    ],
+    [applyPatchedProfile, i18n, isCurrentEditSession, isSavingLanguage, t],
   );
 
   const handleAvatarThemeSelect = useCallback(
@@ -689,8 +632,7 @@ export default function ProfileMenu({
       );
 
       try {
-        const { user } = await serializeProfileRequest(() => patchMe({ avatar_theme: avatarTheme }));
-        applyPatchedProfile(user);
+        await saveProfile({ avatar_theme: avatarTheme }, applyPatchedProfile);
       } catch (err) {
         console.error("Failed to update avatar theme", err);
         setProfile((current) =>
@@ -714,7 +656,6 @@ export default function ProfileMenu({
       isCurrentEditSession,
       isSavingAvatarTheme,
       profile,
-      serializeProfileRequest,
       t,
     ],
   );
@@ -943,6 +884,7 @@ export default function ProfileMenu({
           setActiveSubmenu(parent);
         }}
         onHistoryMutated={onHistoryMutated}
+        onProfileSaved={applyPatchedProfile}
       />
     );
   }

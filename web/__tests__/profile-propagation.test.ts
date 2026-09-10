@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -18,6 +18,40 @@ import type { ApiUser, UserResponse } from "../lib/guest-account";
 const root = join(import.meta.dir, "..");
 const source = (relativePath: string) =>
   readFileSync(join(root, relativePath), "utf-8");
+
+const WRITE_PATH = "lib/profile-writes.ts";
+const MENU = "components/sidebar/ProfileMenu.tsx";
+
+/** Every file that could send a profile request, not only the menu. */
+function sourcesUnder(dir: string): Array<{ path: string; text: string }> {
+  return readdirSync(join(root, dir)).flatMap((entry) => {
+    const path = join(dir, entry);
+    if (statSync(join(root, path)).isDirectory()) return sourcesUnder(path);
+    return /\.tsx?$/.test(entry) ? [{ path, text: source(path) }] : [];
+  });
+}
+const SOURCES = ["app", "components", "lib"].flatMap(sourcesUnder);
+
+/** Each save call's arguments, however the call wraps. */
+function saveCalls(text: string): Array<{ awaited: boolean; args: string }> {
+  return [...text.matchAll(/\b(?:saveProfile|saveProfileLanguage)\(/g)].map(
+    (match) => {
+      const start = match.index + match[0].length;
+      let end = start;
+      for (let depth = 1; depth > 0; end += 1) {
+        if (text[end] === "(") depth += 1;
+        if (text[end] === ")") depth -= 1;
+      }
+      return {
+        awaited: /await\s+$/.test(text.slice(0, match.index)),
+        args: text.slice(start, end - 1),
+      };
+    },
+  );
+}
+const WRITERS = SOURCES.filter(
+  (file) => file.path !== WRITE_PATH && saveCalls(file.text).length > 0,
+);
 
 const user = (overrides: Partial<ApiUser> = {}): ApiUser => ({
   id: "user-1",
@@ -101,13 +135,35 @@ describe("a saved profile reaches the greeting", () => {
     expect(applyProfileUpdate(null, user({ preferred_name: "Alex" }))).toBeNull();
   });
 
-  test("every successful patch propagates, not just the one that was noticed", () => {
-    const menu = source("components/sidebar/ProfileMenu.tsx");
-    const patches = menu.match(/patchMe\(/g) ?? [];
-    const propagations = menu.match(/applyPatchedProfile\(user\)/g) ?? [];
-    expect(patches.length).toBeGreaterThanOrEqual(4);
-    // Every patch, plus the menu-open read, which queues behind them.
-    expect(propagations.length).toBe(patches.length + 1);
+  test("a profile field has one way to the server", () => {
+    // A patch sent from anywhere else skips the queue, the rollback and the
+    // hand-off together, and the menu was the only file this used to read.
+    const senders = SOURCES.filter((file) =>
+      /(?<!function )\bpatchMe\(/.test(file.text),
+    ).map((file) => file.path);
+    expect(senders).toEqual([WRITE_PATH]);
+
+    // The scan reaches every surface that saves today.
+    const writers = WRITERS.map((file) => file.path);
+    expect(writers).toContain(MENU);
+    expect(writers).toContain("components/settings/LanguageModal.tsx");
+    expect(writers).toContain("components/settings/AppearanceModal.tsx");
+  });
+
+  test("every save hands the saved profile on, wherever it is made", () => {
+    for (const file of WRITERS) {
+      for (const call of saveCalls(file.text)) {
+        expect(call.args).toMatch(/\b(?:applyPatchedProfile|onProfileSaved)\b/);
+      }
+    }
+    // A hand-off is only ever the menu's own, passed down unchanged.
+    for (const file of SOURCES) {
+      for (const [, bound] of file.text.matchAll(/onProfileSaved=\{(\w+)\}/g)) {
+        expect(["applyPatchedProfile", "onProfileSaved"]).toContain(bound);
+      }
+    }
+    const menu = source(MENU);
+    expect(menu).toContain("onProfileSaved={applyPatchedProfile}");
     // The menu's own copy is no longer set directly from a patch response.
     const afterHelper = menu.slice(menu.indexOf("const applyPatchedProfile"));
     expect(afterHelper).not.toContain("      setProfile(user);\n      setEditing");
@@ -181,7 +237,7 @@ describe("a name is measured after it is normalized", () => {
   });
 
   test("both save paths refuse an over-long name and say so", () => {
-    const menu = source("components/sidebar/ProfileMenu.tsx");
+    const menu = source(MENU);
     expect(menu).toContain(
       "profileNameExceeds(nameValue, DISPLAY_NAME_MAX_LENGTH)",
     );
@@ -210,7 +266,7 @@ describe("a name is measured after it is normalized", () => {
     // flipped the mode left "Keep this to 40 characters or fewer." pinned under
     // a value that had nothing wrong with it. On the sheet path nothing could
     // clear it for the rest of the session.
-    const menu = source("components/sidebar/ProfileMenu.tsx");
+    const menu = source(MENU);
     const dialog = source("components/sidebar/ProfileDetailsDialog.tsx");
 
     for (const stop of ["stopEditingName", "stopEditingPreferredName"]) {
@@ -233,7 +289,7 @@ describe("a name is measured after it is normalized", () => {
   test("closing the dialog does not leave a cleared box to confirm later", () => {
     // Clearing the box, closing with the X, then reopening showed an empty
     // input claiming the name was gone; pressing Enter there sent the clear.
-    const menu = source("components/sidebar/ProfileMenu.tsx");
+    const menu = source(MENU);
     const close = menu.slice(
       menu.indexOf("const closeProfileModal = useCallback"),
       menu.indexOf("setActiveModal(null);", menu.indexOf("const closeProfileModal")),
@@ -249,14 +305,21 @@ describe("a name is measured after it is normalized", () => {
     // Closing the dialog does not cancel a request already on the wire, and the
     // sheet keeps the menu mounted underneath. A late failure pinned an error on
     // a field nobody was editing; a late success dismissed a fresh edit.
-    const menu = source("components/sidebar/ProfileMenu.tsx");
 
-    // Every save captures the edit session it belongs to.
-    const saves = menu.match(/patchMe\(/g) ?? [];
-    const captures = menu.match(/const session = editSessionRef\.current;/g) ?? [];
-    expect(saves.length).toBeGreaterThanOrEqual(4);
-    expect(captures.length).toBe(saves.length);
-    // And closing bumps it, so those captures stop matching.
+    // Every surface that waits on a save captures the edit it belongs to, and
+    // ending that edit bumps it, so those captures stop matching.
+    for (const file of WRITERS) {
+      const awaited = saveCalls(file.text).filter((call) => call.awaited);
+      const captures =
+        file.text.match(/const session = editSessionRef\.current;/g) ?? [];
+      expect(captures.length).toBe(awaited.length);
+      if (awaited.length > 0) {
+        expect(file.text).toContain("editSessionRef.current += 1");
+      }
+    }
+
+    const menu = source(MENU);
+    expect(saveCalls(menu).filter((call) => call.awaited).length).toBeGreaterThanOrEqual(4);
     const close = menu.slice(
       menu.indexOf("const closeProfileModal = useCallback"),
       menu.indexOf("setActiveModal(null);", menu.indexOf("const closeProfileModal")),
@@ -287,21 +350,22 @@ describe("a name is measured after it is normalized", () => {
     // left a hole, because request issue order is not server commit order and a
     // whole-user snapshot cannot be merged field by field without a generation
     // per field. One request at a time removes the interleaving instead.
-    const menu = source("components/sidebar/ProfileMenu.tsx");
+    const menu = source(MENU);
+    const writePath = source(WRITE_PATH);
 
-    // Every read and write of the profile goes through the queue.
-    const requests = menu.match(/(patchMe|getMe)\(/g) ?? [];
-    const queued = menu.match(/serializeProfileRequest\(\(\) =>/g) ?? [];
-    expect(requests.length).toBeGreaterThanOrEqual(5);
-    expect(queued.length).toBe(requests.length);
+    // The queue belongs to the tab rather than to one component, so every
+    // surface shares it. Its order is exercised in profile-writes.test.ts.
+    expect(menu).not.toMatch(/\b(?:getMe|patchMe)\(/);
+    expect(menu).toContain("readProfile()");
+    expect(menu).not.toContain("profileRequestChainRef");
 
     // The chain advances past a rejection, or one failed save would wedge every
     // later one behind it.
-    const chain = menu.slice(
-      menu.indexOf("const serializeProfileRequest = useCallback"),
-      menu.indexOf("return queued;", menu.indexOf("const serializeProfileRequest")),
+    const chain = writePath.slice(
+      writePath.indexOf("export function serializeProfileRequest"),
+      writePath.indexOf("return queued;"),
     );
-    expect(chain).toContain("profileRequestChainRef.current.then(request, request)");
+    expect(chain).toContain("profileRequestChain.then(request, request)");
     expect(chain).toContain("() => undefined,");
 
     // And the reconciliation the queue replaces is gone, not merely bypassed.

@@ -183,7 +183,6 @@ export default function GuestSettingsMenu({
 
       {isLanguageModalOpen ? (
         <LanguageModal
-          persistProfile={false}
           onClose={() => {
             setIsLanguageModalOpen(false);
             requestAnimationFrame(() => gearButtonRef.current?.focus());
