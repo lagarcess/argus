@@ -1299,6 +1299,41 @@ categorical never-store list for personalization memory, alongside broker
 credentials and raw conversation. No new storage, no new retention surface, and
 the calculations are unblocked.
 
+**9. The models orchestrate; Argus owns the inputs, the math, and what
+persists. Founder-approved 2026-09-10.** This revisits the board's earlier
+rejection of letting Perplexity orchestrate a turn, and it overturns operating
+rule 7, on purpose, rather than letting a lane route around either. Rule 7's
+text is rewritten when this direction is confirmed after the registry lands.
+
+**The evidence, from 2026-09-09.** Every defect found in competitor answers was
+an input defect: "38,000 pesos" answered for Mexico instead of the Dominican
+Republic, off by about four times; a stale previous close quoted as today's
+price; entry prices marked as estimates. Their arithmetic held each time it was
+checked. Every Argus defect was the reverse: a refusal caused by a rule we
+added, and 87 percent of provider spend using an agentic reasoning model as a
+JSON parser. The rejection's main argument, that Perplexity cannot answer in one
+second, does not hold against an Argus that takes 15.6 seconds.
+
+**The division.** The models understand the question, find the facts, and write
+the answer. Argus owns what makes an answer right for this person and what lasts:
+personalization, tested money math exposed as tools the model calls, and the
+durable layer of decisions, memory, and sharing.
+
+**Two conditions.** Money math stays in tested Python as a tool and is never
+computed in prose, per operating rule 6. And personalization means stable
+declared settings, country and currency; under decision 8 a stated salary,
+expense, or debt stays ephemeral and is never stored.
+
+**Inputs beyond text.** Perplexity's Agent API accepts `input_text` and
+`input_image` by URL or base64; file parts are not documented. Grok 4.3 accepts
+files. Argus today sends Perplexity a plain string and uses neither.
+
+**Not yet measured, and owed before this is built.** The cost and latency of an
+agent-first turn against today's pipeline. And whether a cheaper structured tier
+is good enough: PR #129 swapped that tier from mistral-small with a DeepSeek
+fallback to Grok 4.3 on 2026-06-28 as one bullet in an unrelated PR, and no
+committed scorecard ever compared them. Reassess after the registry lands.
+
 ### Still open
 
 **Which Dominican sources go in the domain list, and who maintains it.** Founder
