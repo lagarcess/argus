@@ -551,11 +551,11 @@ def _seed_job(
 
 
 def _projected(connection, *, user_id: str, conversation_id: str):
-    from argus.api.conversation_activity import _source_from_row
+    from argus.api.conversation_activity import source_from_row
     from argus.domain.conversation_activity import project_conversation_activity
 
     rows = _read_sources(connection, user_id=user_id, conversation_ids=[conversation_id])
-    sources = [_source_from_row(raw) for raw in rows[0][1]]
+    sources = [source_from_row(raw) for raw in rows[0][1]]
     return sources, project_conversation_activity(
         conversation_id=conversation_id,
         sources=sources,

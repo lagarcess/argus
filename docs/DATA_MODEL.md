@@ -1275,7 +1275,9 @@ Fields:
   `reconciled`, `unavailable`)
 - `latency_ms`: `integer` (Nullable)
 - `status`: `text` (`succeeded`, `failed`, `skipped`, `estimated`,
-  `reconciled`)
+  `reconciled`); nullable only for `source = "research"` and
+  `feature_area = "research_rail"`, whose new rows always carry SQL NULL.
+  Legacy discovery rows and other sources still require status.
 - `metadata`: `jsonb` (Default: `{}`)
 - `occurred_at`: `timestamptz`
 - `created_at`: `timestamptz`
@@ -1285,9 +1287,21 @@ Append-only rules:
   frontend read paths in the private-alpha slice.
 - The migration grants service-role `insert` and `select` only. RLS is enabled,
   and no `anon` or `authenticated` policies are added.
-- Rollback is one reversible step: drop `public.cost_ledger_entries`.
+- Writer rollbacks retain the ledger table and its permanent rows.
 
 Current write hooks:
+- The shared insert normalizer owns the research-rail status retirement:
+  capability-class turns and invoice anomalies carry null status and
+  `metadata.research_ledger_contract = "argus_research_ledger/v2"`.
+  Detailed outcome/cache/pricing fields are unchanged. Legacy discovery
+  retains its `fallback_code`-derived status and receives no new marker.
+  Existing unversioned rows are left untouched, not reinterpreted or backfilled.
+  Migration `20260909225701` follows the sharing migration `20260909183646`.
+  Its `DROP NOT NULL` is classified destructive by the promotion gate, despite
+  deleting no object and rewriting no row; the founder applies it at promotion
+  before deploying the new writer. The database default remains for legacy
+  writers. Roll back application code only; retain the nullable schema and
+  existing versioned rows instead of rewriting history to restore NOT NULL.
 - Unreconciled Perplexity Agent responses append an anomaly row at the response
   boundary, correlated for invoice reconciliation by provider response id. They have
   `cost_amount = null`, `cost_source = "unavailable"`, and
