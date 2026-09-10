@@ -1086,6 +1086,15 @@ makes a live `fetch`, and it reds `backend-checks` with "the socket connection
 was closed unexpectedly". It failed once on integration `6bb73c86` and passed on
 a rerun of the same head with no code change. Rerun it; do not chase it.
 
+**The live measurement grades a failing prose judge as a pass when it names no
+criterion.** `tests/evals/measurement_eval_harness.py` adds one failed check per
+criterion the judge lists, so a verdict of `pass: false` with an empty list adds
+nothing and the case passes. It hid one failure in the scorecard the interpreter
+fingerprint names: `messy_spanish_future_performance_nvda_cruce_dorado` in
+`docs/reports/evidence/411/live-measurement.json` is a judge fail, so that
+baseline is 60 passed and 2 failed, not 61 and 1. None of the registry lane's
+four full runs hit it. PR #575 found it and its narrowed goal carries the fix.
+
 | Lane | PR | Surface it owns |
 | --- | --- | --- |
 | Subtract the guardrails | **LANDED** `695d9250`, PR #565 | done; surface released |
@@ -1109,7 +1118,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
 | Lift the loop, Lane B | The spine | **LANDED** `0ac96828`, PR #570, closing #430. Seven silent-reissue classes closed, card `kind` shipped, sixteen bilingual browser cases. `artifact_assumption_edit.py` went 1,561 to 1,507 lines, so 56 of its 75 growth lines are free again. |
-| The registry | The spine | **First half landed** as PR #567, `772aa276`. The catalog edge is cut: `state/models.py` now takes `RegisteredStrategyTemplate` from a new `strategy_template_contract.py` that loads the catalog only inside the validator, so a general envelope imports without it. Lane C's probes went from three passing the catalog guard to seven. The rest of the registry, the tool declaration itself, is not started. |
+| The registry | The spine | **First half landed** as PR #567, `772aa276`. The catalog edge is cut: `state/models.py` now takes `RegisteredStrategyTemplate` from a new `strategy_template_contract.py` that loads the catalog only inside the validator, so a general envelope imports without it. Lane C's probes went from three passing the catalog guard to seven. **Second half in flight as PR #575, narrowed 2026-09-10.** It rewrote the interpreter's contract, cutting the response schema's field descriptions from 40 to 19 and generating a new system prompt and tool catalog, and paid for four full live runs, 43/25, 52/16, 49/19 and 58/11 passed/failed, about $10 accounted, plus a 56-run comparison the lane reports at $2.61. Its fourth run failed ten cases that had passed before. Under decision 9 that rewrite is the part being reconsidered, so the goal now lands only the declaration half: one typed tool declaration driving schema, runtime contract, cost and confirmation, result card and recompute, with every fingerprinted file byte-identical to integration and no live eval. The rewrite is to be parked on `codex/registry-interpreter-rewrite` as evidence for decision 9's reassessment. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |
 
@@ -1333,6 +1342,8 @@ agent-first turn against today's pipeline. And whether a cheaper structured tier
 is good enough: PR #129 swapped that tier from mistral-small with a DeepSeek
 fallback to Grok 4.3 on 2026-06-28 as one bullet in an unrelated PR, and no
 committed scorecard ever compared them. Reassess after the registry lands.
+The registry now lands without the interpreter rewrite, which is parked with
+its live runs as the first evidence for that reassessment; see the status table.
 
 ### Still open
 
