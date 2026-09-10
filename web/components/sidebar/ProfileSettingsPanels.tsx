@@ -9,6 +9,7 @@ import DeletedItemsView from "@/components/settings/DeletedItemsView";
 import MemoryControlsModal from "@/components/settings/MemoryControlsModal";
 import SharedReceiptsView from "@/components/settings/SharedReceiptsView";
 import UsageModal from "@/components/settings/UsageModal";
+import type { ApiUser } from "@/lib/argus-api";
 
 /* Every settings surface the profile menu opens, registered once. A new panel
  * is an import and an entry: the key set is the type, and the menu derives its
@@ -26,6 +27,8 @@ type SettingsPanelContext = {
   onBack: (() => void) | undefined;
   backLabel: string;
   onHistoryMutated?: () => void;
+  /** The menu's hand-off, so a panel's save reaches the shell like the menu's own. */
+  onProfileSaved: (user: ApiUser) => void;
 };
 
 type SettingsPanelEntry = {
@@ -37,14 +40,24 @@ type SettingsPanelEntry = {
 const SETTINGS_PANELS = {
   appearance: {
     parent: "settings",
-    render: ({ onClose, onBack, backLabel }) => (
-      <AppearanceModal onClose={onClose} onBack={onBack} backLabel={backLabel} />
+    render: ({ onClose, onBack, backLabel, onProfileSaved }) => (
+      <AppearanceModal
+        onClose={onClose}
+        onBack={onBack}
+        backLabel={backLabel}
+        onProfileSaved={onProfileSaved}
+      />
     ),
   },
   language: {
     parent: "settings",
-    render: ({ onClose, onBack, backLabel }) => (
-      <LanguageModal onClose={onClose} onBack={onBack} backLabel={backLabel} />
+    render: ({ onClose, onBack, backLabel, onProfileSaved }) => (
+      <LanguageModal
+        onClose={onClose}
+        onBack={onBack}
+        backLabel={backLabel}
+        onProfileSaved={onProfileSaved}
+      />
     ),
   },
   archived: {
@@ -122,6 +135,7 @@ type ProfileSettingsPanelsProps = {
   onClose: () => void;
   onBack: (parent: SettingsPanelParent) => void;
   onHistoryMutated?: () => void;
+  onProfileSaved: (user: ApiUser) => void;
 };
 
 export default function ProfileSettingsPanels({
@@ -132,6 +146,7 @@ export default function ProfileSettingsPanels({
   onClose,
   onBack,
   onHistoryMutated,
+  onProfileSaved,
 }: ProfileSettingsPanelsProps) {
   const { t } = useTranslation();
   const { parent, render } = SETTINGS_PANELS[panel];
@@ -144,5 +159,6 @@ export default function ProfileSettingsPanels({
     onBack: asSheet ? () => onBack(parent) : undefined,
     backLabel: t(titleKey, titleFallback),
     onHistoryMutated,
+    onProfileSaved,
   });
 }

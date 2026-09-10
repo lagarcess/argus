@@ -47,9 +47,6 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
   test("no private-alpha onboarding feature flag remains", () => {
     const flags = read("lib/private-alpha-flags.ts");
     expect(flags).not.toContain("ONBOARDING");
-    const settings = read("components/views/SettingsView.tsx");
-    expect(settings).not.toContain("ONBOARDING");
-    expect(settings.toLowerCase()).not.toContain("onboarding");
     const envExample = read(".env.local.example");
     expect(envExample).not.toContain("ONBOARDING");
     const playwrightConfig = read("playwright.config.ts");

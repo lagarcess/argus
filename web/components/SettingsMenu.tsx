@@ -4,10 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { useTheme } from "next-themes";
 import { Settings, Sun, Moon, Monitor, Search, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { patchMe } from "@/lib/argus-api";
 import {
   ENABLED_LANGUAGES,
-  localeForLanguage,
   normalizeEnabledLanguage,
 } from "@/lib/language-features";
 
@@ -58,21 +56,11 @@ export function SettingsMenu() {
     t(`settings.languages.${l.code}`).toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Before sign-in a language is this browser's hint, which the account replaces.
   const changeLanguage = async (code: string) => {
-    const nextLanguage = normalizeEnabledLanguage(code);
-    await i18n.changeLanguage(nextLanguage);
+    await i18n.changeLanguage(normalizeEnabledLanguage(code));
     setIsLanguageModalOpen(false);
     setSearchQuery("");
-
-    // Persist to backend if logged in
-    try {
-      await patchMe({
-        language: nextLanguage,
-        locale: localeForLanguage(nextLanguage),
-      });
-    } catch {
-      // Silently ignore if not logged in
-    }
   };
 
   return (

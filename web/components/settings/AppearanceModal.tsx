@@ -4,13 +4,15 @@ import { useTheme } from "next-themes";
 import { Sun, Moon, Monitor } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import { patchMe } from "@/lib/argus-api";
+import type { ApiUser } from "@/lib/argus-api";
+import { saveProfile } from "@/lib/profile-writes";
 
 type AppearanceModalProps = {
   onClose: () => void;
   /** Present when opened from a parent panel, so back returns rather than closes. */
   onBack?: () => void;
   backLabel?: string;
+  onProfileSaved: (user: ApiUser) => void;
 };
 
 /** Segmented Light / Dark / System. The shell decides sheet or dialog. */
@@ -18,6 +20,7 @@ export default function AppearanceModal({
   onClose,
   onBack,
   backLabel,
+  onProfileSaved,
 }: AppearanceModalProps) {
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
@@ -25,9 +28,8 @@ export default function AppearanceModal({
   const handleSelect = (newTheme: "light" | "dark" | "system") => {
     setTheme(newTheme);
     onClose();
-    void patchMe({ theme: newTheme }).catch(() => {
-      // Silently ignore if not logged in
-    });
+    // Nothing reads profiles.theme yet, so a failed save leaves nothing to take back.
+    void saveProfile({ theme: newTheme }, onProfileSaved).catch(() => undefined);
   };
 
   return (
