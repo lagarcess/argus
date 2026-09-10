@@ -1,0 +1,362 @@
+{
+  "status": "passed",
+  "captured_at": "2026-09-10T19:54:21.512Z",
+  "candidate_sha": "55e63bf7647eb8a6f87e152a05db3fb871a76594",
+  "runtime_worktree_clean": true,
+  "evidence_kind": "committed-runtime provider-free transport replay; synthetic new readouts and Breakdown rows, genuine pre-lane META result/card",
+  "browser": "Chromium via repository Playwright; Browser plugin not available",
+  "desktop_viewport": {
+    "width": 1440,
+    "height": 1050
+  },
+  "mobile_viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "source_hashes": {
+    "web/components/chat/ChatMessage.tsx": "1a161cb855cc295891e35c3066eacc063f2a0f5b25eddd5f21a9d328cb596bc6",
+    "web/lib/result-readout-display.ts": "14f03e8920fe6c19f43c9ca8ee766c68737d4d9d8ecdb6a6b637cedba2889134",
+    "web/components/chat/ChatInterface.tsx": "efef4c0a6ed7535f19b729b57e41146d2a45ac7d45b17138e1217ac72d535547",
+    "web/components/chat/chat-message-projection.ts": "520889c240964c39f357ab523d4b3f4dc9c4374b5be4ccdd4a91137349e55bb0",
+    "web/components/chat/types.ts": "a04359ebbff2724a214ec77aa8a45da17836ecc7f4c9b9376529acf031e4034e",
+    "web/lib/result-readout-content.ts": "1cd2c22e6e9835c9eded219526b07cc1c758d43aec3a471166380c6549b47e49",
+    "web/lib/argus-api.ts": "7653865e44c4db93990acb569453fa9d5011c32e7e19b394a5b068aa2419339d",
+    "web/lib/artifact-response-transport.ts": "14638716b9fdad564de48e728c2a8f7b6dd5d54cb76df43beba2a44bdcee1c97",
+    "web/lib/chat-backtest-jobs.ts": "90beab1f201de16391cfdb425de2b739f42ef904eca759b3dd9fa3c615a8d939",
+    "web/lib/chat-final-message.ts": "ac5b04b245d444793a0f744c2390143138042ecd066e34771bdb6d9ebfe6d37a",
+    "web/lib/chat-message-hydration.ts": "faaaf3e8e57a63e2804404556d72a78ff3e0e527e49c85bd5c4da8b8b556aebb",
+    "web/lib/result-card-view-model.ts": "9e25d03fe4c48725b8cf023c453685f18a49bcd363da051e435bcee4b260d097",
+    "web/lib/chat-message-copy-text.ts": "bd4f8a7b9db05955cc5387c43ce10ea98cd101d68c2be42886f3c4b9925ca675",
+    "web/lib/chat-card-copy-text.ts": "1d0006a1cfd6af8ed79ce9c462f82ccc707fe2b7cfb9d2001ae4cc7e70fae93d",
+    "web/public/locales/en/common.json": "19405e4c1d6c2f393a6649896bb70ae21535d58a052394e5c9a2143b8cb7fac3",
+    "web/public/locales/es-419/common.json": "4cb3a041c15b86195a925293c63ad07d4b3995c0e852e232bc1fe80503bc321a",
+    "src/argus/api/artifact_presentation.py": "084333a70b370e60716a41afaaf3cd2acfbb8f2183c79bf3907a178e45502741",
+    "src/argus/domain/result_readout_content.py": "bf652d33ea7bd246a3c8cbdb9217c726d46eb6a4230377d8af5ee15a0c039389"
+  },
+  "cases": [
+    {
+      "name": "new-en-match",
+      "mode": "model",
+      "language": "en",
+      "quick_take": "META's gain comfortably exceeded SPY's, but holding it meant accepting a rough ride. The 18.35% worst drop is a reminder that a strong finish did not make this a smooth experience.",
+      "breakdown": "The annualized return was 117.25%, while volatility was 38.17%. Those figures describe a large gain with substantial swings along the way.\n\nFor scale, an 18.35% fall applied to the $10,000 starting capital is about $1,835. This is an illustration of the drop's size, not the actual loss from the portfolio's later peak. The recorded Sharpe ratio was 2.22, and the run recorded one trade.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005392",
+      "title": "Readout replay: new-en (fixture) · Argus",
+      "screenshot": "new-en-match.png"
+    },
+    {
+      "name": "new-en-mismatch-es",
+      "mode": "template",
+      "language": "es-419",
+      "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.",
+      "breakdown": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.\n\nSPY tuvo un retorno de +53.9% durante el período probado.\n\nEsta es una simulación histórica, no un pronóstico ni asesoría de inversión.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005392",
+      "title": "Readout replay: new-en (fixture) · Argus",
+      "screenshot": "new-en-mismatch-es.png"
+    },
+    {
+      "name": "new-en-mismatch-es-reload",
+      "mode": "template",
+      "language": "es-419",
+      "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.",
+      "breakdown": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.\n\nSPY tuvo un retorno de +53.9% durante el período probado.\n\nEsta es una simulación histórica, no un pronóstico ni asesoría de inversión.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005392",
+      "title": "Readout replay: new-en (fixture) · Argus",
+      "screenshot": null
+    },
+    {
+      "name": "new-es-match",
+      "mode": "model",
+      "language": "es-419",
+      "quick_take": "La ganancia de META superó ampliamente a SPY, aunque mantener la inversión exigió soportar un recorrido agitado. La peor caída de 18.35% recuerda que un buen resultado final no implica una experiencia tranquila.",
+      "breakdown": "El rendimiento anualizado fue de 117.25% y la volatilidad fue de 38.17%. Estas cifras describen una ganancia grande acompañada de oscilaciones importantes.\n\nPara ponerlo en escala, una caída de 18.35% aplicada al capital inicial de $10,000 equivale a unos $1,835. Es una ilustración del tamaño de la caída, no la pérdida real desde un máximo posterior de la cartera. El índice de Sharpe registrado fue de 2.22 y la simulación registró una operación.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005393",
+      "title": "Readout replay: new-es (fixture) · Argus",
+      "screenshot": "new-es-match.png"
+    },
+    {
+      "name": "new-es-mismatch-en",
+      "mode": "template",
+      "language": "en",
+      "quick_take": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was +369.5%. It finished 315.6 percentage points ahead of SPY. The worst drop was -18.4%.",
+      "breakdown": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was +369.5%. It finished 315.6 percentage points ahead of SPY. The worst drop was -18.4%.\n\nSPY returned +53.9% over the tested period.\n\nThis is a historical simulation, not a forecast or investment advice.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005393",
+      "title": "Readout replay: new-es (fixture) · Argus",
+      "screenshot": "new-es-mismatch-en.png"
+    },
+    {
+      "name": "new-es-mismatch-en-reload",
+      "mode": "template",
+      "language": "en",
+      "quick_take": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was +369.5%. It finished 315.6 percentage points ahead of SPY. The worst drop was -18.4%.",
+      "breakdown": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was +369.5%. It finished 315.6 percentage points ahead of SPY. The worst drop was -18.4%.\n\nSPY returned +53.9% over the tested period.\n\nThis is a historical simulation, not a forecast or investment advice.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005393",
+      "title": "Readout replay: new-es (fixture) · Argus",
+      "screenshot": null
+    },
+    {
+      "name": "legacy-en",
+      "mode": "template",
+      "language": "en",
+      "quick_take": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was +369.5%. It finished 315.6 percentage points ahead of SPY. The worst drop was -18.4%.",
+      "breakdown": "Buy and Hold for META, Jan 3, 2023 → Dec 31, 2024. The total return was +369.5%. It finished 315.6 percentage points ahead of SPY. The worst drop was -18.4%.\n\nSPY returned +53.9% over the tested period.\n\nThis is a historical simulation, not a forecast or investment advice.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005391",
+      "title": "Readout replay: legacy (fixture) · Argus",
+      "screenshot": "legacy-en.png"
+    },
+    {
+      "name": "legacy-es",
+      "mode": "template",
+      "language": "es-419",
+      "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.",
+      "breakdown": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.\n\nSPY tuvo un retorno de +53.9% durante el período probado.\n\nEsta es una simulación histórica, no un pronóstico ni asesoría de inversión.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005391",
+      "title": "Readout replay: legacy (fixture) · Argus",
+      "screenshot": "legacy-es.png"
+    },
+    {
+      "name": "legacy-es-reload",
+      "mode": "template",
+      "language": "es-419",
+      "quick_take": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.",
+      "breakdown": "Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.\n\nSPY tuvo un retorno de +53.9% durante el período probado.\n\nEsta es una simulación histórica, no un pronóstico ni asesoría de inversión.",
+      "clipboard_parity": true,
+      "url": "http://127.0.0.1:3219/chat?conversation=00000000-0000-4000-8000-000000005391",
+      "title": "Readout replay: legacy (fixture) · Argus",
+      "screenshot": null
+    }
+  ],
+  "console_entries": [],
+  "page_errors": [],
+  "external_requests_blocked": [],
+  "api_requests": [
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations/00000000-0000-4000-8000-000000005392/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations/00000000-0000-4000-8000-000000005392/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations/00000000-0000-4000-8000-000000005393/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations/00000000-0000-4000-8000-000000005393/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations/00000000-0000-4000-8000-000000005391/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations/00000000-0000-4000-8000-000000005391/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations/00000000-0000-4000-8000-000000005393/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/conversations"
+    }
+  ],
+  "api_proof": {
+    "blocked_network": [],
+    "blocked_generation_requests": [],
+    "generation_requests_allowed": 0,
+    "source_sha256": "715adc440ad4fe1f4a109ee1cc2cb00b6bead70d596df1c8b6086d6dcd33963e",
+    "cases": {
+      "legacy": "00000000-0000-4000-8000-000000005391",
+      "new-en": "00000000-0000-4000-8000-000000005392",
+      "new-es": "00000000-0000-4000-8000-000000005393"
+    },
+    "synthetic_envelopes_and_breakdowns": true,
+    "stored_messages_unchanged": true,
+    "initial_message_digest": "f35707c452abe4d8bc796d48d92b2a766b6b32ba560cbd4a49e19412ad1e5bc8",
+    "loaded_reader_source_hashes": {
+      "src/argus/api/artifact_presentation.py": "084333a70b370e60716a41afaaf3cd2acfbb8f2183c79bf3907a178e45502741",
+      "src/argus/domain/result_readout_content.py": "bf652d33ea7bd246a3c8cbdb9217c726d46eb6a4230377d8af5ee15a0c039389"
+    }
+  },
+  "checks": {
+    "language_match": true,
+    "language_mismatch": true,
+    "legacy_templates": true,
+    "settings_switch": true,
+    "reload": true,
+    "clipboard_parity": true,
+    "mobile_no_horizontal_overflow": true,
+    "result_card_preserved": true
+  }
+}
