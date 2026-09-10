@@ -10,17 +10,18 @@ export D10_API_PORT="${D10_API_PORT:-8610}" D10_TREE_LABEL="$LABEL"
 poetry run python "$HERE/serve.py" > "$OUT/api.log" 2>&1 &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null || true' EXIT
-for _ in $(seq 1 60); do
+for _ in $(seq 1 90); do
   curl -sf "http://127.0.0.1:$D10_API_PORT/api/v1/me" > /dev/null 2>&1 && break
   sleep 1
 done
-python3 - "$HERE/questions.json" <<'PY' | while IFS=$'\t' read -r id language question; do
-import json, sys
+QUESTIONS="$(mktemp)"
+python3 -c 'import json,sys
 for row in json.load(open(sys.argv[1])):
-    print("\t".join([row["id"], row["language"], row["question"]]))
-PY
+    print("\t".join([row["id"], row["language"], row["question"]]))' "$HERE/questions.json" > "$QUESTIONS"
+while IFS=$'\t' read -r id language question; do
   echo "== $id ($language)"
   poetry run python "$HERE/ask.py" "$id" "$language" "$question" "$OUT/$id.json" | head -40
-done
+done < "$QUESTIONS"
+rm -f "$QUESTIONS"
 kill $API_PID 2>/dev/null || true
 wait $API_PID 2>/dev/null || true
