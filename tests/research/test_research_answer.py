@@ -538,6 +538,7 @@ def test_a_thorough_scenario_cache_hit_keeps_the_input_gate(monkeypatch) -> None
     twice; the repeat question composes from that cache and must be withheld
     the same way, never published with the gate off."""
     from argus.domain.research.perplexity_agent import _packet_from_response
+
     from tests.research.conftest import typed_answer_text
 
     set_research_query(
@@ -585,6 +586,7 @@ def test_a_typed_horizon_alone_selects_the_scenario_contract(monkeypatch) -> Non
     scenario bit unset: the scenario contract still applies, so the request
     carries the scenario instructions and the answer needs a cited input."""
     from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
+
     from tests.research.conftest import typed_answer_text
 
     set_research_query(
