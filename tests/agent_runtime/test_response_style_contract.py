@@ -62,17 +62,7 @@ def test_result_followup_headings_are_typed_chrome_keys() -> None:
 
 
 def test_result_breakdown_prompt_includes_argus_response_style_contract() -> None:
-    messages = _result_breakdown_llm_messages(
-        fact_bank={
-            "symbols": "TSLA",
-            "total_return": "+130.0%",
-            "benchmark_symbol": "SPY",
-            "benchmark_delta": "+105.2%",
-            "caveat": "Historical simulation evidence, not advice.",
-        },
-        required_fact_ids={"symbols", "total_return", "caveat"},
-    )
+    messages = _result_breakdown_llm_messages(facts={})
 
     assert ARGUS_RESPONSE_STYLE_CONTRACT in messages[0]["content"]
-    assert "not as a financial report" in messages[0]["content"]
-    assert "one warm takeaway" in messages[0]["content"]
+    assert "Go deeper than the prior Quick take" in messages[0]["content"]

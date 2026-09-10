@@ -99,6 +99,56 @@ async def test_readout_accepts_richer_rounded_metrics_without_forced_mentions(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
 @pytest.mark.parametrize(
+    "provider_location", ["root", "resolved_parameters", "engine_config"]
+)
+async def test_readout_model_inputs_omit_provenance_and_preserve_run_evidence(
+    surface, provider_location, stored_result, monkeypatch, faker
+):
+    from argus.domain.engine_launch.adapter import _provider_metadata
+
+    execution = {
+        **stored_result["config_snapshot"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "fee_bps": 5,
+        "slippage_bps": 10,
+        "date_range": stored_result["date_range"],
+    }
+    snapshot = deepcopy(execution)
+    provenance = _provider_metadata(asset_class="equity", timeframe="1D")
+    if provider_location == "root":
+        snapshot["provider_metadata"] = provenance
+    else:
+        snapshot[provider_location] = {"provider_metadata": provenance}
+    chart = {
+        "kind": "portfolio_equity",
+        "currency": "USD",
+        "base_value": execution["starting_capital"],
+        "series": [{"time": "2023-09-01", "value": 10000}],
+        "markers": [{"time": "2023-09-01", "price": 32.45}],
+        "marker_summary": {"total_groups": 1, "included_groups": 1, "sampled": False},
+        "attribution": faker.company(),
+    }
+    result = {**stored_result, "config_snapshot": snapshot, "chart": chart}
+    before = deepcopy(result)
+
+    rendered, captured = await compose(
+        surface, "The ride was uneven.", result, monkeypatch
+    )
+
+    assert rendered == "The ride was uneven."
+    facts = json.loads(captured["messages"][1]["content"])["run_facts"]
+    assert facts["configuration"] == execution
+    assert facts["metrics"] == stored_result["metrics"]
+    assert facts["chart"] == {
+        key: value for key, value in chart.items() if key != "attribution"
+    }
+    assert result == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["quick_take", "breakdown"])
+@pytest.mark.parametrize(
     "text",
     [
         "DOCN returned 99.9%.",

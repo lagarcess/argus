@@ -83,6 +83,7 @@ def stored_readout_facts(
             "resolved_parameters",
             "context_packets",
             "audit_context",
+            "provider_metadata",
             "quick_take",
             "breakdown",
             "result_readout",
@@ -110,7 +111,9 @@ def stored_readout_facts(
     delta = facts["comparison"].get("delta_vs_benchmark_pct")
     facts["benchmark_comparison_claim"] = benchmark_comparison_from_delta(delta).claim
     if isinstance(chart, dict):
-        facts["chart"] = chart
+        facts["chart"] = {
+            key: value for key, value in chart.items() if key != "attribution"
+        }
     # DCA's seed and recurring contribution are different money roles. The
     # shared config reader derives the seed, including legacy engine shapes.
     capital = config.get("starting_capital", config.get("initial_capital"))
