@@ -47,7 +47,7 @@ remain unchanged. The shared and registered spend suites pass 24 tests.
 
 ## Verification boundary
 
-The final free backend sweep passes **7,214 tests**, skips 584 opt-in tests,
+The final free backend sweep passes **7,214 tests**, skips 584 tests,
 and fails only the owed measured-fingerprint check. The earlier run overlapped
 the final projection edge fixes and is not the final verification result.
 The full frontend suite passes **1,682 tests**, with zero failures and two
@@ -60,7 +60,8 @@ process builds the backtest declaration while rejecting imports from either
 public excerpt namespace. No serializer-pinned class moved. These checks do
 not substitute for current-head CI, browser evidence or the live measurement.
 
-The announced estimate for the next complete 68-case live run is **$3–$5**.
-The fingerprint remains unchanged until the new scorecard and comparison
-justify it. Earlier failed scorecards retain their original grades. This is
-not a clear-lane or completed-review report.
+The subsequent [complete 68-case measurement](../live-gate-third.md) at clean
+`72aa04a0` reports **49 passed and 19 failed**. Its accounted charges are $2.74
+plus unknown costs; the announced estimate was $3–$5. The fingerprint
+remains unchanged; earlier failed scorecards retain their original grades.
+This is not a clear-lane or completed-review report.

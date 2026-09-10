@@ -1,0 +1,12 @@
+{
+  "candidate_sha": "72aa04a06d00a76421414e778d67fc2cf3ccd0f2",
+  "public_paths_checked": 44,
+  "public_drift": [],
+  "private_attribution_exact_restore": true,
+  "protected": {
+    "src/argus/agent_runtime/stages/tool_execution.py": true,
+    "web/lib/tool-result-recompute.ts": true
+  },
+  "integration_ancestor": true,
+  "worktree_clean": true
+}

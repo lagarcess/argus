@@ -1,0 +1,44 @@
+{
+  "artifacts": {
+    "ceiling-candidate.json": "b8d8faceb05a314ad823cc6dbac25451dba0827125457a98984e47242fe1a251",
+    "ceiling-integration.json": "9c165125f638d20aee229a436e7788d2922378779dd790986728eea7a7574426",
+    "ceiling_state_probe.py": "1c7e0269b8f8ca74869275373473ee91329a9eb6ecb6fd1578e629ea53730fc9",
+    "macro-intent-candidate.json": "28d08f0251130661b8726a3a9d6a6e09088dc719e469fe83af978a4c9631a555",
+    "macro_intent_probe.py": "eebf626d17fa56fa677404e33d7378f7cd9a187379cdd18b67a1f71f883fb306",
+    "result-followup-candidate.json": "c4b17106335ef5e8751fb29b722197ec90f0219b9f7c1118d089647523015d6a",
+    "result-followup-integration.json": "0d1fdc0ba2517487749d2105198ae914018f6e1bc6437f1d6d4314422701acd6",
+    "result_followup_probe.py": "e1406b7bd01f435d3ffa882ac3d8c0e913c93160ba4a296a79861122707b3879"
+  },
+  "candidate_head_at_initial_probe": "3f6c67278813f1e7f9cd39c3b75eaaa223f70707",
+  "candidate_head_at_manifest": "3f6c67278813f1e7f9cd39c3b75eaaa223f70707",
+  "candidate_worktree_note": "Other agents are working concurrently; these controls do not claim a clean candidate gate. Source hashes captured below.",
+  "evidence_type": "free deterministic controls; not live acceptance",
+  "integration_sha": "34866139861a5f06a3572edb2533bc42733371e8",
+  "integration_source": "git archive of src, tests, pyproject.toml at exact commit; no source edits",
+  "provider_calls": 0,
+  "python": "Python 3.10.20",
+  "source_hashes": {
+    "/Users/garces/.codex/worktrees/aa72/private-alpha-next": {
+      "src/argus/agent_runtime/interpreter/dca_audits.py": "19241d2bcf0afe9b20178ea62b4d528a256944cd0b0a2558a8f152aa2a1be1d9",
+      "src/argus/agent_runtime/interpreter/run_field_audits.py": "64b3b337a35b7ceacd622bc8ed684adc8da0ceac73ef2bec83c8046bc2a483ed",
+      "src/argus/agent_runtime/next_experiments.py": "5f9aacf71f70a3f8328637c6ea3c1879926deb4c9d7a43298b09ef0d9b4e8e55",
+      "src/argus/agent_runtime/research_grounded.py": "8a28e4480f8b85add6021fad7c7d8bd7ef06398f70d5e007948974cbb9731edd",
+      "src/argus/agent_runtime/result_followups.py": "00cb8129b75c51013ceaf8da250509cbf604761d61f7c101e95a1d2e3783ec62",
+      "src/argus/agent_runtime/stages/interpret_actions.py": "18e5abc56793ccaf54dd0c8e00dd4e0b0fb01066edbf0af56ddc5dff462814e8",
+      "src/argus/agent_runtime/stages/interpret_internal/latest_result_answer.py": "e087b70c9685cc96868957e6a57ee67b51b9f1ba5938330a8956e81fd0fc7422",
+      "src/argus/agent_runtime/stages/tool_execution.py": "ef2bd6d90ffc869257324e87d79749d5c3d8a02235aa260796f6bc9e4f6aba7c",
+      "tests/evals/measurement_eval_harness.py": "9c5fdd194c6ddd0992d3366b4783d07fc072d0b0239d90eaa0bb01f20632ac5f",
+      "tests/evals/measurement_registry.py": "9f03def158a86ee86f6911f8cb1f9924c4f6a4df89502b4b6eab0059f7b7a708"
+    },
+    "/private/tmp/registry-four-case-diagnosis/integration-34866139": {
+      "src/argus/agent_runtime/interpreter/dca_audits.py": "bd3baa791265165cf395fb3b467e913a33cf8c1ea139dc0f7b4ed2bec7619603",
+      "src/argus/agent_runtime/interpreter/run_field_audits.py": "0da6e5ea4ccc50e91e71d59347ae61544d4942d867b8b954e17addf439859715",
+      "src/argus/agent_runtime/next_experiments.py": "5f9aacf71f70a3f8328637c6ea3c1879926deb4c9d7a43298b09ef0d9b4e8e55",
+      "src/argus/agent_runtime/research_grounded.py": "06610f5d4230b74334a81bcc852ae68ad3647e02cc0b0aaa62a5f95dcf9f50e3",
+      "src/argus/agent_runtime/result_followups.py": "00cb8129b75c51013ceaf8da250509cbf604761d61f7c101e95a1d2e3783ec62",
+      "src/argus/agent_runtime/stages/interpret_actions.py": "fd21937d2ae0ea8f0d9e1ea2aed97f7f5c2b28d1a735c6333fa28448147d88f1",
+      "src/argus/agent_runtime/stages/interpret_internal/latest_result_answer.py": "8469c549d3adecff9aff8deb3f2120c2cf2bf31e5078dfba13ee2944d229eaf2",
+      "tests/evals/measurement_eval_harness.py": "c0d98529b5728570b00a18bb3a62cf3c3b1abbbdbad298044de370328fb6f198"
+    }
+  }
+}
