@@ -59,61 +59,12 @@
         "status": "succeeded",
         "result": {
           "execution_status": "succeeded",
-          "receipt": {
-            "schema_version": 1,
-            "idea_title": "Backtest",
+          "facts": {
             "asset_class": "equity",
             "symbols": [
               "AAPL"
             ],
-            "strategy_facts": [
-              {
-                "key": "strategy_type",
-                "value": "dca accumulation"
-              },
-              {
-                "key": "cadence",
-                "value": "monthly"
-              }
-            ],
-            "assumptions": [
-              {
-                "key": "recurring_contribution",
-                "value": "200"
-              },
-              {
-                "key": "contribution_cadence",
-                "value": "monthly"
-              },
-              {
-                "key": "starting_principal",
-                "value": "0"
-              },
-              {
-                "key": "fractional_shares",
-                "value": null
-              },
-              {
-                "key": "long_only",
-                "value": null
-              },
-              {
-                "key": "equal_weight",
-                "value": null
-              },
-              {
-                "key": "modeled_fee_bps",
-                "value": "10"
-              },
-              {
-                "key": "modeled_slippage_bps",
-                "value": "5"
-              },
-              {
-                "key": "benchmark_same_modeled_costs",
-                "value": "SPY"
-              }
-            ],
+            "benchmark_symbol": "SPY",
             "date_range": {
               "start": "2024-01-02",
               "end": "2024-03-01"
@@ -140,7 +91,54 @@
                 "value": "9.3"
               }
             ],
-            "benchmark_symbol": "SPY",
+            "strategy_facts": [
+              {
+                "key": "strategy_type",
+                "value": "dca accumulation"
+              },
+              {
+                "key": "cadence",
+                "value": "monthly"
+              }
+            ],
+            "assumptions": [
+              {
+                "key": "recurring_contribution",
+                "value": 200.0
+              },
+              {
+                "key": "contribution_cadence",
+                "value": "monthly"
+              },
+              {
+                "key": "starting_principal",
+                "value": 0.0
+              },
+              {
+                "key": "fractional_shares",
+                "value": null
+              },
+              {
+                "key": "long_only",
+                "value": null
+              },
+              {
+                "key": "equal_weight",
+                "value": null
+              },
+              {
+                "key": "modeled_fee_bps",
+                "value": 10.0
+              },
+              {
+                "key": "modeled_slippage_bps",
+                "value": 5.0
+              },
+              {
+                "key": "benchmark_same_modeled_costs",
+                "value": "SPY"
+              }
+            ],
             "visual": {
               "kind": "portfolio_equity",
               "currency": "USD",
@@ -179,11 +177,7 @@
                   "value": 10840.0
                 }
               ]
-            },
-            "owner_note": null,
-            "content_language": "en",
-            "framing": "historical_simulation_not_advice",
-            "provenance_mark": "tested_with_argus"
+            }
           },
           "job_id": null
         },
@@ -376,10 +370,10 @@
           {
             "locale_key": "receipt.assumptions.recurring_contribution",
             "interpolation_args": {
-              "value": "200",
-              "amount": "200",
-              "bps": "200",
-              "symbol": "200"
+              "value": 200.0,
+              "amount": 200.0,
+              "bps": 200.0,
+              "symbol": 200.0
             }
           },
           {
@@ -394,10 +388,10 @@
           {
             "locale_key": "receipt.assumptions.starting_principal",
             "interpolation_args": {
-              "value": "0",
-              "amount": "0",
-              "bps": "0",
-              "symbol": "0"
+              "value": 0.0,
+              "amount": 0.0,
+              "bps": 0.0,
+              "symbol": 0.0
             }
           },
           {
@@ -430,19 +424,19 @@
           {
             "locale_key": "receipt.assumptions.modeled_fee_bps",
             "interpolation_args": {
-              "value": "10",
-              "amount": "10",
-              "bps": "10",
-              "symbol": "10"
+              "value": 10.0,
+              "amount": 10.0,
+              "bps": 10.0,
+              "symbol": 10.0
             }
           },
           {
             "locale_key": "receipt.assumptions.modeled_slippage_bps",
             "interpolation_args": {
-              "value": "5",
-              "amount": "5",
-              "bps": "5",
-              "symbol": "5"
+              "value": 5.0,
+              "amount": 5.0,
+              "bps": 5.0,
+              "symbol": 5.0
             }
           },
           {
@@ -519,61 +513,12 @@
         "status": "succeeded",
         "result": {
           "execution_status": "succeeded",
-          "receipt": {
-            "schema_version": 1,
-            "idea_title": "Backtest",
+          "facts": {
             "asset_class": "equity",
             "symbols": [
               "AAPL"
             ],
-            "strategy_facts": [
-              {
-                "key": "strategy_type",
-                "value": "dca accumulation"
-              },
-              {
-                "key": "cadence",
-                "value": "monthly"
-              }
-            ],
-            "assumptions": [
-              {
-                "key": "recurring_contribution",
-                "value": "200"
-              },
-              {
-                "key": "contribution_cadence",
-                "value": "monthly"
-              },
-              {
-                "key": "starting_principal",
-                "value": "0"
-              },
-              {
-                "key": "fractional_shares",
-                "value": null
-              },
-              {
-                "key": "long_only",
-                "value": null
-              },
-              {
-                "key": "equal_weight",
-                "value": null
-              },
-              {
-                "key": "modeled_fee_bps",
-                "value": "10"
-              },
-              {
-                "key": "modeled_slippage_bps",
-                "value": "5"
-              },
-              {
-                "key": "benchmark_same_modeled_costs",
-                "value": "SPY"
-              }
-            ],
+            "benchmark_symbol": "SPY",
             "date_range": {
               "start": "2024-01-02",
               "end": "2024-03-01"
@@ -600,7 +545,54 @@
                 "value": "9.3"
               }
             ],
-            "benchmark_symbol": "SPY",
+            "strategy_facts": [
+              {
+                "key": "strategy_type",
+                "value": "dca accumulation"
+              },
+              {
+                "key": "cadence",
+                "value": "monthly"
+              }
+            ],
+            "assumptions": [
+              {
+                "key": "recurring_contribution",
+                "value": 200.0
+              },
+              {
+                "key": "contribution_cadence",
+                "value": "monthly"
+              },
+              {
+                "key": "starting_principal",
+                "value": 0.0
+              },
+              {
+                "key": "fractional_shares",
+                "value": null
+              },
+              {
+                "key": "long_only",
+                "value": null
+              },
+              {
+                "key": "equal_weight",
+                "value": null
+              },
+              {
+                "key": "modeled_fee_bps",
+                "value": 10.0
+              },
+              {
+                "key": "modeled_slippage_bps",
+                "value": 5.0
+              },
+              {
+                "key": "benchmark_same_modeled_costs",
+                "value": "SPY"
+              }
+            ],
             "visual": {
               "kind": "portfolio_equity",
               "currency": "USD",
@@ -639,11 +631,7 @@
                   "value": 10840.0
                 }
               ]
-            },
-            "owner_note": null,
-            "content_language": "en",
-            "framing": "historical_simulation_not_advice",
-            "provenance_mark": "tested_with_argus"
+            }
           },
           "job_id": null
         },
@@ -836,10 +824,10 @@
           {
             "locale_key": "receipt.assumptions.recurring_contribution",
             "interpolation_args": {
-              "value": "200",
-              "amount": "200",
-              "bps": "200",
-              "symbol": "200"
+              "value": 200.0,
+              "amount": 200.0,
+              "bps": 200.0,
+              "symbol": 200.0
             }
           },
           {
@@ -854,10 +842,10 @@
           {
             "locale_key": "receipt.assumptions.starting_principal",
             "interpolation_args": {
-              "value": "0",
-              "amount": "0",
-              "bps": "0",
-              "symbol": "0"
+              "value": 0.0,
+              "amount": 0.0,
+              "bps": 0.0,
+              "symbol": 0.0
             }
           },
           {
@@ -890,19 +878,19 @@
           {
             "locale_key": "receipt.assumptions.modeled_fee_bps",
             "interpolation_args": {
-              "value": "10",
-              "amount": "10",
-              "bps": "10",
-              "symbol": "10"
+              "value": 10.0,
+              "amount": 10.0,
+              "bps": 10.0,
+              "symbol": 10.0
             }
           },
           {
             "locale_key": "receipt.assumptions.modeled_slippage_bps",
             "interpolation_args": {
-              "value": "5",
-              "amount": "5",
-              "bps": "5",
-              "symbol": "5"
+              "value": 5.0,
+              "amount": 5.0,
+              "bps": 5.0,
+              "symbol": 5.0
             }
           },
           {

@@ -1,14 +1,13 @@
-"""Bind the canonical backtest receipt facts to the declared result card."""
+"""Bind executed backtest facts to the declared result card."""
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
 from argus.agent_runtime.backtest_input import BacktestStrategyInput
-from argus.api.public_excerpt_schemas import PublicExcerptPayload
-from argus.domain.public_excerpts import (
-    PublicExcerptSourceError,
-    backtest_receipt_facts,
+from argus.agent_runtime.tools.backtest_result_facts import (
+    BacktestCardFacts,
+    backtest_card_facts,
 )
 from argus.domain.tool_contracts import (
     LocalizedText,
@@ -17,7 +16,7 @@ from argus.domain.tool_contracts import (
     ToolOutcome,
 )
 from argus.domain.tool_declaration import ToolInvocationError
-from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class BacktestArguments(BaseModel):
@@ -30,20 +29,20 @@ class BacktestExecutionResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     execution_status: Literal["succeeded", "pending"]
-    receipt: PublicExcerptPayload | None = None
+    facts: BacktestCardFacts | None = None
     job_id: str | None = None
 
     @model_validator(mode="after")
     def completed_results_have_complete_facts(self) -> BacktestExecutionResult:
-        if self.execution_status == "succeeded" and self.receipt is None:
-            raise ValueError("A completed backtest needs its complete receipt facts")
-        if self.execution_status == "pending" and self.receipt is not None:
+        if self.execution_status == "succeeded" and self.facts is None:
+            raise ValueError("A completed backtest needs its complete executed facts")
+        if self.execution_status == "pending" and self.facts is not None:
             raise ValueError("A pending backtest cannot carry completed result facts")
         return self
 
 
 def backtest_execution_result(final: dict[str, Any]) -> BacktestExecutionResult:
-    """Use the same fact owner for in-process, background and shared results."""
+    """Use one fact owner for in-process and background tool results."""
     result = final.get("result")
     card = final.get("result_card")
     if not isinstance(result, dict) or not isinstance(card, dict):
@@ -51,24 +50,13 @@ def backtest_execution_result(final: dict[str, Any]) -> BacktestExecutionResult:
     parameters = result.get("resolved_parameters")
     if not isinstance(parameters, dict):
         raise ToolInvocationError("unavailable", code="invalid_backtest_result")
-    source = {
-        "result_card": card,
-        "metrics": result.get("metrics"),
-        "provenance": {"benchmark_symbol": parameters.get("benchmark_symbol")},
-    }
-    chart = card.get("chart")
     try:
-        receipt = backtest_receipt_facts(
-            source=source,
-            title="Backtest",
-            run_chart=chart if isinstance(chart, dict) else None,
-            run_config_snapshot=result,
-        )
-    except (PublicExcerptSourceError, ValidationError) as exc:
+        facts = backtest_card_facts(result=result, card=card)
+    except (ValueError, TypeError, KeyError) as exc:
         raise ToolInvocationError(
             "unavailable", code="unprojectable_backtest_result"
         ) from exc
-    return BacktestExecutionResult(execution_status="succeeded", receipt=receipt)
+    return BacktestExecutionResult(execution_status="succeeded", facts=facts)
 
 
 def backtest_presentation(
@@ -82,8 +70,8 @@ def backtest_presentation(
     )
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title)
-    receipt = BacktestExecutionResult.model_validate(outcome.result).receipt
-    if receipt is None:
+    facts = BacktestExecutionResult.model_validate(outcome.result).facts
+    if facts is None:
         return ToolCardPresentation(title=title)
     metrics = [
         ToolFact(
@@ -96,7 +84,7 @@ def backtest_presentation(
                 else None
             ),
         )
-        for metric in receipt.metrics
+        for metric in facts.metrics
     ]
     headline = next(
         (
@@ -118,44 +106,44 @@ def backtest_presentation(
                 else None
             ),
         )
-        for fact in receipt.strategy_facts
+        for fact in facts.strategy_facts
     )
     rows.extend(
         [
             ToolFact(
                 name="symbols",
                 label=LocalizedText(locale_key="receipt.fields.asset"),
-                value=", ".join(receipt.symbols),
+                value=", ".join(facts.symbols),
             ),
             ToolFact(
                 name="start_date",
                 label=LocalizedText(locale_key="chat.tools.backtest.start_date"),
-                value=receipt.date_range.start,
+                value=facts.date_range.start,
             ),
             ToolFact(
                 name="end_date",
                 label=LocalizedText(locale_key="chat.tools.backtest.end_date"),
-                value=receipt.date_range.end,
+                value=facts.date_range.end,
             ),
         ]
     )
-    if receipt.asset_class is not None:
+    if facts.asset_class is not None:
         rows.append(
             ToolFact(
                 name="asset_class",
                 label=LocalizedText(locale_key="receipt.fields.asset_class"),
-                value=receipt.asset_class,
+                value=facts.asset_class,
                 value_text=LocalizedText(
-                    locale_key=f"receipt.asset_class_values.{receipt.asset_class}"
+                    locale_key=f"receipt.asset_class_values.{facts.asset_class}"
                 ),
             )
         )
-    if receipt.benchmark_symbol is not None:
+    if facts.benchmark_symbol is not None:
         rows.append(
             ToolFact(
                 name="benchmark_symbol",
                 label=LocalizedText(locale_key="receipt.fields.benchmark"),
-                value=receipt.benchmark_symbol,
+                value=facts.benchmark_symbol,
             )
         )
     # Every assumption comes from the canonical projector. Templates select the
@@ -171,12 +159,12 @@ def backtest_presentation(
                 name: fact.value for name in ("value", "amount", "bps", "symbol")
             },
         )
-        for fact in receipt.assumptions
+        for fact in facts.assumptions
     ]
     return ToolCardPresentation(
         title=title,
         answer=headline,
         rows=rows,
         notes=notes,
-        visual=receipt.visual,
+        visual=facts.visual,
     )

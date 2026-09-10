@@ -10,6 +10,7 @@ import pytest
 from argus.agent_runtime.artifacts.drafts import draft_from_failed_launch_payload
 from argus.agent_runtime.tools.registered_backtest import get_backtest_declaration
 from argus.domain.engine_launch.models import LaunchBacktestRequest
+from argus.domain.engine_launch.results import build_success_envelope
 from argus.domain.tool_contracts import ToolCall, ToolResultCard
 from argus.domain.tool_job_binding import bind_tool_job_call
 from faker import Faker
@@ -84,23 +85,25 @@ def test_backtest_admission_freezes_binding_before_dispatch(monkeypatch) -> None
 
 @pytest.mark.parametrize("language", ["en", "es-419"])
 def test_async_backtest_persists_same_declared_card_and_replays_once(language) -> None:
-    from argus.domain.public_excerpts import build_public_excerpt_payload
-
     from workflows.backtest_job import run_backtest_job
 
     artifact = build_generated_artifact(language=language)
     config = deepcopy(GENERATED_CARD_CONFIG_SNAPSHOT)
-    envelope = {
-        "resolved_strategy": {
+    envelope = build_success_envelope(
+        resolved_strategy={
             **config["resolved_strategy"],
             "asset_universe": config["symbols"],
         },
-        "resolved_parameters": {
+        resolved_parameters={
             **config["resolved_parameters"],
             "benchmark_symbol": config["benchmark_symbol"],
         },
-        "metrics": artifact.payload["metrics"],
-    }
+        metrics=artifact.payload["metrics"],
+        benchmark_metrics={},
+        assumptions=[],
+        caveats=[],
+        provider_metadata={},
+    ).model_dump(mode="json")
 
     call, artifact_id = _call(language), fake.uuid4()
     row = _job_row(
@@ -138,16 +141,7 @@ def test_async_backtest_persists_same_declared_card_and_replays_once(language) -
     )
     assert card.presentation.answer.value == expected["value"]
     assert ToolResultCard.model_validate(json.loads(json.dumps(cards[0]))) == card
-    stored_artifact = next(iter(gateway.finalization_store.evidence_artifacts.values()))
-    receipt = build_public_excerpt_payload(
-        artifact=stored_artifact,
-        run_chart=run.chart,
-        run_config_snapshot=run.config_snapshot,
-        owner_note=None,
-        content_language=language,
-    )
-    assert receipt.schema_version == 2
-    assert receipt.presentation == card.presentation
     run_backtest_job(gateway, job_id=row["id"], backtest_tool=tool)
     assert len(tool.calls) == 1
     assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
