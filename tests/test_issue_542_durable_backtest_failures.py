@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any
 
 from argus.agent_runtime.stages.execute import execute_stage
@@ -13,6 +13,7 @@ from argus.api.chat.backtest_jobs import (
     backtest_job_shadow_context,
 )
 from argus.api.main import app
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.research.admission import (
     ResearchAttemptAdmission,
     claim_current_research_attempt,
@@ -26,7 +27,7 @@ SYMBOLS = ["NVDA", "MSFT", "PLTR", "GOOGL", "AMZN"]
 
 
 def _today_launch_payload() -> dict[str, Any]:
-    today = date.today()
+    today = new_york_today()
     return {
         "strategy_type": "buy_and_hold",
         "symbol": SYMBOLS[0],
@@ -139,7 +140,7 @@ def test_spent_confirmation_identity_rotates_before_today_card_is_published() ->
     assert payload["artifact_id"] == confirmation_id
     assert payload["launch_payload"]["symbols"] == SYMBOLS
     assert payload["launch_payload"]["capital_amount"] == 100_000
-    assert payload["launch_payload"]["date_range"]["end"] == date.today().isoformat()
+    assert payload["launch_payload"]["date_range"]["end"] == new_york_today().isoformat()
     reference = runtime_result["artifact_references"][0]
     assert reference["artifact_id"] == confirmation_id
     assert reference["metadata"]["confirmation_id"] == confirmation_id
@@ -239,7 +240,7 @@ def test_conflicting_today_launch_records_reason_and_drives_user_copy(
     assert receipt["launch_payload"]["request"]["symbols"] == SYMBOLS
     assert receipt["launch_payload"]["request"]["capital_amount"] == 100_000
     assert receipt["launch_payload"]["request"]["date_range"]["end"] == (
-        date.today().isoformat()
+        new_york_today().isoformat()
     )
 
     assert result.outcome == "execution_failed_terminally"

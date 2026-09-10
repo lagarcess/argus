@@ -30,6 +30,7 @@ from argus.api.chat.recovery import _run_by_id_for_user
 from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
 from argus.api.dependencies import problem
 from argus.api.schemas import ChatStreamRequest, Message
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.retest_setup import (
     RETEST_CONTRACT_PAIRS,
     RETEST_CONTRACT_VERSION,
@@ -144,7 +145,7 @@ def prepare_retest_turn(
             user_id=user_id,
             conversation_id=conversation_id,
             source_run_id=source_run_id,
-            today=today or date.today(),
+            today=today or new_york_today(),
         )
         if source_run_id is not None
         else None

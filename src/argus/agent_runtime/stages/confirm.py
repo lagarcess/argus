@@ -42,6 +42,7 @@ from argus.domain.market_data.capabilities import (
     latest_complete_data_adjustment,
     market_data_window_violation,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.nlp.natural_time import resolve_date_range_intent
 from loguru import logger
 from pydantic import ValidationError
@@ -506,7 +507,7 @@ def _strategy_without_data_availability_adjustment(
 
 
 def _today() -> date:
-    return date.today()
+    return new_york_today()
 
 
 def _market_clock_for_strategy(asset_class: str) -> Any:

@@ -26,7 +26,6 @@ from tests.research.conftest import (
     RESEARCH_USER_ID,
     agent_response,
     educational_interpretation,
-    freeze_question_clock,
     retrieved_row,
     run_research_turn,
     search_results_item,
@@ -67,22 +66,22 @@ TWO_DAYS_AHEAD = "https://www.reuters.com/markets/us/stocks-2026-09-11/"
     ],
 )
 def test_a_question_is_dated_by_the_new_york_calendar(
-    monkeypatch, asked_at: datetime, asked_on: date
+    freeze_new_york_clock, asked_at: datetime, asked_on: date
 ) -> None:
     """The date turns at midnight in New York, in daylight and standard time
     alike, never at midnight UTC."""
-    freeze_question_clock(monkeypatch, asked_at)
+    freeze_new_york_clock(asked_at)
 
     assert question_date() == asked_on
 
 
 def test_a_survey_asked_after_the_close_keeps_the_pages_of_the_day_it_asked_about(
-    monkeypatch,
+    monkeypatch, freeze_new_york_clock
 ) -> None:
     """The recorded S&P turn, asked at 00:17 UTC: its rows cited a page dated
     that New York day and the drawer was empty, because the freshness bound
     had already moved to the next UTC date."""
-    freeze_question_clock(monkeypatch, AFTER_THE_CLOSE)
+    freeze_new_york_clock(AFTER_THE_CLOSE)
     set_research_query(
         monkeypatch, globals(), question_kind="market_pulse", symbols=["SPY"]
     )
@@ -145,11 +144,13 @@ def test_a_page_dated_one_day_past_the_question_is_kept_and_two_days_is_not(
     assert [source.url for source in selected] == [UTC_STAMPED]
 
 
-def test_inline_and_background_research_date_the_question_alike(monkeypatch) -> None:
+def test_inline_and_background_research_date_the_question_alike(
+    monkeypatch, freeze_new_york_clock
+) -> None:
     """One owner dates the question on both paths: at the same instant the
     inline turn and the background job keep the same pages of the same
     packet, and the job carries the date it was asked on to its completion."""
-    freeze_question_clock(monkeypatch, AFTER_THE_CLOSE)
+    freeze_new_york_clock(AFTER_THE_CLOSE)
     period_start = date(2026, 9, 7)
     set_research_query(
         monkeypatch,

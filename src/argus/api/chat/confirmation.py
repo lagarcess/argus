@@ -49,6 +49,7 @@ from argus.domain.backtesting.config import (
 from argus.domain.engine_launch.display import (
     format_date_range_label,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 
 # This module is the confirmation card's builder and the import path every
 # caller and test already holds. The lifecycle and research-peer names below
@@ -350,7 +351,7 @@ def _edit_constraints(
     )
     from argus.domain.market_data.capabilities import ALPACA_EQUITY_HISTORY_START
 
-    date_window: dict[str, Any] = {"max_end": date.today().isoformat()}
+    date_window: dict[str, Any] = {"max_end": new_york_today().isoformat()}
     if str(strategy.get("asset_class") or "") == "equity":
         date_window["min_start"] = ALPACA_EQUITY_HISTORY_START.isoformat()
     capital: dict[str, Any] = {"max": MAX_STARTING_CAPITAL}
@@ -679,4 +680,4 @@ def _confirmation_status_label(*, is_ready_to_run: bool) -> str:
 
 
 def _confirmation_today() -> date:
-    return date.today()
+    return new_york_today()

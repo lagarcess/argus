@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +37,8 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.turn_execution import turn_execution_scope
 from argus.context.providers import build_alpaca_market_movers_packet
 from argus.domain.indicators import EXECUTABLE_INDICATORS
+from argus.domain.market_data.capabilities import EASTERN
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.nlp.natural_time import parse_date_text, shift_months
 
 
@@ -5894,15 +5896,11 @@ def test_pending_spanish_date_answer_repairs_reload_thinned_metadata(
 
 def test_pending_date_route_repair_prefers_prior_weekday_when_today_matches(
     monkeypatch,
+    freeze_new_york_clock,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
-    class FrozenDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 6, 19)
-
-    monkeypatch.setattr(interpret_module, "date", FrozenDate)
+    freeze_new_york_clock(datetime(2026, 6, 19, 20, 17, tzinfo=EASTERN))
     monkeypatch.setattr(
         interpret_module,
         "resolve_asset",
@@ -6485,7 +6483,7 @@ def test_pending_date_answer_removes_mislabeled_timeframe_constraint(
     assert len(interpreter.requests) == 1
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
-    today = date.today()
+    today = new_york_today()
     assert strategy.date_range == {
         "start": today.replace(year=today.year - 1).isoformat(),
         "end": today.isoformat(),
@@ -6642,15 +6640,11 @@ def test_pending_rolling_window_patch_infers_missing_endpoint_from_date_delta(
 
 def test_pending_rolling_window_patch_resolves_bounded_endpoint_evidence(
     monkeypatch,
+    freeze_new_york_clock,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
-    class FrozenDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 6, 15)
-
-    monkeypatch.setattr(interpret_module, "date", FrozenDate)
+    freeze_new_york_clock(datetime(2026, 6, 15, 20, 17, tzinfo=EASTERN))
     monkeypatch.setattr(
         interpret_module,
         "resolve_asset",
@@ -6770,7 +6764,7 @@ def test_pending_date_answer_misroute_uses_pending_field_context(
 
     expected_end = parse_date_text(
         "viernes pasado",
-        today=date.today(),
+        today=new_york_today(),
         languages=("es", "en"),
         prefer_dates_from="past",
     )
@@ -6847,6 +6841,7 @@ def test_pending_concrete_date_endpoint_patch_preserves_existing_start(
 
 def test_interpreter_unavailable_date_answer_preserves_active_confirmation(
     monkeypatch,
+    freeze_new_york_clock,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -6864,15 +6859,7 @@ def test_interpreter_unavailable_date_answer_preserves_active_confirmation(
         "resolve_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
-    monkeypatch.setattr(
-        interpret_module,
-        "date",
-        type(
-            "FrozenDate",
-            (date,),
-            {"today": classmethod(lambda cls: cls(2026, 6, 15))},
-        ),
-    )
+    freeze_new_york_clock(datetime(2026, 6, 15, 20, 17, tzinfo=EASTERN))
     strategy = StrategySummary(
         raw_user_phrasing=(
             "Buy and hold AAPL over the last 12 months with SPY as the benchmark."

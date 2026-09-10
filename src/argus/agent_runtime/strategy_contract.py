@@ -18,6 +18,7 @@ from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 # `from argus.agent_runtime.strategy_contract import SUPPORTED_STRATEGY_TYPES`.
 from argus.domain.capability_registry import SUPPORTED_STRATEGY_TYPES
 from argus.domain.indicators import executable_indicator_spec
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.slot_normalizer import normalize_template_name
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import resolve_date_range_intent, shift_months
@@ -252,7 +253,7 @@ def display_strategy_slug(strategy: StrategySummary | dict[str, Any]) -> str:
 
 
 def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeResolution:
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     if isinstance(value, dict):
         start = _parse_date_token(
             value.get("start") or value.get("from"),
@@ -310,7 +311,7 @@ def resolve_executable_date_range(
     extra_parameters: Mapping[str, Any] | None = None,
     today: date | None = None,
 ) -> DateRangeResolution:
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     explicit_resolution = resolve_date_range(value, today=current_date)
     if not explicit_resolution.used_default:
         return explicit_resolution

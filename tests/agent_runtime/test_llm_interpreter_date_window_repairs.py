@@ -1,4 +1,9 @@
 # ruff: noqa: F403, F405
+from datetime import datetime
+
+from argus.domain.market_data.capabilities import EASTERN
+from argus.domain.market_data.new_york_clock import new_york_today
+
 from tests.agent_runtime._llm_interpreter_common import *
 
 
@@ -178,16 +183,11 @@ async def test_retry_word_inside_new_prompt_uses_focused_strategy_repair(
 @pytest.mark.asyncio
 async def test_current_year_so_far_repairs_llm_year_end_date_range(
     monkeypatch,
+    freeze_new_york_clock,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
-    from argus.nlp import natural_time as natural_time_module
 
-    class FrozenDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 6, 30)
-
-    monkeypatch.setattr(natural_time_module, "date", FrozenDate)
+    freeze_new_york_clock(datetime(2026, 6, 30, 20, 17, tzinfo=EASTERN))
 
     async def repair_stub(*, failed_response, request, **kwargs):
         del kwargs
@@ -2012,7 +2012,7 @@ async def test_unprovenanced_calendar_year_intent_uses_focused_date_window_audit
     assert "FocusedDateWindowExtraction" in calls
     assert ready_response.candidate_strategy_draft.date_range == {
         "start": "2023-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert ready_response.candidate_strategy_draft.date_range_raw_text == (
         "from 2023 to date"
@@ -2118,7 +2118,7 @@ async def test_raw_date_evidence_does_not_trust_mismatched_calendar_year_intent(
     assert "FocusedDateWindowExtraction" in calls
     assert ready_response.candidate_strategy_draft.date_range == {
         "start": "2023-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert ready_response.candidate_strategy_draft.date_range_raw_text == (
         "from 2023 to date"

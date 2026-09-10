@@ -4274,8 +4274,8 @@ nothing.
 - The card also advertises `capabilities.edit_constraints`, the engine's own
   accepted-value envelope: `capital.min`/`capital.max` (the run-time
   starting-capital band), `fees.max` and `slippage.max` (decimal rate caps),
-  and `date_window.max_end` plus a per-asset-class `date_window.min_start`
-  provider history floor. The client renders and pre-checks against these
+  and `date_window.max_end` (today by the New York calendar) plus a
+  per-asset-class `date_window.min_start` provider history floor. The client renders and pre-checks against these
   values and never restates them; the confirm preflight enforces the same
   imported constants, so a card whose `validation.status` is `ready_to_run`
   can never violate run-time validation.

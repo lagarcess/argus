@@ -22,6 +22,7 @@ from argus.api.schemas import (
     Strategy,
 )
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -3749,12 +3750,12 @@ def _chat_persisted_retest_fixture(
     stored_run = run.model_dump(mode="python")
     # The action is now identity-only, so setup fidelity is asserted where it
     # actually lives: the server-side reconstruction the confirmation uses.
-    setup = retest_setup_from_run(stored_run, today=date.today())
+    setup = retest_setup_from_run(stored_run, today=new_york_today())
     return (action, setup, envelope, stored_run)
 
 
 def _run_fresh_spanish_dates() -> tuple[str, str]:
-    current_end = date.today()
+    current_end = new_york_today()
     current_start = current_end - timedelta(days=365)
     return current_start.isoformat(), current_end.isoformat()
 

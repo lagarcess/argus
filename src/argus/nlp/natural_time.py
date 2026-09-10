@@ -9,6 +9,8 @@ from typing import Any, Literal, cast
 from dateparser.date import DateDataParser
 from dateparser.search import search_dates
 
+from argus.domain.market_data.new_york_clock import new_york_today
+
 DatePeriod = Literal["day", "week", "month", "year"]
 DateIntentUnit = Literal["day", "week", "month", "quarter", "year"]
 
@@ -68,7 +70,7 @@ def resolve_date_range_text(
         return None
     if text_has_fractional_duration(raw):
         return None
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     matches = _search_date_spans(raw, today=current_date, languages=languages)
     if not matches:
         return None
@@ -137,7 +139,7 @@ def resolve_rolling_window_intent_text(
     raw = str(text or "").strip()
     if not raw:
         return None
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     idiom_window = _trailing_window_fields_from_idiom(raw)
     if idiom_window is not None:
         return {
@@ -193,7 +195,7 @@ def resolve_calendar_year_intent_text(
     raw = str(text or "").strip()
     if not raw:
         return None
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     years: list[int] = []
     for span, _ in _search_date_spans(
         raw,
@@ -235,7 +237,7 @@ def resolve_date_range_intent(
     payload = _intent_payload(intent)
     if not payload:
         return None
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     if not _intent_confidence_is_usable(payload):
         return None
 
@@ -569,7 +571,7 @@ def resolve_date_range_endpoint_patch(
     if count is None or unit is None or endpoint not in {"start", "end"}:
         return None
 
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     start = _intent_date(patch.get("start"), today=current_date)
     end = _intent_date(patch.get("end"), today=current_date)
     offset_date = _intent_day_offset_date(patch, today=current_date)
@@ -693,7 +695,7 @@ def parse_date_text(
     languages: tuple[str, ...] | None = None,
     prefer_dates_from: Literal["past", "future"] | None = None,
 ) -> date | None:
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     if text_has_fractional_duration(str(text or "")):
         return None
     parsed = _parse_date_span(
@@ -768,7 +770,7 @@ def contains_named_date_evidence(
     language data directly in the runtime layer.
     """
 
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     for span, _ in _search_date_spans(
         str(text or ""),
         today=current_date,

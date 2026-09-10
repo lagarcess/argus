@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.artifacts.patch_policy import (
     executable_artifact_patch_missing_fields,
@@ -1437,7 +1438,7 @@ def _complete_current_message_date_endpoint_patch(
 ) -> tuple[dict[str, str] | None, bool]:
     if date_range is None:
         return date_range, False
-    current_date = date.today()
+    current_date = new_york_today()
     rolling_patch = _rolling_window_range_from_endpoint_patch(
         strategy.extra_parameters.get("date_range_intent"),
         date_range=date_range,
@@ -1558,7 +1559,7 @@ def _explicit_date_range_from_strategy_for_repair(
     *,
     language: str | None,
 ) -> dict[str, str] | None:
-    current_date = date.today()
+    current_date = new_york_today()
     intent = strategy.extra_parameters.get("date_range_intent")
     intent_kind = (
         str(intent.get("kind") or "").strip() if isinstance(intent, dict) else ""
@@ -1627,7 +1628,7 @@ def _complete_date_range_lacks_stated_window_support(
         _date_range_from_strategy_bounded_evidence(
             strategy,
             language=language,
-            today=date.today(),
+            today=new_york_today(),
         )
         is not None
     ):
@@ -1713,8 +1714,7 @@ def _date_range_from_strategy_bounded_evidence(
 def _repair_pending_date_answer_route_when_pending_need_is_active(
     **kwargs: Any,
 ) -> StructuredInterpretation:
-    # This module's date stays the clock seam tests patch.
-    return _route_repair_pending_date_answer(today=date.today(), **kwargs)
+    return _route_repair_pending_date_answer(today=new_york_today(), **kwargs)
 
 
 def _repair_pending_date_answer_noop_from_current_message(
@@ -1750,7 +1750,7 @@ def _repair_pending_date_answer_noop_from_current_message(
         return interpretation
     resolved_range = resolve_date_range_text(
         text,
-        today=date.today(),
+        today=new_york_today(),
         languages=dateparser_languages_for_user_language(language),
     )
     if resolved_range is None:
@@ -2449,7 +2449,7 @@ async def _interpreter_unavailable_result(
             language=user.language_preference,
             snapshot=snapshot,
             selected_thread_metadata=selected_metadata,
-            today=date.today(),
+            today=new_york_today(),
             reason_code="pending_date_answer_interpreter_unavailable_repaired",
             user_goal_summary=(
                 "User supplied the requested date range while structured "

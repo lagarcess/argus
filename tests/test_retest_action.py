@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from datetime import date
+from datetime import date, datetime, time
 from typing import Any
 
 import pytest
@@ -26,6 +26,7 @@ from argus.api.main import app
 from argus.api.message_store import create_message, prepare_message
 from argus.api.schemas import ChatActionPayload, ChatStreamRequest
 from argus.domain.backtesting.coverage import MarketDataCoverageError
+from argus.domain.market_data.capabilities import EASTERN
 from argus.domain.retest_setup import retest_setup_from_run
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -691,13 +692,9 @@ def test_coverage_failure_returns_specific_code_without_persisting_confirmation(
 def test_extended_currency_pair_window_is_repaired_before_confirmation_without_run(
     stored_run: Any,
     monkeypatch: pytest.MonkeyPatch,
+    freeze_new_york_clock,
 ) -> None:
-    class _FixedDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return _TODAY
-
-    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    freeze_new_york_clock(datetime.combine(_TODAY, time(20, 17), EASTERN))
     currency_pair_run = _currency_pair_run(stored_run)
 
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
@@ -730,15 +727,11 @@ def test_extended_currency_pair_window_is_repaired_before_confirmation_without_r
 def test_exact_currency_pair_candle_limit_offered_action_reaches_confirmation(
     stored_run: Any,
     monkeypatch: pytest.MonkeyPatch,
+    freeze_new_york_clock,
 ) -> None:
     from argus.domain.run_dossiers import project_retest_action
 
-    class _FixedDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return _TODAY
-
-    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    freeze_new_york_clock(datetime.combine(_TODAY, time(20, 17), EASTERN))
     currency_pair_run = _currency_pair_run(
         stored_run,
         start_date="2024-08-10",
@@ -794,13 +787,9 @@ def test_exact_currency_pair_candle_limit_offered_action_reaches_confirmation(
 def test_same_period_retest_is_rejected_without_turn_job_or_backtest(
     stored_run: Any,
     monkeypatch: pytest.MonkeyPatch,
+    freeze_new_york_clock,
 ) -> None:
-    class _FixedDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return _TODAY
-
-    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    freeze_new_york_clock(datetime.combine(_TODAY, time(20, 17), EASTERN))
     config_snapshot = dict(stored_run.config_snapshot)
     config_snapshot["date_range"] = {
         "start": "2024-01-01",
@@ -837,13 +826,9 @@ def test_same_period_retest_is_rejected_without_turn_job_or_backtest(
 def test_unavailable_timeframe_retest_is_rejected_without_turn_job_or_backtest(
     stored_run: Any,
     monkeypatch: pytest.MonkeyPatch,
+    freeze_new_york_clock,
 ) -> None:
-    class _FixedDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return _TODAY
-
-    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    freeze_new_york_clock(datetime.combine(_TODAY, time(20, 17), EASTERN))
     config_snapshot = dict(stored_run.config_snapshot)
     config_snapshot["resolved_strategy"] = {
         **config_snapshot["resolved_strategy"],

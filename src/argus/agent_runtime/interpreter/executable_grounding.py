@@ -4,8 +4,6 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
-from datetime import date
-
 from argus.agent_runtime.interpreter.audits import ExecutableStrategyGroundingAudit
 from argus.agent_runtime.interpreter.shared import (
     _EXECUTABLE_TIMEFRAMES,
@@ -18,6 +16,7 @@ from argus.agent_runtime.llm_interpreter_types import (
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.domain.market_data.new_york_clock import new_york_today
 
 
 def _response_needs_launch_field_fidelity_repair(
@@ -98,7 +97,7 @@ def _draft_uses_launch_default_window(draft: LLMStrategyDraft) -> bool:
         return False
     start = str(date_range_value.get("start") or "").strip()
     end = str(date_range_value.get("end") or "").strip()
-    return start == "2016-01-01" and end in {"today", date.today().isoformat()}
+    return start == "2016-01-01" and end in {"today", new_york_today().isoformat()}
 
 
 def _executable_strategy_grounding_messages(
