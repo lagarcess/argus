@@ -4,26 +4,27 @@ import { receiptCopy } from "../lib/receipt-copy";
 import type { ReceiptCandidates, ReceiptPreview } from "../lib/evidence-receipts";
 import { researchTurn, turnDocument } from "./fixtures/receipt-turns";
 
-function candidates(count: number, max = 4): ReceiptCandidates {
-  return { max_turns: max, items: Array.from({ length: count }, (_, i) => ({ message_id: `message-${i}`, question: `Question ${i}`, eligible: i !== 0, reason: i === 0 ? "memory_used" : null, kind: "research_answer" })) };
+function candidates(count: number): ReceiptCandidates {
+  return { items: Array.from({ length: count }, (_, i) => ({ message_id: `message-${i}`, question: `Question ${i}`, eligible: i !== 0, reason: i === 0 ? "memory_used" : null, kind: "research_answer" })) };
 }
 const preview: ReceiptPreview = { payload: turnDocument(researchTurn), payload_digest: "a".repeat(64), kind: "research_answer" };
 
-test("select all never silently truncates eligible answers to the cap", () => {
+test("select all takes every eligible answer however many there are", () => {
   const page = candidates(6);
   const state = receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page });
-  expect(selectAllEligibleAvailable(page)).toBe(false);
-  expect(receiptSelectionReducer(state, { type: "select_all" }).selected).toEqual([]);
+  expect(selectAllEligibleAvailable(page)).toBe(true);
+  expect(receiptSelectionReducer(state, { type: "select_all" }).selected).toEqual(["message-1", "message-2", "message-3", "message-4", "message-5"]);
+  expect(selectAllEligibleAvailable({ items: [{ message_id: "only", eligible: false, reason: "degraded" }] })).toBe(false);
 });
 
-test("server cap and eligibility govern every selection operation", () => {
-  const page = candidates(4, 2);
+test("eligibility alone governs every selection operation", () => {
+  const page = candidates(4);
   let state = receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page, messageId: "message-1" });
   state = receiptSelectionReducer(state, { type: "toggle", messageId: "message-0" });
   expect(state.selected).toEqual(["message-1"]);
   state = receiptSelectionReducer(state, { type: "toggle", messageId: "message-2" });
   state = receiptSelectionReducer(state, { type: "toggle", messageId: "message-3" });
-  expect(state.selected).toEqual(["message-1", "message-2"]);
+  expect(state.selected).toEqual(["message-1", "message-2", "message-3"]);
 });
 
 test("select all includes all eligible turns and excludes unsupported ones", () => {

@@ -194,7 +194,6 @@ class PublicExcerptPayload(BaseModel):
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
 
-PUBLIC_EXCERPT_MAX_TURNS = 4
 PublicExcerptKind = Literal["backtest", "research_answer", "mixed"]
 PublicExcerptRefusalReason = Literal[
     "not_completed",
@@ -268,9 +267,7 @@ class PublicExcerptTurnsPayload(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     schema_version: Literal[2] = 2
     kind: Literal["turns"] = "turns"
-    turns: list[PublicExcerptTurn] = Field(
-        min_length=1, max_length=PUBLIC_EXCERPT_MAX_TURNS
-    )
+    turns: list[PublicExcerptTurn] = Field(min_length=1)
 
 
 PublicExcerptDocument = PublicExcerptPayload | PublicExcerptTurnsPayload
@@ -374,7 +371,7 @@ class PublicExcerptView(BaseModel):
 
 class PublicExcerptSelection(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    message_ids: list[UUID] = Field(min_length=1, max_length=PUBLIC_EXCERPT_MAX_TURNS)
+    message_ids: list[UUID] = Field(min_length=1)
     owner_note: str | None = None
 
     @field_validator("message_ids")
@@ -402,7 +399,6 @@ class PublicExcerptCandidate(BaseModel):
 class PublicExcerptCandidates(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     items: list[PublicExcerptCandidate]
-    max_turns: Literal[4] = PUBLIC_EXCERPT_MAX_TURNS
 
 
 class PublicExcerptPreview(BaseModel):
