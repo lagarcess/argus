@@ -81,7 +81,7 @@ test.each([1, 4])("%s turns mount one public beacon and zero preview beacons", (
   expect(beaconCount(ReceiptBody({ ...props, preview: true }))).toBe(0);
 });
 
-test.each(["backtest", "research_answer", "tool_result", "mixed"] as ReceiptKind[])("funnel preserves %s without carrying a receipt identity", async (kind) => {
+test.each(["backtest", "research_answer", "mixed"] as ReceiptKind[])("funnel preserves %s without carrying a receipt identity", async (kind) => {
   const bodies: unknown[] = [];
   globalThis.fetch = (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return Response.json({}); }) as typeof fetch;
   reportReceiptFunnelStage("viewed", kind);

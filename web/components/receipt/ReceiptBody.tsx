@@ -3,8 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { PublicReceiptDocument } from "@/lib/public-receipt-turns";
 import { receiptDocumentKind } from "@/lib/public-receipt-turns";
-import { type ReceiptCopy, formatReceiptDay, interpolate, receiptTranslator } from "@/lib/receipt-copy";
-import ToolCardPresentation from "@/components/chat/ToolCardPresentation";
+import { type ReceiptCopy, formatReceiptDay, interpolate } from "@/lib/receipt-copy";
 import { receiptPresentations } from "@/lib/receipt-presentation";
 import type { ArgusLanguage } from "@/lib/language-features";
 import { RECEIPT_ACTION_BAR_CLEARANCE } from "@/lib/receipt-layout";
@@ -49,16 +48,11 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
             <Fragment key={index}>
               {index > 0 && <hr className="my-10 border-white/20" />}
               <div className={entry.research ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between gap-3"}>
-                <ProvenanceMark label={entry.provenance ?? copy.provenance} />
+                <ProvenanceMark label={copy.provenance} />
                 {entry.stamp && <span className={LABEL}>{entry.stamp}</span>}
               </div>
-              {!entry.hideTitle && <Heading lang={entry.language} className="font-display mt-4 text-[23px] font-medium leading-[1.16] tracking-[-0.5px] text-white sm:text-[30px] sm:tracking-[-0.8px]">{entry.title}</Heading>}
-              {entry.toolCards && <section data-receipt-tool-cards className="dark mt-5 space-y-7 text-white">
-                {entry.toolCards.map((card, cardIndex) => <div key={cardIndex}>
-                  <ToolCardPresentation presentation={card.presentation} t={receiptTranslator(language)} locale={language} />
-                </div>)}
-              </section>}
-              {!entry.research && !entry.toolCards && (
+              <Heading lang={entry.language} className="font-display mt-4 text-[23px] font-medium leading-[1.16] tracking-[-0.5px] text-white sm:text-[30px] sm:tracking-[-0.8px]">{entry.title}</Heading>
+              {!entry.research && (
                 <div className={`mt-4 pt-5 ${RULE}`}>
                   <div className={`font-display text-[52px] font-medium leading-[0.98] tracking-[-1.9px] tabular-nums sm:text-[62px] sm:tracking-[-2.4px] ${isNegative ? "text-[#d66d75]" : "text-[#5ba897]"}`}>{entry.headline}</div>
                   {entry.verdict && (
@@ -110,7 +104,7 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
           );
         })}
       </main>
-      {!preview && <ReceiptActionBar kind={kind} framing={kind === "backtest" ? copy.framing.headline : entries.some((entry) => entry.toolCards) ? receiptTranslator(language)("tools.receipt.framing") : copy.research.headline} action={copy.cta.action} />}
+      {!preview && <ReceiptActionBar kind={kind} framing={kind === "backtest" ? copy.framing.headline : copy.research.headline} action={copy.cta.action} />}
     </>
   );
 }

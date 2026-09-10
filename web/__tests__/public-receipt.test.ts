@@ -10,7 +10,7 @@ import {
   headlineReceiptMetric,
   isPublicReceiptId,
   publicReceiptPath,
-  type PublicBacktestReceiptPayload as PublicReceiptPayload,
+  type PublicReceiptPayload,
   type PublicReceiptView,
 } from "../lib/public-receipt-contract";
 import {
@@ -335,7 +335,8 @@ describe("the preview image inherits the never-expose list", () => {
     // on the card are already in the receipt's language.
     const body = code(OG_IMAGE_ROUTE);
     expect(body).toContain("cardCopy(language)");
-    expect(body).toContain("receiptDocumentLanguage(result.payload)");
+    expect(body).toContain("result.payload.content_language");
+    expect(body).toContain("result.payload.turns[0].content_language");
     expect(body).not.toContain("accept-language");
     expect(body).not.toContain("const FRAMING");
     expect(body).not.toContain("const PROVENANCE");
@@ -356,7 +357,7 @@ describe("the rendered page", () => {
     const referenced = [...body.matchAll(/payload\.(\w+)/g)].map(
       (match) => match[1],
     );
-    const closed = new Set([...Object.keys(PAYLOAD), "presentation"]);
+    const closed = new Set(Object.keys(PAYLOAD));
     expect([...new Set(referenced)].filter((key) => !closed.has(key))).toEqual([]);
   });
 

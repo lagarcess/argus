@@ -129,6 +129,13 @@ ownership changes differ:
 - Historical labels normalize through the canonical state-model owner. Existing
   capability, unsupported-recovery, and delivery checks stay exact.
 
+That paragraph records the initial measurement contract. The subsequent
+[collective selection repair](selection-acceptance.md) removes its
+peer-expansion argument requirement and evaluates delivered results, sources
+and final actions across calls. Discovery retains its original effective
+`follow_up` expectation. Fresh measurements use the versioned selection
+evidence contract; the historical raw scorecards and grades remain unchanged.
+
 The initial eight new dispatcher checks failed against the old harness.
 The final battery also covers zero calls, one call, two distinct calls, one
 call twice, known zero, a real backtest confirmation, follow-up dispatch,
@@ -252,3 +259,8 @@ plus issue 498's original compound-edit checks passed: **300 tests in 9.05
 seconds**. Ruff, diff checks, and the shared modularity gate passed; the main
 harness is **1,240 lines against its existing 1,250-line limit**. No provider
 calls were made.
+# Current scope
+
+The public receipt/excerpt extension has been removed. The current boundary is
+recorded in [the reduced-scope report](reduced-scope.md). Receipt-related entries
+below are historical evidence of removed work, not current acceptance.

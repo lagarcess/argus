@@ -1774,7 +1774,6 @@
     "kinds": {
       "backtest": "Prueba histórica",
       "research_answer": "Respuesta investigada",
-      "tool_result": "Resultado calculado",
       "mixed": "Respuestas y pruebas"
     },
     "research": {
@@ -1856,10 +1855,6 @@
         "bounded": "Una respuesta confiable está fuera de los límites de esta herramienta.",
         "unavailable": "Este resultado no está disponible por ahora."
       }
-    },
-    "receipt": {
-      "provenance": "Verificado con Argus",
-      "framing": "Basado en los datos y las fuentes que se muestran. No es asesoría financiera."
     }
   }
 }

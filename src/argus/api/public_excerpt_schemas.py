@@ -12,26 +12,10 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    TypeAdapter,
-    field_validator,
-    model_serializer,
-)
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 
 from argus.api.public_excerpt_fact_schemas import PublicExcerptFactBank
 from argus.api.schemas import AssetClass, Language
-from argus.domain.tool_contracts import (
-    MAX_TOOL_CALLS,
-    LocalizedText,
-    ToolCardPresentation,
-)
-from argus.domain.tool_contracts import PublicExcerptVisual as PublicExcerptVisual
-from argus.domain.tool_contracts import (
-    PublicExcerptVisualPoint as PublicExcerptVisualPoint,
-)
 
 PUBLIC_EXCERPT_SCHEMA_VERSION = 1
 PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH = 280
@@ -166,6 +150,24 @@ class PublicExcerptAssumption(BaseModel):
     value: str | None = None
 
 
+class PublicExcerptVisualPoint(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    time: str
+    value: float
+
+
+class PublicExcerptVisual(BaseModel):
+    """Frozen visual evidence. No series is fetched at view time."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    kind: Literal["portfolio_equity"]
+    currency: str | None = None
+    base_value: float | None = None
+    series: list[PublicExcerptVisualPoint]
+
+
 class PublicExcerptPayload(BaseModel):
     """The closed receipt payload. Adding a field here is a product decision."""
 
@@ -192,23 +194,8 @@ class PublicExcerptPayload(BaseModel):
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
 
-class PublicToolExcerptPayload(BaseModel):
-    """Read compatibility for frozen registry-preview receipts; never a new writer."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    schema_version: Literal[2] = 2
-    card_type: str
-    card_version: int = Field(ge=1)
-    presentation: ToolCardPresentation
-    owner_note: str | None = None
-    content_language: Language = "en"
-    framing: Literal["computed_result_not_advice"] = "computed_result_not_advice"
-    provenance_mark: Literal["computed_with_argus"] = "computed_with_argus"
-
-
 PUBLIC_EXCERPT_MAX_TURNS = 4
-PublicExcerptKind = Literal["backtest", "research_answer", "tool_result", "mixed"]
+PublicExcerptKind = Literal["backtest", "research_answer", "mixed"]
 PublicExcerptRefusalReason = Literal[
     "not_completed",
     "unsupported_turn",
@@ -272,31 +259,8 @@ class PublicExcerptBacktestTurn(BaseModel):
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
 
-class PublicExcerptToolCard(BaseModel):
-    """A frozen declared presentation with no private execution envelope."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    card_type: str = Field(min_length=1)
-    card_version: int = Field(ge=1)
-    presentation: ToolCardPresentation
-
-
-class PublicExcerptToolTurn(BaseModel):
-    """One selected assistant message, preserving all its ordered tool answers."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    kind: Literal["tool_result"] = "tool_result"
-    question: str = Field(min_length=1, max_length=500)
-    cards: list[PublicExcerptToolCard] = Field(min_length=1, max_length=MAX_TOOL_CALLS)
-    owner_note: str | None = Field(default=None, max_length=280)
-    content_language: Language = "en"
-    framing: Literal["computed_result_not_advice"] = "computed_result_not_advice"
-    provenance_mark: Literal["computed_with_argus"] = "computed_with_argus"
-
-
 PublicExcerptTurn = Annotated[
-    PublicExcerptResearchTurn | PublicExcerptBacktestTurn | PublicExcerptToolTurn,
-    Field(discriminator="kind"),
+    PublicExcerptResearchTurn | PublicExcerptBacktestTurn, Field(discriminator="kind")
 ]
 
 
@@ -309,26 +273,8 @@ class PublicExcerptTurnsPayload(BaseModel):
     )
 
 
-# Both v2 shapes are closed and disjoint. Legacy bare v2 stays readable; only the
-# selected-turn service constructs newly published documents.
-PublicExcerptDocument = (
-    PublicExcerptPayload | PublicExcerptTurnsPayload | PublicToolExcerptPayload
-)
-PublicReceiptPayload = PublicExcerptDocument
+PublicExcerptDocument = PublicExcerptPayload | PublicExcerptTurnsPayload
 PUBLIC_EXCERPT_DOCUMENT_ADAPTER = TypeAdapter(PublicExcerptDocument)
-
-
-def parse_public_receipt_payload(value: object) -> PublicExcerptDocument:
-    return PUBLIC_EXCERPT_DOCUMENT_ADAPTER.validate_python(value)
-
-
-class PublicExcerptToolSource(BaseModel):
-    """Private exact card revision selected from an owned assistant message."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    message_id: UUID
-    artifact_id: UUID
-    input_revision: int = Field(ge=0, strict=True)
 
 
 class PublicExcerptSnapshot(BaseModel):
@@ -342,12 +288,6 @@ class PublicExcerptSnapshot(BaseModel):
     evidence_artifact_id: str | None = None
     source_conversation_id: str | None = None
     source_run_id: str | None = None
-    source_message_id: str | None = None
-    source_artifact_id: str | None = None
-    source_input_revision: int | None = Field(default=None, ge=0)
-    source_tool_bindings: list[PublicExcerptToolSource] = Field(
-        default_factory=list, max_length=PUBLIC_EXCERPT_MAX_TURNS * MAX_TOOL_CALLS
-    )
     source_message_ids: list[str] = Field(default_factory=list)
     source_run_ids: list[str] = Field(default_factory=list)
     source_artifact_ids: list[str] = Field(default_factory=list)
@@ -359,24 +299,6 @@ class PublicExcerptSnapshot(BaseModel):
     created_at: datetime
     revoked_at: datetime | None = None
     revocation_reason: RevocationReason | None = None
-
-    @property
-    def tool_source(self) -> tuple[str, str, str, int] | None:
-        """Resolve a complete message source; deleted-message tombstones have none."""
-        if self.source_message_id is None:
-            return None
-        if (
-            self.source_conversation_id is None
-            or self.source_artifact_id is None
-            or self.source_input_revision is None
-        ):
-            raise ValueError("A tool receipt needs its complete source identity")
-        return (
-            self.source_conversation_id,
-            self.source_message_id,
-            self.source_artifact_id,
-            self.source_input_revision,
-        )
 
 
 class PublicExcerptListItem(BaseModel):
@@ -390,18 +312,10 @@ class PublicExcerptListItem(BaseModel):
     title: str
     symbols: list[str] = Field(default_factory=list)
     date_range: PublicExcerptDateRange | None = None
-    title_facts: LocalizedText | None = None
     kind: PublicExcerptKind = "backtest"
     created_at: datetime
     revoked_at: datetime | None = None
     revocation_reason: RevocationReason | None = None
-
-    @model_serializer(mode="wrap")
-    def omit_absent_title_facts(self, handler):
-        payload = handler(self)
-        if self.title_facts is None:
-            payload.pop("title_facts", None)
-        return payload
 
 
 class PublicExcerptCreate(BaseModel):
@@ -417,11 +331,6 @@ class PublicExcerptCreateResponse(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     receipt: PublicExcerptListItem
-
-
-class PublicToolExcerptCreate(PublicExcerptCreate):
-    message_id: UUID
-    input_revision: int = Field(ge=0, strict=True)
 
 
 class PublicExcerptListResponse(BaseModel):
@@ -484,7 +393,7 @@ class PublicExcerptCandidate(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     message_id: str
     question: str | None = None
-    kind: Literal["backtest", "research_answer", "tool_result"] | None = None
+    kind: Literal["backtest", "research_answer"] | None = None
     eligible: bool
     reason: PublicExcerptRefusalReason | None = None
     field: PublicExcerptRefusalField | None = None

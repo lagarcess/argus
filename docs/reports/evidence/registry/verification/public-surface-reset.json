@@ -1,0 +1,246 @@
+{
+  "source": "34866139861a5f06a3572edb2533bc42733371e8",
+  "reset_paths": [
+    "docs/reports/evidence/registry/receipt-test-bootstrap.sql",
+    "docs/reports/evidence/registry/tool-receipts.json",
+    "src/argus/api/public_excerpt_schemas.py",
+    "src/argus/api/public_excerpt_selection.py",
+    "src/argus/api/public_excerpts.py",
+    "src/argus/api/routers/evidence_receipts.py",
+    "src/argus/domain/public_excerpt_kinds.py",
+    "src/argus/domain/public_excerpt_tool_turns.py",
+    "src/argus/domain/public_excerpt_turns.py",
+    "src/argus/domain/public_excerpts.py",
+    "src/argus/domain/supabase_public_excerpts.py",
+    "src/argus/llm/tool_call_receipts.py",
+    "supabase/migrations/20260909183409_add_tool_receipt_sources.sql",
+    "supabase/migrations/20260909183500_bridge_public_excerpt_message_trigger.sql",
+    "supabase/migrations/20260909233706_combine_selected_tool_receipt_sources.sql",
+    "tests/public_excerpt_tool_factories.py",
+    "tests/test_public_excerpt_migration_bridge_postgres.py",
+    "tests/test_public_excerpt_tool_selection.py",
+    "tests/test_tool_receipt_sources_postgres.py",
+    "tests/test_tool_result_receipts.py",
+    "web/__tests__/fixtures/receipt-turns.ts",
+    "web/__tests__/public-receipt.test.ts",
+    "web/__tests__/receipt-selection-api.test.ts",
+    "web/__tests__/receipt-sharing-surfaces.test.tsx",
+    "web/__tests__/receipt-tool-turns.test.tsx",
+    "web/__tests__/tool-backtest-presentation.test.tsx",
+    "web/app/r/[receiptId]/opengraph-image.tsx",
+    "web/app/r/[receiptId]/page.tsx",
+    "web/components/chat/ShareReceiptAction.tsx",
+    "web/components/guest/GuestExperienceSurfaces.tsx",
+    "web/components/receipt/ReceiptBody.tsx",
+    "web/components/receipt/ReceiptChart.tsx",
+    "web/components/settings/SharedReceiptsView.tsx",
+    "web/e2e/receipt-sharing-focus.spec.ts",
+    "web/e2e/registry-receipts.playwright.config.ts",
+    "web/e2e/registry-receipts.spec.ts",
+    "web/e2e/support/registry-receipt-fixture.ts",
+    "web/e2e/support/registry-receipt-server.ts",
+    "web/lib/evidence-receipts.ts",
+    "web/lib/public-receipt-contract.ts",
+    "web/lib/public-receipt-turns.ts",
+    "web/lib/receipt-copy.ts",
+    "web/lib/receipt-plan.ts",
+    "web/lib/receipt-presentation.ts",
+    "web/lib/receipt-preview-facts.ts"
+  ],
+  "core_implementation_edited": false,
+  "before_reset_head": "2c593c8d08c5c152fbfa8dc77c1b3d816f11f35c",
+  "integration_is_ancestor": true,
+  "protected_core": [
+    {
+      "path": "src/argus/domain/tool_declaration.py",
+      "unchanged": true,
+      "sha256": "af4d9b37fe6bcb95792a9d589757db2a93af090e0ad56e43fd08e0f2bd24c978"
+    },
+    {
+      "path": "src/argus/domain/tool_contracts.py",
+      "unchanged": true,
+      "sha256": "887b0a60334aca38050a08646328f7f3daf262ac79efa7332aef629c54ebd512"
+    },
+    {
+      "path": "src/argus/domain/tool_job_binding.py",
+      "unchanged": true,
+      "sha256": "d0ecda0434ce17e25ef18ccfb66a95dd337f8e90efd08d3b31a547a0ae27581b"
+    },
+    {
+      "path": "src/argus/agent_runtime/interpreter/tool_calls.py",
+      "unchanged": true,
+      "sha256": "757ee465e076c48a6b92453d811e490eed2380cdae408f64e59c8d622d0a1ac1"
+    },
+    {
+      "path": "src/argus/agent_runtime/interpreter/backtest_calls.py",
+      "unchanged": true,
+      "sha256": "60966288df210504574a79c94e2a51676f56eb81f830d92b7e8fd34d80d54b2c"
+    },
+    {
+      "path": "src/argus/agent_runtime/stages/tool_execution.py",
+      "unchanged": true,
+      "sha256": "ef2bd6d90ffc869257324e87d79749d5c3d8a02235aa260796f6bc9e4f6aba7c"
+    },
+    {
+      "path": "src/argus/agent_runtime/tools/registered_backtest.py",
+      "unchanged": true,
+      "sha256": "a65791cfa55c1e2ba7f311428f8dbcadb133c1d394ba1c807966ff821dae9b2f"
+    },
+    {
+      "path": "src/argus/agent_runtime/tools/backtest_presentation.py",
+      "unchanged": true,
+      "sha256": "941607fbd11a61b9f6b359ac9ae88b2285052235a6ecee901473911685492f57"
+    },
+    {
+      "path": "src/argus/agent_runtime/research_tools.py",
+      "unchanged": true,
+      "sha256": "0d8a0926d563387a0512a79f7da21bb03e72dea5e7a3bada26974e33a02571a0"
+    },
+    {
+      "path": "src/argus/api/chat/tool_results.py",
+      "unchanged": true,
+      "sha256": "6c7acdd846acc9bfbc53c6f013c452089bc136f143703a7f67b074bf98941f5f"
+    },
+    {
+      "path": "src/argus/api/routers/tool_results.py",
+      "unchanged": true,
+      "sha256": "74dd1f5ea51e3ad7e5758f4b7e9e0fc4a672c070788414f8c820f6e57ebd6b1e"
+    },
+    {
+      "path": "web/components/chat/ToolResultCard.tsx",
+      "unchanged": true,
+      "sha256": "0cca63165ef93dc053ea072764c5973106aa85afd58bd9adb64de8f9ed565e73"
+    },
+    {
+      "path": "web/components/chat/ToolCardPresentation.tsx",
+      "unchanged": true,
+      "sha256": "0fbcb770786eba271ac45a4d948939c0a6c7e3d54ccd0594e9cf3bf2a1a749b8"
+    },
+    {
+      "path": "web/lib/tool-result-card.ts",
+      "unchanged": true,
+      "sha256": "1bd7d021df795b68114a3fded4b737bef73e3208dc9f79caef91621f0200216c"
+    },
+    {
+      "path": "web/lib/tool-result-recompute.ts",
+      "unchanged": true,
+      "sha256": "a82aec47730d9cc439f4888c439f6aec3f64892f2ed40192f4b029b5b9fbcbc2"
+    },
+    {
+      "path": "src/argus/domain/capability_registry.py",
+      "unchanged": true,
+      "sha256": "a2fab7a77256724dc6b3618e62126581171da7497e583e5069ac71125f6d2358"
+    },
+    {
+      "path": "src/argus/agent_runtime/llm_interpreter_types.py",
+      "unchanged": true,
+      "sha256": "44faf6005750480a9b04a78a739649d289ee2c94455e0d377d6e588b55146531"
+    },
+    {
+      "path": "src/argus/agent_runtime/state/models.py",
+      "unchanged": true,
+      "sha256": "e5488116be4dd20c7250442619ea4d22c023a3ac68c7919bdb313338360056bc"
+    },
+    {
+      "path": "src/argus/agent_runtime/interpreter/unsupported_admission.py",
+      "unchanged": true,
+      "sha256": "3a36dc15ef94f3b8d10dfbdf03db43faa27cbd0f2c47b64691a844453e62699a"
+    }
+  ],
+  "before": {
+    "files": 386,
+    "groups": {
+      ".agent": {
+        "files": 2,
+        "added_lines": 16,
+        "deleted_lines": 14
+      },
+      "docs": {
+        "files": 7,
+        "added_lines": 881,
+        "deleted_lines": 22
+      },
+      "evidence": {
+        "files": 137,
+        "added_lines": 67961,
+        "deleted_lines": 0
+      },
+      "scripts": {
+        "files": 2,
+        "added_lines": 22,
+        "deleted_lines": 5
+      },
+      "src": {
+        "files": 95,
+        "added_lines": 5866,
+        "deleted_lines": 1045
+      },
+      "supabase": {
+        "files": 3,
+        "added_lines": 399,
+        "deleted_lines": 0
+      },
+      "tests": {
+        "files": 84,
+        "added_lines": 12105,
+        "deleted_lines": 651
+      },
+      "web": {
+        "files": 55,
+        "added_lines": 2086,
+        "deleted_lines": 275
+      },
+      "workflows": {
+        "files": 1,
+        "added_lines": 29,
+        "deleted_lines": 0
+      }
+    }
+  },
+  "after_tracked_tree": {
+    "files": 344,
+    "groups": {
+      ".agent": {
+        "files": 2,
+        "added_lines": 16,
+        "deleted_lines": 14
+      },
+      "docs": {
+        "files": 8,
+        "added_lines": 494,
+        "deleted_lines": 14
+      },
+      "evidence": {
+        "files": 135,
+        "added_lines": 67064,
+        "deleted_lines": 0
+      },
+      "scripts": {
+        "files": 2,
+        "added_lines": 22,
+        "deleted_lines": 5
+      },
+      "src": {
+        "files": 85,
+        "added_lines": 5009,
+        "deleted_lines": 930
+      },
+      "tests": {
+        "files": 79,
+        "added_lines": 11133,
+        "deleted_lines": 651
+      },
+      "web": {
+        "files": 32,
+        "added_lines": 1600,
+        "deleted_lines": 223
+      },
+      "workflows": {
+        "files": 1,
+        "added_lines": 29,
+        "deleted_lines": 0
+      }
+    }
+  },
+  "verification": "Git object and file comparison before publishing the reduced diff; no post-reset runtime acceptance."
+}

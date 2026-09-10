@@ -208,13 +208,13 @@ _Design targets below are intentional for this system; if implementation keeps T
   with timers or label a general question as a backtest.
 - **Inline Results**: Backtest result cards appear directly in the flow of conversation.
 - **Declared Tool Results**: Lead with the answer and its unit, then supporting
-  facts and inputs. The tool's versioned presenter owns this structure for both
-  chat and sanitized receipts. Failure, ambiguity and bounds remain visibly
+  facts and inputs. The tool's versioned presenter owns this chat structure.
+  Failure, ambiguity and bounds remain visibly
   distinct from answers. A retained unknown is blank and read-only; zero is a
   known input. Editable local inputs recompute the same card without adding a
   conversational turn. Repeated calls remain separate cards through edits and
-  reloads. Research cards preserve their public source citations; public
-  receipts omit private narrative and the original request.
+  reloads. Research cards preserve their public source citations. Public sharing
+  remains owned by the shipped receipt contract and is outside this lane.
 - **Minimal Actions**: Follow-up actions should be clear but few. Under
   private-alpha defaults, examples are "Explain result", "Refine idea", and
   "Add decision". "Save Strategy" and "Add to Collection" must not appear while

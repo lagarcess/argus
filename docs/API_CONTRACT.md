@@ -672,7 +672,6 @@ Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
 | `POST`   | `/conversations/{conversation_id}/public-excerpt-preview` | Validate selected turns and return their exact public rendering payload |
 | `POST`   | `/conversations/{conversation_id}/public-excerpt` | Recheck and freeze the previewed selection |
 | `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Compatibility adapter to the same single-message receipt |
-| `POST`   | `/conversations/{conversation_id}/tool-results/{artifact_id}/public-excerpt` | Compatibility adapter for an exact owned tool-card revision |
 | `GET`    | `/public-excerpts`                                 | The owner's receipt list for Data Controls |
 | `DELETE` | `/public-excerpts/{snapshot_id}`                   | Revoke, immediately and irreversibly |
 
@@ -706,9 +705,8 @@ Creation takes the same selection plus the required `payload_digest`. It repeats
 the source checks and refuses with `409 receipt_preview_changed` if the public
 content no longer matches the preview. A successful call returns
 `{receipt: PublicExcerptListItem}`. Selection identity depends on the canonical
-message selection and its selected tool-card revisions, not the payload digest
-or owner note. Concurrent creation and the compatibility endpoints resolve the
-same live record. One refused turn means
+message selection, not the payload digest or owner note. Concurrent creation and
+the artifact compatibility endpoint resolve the same live record. One refused turn means
 no receipt is created for any part of the selection.
 
 `POST /evidence-artifacts/{artifact_id}/public-excerpt` takes
@@ -719,18 +717,10 @@ when two concurrent requests race on the insert. Only a real insert emits the
 `receipt_created` funnel event, so a retry or a reload cannot inflate the
 acquisition funnel's creation stage.
 
-The tool-result compatibility route takes
-`{message_id, input_revision, owner_note}`. It verifies the requested successful
-card revision, then uses the same eligibility and selection service for that
-assistant message. Ordered sibling cards stay together within one selected
-turn; every sibling must be eligible. Recomputing changes the source revision
-and selection identity while earlier receipts remain frozen.
-
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
-created_at, revoked_at, revocation_reason}` with optional `title_facts` for a
-localized tool-card title. `date_range` is `{start, end}`
-as ISO dates or null when no historical window exists. `kind` is `backtest`,
-`research_answer`, `tool_result`, or `mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
+created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
+as ISO dates or null for research. `kind` is `backtest`, `research_answer`, or
+`mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
 `removed_by_argus`. It carries no source conversation, message, run, or artifact id. Clients
 compose the shareable url as `origin + path`, so the backend owns no origin
 configuration.
@@ -765,7 +755,7 @@ timestamps cannot drop or repeat a row across pages.
   from a message.
 
 `POST /public/receipt-funnel` takes
-`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "tool_result" | "mixed"}`
+`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "mixed"}`
 (kind defaults to `backtest` for compatible callers) and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
 rendered page rather than counted when the receipt is read, because that read also
@@ -810,24 +800,6 @@ tested window will not project into that form answers
 would reopen this defect under a new name.
 
 Version 2 uses the closed `turns` wrapper, including for new singleton shares.
-Generic tool-result turns hold the ordered, declaration-bound card
-presentations from their selected assistant message. Their closed leaf is
-`{kind: "tool_result", question, cards, owner_note, content_language, framing,
-provenance_mark}`, where each card contains only
-`{card_type, card_version, presentation}`. The card count uses the declared-call
-limit, independently of the four-turn selection cap. Framing is
-`computed_result_not_advice` and provenance is `computed_with_argus`. The public sanitizer
-removes private narrative and private inputs; input visibility defaults to
-private. The declaration's `public_receipt` policy defaults to `disabled`;
-`typed_facts` opts a computed result into sharing, while `cited_facts` also
-requires retained public citations. Every sibling must resolve its declared
-card binding and pass that policy plus the shared privacy and eligibility
-checks. Generic cards preserve the existing refusal of quote-only and discovery
-research shares. Validated public citations and typed visuals remain attached to their
-facts. Raw call identities, arguments, execution outcomes and private source
-bindings never reach the public payload. Existing bare version 2 tool receipts
-remain strictly readable without rewriting their frozen payloads or digests.
-
 Research leaves freeze exactly the question, answer, typed sources and dates,
 retrieval date, symbols, asset class, typed offered next step, note, content
 language, framing and provenance listed in section 4.2 of the sharing spec. These

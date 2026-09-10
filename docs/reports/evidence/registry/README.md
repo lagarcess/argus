@@ -1,5 +1,9 @@
 # Registry browser fixtures
 
+The public receipt/excerpt extension has been removed per the founder's scope
+correction. See [the reduced diff and import boundary](verification/reduced-scope.md).
+The captures below are historical; no post-reset acceptance is claimed.
+
 These files are generated through backend declarations and contain no provider
 responses or newly implemented financial calculations.
 
@@ -10,8 +14,8 @@ responses or newly implemented financial calculations.
   a known zero. The browser holds the stream after this actual-call event so its
   English and Spanish display can be checked before the result arrives.
 - `backtest-cards.json` derives from the existing canonical modeled-cost DCA test
-  result, passes through the registered backtest return and presenter, and then
-  the public receipt sanitizer. It preserves starting capital zero, recurring
+  result and passes through the registered backtest return and presenter.
+  It preserves starting capital zero, recurring
   contributions, cadence, costs, benchmark facts, and the frozen equity visual.
 
 Regenerate from the repository root:
@@ -32,9 +36,7 @@ desktop and mobile editable cards, plural live/reloaded results, out-of-order
 asynchronous completions, actual-call progress, and the DCA facts and chart.
 It also checks that later saved user messages make old cards read-only and that
 sending a message cancels a queued input edit before it makes an API request.
-The v2 receipt checks in `web/__tests__/tool-backtest-presentation.test.tsx`
-render the sanitized presentation through the same card and chart components;
-they are not browser checks of the public `/r/` route.
+Public receipt fixtures and their tests are excluded from this lane.
 
 For durable candidate screenshots, run with `REGISTRY_SCREENSHOT_DIR` set to the
 absolute path of this directory's `browser/` subdirectory. Capture or explicitly

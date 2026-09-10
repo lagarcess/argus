@@ -126,45 +126,6 @@ def answer_destinations(answer: str) -> set[str]:
     return destinations
 
 
-def audit_cited_answer(
-    *,
-    answer: str | None,
-    sources: list[PublicExcerptResearchSource],
-    private_ids: tuple[str, ...],
-) -> str | None:
-    """One citation/privacy boundary for sidecars and declared cited answers."""
-    if not sources:
-        refuse("missing_sources", "sources")
-    text = (
-        audit_text(answer, field="answer", private_ids=private_ids)
-        if answer is not None
-        else None
-    )
-    try:
-        for source in sources:
-            parsed = urlsplit(source.url)
-            if (
-                parsed.scheme not in {"http", "https"}
-                or not parsed.netloc
-                or parsed.username
-                or parsed.password
-                or parsed.netloc.lower() != source.domain.lower()
-            ):
-                refuse("invalid_source", "sources")
-            audit_public_excerpt_document(
-                source.model_dump(mode="json"), private_ids=private_ids
-            )
-    except (ValueError, PublicExcerptSanitizationError) as error:
-        if isinstance(error, PublicExcerptSourceError):
-            raise
-        refuse("invalid_source", "sources")
-    if text is not None and answer_destinations(text) - {
-        source.url for source in sources
-    }:
-        refuse("unlisted_url", "answer")
-    return text
-
-
 def _offered_step(metadata: dict[str, Any]) -> PublicExcerptOfferedNextStep | None:
     block = metadata.get("next_experiments")
     rows = block.get("rows") if isinstance(block, dict) else None
@@ -220,10 +181,19 @@ def project_research_turn(
         sources = [
             PublicExcerptResearchSource.model_validate(row) for row in source["sources"]
         ]
+        for row in sources:
+            parsed = urlsplit(row.url)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.netloc
+                or parsed.username
+                or parsed.password
+                or parsed.netloc.lower() != row.domain.lower()
+            ):
+                refuse("invalid_source", "sources")
         assert answer is not None
-        answer = audit_cited_answer(
-            answer=answer, sources=sources, private_ids=private_ids
-        )
+        if answer_destinations(answer) - {row.url for row in sources}:
+            refuse("unlisted_url", "answer")
         payload = PublicExcerptResearchTurn(
             question=question,
             answer=answer,

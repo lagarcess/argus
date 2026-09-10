@@ -1,5 +1,5 @@
 import type { PublicReceiptPayload, PublicReceiptVisual } from "./public-receipt-contract";
-import { isSelectedReceiptDocument, type LegacyToolReceiptDocument, type PublicReceiptDocument, type PublicReceiptTurn, type PublicToolReceiptCard, type ResearchReceiptTurn } from "./public-receipt-turns";
+import type { PublicReceiptDocument, PublicReceiptTurn, ResearchReceiptTurn } from "./public-receipt-turns";
 import type { ArgusLanguage } from "./language-features";
 import { formatReceiptDate, formatReceiptDateRange, interpolate, receiptCopy, receiptTranslator } from "./receipt-copy";
 import { benchmarkReturn, benchmarkVerdict, receiptAssumptions, receiptPlan } from "./receipt-plan";
@@ -7,7 +7,6 @@ import { resultReadoutFacts } from "./result-readout-facts";
 import { resultCardViewModel } from "./result-card-view-model";
 import { signedPercentText } from "./result-figures";
 import { resultReadoutPlanDetails } from "./result-readout-display";
-import { localizedToolText, toolFactValue } from "./tool-result-card";
 
 export type ReceiptPresentation = {
   title: string; language: ArgusLanguage; stamp: string | null;
@@ -16,22 +15,8 @@ export type ReceiptPresentation = {
   visual?: PublicReceiptVisual | null;
   plan?: { heading: string; rows: { text: string; exact?: string | null }[]; assumptions: string[]; footer?: string };
   research?: { answer: string; sources: ResearchReceiptTurn["sources"]; nextStep: string | null };
-  toolCards?: PublicToolReceiptCard[]; hideTitle?: boolean; provenance?: string;
   ownerNote?: string | null; framing: string;
 };
-
-function toolPresentation(cards: PublicToolReceiptCard[], language: ArgusLanguage): Pick<ReceiptPresentation, "toolCards" | "headline" | "rows" | "provenance" | "framing"> {
-  const t = receiptTranslator(language);
-  const answer = cards[0]?.presentation.answer;
-  return { toolCards: cards, headline: answer ? toolFactValue(answer, t, language) : undefined,
-    rows: answer ? [{ label: localizedToolText(answer.label, t), value: toolFactValue(answer, t, language) }] : [],
-    provenance: t("tools.receipt.provenance"), framing: t("tools.receipt.framing") };
-}
-
-function legacyToolPresentation(payload: LegacyToolReceiptDocument, createdAt: string | null, language: ArgusLanguage): ReceiptPresentation {
-  return { ...toolPresentation([payload], language), title: localizedToolText(payload.presentation.title, receiptTranslator(language)),
-    hideTitle: true, language: payload.content_language, stamp: formatReceiptDate(createdAt, language), ownerNote: payload.owner_note };
-}
 
 /** Isolated v1 compatibility. Its display strings and markup stay frozen. */
 function legacyPresentation(payload: PublicReceiptPayload, createdAt: string | null, language: ArgusLanguage): ReceiptPresentation {
@@ -57,8 +42,6 @@ function legacyPresentation(payload: PublicReceiptPayload, createdAt: string | n
 function turnPresentation(turn: PublicReceiptTurn, createdAt: string | null, language: ArgusLanguage): ReceiptPresentation {
   const copy = receiptCopy(language);
   const base = { language: turn.content_language, ownerNote: turn.owner_note };
-  if (turn.kind === "tool_result") return { ...base, ...toolPresentation(turn.cards, language),
-    title: turn.question, stamp: formatReceiptDate(createdAt, language) };
   if (turn.kind === "research_answer") {
     const date = formatReceiptDate(turn.retrieved_at, language) ?? "";
     const nextStepTemplate = turn.offered_next_step ? copy.research[turn.offered_next_step.kind] : null;
@@ -99,6 +82,5 @@ function turnPresentation(turn: PublicReceiptTurn, createdAt: string | null, lan
 }
 
 export function receiptPresentations(payload: PublicReceiptDocument, createdAt: string | null, language: ArgusLanguage): ReceiptPresentation[] {
-  if (payload.schema_version === 1) return [legacyPresentation(payload, createdAt, language)];
-  return isSelectedReceiptDocument(payload) ? payload.turns.map((turn) => turnPresentation(turn, createdAt, language)) : [legacyToolPresentation(payload, createdAt, language)];
+  return payload.schema_version === 1 ? [legacyPresentation(payload, createdAt, language)] : payload.turns.map((turn) => turnPresentation(turn, createdAt, language));
 }

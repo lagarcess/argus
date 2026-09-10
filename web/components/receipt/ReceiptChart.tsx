@@ -7,10 +7,10 @@ import {
   createChart,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { EvidenceVisual } from "@/lib/evidence-visual";
+import type { PublicReceiptVisual } from "@/lib/public-receipt-contract";
 
 type ReceiptChartProps = {
-  visual: EvidenceVisual;
+  visual: PublicReceiptVisual;
 };
 
 const POSITIVE_LINE = "#5ba897";

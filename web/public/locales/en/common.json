@@ -1774,7 +1774,6 @@
     "kinds": {
       "backtest": "Historical test",
       "research_answer": "Research answer",
-      "tool_result": "Computed result",
       "mixed": "Answers and tests"
     },
     "research": {
@@ -1856,10 +1855,6 @@
         "bounded": "A reliable answer is outside this tool’s limits.",
         "unavailable": "This result is unavailable right now."
       }
-    },
-    "receipt": {
-      "provenance": "Checked with Argus",
-      "framing": "Based on the inputs and sources shown. Not financial advice."
     }
   }
 }

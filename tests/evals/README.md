@@ -26,6 +26,7 @@ Run the mocked harness checks with:
 poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_registry_dispatch.py \
   tests/evals/test_measurement_registry_observation.py \
+  tests/evals/test_measurement_selection.py \
   tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
@@ -60,8 +61,14 @@ from the ordered stage patches after dispatch, while `primary_intent` preserves
 the original interpreter read. Expectations use the four canonical names;
 historical labels normalize through the state-model compatibility owner.
 Discovery's original effective `follow_up` expectation is retained. Its typed facts
-are checked against actual peer-expansion arguments, and its original delivery
-checks remain unchanged. No prompt-to-tool-name expectation is added.
+are checked against the collective delivered selection evidence, independently
+of which declared tools supplied it. Completed typed results, their versioned
+cards, resolved identities, retained sources and final selectable actions must
+agree. Category and relationship relevance use one additional criterion in the
+existing prose-judge invocation, with no extra model call. The versioned
+`argus-selection-evidence/v1` contract and evidence are retained in fresh results;
+missing or unavailable judgment remains unproven. Original delivery checks and
+fixture expectations remain active. No prompt-to-tool-name expectation is added.
 
 Answer-required dispatch also needs a successful typed result card with a
 typed answer or a nonblank narrative from a recorded call. A queued job with

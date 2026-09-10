@@ -16,13 +16,11 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptCandidates,
     PublicExcerptPreview,
     PublicExcerptSnapshot,
-    PublicExcerptToolSource,
     PublicExcerptTurnsPayload,
 )
 from argus.api.schemas import Message, User
 from argus.domain.job_settlement import RESEARCH_OPERATION_SCOPE
 from argus.domain.public_excerpt_kinds import document_kind
-from argus.domain.public_excerpt_tool_turns import project_tool_turn
 from argus.domain.public_excerpt_turns import (
     audit_text,
     project_backtest_turn,
@@ -103,35 +101,19 @@ def _run_id(message: Message) -> str | None:
     return candidate or (bank.get("run_id") if isinstance(bank, dict) else None)
 
 
-def _jobs(context: SelectionContext, message: Message) -> list[dict[str, Any]]:
-    metadata = message.metadata or {}
-    job_ids = set()
-    if metadata.get("backtest_job_id"):
-        job_ids.add(metadata["backtest_job_id"])
-    if isinstance(metadata.get("backtest_job"), dict):
-        job_ids.add(metadata["backtest_job"].get("id"))
-    for item in metadata.get("tool_jobs", []):
-        if not isinstance(item, dict) or not isinstance(item.get("job"), dict):
-            refuse("not_completed")
-        job_ids.add(item["job"].get("id"))
-    jobs = [
-        job
-        for job in context.jobs
-        if job.get("id") in job_ids
-        or (job.get("execution_metadata") or {}).get("research_result_message_id")
-        == message.id
-    ]
-    if job_ids - {job.get("id") for job in jobs}:
-        refuse("not_completed")
-    return jobs
-
-
 def _job(context: SelectionContext, message: Message) -> dict[str, Any] | None:
-    jobs = _jobs(context, message)
-    requests = {job.get("request_message_id") for job in jobs}
-    if len(requests) > 1:
-        refuse("unsupported_turn")
-    return jobs[0] if jobs else None
+    metadata = message.metadata or {}
+    job_id = metadata.get("backtest_job_id")
+    if not job_id and isinstance(metadata.get("backtest_job"), dict):
+        job_id = metadata["backtest_job"].get("id")
+    for job in context.jobs:
+        execution = job.get("execution_metadata") or {}
+        if (
+            job.get("id") == job_id
+            or execution.get("research_result_message_id") == message.id
+        ):
+            return job
+    return None
 
 
 def _question(
@@ -152,7 +134,7 @@ def _question(
 
 def _project(
     context: SelectionContext, message: Message, owner_note: str | None
-) -> tuple[Any, list[Any], list[str], list[PublicExcerptToolSource]]:
+) -> tuple[Any, Any | None, str | None]:
     from argus.api.public_excerpts import _owned_run
 
     metadata = message.metadata or {}
@@ -167,18 +149,15 @@ def _project(
         refuse("unsupported_turn")
     if metadata.get("memory_recalls"):
         refuse("memory_used")
-    jobs = _jobs(context, message)
     job = _job(context, message)
     terminal = metadata.get("agent_runtime_turn")
     terminal = terminal if isinstance(terminal, dict) else {}
     if job is None and (metadata.get("backtest_job_id") or metadata.get("backtest_job")):
         refuse("not_completed")
-    for observed_job in jobs:
+    if job is not None:
         from argus.api.conversation_activity import _memory_result_hydrateable
 
-        job_run = _owned_run(
-            user_id=context.user.id, run_id=observed_job.get("result_run_id")
-        )
+        job_run = _owned_run(user_id=context.user.id, run_id=job.get("result_run_id"))
         observed = SimpleNamespace(
             backtest_runs={job_run.id: job_run} if job_run is not None else {},
             backtest_run_owners={job_run.id: context.user.id}
@@ -193,12 +172,10 @@ def _project(
             observed,
             user_id=context.user.id,
             conversation_id=context.conversation.id,
-            job=observed_job,
+            job=job,
         ):
             refuse("not_completed")
-    if not jobs and not (
-        terminal.get("terminal") is True and terminal.get("status") == "completed"
-    ):
+    elif not (terminal.get("terminal") is True and terminal.get("status") == "completed"):
         refuse("not_completed")
     request = _question(context, message, job)
     if request is None:
@@ -213,13 +190,9 @@ def _project(
         ]
     )
     audit_text(request.content, field="question", private_ids=private_ids)
+    audit_text(message.content, field="answer", private_ids=private_ids)
     audit_text(owner_note, field="owner_note", private_ids=private_ids)
     language = context.conversation.language
-    if "tool_result_cards" in metadata:
-        return _project_tool_message(
-            context, message, request.content, owner_note, private_ids, jobs
-        )
-    audit_text(message.content, field="answer", private_ids=private_ids)
     if "research" in metadata:
         if job is not None and job.get("operation_scope") != RESEARCH_OPERATION_SCOPE:
             refuse("unsupported_turn")
@@ -231,9 +204,8 @@ def _project(
                 language=language,
                 private_ids=private_ids,
             ),
-            [],
-            [],
-            [],
+            None,
+            None,
         )
     run_id = job.get("result_run_id") if job is not None else _run_id(message)
     if not run_id:
@@ -258,86 +230,7 @@ def _project(
         language=language,
         private_ids=(*private_ids, run_id),
     )
-    return leaf, [artifact], [run_id], []
-
-
-def _project_tool_message(
-    context: SelectionContext,
-    message: Message,
-    question: str,
-    owner_note: str | None,
-    private_ids: tuple[str, ...],
-    jobs: list[dict[str, Any]],
-) -> tuple[Any, list[Any], list[str], list[PublicExcerptToolSource]]:
-    from argus.api.chat.tool_results import tool_cards_from_metadata
-    from argus.api.public_excerpts import _owned_run
-
-    try:
-        cards = tool_cards_from_metadata(message.metadata or {})
-        bindings = [
-            PublicExcerptToolSource(
-                message_id=message.id,
-                artifact_id=card.artifact_id,
-                input_revision=card.input_revision,
-            )
-            for card in cards
-        ]
-    except ValueError:
-        refuse("unsupported_turn")
-    metadata = message.metadata or {}
-    if "research" in metadata:
-        project_research_turn(
-            message=message,
-            question=question,
-            owner_note=owner_note,
-            language=context.conversation.language,
-            private_ids=private_ids,
-        )
-    run_ids = list(
-        dict.fromkeys(
-            [job["result_run_id"] for job in jobs if job.get("result_run_id")]
-            + ([_run_id(message)] if _run_id(message) else [])
-        )
-    )
-    artifacts = []
-    for run_id in run_ids:
-        run = _owned_run(user_id=context.user.id, run_id=run_id)
-        artifact = next(
-            (
-                a
-                for a in context.artifacts
-                if a.source_run_id == run_id and a.artifact_type == "backtest"
-            ),
-            None,
-        )
-        if (
-            run is None
-            or run.conversation_id != context.conversation.id
-            or artifact is None
-        ):
-            refuse("unsupported_backtest")
-        # The existing result owner proves completeness; the declaration supplies
-        # the actual shared presentation. No public facts are reconstructed here.
-        project_backtest_turn(
-            run=run,
-            title=artifact.title,
-            owner_note=owner_note,
-            language=context.conversation.language,
-            private_ids=(*private_ids, run_id),
-        )
-        artifacts.append(artifact)
-    return (
-        project_tool_turn(
-            cards=cards,
-            question=question,
-            owner_note=owner_note,
-            language=context.conversation.language,
-            private_ids=private_ids,
-        ),
-        artifacts,
-        run_ids,
-        bindings,
-    )
+    return leaf, artifact, run_id
 
 
 def receipt_candidates(*, user: User, conversation_id: str) -> PublicExcerptCandidates:
@@ -346,11 +239,12 @@ def receipt_candidates(*, user: User, conversation_id: str) -> PublicExcerptCand
     for message in context.messages:
         if message.role != "assistant":
             continue
-        values = dict(message_id=message.id, question=None)
+        request = _question(context, message, _job(context, message))
+        values = dict(
+            message_id=message.id, question=request.content if request else None
+        )
         try:
-            request = _question(context, message, _job(context, message))
-            values["question"] = request.content if request else None
-            leaf, _, _, _ = _project(context, message, None)
+            leaf, _, _ = _project(context, message, None)
             candidates.append(
                 PublicExcerptCandidate(**values, kind=leaf.kind, eligible=True)
             )
@@ -365,15 +259,7 @@ def receipt_candidates(*, user: User, conversation_id: str) -> PublicExcerptCand
 
 def _selection(
     user: User, conversation_id: str, message_ids: list[str], owner_note: str | None
-) -> tuple[
-    SelectionContext,
-    list[Message],
-    list[Any],
-    list[Any],
-    list[str],
-    list[PublicExcerptToolSource],
-    str,
-]:
+) -> tuple[SelectionContext, list[Message], list[Any], list[Any], list[str], str]:
     if not 1 <= len(message_ids) <= PUBLIC_EXCERPT_MAX_TURNS or len(
         set(message_ids)
     ) != len(message_ids):
@@ -382,34 +268,24 @@ def _selection(
     chosen = [m for m in context.messages if m.id in message_ids]
     if len(chosen) != len(message_ids):
         refuse("invalid_selection")
-    leaves, artifacts, run_ids, bindings = [], [], [], []
+    leaves, artifacts, run_ids = [], [], []
     for message in chosen:
-        leaf, selected_artifacts, selected_runs, selected_bindings = _project(
-            context, message, owner_note
-        )
+        leaf, artifact, run_id = _project(context, message, owner_note)
         leaves.append(leaf)
-        artifacts.extend(selected_artifacts)
-        run_ids.extend(selected_runs)
-        bindings.extend(selected_bindings)
-    identity = sorted(message_ids)
-    if bindings:
-        identity = [identity, [binding.model_dump(mode="json") for binding in bindings]]
+        if artifact:
+            artifacts.append(artifact)
+        if run_id:
+            run_ids.append(run_id)
     key = hashlib.sha256(
-        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(sorted(message_ids), separators=(",", ":")).encode()
     ).hexdigest()
-    return context, chosen, leaves, artifacts, run_ids, bindings, key
+    return context, chosen, leaves, artifacts, run_ids, key
 
 
 def _existing(
-    repository: Any,
-    *,
-    user: User,
-    artifacts: list[Any],
-    count: int,
-    key: str,
-    bindings: list[PublicExcerptToolSource],
+    repository: Any, *, user: User, artifacts: list[Any], count: int, key: str
 ) -> PublicExcerptSnapshot | None:
-    if count == 1 and artifacts and not bindings:
+    if count == 1 and artifacts:
         existing = repository.get_live_public_excerpt_for_artifact(
             owner_id=user.id, evidence_artifact_id=artifacts[0].id
         )
@@ -425,7 +301,7 @@ def preview_receipt_for_messages(
 ) -> PublicExcerptPreview:
     from argus.api.public_excerpts import public_excerpt_repository
 
-    _, _, leaves, artifacts, _, bindings, key = _selection(
+    _, _, leaves, artifacts, _, key = _selection(
         user, conversation_id, message_ids, owner_note
     )
     existing = _existing(
@@ -434,7 +310,6 @@ def preview_receipt_for_messages(
         artifacts=artifacts,
         count=len(leaves),
         key=key,
-        bindings=bindings,
     )
     payload = existing.payload if existing else PublicExcerptTurnsPayload(turns=leaves)
     return PublicExcerptPreview(
@@ -452,28 +327,19 @@ def create_receipt_for_messages(
     message_ids: list[str],
     owner_note: str | None,
     expected_digest: str,
-    expected_tool_source: PublicExcerptToolSource | None = None,
 ) -> tuple[PublicExcerptSnapshot, bool]:
     from argus.api.public_excerpts import (
-        EvidenceReceiptSourceChangedError,
         EvidenceReceiptSourceMissingError,
         _is_source_refusal,
         public_excerpt_repository,
     )
 
-    _, chosen, leaves, artifacts, run_ids, bindings, key = _selection(
+    _, chosen, leaves, artifacts, run_ids, key = _selection(
         user, conversation_id, message_ids, owner_note
     )
-    if expected_tool_source is not None and expected_tool_source not in bindings:
-        raise EvidenceReceiptSourceChangedError("That source changed.")
     repository = public_excerpt_repository()
     existing = _existing(
-        repository,
-        user=user,
-        artifacts=artifacts,
-        count=len(chosen),
-        key=key,
-        bindings=bindings,
+        repository, user=user, artifacts=artifacts, count=len(chosen), key=key
     )
     payload = existing.payload if existing else PublicExcerptTurnsPayload(turns=leaves)
     if payload_digest(payload) != expected_digest:
@@ -482,20 +348,17 @@ def create_receipt_for_messages(
         return existing, False
     title = (
         leaves[0].question
-        if leaves[0].kind in {"research_answer", "tool_result"}
+        if leaves[0].kind == "research_answer"
         else leaves[0].idea_title
     )
     snapshot = PublicExcerptSnapshot(
         id=api_state.store.new_id(),
         public_id=new_public_excerpt_id(),
         owner_id=user.id,
-        evidence_artifact_id=artifacts[0].id
-        if len(chosen) == 1 and artifacts and not bindings
-        else None,
+        evidence_artifact_id=artifacts[0].id if len(chosen) == 1 and artifacts else None,
         source_conversation_id=conversation_id,
         source_run_id=run_ids[0] if len(chosen) == 1 and run_ids else None,
         source_message_ids=[m.id for m in chosen],
-        source_tool_bindings=bindings,
         source_run_ids=run_ids,
         source_artifact_ids=[a.id for a in artifacts],
         selection_key=key,
@@ -511,10 +374,6 @@ def create_receipt_for_messages(
             refuse("preview_changed")
         return result, created
     except Exception as error:
-        if isinstance(
-            error, EvidenceReceiptSourceChangedError
-        ) or "public_excerpt_source_changed" in str(error):
-            refuse("preview_changed")
         if _is_source_refusal(error):
             raise EvidenceReceiptSourceMissingError(
                 "That source is not available."

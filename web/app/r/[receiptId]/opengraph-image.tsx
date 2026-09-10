@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import { receiptCopy } from "@/lib/receipt-copy";
 import { receiptPreviewFacts } from "@/lib/receipt-preview-facts";
-import { receiptDocumentLanguage } from "@/lib/public-receipt-turns";
 import {
   readPublicReceipt,
 } from "@/lib/public-receipt-contract";
@@ -154,7 +153,7 @@ export default async function Image({
     );
   }
 
-  const language = receiptDocumentLanguage(result.payload);
+  const language = result.payload.schema_version === 1 ? result.payload.content_language : result.payload.turns[0].content_language;
   const copy = cardCopy(language);
   const facts = receiptPreviewFacts(result.payload, language);
   if (facts.research) {
@@ -227,7 +226,7 @@ export default async function Image({
             </div>
           ) : null}
           <div style={{ display: "flex", fontSize: 44, color: MUTED }}>
-            {facts.framing}
+            {copy.framing}
           </div>
         </div>
       </Frame>

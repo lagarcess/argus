@@ -3,14 +3,11 @@
 import asyncio
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 from argus.agent_runtime.tools.registered_backtest import (
     backtest_execution_result,
     get_backtest_declaration,
 )
-from argus.api.public_excerpt_schemas import PublicExcerptTurnsPayload
-from argus.domain.public_excerpt_tool_turns import project_tool_turn
 from argus.domain.tool_contracts import (
     LocalizedText,
     ToolCall,
@@ -18,12 +15,10 @@ from argus.domain.tool_contracts import (
     ToolFact,
     ToolInputFact,
     ToolOutcome,
-    ToolResultCard,
 )
 from argus.domain.tool_declaration import (
     ExactlyOneUnknown,
     ToolCardBinding,
-    ToolCatalog,
     ToolDeclaration,
     ToolPolicy,
     ToolProgressTemplate,
@@ -111,30 +106,6 @@ async def main() -> None:
     output.with_name("tool-progress.json").write_text(
         progress.model_dump_json(indent=2) + "\n"
     )
-    with patch(
-        "argus.domain.public_excerpt_tool_turns.get_tool_catalog",
-        return_value=ToolCatalog((DECLARATION,)),
-    ):
-        receipts = {
-            language: PublicExcerptTurnsPayload(
-                turns=[
-                    project_tool_turn(
-                        cards=[
-                            ToolResultCard.model_validate(fixture[name])
-                            for name in ("initial", "sibling")
-                        ],
-                        question="What are the provided values?",
-                        owner_note=None,
-                        language=language,
-                        private_ids=(),
-                    )
-                ]
-            ).model_dump(mode="json")
-            for language in ("en", "es-419")
-        }
-    output.with_name("tool-receipts.json").write_text(
-        json.dumps(receipts, indent=2) + "\n"
-    )
     backtests = {}
     declaration = get_backtest_declaration()
     for language in ("en", "es-419"):
@@ -153,20 +124,8 @@ async def main() -> None:
             ),
             artifact_id="backtest-artifact",
         )
-        receipt = PublicExcerptTurnsPayload(
-            turns=[
-                project_tool_turn(
-                    cards=[card],
-                    question="Compare this historical result.",
-                    owner_note=None,
-                    language=language,
-                    private_ids=(),
-                )
-            ]
-        )
         backtests[language] = {
             "card": card.model_dump(mode="json"),
-            "receipt": receipt.model_dump(mode="json"),
         }
     output.with_name("backtest-cards.json").write_text(
         json.dumps(backtests, indent=2) + "\n"

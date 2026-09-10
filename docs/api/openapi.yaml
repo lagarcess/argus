@@ -1189,50 +1189,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/conversations/{conversation_id}/tool-results/{artifact_id}/public-excerpt:
-    post:
-      tags:
-      - evidence-receipts
-      parameters:
-      - name: conversation_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: artifact_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PublicToolExcerptCreate'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PublicExcerptCreateResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/tool-results/{artifact_id}/recompute:
     post:
       tags:
@@ -3777,25 +3733,6 @@ components:
       - conversation_id
       - expires_at
     JsonValue: {}
-    LocalizedText:
-      properties:
-        locale_key:
-          type: string
-          maxLength: 160
-          minLength: 1
-        interpolation_args:
-          additionalProperties:
-            anyOf:
-            - type: boolean
-            - type: integer
-            - type: number
-            - type: string
-            - type: 'null'
-          type: object
-      additionalProperties: false
-      type: object
-      required:
-      - locale_key
     LoginRequest:
       properties:
         email:
@@ -4599,7 +4536,6 @@ components:
             enum:
             - backtest
             - research_answer
-            - tool_result
           - type: 'null'
         eligible:
           type: boolean
@@ -4731,7 +4667,6 @@ components:
           enum:
           - backtest
           - research_answer
-          - tool_result
           - mixed
           default: backtest
       additionalProperties: false
@@ -4762,16 +4697,11 @@ components:
           anyOf:
           - $ref: '#/components/schemas/PublicExcerptDateRange'
           - type: 'null'
-        title_facts:
-          anyOf:
-          - $ref: '#/components/schemas/LocalizedText'
-          - type: 'null'
         kind:
           type: string
           enum:
           - backtest
           - research_answer
-          - tool_result
           - mixed
           default: backtest
         created_at:
@@ -4937,7 +4867,6 @@ components:
           anyOf:
           - $ref: '#/components/schemas/PublicExcerptPayload'
           - $ref: '#/components/schemas/PublicExcerptTurnsPayload'
-          - $ref: '#/components/schemas/PublicToolExcerptPayload'
         payload_digest:
           type: string
         kind:
@@ -4945,7 +4874,6 @@ components:
           enum:
           - backtest
           - research_answer
-          - tool_result
           - mixed
         existing_receipt:
           anyOf:
@@ -5124,64 +5052,6 @@ components:
         alternative, freezing an English label, would put untranslatable chrome inside
 
         the payload.'
-    PublicExcerptToolCard:
-      properties:
-        card_type:
-          type: string
-          minLength: 1
-        card_version:
-          type: integer
-          minimum: 1.0
-        presentation:
-          $ref: '#/components/schemas/ToolCardPresentation'
-      additionalProperties: false
-      type: object
-      required:
-      - card_type
-      - card_version
-      - presentation
-      description: A frozen declared presentation with no private execution envelope.
-    PublicExcerptToolTurn:
-      properties:
-        kind:
-          type: string
-          const: tool_result
-          default: tool_result
-        question:
-          type: string
-          maxLength: 500
-          minLength: 1
-        cards:
-          items:
-            $ref: '#/components/schemas/PublicExcerptToolCard'
-          type: array
-          maxItems: 8
-          minItems: 1
-        owner_note:
-          anyOf:
-          - type: string
-            maxLength: 280
-          - type: 'null'
-        content_language:
-          type: string
-          enum:
-          - en
-          - es-419
-          default: en
-        framing:
-          type: string
-          const: computed_result_not_advice
-          default: computed_result_not_advice
-        provenance_mark:
-          type: string
-          const: computed_with_argus
-          default: computed_with_argus
-      additionalProperties: false
-      type: object
-      required:
-      - question
-      - cards
-      description: One selected assistant message, preserving all its ordered tool answers.
     PublicExcerptTurnsPayload:
       properties:
         schema_version:
@@ -5197,13 +5067,11 @@ components:
             oneOf:
             - $ref: '#/components/schemas/PublicExcerptResearchTurn'
             - $ref: '#/components/schemas/PublicExcerptBacktestTurn'
-            - $ref: '#/components/schemas/PublicExcerptToolTurn'
             discriminator:
               propertyName: kind
               mapping:
                 backtest: '#/components/schemas/PublicExcerptBacktestTurn'
                 research_answer: '#/components/schemas/PublicExcerptResearchTurn'
-                tool_result: '#/components/schemas/PublicExcerptToolTurn'
           type: array
           maxItems: 4
           minItems: 1
@@ -5226,7 +5094,6 @@ components:
             enum:
             - backtest
             - research_answer
-            - tool_result
             - mixed
           - type: 'null'
         indexing:
@@ -5242,7 +5109,6 @@ components:
           anyOf:
           - $ref: '#/components/schemas/PublicExcerptPayload'
           - $ref: '#/components/schemas/PublicExcerptTurnsPayload'
-          - $ref: '#/components/schemas/PublicToolExcerptPayload'
           - type: 'null'
       additionalProperties: false
       type: object
@@ -5272,7 +5138,7 @@ components:
       required:
       - kind
       - series
-      description: Frozen visual evidence shared by cards and receipts, without a later fetch.
+      description: Frozen visual evidence. No series is fetched at view time.
     PublicExcerptVisualPoint:
       properties:
         time:
@@ -5284,62 +5150,6 @@ components:
       required:
       - time
       - value
-    PublicToolExcerptCreate:
-      properties:
-        owner_note:
-          anyOf:
-          - type: string
-            maxLength: 280
-          - type: 'null'
-        message_id:
-          type: string
-          format: uuid
-        input_revision:
-          type: integer
-          minimum: 0.0
-      additionalProperties: false
-      type: object
-      required:
-      - message_id
-      - input_revision
-    PublicToolExcerptPayload:
-      properties:
-        schema_version:
-          type: integer
-          const: 2
-          default: 2
-        card_type:
-          type: string
-        card_version:
-          type: integer
-          minimum: 1.0
-        presentation:
-          $ref: '#/components/schemas/ToolCardPresentation'
-        owner_note:
-          anyOf:
-          - type: string
-          - type: 'null'
-        content_language:
-          type: string
-          enum:
-          - en
-          - es-419
-          default: en
-        framing:
-          type: string
-          const: computed_result_not_advice
-          default: computed_result_not_advice
-        provenance_mark:
-          type: string
-          const: computed_with_argus
-          default: computed_with_argus
-      additionalProperties: false
-      type: object
-      required:
-      - card_type
-      - card_version
-      - presentation
-      description: Read compatibility for frozen registry-preview receipts; never a new writer.
     ReceiptCardFacts:
       properties:
         execution_costs:
@@ -5707,28 +5517,6 @@ components:
           - type: 'null'
       additionalProperties: false
       type: object
-    ResearchSource:
-      properties:
-        url:
-          type: string
-        title:
-          type: string
-          default: ''
-        source_date:
-          anyOf:
-          - type: string
-          - type: 'null'
-      type: object
-      required:
-      - url
-      description: 'One citation the packet actually returned.
-
-
-        Web search citations arrive in their own output items and, for some
-
-        models, as annotations on the answer chunk. Both are the same evidence
-
-        and both land here; provider-identity URLs never do.'
     RetrievedMemoryOut:
       properties:
         record:
@@ -6178,108 +5966,6 @@ components:
       type: object
       required:
       - success
-    ToolCardPresentation:
-      properties:
-        title:
-          $ref: '#/components/schemas/LocalizedText'
-        answer:
-          anyOf:
-          - $ref: '#/components/schemas/ToolFact'
-          - type: 'null'
-        narrative:
-          anyOf:
-          - type: string
-          - type: 'null'
-        sources:
-          items:
-            $ref: '#/components/schemas/ResearchSource'
-          type: array
-        visual:
-          anyOf:
-          - $ref: '#/components/schemas/PublicExcerptVisual'
-          - type: 'null'
-        rows:
-          items:
-            $ref: '#/components/schemas/ToolFact'
-          type: array
-        inputs:
-          items:
-            $ref: '#/components/schemas/ToolInputFact'
-          type: array
-        notes:
-          items:
-            $ref: '#/components/schemas/LocalizedText'
-          type: array
-      additionalProperties: false
-      type: object
-      required:
-      - title
-    ToolFact:
-      properties:
-        name:
-          type: string
-        label:
-          $ref: '#/components/schemas/LocalizedText'
-        value:
-          anyOf:
-          - type: boolean
-          - type: integer
-          - type: number
-          - type: string
-          - type: 'null'
-        value_text:
-          anyOf:
-          - $ref: '#/components/schemas/LocalizedText'
-          - type: 'null'
-        unit:
-          anyOf:
-          - $ref: '#/components/schemas/LocalizedText'
-          - type: 'null'
-      additionalProperties: false
-      type: object
-      required:
-      - name
-      - label
-      - value
-    ToolInputFact:
-      properties:
-        name:
-          type: string
-        label:
-          $ref: '#/components/schemas/LocalizedText'
-        value:
-          anyOf:
-          - type: boolean
-          - type: integer
-          - type: number
-          - type: string
-          - type: 'null'
-        value_text:
-          anyOf:
-          - $ref: '#/components/schemas/LocalizedText'
-          - type: 'null'
-        unit:
-          anyOf:
-          - $ref: '#/components/schemas/LocalizedText'
-          - type: 'null'
-        editable:
-          type: boolean
-          default: false
-        unknown:
-          type: boolean
-          default: false
-        visibility:
-          type: string
-          enum:
-          - public
-          - private
-          default: private
-      additionalProperties: false
-      type: object
-      required:
-      - name
-      - label
-      - value
     ToolResultRecomputeRequest:
       properties:
         message_id:

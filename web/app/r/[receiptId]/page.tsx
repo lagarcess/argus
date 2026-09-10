@@ -77,7 +77,7 @@ export async function generateMetadata({
   const facts = receiptPreviewFacts(result.payload, language);
   const description = facts.description;
   return {
-    title: `${facts.title} · ${facts.provenance}`,
+    title: `${facts.title} · ${copy.provenance}`,
     description,
     robots: RECEIPT_ROBOTS,
     metadataBase: metadataBase(),

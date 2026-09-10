@@ -35,7 +35,7 @@ for (const width of [390, 1280]) {
       await page.evaluate(() => new Promise<void>((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 0)));
       }));
-      const trace = () => page.evaluate(() => (window as unknown as { receiptFocusTrace: { pushes: number; backs: number } }).receiptFocusTrace);
+      const trace = () => page.evaluate(() => (window as Window & { receiptFocusTrace: { pushes: number; backs: number } }).receiptFocusTrace);
       expect(await trace()).toEqual({ pushes: cycle, backs: cycle - 1 });
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();

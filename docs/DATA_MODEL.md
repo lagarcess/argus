@@ -1347,10 +1347,6 @@ adapter to that same selection service and singleton identity. The header opens
 the sole user-facing selection flow. Existing live version 1 receipts are reused
 unchanged.
 
-Generic tool results use their owned message's exact card revisions at this
-same boundary. They create no placeholder run or EvidenceArtifact. Ordered
-sibling cards stay within one selected turn, and every sibling must be eligible.
-
 The snapshot is frozen at creation and the public read never queries the source
 conversation, message, run or provider. Asking again or rerunning produces new
 source material and leaves the earlier receipt unchanged.
@@ -1366,20 +1362,12 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
-- `source_message_id`: `uuid` (Nullable legacy tool source, references
-  `messages.id` ON DELETE SET NULL)
-- `source_artifact_id`: `uuid` (Nullable legacy tool-card identity)
-- `source_input_revision`: `integer` (Nullable, nonnegative; paired with the
-  legacy tool-card identity)
-- `kind`: `text` (`backtest`, `research_answer`, `tool_result`, or `mixed`; existing rows default
+- `kind`: `text` (`backtest`, `research_answer`, or `mixed`; existing rows default
   to `backtest`)
 - `source_message_ids`: `uuid[]` (Private selected assistant messages; one to four
   for new receipts, empty for legacy rows)
 - `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
   sources, each bounded at four)
-- `source_tool_bindings`: `jsonb` (Private ordered tool sources, each containing
-  `message_id`, `artifact_id`, and nonnegative `input_revision`; bounded by the
-  selected-turn and declared-call limits, empty for legacy rows)
 - `selection_key`: `text` (Nullable for legacy rows; canonical sha256 selection
   identity, independent of note and payload content)
 - `title`: `text`
@@ -1411,18 +1399,6 @@ The backtest leaf freezes the card's closed typed fact bank, title, visual, note
 content language, framing and provenance. `public_excerpt_fact_schemas.py` closes
 every nested config, rule, figure and cost field. The public renderer reads the
 same result fact and display owners as the result card.
-
-Generic tool-result turns contain ordered, declaration-bound card presentations.
-Their closed leaf contains `kind: "tool_result"`, `question`, `cards`,
-`owner_note`, `content_language`, `framing: "computed_result_not_advice"`, and
-`provenance_mark: "computed_with_argus"`. Each card contains only `card_type`,
-`card_version`, and `presentation`; call limits bound the sibling list.
-The same public sanitizer removes private narrative and private input facts;
-input visibility is declared and defaults to private. Validated citations and
-typed visuals remain attached to their facts. Raw tool arguments, outcomes and
-call identities never reach the public document. Previously frozen bare version
-2 tool receipts remain strictly readable; their payloads and digests never
-change during migration.
 
 Every selected turn independently passes the shared eligibility and privacy audit
 at preview and creation. A refusal refuses the entire selection. The owner sees
@@ -1500,8 +1476,7 @@ fetched at view time.
 
 `prevent_public_excerpt_immutable_update` rejects any change to `id`,
 `public_id`, `owner_id`, `title`, `payload`, `payload_digest`, or `created_at`,
-and also freezes `kind`, `selection_key`, private source arrays and tool
-revision bindings. It
+and also freezes `kind`, `selection_key` and the private source arrays. It
 rejects any change to the revocation columns once `revoked_at` is set.
 Revocation is one way.
 
@@ -1519,12 +1494,6 @@ assistant message, run and artifact against the same owner and conversation.
 It acquires source locks in deterministic order. No selected source can disappear
 between an application check and publication without either refusing creation or
 revoking the snapshot.
-
-Tool-source checks also bind each card's successful current input revision.
-Recomputation produces a new selection identity and cannot alter a frozen
-receipt. Tool-card ids remain separate from EvidenceArtifact source arrays.
-The legacy singular tool source remains readable and participates in deletion
-revocation alongside selected message sources.
 
 `revoke_public_excerpts_for_deleted_source` revokes a receipt when its source
 goes away, so deleting a chat cannot leave a live public page behind:

@@ -1,6 +1,5 @@
 "use client";
 
-import { localizedToolText } from "@/lib/tool-result-card";
 import { useCallback, useEffect, useState, type RefObject } from "react";
 import { Check, Copy, ExternalLink, Link2, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -194,7 +193,7 @@ export default function SharedReceiptsView({
                     className="rounded-[16px] border border-black/5 bg-black/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.03]"
                   >
                     <p className="truncate text-[14.5px] font-medium text-black dark:text-white">
-                      {receipt.title_facts ? localizedToolText(receipt.title_facts, t) : receipt.title}
+                      {receipt.title}
                     </p>
                     <p className="mt-0.5 truncate text-[12.5px] text-black/45 dark:text-white/45">
                       {[t(`receipt.kinds.${receipt.kind}`), receipt.symbols.join(", "), formatWindow(receipt.date_range)]

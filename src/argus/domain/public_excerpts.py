@@ -15,7 +15,6 @@ import secrets
 import unicodedata
 from datetime import date
 from typing import Any, get_args
-from urllib.parse import urlsplit
 
 from argus.api.public_excerpt_schemas import (
     PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH,
@@ -30,8 +29,6 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptView,
     PublicExcerptVisual,
     PublicExcerptVisualPoint,
-    PublicReceiptPayload,
-    PublicToolExcerptPayload,
 )
 from argus.api.schemas import EvidenceArtifact
 
@@ -46,7 +43,6 @@ from argus.domain.credential_shapes import credential_shape_in
 from argus.domain.result_readout_facts import (
     engine_config_from_snapshot as _engine_config,
 )
-from argus.domain.tool_contracts import ToolResultCard
 
 PUBLIC_EXCERPT_ID_BYTES = 24
 PUBLIC_EXCERPT_PATH_PREFIX = "/r/"
@@ -187,7 +183,7 @@ def public_excerpt_path(public_id: str) -> str:
     return f"{PUBLIC_EXCERPT_PATH_PREFIX}{public_id}"
 
 
-def payload_digest(payload: PublicReceiptPayload) -> str:
+def payload_digest(payload: PublicExcerptPayload) -> str:
     """Stable digest of the frozen payload. Any drift changes this string."""
     canonical = json.dumps(
         payload.model_dump(mode="json"),
@@ -235,50 +231,6 @@ def normalize_owner_note(note: object) -> str | None:
     return cleaned
 
 
-def build_tool_public_excerpt_payload(
-    *,
-    card: ToolResultCard,
-    owner_note: str | None,
-    content_language: str,
-    private_ids: tuple[str, ...] = (),
-) -> PublicToolExcerptPayload:
-    """Freeze a completed tool's presentation without its execution envelope."""
-    if card.outcome.status != "succeeded" or card.presentation.answer is None:
-        raise PublicExcerptSourceError("Only completed answers are shareable.")
-    for source in card.presentation.sources:
-        try:
-            url = urlsplit(source.url)
-        except ValueError as exc:
-            raise PublicExcerptSanitizationError(
-                "A citation is not a public HTTPS URL."
-            ) from exc
-        if url.scheme != "https" or not url.hostname or url.username or url.password:
-            raise PublicExcerptSanitizationError("A citation is not a public HTTPS URL.")
-    presentation = card.presentation.model_copy(
-        update={
-            "narrative": None,
-            "inputs": [
-                fact.model_copy(update={"editable": False})
-                for fact in card.presentation.inputs
-                if fact.visibility == "public"
-            ],
-        }
-    )
-    payload = PublicToolExcerptPayload(
-        card_type=card.card_type,
-        card_version=card.card_version,
-        presentation=presentation,
-        owner_note=owner_note,
-        content_language="es-419" if content_language == "es-419" else "en",
-    )
-    audit_public_excerpt_payload(
-        payload,
-        private_ids=(*private_ids, card.artifact_id, card.call_id),
-        skip_value_markers_for=("owner_note",),
-    )
-    return payload
-
-
 def build_public_excerpt_payload(
     *,
     artifact: EvidenceArtifact,
@@ -286,52 +238,11 @@ def build_public_excerpt_payload(
     run_config_snapshot: dict[str, Any] | None = None,
     owner_note: str | None,
     content_language: str,
-) -> PublicReceiptPayload:
+) -> PublicExcerptPayload:
     """Assemble the closed payload from frozen records, then audit it."""
     if artifact.artifact_type != "backtest":
         raise PublicExcerptSourceError("Only completed backtest results are shareable.")
     source = artifact.payload if isinstance(artifact.payload, dict) else {}
-    result_card = _mapping(source.get("result_card"))
-    bound_cards = result_card.get("tool_result_cards")
-    if bound_cards is not None:
-        if not isinstance(bound_cards, list) or len(bound_cards) != 1:
-            raise PublicExcerptSourceError("The result has no unique declared card.")
-        return build_tool_public_excerpt_payload(
-            card=ToolResultCard.model_validate(bound_cards[0]),
-            owner_note=owner_note,
-            content_language=content_language,
-            private_ids=_private_ids(artifact),
-        )
-    payload = backtest_receipt_facts(
-        source=source,
-        title=artifact.title,
-        run_chart=run_chart,
-        run_config_snapshot=run_config_snapshot,
-        owner_note=owner_note,
-        content_language=content_language,
-    )
-    audit_public_excerpt_payload(
-        payload,
-        private_ids=_private_ids(artifact),
-        skip_value_markers_for=("owner_note",),
-    )
-    return payload
-
-
-def backtest_receipt_facts(
-    *,
-    source: dict[str, Any],
-    title: str,
-    run_chart: dict[str, Any] | None,
-    run_config_snapshot: dict[str, Any] | None,
-    owner_note: str | None = None,
-    content_language: str = "en",
-) -> PublicExcerptPayload:
-    """The full typed projection shared by the declared card and legacy receipts.
-
-    ``source`` contains result_card, metrics and provenance from the existing
-    backtest result. No EvidenceArtifact or persistence identity is required.
-    """
     result_card = _mapping(source.get("result_card"))
     provenance = _mapping(source.get("provenance"))
     date_range = _date_range(result_card.get("date_range"))
@@ -339,7 +250,7 @@ def backtest_receipt_facts(
         raise PublicExcerptSourceError("The result has no tested date range.")
     benchmark_symbol = _text(provenance.get("benchmark_symbol"))
     payload = PublicExcerptPayload(
-        idea_title=_text(title) or _text(result_card.get("title")) or "Backtest",
+        idea_title=_text(artifact.title) or _text(result_card.get("title")) or "Backtest",
         asset_class=_asset_class(
             provenance.get("asset_class") or result_card.get("asset_class")
         ),
@@ -360,11 +271,16 @@ def backtest_receipt_facts(
         owner_note=owner_note,
         content_language="es-419" if content_language == "es-419" else "en",
     )
+    audit_public_excerpt_payload(
+        payload,
+        private_ids=_private_ids(artifact),
+        skip_value_markers_for=("owner_note",),
+    )
     return payload
 
 
 def audit_public_excerpt_payload(
-    payload: PublicReceiptPayload,
+    payload: PublicExcerptPayload,
     *,
     private_ids: tuple[str, ...] = (),
     skip_value_markers_for: tuple[str, ...] = (),
@@ -376,7 +292,7 @@ def audit_public_excerpt_payload(
     metadata, no known private id).
     """
     serialized = payload.model_dump(mode="json")
-    expected_keys = set(type(payload).model_fields)
+    expected_keys = set(PublicExcerptPayload.model_fields)
     if set(serialized) != expected_keys:
         unexpected = sorted(set(serialized) - expected_keys)
         missing = sorted(expected_keys - set(serialized))
@@ -421,8 +337,6 @@ def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem
     payload = snapshot.payload
     if payload.schema_version == 1:
         title, symbols, dates = payload.idea_title, payload.symbols, payload.date_range
-    elif isinstance(payload, PublicToolExcerptPayload):
-        title, symbols, dates = "", [], None
     else:
         title = snapshot.title
         symbols = list(
@@ -433,8 +347,6 @@ def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem
                     turn.anchor_symbols
                     if turn.kind == "research_answer"
                     else turn.fact_bank.symbols
-                    if turn.kind == "backtest"
-                    else []
                 )
             )
         )
@@ -454,9 +366,6 @@ def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem
         public_id=snapshot.public_id,
         path=public_excerpt_path(snapshot.public_id),
         title=title,
-        title_facts=payload.presentation.title
-        if isinstance(payload, PublicToolExcerptPayload)
-        else None,
         symbols=symbols,
         date_range=dates,
         kind=document_kind(payload),

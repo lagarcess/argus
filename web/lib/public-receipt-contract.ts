@@ -2,7 +2,6 @@ import { cache } from "react";
 import type { AssetClass } from "./argus-types";
 import { ARGUS_API_BASE_URL } from "./argus-api-transport";
 import { receiptDocumentSupported, type PublicReceiptDocument, type ReceiptKind } from "./public-receipt-turns";
-import type { EvidenceVisual, EvidenceVisualPoint } from "./evidence-visual";
 
 /**
  * Mirrors src/argus/api/public_excerpt_schemas.py. The payload is closed: this
@@ -88,8 +87,17 @@ export type PublicReceiptMetric = {
   value: string;
 };
 
-export type PublicReceiptVisualPoint = EvidenceVisualPoint;
-export type PublicReceiptVisual = EvidenceVisual;
+export type PublicReceiptVisualPoint = {
+  time: string;
+  value: number;
+};
+
+export type PublicReceiptVisual = {
+  kind: "portfolio_equity";
+  currency?: string | null;
+  base_value?: number | null;
+  series: PublicReceiptVisualPoint[];
+};
 
 export type PublicReceiptPayload = {
   schema_version: 1;
@@ -116,8 +124,6 @@ export type PublicReceiptView = {
   created_at?: string | null;
   payload?: PublicReceiptDocument | null;
 };
-
-export type PublicBacktestReceiptPayload = PublicReceiptPayload;
 
 export const PUBLIC_RECEIPT_PATH_PREFIX = "/r/";
 export const PUBLIC_RECEIPT_MAX_ID_LENGTH = 64;

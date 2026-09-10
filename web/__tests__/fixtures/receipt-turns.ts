@@ -1,6 +1,4 @@
 import type { PublicReceiptPayload } from "../../lib/public-receipt-contract";
-import type { PublicReceiptTurn } from "../../lib/public-receipt-turns";
-import { toolCardFixture } from "./tool-result-card";
 
 export const legacyReceipt: PublicReceiptPayload = {
   schema_version: 1,
@@ -52,26 +50,6 @@ export const backtestTurn = {
   framing: legacyReceipt.framing, provenance_mark: legacyReceipt.provenance_mark,
 };
 
-export function toolTurnFixture() {
-  const card = toolCardFixture();
-  return {
-    kind: "tool_result" as const, question: "Read these values.",
-    cards: [0, 40].map((value) => ({ card_type: card.card_type, card_version: card.card_version,
-      presentation: { ...card.presentation, answer: { ...card.presentation.answer!, value },
-        inputs: card.presentation.inputs.map((input) => ({ ...input, editable: false })),
-      },
-    })),
-    owner_note: null, content_language: "en" as const,
-    framing: "computed_result_not_advice" as const, provenance_mark: "computed_with_argus" as const,
-  };
-}
-
-export function legacyToolDocument() {
-  const turn = toolTurnFixture();
-  return { schema_version: 2 as const, ...turn.cards[0], owner_note: turn.owner_note,
-    content_language: turn.content_language, framing: turn.framing, provenance_mark: turn.provenance_mark };
-}
-
-export function turnDocument(...turns: PublicReceiptTurn[]) {
+export function turnDocument(...turns: (typeof researchTurn | typeof backtestTurn)[]) {
   return { schema_version: 2 as const, kind: "turns" as const, turns };
 }

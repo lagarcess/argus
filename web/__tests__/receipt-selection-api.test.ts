@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import * as receipts from "../lib/evidence-receipts";
 import { fetchPublicReceipt } from "../lib/public-receipt-contract";
 import { pendingGuestActionSummary, SingleUseGuestAction, verifiedClaimAction } from "../lib/guest-conversion";
-import { legacyReceipt, legacyToolDocument, researchTurn, toolTurnFixture, turnDocument } from "./fixtures/receipt-turns";
+import { researchTurn, turnDocument } from "./fixtures/receipt-turns";
 
 const originalFetch = globalThis.fetch;
 const originalMock = process.env.NEXT_PUBLIC_MOCK_AUTH;
@@ -40,12 +40,7 @@ test("unknown public document versions fail closed", async () => {
   expect(await fetchPublicReceipt("abcdefghijklmnopqrstuvwx")).toEqual({ kind: "unavailable" });
 });
 
-test.each([legacyReceipt, legacyToolDocument(), turnDocument(toolTurnFixture())])("public reads preserve supported frozen document formats: %j", async (payload) => {
-  globalThis.fetch = (async () => Response.json({ status: "available", payload })) as typeof fetch;
-  expect(await fetchPublicReceipt("abcdefghijklmnopqrstuvwx")).toEqual({ kind: "available", payload, createdAt: null });
-});
-
-test("header selection uses the message preview and creation contract", async () => {
+test("header selection and answer shortcut use the same message preview and creation contract", async () => {
   process.env.NEXT_PUBLIC_MOCK_AUTH = "true";
   const seen: { url: string; method: string; body: unknown }[] = [];
   const receipt: receipts.EvidenceReceipt = { id: "receipt", public_id: "abcdefghijklmnopqrstuvwx", path: "/r/abcdefghijklmnopqrstuvwx", title: researchTurn.question, symbols: researchTurn.anchor_symbols, kind: "research_answer", created_at: researchTurn.retrieved_at };

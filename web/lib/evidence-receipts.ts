@@ -4,7 +4,6 @@ import {
   type PublicReceiptDateRange,
 } from "./public-receipt-contract";
 import type { PublicReceiptDocument, ReceiptKind, ReceiptRefusalField, ReceiptRefusalReason } from "./public-receipt-turns";
-import type { LocalizedToolText } from "./tool-result-card";
 
 /** Mirrors PublicExcerptListItem. Carries no source id, by design. */
 export type EvidenceReceipt = {
@@ -16,7 +15,6 @@ export type EvidenceReceipt = {
   // Two dates, not a rendered string: the owner reads this row in whatever
   // language the app is in, which need not be the one the run was made in.
   date_range?: PublicReceiptDateRange | null;
-  title_facts?: LocalizedToolText | null;
   kind: ReceiptKind;
   created_at: string;
   revoked_at?: string | null;

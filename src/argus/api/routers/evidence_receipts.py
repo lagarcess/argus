@@ -7,7 +7,6 @@ on.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated
 from uuid import UUID
@@ -27,19 +26,15 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptRevokeResponse,
     PublicExcerptSelection,
     PublicExcerptSelectionCreate,
-    PublicExcerptSnapshot,
-    PublicToolExcerptCreate,
 )
 from argus.api.public_excerpts import (
     RECEIPT_CREATE_DAILY_LIMIT,
     RECEIPT_CREATE_DAILY_WINDOW_SECONDS,
     RECEIPT_CREATE_LIMIT,
     RECEIPT_CREATE_WINDOW_SECONDS,
-    EvidenceReceiptSourceChangedError,
     EvidenceReceiptSourceMissingError,
     create_receipt_for_artifact,
     create_receipt_for_messages,
-    create_receipt_for_tool_result,
     preview_receipt_for_messages,
     public_excerpt_repository,
     receipt_candidates,
@@ -157,51 +152,6 @@ def create_public_excerpt(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> PublicExcerptCreateResponse:
-    return _create_receipt_response(
-        request=request,
-        user=user,
-        payload=payload,
-        create=lambda owner_note: create_receipt_for_artifact(
-            user=user,
-            artifact_id=_require_uuid(artifact_id, request),
-            owner_note=owner_note,
-        ),
-    )
-
-
-@router.post(
-    "/conversations/{conversation_id}/tool-results/{artifact_id}/public-excerpt",
-    response_model=PublicExcerptCreateResponse,
-)
-def create_public_tool_excerpt(
-    conversation_id: UUID,
-    artifact_id: UUID,
-    payload: PublicToolExcerptCreate,
-    request: Request,
-    user: User = Depends(current_user),  # noqa: B008
-) -> PublicExcerptCreateResponse:
-    return _create_receipt_response(
-        request=request,
-        user=user,
-        payload=payload,
-        create=lambda owner_note: create_receipt_for_tool_result(
-            user=user,
-            conversation_id=str(conversation_id),
-            message_id=str(payload.message_id),
-            artifact_id=str(artifact_id),
-            input_revision=payload.input_revision,
-            owner_note=owner_note,
-        ),
-    )
-
-
-def _create_receipt_response(
-    *,
-    request: Request,
-    user: User,
-    payload: PublicExcerptCreate,
-    create: Callable[[str | None], tuple[PublicExcerptSnapshot, bool]],
-) -> PublicExcerptCreateResponse:
     require_evidence_receipt_sharing_enabled()
     require_account_capability(
         request,
@@ -209,6 +159,7 @@ def _create_receipt_response(
         detail="Sign in to share a result.",
         reason="share_result",
     )
+    owned_artifact_id = _require_uuid(artifact_id, request)
     try:
         owner_note = normalize_owner_note(payload.owner_note)
     except PublicExcerptOwnerNoteError as exc:
@@ -221,15 +172,11 @@ def _create_receipt_response(
         ) from exc
     _enforce_create_rate_limit(request, user=user)
     try:
-        snapshot, created = create(owner_note)
-    except EvidenceReceiptSourceChangedError as exc:
-        raise problem(
-            request,
-            status_code=409,
-            code="tool_result_changed",
-            title="Conflict",
-            detail=str(exc),
-        ) from exc
+        snapshot, created = create_receipt_for_artifact(
+            user=user,
+            artifact_id=owned_artifact_id,
+            owner_note=owner_note,
+        )
     except EvidenceReceiptSourceMissingError as exc:
         raise problem(
             request,
