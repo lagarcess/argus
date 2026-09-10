@@ -1,0 +1,876 @@
+{
+  "en": {
+    "card": {
+      "kind": "tool_result",
+      "schema_version": 1,
+      "tool_name": "backtest",
+      "call_id": "backtest-call",
+      "artifact_id": "backtest-artifact",
+      "input_revision": 0,
+      "card_type": "backtest",
+      "card_version": 1,
+      "arguments": {
+        "strategy": {
+          "raw_user_phrasing": null,
+          "requested_strategy_template": null,
+          "strategy_type": null,
+          "strategy_thesis": null,
+          "asset_universe": [
+            "AAPL"
+          ],
+          "asset_class": null,
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": null,
+          "sizing_mode": null,
+          "capital_amount": null,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": null,
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [],
+          "extra_parameters": {}
+        }
+      },
+      "outcome": {
+        "status": "succeeded",
+        "result": {
+          "execution_status": "succeeded",
+          "facts": {
+            "asset_class": "equity",
+            "symbols": [
+              "AAPL"
+            ],
+            "benchmark_symbol": "SPY",
+            "date_range": {
+              "start": "2024-01-02",
+              "end": "2024-03-01"
+            },
+            "metrics": [
+              {
+                "key": "cash_value",
+                "value": "$600 -> $720"
+              },
+              {
+                "key": "contribution_return_pct",
+                "value": "+18.4%"
+              },
+              {
+                "key": "max_drawdown_pct",
+                "value": "-6.2%"
+              },
+              {
+                "key": "benchmark_return_pct",
+                "value": "+9.1%"
+              },
+              {
+                "key": "delta_vs_benchmark_pct",
+                "value": "9.3"
+              }
+            ],
+            "strategy_facts": [
+              {
+                "key": "strategy_type",
+                "value": "dca accumulation"
+              },
+              {
+                "key": "cadence",
+                "value": "monthly"
+              }
+            ],
+            "assumptions": [
+              {
+                "key": "recurring_contribution",
+                "value": 200.0
+              },
+              {
+                "key": "contribution_cadence",
+                "value": "monthly"
+              },
+              {
+                "key": "starting_principal",
+                "value": 0.0
+              },
+              {
+                "key": "fractional_shares",
+                "value": null
+              },
+              {
+                "key": "long_only",
+                "value": null
+              },
+              {
+                "key": "equal_weight",
+                "value": null
+              },
+              {
+                "key": "modeled_fee_bps",
+                "value": 10.0
+              },
+              {
+                "key": "modeled_slippage_bps",
+                "value": 5.0
+              },
+              {
+                "key": "benchmark_same_modeled_costs",
+                "value": "SPY"
+              }
+            ],
+            "visual": {
+              "kind": "portfolio_equity",
+              "currency": "USD",
+              "base_value": 10000.0,
+              "series": [
+                {
+                  "time": "2024-01-02",
+                  "value": 10000.0
+                },
+                {
+                  "time": "2024-01-03",
+                  "value": 10120.0
+                },
+                {
+                  "time": "2024-01-04",
+                  "value": 10240.0
+                },
+                {
+                  "time": "2024-01-05",
+                  "value": 10360.0
+                },
+                {
+                  "time": "2024-01-08",
+                  "value": 10480.0
+                },
+                {
+                  "time": "2024-01-09",
+                  "value": 10600.0
+                },
+                {
+                  "time": "2024-01-10",
+                  "value": 10720.0
+                },
+                {
+                  "time": "2024-01-11",
+                  "value": 10840.0
+                }
+              ]
+            }
+          },
+          "job_id": null
+        },
+        "failure": null
+      },
+      "presentation": {
+        "title": {
+          "locale_key": "chat.tools.backtest.title",
+          "interpolation_args": {
+            "asset_universe": "AAPL"
+          }
+        },
+        "answer": {
+          "name": "contribution_return_pct",
+          "label": {
+            "locale_key": "receipt.metric_labels.contribution_return_pct",
+            "interpolation_args": {}
+          },
+          "value": "+18.4%",
+          "value_text": null,
+          "unit": null
+        },
+        "narrative": null,
+        "sources": [],
+        "visual": {
+          "kind": "portfolio_equity",
+          "currency": "USD",
+          "base_value": 10000.0,
+          "series": [
+            {
+              "time": "2024-01-02",
+              "value": 10000.0
+            },
+            {
+              "time": "2024-01-03",
+              "value": 10120.0
+            },
+            {
+              "time": "2024-01-04",
+              "value": 10240.0
+            },
+            {
+              "time": "2024-01-05",
+              "value": 10360.0
+            },
+            {
+              "time": "2024-01-08",
+              "value": 10480.0
+            },
+            {
+              "time": "2024-01-09",
+              "value": 10600.0
+            },
+            {
+              "time": "2024-01-10",
+              "value": 10720.0
+            },
+            {
+              "time": "2024-01-11",
+              "value": 10840.0
+            }
+          ]
+        },
+        "rows": [
+          {
+            "name": "cash_value",
+            "label": {
+              "locale_key": "receipt.metric_labels.cash_value",
+              "interpolation_args": {}
+            },
+            "value": "$600 -> $720",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "max_drawdown_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.max_drawdown_pct",
+              "interpolation_args": {}
+            },
+            "value": "-6.2%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "benchmark_return_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.benchmark_return_pct",
+              "interpolation_args": {}
+            },
+            "value": "+9.1%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "delta_vs_benchmark_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.delta_vs_benchmark_pct",
+              "interpolation_args": {}
+            },
+            "value": "9.3",
+            "value_text": null,
+            "unit": {
+              "locale_key": "chat.tools.units.percentage_points",
+              "interpolation_args": {}
+            }
+          },
+          {
+            "name": "strategy.strategy_type",
+            "label": {
+              "locale_key": "receipt.strategy_facts.strategy_type",
+              "interpolation_args": {}
+            },
+            "value": "dca accumulation",
+            "value_text": {
+              "locale_key": "receipt.strategy_type_values.dca accumulation",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "strategy.cadence",
+            "label": {
+              "locale_key": "receipt.strategy_facts.cadence",
+              "interpolation_args": {}
+            },
+            "value": "monthly",
+            "value_text": {
+              "locale_key": "receipt.cadence_values.monthly",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "symbols",
+            "label": {
+              "locale_key": "receipt.fields.asset",
+              "interpolation_args": {}
+            },
+            "value": "AAPL",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "start_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.start_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-01-02",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "end_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.end_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-03-01",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "asset_class",
+            "label": {
+              "locale_key": "receipt.fields.asset_class",
+              "interpolation_args": {}
+            },
+            "value": "equity",
+            "value_text": {
+              "locale_key": "receipt.asset_class_values.equity",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "benchmark_symbol",
+            "label": {
+              "locale_key": "receipt.fields.benchmark",
+              "interpolation_args": {}
+            },
+            "value": "SPY",
+            "value_text": null,
+            "unit": null
+          }
+        ],
+        "inputs": [],
+        "notes": [
+          {
+            "locale_key": "receipt.assumptions.recurring_contribution",
+            "interpolation_args": {
+              "value": 200.0,
+              "amount": 200.0,
+              "bps": 200.0,
+              "symbol": 200.0
+            }
+          },
+          {
+            "locale_key": "receipt.cadence_values.monthly",
+            "interpolation_args": {
+              "value": "monthly",
+              "amount": "monthly",
+              "bps": "monthly",
+              "symbol": "monthly"
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.starting_principal",
+            "interpolation_args": {
+              "value": 0.0,
+              "amount": 0.0,
+              "bps": 0.0,
+              "symbol": 0.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.fractional_shares",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.long_only",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.equal_weight",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_fee_bps",
+            "interpolation_args": {
+              "value": 10.0,
+              "amount": 10.0,
+              "bps": 10.0,
+              "symbol": 10.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_slippage_bps",
+            "interpolation_args": {
+              "value": 5.0,
+              "amount": 5.0,
+              "bps": 5.0,
+              "symbol": 5.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.benchmark_same_modeled_costs",
+            "interpolation_args": {
+              "value": "SPY",
+              "amount": "SPY",
+              "bps": "SPY",
+              "symbol": "SPY"
+            }
+          }
+        ]
+      },
+      "artifact_state": "active"
+    }
+  },
+  "es-419": {
+    "card": {
+      "kind": "tool_result",
+      "schema_version": 1,
+      "tool_name": "backtest",
+      "call_id": "backtest-call",
+      "artifact_id": "backtest-artifact",
+      "input_revision": 0,
+      "card_type": "backtest",
+      "card_version": 1,
+      "arguments": {
+        "strategy": {
+          "raw_user_phrasing": null,
+          "requested_strategy_template": null,
+          "strategy_type": null,
+          "strategy_thesis": null,
+          "asset_universe": [
+            "AAPL"
+          ],
+          "asset_class": null,
+          "timeframe": null,
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": null,
+          "sizing_mode": null,
+          "capital_amount": null,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": null,
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [],
+          "extra_parameters": {}
+        }
+      },
+      "outcome": {
+        "status": "succeeded",
+        "result": {
+          "execution_status": "succeeded",
+          "facts": {
+            "asset_class": "equity",
+            "symbols": [
+              "AAPL"
+            ],
+            "benchmark_symbol": "SPY",
+            "date_range": {
+              "start": "2024-01-02",
+              "end": "2024-03-01"
+            },
+            "metrics": [
+              {
+                "key": "cash_value",
+                "value": "$600 -> $720"
+              },
+              {
+                "key": "contribution_return_pct",
+                "value": "+18.4%"
+              },
+              {
+                "key": "max_drawdown_pct",
+                "value": "-6.2%"
+              },
+              {
+                "key": "benchmark_return_pct",
+                "value": "+9.1%"
+              },
+              {
+                "key": "delta_vs_benchmark_pct",
+                "value": "9.3"
+              }
+            ],
+            "strategy_facts": [
+              {
+                "key": "strategy_type",
+                "value": "dca accumulation"
+              },
+              {
+                "key": "cadence",
+                "value": "monthly"
+              }
+            ],
+            "assumptions": [
+              {
+                "key": "recurring_contribution",
+                "value": 200.0
+              },
+              {
+                "key": "contribution_cadence",
+                "value": "monthly"
+              },
+              {
+                "key": "starting_principal",
+                "value": 0.0
+              },
+              {
+                "key": "fractional_shares",
+                "value": null
+              },
+              {
+                "key": "long_only",
+                "value": null
+              },
+              {
+                "key": "equal_weight",
+                "value": null
+              },
+              {
+                "key": "modeled_fee_bps",
+                "value": 10.0
+              },
+              {
+                "key": "modeled_slippage_bps",
+                "value": 5.0
+              },
+              {
+                "key": "benchmark_same_modeled_costs",
+                "value": "SPY"
+              }
+            ],
+            "visual": {
+              "kind": "portfolio_equity",
+              "currency": "USD",
+              "base_value": 10000.0,
+              "series": [
+                {
+                  "time": "2024-01-02",
+                  "value": 10000.0
+                },
+                {
+                  "time": "2024-01-03",
+                  "value": 10120.0
+                },
+                {
+                  "time": "2024-01-04",
+                  "value": 10240.0
+                },
+                {
+                  "time": "2024-01-05",
+                  "value": 10360.0
+                },
+                {
+                  "time": "2024-01-08",
+                  "value": 10480.0
+                },
+                {
+                  "time": "2024-01-09",
+                  "value": 10600.0
+                },
+                {
+                  "time": "2024-01-10",
+                  "value": 10720.0
+                },
+                {
+                  "time": "2024-01-11",
+                  "value": 10840.0
+                }
+              ]
+            }
+          },
+          "job_id": null
+        },
+        "failure": null
+      },
+      "presentation": {
+        "title": {
+          "locale_key": "chat.tools.backtest.title",
+          "interpolation_args": {
+            "asset_universe": "AAPL"
+          }
+        },
+        "answer": {
+          "name": "contribution_return_pct",
+          "label": {
+            "locale_key": "receipt.metric_labels.contribution_return_pct",
+            "interpolation_args": {}
+          },
+          "value": "+18.4%",
+          "value_text": null,
+          "unit": null
+        },
+        "narrative": null,
+        "sources": [],
+        "visual": {
+          "kind": "portfolio_equity",
+          "currency": "USD",
+          "base_value": 10000.0,
+          "series": [
+            {
+              "time": "2024-01-02",
+              "value": 10000.0
+            },
+            {
+              "time": "2024-01-03",
+              "value": 10120.0
+            },
+            {
+              "time": "2024-01-04",
+              "value": 10240.0
+            },
+            {
+              "time": "2024-01-05",
+              "value": 10360.0
+            },
+            {
+              "time": "2024-01-08",
+              "value": 10480.0
+            },
+            {
+              "time": "2024-01-09",
+              "value": 10600.0
+            },
+            {
+              "time": "2024-01-10",
+              "value": 10720.0
+            },
+            {
+              "time": "2024-01-11",
+              "value": 10840.0
+            }
+          ]
+        },
+        "rows": [
+          {
+            "name": "cash_value",
+            "label": {
+              "locale_key": "receipt.metric_labels.cash_value",
+              "interpolation_args": {}
+            },
+            "value": "$600 -> $720",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "max_drawdown_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.max_drawdown_pct",
+              "interpolation_args": {}
+            },
+            "value": "-6.2%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "benchmark_return_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.benchmark_return_pct",
+              "interpolation_args": {}
+            },
+            "value": "+9.1%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "delta_vs_benchmark_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.delta_vs_benchmark_pct",
+              "interpolation_args": {}
+            },
+            "value": "9.3",
+            "value_text": null,
+            "unit": {
+              "locale_key": "chat.tools.units.percentage_points",
+              "interpolation_args": {}
+            }
+          },
+          {
+            "name": "strategy.strategy_type",
+            "label": {
+              "locale_key": "receipt.strategy_facts.strategy_type",
+              "interpolation_args": {}
+            },
+            "value": "dca accumulation",
+            "value_text": {
+              "locale_key": "receipt.strategy_type_values.dca accumulation",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "strategy.cadence",
+            "label": {
+              "locale_key": "receipt.strategy_facts.cadence",
+              "interpolation_args": {}
+            },
+            "value": "monthly",
+            "value_text": {
+              "locale_key": "receipt.cadence_values.monthly",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "symbols",
+            "label": {
+              "locale_key": "receipt.fields.asset",
+              "interpolation_args": {}
+            },
+            "value": "AAPL",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "start_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.start_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-01-02",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "end_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.end_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-03-01",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "asset_class",
+            "label": {
+              "locale_key": "receipt.fields.asset_class",
+              "interpolation_args": {}
+            },
+            "value": "equity",
+            "value_text": {
+              "locale_key": "receipt.asset_class_values.equity",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "benchmark_symbol",
+            "label": {
+              "locale_key": "receipt.fields.benchmark",
+              "interpolation_args": {}
+            },
+            "value": "SPY",
+            "value_text": null,
+            "unit": null
+          }
+        ],
+        "inputs": [],
+        "notes": [
+          {
+            "locale_key": "receipt.assumptions.recurring_contribution",
+            "interpolation_args": {
+              "value": 200.0,
+              "amount": 200.0,
+              "bps": 200.0,
+              "symbol": 200.0
+            }
+          },
+          {
+            "locale_key": "receipt.cadence_values.monthly",
+            "interpolation_args": {
+              "value": "monthly",
+              "amount": "monthly",
+              "bps": "monthly",
+              "symbol": "monthly"
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.starting_principal",
+            "interpolation_args": {
+              "value": 0.0,
+              "amount": 0.0,
+              "bps": 0.0,
+              "symbol": 0.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.fractional_shares",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.long_only",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.equal_weight",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_fee_bps",
+            "interpolation_args": {
+              "value": 10.0,
+              "amount": 10.0,
+              "bps": 10.0,
+              "symbol": 10.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_slippage_bps",
+            "interpolation_args": {
+              "value": 5.0,
+              "amount": 5.0,
+              "bps": 5.0,
+              "symbol": 5.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.benchmark_same_modeled_costs",
+            "interpolation_args": {
+              "value": "SPY",
+              "amount": "SPY",
+              "bps": "SPY",
+              "symbol": "SPY"
+            }
+          }
+        ]
+      },
+      "artifact_state": "active"
+    }
+  }
+}

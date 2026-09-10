@@ -1,0 +1,39 @@
+{
+  "source_sha": "b17d25775028b7d7e2ea2f30ab35348291c973cc",
+  "source_clean_before_generation": true,
+  "evidence_kind": "authored_rendered_fixture",
+  "generator_network_attempts": 0,
+  "provider_calls": 0,
+  "interpreter_calls": 0,
+  "backtest_handler_calls": 0,
+  "real_api_calls": 0,
+  "source_files": {
+    "web/e2e/support/registry-fixture.py": "14992c317fe0d18e392d7ed62e38b746340d726e07e3a5bebacf4c36e9824e1f",
+    "web/e2e/tool-registry.spec.ts": "fc214f21ac979f40fbfd3a0836c7ee2f7bad33896e5a2eb52dfa776e9901a0f1",
+    "web/e2e/support/mobile-shell-fixture.ts": "2d3e8f43c342980d4d3b2a32594b2f4e853a01049ca3547519f5e966eb131683",
+    "tests/public_excerpt_factories.py": "4af6cbec173c2118d75fb5f03eedc5395b730dfb448cc6ed851e37a51153ee72",
+    "tests/agent_runtime/test_registered_backtest_presentation.py": "23f24f930a443472333ee139a1148d15b2bf463ad3e0f6e07e82eb26ddbe338b",
+    "src/argus/agent_runtime/state/models.py": "5c7f4052f7b6567ddeef972f6b03cd4e12ab6c23358e7b204d86ede240f3f6a3",
+    "src/argus/agent_runtime/tools/registered_backtest.py": "f9bb6895e4d29dca3283fc0fd8503bf68906267e756a8a1108ceb47a4a8b8c8d",
+    "src/argus/agent_runtime/tools/backtest_presentation.py": "e5cabd9cb85b74ff26740758a76211afb0052b5c2ebd903ec901918fb686c605",
+    "src/argus/agent_runtime/tools/backtest_result_facts.py": "014862e61fb479507537d2e12a461d37f98a2d867c3fe5cc399f971e23c36716",
+    "src/argus/domain/tool_declaration.py": "6951497754b0d9b8cad791636360738bde0d897002a0d15cf731a9b90d621fc5",
+    "src/argus/domain/tool_contracts.py": "73a19a8163dc7bdc84fef5ba1694753244c277a6de768df52feca641ef7b374e",
+    "src/argus/domain/dca_capital.py": "30301d4d5f73580f0a986bea1ffc210cc92415d54529193aee1f1a83cf217791",
+    "src/argus/domain/backtesting/cards.py": "ffc4d877cd53eff484f2c199e34c3360ba3be2f84e6db86e510be3e89b13ca85",
+    "web/components/chat/ToolResultCard.tsx": "0cca63165ef93dc053ea072764c5973106aa85afd58bd9adb64de8f9ed565e73",
+    "web/components/chat/ToolCardPresentation.tsx": "0fbcb770786eba271ac45a4d948939c0a6c7e3d54ccd0594e9cf3bf2a1a749b8",
+    "web/lib/tool-result-card.ts": "1bd7d021df795b68114a3fded4b737bef73e3208dc9f79caef91621f0200216c",
+    "web/public/locales/en/common.json": "19405e4c1d6c2f393a6649896bb70ae21535d58a052394e5c9a2143b8cb7fac3",
+    "web/public/locales/es-419/common.json": "4cb3a041c15b86195a925293c63ad07d4b3995c0e852e232bc1fe80503bc321a"
+  },
+  "fixture_files": {
+    "tool-cards.json": "35f3786eca400c82bebc445ca3dba0df444d9f1edfd919f735592a93529d5fb9",
+    "backtest-cards.json": "5d0a14d8fabd517bcb64041c2f25037dbaea777319bd252f068f4bab7922eaf3",
+    "signal-cards.json": "870392fbee52304a7a1f79003d1e33f8ff4051c65e369de5f0ab90af1f2839de",
+    "tool-progress.json": "9062af124011023f543f4fa9d2d540e01ad305e4cea72bfdee6ef1145a946f0b",
+    "fixture-coherence.json": "7f49e8dc63cdb7831b7419acd0cdc1ac569c32e265bd91a1c594969466b44907"
+  },
+  "wrapper": "Existing test-only echo declaration; actual registered backtest result projector and presenter consume authored DCA/MACD engine fixtures. No backtest handler or model was invoked.",
+  "numeric_fixture_owner": "fixture-coherence.json: principal from engine config or DcaCapitalPlan; profit and ending value from that principal and authored net return; chart endpoints derived from the same values"
+}

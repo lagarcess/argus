@@ -1,0 +1,69 @@
+{
+  "title": "repeated asynchronous calls settle independently en",
+  "status": "passed",
+  "requests": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations/conversation-alpha/messages?limit=100"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/backtest-jobs/tool-job-0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/backtest-jobs/tool-job-1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/backtest-jobs/tool-job-0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations/conversation-alpha/messages?limit=100"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    }
+  ],
+  "external": [],
+  "unhandledApi": [],
+  "pageErrors": []
+}

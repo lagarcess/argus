@@ -1,0 +1,441 @@
+{
+  "config": {
+    "configFile": "/private/tmp/registry-declaration-browser-b17d2577/registry-capture.playwright.config.ts",
+    "rootDir": "/private/tmp/registry-declaration-browser-b17d2577/checkout/web/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/private/tmp/registry-declaration-browser-b17d2577/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/private/tmp/registry-declaration-browser-b17d2577/checkout/web/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "tool-registry.spec.ts",
+          "registry-signal-control.spec.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/private/tmp/registry-declaration-browser-b17d2577/capture-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 1,
+    "webServer": {
+      "command": "node ./node_modules/next/dist/bin/next dev --webpack --hostname 127.0.0.1 --port 3195",
+      "cwd": "/private/tmp/registry-declaration-browser-b17d2577/checkout/web",
+      "url": "http://127.0.0.1:3195",
+      "reuseExistingServer": false,
+      "timeout": 120000,
+      "env": {
+        "NEXT_TELEMETRY_DISABLED": "1",
+        "NEXT_PUBLIC_MOCK_AUTH": "true",
+        "NEXT_PUBLIC_ENABLE_SPANISH": "true",
+        "NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED": "false",
+        "NEXT_PUBLIC_ARGUS_API_URL": "http://127.0.0.1:8318/api/v1"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "registry-signal-control.spec.ts",
+      "file": "registry-signal-control.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "authored signal card retains MACD windows and chart across reload en",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6070,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:25.452Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "21f1515154fe61be331a-14e0c450bae7c05c0ff2",
+          "file": "registry-signal-control.spec.ts",
+          "line": 13,
+          "column": 7
+        },
+        {
+          "title": "authored signal card retains MACD windows and chart across reload es-419",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3498,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:31.622Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "21f1515154fe61be331a-c3d1d73c4726135fd3c3",
+          "file": "registry-signal-control.spec.ts",
+          "line": 13,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "tool-registry.spec.ts",
+      "file": "tool-registry.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "declared backtest keeps DCA assumptions and the receipt visual en",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1891,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:35.132Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-5adf68052e61494365c4",
+          "file": "tool-registry.spec.ts",
+          "line": 77,
+          "column": 7
+        },
+        {
+          "title": "tool results live, recompute and reload en 1280",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4379,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:37.029Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-e5fcae9d6e8f9461233b",
+          "file": "tool-registry.spec.ts",
+          "line": 135,
+          "column": 9
+        },
+        {
+          "title": "tool results live, recompute and reload en 390",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4277,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:41.414Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-b88ac36fc0335673dec1",
+          "file": "tool-registry.spec.ts",
+          "line": 135,
+          "column": 9
+        },
+        {
+          "title": "declared backtest keeps DCA assumptions and the receipt visual es-419",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1877,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:45.696Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-75ca613df24f18cb970e",
+          "file": "tool-registry.spec.ts",
+          "line": 77,
+          "column": 7
+        },
+        {
+          "title": "tool results live, recompute and reload es-419 1280",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4369,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:47.579Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-b7944500c6be30013eb5",
+          "file": "tool-registry.spec.ts",
+          "line": 135,
+          "column": 9
+        },
+        {
+          "title": "tool results live, recompute and reload es-419 390",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4329,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:51.954Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-4dea2b8f38f781b5362b",
+          "file": "tool-registry.spec.ts",
+          "line": 135,
+          "column": 9
+        },
+        {
+          "title": "repeated asynchronous calls settle independently en",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3082,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:56.288Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-cdd3534d2f46ca86b33f",
+          "file": "tool-registry.spec.ts",
+          "line": 199,
+          "column": 7
+        },
+        {
+          "title": "repeated asynchronous calls settle independently es-419",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3074,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-10T08:51:59.376Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3361b769c2bf936c540-eebb20d53f56658d1e42",
+          "file": "tool-registry.spec.ts",
+          "line": 199,
+          "column": 7
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-10T08:51:22.607Z",
+    "duration": 39925.216,
+    "expected": 10,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
