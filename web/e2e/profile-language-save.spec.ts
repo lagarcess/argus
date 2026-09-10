@@ -46,7 +46,11 @@ const COPY = Object.fromEntries(
 
 const LOCALE: Record<ArgusLanguage, string> = { en: "en-US", "es-419": "es-419" };
 
-type SaveOutcome = "saves" | "fails" | { held: Promise<void> };
+type SaveOutcome =
+  | "saves"
+  | "fails"
+  | "saves-but-reply-fails"
+  | { held: Promise<void> };
 
 function languageRow(language: ArgusLanguage): RegExp {
   const { name } = ALL_LANGUAGES.find((entry) => entry.code === language)!;
@@ -97,6 +101,14 @@ async function mockAccount(
       }
       if (typeof outcome === "object") await outcome.held;
       Object.assign(profile, patch);
+      if (outcome === "saves-but-reply-fails") {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "Profile read failed after the write" }),
+        });
+        return;
+      }
     }
     await fulfillJson(route, { user: profile, account_kind: "registered" });
   });
@@ -201,6 +213,24 @@ test("a saved language reaches the account and survives a reload", async ({
   await expect(
     page.getByRole("button", { name: COPY["es-419"].common.settings }),
   ).toBeVisible();
+});
+
+test("a save the account took is kept when its reply fails", async ({
+  page,
+}) => {
+  const { saves } = await mockAccount(page, "en", "saves-but-reply-fails");
+  await page.goto("/chat", { waitUntil: "networkidle" });
+
+  const panel = await openPreference(page, "en", "language");
+  await activate(page, panel.getByRole("button", { name: languageRow("es-419") }));
+
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: COPY["es-419"].common.settings }),
+  ).toBeVisible();
+  expect(saves).toEqual([{ language: "es-419", locale: "es-419" }]);
+  await expect.poll(() => storedLanguage(page)).toBe("es-419");
+  await capture(page, "en-kept-after-failed-reply");
 });
 
 test("a save that outlives its panel cannot close the panel that replaced it", async ({
