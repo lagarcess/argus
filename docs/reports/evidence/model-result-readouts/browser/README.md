@@ -106,36 +106,11 @@ Open `/chat?conversation=` with these aliases:
 | Synthetic new English envelope | `00000000-0000-4000-8000-000000005392` |
 | Synthetic new Spanish envelope | `00000000-0000-4000-8000-000000005393` |
 
-## Founder DOCN side-by-side steps for the real PR preview
+## Founder DOCN side-by-side
 
-Use the PR's real preview link, **not the provider-free replay above**, which
-deliberately rejects generation. Both comparisons must use the same date window,
-starting capital, benchmark, and cost assumptions. These are reproduction steps;
-this replay did not execute DOCN or measure the model's text.
-
-1. English: expand the sidebar, open **Settings → Preferences → App language →
-   English**, then **New chat**. Send: `buy and hold DOCN since September 2023
-   against SPY`.
-2. If the setup asks for dates or capital, supply: `Start September 1, 2023,
-   end September 9, 2026, with $10,000 starting capital. Use SPY as the benchmark.`
-   Use the same explicit window for the competitor comparison. Review the
-   confirmation's effective window and cost assumptions, then choose
-   **Run backtest**.
-3. Compare the **Quick take** with the card. Choose **Explain result** to open
-   **Breakdown**. Record whether it adds a meaningful explanation of comparison,
-   roughness, and drawdown scale rather than only repeating the card. These
-   model-quality judgments require the separate approved live evidence.
-4. Spanish: **Ajustes → Preferencias → Idioma de la app → Español**, then
-   **Nuevo chat**. Send: `Compra y mantén DOCN desde septiembre de 2023 y compáralo
-   con SPY`.
-5. If needed, supply: `Del 1 de septiembre de 2023 al 9 de septiembre de 2026,
-   con un capital inicial de $10,000. Usa SPY como referencia.` Review the same
-   assumptions and choose **Ejecutar backtest**, then compare **Lectura rápida**
-   and **Explicar resultado → Desglose**.
-6. Switch each saved result to the other workspace language and reload. Both
-   frames should use localized templates. Switching back restores its stored
-   composition-language text without regenerating or rewriting it.
-
-Settings, readout frame, and copy labels were observed in browser. Confirmation
-and Explain result labels were checked against the current locale catalogs; the
-replay already contains a Breakdown, so it does not click the generation action.
+Use the [canonical bilingual DOCN steps](../founder-comparison.md) for the real
+candidate preview. This provider-free replay deliberately rejects generation.
+Settings, readout frame and copy labels were observed in the browser.
+Confirmation and Explain result labels were checked against the current locale
+catalogs; this replay already contains a Breakdown and does not click the
+generation action.

@@ -67,11 +67,11 @@ interleaved readout comparison, and exact DOCN/SPY preview instructions.
 
 Implementation sequence:
 
-- [ ] Prove current generation, persistence, reader and validator boundaries.
-- [ ] Test and implement the shared generation facts and truth checks.
-- [ ] Test and implement creation-time transport and template fallbacks.
-- [ ] Test and implement matching-language frame content and clipboard parity.
-- [ ] Record every validator disposition and focused verification result.
+- [x] Prove current generation, persistence, reader and validator boundaries.
+- [x] Test and implement the shared generation facts and truth checks.
+- [x] Test and implement creation-time transport and template fallbacks.
+- [x] Test and implement matching-language frame content and clipboard parity.
+- [x] Record every validator disposition and focused verification result.
 - [ ] Post a cost estimate and wait for founder approval before live work.
 - [ ] Commit measured evidence and fingerprint; capture bilingual browser proof.
 - [ ] Recheck PR overlap and current integration, reconcile one-way as needed.

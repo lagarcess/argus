@@ -51,11 +51,15 @@ Python 3.10.20, provider keys blanked, no live calls:
   job completion, reload, private-prose boundaries and runtime workflows.
 - 254 frontend tests passed across 12 files, including both language directions,
   old results, invalid envelopes, visible text/copy parity and AST bypass probes.
+- 23 targeted measurement and prompt-extractor tests passed. The unchanged
+  prompt-freeze suite had its expected one failure and two passes.
 - The prescribed mocked evaluation harness passed 257 tests earlier in this
   lane; this is mocked harness evidence, not a live scorecard.
 - Changed Python Ruff checks and changed TypeScript ESLint passed.
-- Local modularity budgets and `git diff --check` passed. A committed merged-tree
-  budget check and remote exact-head CI remain separate gates.
+- Modularity budgets and `git diff --check` passed. `git merge-tree` calculated
+  `42d16ecf927946722a83b49a4410a23d7f814a7c`, identical to the implementation
+  tree at `55e63bf7647eb8a6f87e152a05db3fb871a76594`; that would-be merged tree
+  passed the budget check. Recheck current integration before readiness.
 - Independent code review reproduced and closed unit confusion, generic
   benchmark-subject inversion, and compact-number parsing defects. Its final
   review of the latest correction was clean. This does not replace the final
