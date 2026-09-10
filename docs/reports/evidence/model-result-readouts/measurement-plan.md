@@ -43,8 +43,8 @@ located through a read-only database query, with no provider call. Its sanitized
 typed snapshot remains separate under `/private/tmp/`; it is not committed and
 does not change the synthetic examples into empirical evidence. Fresh DOCN and RSI fixtures are now retained under `live-browser/stored-runs/`.
 The DCA chat setup hit an unrelated capital-interpretation failure. The fourth
-simulation allowance will supply its genuine fixture through the typed engine
-path; that fixture will not represent a successful DCA browser journey.
+simulation allowance supplied its genuine fixture through the typed engine
+path; that fixture does not represent a successful DCA browser journey.
 
 For an empirical fixture, `source.kind` is `recorded_run`; `source.artifact`
 points to the approved sanitized saved-run JSON, relative to the fixture file;
@@ -56,8 +56,9 @@ metric precision and absent fields; do not fabricate a curve or full ledger.
 ## Cost and execution bounds
 
 Founder-approved total allowance: **up to $5**, using **$3.50 for the 48-completion
-comparison and at most $1.50 for browser proof**, with at most four fresh browser
-backtests. This supersedes the earlier $1 targeted measurement / $2 total
+comparison and at most $1.50 for browser proof**, with at most four fresh
+simulations. Final usage is three UI-completed backtests and one direct typed
+DCA engine fixture after its chat setup failed. This supersedes the earlier $1 targeted measurement / $2 total
 request. No full live suite or fingerprint regeneration is included in this
 authorization.
 The recorded DOCN chart makes the earlier 8,000-byte input assumption invalid;
@@ -115,28 +116,29 @@ Free preflight, with the lane's prepared fixture examples:
 
 ```bash
 poetry run python -m tests.evals.result_readout_eval \
-  --baseline /Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next \
+  --baseline /private/tmp/model-result-readouts-baseline-d088 \
   --candidate /Users/garces/.codex/worktrees/7c2d/private-alpha-next \
   --output /private/tmp/model-result-readouts-preflight.json
 ```
 
-The selected baseline was verified at `d0884c3de81f8c53d454ac4f68f461d3b5dd77e3`
+An isolated baseline clone was created after the shared checkout advanced.
+The selected immutable baseline was verified at `d0884c3de81f8c53d454ac4f68f461d3b5dd77e3`
 and clean. Do not rely on that path remaining at the same commit; the runner
 records both current SHAs. The free check tolerates dirty development code and
 labels it explicitly. The separate recorded DOCN size preflight observed
 7,601 bytes on baseline and 48,835 bytes on candidate, exposing why synthetic
-fixture sizing was insufficient. The other two cases in that partial fixture
-set are still synthetic; this is free size/configuration evidence, not paid
-measurement or committed-head acceptance.
+fixture sizing was insufficient. The two other cases in that earlier partial fixture set were synthetic.
+The final `recorded-fixtures.json` uses three complete genuine saved runs and
+verified source hashes; its free preflight is sizing/configuration evidence.
 
 Once three genuine source-verified fixtures and final clean candidate code
 exist, the authorized targeted command is:
 
 ```bash
 poetry run python -m tests.evals.result_readout_eval \
-  --baseline /Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next \
+  --baseline /private/tmp/model-result-readouts-baseline-d088 \
   --candidate /Users/garces/.codex/worktrees/7c2d/private-alpha-next \
-  --fixtures /private/tmp/model-result-readouts-recorded-fixtures.json \
+  --fixtures docs/reports/evidence/model-result-readouts/recorded-fixtures.json \
   --pricing /private/tmp/model-result-readouts-refreshed-prices.json \
   --budget-usd 3.5 --live \
   --output /private/tmp/model-result-readouts-live.json

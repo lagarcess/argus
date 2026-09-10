@@ -1,0 +1,57 @@
+{
+  "candidate_sha": "8c657b3c74c098ec58be2a2e91e75b202d5e33d3",
+  "execution_path": "canonical prepare_confirmation_launch -> RealBacktestTool -> build_backtest_run_from_result",
+  "successful_chat_or_browser_journey": false,
+  "history_rewrites": 0,
+  "models_disabled": true,
+  "before_model_attempt_count": 43,
+  "after_model_attempt_count": 43,
+  "total_backtest_attempts": 4,
+  "provider_requests": [
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/assets/DOCN",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/assets/SPY",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/calendar",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "method": "GET"
+    },
+    {
+      "host": "paper-api.alpaca.markets",
+      "path": "/v2/calendar",
+      "method": "GET"
+    }
+  ],
+  "stored_run": "docs/reports/evidence/model-result-readouts/live-browser/stored-runs/dca-costs.json",
+  "stored_run_sha256": "5d788b99cee6d2519a7a717118d94a52dd89aa6755525fb5e4b768882bf9ef28",
+  "raw_engine_result_uncompressed_sha256": "167bbcc42b6640a4af8c6ec36824fa3257013e7e69114d6a519f8285f06fb3bb",
+  "approved_inputs_verified": true,
+  "accounted_cost_usd": "0.6286376422"
+}

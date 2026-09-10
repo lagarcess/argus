@@ -1,0 +1,14 @@
+{
+  "captured_viewer_sha": "104da766a88d04fc466285a64c622b936925d657",
+  "revalidated_sha": "8c657b3c74c098ec58be2a2e91e75b202d5e33d3",
+  "web_and_shared_json_hash_count": 671,
+  "changed_captured_files": [],
+  "changed_additional_reader_paths": [],
+  "reader_paths": [
+    "src/argus/api/artifact_presentation.py",
+    "src/argus/domain/artifact_prose_fields.json",
+    "src/argus/domain/artifact_root_prose_fields.json",
+    "src/argus/domain/result_readout_content.py"
+  ],
+  "disposition": "Saved-frame browser evidence retained. Generation-only fixes do not rewrite the recorded readouts; this is not fresh model-quality proof at the revalidation SHA."
+}

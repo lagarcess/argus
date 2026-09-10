@@ -1792,13 +1792,6 @@
       "candidate_sha": "104da766a88d04fc466285a64c622b936925d657",
       "payload_sha256": "0dd245b2adfc6f1d72ed44f7355751579a97074cb85f7d0b1a7334eb696639a2",
       "success": true
-    },
-    {
-      "case": "dca-costs",
-      "candidate_sha": "8c657b3c74c098ec58be2a2e91e75b202d5e33d3",
-      "payload_sha256": "6b5dc840d5fe95919fcf3b70630ac7bb44a10e3c66528f9cca2012fac2d23a2f",
-      "execution_path": "direct typed engine fixture; blocked DCA chat journey is preserved",
-      "success": true
     }
   ],
   "accounting_notes": [
@@ -1829,13 +1822,6 @@
       "original_halt": null,
       "original_attempt_count": 26,
       "source_sha": "e279380030b284ce43bf1fc740bbac8a8b3359ed"
-    },
-    {
-      "at": "2026-09-10T20:59:02.751170+00:00",
-      "reason": "Captain authorized full reservation charges for unknown response/cancellation cost; no attempts reset",
-      "original_halt": null,
-      "original_attempt_count": 43,
-      "source_sha": "8c657b3c74c098ec58be2a2e91e75b202d5e33d3"
     }
   ]
 }

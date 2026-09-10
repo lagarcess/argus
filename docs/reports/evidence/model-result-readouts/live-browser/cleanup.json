@@ -11,5 +11,8 @@
     "/var/folders/04/_3s7_2qd2z3_pxhb1jgjj5m00000gn/T/argus-readout-live-e2793800-9f_erhgn"
   ],
   "environment_file_writes": 0,
-  "pending_work": "One authorized direct DCA engine fixture after clean source SHA; no model calls"
+  "pending_work": null,
+  "direct_engine_session": 17785,
+  "direct_engine_exit_code": 0,
+  "total_backtest_attempts": 4
 }

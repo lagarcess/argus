@@ -20,7 +20,7 @@ metadata from shared model facts. DCA's first setup used `e2793800`, while its
 single clarification reply, the RSI browser run, and the new old-run Breakdown
 used `104da766a88d04fc466285a64c622b936925d657`. Each checkpoint and the cumulative
 ledger preserve these distinct creation sources. The fourth direct DCA engine
-fixture is pending the captain's clean commit; it has not run yet.
+fixture completed on `8c657b3c74c098ec58be2a2e91e75b202d5e33d3`.
 
 The first case completed one genuine engine run and accepted the configured
 Qwen fallback's Quick take after DeepSeek timed out. Its Breakdown is a template:
@@ -52,9 +52,10 @@ locally reconstructed conversation/control metadata so its Explain result action
 can be exercised; its metrics are not synthetic. New transport fixtures in the
 sibling `browser/` replay folder are synthetic and are not live-model evidence.
 
-For every fresh case the browser enters a fully specified idea, clicks the
-confirmation's Run backtest / Ejecutar backtest, then Explain result / Explicar
-resultado once. Matching-language, reload, and Settings language-switch captures
+For the three completed browser cases, the browser enters a fully specified
+idea, clicks Run backtest / Ejecutar backtest, then Explain result / Explicar
+resultado once. DCA's blocked chat path and separate direct fixture are recorded
+explicitly below. Matching-language, reload, and Settings language-switch captures
 are saved without further model calls. `fee-ledger.json` owns cumulative model
 attempts and backtest count across the controlled API restart. Raw readout
 completion bodies, usage, selected models, and any safely redacted provider
@@ -89,7 +90,7 @@ may be necessary. RSI had not started at this checkpoint.
 The single DCA clarification reply on `104da766` repeated the same recovery
 instead of producing confirmation. That blocked chat journey is preserved in
 `dca-followup-resumed-stopped.png` and its DOM/JSON. No further DCA chat reply or
-setup was issued. The separately authorized fourth engine fixture will use the
+setup was issued. The separately authorized fourth engine fixture used the
 exact already approved inputs directly, with models disabled; it is not evidence
 that the DCA chat journey succeeded.
 
@@ -117,10 +118,21 @@ in `old-run-button-unavailable.json`; the final saved matrix has none.
 
 The final browser viewer used the copied reader source from `104da766`; earlier
 creation SHAs remain attached to each run in the cumulative fee ledger. The
-reader source hashes are in `web-source.json`. `cleanup.json` records stopped
-servers and removed isolated web copies. The only remaining execution is the
-fourth direct DCA engine fixture after the captain supplies its clean source SHA.
-The terminal manifest will record its result and final total.
+reader source hashes are in `web-source.json`. `reader-revalidation.json` verifies
+all 671 copied web/shared-JSON files plus the additional API reader paths still
+match at `8c657b3c`; the saved-state browser evidence is retained. `cleanup.json`
+records stopped servers and removed isolated web copies.
+
+The fourth direct DCA fixture completed on clean `8c657b3c`, through canonical
+coverage preflight, RealBacktestTool, and the stored-run builder. It verifies
+$1,000 seed, $100 monthly contributions, DOCN against SPY, the requested year,
+10bps fees and 5bps slippage. `direct-dca-proof.json` records zero model calls
+and the full source hash. `terminal-report.json` totals three browser backtests
+plus one direct fixture, 43 model attempts, $0.1573110822 reported model cost plus
+$0.47132656 conservatively charged unknown costs, $0.6286376422 total against
+the original $1 cap. No cap increase was used. All requested bounded work in
+this browser subtask is complete; model-quality comparison remains a separate
+measurement artifact.
 
 For the founder's PR-preview side-by-side, set Settings → Preferences → App
 language → English. In a new chat, submit:

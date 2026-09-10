@@ -1,0 +1,69 @@
+{
+  "status": "bounded_browser_and_fourth_engine_fixture_complete",
+  "final_engine_sha": "8c657b3c74c098ec58be2a2e91e75b202d5e33d3",
+  "scope_limitations": [
+    "DCA chat setup and its single clarification reply remained blocked; fourth DCA run is a separately authorized direct engine fixture, not a successful DCA browser journey.",
+    "Only the original English DOCN Quick take accepted model prose; other saved drafts fell back under the validation state at their creation SHA. Later fixes do not rewrite them.",
+    "New Breakdown on genuine old run used typed local API action because the sparse fixture had no rendered button; it was stamped es-419 and fell back.",
+    "Initial English DOCN Breakdown fallback was guard-interrupted; its HTTP400 body was not retained. Initial canceled attempt reservation remained charged; original row is preserved."
+  ],
+  "runs": {
+    "docn-en": {
+      "path": "docs/reports/evidence/model-result-readouts/live-browser/stored-runs/docn-en.json",
+      "sha256": "3cce17ff8236bb110fbc8c38cade27af74e560a0f07a93a774728d098d0cca56",
+      "created_at": "2026-09-10T20:12:30.572008Z",
+      "candidate_sha": "c36c099316578fb03804405f24cc1600debd0f25",
+      "evidence_kind": "completed_browser_backtest",
+      "readout_language": "en",
+      "quick_take_source": "llm_explain_stage"
+    },
+    "docn-es": {
+      "path": "docs/reports/evidence/model-result-readouts/live-browser/stored-runs/docn-es.json",
+      "sha256": "d72292d99aaec24ee0dbdaa67e726bb83c1d260838229ae28a890874daa244a5",
+      "created_at": "2026-09-10T20:26:55.700799Z",
+      "candidate_sha": "1fbeeaced804f4523c20c93cc4d7db176a48c006",
+      "evidence_kind": "completed_browser_backtest",
+      "readout_language": "es-419",
+      "quick_take_source": "deterministic_fallback"
+    },
+    "indicator": {
+      "path": "docs/reports/evidence/model-result-readouts/live-browser/stored-runs/indicator.json",
+      "sha256": "c5893b49a504d01b23faac9693eb3032806b37f41034046ccdc154e8f1e8a2b6",
+      "created_at": "2026-09-10T20:43:08.296177Z",
+      "candidate_sha": "104da766a88d04fc466285a64c622b936925d657",
+      "evidence_kind": "completed_browser_backtest",
+      "readout_language": "es-419",
+      "quick_take_source": "deterministic_fallback"
+    },
+    "dca-costs": {
+      "path": "docs/reports/evidence/model-result-readouts/live-browser/stored-runs/dca-costs.json",
+      "sha256": "5d788b99cee6d2519a7a717118d94a52dd89aa6755525fb5e4b768882bf9ef28",
+      "created_at": "2026-09-10T20:59:04.979299Z",
+      "candidate_sha": "8c657b3c74c098ec58be2a2e91e75b202d5e33d3",
+      "evidence_kind": "direct_engine_fixture",
+      "readout_language": null,
+      "quick_take_source": null
+    }
+  },
+  "model_attempts": 43,
+  "reported_cost_usd": "0.1573110822",
+  "conservative_unknown_cost_charge_usd": "0.47132656",
+  "accounted_cost_usd": "0.6286376422",
+  "cap_usd": "1.00",
+  "cap_increase_used": false,
+  "remaining_usd": "0.3713623578",
+  "engine_attempts": 4,
+  "completed_browser_backtests": 3,
+  "direct_engine_fixtures": 1,
+  "saved_browser_states": 12,
+  "saved_read_model_requests": 0,
+  "clipboard_parity": true,
+  "browser_console_entries": [],
+  "mobile_no_horizontal_overflow": true,
+  "old_run_new_breakdown_language": "es-419",
+  "old_run_new_breakdown_source": "deterministic_fallback",
+  "hosted_database_calls": 0,
+  "environment_file_writes": 0,
+  "history_rewrites": 0,
+  "deployments": 0
+}
