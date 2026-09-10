@@ -102,6 +102,24 @@ RESEARCH_SIDECAR_KEYS = frozenset(
 SURVEY_CANDIDATE_SCAN_LIMIT = 32
 
 
+def scenario_contract_applies(
+    query: ResearchQueryExtraction, interpretation: StructuredInterpretation
+) -> bool:
+    """Whether this turn is a computed scenario (decision 10).
+
+    Two independent typed facts say so and either is enough: the research
+    query's ``scenario_question`` bit, or a ``future_window`` horizon the
+    interpreter typed on the draft. Neither reads the message; a read that
+    carries neither is an ordinary lookup and takes the recorded contract."""
+    from argus.agent_runtime.interpreter.draft_shape import (
+        strategy_draft_future_horizon,
+    )
+
+    return bool(getattr(query, "scenario_question", False)) or (
+        strategy_draft_future_horizon(interpretation.candidate_strategy_draft) is not None
+    )
+
+
 def _cache_key_for(
     *,
     query: ResearchQueryExtraction,
@@ -110,6 +128,7 @@ def _cache_key_for(
     capability_class: CapabilityClass,
     message: str,
     language: str,
+    scenario: bool = False,
 ) -> str:
     """One key recipe for every shape, so a packet stored by the thorough job
     finalizer serves the same question asked inline later."""
@@ -120,9 +139,7 @@ def _cache_key_for(
         period_key=(query.period_of_interest or "").strip().lower() or "current",
         question_fingerprint=" ".join(message.lower().split()),
         language=language,
-        contract=(
-            "scenario" if getattr(query, "scenario_question", False) else "retrieval"
-        ),
+        contract="scenario" if scenario else "retrieval",
     )
 
 
@@ -178,13 +195,13 @@ async def grounded_result(
     decision: InterpretDecision | None = None,
     provider_finance: bool = True,
 ) -> StageResult | None:
-    publisher_sources_required = requires_publisher_sources(query)
+    scenario = scenario_contract_applies(query, interpretation)
+    publisher_sources_required = requires_publisher_sources(query) or scenario
     question_as_of_date = question_date()
     capability_class = capability_class_for_shape(
         shape, screening=is_market_survey(query.question_kind)
     )
     language = language_tag(user.language_preference)
-    scenario = bool(getattr(query, "scenario_question", False))
     spec = retrieval_spec(
         shape,
         question_kind=query.question_kind,
@@ -218,6 +235,7 @@ async def grounded_result(
         capability_class=capability_class,
         message=state.current_user_message,
         language=language,
+        scenario=scenario,
     )
     cache_status = "miss"
     spend = _TurnSpend()
@@ -517,6 +535,7 @@ def thorough_job_result(
     capability_class = capability_class_for_shape(
         "thorough", screening=is_market_survey(query.question_kind)
     )
+    scenario = scenario_contract_applies(query, interpretation)
     key = _cache_key_for(
         query=query,
         subjects=subjects,
@@ -524,6 +543,7 @@ def thorough_job_result(
         capability_class=capability_class,
         message=message,
         language=language,
+        scenario=scenario,
     )
     cached = cache_get(key)
     if cached is not None:
@@ -538,7 +558,7 @@ def thorough_job_result(
             cache_status="hit",
             period_of_interest=query.period_of_interest,
             question_kind=query.question_kind,
-            scenario=bool(getattr(query, "scenario_question", False)),
+            scenario=scenario,
             period_start_date=_coerce_date(query.period_start_date),
             question_as_of_date=question_date(),
             decision=decision,
@@ -582,8 +602,9 @@ def thorough_job_result(
                 ),
                 "question_as_of_date": question_date().isoformat(),
                 "question_kind": query.question_kind,
-                "requires_publisher_sources": requires_publisher_sources(query),
-                "scenario_question": bool(getattr(query, "scenario_question", False)),
+                "requires_publisher_sources": requires_publisher_sources(query)
+                or scenario,
+                "scenario_question": scenario,
                 # The exact key computed at classification time; completion
                 # paths store under it verbatim so later identical questions
                 # hit without recomputation drift.

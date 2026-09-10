@@ -580,6 +580,65 @@ def test_a_thorough_scenario_cache_hit_keeps_the_input_gate(monkeypatch) -> None
     assert "written from memory" not in repeat.stage_patch["assistant_response"]
 
 
+def test_a_typed_horizon_alone_selects_the_scenario_contract(monkeypatch) -> None:
+    """The interpreter typed the future horizon on the draft but left the
+    scenario bit unset: the scenario contract still applies, so the request
+    carries the scenario instructions and the answer needs a cited input."""
+    from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="company_lookup",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+    )
+    original = globals()["_interpretation"]
+
+    def with_horizon(*args, **kwargs):
+        read = original(*args, **kwargs)
+        return read.model_copy(
+            update={
+                "candidate_strategy_draft": StrategySummary(
+                    extra_parameters={
+                        "date_range_intent": {
+                            "kind": "future_window",
+                            "count": 10,
+                            "unit": "year",
+                            "anchor": "today",
+                            "confidence": 0.9,
+                            "evidence": "in ten years",
+                        }
+                    }
+                )
+            }
+        )
+
+    monkeypatch.setitem(globals(), "_interpretation", with_horizon)
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "A range written from memory.", _scenario_rows(cited=False)
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+
+    result = _run("what will $10,000 in NVDA be worth in ten years?")
+
+    assert result is not None
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert result.stage_patch["research"]["degraded"] == {
+        "code": "scenario_inputs_uncited"
+    }
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:
@@ -605,7 +664,7 @@ def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
         ],
     )
 
-    result = _run("If I hold $10,000 of Bitcoin, what will it be worth in ten years?")
+    result = _run("How has Bitcoin's adoption changed over the last year?")
 
     assert result is not None
     assert len(transport.requests) == 1

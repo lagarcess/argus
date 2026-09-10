@@ -354,3 +354,25 @@ def test_a_future_horizon_without_a_research_query_never_voices_a_forecast(
     assert result.outcome == "needs_clarification"
     assert FUTURE_PERFORMANCE_ADMISSION_BLOCKED in result.decision.reason_codes
     assert result.patch.get("assistant_response") is None
+
+
+def test_the_scenario_contract_applies_on_either_typed_fact() -> None:
+    """A missing scenario bit never quietly selects the ordinary contract when
+    the interpreter typed the horizon: either typed fact is enough, and a read
+    with neither is an ordinary lookup."""
+    from argus.agent_runtime.research_grounded import scenario_contract_applies
+
+    query_only = ResearchQueryExtraction(
+        question_kind="company_lookup", symbols=["NVDA"], scenario_question=True
+    )
+    plain_query = ResearchQueryExtraction(
+        question_kind="company_lookup", symbols=["NVDA"]
+    )
+    with_horizon = _question_read(research_query=plain_query.model_dump(mode="json"))
+    without = _question_read(
+        research_query=plain_query.model_dump(mode="json"),
+        candidate_strategy_draft=StrategySummary(),
+    )
+    assert scenario_contract_applies(query_only, without)
+    assert scenario_contract_applies(plain_query, with_horizon)
+    assert not scenario_contract_applies(plain_query, without)

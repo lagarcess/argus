@@ -226,6 +226,9 @@ async def _dispatch(
             provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
+    if shape == "fast" and grounded.scenario_contract_applies(query, interpretation):
+        # A computed scenario is never a quote: it needs public pages.
+        shape = "balanced"
     if shape == "thorough":
         return grounded.thorough_job_result(
             query=query,
