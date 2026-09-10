@@ -903,8 +903,8 @@ city, country, latitude, longitude and region; `search_recency_filter`;
 not sending, and #545, publisher URLs stranded in prose with no typed sources,
 is what not sending it causes.
 
-`search_domain_filter` is the local moat and its 20-domain ceiling is the real
-constraint on the source list. `user_location` derives the calculations's currency default.
+`search_domain_filter` was framed as the local moat; the founder dropped the
+source list on 2026-09-10 (see Still open). `user_location` derives the calculations's currency default.
 
 **Done means.** Retrieved facts arrive as typed rows with citations, never as
 prose to be re-parsed. Domain filtering and location are configured per
@@ -919,8 +919,8 @@ it can be unit tested. There is no SEC tool on the Agents API; `search_mode:
 sec` belongs to Sonar chat completions, which we do not use.
 
 **Proof.** A recorded response showing typed rows under a strict schema. A
-domain-filtered call citing a local source. Founder supplies the Dominican
-domains when this starts; seed from banks users actually named.
+domain-filtered call citing a local source. The Dominican
+domain list was dropped on 2026-09-10.
 
 ---
 
@@ -1459,9 +1459,19 @@ you, never prescribe what they should do" still stands.
 
 ### Still open
 
-**Which Dominican sources go in the domain list, and who maintains it.** Founder
-supplies these when retrieval starts. The mechanism does not wait on the complete
-list: seed it with the banks users actually named, and let the refusal log grow it. Spec section 10, question 3.
+**Dropped 2026-09-10, founder: no Dominican source list.** A hand-kept domain
+allowlist adds rigidity Argus does not need. Perplexity is a search engine and
+finds local sources well once the right guardrails are removed. The #545 probes
+agreed: Banco Popular publishes no certificate rate online, and a three-site list
+with a one-week window returned nothing. `LOCAL_SOURCE_DOMAINS` and the
+`local_sources` parameter in `src/argus/domain/research/config.py` are unused
+code to delete in a later cleanup.
+
+**Home country comes from the user, not the deployment.** Founder, 2026-09-10:
+Argus must adapt to each user's home country. Today `ARGUS_RESEARCH_HOME_COUNTRY`
+is one country for every user, sent to the provider as the reader's location.
+Per decision 9's personalization condition, country (and currency) become
+declared user settings.
 
 ---
 
