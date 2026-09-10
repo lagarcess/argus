@@ -266,7 +266,21 @@ against the fingerprint's previous scorecard (`411/live-measurement.json` at
   as an unsupported capability claim beside an empty rendered surface. It passed
   in PR #565's run under rubric v2.
 
-RETRY_PLACEHOLDER
+**Re-run once, at the head and on the base** (`live-measurement-retry.json`):
+
+| Case | Re-run at head `53c35ff8` | Re-run at base `d0884c3d` |
+| --- | --- | --- |
+| `asset_discovery_category_spanish_issue_244` | failed | failed |
+| `asset_discovery_not_result_followup_issue_244` | failed | failed |
+| `asset_discovery_old_pharma_escalation_exact_issue_344` | failed | failed |
+| `graceful_recovery_spanish_weekly_options_aapl` | passed | passed |
+| `ordinary_conversation_concept_compound_interest_en` | passed | passed |
+
+Both judge failures pass on re-run on both trees: judge variance, not the
+rubric text and not this lane. The three discovery cases fail on re-run on
+both trees with the same failure classes (no actionable discovery, no rows):
+the discovery path was failing on the provider this afternoon with or without
+this lane's changes, the flake PR #565 recorded on the sibling pharma cases.
 
 ## Browser proof
 
