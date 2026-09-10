@@ -55,7 +55,9 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   other, and a scenario publishes only when at least one input row cites a
   public page (`scenario_inputs_uncited` otherwise, on the inline and the
   background path); every recorded scenario answer carried three to seven
-  (Codex round 2, two P2s).
+  (Codex round 2, two P2s; round 3 carried the gate to the thorough cache-hit
+  composition, where a cached withheld scenario would otherwise publish on
+  the repeat question).
 - `src/argus/domain/research/config.py`: the balanced shape's ceiling moves
   from 75s to 150s. A scenario answer took 122s in the probe below and every
   forward-looking question timed out at 75s in the first after picture. The

@@ -533,6 +533,53 @@ def test_the_background_scenario_applies_the_same_input_gate() -> None:
     assert "won't compute a range" in composed["answer"]
 
 
+def test_a_thorough_scenario_cache_hit_keeps_the_input_gate(monkeypatch) -> None:
+    """A withheld scenario is cached so the same question is not billed
+    twice; the repeat question composes from that cache and must be withheld
+    the same way, never published with the gate off."""
+    from argus.domain.research.perplexity_agent import _packet_from_response
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="cross_company",
+        symbols=["NVDA", "AMD"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = _wire_client(monkeypatch, [])
+
+    first = _run("Which of NVDA or AMD will be worth more in ten years?")
+    assert first is not None
+    job_request = first.stage_patch["research_job_request"]
+    assert job_request["scenario_question"] is True
+
+    packet = _packet_from_response(
+        agent_response(
+            text=typed_answer_text(
+                "NVDA bear to bull ranges written from memory.",
+                _scenario_rows(cited=False),
+            ),
+            sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+            tickers=["NVDA", "AMD"],
+        ),
+        latency_ms=1200,
+    )
+    composed = ra.compose_completed_research(job_request=job_request, packet=packet)
+    assert composed["research"]["degraded"] == {"code": "scenario_inputs_uncited"}
+    ra.store_research_packet_for_job(job_request, packet, composed)
+
+    repeat = _run("Which of NVDA or AMD will be worth more in ten years?")
+    assert repeat is not None
+    assert transport.requests == [], "a cache hit must not touch the provider"
+    assert "research_job_request" not in repeat.stage_patch
+    sidecar = repeat.stage_patch["research"]
+    assert sidecar["usage"]["cache_status"] == "hit"
+    assert sidecar["degraded"] == {"code": "scenario_inputs_uncited"}
+    assert "written from memory" not in repeat.stage_patch["assistant_response"]
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:

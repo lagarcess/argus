@@ -538,6 +538,7 @@ def thorough_job_result(
             cache_status="hit",
             period_of_interest=query.period_of_interest,
             question_kind=query.question_kind,
+            scenario=bool(getattr(query, "scenario_question", False)),
             period_start_date=_coerce_date(query.period_start_date),
             question_as_of_date=question_date(),
             decision=decision,
