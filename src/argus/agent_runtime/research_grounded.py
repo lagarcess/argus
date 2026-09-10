@@ -47,6 +47,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.substage_events import emit_substage
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.cache import (
     cache_get,
@@ -773,7 +774,7 @@ async def _latest_close(symbol: str, asset_class: str) -> dict[str, str] | None:
 
         from argus.domain.market_data.provider import fetch_price_series
 
-        end = datetime.now(timezone.utc).date()
+        end = new_york_today()
         start = end - timedelta(days=14)
         series = await asyncio.to_thread(
             fetch_price_series, symbol, asset_class, start, end, "1d"

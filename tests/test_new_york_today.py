@@ -243,32 +243,120 @@ def test_the_card_and_the_engine_default_read_the_new_york_date(
     assert config["end_date"] == (new_york_date - timedelta(days=1)).isoformat()
 
 
-def test_no_reader_asks_the_host_calendar_or_keeps_a_second_new_york_clock() -> None:
-    """A date is New York's, and an instant names its zone. `date.today()` and a
-    zoneless `now()` read the host's calendar; `now(EASTERN)` outside the owner
-    is a second clock."""
-    offenders: list[str] = []
-    for path in sorted(SOURCE_ROOT.rglob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
-                continue
-            receiver = node.func.value
-            if not isinstance(receiver, ast.Name):
-                continue
-            method, arguments = node.func.attr, [*node.args, *node.keywords]
-            host_calendar = (
-                receiver.id in {"date", "datetime"} and method == "today"
-            ) or (receiver.id == "datetime" and method == "now" and not arguments)
-            second_clock = (
-                method == "now"
-                and path != OWNER
-                and any(
-                    isinstance(argument, ast.Name) and argument.id == "EASTERN"
-                    for argument in node.args
-                )
+@INSTANTS
+def test_market_data_windows_that_end_today_end_on_the_new_york_date(
+    monkeypatch, freeze_new_york_clock, asked_at: datetime, new_york_date: date
+) -> None:
+    """A row's coverage probe, an off-coverage latest close and the
+    tradable-history probe fetch through the day the user is on."""
+    import asyncio
+
+    import pandas as pd
+    from argus.agent_runtime import research_grounded, research_rows
+    from argus.domain import market_data
+    from argus.domain.market_data import provider, tradability
+
+    freeze_new_york_clock(asked_at)
+    ends: list[date] = []
+
+    def fetch(symbol, asset_class, start, end, timeframe):
+        ends.append(end)
+        return pd.Series([1.0, 2.0], index=pd.to_datetime([start, end]))
+
+    monkeypatch.setattr(provider, "fetch_price_series", fetch)
+    monkeypatch.setattr(
+        market_data,
+        "tradable_history",
+        lambda symbol, asset_class: market_data.TradableHistory("tradable"),
+    )
+
+    research_rows._earliest_available("NVDA", "equity")
+    asyncio.run(research_grounded._latest_close("NVDA", "equity"))
+    tradability._probe("NVDA", "equity")
+
+    assert ends == [new_york_date] * 3
+
+
+@INSTANTS
+def test_a_row_names_a_full_window_only_back_from_the_new_york_date(
+    freeze_new_york_clock, asked_at: datetime, new_york_date: date
+) -> None:
+    """"Over the last 3 years" is counted back from the day the test runs to."""
+    from argus.agent_runtime import research_rows
+
+    freeze_new_york_clock(asked_at)
+    requested_start = new_york_date - timedelta(
+        days=365 * research_rows.TEST_WINDOW_YEARS
+    )
+
+    def listed(days_after_requested_start: int) -> research_rows.RowWindow:
+        listing = requested_start + timedelta(days=days_after_requested_start)
+        return research_rows.row_window(
+            [{"symbol": "NVDA", "asset_class": "equity"}],
+            probe=lambda _symbol, _asset_class: listing,
+        )
+
+    slack = research_rows._COVERAGE_SLACK_DAYS
+    assert listed(slack).is_full
+    assert not listed(slack + 1).is_full
+
+
+@INSTANTS
+def test_a_movers_snapshot_is_dated_on_the_new_york_date(
+    freeze_new_york_clock, asked_at: datetime, new_york_date: date
+) -> None:
+    from argus.context.providers import (
+        build_alpaca_market_movers_packet,
+        build_alpaca_most_actives_packet,
+    )
+
+    freeze_new_york_clock(asked_at)
+
+    movers = build_alpaca_market_movers_packet(
+        market_type="stocks", movers={"gainers": [], "losers": []}
+    )
+    actives = build_alpaca_most_actives_packet(by="volume", most_actives=[])
+
+    assert movers.coverage_end == actives.coverage_end == new_york_date
+
+
+def _clock_offense(node: ast.AST, path: Path) -> bool:
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+        return False
+    method, receiver = node.func.attr, node.func.value
+    arguments = [*node.args, *node.keywords]
+    if isinstance(receiver, ast.Name):
+        if receiver.id in {"date", "datetime"} and method == "today":
+            return True
+        if receiver.id == "datetime" and method == "now" and not arguments:
+            return True
+        return (
+            method == "now"
+            and path != OWNER
+            and any(
+                isinstance(argument, ast.Name) and argument.id == "EASTERN"
+                for argument in node.args
             )
-            if host_calendar or second_clock:
-                offenders.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}")
+        )
+    if method == "date" and not arguments and isinstance(receiver, ast.Call):
+        clock = receiver.func
+        reads_now = (
+            isinstance(clock, ast.Attribute) and clock.attr in {"now", "utcnow"}
+        ) or (isinstance(clock, ast.Name) and clock.id == "utcnow")
+        return reads_now and path != OWNER
+    return False
+
+
+def test_no_reader_dates_today_outside_the_one_clock() -> None:
+    """A date derived from the current instant comes from the owner.
+    `date.today()` and a zoneless `now()` read the host's calendar,
+    `now(tz).date()` and `utcnow().date()` read another zone's, and
+    `now(EASTERN)` outside the owner is a second clock."""
+    offenders = [
+        f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}"
+        for path in sorted(SOURCE_ROOT.rglob("*.py"))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if _clock_offense(node, path)
+    ]
 
     assert offenders == []

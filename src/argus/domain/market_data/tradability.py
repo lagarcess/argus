@@ -15,10 +15,12 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from typing import Literal
 
 from loguru import logger
+
+from argus.domain.market_data.new_york_clock import new_york_today
 
 # One window and one budget for every caller. The window is short because the
 # question is "does history exist", not "how far back does it go".
@@ -96,7 +98,7 @@ def _probe_under_budget(symbol: str, asset_class: str) -> TradableHistory:
 def _probe(symbol: str, asset_class: str) -> TradableHistory:
     from argus.domain.market_data.provider import fetch_price_series
 
-    end = datetime.now(timezone.utc).date()
+    end = new_york_today()
     start = end - timedelta(days=TRADABLE_HISTORY_PROBE_DAYS)
     try:
         series = fetch_price_series(symbol, asset_class, start, end, "1d")
