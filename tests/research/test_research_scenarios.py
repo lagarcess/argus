@@ -646,12 +646,43 @@ def test_a_discovery_act_with_a_named_scenario_is_dispatched_not_found(
     assert result.stage_patch["research"]["shape"] == "balanced"
 
 
-def test_a_survey_typed_scenario_keeps_a_dated_analyst_page(monkeypatch) -> None:
-    """Source freshness reads the derived survey fact: a scenario typed as a
-    survey kind keeps a publisher page dated before the question day instead
-    of being withheld for missing public sources."""
-    from tests.research.conftest import typed_answer_text
+def _dated_scenario_document(page: str, page_date: str) -> dict:
+    """A typed scenario answer whose only public page carries an explicit
+    date, with the inputs rowed to that page."""
+    from tests.research.conftest import (
+        retrieved_row,
+        search_results_item,
+        typed_answer_text,
+    )
 
+    rows = [
+        retrieved_row(
+            subject="NVIDIA",
+            symbol="NVDA",
+            label="average twelve-month analyst price target",
+            value=327.18,
+            kind="currency",
+            unit="USD",
+            source_url=page,
+        )
+    ]
+    document = agent_response(
+        text=typed_answer_text("Bear to bull ranges.", rows),
+        tickers=["NVDA"],
+        web_search_invocations=1,
+    )
+    document["output"].insert(
+        1, search_results_item({"url": page, "title": "NVDA outlook", "date": page_date})
+    )
+    return document
+
+
+def test_a_survey_typed_scenario_keeps_a_dated_analyst_page(monkeypatch) -> None:
+    """Source freshness reads the derived survey fact. The only public page is
+    dated before the question day: a scenario typed as market_pulse keeps it
+    and publishes, while the same document under a genuine market_pulse
+    survey drops it under the survey's same-day bound."""
+    old_page = "https://www.reuters.com/markets/nvidia-outlook/"
     set_research_query(
         monkeypatch,
         globals(),
@@ -660,22 +691,21 @@ def test_a_survey_typed_scenario_keeps_a_dated_analyst_page(monkeypatch) -> None
         period_of_interest="ten years",
         scenario_question=True,
     )
-    _wire_client(
-        monkeypatch,
-        [
-            agent_response(
-                text=typed_answer_text(
-                    "Bear to bull ranges.", _scenario_rows(cited=True)
-                ),
-                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
-                tickers=["NVDA"],
-            )
-        ],
-    )
+    _wire_client(monkeypatch, [_dated_scenario_document(old_page, "2026-09-04")])
 
-    result = _run("what will $10,000 in NVDA be worth in ten years?")
+    scenario = _run("what will $10,000 in NVDA be worth in ten years?")
 
-    assert result is not None
-    sidecar = result.stage_patch["research"]
+    assert scenario is not None
+    sidecar = scenario.stage_patch["research"]
     assert "degraded" not in sidecar
-    assert sidecar["sources"], "the dated analyst page is kept"
+    assert [source["url"] for source in sidecar["sources"]] == [old_page]
+
+    set_research_query(
+        monkeypatch, globals(), question_kind="market_pulse", symbols=["NVDA"]
+    )
+    _wire_client(monkeypatch, [_dated_scenario_document(old_page, "2026-09-04")])
+
+    survey = _run("what is moving in the market today?")
+
+    assert survey is not None
+    assert survey.stage_patch["research"]["sources"] == []
