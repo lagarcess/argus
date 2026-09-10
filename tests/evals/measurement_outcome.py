@@ -124,6 +124,10 @@ def rendered_beside_reply(
     rows = [row for row in rows if row]
     if rows:
         surface["discovery_rows"] = rows
+        if not discovery.get("sources"):
+            # ChatMessage renders this grounding marker from the same empty
+            # sources list; it is not part of the assistant's framing prose.
+            surface["discovery_grounding"] = "general_knowledge_not_current_search"
     sources = [
         {
             key: source[key]

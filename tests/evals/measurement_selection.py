@@ -187,17 +187,23 @@ def observe_selection(
             if asset is not None:
                 owners.append(asset)
                 linked = discovery.get("sources", [])
+                candidate_sources = []
                 for index in candidate.source_indices:
                     source = _dict(linked[index]) if 0 <= index < len(linked) else {}
                     if source.get("url") in sources:
-                        facts.append(
-                            {
-                                **asset,
-                                "source": sources[source["url"]],
-                                "retrieved_at": result.retrieved_at,
-                                "reason": candidate.reason_text,
-                            }
-                        )
+                        candidate_sources.append(sources[source["url"]])
+                # An uncited reason is still displayed beside its candidate.
+                # Keep its missing source explicit; currentness still requires
+                # linked evidence and cannot be inferred from this reason.
+                for source in candidate_sources or [None]:
+                    facts.append(
+                        {
+                            **asset,
+                            "source": source,
+                            "retrieved_at": result.retrieved_at,
+                            "reason": candidate.reason_text,
+                        }
+                    )
         followup = _dict(_dict(effect.get("research")).get("follow_up"))
         for raw_asset in followup.get("subjects", []):
             asset = _asset(raw_asset)

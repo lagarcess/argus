@@ -206,6 +206,43 @@ def test_alternate_and_composed_delivery_preserve_the_same_acceptance(
 
 
 @pytest.mark.parametrize(
+    "case_id,symbol",
+    [
+        ("asset_discovery_peer_anchor_english_issue_244", "AMD"),
+        ("asset_discovery_trending_crypto_exact_issue_344", "BTC"),
+    ],
+)
+def test_unsourced_candidate_reasons_reach_the_judge_without_becoming_current_facts(
+    monkeypatch, case_id, symbol
+):
+    case = next(case for case in harness.load_eval_cases() if case.id == case_id)
+    patch = _selection_patch(figures=False, discovery=True, symbol=symbol)
+    patch["discovery"]["relationship"] = case.expected.asset_discovery["relationship"]
+    candidate = patch["discovery"]["candidates"][0]
+    _wire_delivery(monkeypatch, patches=[patch], names=("deliver_candidates",))
+
+    result = harness.run_eval_case(case)
+
+    facts = result["prose_judge"]["selection_evidence"]["assets"][0]["facts"]
+    assert len(facts) == 1
+    assert facts[0]["reason"] == candidate["reason_text"]
+    assert facts[0]["source"] is None
+    assert "figure" not in facts[0]
+    rendered = json.loads(result["prose_judge"]["judged_rendered_context"]["text"])
+    assert rendered["discovery_grounding"] == "general_knowledge_not_current_search"
+    assert rendered.get("discovery_sources", []) == []
+    assert result["prose_judge"]["requested_criteria"] == [
+        *case.prose_judge_criteria,
+        "selection_relevance",
+    ]
+    if case.expected.asset_discovery.get("needs_current_facts"):
+        assert any("current-source" in check for check in result["failed_checks"])
+        assert result["status"] == "failed"
+    else:
+        assert result["failed_checks"] == []
+
+
+@pytest.mark.parametrize(
     "missing,reason",
     [
         ("source", "current-source"),
@@ -289,6 +326,11 @@ def test_validated_candidate_requires_its_own_source_link(
     assert (result["status"] == "passed") is linked
     if not linked:
         assert any("current-source" in check for check in result["failed_checks"])
+        facts = result["prose_judge"]["selection_evidence"]["assets"][0]["facts"]
+        assert facts[0]["reason"] == patch["discovery"]["candidates"][0]["reason_text"]
+        assert facts[0]["source"] is None
+    rendered = json.loads(result["prose_judge"]["judged_rendered_context"]["text"])
+    assert "discovery_grounding" not in rendered
 
 
 @pytest.mark.parametrize(
