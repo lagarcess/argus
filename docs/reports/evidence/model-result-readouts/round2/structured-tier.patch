@@ -1,0 +1,15 @@
+diff --git a/src/argus/llm/openrouter_tasks.py b/src/argus/llm/openrouter_tasks.py
+index 87a9348e..cdc0741a 100644
+--- a/src/argus/llm/openrouter_tasks.py
++++ b/src/argus/llm/openrouter_tasks.py
+@@ -121,8 +121,8 @@ OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
+     "capability_conflict": "context",
+     "clarification": "chat",
+     "chat_composer": "chat",
+-    "result_summary": "chat",
+-    "result_breakdown": "context",
++    "result_summary": "structured",
++    "result_breakdown": "structured",
+     "name_suggestion": "utility",
+     "discovery_extraction": "structured",
+     "discovery_voicing": "chat",

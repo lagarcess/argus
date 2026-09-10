@@ -1,0 +1,27 @@
+{
+  "status": "free_preflight_complete_paid_approval_pending",
+  "fix_commit": "b6e7f624",
+  "current_source": "cc0b32e19412a1bb483b8a6a45e982418b9dae34",
+  "structured_source": "955dfa86b40b176e6fbb9d1a5857d4dd35fe57ef",
+  "fixture_sha256": "b255b3b18050a6c7ca7b39fd99645ca3297a4b50a373bf109895ea4fe9793851",
+  "logical_tasks_per_arm": {
+    "current": 48,
+    "structured": 48
+  },
+  "http_attempts": 0,
+  "maximum_request_bytes": 82540,
+  "maximum_with_prior_quick_headroom_bytes": 87049,
+  "fingerprint_regenerated": false,
+  "live_quality_measured": false,
+  "artifacts": {
+    "README.md": "e10bdc7a2a1e502d96ee06ceea75ddf59e93db887131fb287293fd58e9f94bfd",
+    "cost-estimate.md": "60863ce2d44b700d1cd730d7a04bdfe22872bd24fc83b3b749c0006b27b04e74",
+    "fingerprint-held.txt": "c6149ee9afde838f21f8e96075d84350ce9c90ac037a2f19bf676e68407b1066",
+    "focused-tests.txt": "b7d061cc81b7d19516244be8b7bd9be5e663c96b1c0f4d98976d23929188c425",
+    "mocked-tests.txt": "dc351673bd60c5c08f7c5ebcba2276d922390852159a86b62203b424ddef01f2",
+    "modularity.txt": "1f6659e18d164e4c04cb6e93d8e54e3a4c0cc70b60a725241cafea75dabca26f",
+    "preflight.json": "c0f0e618dbbde1dc0e7bc2b85151f48d8a5fdd8a29011db7b2873ae4dad3b8d9",
+    "prices.json": "ec714b2688d089bb4b70441e31910a1325f106e379018e612f58419c8a2be1af",
+    "structured-tier.patch": "79ebf0a527362cdb156b49c5d20f72935f16c33293f413d601125f40f9e59ea8"
+  }
+}

@@ -68,10 +68,18 @@ it cannot authorize fingerprint regeneration or deployment.
 
 ## Cost approval
 
-The [proposed $50 cap](cost-estimate.md) is pending final clean-checkout sizing
-and founder approval. Complete fact sheets exceed the old request bound for
+The [proposed $50 cap](cost-estimate.md) is pending founder approval.
+Clean-checkout sizing is complete. Fact sheets exceed the old request bound for
 DOCN; the estimate prices a 90,000-byte ceiling without truncating evidence.
 No unused first-round allowance is being treated as approval for this round.
+
+The [preflight](preflight.json) binds current source
+`cc0b32e19412a1bb483b8a6a45e982418b9dae34` and structured source
+`955dfa86b40b176e6fbb9d1a5857d4dd35fe57ef`, both clean, with all other
+4,693 tree entries identical. The [two-line tier patch](structured-tier.patch)
+reproduces the structured source from the current source. Maximum full request
+size was 82,540 bytes, or 87,049 bytes with prior-Quick headroom. No HTTP
+attempts ran. Preflight fallback placeholders are not model-quality outcomes.
 
 ## Deterministic verification
 
@@ -90,3 +98,9 @@ Local Codex review returned clean after fixing the observed wrong-month,
 currency-name and article regressions. A separate review verified the
 fact-sheet meaning and unsupported-derivation fixes. These local results do
 not claim green GitHub CI, paid quality results or merge readiness.
+
+The [virtual merged-tree modularity check](modularity.txt) passed at tree
+`5a3cb3c7db0aca863888d8aebf209bb3b021e588`, combining the corrected source
+with fetched integration `f03834d0fcc2a70f029cb2331b3702dd637eb865`.
+Original lane base remains `d0884c3de81f8c53d454ac4f68f461d3b5dd77e3`.
+This calculation did not merge or modify the lane branch.
