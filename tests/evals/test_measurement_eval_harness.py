@@ -86,7 +86,7 @@ def test_measurement_fixtures_do_not_assert_expected_prose() -> None:
     assert offending_keys == []
     # v2 hands the judge the surface rendered beside the reply (issue #516);
     # the discrimination evidence lives in docs/reports/evidence/issue-516/.
-    assert PROSE_JUDGE_RUBRIC_VERSION == "argus-prose-quality-v2"
+    assert PROSE_JUDGE_RUBRIC_VERSION == "argus-prose-quality-v3"
 
 
 def test_expected_fail_baselines_are_issue_tagged() -> None:

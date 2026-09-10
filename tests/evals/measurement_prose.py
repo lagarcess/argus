@@ -7,9 +7,9 @@ from typing import Any
 
 from tests.evals.prose_evidence import judged_prose_evidence
 
-PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v2"
+PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v3"
 PROSE_JUDGE_RUBRIC = """
-Version: argus-prose-quality-v2
+Version: argus-prose-quality-v3
 
 Judge only the prose qualities listed in the case. Do not grade asset symbols,
 dates, strategy type, benchmark, stage outcome, or executable capability truth;
@@ -33,6 +33,9 @@ Allowed prose criteria:
 - spanish_language_integrity: Spanish sessions do not leak English fallback copy.
 - no_raw_runtime_error: provider, Python, traceback, enum, or schema details are
   not exposed as user-facing recovery text.
+- scenario_framing: a forward-looking or valuation answer gives labeled
+  scenarios or ranges built from cited inputs with the arithmetic shown, never
+  a single number as the future, and no buy, sell, or hold advice.
 
 Return JSON only. Use failed_criteria for any failed requested criterion.
 """

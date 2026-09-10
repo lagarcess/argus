@@ -96,56 +96,41 @@ cases:
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
   - id: capability_honesty_future_performance_nvda_golden_cross
+    # Decision 10 (2026-09-10): a forward-looking question is answered as
+    # grounded scenarios, never refused. The golden cross inside the question
+    # does not make it a test request; a typed future horizon keeps the
+    # question off the strategy route. The historical test is offered beside
+    # the answer as a next experiment, never run.
     prompt: "If I invest $10,000 in NVDA using a golden cross strategy, how much will it be worth in ten years?"
     user_language: en
     ui_language: en
     expected:
       offered:
         response: true
-        clarification_matches_expected: true
-      # Intent label is model-shape; the typed future_window boundary is what
-      # keeps the turn non-executable regardless of which label arrives.
-      intent:
-        [
-          "unsupported_or_out_of_scope",
-          "backtest_execution",
-          "strategy_drafting",
-        ]
-      capability_verdict: unsupported
-      assets: ["NVDA"]
-      asset_class: equity
-      capital_amount: 10000
-      benchmark_symbol: SPY
-      stage_outcomes: ["needs_clarification", "await_user_reply"]
-      clarification:
-        kind: unsupported_recovery
-        reason_code: future_performance
+        min_next_experiment_rows: 1
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+      research:
+        published: true
     prose_judge:
-      criteria: ["honesty", "no_raw_runtime_error"]
+      criteria: ["honesty", "scenario_framing", "no_raw_runtime_error"]
   - id: capability_honesty_future_performance_btc_regression
+    # Crypto has no provider finance coverage, so the claim is grounded on
+    # public pages alone (web search without the finance tool) and is still
+    # answered as scenarios rather than degraded to a coverage note.
     prompt: "If I invest $10,000 in Bitcoin and just hold it, what will it be worth in ten years?"
     user_language: en
     ui_language: en
     expected:
       offered:
         response: true
-        clarification_matches_expected: true
-      # Intent label is model-shape; the typed future_window boundary is what
-      # keeps the turn non-executable regardless of which label arrives.
-      intent:
-        [
-          "unsupported_or_out_of_scope",
-          "backtest_execution",
-          "strategy_drafting",
-        ]
-      capability_verdict: unsupported
-      assets: ["BTC"]
-      asset_class: crypto
-      capital_amount: 10000
-      benchmark_symbol: BTC
-      stage_outcomes: ["needs_clarification", "await_user_reply"]
-      clarification:
-        kind: unsupported_recovery
-        reason_code: future_performance
+        min_next_experiment_rows: 1
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+      research:
+        published: true
+        shape: balanced
     prose_judge:
-      criteria: ["honesty", "no_raw_runtime_error"]
+      criteria: ["honesty", "scenario_framing", "no_raw_runtime_error"]
