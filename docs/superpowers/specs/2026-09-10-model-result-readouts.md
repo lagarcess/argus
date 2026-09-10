@@ -150,3 +150,47 @@ fingerprint regeneration is authorized.
 The existing frame, transport, history, privacy, no-touch and founder-merge
 boundaries remain in force. The second-round evidence must not replace the
 first round or become fingerprint authority.
+
+## 8. Final founder-directed writing round
+
+The founder declined the 96-task comparison and stopped the slot proposal.
+Resume from `ab1fbda96678e7115fa798b8ec781022da180c3f` behavior. The
+worktree was clean at that commit: no uncommitted slot implementation existed
+to preserve on a local reference branch. No slot changes are authorized.
+
+1. Change only the model writing brief in production. Keep the labeled fact
+   sheet, response schema, figure-reference checks, benchmark contradiction
+   check, internal-field check, language fallback, transport and templates.
+2. The card owns numerical reporting. Quick take and Breakdown tell the
+   historical story: the shape of the ride, what holding through it involved,
+   and a supported next historical test when useful. They do not inventory or
+   restate card figures. Use a figure only when needed to explain a point,
+   through the existing exact fact references. Quick take stays first-glance;
+   Breakdown adds depth without repeating it. Keep frames and actions intact.
+3. Historical test suggestions are not investment advice, forecasts or claims
+   about price causes. Story language must stay anchored to the supplied run;
+   do not invent a path, recovery, holder emotion or missing trade history.
+4. Prepare exactly twelve drafts from the same three genuine saved runs:
+   English and Spanish, Quick take followed by Breakdown, one repetition,
+   structured tier only. Change the two task-tier mappings only in
+   `src/argus/llm/openrouter_tasks.py` in a clean isolated measurement checkout.
+   Production lane mappings remain unchanged. Allow one provider HTTP attempt
+   per frame task, with no provider retry or fallback call after that attempt.
+   A failed or rejected attempt remains an outcome, not a reason to rerun it.
+5. Measure complete request size without provider calls, retain the current
+   output profiles and verified primary-model pricing, post a conservative
+   estimate (expected near $3), and wait for explicit approval. Earlier budget
+   approvals do not apply. No new backtests or market-data requests are included.
+6. After approval, render every outcome in the browser beside the associated
+   run's canonical source numbers. Accepted text uses the actual frames;
+   rejected/unavailable outcomes show complete fallback, with any complete raw
+   draft separately labeled as diagnostic and never misrepresented as accepted.
+   Commit screenshots and source/provenance records. Browser rendering is
+   provider-free and must not create additional model calls or backtests.
+7. Report acceptance, fallback, writing quality, factual errors and cost for
+   all twelve tasks, then stop. The fingerprint remains held. Do not merge,
+   deploy, run the full live suite, write environment files, stash, or modify
+   forbidden interpreter/research/release surfaces.
+
+This final instruction supersedes the unpaid two-tier comparison plan, not its
+preserved historical evidence. All runtime checks remain at `ab1fbda9` behavior.
