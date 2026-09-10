@@ -15,10 +15,11 @@ def test_three_documented_configurations_are_locked() -> None:
     thorough = RESEARCH_CONFIG_SPECS["thorough"]
 
     # Documented as max_steps=1; probed 2026-08-07 to need 2 because the
-    # finance skill load consumes the first step (see config.py docstring and
-    # docs/reports/evidence/research-rail/probes/). Everything else matches
-    # the documentation verbatim.
-    assert fast.max_steps == 2
+    # finance skill load consumes the first step, and 2026-09-10 to need 4
+    # when the ticker is not already resolved (a lookup, then the quote; see
+    # config.py and docs/reports/evidence/open-the-gates/probes/). Everything
+    # else matches the documentation verbatim.
+    assert fast.max_steps == 4
     assert fast.max_output_tokens == 1024
     assert fast.tools == ("finance_search",)
     assert fast.model == "openai/gpt-5.6-sol"
