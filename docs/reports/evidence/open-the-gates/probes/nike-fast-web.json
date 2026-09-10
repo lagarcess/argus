@@ -1,0 +1,273 @@
+{
+  "captured_at": "2026-09-09T23:52:35.627644+00:00",
+  "candidate_sha": "ba5a9fb71a2696cc7155d6c8241d20dc79bea4c7",
+  "request": {
+    "models": [
+      "openai/gpt-5.6-sol",
+      "anthropic/claude-opus-4-7"
+    ],
+    "input": "what's the price of nike today\nTickers: NIKE, Inc. (NKE)\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search",
+        "filters": {
+          "search_recency_filter": "week"
+        }
+      }
+    ],
+    "max_steps": 3,
+    "max_output_tokens": 1024,
+    "language_preference": "en",
+    "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+    "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+        "name": "argus_typed_retrieval",
+        "strict": true,
+        "schema": {
+          "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+          "properties": {
+            "answer_markdown": {
+              "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+              "type": "string"
+            },
+            "rows": {
+              "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+              "items": {
+                "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                "properties": {
+                  "subject": {
+                    "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                    "type": "string"
+                  },
+                  "symbol": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The exchange ticker of the security the figure describes, or null."
+                  },
+                  "label": {
+                    "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                    "type": "number"
+                  },
+                  "kind": {
+                    "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                    "enum": [
+                      "currency",
+                      "percent",
+                      "multiple",
+                      "count"
+                    ],
+                    "type": "string"
+                  },
+                  "unit": {
+                    "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                    "type": "string"
+                  },
+                  "as_of": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                  },
+                  "source_url": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                  }
+                },
+                "required": [
+                  "subject",
+                  "symbol",
+                  "label",
+                  "value",
+                  "kind",
+                  "unit",
+                  "as_of",
+                  "source_url"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "answer_markdown",
+            "rows"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "response": {
+    "background": false,
+    "completed_at": 1788997948,
+    "created_at": 1788997948,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_1925dcd1-8baf-4971-a7c5-f1db4826401a",
+    "incomplete_details": null,
+    "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## NKE Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency |\n| --- | --- | --- | --- | --- | --- | --- |\n| NKE | NIKE, Inc. | 2026-09-09 20:00:03 UTC | 2026-09-09 23:52:31 UTC | after_hours | 37.35 | USD |\n\nData available in: `NKE_quotes_099af4.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/NKE"
+            ],
+            "tickers": [
+              "NKE"
+            ]
+          }
+        ],
+        "tickers": [
+          "NKE"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "{\"answer_markdown\":\"Nike’s latest share price is **$37.35 USD**, as of September 9, 2026.\",\"rows\":[{\"as_of\":\"2026-09-09\",\"kind\":\"currency\",\"label\":\"latest share price\",\"source_url\":\"https://www.perplexity.ai/finance/NKE\",\"subject\":\"NIKE, Inc.\",\"symbol\":\"NKE\",\"unit\":\"USD\",\"value\":37.35}]}",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_ed6aff11-2775-4a59-adbe-55a434ecc35b",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search",
+        "filters": {
+          "search_recency_filter": "week"
+        }
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.03109,
+        "cache_read_cost": 0.0044,
+        "currency": "USD",
+        "input_cost": 4e-05,
+        "output_cost": 0.00544,
+        "tool_calls_cost": 0.005,
+        "tool_calls_cost_details": {
+          "finance_search": 0.005
+        },
+        "total_cost": 0.04597
+      },
+      "input_tokens": 17225,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 6218,
+        "cache_read_input_tokens": 10998,
+        "cached_tokens": 10998
+      },
+      "output_tokens": 272,
+      "output_tokens_details": {
+        "reasoning_tokens": 120
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "cost_usd": 0.005,
+          "invocation": 1
+        }
+      },
+      "total_tokens": 17497
+    },
+    "user": null
+  },
+  "summary": {
+    "label": "nike-fast-web",
+    "tools": [
+      "finance_search",
+      "web_search"
+    ],
+    "http_status": 200,
+    "elapsed_seconds": 7.5,
+    "answer_markdown": "Nike’s latest share price is **$37.35 USD**, as of September 9, 2026.",
+    "rows": [
+      {
+        "subject": "NIKE, Inc.",
+        "symbol": "NKE",
+        "label": "latest share price",
+        "value": 37.35,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-09",
+        "source_url": null
+      }
+    ],
+    "rejected_rows": [],
+    "sources": [],
+    "tool_results": [
+      "finance_results"
+    ],
+    "cost_usd": 0.04597
+  }
+}

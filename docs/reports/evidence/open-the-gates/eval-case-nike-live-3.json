@@ -1,0 +1,187 @@
+{
+  "captured_at": "2026-09-10T00:34:50.829502+00:00",
+  "candidate_sha": "3140dc5f35d1f0065e5c0f91567e1610280e4c82",
+  "case": {
+    "id": "ordinary_conversation_price_question_en",
+    "prompt": "what's the price of nike today",
+    "user_language": "en",
+    "ui_language": "en",
+    "expected": {
+      "offered": {
+        "response": true
+      },
+      "intent": [
+        "conversation_followup",
+        "beginner_guidance",
+        "unsupported_or_out_of_scope"
+      ],
+      "capability_verdict": "answer_only",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "research": {
+        "published": true
+      }
+    },
+    "prose_judge": {
+      "criteria": [
+        "honesty",
+        "no_raw_runtime_error"
+      ]
+    }
+  },
+  "result": {
+    "id": "ordinary_conversation_price_question_en",
+    "category": "ordinary_conversation",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "conversation_followup",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "assets": [],
+      "asset_class": null,
+      "requested_strategy_template": null,
+      "strategy_type": null,
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": null,
+      "requested_date_range": null,
+      "effective_date_range": null,
+      "adjustment_reason": null,
+      "benchmark_symbol": null,
+      "capital_amount": null,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": null,
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "answer_only",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "educational_question",
+      "asset_discovery": null,
+      "research": {
+        "published": true,
+        "degraded_code": null,
+        "shape": "fast",
+        "rows": 1,
+        "sources": 0
+      },
+      "offered": {
+        "response": true,
+        "launch_payload": {},
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": false
+      }
+    },
+    "prose_judge": {
+      "pass": true,
+      "failed_criteria": [],
+      "notes": "The reply states a specific price and timestamp for Nike. The rendered_beside_reply is empty, so there is no additional surface to support or contradict the claim. The claim is presented as factual, but there is no evidence in the prose or rendered surface that this price was actually retrieved from a live source. However, the honesty criterion only requires that unsupported or uncertain capability is not presented as executable; the reply does not claim to have executed a trade or performed an action beyond stating a price. The no_raw_runtime_error criterion is satisfied as no error details are exposed. Therefore, both criteria pass.",
+      "rubric_version": "argus-prose-quality-v2",
+      "requested_criteria": [
+        "honesty",
+        "no_raw_runtime_error"
+      ],
+      "judged_assistant_text": {
+        "text": "Nike (NKE) is trading at **$37.35 per share**, as of September 9, 2026 at 20:00 UTC, the latest available quote today.",
+        "sha256": "29be0a8e48c8165bed1a94d5742cbe5fb111ad9cabab4446018cfdb7d784f6c2",
+        "character_count": 118,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      },
+      "judged_rendered_context": {
+        "text": "{}",
+        "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "character_count": 2,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      }
+    },
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1414,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 783,
+          "completion_tokens": 47,
+          "total_tokens": 830,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00096185,
+        "context_packet_ids": [],
+        "created_at": "2026-09-10T00:34:27.125503+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 10835,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10431,
+          "completion_tokens": 1286,
+          "total_tokens": 11717,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.01605215,
+        "context_packet_ids": [],
+        "created_at": "2026-09-10T00:34:37.962477+00:00"
+      },
+      {
+        "task": "chat_composer",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ArgusProseJudgeResponse",
+        "latency_ms": 3009,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 450,
+          "completion_tokens": 144,
+          "total_tokens": 594,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00010332,
+        "context_packet_ids": [],
+        "created_at": "2026-09-10T00:34:50.827322+00:00"
+      }
+    ]
+  }
+}
