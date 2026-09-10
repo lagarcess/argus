@@ -306,11 +306,13 @@ async def _llm_explanation(
             "content": (
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 "Write what belongs inside the Quick take frame of a completed "
-                "historical backtest. Keep it short and first-glance: explain the "
-                "most meaningful result and tradeoff for a person, rather than "
-                "reciting the card. Save the deeper discussion for Breakdown. "
-                "Do not add a heading or next experiments; the existing UI owns "
-                "the frame and follow-up actions. "
+                "historical backtest. Keep it short and first-glance: give the "
+                "reader the central story and what it meant to hold through "
+                "this run, including its most meaningful tradeoff. The reader "
+                "can already see the card's numbers. Save the supporting "
+                "discussion for Breakdown. A next historical test belongs here "
+                "only if it sharpens that first impression. Do not add a heading "
+                "or an experiment checklist; the UI owns the frame and actions. "
                 f"{response_language_instruction(language)} "
                 f"{READOUT_GROUNDING_INSTRUCTIONS}"
             ),

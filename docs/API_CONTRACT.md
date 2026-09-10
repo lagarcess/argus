@@ -1148,6 +1148,14 @@ model call, translation, historical rewrite or partial-draft display.
 `result_readout_failure_mode` record generation provenance for both surfaces;
 existing Breakdown provenance remains read-compatible.
 
+The card owns numerical reporting. Quick take tells the first-glance historical
+story; Breakdown develops what holding through the run involved and the
+tradeoffs, without repeating Quick take or the card's figures. A figure appears
+in prose only when needed to explain a point, through the existing fact
+references. A supported next historical test may follow naturally from that
+story; it is not investment advice and does not replace the typed action
+controls. Frames, labels and their order are unchanged.
+
 Before creating that public envelope, both composers use the same internal
 labeled fact sheet. Each fact identifies its canonical value, unit, meaning,
 scope, return basis and stored or derived source. Executed fills are distinct

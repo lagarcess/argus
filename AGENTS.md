@@ -377,9 +377,11 @@ Milestone guardrails:
 - Add out-of-focus chat attention state without inventing backend facts in the
   frontend.
 - Treat Quick take, Explain result, and Try next as distinct result surfaces:
-  Quick take is the first-glance result readout, Explain result is the deeper
-  fact-grounded breakdown action, and Try next must come from supported next
-  experiments rather than generic advice or duplicated Quick take prose.
+  the card owns numerical reporting, Quick take tells the first-glance story,
+  and Explain result develops the fact-grounded holding experience and
+  tradeoffs without repeating it. A supported next historical test may follow
+  naturally in the prose; Try next actions remain structured experiments,
+  not investment advice or a duplicated readout.
 - Do not restore "copy conversation link" or "share conversation id" as a
   pseudo-share action. Until the public excerpt feature exists, the header menu
   should expose only real owner actions such as rename, pin, and delete.
@@ -845,9 +847,11 @@ Pattern:
 - Anti-patterns: dense PDF tone, metric dumps, generic lists, jargon
 - Deterministic facts ground LLM language
 - No raw enums or internal field names in user-facing text
-- Result readouts must preserve surface ownership: Quick take should not render
-  supported next experiments as visible "Try next" copy, while Explain result
-  must not reuse Quick take / Quick Breakdown headings.
+- Result readouts interpret the card instead of restating its figures. A figure
+  belongs in prose only when needed to explain a point, with its fact reference.
+  A supported next historical test may appear in the story without a "Try next"
+  heading or experiment checklist. Quick take stays first-glance; Explain
+  result adds depth without repeating it or reusing frame headings.
 
 Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
 
