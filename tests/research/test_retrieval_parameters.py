@@ -265,7 +265,7 @@ def test_the_strict_schema_closes_every_object_and_requires_every_field() -> Non
                 walk(item)
 
     walk(schema)
-    assert len(objects) == 2, "the answer envelope and the row"
+    assert len(objects) == 3, "the answer envelope, figure row, and named entity"
     for node in objects:
         assert node["additionalProperties"] is False
         assert node["required"] == list(node["properties"])

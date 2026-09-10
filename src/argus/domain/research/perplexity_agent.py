@@ -273,20 +273,27 @@ def _packet_from_priced_response(
         answer = _sanitize_answer("\n\n".join(text_blocks))
     if not answer:
         raise ResearchUnavailableError("empty_answer")
-    seen: set[str] = set()
-    unique_pairs = []
-    for pair in parsed.pairs:
-        key = pair.symbol.upper()
-        if key in seen:
-            continue
-        seen.add(key)
-        unique_pairs.append(pair)
+    pairs = [*parsed.pairs, *(typed.name_pairs if typed is not None else ())]
+    symbols = set(
+        list(dict.fromkeys(pair.symbol.strip().upper() for pair in pairs))[
+            :MAX_PEER_PAIRS
+        ]
+    )
+    # Bound catalog candidates, not the names we must corroborate for each.
+    # A bare metadata pair must not erase a conflicting authored identity.
+    unique_pairs = dict.fromkeys(
+        (pair.symbol.strip().upper(), pair.name)
+        for pair in pairs
+        if pair.symbol.strip().upper() in symbols
+    )
     return ResearchPacket(
         answer_markdown=answer[:MAX_ANSWER_CHARS],
         categories=tuple(parsed.categories[:12]),
         tickers=tuple(parsed.tickers[:MAX_PACKET_TICKERS]),
         sources=tuple(parsed.sources[:MAX_PACKET_SOURCES]),
-        name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
+        name_pairs=tuple(
+            ResearchNamePair(symbol=symbol, name=name) for symbol, name in unique_pairs
+        ),
         rows=tuple(rows),
         typed_answer=typed is not None,
         unsourced_rows=tuple(unsourced),

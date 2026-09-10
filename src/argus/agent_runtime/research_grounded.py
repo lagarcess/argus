@@ -425,7 +425,7 @@ def _packet_stage_result(
     if degraded_code is None:
         # A withheld answer shows no peer, so a reason already established
         # spares the resolver a pass over names nothing will render.
-        candidates = list(packet.name_pairs)
+        candidates = list(packet.candidate_name_pairs)
         if survey:
             # A survey's answer names its assets in the results, and often
             # only in its own tables; the resolver still gates every one.
@@ -436,7 +436,6 @@ def _packet_stage_result(
             seen = {pair.symbol.upper() for pair in candidates}
             for symbol in (
                 *packet.tickers,
-                *(row.symbol for row in packet.published_rows if row.symbol),
                 *symbols_from_answer_tables(packet.answer_markdown),
             ):
                 if symbol.upper() in seen:
@@ -1412,7 +1411,7 @@ def compose_completed_research(
         []
         if degraded_code is not None
         else verified_peers(
-            packet.name_pairs,
+            packet.candidate_name_pairs,
             exclude={s["symbol"] for s in subjects},
             identity_rows=packet.published_rows,
         )

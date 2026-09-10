@@ -88,7 +88,7 @@ def research_action_assets(
     Subjects already resolved before retrieval and newly found peers pass
     the same boundary. The returned identities own both actions and sidecars.
     """
-    names = _identity_names(packet.name_pairs, packet.published_rows)
+    names = _identity_names(packet.candidate_name_pairs, ())
 
     def corroborated(asset: dict[str, str]) -> bool:
         resolved = ResolvedAsset(
@@ -145,7 +145,7 @@ def verified_peers(
         if resolved is None:
             continue
         symbol = resolved["symbol"]
-        if symbol in seen or resolved["asset_class"] != "equity":
+        if symbol in seen:
             continue
         seen.add(candidate)
         seen.add(symbol)

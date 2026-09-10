@@ -98,6 +98,18 @@ class RetrievedRow(BaseModel):
         return self
 
 
+class ResearchNamePair(BaseModel):
+    """A (name, symbol) pair the provider surfaced. Untrusted until it passes
+    Argus's own resolver, asset-class, and coverage gates."""
+
+    model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
+
+    name: str
+    """The entity's name as supplied by the answer or retrieved tool result."""
+    symbol: str
+    """The exchange symbol supplied for that named entity."""
+
+
 class TypedRetrieval(BaseModel):
     """A grounded answer: prose for the reader, plus every figure it states as a cited row."""
 
@@ -107,6 +119,8 @@ class TypedRetrieval(BaseModel):
     """The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models."""
     rows: list[RetrievedRow]
     """Every figure answer_markdown states, one row each, with the retrieved page it was read from."""
+    name_pairs: list[ResearchNamePair] = Field(default_factory=list)
+    """The assets answer_markdown names, each with its name and exchange symbol; an empty list when the answer names no assets."""
 
 
 def typed_retrieval_json_schema() -> dict[str, Any]:
@@ -251,16 +265,6 @@ def combined_research_usage(usages: Sequence[ResearchUsage]) -> ResearchUsage:
     )
 
 
-class ResearchNamePair(BaseModel):
-    """A (name, symbol) pair the provider surfaced. Untrusted until it passes
-    Argus's own resolver, asset-class, and coverage gates."""
-
-    model_config = ConfigDict(frozen=True)
-
-    name: str
-    symbol: str
-
-
 class ResearchSource(BaseModel):
     """One citation the packet actually returned.
 
@@ -307,6 +311,21 @@ class ResearchPacket(BaseModel):
     def published_rows(self) -> tuple[RetrievedRow, ...]:
         """All figures the answer publishes, with their original identities and citations."""
         return (*self.rows, *self.unsourced_rows)
+
+    @property
+    def candidate_name_pairs(self) -> tuple[ResearchNamePair, ...]:
+        """Every typed candidate identity, retaining conflicting names for validation."""
+        identities = dict.fromkeys(
+            (symbol.strip().upper(), name)
+            for symbol, name in (
+                *((pair.symbol, pair.name) for pair in self.name_pairs),
+                *((row.symbol, row.subject) for row in self.published_rows if row.symbol),
+            )
+            if symbol.strip()
+        )
+        return tuple(
+            ResearchNamePair(symbol=symbol, name=name) for symbol, name in identities
+        )
 
 
 class BackgroundPoll(BaseModel):
