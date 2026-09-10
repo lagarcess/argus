@@ -214,8 +214,9 @@ def observe_selection(
                             "reason": candidate.reason_text,
                         }
                     )
-        followup = _dict(_dict(effect.get("research")).get("follow_up"))
-        for raw_asset in followup.get("subjects", []):
+        research = _dict(effect.get("research"))
+        followup = _dict(research.get("follow_up"))
+        for raw_asset in (*followup.get("subjects", []), *research.get("peers", [])):
             asset = _asset(raw_asset)
             if asset is not None and (asset["symbol"], asset["name"]) in result_assets:
                 owners.append(asset)
@@ -362,12 +363,48 @@ def selection_offered(offered: dict, evidence: dict) -> dict:
 
 
 def selection_judge_context(evidence: dict) -> dict:
-    """Keep typed facts and source evidence; exclude internal execution identities."""
+    """Give the judge semantic evidence; raw policy remains with structural checks."""
     return {
         "contract_version": evidence["contract_version"],
         "observed_at": evidence["observed_at"],
         "assets": [
-            {**item["identity"], "facts": item["facts"]} for item in evidence["assets"]
+            {
+                **item["identity"],
+                "facts": [_semantic_fact(fact) for fact in item["facts"]],
+            }
+            for item in evidence["assets"]
         ],
         "structural_errors": evidence["errors"],
     }
+
+
+def _semantic_fact(fact: dict) -> dict:
+    projected = {
+        key: fact[key]
+        for key in (
+            "symbol",
+            "name",
+            "asset_class",
+            "reason",
+            "figure",
+            "source",
+            "citation_url",
+            "citation_origin",
+            "retrieved_at",
+        )
+        if key in fact
+    }
+    policy = _dict(fact.get("evidence_policy"))
+    if policy:
+        # Cache class/TTL describe retention, not the requested asset category.
+        projected["source_period"] = {
+            key: policy[key]
+            for key in (
+                "period_start_date",
+                "question_as_of_date",
+                "current_survey",
+                "closed_period",
+            )
+            if key in policy
+        }
+    return projected

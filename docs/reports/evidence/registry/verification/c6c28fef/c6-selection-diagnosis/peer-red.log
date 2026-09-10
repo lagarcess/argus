@@ -1,0 +1,84 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/aa72/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 42 items / 38 deselected / 4 selected
+
+tests/evals/test_measurement_selection.py F...                           [100%]
+
+=================================== FAILURES ===================================
+___ test_subject_and_peer_actions_require_the_same_completed_delivery[None] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e120400>
+broken = None
+
+    @pytest.mark.parametrize("broken", [None, "return", "effect", "peer_class"])
+    def test_subject_and_peer_actions_require_the_same_completed_delivery(monkeypatch, broken):
+        case = next(
+            case
+            for case in harness.load_eval_cases()
+            if case.id == "asset_discovery_recent_ipo_exact_issue_344"
+        )
+        patch = _selection_patch(symbol="AAPL")
+        peer_patch = _selection_patch(symbol="MSFT")
+        research = patch["research"]
+        subjects = research["follow_up"]["subjects"]
+        peers = peer_patch["research"]["follow_up"]["subjects"]
+        patch["research"] = build_research_sidecar(
+            capability_class="screening",
+            shape="balanced",
+            sources=research["sources"],
+            retrieved_at=research["retrieved_at"],
+            subjects=subjects,
+            peers=peers,
+            usage={},
+            period_of_interest=None,
+            retrieved_rows=[*research["rows"], *peer_patch["research"]["rows"]],
+            evidence_policy=build_research_evidence_policy(
+                question_kind="screening",
+                question_as_of_date=datetime.now(timezone.utc).date(),
+            ),
+        )
+        patch["next_experiments"] = research_next_experiment_rows(
+            subjects=subjects,
+            peers=peers,
+            language="en",
+            coverage_probe=lambda *_: datetime.now(timezone.utc).date()
+            - timedelta(days=365 * 4),
+        )
+        _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+        actual = harness.dispatch_requested_calls
+    
+        def dispatch(**kwargs):
+            result = actual(**kwargs)
+            delivered = result.stage_patch
+            effect = delivered["tool_effects"][0]
+            if broken == "return":
+                card = delivered["final_response_payload"]["tool_result_cards"][0]
+                card["outcome"]["result"]["peers"] = []
+                delivered["tool_call_records"][0]["tool_outcome"] = deepcopy(card["outcome"])
+            elif broken == "effect":
+                effect["artifact_id"] = fake.uuid4()
+            elif broken == "peer_class":
+                del effect["stage_patch"]["research"]["peers"][0]["asset_class"]
+            return result
+    
+        monkeypatch.setattr(harness, "dispatch_requested_calls", dispatch)
+    
+        result = harness.run_eval_case(case)
+    
+        evidence = result["typed_outcome"]["asset_discovery"]
+        if broken is None:
+>           assert result["failed_checks"] == []
+E           AssertionError: assert ['asset_disco...vered action'] == []
+E             
+E             Left contains one more item: 'asset_discovery: asset_class or identity unproven for a delivered action'
+E             Use -v to get more diff
+
+tests/evals/test_measurement_selection.py:466: AssertionError
+=========================== short test summary info ============================
+FAILED tests/evals/test_measurement_selection.py::test_subject_and_peer_actions_require_the_same_completed_delivery[None]
+================== 1 failed, 3 passed, 38 deselected in 1.07s ==================

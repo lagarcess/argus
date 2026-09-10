@@ -298,8 +298,16 @@ def test_missing_structural_evidence_cannot_be_rescued_by_the_judge(
     assert result["prose_judge"]["pass"] is True
 
 
+@pytest.mark.parametrize(
+    "data_class,source_before_period,expected_current",
+    [
+        ("fundamentals", False, True),
+        ("movers", False, False),
+        ("fundamentals", True, False),
+    ],
+)
 def test_current_selection_preserves_the_runtime_data_and_source_period_policy(
-    monkeypatch, selection_case
+    monkeypatch, selection_case, data_class, source_before_period, expected_current
 ):
     patch = _selection_patch()
     research = patch["research"]
@@ -307,20 +315,82 @@ def test_current_selection_preserves_the_runtime_data_and_source_period_policy(
     period_start = observed.date() - timedelta(days=14)
     policy = build_research_evidence_policy(
         question_kind=None,
-        data_class="fundamentals",
+        data_class=data_class,
         period_start_date=period_start,
         question_as_of_date=observed.date(),
     )
     research["evidence_policy"] = policy.model_dump(mode="json")
     research["retrieved_at"] = (observed - timedelta(minutes=10)).isoformat()
-    research["sources"][0]["source_date"] = period_start.isoformat()
+    research["sources"][0]["source_date"] = (
+        period_start - timedelta(days=int(source_before_period))
+    ).isoformat()
     _wire_delivery(monkeypatch, patches=[patch], names=("read",))
 
     result = harness.run_eval_case(selection_case)
 
-    assert result["failed_checks"] == []
+    assert (result["failed_checks"] == []) is expected_current
+    if not expected_current:
+        assert any("currentness unproven" in check for check in result["failed_checks"])
     fact = result["typed_outcome"]["asset_discovery"]["assets"][0]["facts"][0]
     assert fact["evidence_policy"] == policy.model_dump(mode="json")
+
+
+@pytest.mark.parametrize("figures", [False, True])
+def test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy(
+    monkeypatch, selection_case, figures
+):
+    patch = _selection_patch(figures=figures, discovery=not figures)
+    observed = datetime.now(timezone.utc)
+    policy = build_research_evidence_policy(
+        question_kind="find_assets",
+        period_start_date=observed.date() - timedelta(days=14),
+        question_as_of_date=observed.date(),
+    ).model_dump(mode="json")
+    patch["research"]["evidence_policy"] = policy
+    _, judged = _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+
+    result = harness.run_eval_case(selection_case)
+
+    # The scorecard keeps the complete runtime policy; only the model's view changes.
+    recorded = json.loads(json.dumps(result))["typed_outcome"]["asset_discovery"]
+    fact = recorded["assets"][0]["facts"][0]
+    assert fact["evidence_policy"] == policy
+    context = judged[0]["selection_evidence"]
+    projected = context["assets"][0]["facts"][0]
+    semantic_keys = {
+        "symbol",
+        "name",
+        "asset_class",
+        "reason",
+        "figure",
+        "source",
+        "citation_url",
+        "citation_origin",
+        "retrieved_at",
+    }
+    assert set(projected) == (set(fact) & semantic_keys) | {"source_period"}
+    assert {key: projected[key] for key in semantic_keys & fact.keys()} == {
+        key: fact[key] for key in semantic_keys & fact.keys()
+    }
+    assert projected["source_period"] == {
+        key: policy[key]
+        for key in (
+            "period_start_date",
+            "question_as_of_date",
+            "current_survey",
+            "closed_period",
+        )
+    }
+    assert not {"data_class", "max_age_seconds", "question_kind"} & set(
+        projected["source_period"]
+    )
+    assert context["observed_at"] == recorded["observed_at"]
+    assert context["assets"][0] == {
+        **recorded["assets"][0]["identity"],
+        "facts": [projected],
+    }
+    assert result["prose_judge"]["selection_evidence"] == context
+    assert judged[0]["selection_expectations"] == selection_case.expected.asset_discovery
 
 
 def test_a_model_citation_outside_the_retrieved_drawer_is_retained_as_such(
@@ -329,7 +399,7 @@ def test_a_model_citation_outside_the_retrieved_drawer_is_retained_as_such(
     patch = _selection_patch()
     citation_url = "https://www.coingecko.com/en/coins/bitcoin"
     patch["research"]["rows"][0]["source_url"] = citation_url
-    _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+    _, judged = _wire_delivery(monkeypatch, patches=[patch], names=("read",))
 
     result = harness.run_eval_case(selection_case)
 
@@ -337,7 +407,86 @@ def test_a_model_citation_outside_the_retrieved_drawer_is_retained_as_such(
     assert fact["citation_url"] == citation_url
     assert fact["citation_origin"] == "model"
     assert fact["source"] is None
+    projected = judged[0]["selection_evidence"]["assets"][0]["facts"][0]
+    assert projected["citation_origin"] == "model"
+    assert projected["citation_url"] == citation_url
+    assert projected["source"] is None
+    assert projected["source_period"] == {
+        key: fact["evidence_policy"][key]
+        for key in (
+            "period_start_date",
+            "question_as_of_date",
+            "current_survey",
+            "closed_period",
+        )
+    }
     assert result["failed_checks"] == []
+
+
+@pytest.mark.parametrize("broken", [None, "return", "effect", "peer_class"])
+def test_subject_and_peer_actions_require_the_same_completed_delivery(
+    monkeypatch, broken
+):
+    case = next(
+        case
+        for case in harness.load_eval_cases()
+        if case.id == "asset_discovery_recent_ipo_exact_issue_344"
+    )
+    patch = _selection_patch(symbol="AAPL")
+    peer_patch = _selection_patch(symbol="MSFT")
+    research = patch["research"]
+    subjects = research["follow_up"]["subjects"]
+    peers = peer_patch["research"]["follow_up"]["subjects"]
+    patch["research"] = build_research_sidecar(
+        capability_class="screening",
+        shape="balanced",
+        sources=research["sources"],
+        retrieved_at=research["retrieved_at"],
+        subjects=subjects,
+        peers=peers,
+        usage={},
+        period_of_interest=None,
+        retrieved_rows=[*research["rows"], *peer_patch["research"]["rows"]],
+        evidence_policy=build_research_evidence_policy(
+            question_kind="screening",
+            question_as_of_date=datetime.now(timezone.utc).date(),
+        ),
+    )
+    patch["next_experiments"] = research_next_experiment_rows(
+        subjects=subjects,
+        peers=peers,
+        language="en",
+        coverage_probe=lambda *_: datetime.now(timezone.utc).date()
+        - timedelta(days=365 * 4),
+    )
+    _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+    actual = harness.dispatch_requested_calls
+
+    def dispatch(**kwargs):
+        result = actual(**kwargs)
+        delivered = result.stage_patch
+        effect = delivered["tool_effects"][0]
+        if broken == "return":
+            card = delivered["final_response_payload"]["tool_result_cards"][0]
+            card["outcome"]["result"]["peers"] = []
+            delivered["tool_call_records"][0]["tool_outcome"] = deepcopy(card["outcome"])
+        elif broken == "effect":
+            effect["artifact_id"] = fake.uuid4()
+        elif broken == "peer_class":
+            del effect["stage_patch"]["research"]["peers"][0]["asset_class"]
+        return result
+
+    monkeypatch.setattr(harness, "dispatch_requested_calls", dispatch)
+
+    result = harness.run_eval_case(case)
+
+    evidence = result["typed_outcome"]["asset_discovery"]
+    if broken is None:
+        assert result["failed_checks"] == []
+        assert [asset["identity"] for asset in evidence["assets"]] == [*subjects, *peers]
+    else:
+        assert any("identity unproven" in check for check in result["failed_checks"])
+        assert peers[0] not in [asset["identity"] for asset in evidence["assets"]]
 
 
 def test_same_ticker_wrong_asset_action_fails(monkeypatch, selection_case):

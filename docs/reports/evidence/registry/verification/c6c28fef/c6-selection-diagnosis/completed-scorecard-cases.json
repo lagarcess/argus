@@ -1,0 +1,2085 @@
+{
+  "source": "temp/argus_eval_scorecards/argus-eval-scorecard-20260910T063444Z.json",
+  "source_sha256": "7b2876941b4933f1e1a7d5591d6e294fbc17a48ffba7c88c61e2f0e19ca4b67e",
+  "original_results": [
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [
+        "prose_judge:selection_relevance"
+      ],
+      "id": "asset_discovery_comparison_anchor_english_issue_244",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [
+          "selection_relevance"
+        ],
+        "judged_assistant_text": {
+          "character_count": 88,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "4b40da53aa365fa914b35538edd5b058175d203531235821abb424701265e94b",
+          "text": "These verified candidates represent the closest competitors in Costco's retail category.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 2776,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "fd9c4842490cf318b35553b849b7448ace6cfd264463074c93431c5b77d2fe46",
+          "text": "{\"can_request_search_action\": true, \"discovery_grounding\": \"general_knowledge_not_current_search\", \"discovery_rows\": [{\"name\": \"Walmart Inc. Common Stock\", \"reason_text\": \"Large-scale U.S. retailer with a warehouse-club format that competes directly with Costco on groceries and general merchandise.\", \"symbol\": \"WMT\"}, {\"name\": \"Target Corporation\", \"reason_text\": \"National big-box retailer offering similar consumer staples and discretionary goods, competing on price and assortment.\", \"symbol\": \"TGT\"}, {\"name\": \"Amazon.com, Inc. Common Stock\", \"reason_text\": \"E-commerce giant whose grocery and membership offerings (Amazon Fresh/Prime) compete with Costco's value proposition.\", \"symbol\": \"AMZN\"}, {\"name\": \"The Kroger Co.\", \"reason_text\": \"Major U.S. supermarket chain that overlaps with Costco on groceries and household essentials.\", \"symbol\": \"KR\"}, {\"name\": \"Dollar General Corp.\", \"reason_text\": \"Discount retailer serving price-sensitive consumers, competing on everyday low prices for staples.\", \"symbol\": \"DG\"}], \"retrieved_at\": \"2026-09-10T06:08:18.305659+00:00\", \"tool_result_cards\": [{\"presentation\": {\"answer\": {\"label\": {\"interpolation_args\": {\"name\": \"COST\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_0\", \"unit\": null, \"value\": \"COST\", \"value_text\": null}, \"inputs\": [{\"editable\": false, \"label\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.request\"}, \"name\": \"request\", \"unit\": null, \"unknown\": false, \"value\": \"what else in Costco's category could I compare it against?\", \"value_text\": null, \"visibility\": \"private\"}], \"narrative\": \"These verified candidates represent the closest competitors in Costco's retail category.\", \"notes\": [], \"rows\": [{\"label\": {\"interpolation_args\": {\"name\": \"Walmart Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_1\", \"unit\": null, \"value\": \"WMT\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Target Corporation\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_2\", \"unit\": null, \"value\": \"TGT\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Amazon.com, Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_3\", \"unit\": null, \"value\": \"AMZN\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"The Kroger Co.\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_4\", \"unit\": null, \"value\": \"KR\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Dollar General Corp.\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_5\", \"unit\": null, \"value\": \"DG\", \"value_text\": null}], \"sources\": [], \"title\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.title\"}, \"visual\": null}, \"status\": \"succeeded\"}]}",
+          "truncated": false
+        },
+        "notes": "The user asked for competitors in Costco's category. The delivered assets (WMT, TGT, AMZN, KR, DG) are plausible retail competitors, but Dollar General is a discount dollar-store chain, not a warehouse club or big-box retailer comparable to Costco. Including DG weakens the category relevance. Additionally, the prose claims 'verified candidates' and 'closest competitors' but the discovery_grounding is 'general_knowledge_not_current_search', so the 'verified' framing is unsupported by the rendered surface.",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "no_raw_runtime_error",
+          "selection_relevance"
+        ],
+        "rubric_version": "argus-prose-quality-v2",
+        "selection_evidence": {
+          "assets": [
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Walmart Inc. Common Stock",
+                  "reason": "Large-scale U.S. retailer with a warehouse-club format that competes directly with Costco on groceries and general merchandise.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "WMT"
+                }
+              ],
+              "name": "Walmart Inc. Common Stock",
+              "symbol": "WMT"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Target Corporation",
+                  "reason": "National big-box retailer offering similar consumer staples and discretionary goods, competing on price and assortment.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "TGT"
+                }
+              ],
+              "name": "Target Corporation",
+              "symbol": "TGT"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Amazon.com, Inc. Common Stock",
+                  "reason": "E-commerce giant whose grocery and membership offerings (Amazon Fresh/Prime) compete with Costco's value proposition.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "AMZN"
+                }
+              ],
+              "name": "Amazon.com, Inc. Common Stock",
+              "symbol": "AMZN"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "The Kroger Co.",
+                  "reason": "Major U.S. supermarket chain that overlaps with Costco on groceries and household essentials.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "KR"
+                }
+              ],
+              "name": "The Kroger Co.",
+              "symbol": "KR"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Dollar General Corp.",
+                  "reason": "Discount retailer serving price-sensitive consumers, competing on everyday low prices for staples.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "DG"
+                }
+              ],
+              "name": "Dollar General Corp.",
+              "symbol": "DG"
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "observed_at": "2026-09-10T06:08:27.339907+00:00",
+          "structural_errors": []
+        },
+        "selection_expectations": {
+          "anchor_symbols": [
+            "COST"
+          ],
+          "relationship": "comparison"
+        }
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:03.659898+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1174,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 45,
+            "prompt_tokens": 787,
+            "total_tokens": 832
+          },
+          "usage_cost_usd": 0.00096185
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:14.664060+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 10967,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1089,
+            "prompt_tokens": 26832,
+            "total_tokens": 27921
+          },
+          "usage_cost_usd": 0.0360609
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:18.305249+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3626,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 284,
+            "prompt_tokens": 474,
+            "total_tokens": 758
+          },
+          "usage_cost_usd": 0.0011681
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:27.317949+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 7911,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 355,
+            "prompt_tokens": 347,
+            "total_tokens": 702
+          },
+          "usage_cost_usd": 9.3656542e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:33.701001+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 6352,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 134,
+            "prompt_tokens": 2394,
+            "total_tokens": 2528
+          },
+          "usage_cost_usd": 0.00037268
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "acceptance_stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "assets": [
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Walmart Inc. Common Stock",
+                  "reason": "Large-scale U.S. retailer with a warehouse-club format that competes directly with Costco on groceries and general merchandise.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "WMT"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Walmart Inc. Common Stock",
+                "symbol": "WMT"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Target Corporation",
+                  "reason": "National big-box retailer offering similar consumer staples and discretionary goods, competing on price and assortment.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "TGT"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Target Corporation",
+                "symbol": "TGT"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Amazon.com, Inc. Common Stock",
+                  "reason": "E-commerce giant whose grocery and membership offerings (Amazon Fresh/Prime) compete with Costco's value proposition.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "AMZN"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Amazon.com, Inc. Common Stock",
+                "symbol": "AMZN"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "The Kroger Co.",
+                  "reason": "Major U.S. supermarket chain that overlaps with Costco on groceries and household essentials.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "KR"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "The Kroger Co.",
+                "symbol": "KR"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Dollar General Corp.",
+                  "reason": "Discount retailer serving price-sensitive consumers, competing on everyday low prices for staples.",
+                  "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                  "source": null,
+                  "symbol": "DG"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Dollar General Corp.",
+                "symbol": "DG"
+              },
+              "identity_matches": true
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "errors": [],
+          "observed_at": "2026-09-10T06:08:27.339907+00:00"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "execution_trace": [
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "ready_to_respond",
+            "stage": "execute"
+          }
+        ],
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "follow_up",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [
+            "WMT",
+            "TGT",
+            "AMZN",
+            "KR",
+            "DG"
+          ],
+          "dropped_not_named": [
+            "BJ's Wholesale Club"
+          ],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "primary_intent": "explain",
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": {
+          "calls": [
+            {
+              "call_id": "peer_001",
+              "degraded_code": null,
+              "published": true,
+              "rows": 0,
+              "shape": "find",
+              "sources": 0
+            }
+          ],
+          "degraded_code": null,
+          "published": true,
+          "rows": 0,
+          "shape": "find",
+          "sources": 0
+        },
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "approved_for_execution",
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null,
+        "tool_call_records": [
+          {
+            "call_id": "peer_001",
+            "outcome": "succeeded",
+            "tool_name": "peer_expansion",
+            "tool_outcome": {
+              "failure": null,
+              "result": {
+                "answer": "These verified candidates represent the closest competitors in Costco's retail category.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": false,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": null,
+                  "question_kind": "find_assets"
+                },
+                "peers": [
+                  {
+                    "name": "Walmart Inc. Common Stock",
+                    "symbol": "WMT"
+                  },
+                  {
+                    "name": "Target Corporation",
+                    "symbol": "TGT"
+                  },
+                  {
+                    "name": "Amazon.com, Inc. Common Stock",
+                    "symbol": "AMZN"
+                  },
+                  {
+                    "name": "The Kroger Co.",
+                    "symbol": "KR"
+                  },
+                  {
+                    "name": "Dollar General Corp.",
+                    "symbol": "DG"
+                  }
+                ],
+                "relationship": "peer",
+                "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": [
+                  {
+                    "name": "COST",
+                    "symbol": "COST"
+                  }
+                ]
+              },
+              "status": "succeeded"
+            }
+          }
+        ],
+        "tool_calls": [
+          {
+            "arguments": {
+              "anchor_symbols": [
+                "COST"
+              ],
+              "asset_class_hint": "equity",
+              "category_description": null,
+              "needs_current_facts": false,
+              "relationship": "peer",
+              "request": "what else in Costco's category could I compare it against?"
+            },
+            "call_id": "peer_001",
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_result_cards": [
+          {
+            "arguments": {
+              "anchor_symbols": [
+                "COST"
+              ],
+              "asset_class_hint": "equity",
+              "category_description": null,
+              "needs_current_facts": false,
+              "relationship": "peer",
+              "request": "what else in Costco's category could I compare it against?"
+            },
+            "artifact_id": "f4ce831a-d706-4b92-8fb0-671e63e82b3c",
+            "artifact_state": "active",
+            "call_id": "peer_001",
+            "card_type": "research",
+            "card_version": 1,
+            "input_revision": 0,
+            "kind": "tool_result",
+            "outcome": {
+              "failure": null,
+              "result": {
+                "answer": "These verified candidates represent the closest competitors in Costco's retail category.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": false,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": null,
+                  "question_kind": "find_assets"
+                },
+                "peers": [
+                  {
+                    "name": "Walmart Inc. Common Stock",
+                    "symbol": "WMT"
+                  },
+                  {
+                    "name": "Target Corporation",
+                    "symbol": "TGT"
+                  },
+                  {
+                    "name": "Amazon.com, Inc. Common Stock",
+                    "symbol": "AMZN"
+                  },
+                  {
+                    "name": "The Kroger Co.",
+                    "symbol": "KR"
+                  },
+                  {
+                    "name": "Dollar General Corp.",
+                    "symbol": "DG"
+                  }
+                ],
+                "relationship": "peer",
+                "retrieved_at": "2026-09-10T06:08:18.305659+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": [
+                  {
+                    "name": "COST",
+                    "symbol": "COST"
+                  }
+                ]
+              },
+              "status": "succeeded"
+            },
+            "presentation": {
+              "answer": {
+                "label": {
+                  "interpolation_args": {
+                    "name": "COST"
+                  },
+                  "locale_key": "chat.tools.research.subject"
+                },
+                "name": "subject_0",
+                "unit": null,
+                "value": "COST",
+                "value_text": null
+              },
+              "inputs": [
+                {
+                  "editable": false,
+                  "label": {
+                    "interpolation_args": {},
+                    "locale_key": "chat.tools.research.request"
+                  },
+                  "name": "request",
+                  "unit": null,
+                  "unknown": false,
+                  "value": "what else in Costco's category could I compare it against?",
+                  "value_text": null,
+                  "visibility": "private"
+                }
+              ],
+              "narrative": "These verified candidates represent the closest competitors in Costco's retail category.",
+              "notes": [],
+              "rows": [
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Walmart Inc. Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_1",
+                  "unit": null,
+                  "value": "WMT",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Target Corporation"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_2",
+                  "unit": null,
+                  "value": "TGT",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Amazon.com, Inc. Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_3",
+                  "unit": null,
+                  "value": "AMZN",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "The Kroger Co."
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_4",
+                  "unit": null,
+                  "value": "KR",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Dollar General Corp."
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_5",
+                  "unit": null,
+                  "value": "DG",
+                  "value_text": null
+                }
+              ],
+              "sources": [],
+              "title": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.research.title"
+              },
+              "visual": null
+            },
+            "schema_version": 1,
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_usage": [
+          {
+            "call_id": "peer_001",
+            "tool_name": "peer_expansion",
+            "usage": {
+              "cache_status": "bypass",
+              "cost_usd": null,
+              "invocations": 0,
+              "latency_ms": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [
+        "prose_judge:selection_relevance"
+      ],
+      "id": "asset_discovery_category_spanish_issue_244",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [
+          "selection_relevance"
+        ],
+        "judged_assistant_text": {
+          "character_count": 79,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "cd420dc69ef246908af57b9ff6c9a213ce7b578e4b081cd894b86b59240f6aad",
+          "text": "Puedes explorar varias opciones en ciberseguridad para empezar a hacer pruebas.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 2612,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "38d2463885f7734fee31a1e9cefef6902924727bc341a51f6c93ba6d95428abd",
+          "text": "{\"can_request_search_action\": true, \"discovery_grounding\": \"general_knowledge_not_current_search\", \"discovery_rows\": [{\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Empresa l\\u00edder en ciberseguridad con soluciones de detecci\\u00f3n y respuesta en la nube.\", \"symbol\": \"CRWD\"}, {\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Proveedor global de firewalls y plataformas de ciberseguridad empresarial.\", \"symbol\": \"PANW\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Especialista en seguridad de redes y soluciones de ciberseguridad integradas.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Ofrece seguridad en la nube y protecci\\u00f3n de accesos remotos.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Empresa israel\\u00ed de soluciones de ciberseguridad para empresas y gobiernos.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-10T06:08:47.923766+00:00\", \"tool_result_cards\": [{\"presentation\": {\"answer\": {\"label\": {\"interpolation_args\": {\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_0\", \"unit\": null, \"value\": \"CRWD\", \"value_text\": null}, \"inputs\": [{\"editable\": false, \"label\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.request\"}, \"name\": \"request\", \"unit\": null, \"unknown\": false, \"value\": \"\\u00bfqu\\u00e9 acciones de ciberseguridad podr\\u00eda probar?\", \"value_text\": null, \"visibility\": \"private\"}], \"narrative\": \"Puedes explorar varias opciones en ciberseguridad para empezar a hacer pruebas.\", \"notes\": [], \"rows\": [{\"label\": {\"interpolation_args\": {\"name\": \"Palo Alto Networks, Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_1\", \"unit\": null, \"value\": \"PANW\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Fortinet, Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_2\", \"unit\": null, \"value\": \"FTNT\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Zscaler, Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_3\", \"unit\": null, \"value\": \"ZS\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_4\", \"unit\": null, \"value\": \"CHKP\", \"value_text\": null}], \"sources\": [], \"title\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.title\"}, \"visual\": null}, \"status\": \"succeeded\"}]}",
+          "truncated": false
+        },
+        "notes": "The user asked for 'acciones de ciberseguridad' (cybersecurity stocks) and the selection_expectations require a category relationship with cybersecurity. The delivered assets are all equity securities of cybersecurity companies, matching the requested category. However, the selection_evidence shows that all facts were retrieved under an evidence_policy with data_class 'movers' and a max_age_seconds of 300, meaning the system treated the request as a movers query rather than a category discovery. The rendered discovery_rows and tool_result_cards present the assets as a category discovery, but the evidence_policy indicates the retrieval was for movers, not for a category. This mismatch means the delivered answer does not faithfully address the unchanged selection_expectations for a category relationship; the retrieval was scoped to movers, not to a general category list. Therefore selection_relevance fails.",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error",
+          "selection_relevance"
+        ],
+        "rubric_version": "argus-prose-quality-v2",
+        "selection_evidence": {
+          "assets": [
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                  "reason": "Empresa líder en ciberseguridad con soluciones de detección y respuesta en la nube.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "CRWD"
+                }
+              ],
+              "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+              "symbol": "CRWD"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Palo Alto Networks, Inc. Common Stock",
+                  "reason": "Proveedor global de firewalls y plataformas de ciberseguridad empresarial.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "PANW"
+                }
+              ],
+              "name": "Palo Alto Networks, Inc. Common Stock",
+              "symbol": "PANW"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Fortinet, Inc. Common Stock",
+                  "reason": "Especialista en seguridad de redes y soluciones de ciberseguridad integradas.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "FTNT"
+                }
+              ],
+              "name": "Fortinet, Inc. Common Stock",
+              "symbol": "FTNT"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Zscaler, Inc. Common Stock",
+                  "reason": "Ofrece seguridad en la nube y protección de accesos remotos.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "ZS"
+                }
+              ],
+              "name": "Zscaler, Inc. Common Stock",
+              "symbol": "ZS"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                  "reason": "Empresa israelí de soluciones de ciberseguridad para empresas y gobiernos.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "CHKP"
+                }
+              ],
+              "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+              "symbol": "CHKP"
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "observed_at": "2026-09-10T06:08:49.604398+00:00",
+          "structural_errors": []
+        },
+        "selection_expectations": {
+          "anchor_symbols": [],
+          "category_description_includes_any": [
+            "ciberseguridad",
+            "cybersecurity",
+            "cyber"
+          ],
+          "relationship": "category"
+        }
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:34.601788+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 854,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:44.648971+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 10027,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 26496,
+            "completion_tokens": 1242,
+            "prompt_tokens": 26744,
+            "total_tokens": 27986
+          },
+          "usage_cost_usd": 0.0087142
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:47.923431+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3257,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 394,
+            "prompt_tokens": 476,
+            "total_tokens": 870
+          },
+          "usage_cost_usd": 0.0014456
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:49.581982+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1003,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 22,
+            "prompt_tokens": 370,
+            "total_tokens": 392
+          },
+          "usage_cost_usd": 3.726e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:55.129912+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 5516,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 206,
+            "prompt_tokens": 2523,
+            "total_tokens": 2729
+          },
+          "usage_cost_usd": 0.000404824
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "acceptance_stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "assets": [
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                  "reason": "Empresa líder en ciberseguridad con soluciones de detección y respuesta en la nube.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "CRWD"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                "symbol": "CRWD"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Palo Alto Networks, Inc. Common Stock",
+                  "reason": "Proveedor global de firewalls y plataformas de ciberseguridad empresarial.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "PANW"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Palo Alto Networks, Inc. Common Stock",
+                "symbol": "PANW"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Fortinet, Inc. Common Stock",
+                  "reason": "Especialista en seguridad de redes y soluciones de ciberseguridad integradas.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "FTNT"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Fortinet, Inc. Common Stock",
+                "symbol": "FTNT"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Zscaler, Inc. Common Stock",
+                  "reason": "Ofrece seguridad en la nube y protección de accesos remotos.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "ZS"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Zscaler, Inc. Common Stock",
+                "symbol": "ZS"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                  "reason": "Empresa israelí de soluciones de ciberseguridad para empresas y gobiernos.",
+                  "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                  "source": null,
+                  "symbol": "CHKP"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                "symbol": "CHKP"
+              },
+              "identity_matches": true
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "errors": [],
+          "observed_at": "2026-09-10T06:08:49.604398+00:00"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "execution_trace": [
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "ready_to_respond",
+            "stage": "execute"
+          }
+        ],
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "follow_up",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [
+            "CRWD",
+            "PANW",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "primary_intent": "explain",
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": {
+          "calls": [
+            {
+              "call_id": "peer_cyber_001",
+              "degraded_code": null,
+              "published": true,
+              "rows": 0,
+              "shape": "find",
+              "sources": 0
+            }
+          ],
+          "degraded_code": null,
+          "published": true,
+          "rows": 0,
+          "shape": "find",
+          "sources": 0
+        },
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "approved_for_execution",
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null,
+        "tool_call_records": [
+          {
+            "call_id": "peer_cyber_001",
+            "outcome": "succeeded",
+            "tool_name": "peer_expansion",
+            "tool_outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Puedes explorar varias opciones en ciberseguridad para empezar a hacer pruebas.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": false,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": null,
+                  "question_kind": "find_assets"
+                },
+                "peers": [
+                  {
+                    "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                    "symbol": "CRWD"
+                  },
+                  {
+                    "name": "Palo Alto Networks, Inc. Common Stock",
+                    "symbol": "PANW"
+                  },
+                  {
+                    "name": "Fortinet, Inc. Common Stock",
+                    "symbol": "FTNT"
+                  },
+                  {
+                    "name": "Zscaler, Inc. Common Stock",
+                    "symbol": "ZS"
+                  },
+                  {
+                    "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                    "symbol": "CHKP"
+                  }
+                ],
+                "relationship": "category",
+                "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": []
+              },
+              "status": "succeeded"
+            }
+          }
+        ],
+        "tool_calls": [
+          {
+            "arguments": {
+              "anchor_symbols": [],
+              "asset_class_hint": "equity",
+              "category_description": "ciberseguridad",
+              "needs_current_facts": false,
+              "relationship": "category",
+              "request": "¿qué acciones de ciberseguridad podría probar?"
+            },
+            "call_id": "peer_cyber_001",
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_result_cards": [
+          {
+            "arguments": {
+              "anchor_symbols": [],
+              "asset_class_hint": "equity",
+              "category_description": "ciberseguridad",
+              "needs_current_facts": false,
+              "relationship": "category",
+              "request": "¿qué acciones de ciberseguridad podría probar?"
+            },
+            "artifact_id": "4783c457-0538-4d0f-939d-565a2ca1c477",
+            "artifact_state": "active",
+            "call_id": "peer_cyber_001",
+            "card_type": "research",
+            "card_version": 1,
+            "input_revision": 0,
+            "kind": "tool_result",
+            "outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Puedes explorar varias opciones en ciberseguridad para empezar a hacer pruebas.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": false,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": null,
+                  "question_kind": "find_assets"
+                },
+                "peers": [
+                  {
+                    "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                    "symbol": "CRWD"
+                  },
+                  {
+                    "name": "Palo Alto Networks, Inc. Common Stock",
+                    "symbol": "PANW"
+                  },
+                  {
+                    "name": "Fortinet, Inc. Common Stock",
+                    "symbol": "FTNT"
+                  },
+                  {
+                    "name": "Zscaler, Inc. Common Stock",
+                    "symbol": "ZS"
+                  },
+                  {
+                    "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                    "symbol": "CHKP"
+                  }
+                ],
+                "relationship": "category",
+                "retrieved_at": "2026-09-10T06:08:47.923766+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": []
+              },
+              "status": "succeeded"
+            },
+            "presentation": {
+              "answer": {
+                "label": {
+                  "interpolation_args": {
+                    "name": "CrowdStrike Holdings, Inc. Class A Common Stock"
+                  },
+                  "locale_key": "chat.tools.research.subject"
+                },
+                "name": "subject_0",
+                "unit": null,
+                "value": "CRWD",
+                "value_text": null
+              },
+              "inputs": [
+                {
+                  "editable": false,
+                  "label": {
+                    "interpolation_args": {},
+                    "locale_key": "chat.tools.research.request"
+                  },
+                  "name": "request",
+                  "unit": null,
+                  "unknown": false,
+                  "value": "¿qué acciones de ciberseguridad podría probar?",
+                  "value_text": null,
+                  "visibility": "private"
+                }
+              ],
+              "narrative": "Puedes explorar varias opciones en ciberseguridad para empezar a hacer pruebas.",
+              "notes": [],
+              "rows": [
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Palo Alto Networks, Inc. Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_1",
+                  "unit": null,
+                  "value": "PANW",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Fortinet, Inc. Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_2",
+                  "unit": null,
+                  "value": "FTNT",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Zscaler, Inc. Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_3",
+                  "unit": null,
+                  "value": "ZS",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Check Point Software Technologies Ltd. Ordinary Shares"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_4",
+                  "unit": null,
+                  "value": "CHKP",
+                  "value_text": null
+                }
+              ],
+              "sources": [],
+              "title": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.research.title"
+              },
+              "visual": null
+            },
+            "schema_version": 1,
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_usage": [
+          {
+            "call_id": "peer_cyber_001",
+            "tool_name": "peer_expansion",
+            "usage": {
+              "cache_status": "bypass",
+              "cost_usd": null,
+              "invocations": 0,
+              "latency_ms": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [
+        "asset_discovery: asset_class or identity unproven for a delivered action",
+        "prose_judge:selection_relevance"
+      ],
+      "id": "asset_discovery_recent_ipo_exact_issue_344",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [
+          "selection_relevance"
+        ],
+        "judged_assistant_text": {
+          "character_count": 680,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "96659f66c47ac01d29e306115fa0ed23cf2db0b57b6d8faa69f134cba981178a",
+          "text": "Two recently completed U.S. IPO listings I could verify are:\n\n| Ticker | Asset | Condition satisfied | Proof |\n|---|---|---|---|\n| **TLACU** | Three Lions Acquisition Corp. units | **Recently IPO’d** | Its Nasdaq IPO was priced on **September 1, 2026**. Note that this is a SPAC unit rather than ordinary common stock alone. |\n| **JTTT** | JATT III Acquisition Corp. shares | **Recently IPO’d** | Its shares began Nasdaq trading following the IPO on **August 26, 2026**. |\n\n“Recent” here means completed during late August or early September, based on records available as of **September 10, 2026**. Proposed or merely filed offerings were excluded. This is not investment advice.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 2247,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "81a70d1ac36802fee2ddc3b922449b131a82cfc453532a91df35f218bef35a17",
+          "text": "{\"next_experiment_rows\": [{\"kind\": \"research_test_single\", \"label\": \"Test Three Lions Acquisition (TLACU) since September 2026\"}, {\"kind\": \"research_test_versus\", \"label\": \"Test Three Lions Acquisition (TLACU) vs JATT III Acquisition (JTTT) since September 2026\"}], \"tool_result_cards\": [{\"presentation\": {\"answer\": {\"label\": {\"interpolation_args\": {\"label\": \"completed IPO pricing event\", \"subject\": \"Three Lions Acquisition Corp.\"}, \"locale_key\": \"chat.tools.research.figure\"}, \"name\": \"figure_0\", \"unit\": {\"interpolation_args\": {\"unit\": \"IPO event\"}, \"locale_key\": \"chat.tools.research.unit\"}, \"value\": 1.0, \"value_text\": null}, \"inputs\": [{\"editable\": false, \"label\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.request\"}, \"name\": \"request\", \"unit\": null, \"unknown\": false, \"value\": \"find me stocks that have recently IPO'ed\", \"value_text\": null, \"visibility\": \"private\"}], \"narrative\": \"Two recently completed U.S. IPO listings I could verify are:\\n\\n| Ticker | Asset | Condition satisfied | Proof |\\n|---|---|---|---|\\n| **TLACU** | Three Lions Acquisition Corp. units | **Recently IPO\\u2019d** | Its Nasdaq IPO was priced on **September 1, 2026**. Note that this is a SPAC unit rather than ordinary common stock alone. |\\n| **JTTT** | JATT III Acquisition Corp. shares | **Recently IPO\\u2019d** | Its shares began Nasdaq trading following the IPO on **August 26, 2026**. |\\n\\n\\u201cRecent\\u201d here means completed during late August or early September, based on records available as of **September 10, 2026**. Proposed or merely filed offerings were excluded. This is not investment advice.\", \"notes\": [], \"rows\": [{\"label\": {\"interpolation_args\": {\"label\": \"IPO trading debut event\", \"subject\": \"JATT III Acquisition Corp.\"}, \"locale_key\": \"chat.tools.research.figure\"}, \"name\": \"figure_1\", \"unit\": {\"interpolation_args\": {\"unit\": \"IPO event\"}, \"locale_key\": \"chat.tools.research.unit\"}, \"value\": 1.0, \"value_text\": null}], \"sources\": [{\"source_date\": null, \"title\": \"finobird.com\", \"url\": \"https://finobird.com/calendar/ipo/analysis/week-of-august-22-28-2026-four-spacs-price-at-10-on-nasdaq/\"}], \"title\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.title\"}, \"visual\": null}, \"status\": \"succeeded\"}]}",
+          "truncated": false
+        },
+        "notes": "The user asked for stocks that have recently IPO'd. The reply delivers two SPAC units/shares (TLACU and JTTT) that recently began trading, which matches the category 'ipo' and the relationship 'category'. However, the selection_evidence contains a structural_errors field stating 'asset_class or identity unproven for a delivered action', meaning the evidence does not confirm the delivered assets as valid equity IPOs. Additionally, the evidence for TLACU cites a model citation (finobird.com IPO recap) that is not present in the rendered surface sources (which only show a source for JTTT). The reply claims both are verified, but the rendered surface only provides a source for JTTT, not for TLACU. Therefore, the selection_relevance criterion fails because the collective delivery is not fully supported by the rendered evidence.",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "no_raw_runtime_error",
+          "selection_relevance"
+        ],
+        "rubric_version": "argus-prose-quality-v2",
+        "selection_evidence": {
+          "assets": [
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "citation_origin": "model",
+                  "citation_url": "https://finobird.com/calendar/ipo/analysis/ipo-recap-week-of-august-29-september-4-2026-2026-09-04/",
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": true,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": "2026-09-10",
+                    "question_kind": null
+                  },
+                  "figure": {
+                    "as_of": "2026-09-01",
+                    "kind": "count",
+                    "label": "completed IPO pricing event",
+                    "source_url": "https://finobird.com/calendar/ipo/analysis/ipo-recap-week-of-august-29-september-4-2026-2026-09-04/",
+                    "subject": "Three Lions Acquisition Corp.",
+                    "symbol": "TLACU",
+                    "unit": "IPO event",
+                    "value": 1.0
+                  },
+                  "name": "Three Lions Acquisition Corp.",
+                  "retrieved_at": "2026-09-10T06:10:54.084244+00:00",
+                  "source": null,
+                  "symbol": "TLACU"
+                }
+              ],
+              "name": "Three Lions Acquisition Corp. Units",
+              "symbol": "TLACU"
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "observed_at": "2026-09-10T06:10:55.150930+00:00",
+          "structural_errors": [
+            "asset_class or identity unproven for a delivered action"
+          ]
+        },
+        "selection_expectations": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description_includes_any": [
+            "ipo",
+            "public"
+          ],
+          "needs_current_facts": true,
+          "relationship": "category"
+        }
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:08:56.012760+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 836,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 17,
+            "prompt_tokens": 783,
+            "total_tokens": 800
+          },
+          "usage_cost_usd": 0.00088685
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:09:06.322864+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 10284,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1228,
+            "prompt_tokens": 26742,
+            "total_tokens": 27970
+          },
+          "usage_cost_usd": 0.0362959
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:11:01.448545+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 6288,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 512,
+            "completion_tokens": 205,
+            "prompt_tokens": 1862,
+            "total_tokens": 2067
+          },
+          "usage_cost_usd": 0.000167616
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "acceptance_stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "assets": [
+            {
+              "facts": [
+                {
+                  "citation_origin": "model",
+                  "citation_url": "https://finobird.com/calendar/ipo/analysis/ipo-recap-week-of-august-29-september-4-2026-2026-09-04/",
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": true,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": "2026-09-10",
+                    "question_kind": null
+                  },
+                  "figure": {
+                    "as_of": "2026-09-01",
+                    "kind": "count",
+                    "label": "completed IPO pricing event",
+                    "source_url": "https://finobird.com/calendar/ipo/analysis/ipo-recap-week-of-august-29-september-4-2026-2026-09-04/",
+                    "subject": "Three Lions Acquisition Corp.",
+                    "symbol": "TLACU",
+                    "unit": "IPO event",
+                    "value": 1.0
+                  },
+                  "name": "Three Lions Acquisition Corp.",
+                  "retrieved_at": "2026-09-10T06:10:54.084244+00:00",
+                  "source": null,
+                  "symbol": "TLACU"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Three Lions Acquisition Corp. Units",
+                "symbol": "TLACU"
+              },
+              "identity_matches": true
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "errors": [
+            "asset_class or identity unproven for a delivered action"
+          ],
+          "observed_at": "2026-09-10T06:10:55.150930+00:00"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "execution_trace": [
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "ready_to_respond",
+            "stage": "execute"
+          }
+        ],
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "follow_up",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [
+            "TLACU"
+          ],
+          "dropped_not_named": [],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [
+            "research_test_single",
+            "research_test_versus"
+          ],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "primary_intent": "calculate",
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": {
+          "calls": [
+            {
+              "call_id": "screening_recent_ipo_1",
+              "degraded_code": null,
+              "published": true,
+              "rows": 2,
+              "shape": "balanced",
+              "sources": 1
+            }
+          ],
+          "degraded_code": null,
+          "published": true,
+          "rows": 2,
+          "shape": "balanced",
+          "sources": 1
+        },
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "approved_for_execution",
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null,
+        "tool_call_records": [
+          {
+            "call_id": "screening_recent_ipo_1",
+            "outcome": "succeeded",
+            "tool_name": "screening",
+            "tool_outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Two recently completed U.S. IPO listings I could verify are:\n\n| Ticker | Asset | Condition satisfied | Proof |\n|---|---|---|---|\n| **TLACU** | Three Lions Acquisition Corp. units | **Recently IPO’d** | Its Nasdaq IPO was priced on **September 1, 2026**. Note that this is a SPAC unit rather than ordinary common stock alone. |\n| **JTTT** | JATT III Acquisition Corp. shares | **Recently IPO’d** | Its shares began Nasdaq trading following the IPO on **August 26, 2026**. |\n\n“Recent” here means completed during late August or early September, based on records available as of **September 10, 2026**. Proposed or merely filed offerings were excluded. This is not investment advice.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": true,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": "2026-09-10",
+                  "question_kind": null
+                },
+                "peers": [
+                  {
+                    "name": "JATT III Acquisition Corp Ordinary Shares",
+                    "symbol": "JTTT"
+                  }
+                ],
+                "relationship": null,
+                "retrieved_at": "2026-09-10T06:10:54.084244+00:00",
+                "rows": [
+                  {
+                    "as_of": "2026-09-01",
+                    "kind": "count",
+                    "label": "completed IPO pricing event",
+                    "source_url": "https://finobird.com/calendar/ipo/analysis/ipo-recap-week-of-august-29-september-4-2026-2026-09-04/",
+                    "subject": "Three Lions Acquisition Corp.",
+                    "symbol": "TLACU",
+                    "unit": "IPO event",
+                    "value": 1.0
+                  },
+                  {
+                    "as_of": "2026-08-26",
+                    "kind": "count",
+                    "label": "IPO trading debut event",
+                    "source_url": "https://financereviewdaily.com/en/article/jatt-iii-acquisition-corp-completes-69-million-nasdaq-ipo",
+                    "subject": "JATT III Acquisition Corp.",
+                    "symbol": "JTTT",
+                    "unit": "IPO event",
+                    "value": 1.0
+                  }
+                ],
+                "sources": [
+                  {
+                    "source_date": null,
+                    "title": "finobird.com",
+                    "url": "https://finobird.com/calendar/ipo/analysis/week-of-august-22-28-2026-four-spacs-price-at-10-on-nasdaq/"
+                  }
+                ],
+                "status": "completed",
+                "subjects": [
+                  {
+                    "name": "Three Lions Acquisition Corp. Units",
+                    "symbol": "TLACU"
+                  }
+                ]
+              },
+              "status": "succeeded"
+            }
+          }
+        ],
+        "tool_calls": [
+          {
+            "arguments": {
+              "criteria": [
+                "recently IPO'ed"
+              ],
+              "period": null,
+              "request": "find me stocks that have recently IPO'ed",
+              "universe": null
+            },
+            "call_id": "screening_recent_ipo_1",
+            "tool_name": "screening"
+          }
+        ],
+        "tool_result_cards": [
+          {
+            "arguments": {
+              "criteria": [
+                "recently IPO'ed"
+              ],
+              "period": null,
+              "request": "find me stocks that have recently IPO'ed",
+              "universe": null
+            },
+            "artifact_id": "02eb9832-b721-4f7c-be06-99a78b45273b",
+            "artifact_state": "active",
+            "call_id": "screening_recent_ipo_1",
+            "card_type": "research",
+            "card_version": 1,
+            "input_revision": 0,
+            "kind": "tool_result",
+            "outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Two recently completed U.S. IPO listings I could verify are:\n\n| Ticker | Asset | Condition satisfied | Proof |\n|---|---|---|---|\n| **TLACU** | Three Lions Acquisition Corp. units | **Recently IPO’d** | Its Nasdaq IPO was priced on **September 1, 2026**. Note that this is a SPAC unit rather than ordinary common stock alone. |\n| **JTTT** | JATT III Acquisition Corp. shares | **Recently IPO’d** | Its shares began Nasdaq trading following the IPO on **August 26, 2026**. |\n\n“Recent” here means completed during late August or early September, based on records available as of **September 10, 2026**. Proposed or merely filed offerings were excluded. This is not investment advice.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": true,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": "2026-09-10",
+                  "question_kind": null
+                },
+                "peers": [
+                  {
+                    "name": "JATT III Acquisition Corp Ordinary Shares",
+                    "symbol": "JTTT"
+                  }
+                ],
+                "relationship": null,
+                "retrieved_at": "2026-09-10T06:10:54.084244+00:00",
+                "rows": [
+                  {
+                    "as_of": "2026-09-01",
+                    "kind": "count",
+                    "label": "completed IPO pricing event",
+                    "source_url": "https://finobird.com/calendar/ipo/analysis/ipo-recap-week-of-august-29-september-4-2026-2026-09-04/",
+                    "subject": "Three Lions Acquisition Corp.",
+                    "symbol": "TLACU",
+                    "unit": "IPO event",
+                    "value": 1.0
+                  },
+                  {
+                    "as_of": "2026-08-26",
+                    "kind": "count",
+                    "label": "IPO trading debut event",
+                    "source_url": "https://financereviewdaily.com/en/article/jatt-iii-acquisition-corp-completes-69-million-nasdaq-ipo",
+                    "subject": "JATT III Acquisition Corp.",
+                    "symbol": "JTTT",
+                    "unit": "IPO event",
+                    "value": 1.0
+                  }
+                ],
+                "sources": [
+                  {
+                    "source_date": null,
+                    "title": "finobird.com",
+                    "url": "https://finobird.com/calendar/ipo/analysis/week-of-august-22-28-2026-four-spacs-price-at-10-on-nasdaq/"
+                  }
+                ],
+                "status": "completed",
+                "subjects": [
+                  {
+                    "name": "Three Lions Acquisition Corp. Units",
+                    "symbol": "TLACU"
+                  }
+                ]
+              },
+              "status": "succeeded"
+            },
+            "presentation": {
+              "answer": {
+                "label": {
+                  "interpolation_args": {
+                    "label": "completed IPO pricing event",
+                    "subject": "Three Lions Acquisition Corp."
+                  },
+                  "locale_key": "chat.tools.research.figure"
+                },
+                "name": "figure_0",
+                "unit": {
+                  "interpolation_args": {
+                    "unit": "IPO event"
+                  },
+                  "locale_key": "chat.tools.research.unit"
+                },
+                "value": 1.0,
+                "value_text": null
+              },
+              "inputs": [
+                {
+                  "editable": false,
+                  "label": {
+                    "interpolation_args": {},
+                    "locale_key": "chat.tools.research.request"
+                  },
+                  "name": "request",
+                  "unit": null,
+                  "unknown": false,
+                  "value": "find me stocks that have recently IPO'ed",
+                  "value_text": null,
+                  "visibility": "private"
+                }
+              ],
+              "narrative": "Two recently completed U.S. IPO listings I could verify are:\n\n| Ticker | Asset | Condition satisfied | Proof |\n|---|---|---|---|\n| **TLACU** | Three Lions Acquisition Corp. units | **Recently IPO’d** | Its Nasdaq IPO was priced on **September 1, 2026**. Note that this is a SPAC unit rather than ordinary common stock alone. |\n| **JTTT** | JATT III Acquisition Corp. shares | **Recently IPO’d** | Its shares began Nasdaq trading following the IPO on **August 26, 2026**. |\n\n“Recent” here means completed during late August or early September, based on records available as of **September 10, 2026**. Proposed or merely filed offerings were excluded. This is not investment advice.",
+              "notes": [],
+              "rows": [
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "label": "IPO trading debut event",
+                      "subject": "JATT III Acquisition Corp."
+                    },
+                    "locale_key": "chat.tools.research.figure"
+                  },
+                  "name": "figure_1",
+                  "unit": {
+                    "interpolation_args": {
+                      "unit": "IPO event"
+                    },
+                    "locale_key": "chat.tools.research.unit"
+                  },
+                  "value": 1.0,
+                  "value_text": null
+                }
+              ],
+              "sources": [
+                {
+                  "source_date": null,
+                  "title": "finobird.com",
+                  "url": "https://finobird.com/calendar/ipo/analysis/week-of-august-22-28-2026-four-spacs-price-at-10-on-nasdaq/"
+                }
+              ],
+              "title": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.research.title"
+              },
+              "visual": null
+            },
+            "schema_version": 1,
+            "tool_name": "screening"
+          }
+        ],
+        "tool_usage": [
+          {
+            "call_id": "screening_recent_ipo_1",
+            "tool_name": "screening",
+            "usage": {
+              "cache_status": "miss",
+              "cost_usd": 0.54301,
+              "invocations": 1,
+              "latency_ms": 107727
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

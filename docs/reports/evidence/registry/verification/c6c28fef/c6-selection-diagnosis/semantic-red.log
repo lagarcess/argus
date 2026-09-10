@@ -1,0 +1,114 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/aa72/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 38 items / 33 deselected / 5 selected
+
+tests/evals/test_measurement_selection.py ...FF                          [100%]
+
+=================================== FAILURES ===================================
+_ test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy[False] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c114c70>
+selection_case = EvalCase(id='asset_discovery_trending_crypto_exact_issue_344', category='asset_discovery_routing', prompt='find me cry...min_discovery_rows': 1, 'names_unavailable': True}}, 'prose_judge': {'criteria': ['honesty', 'no_raw_runtime_error']}})
+figures = False
+
+    @pytest.mark.parametrize("figures", [False, True])
+    def test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy(
+        monkeypatch, selection_case, figures
+    ):
+        patch = _selection_patch(figures=figures, discovery=not figures)
+        observed = datetime.now(timezone.utc)
+        policy = build_research_evidence_policy(
+            question_kind="find_assets",
+            period_start_date=observed.date() - timedelta(days=14),
+            question_as_of_date=observed.date(),
+        ).model_dump(mode="json")
+        patch["research"]["evidence_policy"] = policy
+        _, judged = _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+    
+        result = harness.run_eval_case(selection_case)
+    
+        # The scorecard keeps the complete runtime policy; only the model's view changes.
+        recorded = json.loads(json.dumps(result))["typed_outcome"]["asset_discovery"]
+        fact = recorded["assets"][0]["facts"][0]
+        assert fact["evidence_policy"] == policy
+        context = judged[0]["selection_evidence"]
+        projected = context["assets"][0]["facts"][0]
+        semantic_keys = {
+            "symbol",
+            "name",
+            "asset_class",
+            "reason",
+            "figure",
+            "source",
+            "citation_url",
+            "citation_origin",
+            "retrieved_at",
+        }
+>       assert set(projected) == (set(fact) & semantic_keys) | {"source_period"}
+E       AssertionError: assert {'asset_class...'reason', ...} == {'asset_class...eved_at', ...}
+E         
+E         Extra items in the left set:
+E         'evidence_policy'
+E         Extra items in the right set:
+E         'source_period'
+E         Use -v to get more diff
+
+tests/evals/test_measurement_selection.py:367: AssertionError
+_ test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy[True] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e7da0b0>
+selection_case = EvalCase(id='asset_discovery_trending_crypto_exact_issue_344', category='asset_discovery_routing', prompt='find me cry...min_discovery_rows': 1, 'names_unavailable': True}}, 'prose_judge': {'criteria': ['honesty', 'no_raw_runtime_error']}})
+figures = True
+
+    @pytest.mark.parametrize("figures", [False, True])
+    def test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy(
+        monkeypatch, selection_case, figures
+    ):
+        patch = _selection_patch(figures=figures, discovery=not figures)
+        observed = datetime.now(timezone.utc)
+        policy = build_research_evidence_policy(
+            question_kind="find_assets",
+            period_start_date=observed.date() - timedelta(days=14),
+            question_as_of_date=observed.date(),
+        ).model_dump(mode="json")
+        patch["research"]["evidence_policy"] = policy
+        _, judged = _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+    
+        result = harness.run_eval_case(selection_case)
+    
+        # The scorecard keeps the complete runtime policy; only the model's view changes.
+        recorded = json.loads(json.dumps(result))["typed_outcome"]["asset_discovery"]
+        fact = recorded["assets"][0]["facts"][0]
+        assert fact["evidence_policy"] == policy
+        context = judged[0]["selection_evidence"]
+        projected = context["assets"][0]["facts"][0]
+        semantic_keys = {
+            "symbol",
+            "name",
+            "asset_class",
+            "reason",
+            "figure",
+            "source",
+            "citation_url",
+            "citation_origin",
+            "retrieved_at",
+        }
+>       assert set(projected) == (set(fact) & semantic_keys) | {"source_period"}
+E       AssertionError: assert {'citation_or...eved_at', ...} == {'citation_or...'source', ...}
+E         
+E         Extra items in the left set:
+E         'evidence_policy'
+E         Extra items in the right set:
+E         'source_period'
+E         Use -v to get more diff
+
+tests/evals/test_measurement_selection.py:367: AssertionError
+=========================== short test summary info ============================
+FAILED tests/evals/test_measurement_selection.py::test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy[False]
+FAILED tests/evals/test_measurement_selection.py::test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy[True]
+================== 2 failed, 3 passed, 33 deselected in 1.16s ==================
