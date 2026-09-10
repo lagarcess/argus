@@ -19,6 +19,7 @@ import {
   decisionComputationFromMetadata,
   decisionStateFromValue,
 } from "@/lib/decision-contract";
+import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
@@ -304,6 +305,7 @@ export function hydrateMessagesFromApi(
       const toolResultCards = message.role !== "user" ? toolCardsFromMetadata(metadata) : undefined;
       const hasUnavailableToolResults = message.role !== "user" && hasUnavailableToolCards(metadata);
       const toolJobs = message.role !== "user" ? toolJobsFromMetadata(metadata) : undefined;
+      const isBreakdown = message.role !== "user" && (metadata.artifact_presentation_kind === "breakdown" || isBreakdownActionMetadata(metadata));
       const chatAction = metadata.chat_action as ChatActionOption | undefined;
       const confirmation = pendingArtifactCardFromPayload(metadata.confirmation_card);
       const projectedJob =
@@ -324,7 +326,7 @@ export function hydrateMessagesFromApi(
       }
       if (
         message.role !== "user" &&
-        !isBreakdownActionMetadata(metadata) &&
+        !isBreakdown &&
         isHydratableResultCard(metadata.result_card)
       ) {
         const runId = String(
@@ -366,6 +368,7 @@ export function hydrateMessagesFromApi(
           content: undefined,
           result: {
             ...card,
+            readoutContent: resultReadoutContentFromMetadata(metadata, card.readoutContent),
             symbols: context.symbols,
             template: context.template ?? undefined,
             assetClass: context.assetClass,
@@ -390,6 +393,7 @@ export function hydrateMessagesFromApi(
           contentPresentation: "result_readout",
           toolResultCards, hasUnavailableToolResults, toolJobs,
           resultReadoutFacts: resultReadoutFacts(metadata.result_fact_bank),
+          resultReadoutContent: resultReadoutContentFromMetadata(metadata),
         };
       }
       const jobMessage = backtestJobMessageFromApi(message);
@@ -425,15 +429,15 @@ export function hydrateMessagesFromApi(
           retryRequestMessageForAssistant(items, message) ??
           precedingUserMessageForRetryableRecovery(items, message),
         contentPresentation:
-          message.role !== "user" && isBreakdownActionMetadata(metadata)
+          isBreakdown
             ? "result_breakdown"
             : undefined,
       }), toolJobs };
-      if (message.role !== "user" && isBreakdownActionMetadata(metadata)) {
+      if (isBreakdown) {
         return {
           ...hydratedText,
           content: undefined,
-          recoveryDisplay: {
+          recoveryDisplay: hydratedText.recoveryDisplay?.kind === "result_breakdown" ? hydratedText.recoveryDisplay : {
             kind: "result_breakdown" as const,
             facts: resultReadoutFacts(metadata.result_fact_bank),
           },

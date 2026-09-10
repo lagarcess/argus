@@ -11,6 +11,8 @@ import type { MemoryRecallItem } from "./memory-recalls";
 type MergeFinalTextOptions = {
   assistantId: string;
   finalText: string;
+  resultReadoutContent?: Message["resultReadoutContent"];
+  resultReadoutFacts?: Message["resultReadoutFacts"];
   toolResultCards?: Message["toolResultCards"];
   finalActions: ChatActionOption[];
   contentPresentation?: Message["contentPresentation"];
@@ -32,6 +34,8 @@ export function mergeFinalTextMessage(
   {
     assistantId,
     finalText,
+    resultReadoutContent,
+    resultReadoutFacts,
     toolResultCards,
     finalActions,
     contentPresentation,
@@ -56,6 +60,8 @@ export function mergeFinalTextMessage(
     toolResultCards: toolResultCards ?? message.toolResultCards,
     actions: finalActions.length > 0 ? finalActions : message.actions,
     contentPresentation: contentPresentation ?? message.contentPresentation,
+    resultReadoutContent,
+    resultReadoutFacts,
     resultFactHeadingKey: resultFactHeadingKey ?? message.resultFactHeadingKey,
     recoveryDisplay: recoveryDisplay ?? message.recoveryDisplay,
     strategyPathContext:

@@ -45,7 +45,7 @@ export function resultCardViewModel(
     periodDisplay: compactDateRangeDisplay(result.dateRange, locale) ?? copy.unavailable,
     evidence,
     copy,
-    readout: resultQuickTakeText(result.readoutFacts, t, locale),
+    readout: resultQuickTakeText(result.readoutFacts, t, locale, result.readoutContent),
   };
 }
 

@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import ToolResultCard from "./ToolResultCard";
-import { toolCardCopyText, type ToolRecompute } from "@/lib/tool-result-card";
+import type { ToolRecompute } from "@/lib/tool-result-card";
 import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
@@ -34,19 +34,11 @@ import {
 } from "./types";
 import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
-import {
-  confirmationCardCopyText,
-  resultCardCopyText,
-} from "@/lib/chat-card-copy-text";
-import { confirmationCardViewModel } from "@/lib/confirmation-card-view-model";
-import { resultCardViewModel } from "@/lib/result-card-view-model";
-import { resultBreakdownText, resultQuickTakeText } from "@/lib/result-readout-display";
+import { chatMessageCopyText } from "@/lib/chat-message-copy-text";
+import { resultMessageReadoutText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
-import {
-  recoveryDisplayCopyText,
-  recoveryDisplayText,
-} from "@/lib/chat-recovery-display";
+import { recoveryDisplayText } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import FailureNotice from "./FailureNotice";
@@ -186,9 +178,6 @@ export default function ChatMessage({
     };
   }, [showOptions]);
 
-  const normalizeCopyText = (text: string) =>
-    isUser ? text : normalizeAssistantDisplayText(text);
-
   const handleRating = (newRating: "positive" | "negative") => {
     if (rating === newRating) {
       setRating(null);
@@ -198,40 +187,7 @@ export default function ChatMessage({
     }
   };
 
-  const getCopyText = () => {
-    if (!isUser && message.contentPresentation === "result_readout") {
-      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
-    }
-    if (!isUser) {
-      const localizedRecovery = recoveryDisplayCopyText(message.recoveryDisplay, t, locale);
-      if (localizedRecovery) {
-        return normalizeCopyText(localizedRecovery);
-      }
-    }
-    // Copy reads the card's own view model. Deriving it from the payload
-    // again is what put backend English on a Spanish workspace (#509).
-    if (message.kind === "strategy_result" && message.result) {
-      return normalizeCopyText(
-        resultCardCopyText(
-          resultCardViewModel(message.result, { t, locale }),
-          t,
-        ),
-      );
-    }
-    if (message.kind === "strategy_confirmation" && confirmation?.kind === "backtest") {
-      return normalizeCopyText(
-        confirmationCardCopyText(
-          confirmationCardViewModel(confirmation, t, locale),
-          t,
-          locale,
-        ),
-      );
-    }
-    if (message.contentPresentation === "result_breakdown") {
-      return resultBreakdownText(null, t, locale);
-    }
-    return normalizeCopyText([message.content ?? "", ...(message.toolResultCards ?? []).map((card) => toolCardCopyText(card, t, locale))].filter(Boolean).join("\n\n"));
-  };
+  const getCopyText = () => chatMessageCopyText(message, t, locale);
 
   const handleCopy = async (text = getCopyText()) => {
     const copied = await writeClipboardText(text);
@@ -242,21 +198,14 @@ export default function ChatMessage({
   };
 
   const getDisplayContent = () => {
-    if (!isUser && message.contentPresentation === "result_readout") {
-      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
-    }
-    if (!isUser && message.kind === "strategy_result") {
-      return resultQuickTakeText(message.result?.readoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
-    }
+    const readout = resultMessageReadoutText(message, t, locale);
+    if (readout !== null) return readout;
     const content = message.content ?? "";
     if (!isUser && message.recoveryDisplay) {
       const recovered = recoveryDisplayText(message.recoveryDisplay, t, locale);
       if (recovered.trim()) {
         return recovered;
       }
-    }
-    if (!isUser && message.contentPresentation === "result_breakdown") {
-      return resultBreakdownText(null, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
     }
     return isUser ? content : normalizeAssistantDisplayText(content);
   };

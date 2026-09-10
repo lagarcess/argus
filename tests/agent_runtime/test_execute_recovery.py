@@ -446,7 +446,9 @@ def test_execute_emits_market_data_recovery_code_for_spanish_confirmation() -> N
             },
         ]
     )
-    state = RunState.new(current_user_message="Ejecutar backtest", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="Ejecutar backtest", recent_thread_history=[]
+    )
     state.confirmation_payload = {
         "strategy": {
             "strategy_type": "buy_and_hold",
@@ -498,7 +500,9 @@ def test_execute_emits_benchmark_data_recovery_code_for_spanish_confirmation() -
             },
         ]
     )
-    state = RunState.new(current_user_message="Ejecutar backtest", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="Ejecutar backtest", recent_thread_history=[]
+    )
     state.confirmation_payload = {
         "strategy": {
             "strategy_type": "buy_and_hold",
@@ -669,10 +673,13 @@ def test_execute_stage_keeps_raw_failure_code_out_of_ui_error_metadata() -> None
 
     assert result.outcome == "execution_failed_terminally"
     _assert_value_absent(result.patch["final_response_payload"], "missing_rule_group")
-    _assert_value_absent(result.patch["latest_failed_action_reference"], "missing_rule_group")
+    _assert_value_absent(
+        result.patch["latest_failed_action_reference"], "missing_rule_group"
+    )
     _assert_value_absent(result.patch["tool_call_records"], "missing_rule_group")
-    assert "not valid for the current backtest" in (
-        result.patch["final_response_payload"]["error"]
+    assert (
+        "not valid for the current backtest"
+        in (result.patch["final_response_payload"]["error"])
     )
     assert "draft" not in result.patch["final_response_payload"]["error"].lower()
     assert "current setup" in result.patch["final_response_payload"]["error"]
@@ -1168,7 +1175,6 @@ async def test_workflow_supersedes_stale_coverage_approval_before_execution(
     assert len(tool.calls) == 2
 
 
-
 def test_execute_future_end_date_returns_non_retryable_date_prompt() -> None:
     state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
     state.confirmation_payload = {
@@ -1499,7 +1505,9 @@ def test_execute_stage_uses_currency_pair_as_default_benchmark(
     assert tool.calls[0]["benchmark_symbol"] == "EURUSD"
 
 
-def test_execute_stage_prioritizes_explicit_strategy_benchmark_over_default_optional() -> None:
+def test_execute_stage_prioritizes_explicit_strategy_benchmark_over_default_optional() -> (
+    None
+):
     tool = StubBacktestTool(
         responses=[
             {
@@ -1756,8 +1764,7 @@ def test_execute_stage_normalizes_dip_buying_and_canonical_date_range() -> None:
     }
 
 
-def test_execute_stage_resolves_structured_date_range_with_today(
-) -> None:
+def test_execute_stage_resolves_structured_date_range_with_today() -> None:
     tool = StubBacktestTool(
         responses=[
             {
@@ -1946,7 +1953,9 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_workflow_retry_preserves_explicit_zero_costs_from_pending_strategy() -> None:
+async def test_workflow_retry_preserves_explicit_zero_costs_from_pending_strategy() -> (
+    None
+):
     tool = StubBacktestTool(
         responses=[
             {
@@ -2087,7 +2096,10 @@ def test_execute_maps_unknown_tool_errors_into_runtime_taxonomy() -> None:
     assert result.outcome == "execution_failed_terminally"
     assert result.patch["failure_classification"] == "tool_execution_error"
     assert "worker stopped unexpectedly" not in result.patch["assistant_prompt"]
-    assert "worker stopped unexpectedly" not in result.patch["final_response_payload"]["error"]
+    assert (
+        "worker stopped unexpectedly"
+        not in result.patch["final_response_payload"]["error"]
+    )
     assert "backtest could not complete" in result.patch["assistant_prompt"]
 
 
@@ -2330,10 +2342,7 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
 
     assert result.outcome == "ready_to_respond"
     assert response.startswith("The strategy returned 14.0%")
-    assert (
-        "Tested: the confirmed strategy: Test a Tesla pullback idea."
-        in response
-    )
+    assert "Tested: the confirmed strategy: Test a Tesla pullback idea." in response
     assert "Defaults: Initial capital." in response
     assert "User-set options: Timeframe." in response
     assert "return comparison, not causal attribution" in response
@@ -2372,86 +2381,13 @@ def test_explain_stage_spanish_fallback_does_not_render_language_heading() -> No
     assert not result.patch["assistant_response"].startswith("**Resumen rápido**")
     assert not result.patch["assistant_response"].startswith("**Quick take**")
     assert "- Tested: ETH buy and hold" in result.patch["assistant_response"]
-    assert "1 de enero de 2024 al 31 de marzo de 2024" in result.patch[
-        "assistant_response"
-    ]
+    assert (
+        "1 de enero de 2024 al 31 de marzo de 2024" in result.patch["assistant_response"]
+    )
     assert "Defaults: capital inicial." in result.patch["assistant_response"]
     assert "User-set options: temporalidad." in result.patch["assistant_response"]
     assert "Initial capital" not in result.patch["assistant_response"]
     assert "Timeframe" not in result.patch["assistant_response"]
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_validates_next_checks_without_rendering_them(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    captured: dict[str, object] = {}
-
-    async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
-        captured.update(kwargs)
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "The TSLA test Lagged by 87.8 percentage points against SPY, so the signal needs a tighter follow-up.",
-            "tested_bullet": "Tested TSLA with the confirmed crossover over the supplied window.",
-            "meaning_bullet": "The comparison is useful evidence, not a verdict.",
-            "next_check_bullet": "Next check: adjust the signal periods.",
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": ["adjust_signal_periods"],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_symbol",
-                "benchmark_comparison",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "signal_strategy",
-            "strategy_thesis": "Test TSLA with a 50/200 crossover",
-            "asset_universe": ["TSLA"],
-            "date_range": {"start": "2022-01-01", "end": "2026-05-20"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {
-            "total_return": -0.326,
-            "benchmark_return": 0.552,
-            "benchmark_symbol": "SPY",
-        }
-    }
-
-    result = await explain_stage_async(state=state)
-
-    assert result.stage_patch["assistant_response"].startswith("The TSLA test")
-    assert "adjust the signal periods" not in result.stage_patch["assistant_response"]
-    assert "Next check" not in result.stage_patch["assistant_response"]
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
-    messages = captured["messages"]
-    assert isinstance(messages, list)
-    system_prompt = messages[0]["content"]
-    assert "supported next experiment kinds" in system_prompt
-    context = json.loads(messages[1]["content"])
-    allowed_kinds = {
-        option["kind"] for option in context["allowed_next_experiments"]
-    }
-    assert "adjust_signal_periods" in allowed_kinds
-    assert "trend_filter" not in allowed_kinds
-    assert "volatility_stop" not in allowed_kinds
-    assert captured["schema_model"] is explain_module.QuickTakeDraft
 
 
 @pytest.mark.asyncio
@@ -2465,22 +2401,7 @@ async def test_explain_stage_async_composes_spanish_quick_take_without_heading(
     async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
         captured.update(kwargs)
         return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "ETH rindió +55.1%, pero quedó 6.3 puntos porcentuales detrás de BTC.",
-            "tested_bullet": "Se probó comprar y mantener ETH en la ventana solicitada.",
-            "meaning_bullet": "La comparación sirve como evidencia histórica, no como predicción.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Simulación histórica solamente.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_symbol",
-                "benchmark_comparison",
-                "caveat",
-            ],
+            "text": "ETH rindió +55.1%, pero quedó 6.3 puntos porcentuales detrás de BTC.\n\nSe probó comprar y mantener ETH en la ventana solicitada.\n\nLa comparación sirve como evidencia histórica, no como predicción.\n\nSimulación histórica solamente."
         }
 
     monkeypatch.setattr(
@@ -2511,155 +2432,17 @@ async def test_explain_stage_async_composes_spanish_quick_take_without_heading(
     assert result.stage_patch["assistant_response"].startswith("ETH rindió +55.1%")
     assert not result.stage_patch["assistant_response"].startswith("**Resumen rápido**")
     assert not result.stage_patch["assistant_response"].startswith("**Quick take**")
-    assert "Se probó comprar y mantener ETH" in result.stage_patch[
-        "assistant_response"
-    ]
+    assert "Se probó comprar y mantener ETH" in result.stage_patch["assistant_response"]
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     messages = captured["messages"]
     assert isinstance(messages, list)
     assert "Answer in Spanish" in messages[0]["content"]
     context = json.loads(messages[1]["content"])
-    assert context["language"] == "es-419"
-    assert context["fact_bank"]["tested_summary"].startswith(
-        "ETH buy and hold over 1 de enero de 2024"
-    )
-    assert "2024-01-01 to 2024-03-31" not in context["fact_bank"]["tested_summary"]
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_drops_mixed_language_optional_spanish_quick_take(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": (
-                "Comprar y mantener AAPL superó al benchmark SPY por "
-                "23.6 puntos porcentuales."
-            ),
-            "tested_bullet": "total return for $AAPL",
-            "meaning_bullet": "La comparación muestra total return, no una predicción.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Simulación histórica solamente.",
-            "language_quality": "mixed_or_wrong_language",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_symbol",
-                "benchmark_comparison",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="por que", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "strategy_thesis": "Comprar y mantener AAPL",
-            "asset_universe": ["AAPL"],
-            "date_range": {"start": "2025-06-14", "end": "2026-06-12"},
-        },
-        "optional_parameters": {},
+    assert context["product_language"] == "es-419"
+    assert context["run_facts"]["date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-03-31",
     }
-    state.final_response_payload = {
-        "result": {
-            "total_return": 0.467,
-            "benchmark_return": 0.231,
-            "benchmark_symbol": "SPY",
-        }
-    }
-
-    result = await explain_stage_async(state=state, language="es-419")
-    response = result.stage_patch["assistant_response"]
-
-    assert response.startswith("Comprar y mantener AAPL")
-    assert not response.startswith("**Resumen rápido**")
-    assert not response.startswith("**Quick take**")
-    assert "total return for" not in response
-    assert "Simulación histórica solamente" not in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_renders_spanish_setup_from_canonical_facts(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    captured: dict[str, object] = {}
-
-    async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
-        captured.update(kwargs)
-        return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": (
-                "AAPL rindió +46.7%, superando a SPY por 23.6 puntos porcentuales."
-            ),
-            "tested_bullet": "Se probó comprar y mantener AAPL en la ventana confirmada.",
-            "meaning_bullet": "La comparación sirve como evidencia histórica.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Simulación histórica solamente.",
-            "language_quality": "matches_prompt_language",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "rule_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_symbol",
-                "benchmark_comparison",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="por que", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "strategy_thesis": "Comprar y mantener AAPL",
-            "asset_universe": ["AAPL"],
-            "date_range": {"start": "2025-06-14", "end": "2026-06-12"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {
-            "total_return": 0.467,
-            "benchmark_return": 0.231,
-            "benchmark_symbol": "SPY",
-        }
-    }
-
-    result = await explain_stage_async(state=state, language="es-419")
-    response = result.stage_patch["assistant_response"]
-    messages = captured["messages"]
-    assert isinstance(messages, list)
-    context = json.loads(messages[1]["content"])
-
-    assert context["fact_bank"]["rule_summary"].startswith("Rule:")
-    assert "Entry rule" not in response
-    assert "benchmark SPY" not in response
-    assert "superando a SPY por 23.6 puntos porcentuales" in response
-    assert "Se probó comprar y mantener AAPL" in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
 
 
 @pytest.mark.asyncio
@@ -2670,28 +2453,7 @@ async def test_explain_stage_async_accepts_spanish_decimal_comma_benchmark_gap(
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": (
-                "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; "
-                "quedaron por debajo por 3,1 puntos porcentuales."
-            ),
-            "tested_bullet": (
-                "Se probó comprar y mantener AAPL y MSFT en la ventana confirmada."
-            ),
-            "meaning_bullet": "La comparación nombra SPY y la brecha frente a la referencia.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Simulación histórica solamente.",
-            "language_quality": "matches_prompt_language",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; quedaron por debajo por 3,1 puntos porcentuales.\n\nSe probó comprar y mantener AAPL y MSFT en la ventana confirmada.\n\nLa comparación nombra SPY y la brecha frente a la referencia.\n\nSimulación histórica solamente."
         }
 
     monkeypatch.setattr(
@@ -2734,22 +2496,7 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
     async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
         captured.update(kwargs)
         return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "TSLA lagged SPY in this historical test.",
-            "tested_bullet": "Tested the confirmed TSLA crossover setup.",
-            "meaning_bullet": "SPY is the benchmark comparison, not another tested asset.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "TSLA lagged SPY in this historical test.\n\nTested the confirmed TSLA crossover setup.\n\nSPY is the benchmark comparison, not another tested asset.\n\nHistorical simulation only."
         }
 
     monkeypatch.setattr(
@@ -2783,19 +2530,13 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
     messages = captured["messages"]
     assert isinstance(messages, list)
     system_prompt = messages[0]["content"]
-    assert "Benchmark returns belong only to" in system_prompt
+    assert "return compares with the benchmark" in system_prompt
     context = json.loads(messages[1]["content"])
-    assert context["benchmark_contract"] == {
-        "benchmark_symbol": "SPY",
-        "tested_symbols": ["TSLA"],
-        "benchmark_is_tested_asset": False,
-    }
-    assert context["fact_bank"]["benchmark_comparison"] == (
-        "Lagged by 87.8 percentage points"
-    )
-    assert context["fact_bank"]["benchmark_delta_magnitude"] == (
-        "87.8 percentage points"
-    )
+    facts = context["run_facts"]
+    assert facts["benchmark_symbol"] == "SPY"
+    assert facts["symbols"] == ["TSLA"]
+    assert facts["benchmark_comparison_claim"] == "lagged_benchmark"
+    assert facts["comparison"]["delta_vs_benchmark_pct"] == pytest.approx(-87.8)
     assert captured["context_packet_ids"] == ["packet-1"]
 
 
@@ -2807,22 +2548,7 @@ async def test_explain_stage_async_renders_quick_take_from_canonical_facts(
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed 2024 window.",
-            "meaning_bullet": "AAPL returned 35.0%, while QQQ returned 26.9%.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only."
         }
 
     monkeypatch.setattr(
@@ -2874,22 +2600,7 @@ async def test_explain_stage_async_rejects_mismatched_quick_take_return_values(
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed 2024 window.",
-            "meaning_bullet": "AAPL returned +46.7%, while QQQ returned +38.6%.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned +46.7%, while QQQ returned +38.6%.\n\nHistorical simulation only."
         }
 
     monkeypatch.setattr(
@@ -2923,59 +2634,6 @@ async def test_explain_stage_async_rejects_mismatched_quick_take_return_values(
 
 
 @pytest.mark.asyncio
-async def test_explain_stage_async_ignores_unknown_optional_fact_ids_after_required_facts(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed 2024 window.",
-            "meaning_bullet": "Optional metadata noise should not erase this grounded take.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-                "optional_style_note",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "strategy_thesis": "AAPL buy and hold against QQQ.",
-            "asset_universe": ["AAPL"],
-            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.35, "benchmark_return": 0.269},
-        "explanation_context": {"benchmark_symbol": "QQQ"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "metadata noise should not erase this grounded take" in response
-
-
-@pytest.mark.asyncio
 async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
     monkeypatch,
 ) -> None:
@@ -2983,22 +2641,7 @@ async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "AAPL trailed QQQ by 5.3 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed window.",
-            "meaning_bullet": "The benchmark comparison is still visible without template wording.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "AAPL trailed QQQ by 5.3 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe benchmark comparison is still visible without template wording.\n\nHistorical simulation only."
         }
 
     monkeypatch.setattr(
@@ -3029,245 +2672,6 @@ async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
     assert "template wording" in response
 
 
-@pytest.mark.asyncio
-async def test_explain_stage_async_does_not_reject_grounded_copy_for_missing_fact_id(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": (
-                "AAPL and MSFT lagged SPY by 13.3 percentage points in this "
-                "historical test."
-            ),
-            "tested_bullet": (
-                "Tested AAPL and MSFT buy and hold over the confirmed window."
-            ),
-            "meaning_bullet": "The result still names SPY and the benchmark gap.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "asset_universe": ["AAPL", "MSFT"],
-            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.128, "benchmark_return": 0.261},
-        "explanation_context": {"benchmark_symbol": "SPY"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "SPY" in response
-    assert "lagged SPY by 13.3 percentage points" in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_falls_back_when_required_fact_metadata_is_missing(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "The confirmed portfolio trailed the comparison in this test.",
-            "tested_bullet": (
-                "Tested AAPL and MSFT buy and hold over the confirmed window."
-            ),
-            "meaning_bullet": "The result is directional evidence, not a verdict.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "asset_universe": ["AAPL", "MSFT"],
-            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.1356, "benchmark_return": 0.1663},
-        "explanation_context": {"benchmark_symbol": "SPY"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "SPY" in response
-    assert "lagged by 3.1 percentage points" in response
-    assert "directional evidence" not in response
-    assert result.stage_patch["assistant_response_source"] == "deterministic_fallback"
-    assert result.stage_patch["assistant_response_fallback_used"] is True
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_accepts_clean_copy_with_wrong_language_self_report(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": (
-                "A simple buy-and-hold of AAPL and MSFT returned +12.8%. "
-                "That lagged SPY by 13.3 percentage points."
-            ),
-            "tested_bullet": (
-                "AAPL, MSFT buy and hold over 2025-01-01 to 2026-06-05"
-            ),
-            "meaning_bullet": None,
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": None,
-            "language_quality": "mixed_or_wrong_language",
-            "next_experiment_option_kinds": [
-                "change_date_range",
-                "same_setup_peer_asset",
-            ],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "asset_universe": ["AAPL", "MSFT"],
-            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.1284, "benchmark_return": 0.2614},
-        "explanation_context": {"benchmark_symbol": "SPY"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "SPY" in response
-    assert "That lagged SPY by 13.3 percentage points" in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_drops_optional_mixed_language_prose_without_fallback(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": (
-                "AAPL y MSFT rindieron 12.8% mientras SPY rindió 26.1%; "
-                "quedaron por debajo por 13.3 puntos porcentuales."
-            ),
-            "tested_bullet": "total return for AAPL and MSFT",
-            "meaning_bullet": "Keep in mind this is historical simulation only.",
-            "next_check_bullet": None,
-            "assumption_bullet": "Same period benchmark comparison.",
-            "caveat_bullet": "Historical simulation only.",
-            "language_quality": "mixed_or_wrong_language",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="por que", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "asset_universe": ["AAPL", "MSFT"],
-            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.1284, "benchmark_return": 0.2614},
-        "explanation_context": {"benchmark_symbol": "SPY"},
-    }
-
-    result = await explain_stage_async(state=state, language="es-419")
-    response = result.stage_patch["assistant_response"]
-
-    assert response.startswith("AAPL y MSFT rindieron 12.8%")
-    assert "Probado:" not in response
-    assert "total return for" not in response
-    assert "Keep in mind" not in response
-    assert "Same period" not in response
-    assert "Historical simulation only" not in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
-
-
 def test_explain_stage_quick_take_validation_has_no_language_fragment_blacklist() -> None:
     from argus.agent_runtime.stages import explain as explain_module
 
@@ -3276,234 +2680,6 @@ def test_explain_stage_quick_take_validation_has_no_language_fragment_blacklist(
     assert "english_fragments" not in source
     assert "_quick_take_matches_requested_language" not in source
     assert "import re" not in {line.strip() for line in source.splitlines()}
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_accepts_supported_next_experiment_labels(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "AAPL and MSFT lagged SPY by 13.3 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL and MSFT buy and hold over the confirmed window.",
-            "meaning_bullet": "The result is grounded in the completed backtest run.",
-            "next_check_bullet": "Next check: change the date range.",
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": ["change the date range"],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "asset_universe": ["AAPL", "MSFT"],
-            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.128, "benchmark_return": 0.261},
-        "explanation_context": {"benchmark_symbol": "SPY"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "SPY" in response
-    assert "lagged SPY by 13.3 percentage points" in response
-    assert "change the date range" not in response
-    assert "Next check" not in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_ignores_unrendered_next_experiment_kinds(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "AAPL and MSFT lagged SPY by 13.3 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL and MSFT buy and hold over the confirmed window.",
-            "meaning_bullet": "The result is grounded in the completed backtest run.",
-            "next_check_bullet": "Next check: invent a new private metric.",
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": ["invent_private_metric"],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "asset_universe": ["AAPL", "MSFT"],
-            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.128, "benchmark_return": 0.261},
-        "explanation_context": {"benchmark_symbol": "SPY"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "SPY" in response
-    assert "lagged SPY by 13.3 percentage points" in response
-    assert "invent a new private metric" not in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_replaces_signed_benchmark_delta_takeaway(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": (
-                "AAPL returned 15.1%, while QQQ returned 20.4% over the same "
-                "period, about -5.3 percentage points versus the benchmark."
-            ),
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed window.",
-            "meaning_bullet": None,
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "strategy_thesis": "AAPL buy and hold against QQQ.",
-            "asset_universe": ["AAPL"],
-            "date_range": {"start": "2026-01-01", "end": "2026-05-31"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.151, "benchmark_return": 0.204},
-        "explanation_context": {"benchmark_symbol": "QQQ"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "-5.3" not in response
-    assert "lagged by 5.3 percentage points" in response
-    assert result.stage_patch["assistant_response_source"] == "deterministic_fallback"
-    assert result.stage_patch["assistant_response_fallback_used"] is True
-
-
-@pytest.mark.asyncio
-async def test_explain_stage_async_rejects_rendered_signed_benchmark_delta_copy(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime.stages import explain as explain_module
-
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "AAPL lagged QQQ by 5.3 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed window.",
-            "meaning_bullet": "The strategy was -5.3 percentage points versus the benchmark.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
-        }
-
-    monkeypatch.setattr(
-        explain_module,
-        "invoke_openrouter_json_schema",
-        fake_quick_take_plan,
-    )
-    state = RunState.new(current_user_message="why", recent_thread_history=[])
-    state.confirmation_payload = {
-        "strategy": {
-            "strategy_type": "buy_and_hold",
-            "strategy_thesis": "AAPL buy and hold against QQQ.",
-            "asset_universe": ["AAPL"],
-            "date_range": {"start": "2026-01-01", "end": "2026-05-31"},
-        },
-        "optional_parameters": {},
-    }
-    state.final_response_payload = {
-        "result": {"total_return": 0.151, "benchmark_return": 0.204},
-        "explanation_context": {"benchmark_symbol": "QQQ"},
-    }
-
-    result = await explain_stage_async(state=state)
-    response = result.stage_patch["assistant_response"]
-
-    assert "-5.3" not in response
-    assert "lagged by 5.3 percentage points" in response
-    assert result.stage_patch["assistant_response_source"] == "deterministic_fallback"
-    assert result.stage_patch["assistant_response_fallback_used"] is True
-    assert (
-        result.stage_patch["assistant_response_failure_mode"]
-        == "quick_take_draft_rejected"
-    )
 
 
 @pytest.mark.asyncio
@@ -3524,22 +2700,7 @@ async def test_result_readout_preserves_route_receipt_capture_inside_running_loo
             outcome="succeeded",
         )
         return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed window.",
-            "meaning_bullet": "The result is grounded in the completed backtest run.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe result is grounded in the completed backtest run.\n\nHistorical simulation only."
         }
 
     monkeypatch.setattr(
@@ -3550,16 +2711,18 @@ async def test_result_readout_preserves_route_receipt_capture_inside_running_loo
 
     token = openrouter.begin_openrouter_route_receipt_capture()
     try:
-        readout = result_readout_module.result_readout_with_metadata_from_backtest_payload(
-            request={
-                "strategy_type": "buy_and_hold",
-                "symbols": ["AAPL"],
-                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
-            },
-            envelope={"total_return": 0.35, "benchmark_return": 0.269},
-            result_card={"benchmark_symbol": "QQQ"},
-            explanation_context={"benchmark_symbol": "QQQ"},
-            language="en",
+        readout = (
+            result_readout_module.result_readout_with_metadata_from_backtest_payload(
+                request={
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                },
+                envelope={"total_return": 0.35, "benchmark_return": 0.269},
+                result_card={"benchmark_symbol": "QQQ"},
+                explanation_context={"benchmark_symbol": "QQQ"},
+                language="en",
+            )
         )
     finally:
         receipts = openrouter.end_openrouter_route_receipt_capture(token)
@@ -3580,22 +2743,7 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
     async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
         captured.update(kwargs)
         return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
-            "tested_bullet": "Tested AAPL buy and hold over the confirmed 2024 window.",
-            "meaning_bullet": "AAPL returned 35.0%, while QQQ returned 26.9%.",
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only."
         }
 
     monkeypatch.setattr(
@@ -3631,19 +2779,12 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
     messages = captured["messages"]
     assert isinstance(messages, list)
     context = json.loads(messages[1]["content"])
-    assert set(context) == {
-        "allowed_next_experiments",
-        "benchmark_contract",
-        "fact_bank",
-        "language",
-        "relative_performance_truth",
-        "required_fact_ids",
-        "strategy",
-    }
-    prompt_payload = messages[1]["content"].lower()
-    assert "beat by 8.1 percentage points" in prompt_payload
-    assert "sharpe" not in prompt_payload
-    assert "result_card" not in prompt_payload
+    assert set(context) == {"run_facts", "product_language"}
+    facts = context["run_facts"]
+    assert facts["metrics"] == {"sharpe_ratio": 1.45}
+    assert facts["comparison"]["delta_vs_benchmark_pct"] == pytest.approx(8.1)
+    assert "result_card" not in facts
+    assert "raw_user_phrasing" not in json.dumps(facts)
 
 
 def test_explain_stage_varies_with_expertise_mode() -> None:
@@ -3677,10 +2818,7 @@ def test_explain_stage_varies_with_expertise_mode() -> None:
     advanced_result = explain_stage(state=advanced_state)
 
     assert beginner_result.patch["assistant_response"].startswith("The strategy returned")
-    assert (
-        "evidence check"
-        in beginner_result.patch["assistant_response"].lower()
-    )
+    assert "evidence check" in beginner_result.patch["assistant_response"].lower()
     assert "keep in mind:" in beginner_result.patch["assistant_response"].lower()
     assert "return comparison only" in advanced_result.patch["assistant_response"].lower()
     assert "keep in mind:" in advanced_result.patch["assistant_response"].lower()

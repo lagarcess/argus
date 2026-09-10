@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from argus.agent_runtime.next_experiments import next_experiments_sidecar
 from argus.agent_runtime.presentation_i18n import optional_parameter_display_label
@@ -20,8 +20,6 @@ from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
 from argus.domain.engine_launch.display import (
-    format_benchmark_comparison_phrase,
-    format_benchmark_magnitude_points,
     format_date_range_label,
     normalize_legacy_data_caveat,
 )
@@ -31,32 +29,17 @@ from argus.domain.engine_launch.result_facts import (
 from argus.domain.engine_launch.result_facts import (
     resolved_rule_summary as result_rule_summary,
 )
-from argus.domain.engine_launch.result_facts import structured_next_experiments
+from argus.domain.result_readout_grounding import (
+    READOUT_GROUNDING_INSTRUCTIONS,
+    ResultReadoutDraft,
+    accepted_readout_text,
+    stored_readout_facts,
+)
 from argus.llm.openrouter import invoke_openrouter_json_schema
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
-QuickTakeRelativeClaim = Literal[
-    "beat_benchmark",
-    "lagged_benchmark",
-    "matched_benchmark",
-    "unknown",
-]
-QuickTakeEmphasis = Literal[
-    "comparison",
-    "risk",
-    "rule",
-    "no_trade",
-    "neutral",
-]
-QuickTakeLanguageQuality = Literal[
-    "matches_prompt_language",
-    "mixed_or_wrong_language",
-]
 
 RESULT_READOUT_SOURCE_LLM = "llm_explain_stage"
 RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK = "deterministic_fallback"
 RESULT_READOUT_FAILURE_LLM_UNAVAILABLE = "llm_unavailable_or_rejected"
-RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED = "quick_take_draft_rejected"
 
 
 @dataclass(frozen=True)
@@ -65,71 +48,8 @@ class _LLMExplanationResult:
     failure_mode: str | None = None
 
 
-class QuickTakeDraft(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    relative_performance_claim: QuickTakeRelativeClaim = Field(
-        description=(
-            "Structured claim about the strategy versus the benchmark. Use only "
-            "the supplied benchmark comparison truth."
-        )
-    )
-    takeaway: str = Field(
-        description=(
-            "One concise user-visible sentence interpreting the important result "
-            "from supplied fact_bank facts only."
-        )
-    )
-    tested_bullet: str = Field(
-        description="Compact user-visible tested/setup bullet grounded in fact_bank."
-    )
-    meaning_bullet: str | None = Field(
-        default=None,
-        description=(
-            "Optional user-visible interpretation bullet. Use facts only; do not "
-            "invent causes or recommendations."
-        ),
-    )
-    next_check_bullet: str | None = Field(
-        default=None,
-        description=(
-            "Optional structured next-check metadata. It must correspond to an "
-            "allowed_next_experiments kind when one is supplied. The runtime "
-            "does not render this field inside the Quick take."
-        ),
-    )
-    assumption_bullet: str | None = Field(
-        default=None,
-        description="Optional compact assumption bullet grounded in fact_bank.",
-    )
-    caveat_bullet: str | None = Field(
-        default=None,
-        description="Optional compact caveat bullet grounded in fact_bank.",
-    )
-    language_quality: QuickTakeLanguageQuality = Field(
-        description=(
-            "Self-audit for every user-facing sentence in takeaway, tested_bullet, "
-            "meaning_bullet, assumption_bullet, and caveat_bullet. Use "
-            "matches_prompt_language only when the prose is fully written in "
-            "prompt_context.language, allowing unchanged symbols, tickers, currency "
-            "codes, numbers, and percentages. Use mixed_or_wrong_language if any "
-            "user-facing phrase remains in a different language or copies internal "
-            "schema/fact-id wording."
-        )
-    )
-    next_experiment_option_kinds: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Optional supported next experiment kinds copied exactly from "
-            "allowed_next_experiments. Do not invent kinds."
-        ),
-    )
-    fact_ids: list[str] = Field(
-        description=(
-            "Fact IDs from fact_bank that ground this draft. Include every "
-            "required_fact_id and do not invent IDs."
-        )
-    )
+class QuickTakeDraft(ResultReadoutDraft):
+    """Complete first-glance model prose; the UI owns its frame."""
 
 
 def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
@@ -332,6 +252,7 @@ async def _llm_explanation(
     fallback_text: str,
     language: str,
 ) -> _LLMExplanationResult:
+    del fallback_text
     strategy = _strategy_payload(state)
     result_payload = _result_payload(state)
     explanation_context = _explanation_context(state)
@@ -340,110 +261,54 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    optional_parameters = _optional_parameters(state)
-    tested_summary = _tested_summary(
-        strategy=strategy,
+    returns = _resolved_return_metrics(
         result_payload=result_payload,
         explanation_context=explanation_context,
-        language=language,
     )
-    execution_note = result_execution_note(result_facts)
-    rule_summary = _display_rule_summary(
-        strategy=strategy,
-        result_facts=result_facts,
-        rule_summary=result_rule_summary(result_facts),
-    )
-    assumption_summary = _assumption_summary(
-        optional_parameters=optional_parameters,
-        explanation_context=explanation_context,
-        language=language,
-    )
-    caveat = _caveat_summary(explanation_context, language=language)
-    allowed_next_experiments = structured_next_experiments(result_facts)
-    benchmark_contract = _benchmark_contract(
+    benchmark = _benchmark_contract(
         strategy=strategy,
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    fact_context = {
-        "tested_summary": tested_summary,
-        "execution_note": execution_note,
-        "rule_summary": rule_summary,
-        "assumption_summary": assumption_summary,
-        "caveat": caveat,
-        "benchmark_contract": benchmark_contract,
-    }
-    fact_bank = _quick_take_fact_bank(
-        context=fact_context,
-        result_payload=result_payload,
-        explanation_context=explanation_context,
-        language=language,
+    facts = stored_readout_facts(
+        metrics=result_facts.get("metrics"),
+        config_snapshot=result_payload.get(
+            "config_snapshot",
+            {
+                "resolved_strategy": _canonical_strategy_context(strategy),
+                "resolved_parameters": result_facts.get("resolved_parameters", {}),
+            },
+        ),
+        symbols=benchmark["tested_symbols"],
+        benchmark_symbol=benchmark["benchmark_symbol"],
+        date_range=result_payload.get("date_range", strategy.get("date_range")),
+        chart=result_payload.get("chart"),
+        comparison_metrics={
+            "total_return_pct": returns.total_return,
+            "benchmark_return_pct": returns.benchmark_return,
+            "delta_vs_benchmark_pct": returns.benchmark_delta,
+        },
     )
-    relative_performance_truth = _quick_take_relative_truth(
-        result_payload=result_payload,
-        explanation_context=explanation_context,
-    )
-    required_fact_ids = _required_quick_take_fact_ids(fact_bank)
-    prompt_context = {
-        "allowed_next_experiments": allowed_next_experiments,
-        "benchmark_contract": benchmark_contract,
-        "fact_bank": fact_bank,
-        "language": language,
-        "relative_performance_truth": relative_performance_truth,
-        "required_fact_ids": sorted(required_fact_ids),
-        "strategy": _canonical_strategy_context(strategy),
-    }
     messages = [
         {
             "role": "system",
             "content": (
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
-                "You are writing a concise Quick Take for a completed historical "
-                "backtest. Compose natural user-facing wording, but use only "
-                "supplied fact_bank facts for metrics, symbols, dates, assumptions, "
-                "and next-test labels. The result card answers what happened; your "
-                "job is to explain what matters without duplicating every metric. "
+                "Write what belongs inside the Quick take frame of a completed "
+                "historical backtest. Keep it short and first-glance: explain the "
+                "most meaningful result and tradeoff for a person, rather than "
+                "reciting the card. Save the deeper discussion for Breakdown. "
+                "Do not add a heading or next experiments; the existing UI owns "
+                "the frame and follow-up actions. "
                 f"{response_language_instruction(language)} "
-                "Do not leave untranslated English words in user-facing prose except "
-                "tickers, symbols, currency codes, numbers, and standard abbreviations. "
-                "When product_language is not English, translate finance terms instead "
-                "of borrowing English terms like benchmark. "
-                "For non-English product_language, literal English words such as "
-                "benchmark, drawdown, back-test, backtest, setup, total return, risk, "
-                "assumptions, and useful next check are language-quality failures. "
-                "Some source fact values may be stored in English; translate their "
-                "meaning into product_language in your visible output. Judge "
-                "language_quality only from your generated user-facing fields, not "
-                "from source fact values, fact IDs, or schema keys. "
-                "Do not fail the language audit just because source fact values are "
-                "stored in English; translate those source facts in the completed "
-                "Quick Take. "
-                "Do not turn the Quick Take into a Try next section; supported "
-                "next experiments are validated here but presented through follow-up "
-                "actions and deeper explanation surfaces. "
-                "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
-                "Write every user-facing field in prompt_context.language. "
-                "Symbols, tickers, currency codes, numbers, and percentages can stay "
-                "unchanged, but internal fact IDs and schema field names are never "
-                "user-facing copy. "
-                "Set language_quality to mixed_or_wrong_language if any rendered "
-                "sentence mixes languages or copies internal field wording. "
-                "Write complete sentences and end cleanly; never end on a dangling "
-                "fragment such as a bare data-frequency note. Fold caveats into a "
-                "readable sentence instead of appending them as fragments. "
-                "Return structured fields so the runtime can validate fact usage; "
-                "do not invent facts or supported next experiment kinds."
-                " For user-facing beat/lagged wording, use the benchmark symbol "
-                "and benchmark_delta_magnitude from fact_bank; do not phrase a lag "
-                "as a negative percentage return."
+                f"{READOUT_GROUNDING_INSTRUCTIONS}"
             ),
         },
         {
             "role": "user",
             "content": json.dumps(
-                prompt_context,
+                {"run_facts": facts, "product_language": language},
                 default=str,
-                sort_keys=True,
             ),
         },
     ]
@@ -457,28 +322,10 @@ async def _llm_explanation(
                 explanation_context
             ),
         )
-        rendered = _render_quick_take_draft(
-            draft=draft,
-            fallback_text=fallback_text,
-            fact_bank=fact_bank,
-            required_fact_ids=required_fact_ids,
-            allowed_next_experiments=allowed_next_experiments,
-            relative_performance_truth=relative_performance_truth,
-            tested_line=_tested_readout_line(
-                tested_summary,
-                rule_summary,
-            ),
-        )
-        if rendered is None:
-            return _LLMExplanationResult(
-                text=None,
-                failure_mode=RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED,
-            )
-        return _LLMExplanationResult(text=rendered)
-    except Exception as exc:
-        # The OpenRouter helper records per-model route receipts. This local fallback
-        # only preserves a recoverable answer when every configured model fails.
-        _ = exc
+        rendered, failure = accepted_readout_text(draft, facts=facts)
+        return _LLMExplanationResult(text=rendered, failure_mode=failure)
+    except Exception:
+        # OpenRouter owns per-model route receipts. No partial draft is exposed.
         return _LLMExplanationResult(
             text=None,
             failure_mode=RESULT_READOUT_FAILURE_LLM_UNAVAILABLE,
@@ -500,408 +347,6 @@ def _context_packet_ids_from_explanation_context(
             if packet_id and packet_id not in packet_ids:
                 packet_ids.append(packet_id)
     return packet_ids
-
-
-def _quick_take_fact_bank(
-    *,
-    context: dict[str, Any],
-    result_payload: dict[str, Any],
-    explanation_context: dict[str, Any],
-    language: str,
-) -> dict[str, str]:
-    fact_bank: dict[str, str] = {}
-    for key in (
-        "tested_summary",
-        "execution_note",
-        "rule_summary",
-        "assumption_summary",
-        "caveat",
-    ):
-        value = context.get(key)
-        if isinstance(value, str) and value.strip():
-            fact_bank[key] = value.strip()
-
-    benchmark_contract = context.get("benchmark_contract")
-    benchmark_symbol = (
-        benchmark_contract.get("benchmark_symbol")
-        if isinstance(benchmark_contract, dict)
-        else None
-    )
-    if not benchmark_symbol:
-        benchmark_symbol = _benchmark_contract(
-            strategy={},
-            result_payload=result_payload,
-            explanation_context=explanation_context,
-        ).get("benchmark_symbol")
-    if benchmark_symbol:
-        fact_bank["benchmark_symbol"] = str(benchmark_symbol)
-
-    returns = _resolved_return_metrics(
-        result_payload=result_payload,
-        explanation_context=explanation_context,
-    )
-    if returns.total_return is not None:
-        fact_bank["total_return"] = _format_percent_points(returns.total_return)
-    if returns.benchmark_return is not None:
-        fact_bank["benchmark_return"] = _format_percent_points(returns.benchmark_return)
-    if returns.benchmark_delta is not None:
-        comparison = benchmark_comparison_from_delta(returns.benchmark_delta)
-        fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
-            comparison.magnitude_points,
-            language=language,
-        )
-        fact_bank["benchmark_comparison"] = format_benchmark_comparison_phrase(
-            comparison.claim,
-            comparison.magnitude_points,
-            language=language,
-        )
-    fact_bank["caveat"] = fact_bank.get("caveat") or _caveat_summary(
-        explanation_context,
-        language=language,
-    )
-    return fact_bank
-
-
-def _required_quick_take_fact_ids(fact_bank: dict[str, str]) -> set[str]:
-    required = {"caveat"}
-    for fact_id in (
-        "tested_summary",
-        "total_return",
-        "benchmark_return",
-        "benchmark_symbol",
-    ):
-        if fact_id in fact_bank:
-            required.add(fact_id)
-    if "benchmark_comparison" in fact_bank:
-        required.add("benchmark_comparison")
-    return required
-
-
-def _quick_take_relative_truth(
-    *,
-    result_payload: dict[str, Any],
-    explanation_context: dict[str, Any],
-) -> QuickTakeRelativeClaim:
-    returns = _resolved_return_metrics(
-        result_payload=result_payload,
-        explanation_context=explanation_context,
-    )
-    return benchmark_comparison_from_delta(returns.benchmark_delta).claim
-
-
-def _format_percent_points(value: float) -> str:
-    prefix = "+" if value > 0 else ""
-    return f"{prefix}{value:.1f}%"
-
-
-def _render_quick_take_draft(
-    *,
-    draft: QuickTakeDraft | dict[str, Any] | None,
-    fallback_text: str,
-    fact_bank: dict[str, str],
-    required_fact_ids: set[str],
-    allowed_next_experiments: Any,
-    relative_performance_truth: QuickTakeRelativeClaim,
-    tested_line: str,
-) -> str | None:
-    response = _coerce_quick_take_draft(draft)
-    if response is None:
-        return None
-    truth = relative_performance_truth
-    if truth != "unknown" and response.relative_performance_claim != truth:
-        return None
-    language_matches_prompt = response.language_quality == "matches_prompt_language"
-    tested = (
-        _clean_quick_take_line(response.tested_bullet)
-        or _clean_quick_take_line(tested_line)
-        if language_matches_prompt
-        else None
-    )
-    # `fact_ids` is model self-report metadata. The visible copy checks below are
-    # the authoritative guard for user-facing benchmark truth.
-    visible_response = response.model_copy(
-        update={
-            "tested_bullet": tested,
-        }
-    )
-    if not _quick_take_mentions_required_visible_facts(
-        draft=visible_response,
-        fact_bank=fact_bank,
-    ):
-        return None
-    if _quick_take_mentions_signed_benchmark_delta(
-        draft=visible_response,
-        fact_bank=fact_bank,
-    ):
-        return None
-
-    lines = [_clean_quick_take_line(response.takeaway), ""]
-    if tested:
-        lines.append(f"- {tested}")
-    optional_bullets = (
-        (response.meaning_bullet, response.assumption_bullet, response.caveat_bullet)
-        if language_matches_prompt
-        else ()
-    )
-    for bullet in optional_bullets:
-        line = _clean_quick_take_line(bullet)
-        if line:
-            lines.append(f"- {line}")
-    body = "\n".join(line for line in lines if line is not None).strip()
-    return body or fallback_text
-
-
-def _coerce_quick_take_draft(value: Any) -> QuickTakeDraft | None:
-    if isinstance(value, QuickTakeDraft):
-        return value
-    if isinstance(value, dict) and "language_quality" not in value:
-        value = {**value, "language_quality": "matches_prompt_language"}
-    try:
-        return QuickTakeDraft.model_validate(value)
-    except (TypeError, ValidationError):
-        return None
-
-
-def _quick_take_mentions_required_visible_facts(
-    *,
-    draft: QuickTakeDraft,
-    fact_bank: dict[str, str],
-) -> bool:
-    text = " ".join(
-        line
-        for line in (
-            draft.takeaway,
-            draft.tested_bullet,
-            draft.meaning_bullet or "",
-            draft.assumption_bullet or "",
-            draft.caveat_bullet or "",
-        )
-        if line
-    )
-    benchmark_symbol = fact_bank.get("benchmark_symbol")
-    if benchmark_symbol and not _contains_text(text, benchmark_symbol):
-        return False
-    if not _mentions_benchmark_comparison(text=text, fact_bank=fact_bank):
-        return False
-    if _quick_take_mentions_unknown_metric_number(text=text, fact_bank=fact_bank):
-        return False
-    return True
-
-
-def _quick_take_mentions_signed_benchmark_delta(
-    *,
-    draft: QuickTakeDraft,
-    fact_bank: dict[str, str],
-) -> bool:
-    magnitude = fact_bank.get("benchmark_delta_magnitude")
-    magnitude_number = _first_numeric_token(magnitude)
-    if not magnitude_number:
-        return False
-    text = " ".join(
-        line
-        for line in (
-            draft.takeaway,
-            draft.tested_bullet,
-            draft.meaning_bullet or "",
-            draft.assumption_bullet or "",
-            draft.caveat_bullet or "",
-        )
-        if line
-    ).casefold()
-    if "percentage point" not in text and "puntos porcentual" not in text:
-        return False
-    localized_number = magnitude_number.replace(".", ",")
-    return any(
-        signed_number in text
-        for signed_number in (
-            f"-{magnitude_number}",
-            f"+{magnitude_number}",
-            f"-{localized_number}",
-            f"+{localized_number}",
-        )
-    )
-
-
-def _mentions_benchmark_comparison(
-    *,
-    text: str,
-    fact_bank: dict[str, str],
-) -> bool:
-    benchmark_comparison = fact_bank.get("benchmark_comparison")
-    if not benchmark_comparison:
-        return True
-    if _contains_text(text, benchmark_comparison):
-        return True
-    magnitude = fact_bank.get("benchmark_delta_magnitude")
-    magnitude_number = _first_numeric_token(magnitude)
-    return bool(magnitude_number and magnitude_number in _numeric_tokens(text))
-
-
-def _quick_take_mentions_unknown_metric_number(
-    *,
-    text: str,
-    fact_bank: dict[str, str],
-) -> bool:
-    allowed = set()
-    for fact_id in (
-        "total_return",
-        "benchmark_return",
-        "benchmark_delta_magnitude",
-    ):
-        allowed.update(_metric_numeric_tokens(fact_bank.get(fact_id)))
-    if not allowed:
-        return False
-    return any(token not in allowed for token in _metric_numeric_tokens(text))
-
-
-def _contains_text(text: str, needle: str) -> bool:
-    return needle.casefold() in text.casefold()
-
-
-def _first_numeric_token(value: str | None) -> str | None:
-    tokens = _numeric_tokens(value)
-    return tokens[0] if tokens else None
-
-
-def _numeric_tokens(value: str | None) -> list[str]:
-    normalized = str(value or "").replace("\u2212", "-")
-    tokens: list[str] = []
-
-    def flush(candidate: str) -> None:
-        token = _normalize_numeric_token(candidate)
-        if token is None:
-            return
-        try:
-            normalized_token = f"{float(token):.1f}"
-        except ValueError:
-            return
-        if normalized_token not in tokens:
-            tokens.append(normalized_token)
-
-    candidate = ""
-    for character in normalized:
-        if character.isdigit() or character in ".,":
-            candidate += character
-            continue
-        if character in "+-":
-            if candidate:
-                flush(candidate)
-            candidate = character
-            continue
-        if candidate:
-            flush(candidate)
-            candidate = ""
-    if candidate:
-        flush(candidate)
-    return tokens
-
-
-def _metric_numeric_tokens(value: str | None) -> list[str]:
-    text = str(value or "")
-    tokens: list[str] = []
-    for index, character in enumerate(text):
-        if not (character.isdigit() or character in "+-"):
-            continue
-        token = _numeric_token_starting_at(text, index)
-        if token is None:
-            continue
-        raw_token, end = token
-        suffix = text[end : end + 24].casefold()
-        if (
-            not suffix.lstrip().startswith("%")
-            and not suffix.lstrip().startswith("percentage point")
-            and not suffix.lstrip().startswith("puntos porcentual")
-        ):
-            continue
-        normalized = _normalize_numeric_token(raw_token)
-        if normalized is None:
-            continue
-        try:
-            metric_token = f"{abs(float(normalized)):.1f}"
-        except ValueError:
-            continue
-        if metric_token not in tokens:
-            tokens.append(metric_token)
-    return tokens
-
-
-def _numeric_token_starting_at(text: str, index: int) -> tuple[str, int] | None:
-    candidate = ""
-    cursor = index
-    if text[cursor] in "+-":
-        candidate += text[cursor]
-        cursor += 1
-    seen_digit = False
-    while cursor < len(text):
-        character = text[cursor]
-        if character.isdigit():
-            seen_digit = True
-            candidate += character
-            cursor += 1
-            continue
-        if character in ".,":
-            candidate += character
-            cursor += 1
-            continue
-        break
-    if not seen_digit:
-        return None
-    return candidate, cursor
-
-
-def _normalize_numeric_token(value: str) -> str | None:
-    token = value.strip().strip(".,")
-    if not token or not any(character.isdigit() for character in token):
-        return None
-    if "." in token and "," in token:
-        decimal_separator = "." if token.rfind(".") > token.rfind(",") else ","
-        thousands_separator = "," if decimal_separator == "." else "."
-        token = token.replace(thousands_separator, "")
-        if decimal_separator == ",":
-            token = token.replace(",", ".")
-        return token
-    if "," in token:
-        return _normalize_single_separator_number(token, separator=",")
-    if "." in token:
-        return _normalize_single_separator_number(token, separator=".")
-    return token
-
-
-def _normalize_single_separator_number(value: str, *, separator: str) -> str:
-    pieces = value.split(separator)
-    if len(pieces) > 1 and all(len(piece) == 3 for piece in pieces[1:]):
-        return "".join(pieces)
-    if separator == ",":
-        return value.replace(",", ".")
-    return value
-
-
-def _next_check_kinds_are_supported(
-    *,
-    draft: QuickTakeDraft,
-    allowed_next_experiments: Any,
-) -> bool:
-    if not isinstance(allowed_next_experiments, list):
-        return not draft.next_experiment_option_kinds
-    supported_values = {
-        value
-        for option in allowed_next_experiments
-        if isinstance(option, dict)
-        for value in (
-            str(option.get("kind") or "").strip(),
-            str(option.get("label") or "").strip(),
-        )
-        if value
-    }
-    return all(
-        str(kind_value or "").strip() in supported_values
-        for kind_value in draft.next_experiment_option_kinds
-    )
-
-
-def _clean_quick_take_line(value: str | None) -> str:
-    text = " ".join(str(value or "").split()).strip()
-    return text.strip("- ").rstrip(".")
 
 
 def _benchmark_contract(

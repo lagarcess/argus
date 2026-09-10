@@ -21,6 +21,15 @@ MEASURED_ROOTS = (
 )
 
 FINGERPRINT_PATH = Path(".agent/interpreter_prompt_fingerprint.json")
+# These composers send dictionary messages rather than LangChain messages.
+# Keep the API addition narrow: unrelated router prose is not this lane's scope.
+READOUT_MESSAGE_OWNERS = frozenset(
+    {
+        "src/argus/agent_runtime/stages/explain.py",
+        "src/argus/api/chat/breakdown.py",
+    }
+)
+READOUT_INSTRUCTION_OWNER = "src/argus/domain/result_readout_grounding.py"
 
 _MESSAGE_CONSTRUCTORS = frozenset({"SystemMessage", "HumanMessage", "AIMessage"})
 _PROMPT_FUNCTION_SUFFIXES = ("_prompt", "_instructions", "_directive", "_clause")
@@ -50,12 +59,34 @@ def _joined_constants(node: ast.AST) -> str:
     return "".join(parts)
 
 
-def _model_facing_strings(tree: ast.AST) -> list[tuple[str, str]]:
+def _model_facing_strings(
+    tree: ast.AST,
+    *,
+    include_dictionary_messages: bool = False,
+    include_readout_instructions: bool = False,
+) -> list[tuple[str, str]]:
     """(kind, text) for every string this module hands to a model."""
 
     found: list[tuple[str, str]] = []
 
     for node in ast.walk(tree):
+        if include_dictionary_messages and isinstance(node, ast.Dict):
+            fields = {
+                key.value: value
+                for key, value in zip(node.keys, node.values, strict=False)
+                if isinstance(key, ast.Constant) and isinstance(key.value, str)
+            }
+            role = fields.get("role")
+            content = fields.get("content")
+            if (
+                isinstance(role, ast.Constant)
+                and role.value in {"system", "user", "assistant"}
+                and content is not None
+            ):
+                text = _joined_constants(content)
+                if text:
+                    found.append((f"dict.{role.value}.content", text))
+            continue
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.name.endswith(_PROMPT_FUNCTION_SUFFIXES):
                 body = _joined_constants(node)
@@ -69,7 +100,13 @@ def _model_facing_strings(tree: ast.AST) -> list[tuple[str, str]]:
             ]
             if (
                 len(target_names) == 1
-                and target_names[0].endswith(_GUIDANCE_CONSTANT_SUFFIX)
+                and (
+                    target_names[0].endswith(_GUIDANCE_CONSTANT_SUFFIX)
+                    or (
+                        include_readout_instructions
+                        and target_names[0] == "READOUT_GROUNDING_INSTRUCTIONS"
+                    )
+                )
                 and isinstance(node.value, ast.Constant)
                 and isinstance(node.value.value, str)
                 and node.value.value
@@ -104,24 +141,31 @@ def model_facing_surface(repository_root: Path) -> dict[str, dict[str, object]]:
 
     surface: dict[str, dict[str, object]] = {}
 
-    for root in MEASURED_ROOTS:
-        for path in sorted((repository_root / root).rglob("*.py")):
-            try:
-                tree = ast.parse(path.read_text(encoding="utf-8"))
-            except (OSError, SyntaxError):
-                continue
+    paths = {
+        path for root in MEASURED_ROOTS for path in (repository_root / root).rglob("*.py")
+    }
+    paths.update(repository_root / name for name in READOUT_MESSAGE_OWNERS)
+    for path in sorted(paths):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
 
-            strings = _model_facing_strings(tree)
-            if not strings:
-                continue
+        relative = str(path.relative_to(repository_root))
+        strings = _model_facing_strings(
+            tree,
+            include_dictionary_messages=relative in READOUT_MESSAGE_OWNERS,
+            include_readout_instructions=relative == READOUT_INSTRUCTION_OWNER,
+        )
+        if not strings:
+            continue
 
-            payload = chr(10).join(kind + chr(31) + text for kind, text in strings)
-            relative = str(path.relative_to(repository_root))
-            surface[relative] = {
-                "entries": len(strings),
-                "chars": sum(len(text) for _, text in strings),
-                "sha256": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
-            }
+        payload = chr(10).join(kind + chr(31) + text for kind, text in strings)
+        surface[relative] = {
+            "entries": len(strings),
+            "chars": sum(len(text) for _, text in strings),
+            "sha256": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+        }
 
     return surface
 

@@ -1,3 +1,4 @@
+import { resultReadoutContentFromMetadata } from "./result-readout-content";
 import { toolCardsFromMetadata, hasUnavailableToolCards } from "./tool-result-card";
 import {
   getConversationMessages,
@@ -528,6 +529,7 @@ export function hydrateTextMessageFromApi(
       ? resultFactHeadingKeyFromMetadata(metadata)
       : undefined,
     recoveryDisplay: recoveryDisplayFromMetadata(metadata),
+    resultReadoutContent: isAssistant ? resultReadoutContentFromMetadata(metadata) : undefined,
     strategyPathContext: strategyPathContextFromMetadata(metadata, message.id),
     assistantRecoveryCode: isAssistant
       ? retryableAssistantRecoveryCode(metadata.recovery)

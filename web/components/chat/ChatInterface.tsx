@@ -104,6 +104,8 @@ import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
 import { toolResultRecomputeHandler } from "@/lib/tool-result-recompute";
 import { toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
+import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import {
   discoveryCandidateMention,
   discoverySidecarFromMetadata,
@@ -1389,6 +1391,7 @@ export default function ChatInterface() {
           );
           const card = {
             ...baseCard,
+            readoutContent: resultReadoutContentFromMetadata(finalPayload, baseCard.readoutContent),
             savedStrategyId: run.strategy_id ?? null,
             actions: resultActions,
           };
@@ -1438,7 +1441,8 @@ export default function ChatInterface() {
           const finalResearchDegradedCode =
             researchDegradedCodeFromMetadata(finalPayload);
           const finalTextPresentation =
-            action?.type === "show_breakdown" ? "result_breakdown" : undefined;
+            finalPayload.artifact_presentation_kind === "result" ? "result_readout"
+              : finalRecoveryDisplay?.kind === "result_breakdown" || action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
             const nextMessages = replaceOrAppendFinalAssistantMessage(
               prev.map((m) =>
@@ -1455,6 +1459,8 @@ export default function ChatInterface() {
                   researchSources: finalResearchSources,
                   researchDegradedCode: finalResearchDegradedCode,
                   nextExperiments: finalNextExperiments,
+                  resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
+                  resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
                 }),
@@ -1476,6 +1482,8 @@ export default function ChatInterface() {
                 researchSources: finalResearchSources,
                 researchDegradedCode: finalResearchDegradedCode,
                 nextExperiments: finalNextExperiments,
+                resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
+                resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
               },

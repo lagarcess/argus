@@ -558,7 +558,16 @@ Represents individual messages within a conversation.
   or destructive historical rewrite is permitted.
 - Original result `content`, card `quick_take`/`breakdown`, and job
   `result_readout` remain immutable private audit/model context. Public reader
-  projections omit them and voice only typed facts from the canonical run.
+  projections omit them. New compositions store a closed
+  `result_readout_content` envelope on the run's result card (Quick take) or
+  assistant message metadata (Breakdown), with version, surface, authoring
+  workspace language, and complete accepted text or null on fallback. Job and
+  message read projections derive the Quick take envelope from its run card.
+  Readers may show its text only when their language matches; every other case
+  uses typed facts. This is additive JSON metadata, with no migration, backfill,
+  read-time model call or rewritten historical content. Source and fallback
+  provenance use the existing `result_readout_*` fields. The exact closed
+  transport is documented in API_CONTRACT.md's Message section.
   Existing `result_fact_bank` is a read projection, not a second metrics owner;
   missing historical transport facts are repaired on read using owner and
   conversation scoped run identity. Its `figures` (and a public run's

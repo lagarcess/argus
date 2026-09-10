@@ -1241,6 +1241,13 @@ def test_run_backtest_job_persists_backend_result_readout(
     assert metadata["result_readout"] == readout
     assert metadata["result_readout_source"] == "llm_explain_stage"
     assert metadata["result_readout_fallback_used"] is False
+    saved_run = next(iter(gateway.finalization_store.backtest_runs.values()))
+    assert saved_run.conversation_result_card["result_readout_content"] == {
+        "schema_version": "result_readout/v1",
+        "surface": "quick_take",
+        "language": "en",
+        "text": readout,
+    }
 
 
 def test_run_backtest_job_restores_guest_openrouter_scope_for_result_readout(
@@ -1382,7 +1389,9 @@ def test_run_backtest_job_persists_result_summary_route_receipts(
     assert ledger_entry["backtest_run_id"] == "run-workflow"
     assert ledger_entry["backtest_job_id"] == job["id"]
     assert ledger_entry["route_receipt_id"] == "receipt-1"
-    assert ledger_entry["correlation_id"] == f"workflow:local-run:{job['id']}:run-workflow"
+    assert (
+        ledger_entry["correlation_id"] == f"workflow:local-run:{job['id']}:run-workflow"
+    )
     assert ledger_entry["total_tokens"] == 30
     assert ledger_entry["cost_amount"] == 0.0009
 
@@ -1488,22 +1497,9 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
-            "relative_performance_claim": "beat_benchmark",
-            "takeaway": model_takeaway,
-            "tested_bullet": model_tested_bullet,
-            "meaning_bullet": model_meaning_bullet,
-            "next_check_bullet": None,
-            "assumption_bullet": None,
-            "caveat_bullet": "Historical simulation only.",
-            "next_experiment_option_kinds": [],
-            "fact_ids": [
-                "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_symbol",
-                "caveat",
-            ],
+            "text": "\n\n".join(
+                [model_takeaway, model_tested_bullet, model_meaning_bullet]
+            )
         }
 
     monkeypatch.setattr(
@@ -1529,9 +1525,9 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
     )
 
     readout = result["result_readout"]
-    assert readout.splitlines()[0] == model_takeaway.rstrip(".")
-    assert f"- {model_tested_bullet.rstrip('.')}" in readout
-    assert f"- {model_meaning_bullet.rstrip('.')}" in readout
+    assert readout.splitlines()[0] == model_takeaway
+    assert model_tested_bullet in readout
+    assert model_meaning_bullet in readout
     metadata = gateway.row["execution_metadata"]["workflow_backtest"]
     assert metadata["result_readout_source"] == "llm_explain_stage"
     assert metadata["result_readout_fallback_used"] is False
@@ -1579,6 +1575,13 @@ def test_run_backtest_job_marks_result_readout_fallback_provenance(
     assert metadata["result_readout_source"] == "deterministic_fallback"
     assert metadata["result_readout_fallback_used"] is True
     assert metadata["result_readout_failure_mode"] == "llm_unavailable_or_rejected"
+    saved_run = next(iter(gateway.finalization_store.backtest_runs.values()))
+    assert saved_run.conversation_result_card["result_readout_content"] == {
+        "schema_version": "result_readout/v1",
+        "surface": "quick_take",
+        "language": "en",
+        "text": None,
+    }
 
 
 def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:

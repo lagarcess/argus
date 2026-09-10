@@ -54,7 +54,6 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.breakdown import result_breakdown_message_with_metadata
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -89,6 +88,9 @@ from argus.api.chat.research_evidence import (
 )
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.result_link import apply_result_link_outcome
+from argus.api.chat.result_readout import (
+    compose_result_breakdown as result_breakdown_message_with_metadata,
+)
 from argus.api.chat.retest import (
     complete_retest_turn,
     failed_retest_turn,
@@ -135,6 +137,10 @@ from argus.api.schemas import (
 from argus.domain.artifact_presentation_kind import artifact_presentation_kind
 from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.research.admission import research_attempt_admission_context
+from argus.domain.result_readout_content import (
+    READOUT_METADATA_KEYS,
+    stored_readout_metadata,
+)
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
     allowance_windows,
@@ -951,6 +957,7 @@ async def chat_stream(
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
 
+                    result_card.update(stored_readout_metadata(runtime_result))
                     active_finalization_execution_identity = chat_retry.backtest_finalization_execution_identity(
                         backtest_job=backtest_job,
                         retry_execution_identity=retry_finalization_execution_identity,
@@ -1000,12 +1007,13 @@ async def chat_stream(
                             language=runtime_user.language_preference,
                         )
                         assistant_text = breakdown_message.text
-                        metadata.update(
-                            result_breakdown_metadata(
-                                breakdown_message, result_action_run
-                            )
+                        breakdown_metadata = result_breakdown_metadata(
+                            breakdown_message,
+                            result_action_run,
+                            language=runtime_user.language_preference,
                         )
-                        runtime_result["response_intent"] = metadata["response_intent"]
+                        metadata.update(breakdown_metadata)
+                        runtime_result.update(breakdown_metadata)
                     elif result_action_type == "save_strategy":
                         yield sse_data({"type": "stage_start", "stage": "next_step"})
                         if result_action_run is None:
@@ -1038,6 +1046,7 @@ async def chat_stream(
                             result_action_run.strategy_id
                         )
                 for key in (
+                    *READOUT_METADATA_KEYS,
                     "latest_run_id",
                     "source_result_run_id",
                     "strategy_path_id",

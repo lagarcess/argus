@@ -3197,7 +3197,15 @@ returns `422 tool_inputs_not_editable`.
 - `show_breakdown` requires canonical result run context. A stale
   `save_strategy` request also requires that context, but is non-mutating and
   returns the historical-run continuity response.
-- `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
+- `show_breakdown` composes complete model text from all stored run metrics and
+  configuration facts, with the prior Quick take available for context. New
+  run readouts use the versioned `result_readout_content` transport described
+  under Message. Numeric grounding, benchmark contradictions and visible
+  internal keys reject the whole draft; there are no required-mention or
+  figure-count checks. Generation failure selects the typed template and
+  records `result_readout_source`, `result_readout_fallback_used`, and
+  `result_readout_failure_mode`. Existing `result_breakdown_*` provenance is
+  retained for compatibility. Pre-lane runs remain template-only.
 - `select_response_option` is valid only for typed response-intent options. Its
   payload must include the durable assistant `message_id` that presented the
   option as `source_assistant_id`, plus the exact `option_id` and
@@ -4487,13 +4495,16 @@ Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
 with the current chat turn instead of staying open for workflow-duration
 execution.
 
-For completed workflow-backed jobs, `result_readout` retains the original
-explain-stage prose privately in storage and is always null in the public
-response. Readers voice canonical run facts at the same presentation boundary
-used for in-stream and reloaded results. `result_readout_source` and
-`result_readout_fallback_used` expose whether the normal LLM/schema-grounded
-path produced the readout or whether Argus intentionally fell back to the
-deterministic safety renderer.
+For completed workflow-backed jobs, legacy `result_readout` remains private
+in storage and is always null in the public response. New jobs expose
+`result_readout_content`, the closed, language-tagged envelope derived from the
+canonical run card, through the same presentation boundary used for in-stream
+and reloaded results. Readers show its complete text only when its language
+matches the workspace; missing, null, invalid, or mismatched envelopes use the
+current template. `result_readout_source`, `result_readout_fallback_used`, and
+`result_readout_failure_mode` record whether composition succeeded or selected
+the template fallback. A reader-language mismatch does not change these saved
+creation-time diagnostics or trigger another model call.
 
 For a terminal `chat.research` job, `run` is null and `result_message` is the
 message the job produced: the persisted answer on success, the persisted

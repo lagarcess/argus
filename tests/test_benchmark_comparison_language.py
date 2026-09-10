@@ -4,8 +4,6 @@ from collections.abc import Callable
 
 import pytest
 from argus.agent_runtime.result_followups import result_followup_fact_bank
-from argus.agent_runtime.stages.explain import _quick_take_fact_bank
-from argus.api.chat.breakdown import result_breakdown_fact_bank
 from argus.domain.engine import build_result_card
 
 LanguageRenderer = Callable[[str], tuple[str, ...]]
@@ -96,47 +94,12 @@ def _legacy_result_followup_comparison(language: str) -> tuple[str, ...]:
     )
 
 
-def _quick_take_comparison(language: str) -> tuple[str, ...]:
-    facts = _quick_take_fact_bank(
-        context={},
-        result_payload={},
-        explanation_context={
-            "metrics": {"aggregate": {"performance": _run_performance()}},
-            "benchmark_metrics": {
-                "aggregate": {"total_return_pct": BENCHMARK_RETURN_POINTS}
-            },
-        },
-        language=language,
-    )
-    return (
-        facts["benchmark_comparison"],
-        facts["benchmark_delta_magnitude"],
-    )
-
-
-def _breakdown_comparison(language: str) -> tuple[str, ...]:
-    facts = result_breakdown_fact_bank(
-        {
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "SPY",
-            "raw_metrics": {"aggregate": {"performance": _run_performance()}},
-        },
-        language=language,
-    )
-    return (
-        facts["benchmark_comparison"],
-        facts["benchmark_delta_magnitude"],
-    )
-
-
 @pytest.mark.parametrize(
     "render_comparison",
     [
         pytest.param(_result_card_comparison, id="result-card"),
         pytest.param(_result_followup_comparison, id="result-followup"),
         pytest.param(_legacy_result_followup_comparison, id="legacy-result-followup"),
-        pytest.param(_quick_take_comparison, id="quick-take"),
-        pytest.param(_breakdown_comparison, id="breakdown"),
     ],
 )
 def test_each_benchmark_comparison_is_rendered_for_the_reader(
