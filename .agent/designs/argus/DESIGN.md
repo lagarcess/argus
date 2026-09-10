@@ -454,6 +454,6 @@ Argus is **NOT**:
 
 When designing any Argus surface, ask:
 
-> *Does this make it easier for a normal person to understand, test, or revisit an investing idea through conversation?*
+> *Does this make it easier for a normal person to understand, check, or revisit a money answer?*
 
 If not, it likely should wait.

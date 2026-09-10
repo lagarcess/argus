@@ -591,7 +591,7 @@ If this feels magical and trustworthy, the MVP is working.
 
 When evaluating any feature, ask:
 
-## Does this make it easier for a normal person to turn curiosity into a grounded investing experiment and continue exploring?
+## Does this make it easier for a normal person to bring a money question and get an answer they can check?
 
 If no, it likely should wait.
 
