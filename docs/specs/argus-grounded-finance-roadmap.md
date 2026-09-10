@@ -670,6 +670,71 @@ here.
 
 ---
 
+### Let the model write the readout  ·  ships in **its own promotion, after the registry**
+
+**The Quick take and Breakdown a user reads are not written by a model.** Since
+PR #551 on 2026-09-05 the web renders both from typed facts through fixed
+templates, `web/lib/result-readout-display.ts` and the `chat.result_readout`
+strings in the locale files: four sentences for the Quick take, and for the
+Breakdown the same four plus a few settings lines and a disclaimer. The model
+still writes both on every result, `result_summary` on the chat tier and
+`result_breakdown` on the context tier, and `artifact_presentation.py` strips
+that text on read as private prose. **Argus pays for an answer nobody sees.**
+Founder, 2026-09-10, on a DOCN buy-and-hold result beside Perplexity: the
+readout is shallow.
+
+**Why #551 did it.** Saved English results rendered under Spanish chrome (#531,
+#530, #528). Hiding model prose fixed the language, and it also removed the only
+part of the readout that could say something the card does not.
+
+**The drafts are gated too tight to show as they are.** `explain.py` rejects a
+Quick take that quotes any percentage other than total return, the benchmark's
+return and the gap between them, so it cannot mention the worst drop, and it
+rejects one that does not restate the benchmark comparison. The breakdown
+carries the same kinds of checks. The Quick take is handed a few figures while
+the engine computes more: annualized return, volatility, Sharpe ratio, worst
+drop and costs.
+
+**Done means.** The frames stay exactly as they are. Founder, 2026-09-10: *do
+not remove the quick take and breakdown format of the frame, my concern was just
+what's inside.* Inside them the model's text shows, written in the workspace
+language when the result is created, from every figure the run stored. Checks
+keep only what catches a false statement: a quoted figure that is not in the
+run, a beat or lag that contradicts it, an internal field name. Checks that force
+or cap content go. The templates stay as the fallback when the model fails, and
+for results saved before this lane or read in a language other than the one they
+were written in, so there is still no read-time model call and no rewritten
+history.
+
+**This does not reopen decision 5.** Decision 5 forbids hand-written prose per
+calculation, and this lane adds none; the fallback templates already exist. It
+is decision 9 at the result: the model writes the answer, Argus owns the
+numbers.
+
+**Surface.** `src/argus/agent_runtime/stages/explain.py`,
+`src/argus/api/chat/breakdown.py`, `src/argus/api/artifact_presentation.py` with
+`src/argus/domain/artifact_prose_fields.json`,
+`web/__tests__/private-artifact-prose-boundary.test.ts`,
+`web/components/chat/ChatMessage.tsx`, `web/lib/result-readout-display.ts`, both
+`common.json` locale files, `docs/API_CONTRACT.md`, and the result surface
+ownership rules in `AGENTS.md`.
+
+**Do not touch.** The result card, the frames, their labels and order. No causal
+claim about why a price moved; that needs a source and is research. No forecast
+or advice language.
+
+**Proof.** `explain.py` is fingerprinted, so a change to its model-facing text
+owes a committed scorecard: cost stated first, and a targeted interleaved
+comparison on result cases before any full run. Bilingual browser proof on a new
+result and on one saved before the lane. And the founder's side-by-side: the
+same result question to Argus and to a competitor, where Argus's readout says
+something the card does not.
+
+**Queued behind #575,** which edits `ChatMessage.tsx` and both locale files.
+Prompt written 2026-09-10.
+
+---
+
 ### Share the answer  ·  ships with **The calculations**
 
 **Promoted from a note under the registry to its own item, founder 2026-09-09.**
@@ -1119,6 +1184,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
 | Lift the loop, Lane B | The spine | **LANDED** `0ac96828`, PR #570, closing #430. Seven silent-reissue classes closed, card `kind` shipped, sixteen bilingual browser cases. `artifact_assumption_edit.py` went 1,561 to 1,507 lines, so 56 of its 75 growth lines are free again. |
 | The registry | The spine | **First half landed** as PR #567, `772aa276`. The catalog edge is cut: `state/models.py` now takes `RegisteredStrategyTemplate` from a new `strategy_template_contract.py` that loads the catalog only inside the validator, so a general envelope imports without it. Lane C's probes went from three passing the catalog guard to seven. **Second half in flight as PR #575, narrowed 2026-09-10.** It rewrote the interpreter's contract, cutting the response schema's field descriptions from 40 to 19 and generating a new system prompt and tool catalog, and paid for four full live runs, 43/25, 52/16, 49/19 and 58/11 passed/failed, about $10 accounted, plus a 56-run comparison the lane reports at $2.61. Its fourth run failed ten cases that had passed before. Under decision 9 that rewrite is the part being reconsidered, so the goal now lands only the declaration half: one typed tool declaration driving schema, runtime contract, cost and confirmation, result card and recompute, with every fingerprinted file byte-identical to integration and no live eval. The rewrite is to be parked on `codex/registry-interpreter-rewrite` as evidence for decision 9's reassessment. |
+| Let the model write the readout | its own promotion | **Queued behind #575.** Prompt written 2026-09-10. The Quick take and Breakdown show fixed templates since #551, while the model's text for both is generated, paid for, and hidden. |
 | The five calculations | The calculations | **Not started.** This is the product. |
 | Teach the method | Grounding | **Not started.** |
 
