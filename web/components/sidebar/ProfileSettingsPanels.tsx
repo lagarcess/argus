@@ -40,12 +40,11 @@ type SettingsPanelEntry = {
 const SETTINGS_PANELS = {
   appearance: {
     parent: "settings",
-    render: ({ onClose, onBack, backLabel, onProfileSaved }) => (
+    render: ({ onClose, onBack, backLabel }) => (
       <AppearanceModal
         onClose={onClose}
         onBack={onBack}
         backLabel={backLabel}
-        onProfileSaved={onProfileSaved}
       />
     ),
   },

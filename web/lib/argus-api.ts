@@ -573,7 +573,6 @@ export async function persistBrowserSession(payload: AuthResponsePayload) {
 export type ProfilePatch = {
   language?: "en" | "es-419";
   locale?: ArgusLocale;
-  theme?: string;
   display_name?: string;
   /** Empty clears it, which is how a user opts out of being addressed by name. */
   preferred_name?: string | null;

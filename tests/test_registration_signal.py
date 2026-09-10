@@ -53,7 +53,6 @@ def test_signup_emits_product_event_for_public_registration(
         display_name="Beta",
         language="en",
         locale="en-US",
-        theme="dark",
         is_admin=False,
         onboarding=OnboardingState(
             completed=True,

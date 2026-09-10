@@ -82,7 +82,6 @@ def _mock_profile(*, language: str = "en", stage: str = "ready") -> User:
         display_name="Mock Developer",
         language=language,  # type: ignore[arg-type]
         locale="es-419" if language == "es-419" else "en-US",
-        theme="dark",
         is_admin=True,
         onboarding=OnboardingState(
             completed=stage == "completed",
@@ -300,7 +299,6 @@ def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
             "display_name": "Alpha",
             "language": "es-419",
             "locale": "es-419",
-            "theme": "dark",
             "is_admin": False,
             "onboarding": OnboardingState().model_dump(),
             "created_at": now,
@@ -933,7 +931,7 @@ def test_me_usage_returns_problem_details_when_durable_truth_is_unavailable(
     assert response.headers["X-Request-Id"] == "usage-read-failure"
 
 
-def test_patch_me_supabase_ignores_legacy_onboarding_field(mock_gateway):
+def test_patch_me_supabase_ignores_retired_profile_fields(mock_gateway):
     before = _mock_profile(stage="language_selection")
     mock_gateway.get_user.return_value = before
 
@@ -944,15 +942,22 @@ def test_patch_me_supabase_ignores_legacy_onboarding_field(mock_gateway):
 
     response = client.patch(
         "/api/v1/me",
-        json={"theme": "light", "onboarding": {"language_confirmed": False}},
+        json={
+            "language": "es-419",
+            "locale": "es-419",
+            "theme": "light",
+            "onboarding": {"language_confirmed": False},
+        },
         headers={"Authorization": "Bearer test-token"},
     )
 
     assert response.status_code == 200
     user = response.json()["user"]
-    assert user["theme"] == "light"
+    assert user["language"] == "es-419"
+    assert "theme" not in user
     assert user["onboarding"] == before.onboarding.model_dump()
     mock_gateway.update_user.assert_called_once()
+    assert "theme" not in mock_gateway.update_user.call_args.args[1]
 
 
 def test_patch_me_persists_a_curated_avatar_theme(mock_gateway):

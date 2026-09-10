@@ -41,7 +41,6 @@ def _profile(*, user_id: str, email: str | None) -> User:
         display_name=None,
         language="en",
         locale="en-US",
-        theme="dark",
         is_admin=False,
         onboarding=OnboardingState(),
         created_at=now,

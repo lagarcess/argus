@@ -52,7 +52,6 @@ from argus.domain.strategy_template_contract import (
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
-Theme = Literal["dark", "light", "system"]
 AvatarTheme = Literal["ocean", "plum", "teal", "ember", "gold", "indigo", "slate"]
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
@@ -152,7 +151,6 @@ class User(BaseModel):
     preferred_name: PreferredName = None
     language: Language = "en"
     locale: Locale = "en-US"
-    theme: Theme = "dark"
     avatar_theme: AvatarTheme = "ocean"
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
@@ -192,7 +190,6 @@ class GuestUser(BaseModel):
     display_name: str | None = None
     language: Language = "en"
     locale: Locale = "en-US"
-    theme: Theme = "dark"
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
@@ -226,7 +223,6 @@ class ProfilePatch(BaseModel):
     preferred_name: PreferredName = None
     language: Language | None = None
     locale: Locale | None = None
-    theme: Theme | None = None
     avatar_theme: AvatarTheme = "ocean"
 
 

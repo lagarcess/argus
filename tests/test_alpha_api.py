@@ -257,7 +257,7 @@ def test_me_returns_contract_user_profile() -> None:
     payload = response.json()
     assert payload["user"]["language"] == "en"
     assert payload["user"]["locale"] == "en-US"
-    assert payload["user"]["theme"] == "dark"
+    assert "theme" not in payload["user"]
     assert payload["user"]["onboarding"] == {
         "completed": False,
         "stage": "language_selection",

@@ -40,7 +40,6 @@ def _profile() -> User:
         display_name="Mock Developer",
         language="en",
         locale="en-US",
-        theme="dark",
         is_admin=True,
         created_at=now,
         updated_at=now,

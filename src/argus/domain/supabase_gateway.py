@@ -282,7 +282,6 @@ class SupabaseGateway(
             "display_name": "Mock Developer",
             "language": "en",
             "locale": "en-US",
-            "theme": "dark",
             "is_admin": True,
             "updated_at": now,
         }
@@ -1997,7 +1996,6 @@ class SupabaseGateway(
             "display_name": user_metadata.get("display_name"),
             "language": language,
             "locale": _PROFILE_LOCALE_BY_LANGUAGE[language],
-            "theme": "dark",
             "is_admin": is_admin,
             "created_at": now,
             "updated_at": now,
