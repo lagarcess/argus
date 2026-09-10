@@ -1063,11 +1063,17 @@ def _research_prompt(
         )
     lines.append(
         "If the question asks what something will be worth, what it must grow "
-        "into, or what it is worth today, answer as scenarios: build them from "
-        "cited forecasts, analyst targets and valuation multiples, write the "
-        "arithmetic out step by step from those inputs, and give the result as "
-        "labeled scenario ranges (for example bear, base and bull), each range "
-        "written as low to high. Never present one number as the future, and "
+        "into, or what it is worth today, the answer is a set of scenarios you "
+        "compute. Retrieve the inputs from public pages (the current price, "
+        "published forecasts, analyst targets, growth rates, valuation "
+        "multiples) and put each input in rows with its page; then write the "
+        "arithmetic out step by step and give the result as labeled scenario "
+        "ranges (for example bear, base and bull), each range written as low to "
+        "high. The computed figures are your arithmetic from those inputs, not "
+        "retrieved figures, so no page needs to state them and their absence is "
+        "never a reason to decline; when no published forecast covers the full "
+        "horizon, build the scenarios from the nearest published horizon and "
+        "say what you assumed. Never present one number as the future, and "
         "never say what the reader should do."
     )
     lines.append(
