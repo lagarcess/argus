@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/aa72/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 10 items
+
+tests/evals/test_measurement_research.py F.........                      [100%]
+
+=================================== FAILURES ===================================
+_____ test_zero_calls_cannot_publish_a_research_sidecar_from_another_turn ______
+
+    def test_zero_calls_cannot_publish_a_research_sidecar_from_another_turn():
+        previous_turn = _selection_patch(action=False)
+    
+        assert research_outcome(previous_turn)["published"] is True
+>       assert research_outcome(previous_turn, calls=[], dispatch_patch={}) is None
+E       AssertionError: assert {'degraded_code': None, 'published': True, 'rows': 1, 'shape': 'balanced', ...} is None
+E        +  where {'degraded_code': None, 'published': True, 'rows': 1, 'shape': 'balanced', ...} = research_outcome({'assistant_response': 'Bitcoin is among the current trending cryptocurrencies.', 'intent': 'follow_up', 'research': {...rest': None, 'shape': 'balanced'}, 'peer_suggestions': [], 'schema_version': 'argus_research_follow_up/v1', ...}, ...}}, calls=[], dispatch_patch={})
+
+tests/evals/test_measurement_research.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED tests/evals/test_measurement_research.py::test_zero_calls_cannot_publish_a_research_sidecar_from_another_turn
+========================= 1 failed, 9 passed in 1.48s ==========================

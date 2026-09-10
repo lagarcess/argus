@@ -1,0 +1,775 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/aa72/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 7931 items
+
+tests/agent_runtime/discovery/test_discovery_composer.py ............... [  0%]
+..............................                                           [  0%]
+tests/agent_runtime/discovery/test_discovery_extraction.py .             [  0%]
+tests/agent_runtime/discovery/test_discovery_route.py ..............     [  0%]
+tests/agent_runtime/discovery/test_discovery_selection_action.py ......  [  0%]
+tests/agent_runtime/discovery/test_discovery_validation.py ............. [  0%]
+...                                                                      [  1%]
+tests/agent_runtime/discovery/test_guest_discovery_allowance.py ........ [  1%]
+............                                                             [  1%]
+tests/agent_runtime/test_artifact_assumption_facts.py ......             [  1%]
+tests/agent_runtime/test_artifact_continuity.py ........................ [  1%]
+.........                                                                [  1%]
+tests/agent_runtime/test_artifact_edit_operations.py ................... [  2%]
+........................................................................ [  2%]
+.........                                                                [  3%]
+tests/agent_runtime/test_backtest_call_preparation.py ......             [  3%]
+tests/agent_runtime/test_backtest_input_readiness.py ................... [  3%]
+..........                                                               [  3%]
+tests/agent_runtime/test_backtest_known_facts.py .....                   [  3%]
+tests/agent_runtime/test_backtest_pending_asset_conflicts.py .......     [  3%]
+tests/agent_runtime/test_backtest_projection_boundary.py .               [  3%]
+tests/agent_runtime/test_backtest_tool_grounding.py .................... [  3%]
+.                                                                        [  3%]
+tests/agent_runtime/test_benchmark_coverage.py .............             [  4%]
+tests/agent_runtime/test_benchmark_gap_owner.py .......                  [  4%]
+tests/agent_runtime/test_capacity_refusal_copy.py .......                [  4%]
+tests/agent_runtime/test_catalog_no_call_recovery.py ................... [  4%]
+.................                                                        [  4%]
+tests/agent_runtime/test_chip_clarify_edit_routing.py .................. [  4%]
+..                                                                       [  4%]
+tests/agent_runtime/test_chip_completion_guards.py ..................    [  5%]
+tests/agent_runtime/test_compound_edit_contract.py ...................   [  5%]
+tests/agent_runtime/test_confirm_mixed_asset_preflight.py ...........    [  5%]
+tests/agent_runtime/test_confirmation_artifacts.py .....                 [  5%]
+tests/agent_runtime/test_confirmation_liveness.py ....................   [  5%]
+tests/agent_runtime/test_conversation_stages.py ........................ [  6%]
+.........................................................                [  6%]
+tests/agent_runtime/test_conversational_contract_hardening.py .......... [  7%]
+........................................................................ [  7%]
+....................................................................     [  8%]
+tests/agent_runtime/test_conversion_failure_transport.py .....           [  8%]
+tests/agent_runtime/test_declared_financial_projection.py .............. [  9%]
+........................                                                 [  9%]
+tests/agent_runtime/test_declared_result_edits.py ........               [  9%]
+tests/agent_runtime/test_discovery_focused_read.py ...........           [  9%]
+tests/agent_runtime/test_discovery_payload_routing.py ....               [  9%]
+tests/agent_runtime/test_edit_carrier_conflicts.py ..................... [  9%]
+..............                                                           [ 10%]
+tests/agent_runtime/test_execute_launch_payload.py .......               [ 10%]
+tests/agent_runtime/test_execute_recovery.py ........................... [ 10%]
+..........................................                               [ 11%]
+tests/agent_runtime/test_focused_financial_roles.py .................... [ 11%]
+.................................................                        [ 11%]
+tests/agent_runtime/test_focused_repair_asset_reconciliation.py ...      [ 11%]
+tests/agent_runtime/test_focused_repair_preservation.py ....             [ 11%]
+tests/agent_runtime/test_future_performance_admission.py ............... [ 12%]
+...........                                                              [ 12%]
+tests/agent_runtime/test_future_temporal_direction.py ..........         [ 12%]
+tests/agent_runtime/test_graded_interpretation_routing.py ........       [ 12%]
+tests/agent_runtime/test_interpret_stage.py ............................ [ 12%]
+........................................................................ [ 13%]
+........................................................................ [ 14%]
+...........................                                              [ 15%]
+tests/agent_runtime/test_interpretation_contract_rejections.py ......... [ 15%]
+.                                                                        [ 15%]
+tests/agent_runtime/test_interpretation_repair_observability.py ....     [ 15%]
+tests/agent_runtime/test_issue_154_s1_runtime_prose_boundary.py .        [ 15%]
+tests/agent_runtime/test_issue_154_s3_recovery_i18n_contract.py ....     [ 15%]
+tests/agent_runtime/test_issue_270_strategy_transitions.py ......        [ 15%]
+tests/agent_runtime/test_issue_271_cost_fidelity_audit.py .............. [ 15%]
+...........                                                              [ 15%]
+tests/agent_runtime/test_issue_271_modeled_cost_preservation.py ........ [ 15%]
+............................                                             [ 16%]
+tests/agent_runtime/test_issue_345_recommendation_continuity.py ........ [ 16%]
+.....                                                                    [ 16%]
+tests/agent_runtime/test_issue_453_cause_projection.py .............     [ 16%]
+tests/agent_runtime/test_issue_453_focused_repair.py ....                [ 16%]
+tests/agent_runtime/test_issue_483_resolved_state.py .......             [ 16%]
+tests/agent_runtime/test_knowledge_answer.py .............               [ 16%]
+tests/agent_runtime/test_latest_result_fact_answers.py ................. [ 16%]
+...............                                                          [ 17%]
+tests/agent_runtime/test_latest_result_window_binding.py ......          [ 17%]
+tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py . [ 17%]
+........................................................................ [ 18%]
+.....                                                                    [ 18%]
+tests/agent_runtime/test_llm_interpreter_date_window_repairs.py ........ [ 18%]
+........................................                                 [ 18%]
+tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py . [ 18%]
+........................................................................ [ 19%]
+......                                                                   [ 19%]
+tests/agent_runtime/test_llm_interpreter_semantic_contracts.py ......... [ 19%]
+................................................................         [ 20%]
+tests/agent_runtime/test_next_experiments.py ...................         [ 20%]
+tests/agent_runtime/test_options_semantic_admission.py ................. [ 21%]
+..........................                                               [ 21%]
+tests/agent_runtime/test_ordinary_turn_runs_no_audits.py ............... [ 21%]
+                                                                         [ 21%]
+tests/agent_runtime/test_pending_edit_card_paths.py .................... [ 21%]
+......                                                                   [ 22%]
+tests/agent_runtime/test_pending_edit_outcome_contract.py .............. [ 22%]
+.....                                                                    [ 22%]
+tests/agent_runtime/test_pending_tool_context.py ..........              [ 22%]
+tests/agent_runtime/test_post_result_edit_routing.py ...............     [ 22%]
+tests/agent_runtime/test_private_artifact_prose_boundary.py ............ [ 22%]
+                                                                         [ 22%]
+tests/agent_runtime/test_provider_asset_ownership.py ................... [ 22%]
+.........                                                                [ 23%]
+tests/agent_runtime/test_provider_context_asset_catalog.py .......       [ 23%]
+tests/agent_runtime/test_real_backtest_tool.py .....                     [ 23%]
+tests/agent_runtime/test_recognition_contract_guards.py ................ [ 23%]
+.............................                                            [ 23%]
+tests/agent_runtime/test_recovery_composer.py .                          [ 23%]
+tests/agent_runtime/test_recovery_edit_outcomes.py ..................... [ 24%]
+..                                                                       [ 24%]
+tests/agent_runtime/test_refine_action_edit_routing.py ..............    [ 24%]
+tests/agent_runtime/test_registered_backtest_presentation.py ........... [ 24%]
+......                                                                   [ 24%]
+tests/agent_runtime/test_registered_tool_execution.py .................. [ 24%]
+.............                                                            [ 24%]
+tests/agent_runtime/test_research_routing_contract.py .................. [ 25%]
+................................                                         [ 25%]
+tests/agent_runtime/test_resolution_context.py ...............           [ 25%]
+tests/agent_runtime/test_response_style_contract.py ....                 [ 25%]
+tests/agent_runtime/test_result_followups.py ..........................  [ 26%]
+tests/agent_runtime/test_runtime_semantic_boundaries.py ......           [ 26%]
+tests/agent_runtime/test_runtime_substage_merge.py ....                  [ 26%]
+tests/agent_runtime/test_shared_loop_import_boundary.py ................ [ 26%]
+.                                                                        [ 26%]
+tests/agent_runtime/test_simplification_option_identity.py .....         [ 26%]
+tests/agent_runtime/test_spanish_runtime_transcripts.py ............     [ 26%]
+tests/agent_runtime/test_state_models.py .......................         [ 26%]
+tests/agent_runtime/test_strategy_contract.py .......................... [ 27%]
+.........                                                                [ 27%]
+tests/agent_runtime/test_tool_interpretation.py ........................ [ 27%]
+.........                                                                [ 27%]
+tests/agent_runtime/test_turn_execution.py ................              [ 28%]
+tests/agent_runtime/test_turn_progress.py ...................            [ 28%]
+tests/agent_runtime/test_unsupported_fallback_honesty.py .....           [ 28%]
+tests/agent_runtime/test_unsupported_recovery_asset_conservation.py .... [ 28%]
+..                                                                       [ 28%]
+tests/agent_runtime/test_validation_failure_copy.py .......              [ 28%]
+tests/agent_runtime/test_workflow.py ................................... [ 28%]
+...                                                                      [ 28%]
+tests/agent_runtime/test_workspace_language_prose.py ................... [ 29%]
+........................................................................ [ 30%]
+........................................                                 [ 30%]
+tests/context/test_context_packets.py ........                           [ 30%]
+tests/context/test_freshness_policy.py ...                               [ 30%]
+tests/domain/test_backtest_math_audit_invariants.py .................... [ 30%]
+......................                                                   [ 31%]
+tests/domain/test_benchmark_comparison.py ....                           [ 31%]
+tests/domain/test_benchmark_curve_contract.py ...............            [ 31%]
+tests/domain/test_capability_registry.py ......................          [ 31%]
+tests/domain/test_dca_benchmark_observed_fills.py .......                [ 31%]
+tests/domain/test_dca_capital_semantics.py ............................. [ 32%]
+................................................................         [ 33%]
+tests/domain/test_dca_flow_adjusted_metrics.py ..................        [ 33%]
+tests/domain/test_dca_trading_day_rule.py ............                   [ 33%]
+tests/domain/test_discovery_search_adapters.py ......................... [ 33%]
+.............                                                            [ 33%]
+tests/domain/test_discovery_search_contracts.py ..................       [ 34%]
+tests/domain/test_edit_contract.py ...                                   [ 34%]
+tests/domain/test_engine_execution_ledger.py ........                    [ 34%]
+tests/domain/test_engine_launch.py ..................................... [ 34%]
+...............                                                          [ 34%]
+tests/domain/test_engine_launch_display.py ..................            [ 35%]
+tests/domain/test_indicator_registry.py .......                          [ 35%]
+tests/domain/test_latest_complete_data.py ......                         [ 35%]
+tests/domain/test_market_data_assets.py ......                           [ 35%]
+tests/domain/test_market_data_capabilities.py ......                     [ 35%]
+tests/domain/test_market_data_coverage.py .............................. [ 35%]
+....................                                                     [ 36%]
+tests/domain/test_market_session.py ..................                   [ 36%]
+tests/domain/test_pretrade_baseline_metrics.py .......                   [ 36%]
+tests/domain/test_result_chart_exploration.py .....                      [ 36%]
+tests/domain/test_rule_compiler.py .......                               [ 36%]
+tests/domain/test_rule_descriptions.py ...                               [ 36%]
+tests/domain/test_tool_argument_boundaries.py ..................         [ 36%]
+tests/domain/test_tool_declaration.py .................................. [ 37%]
+.................................................                        [ 37%]
+tests/domain/test_tool_registry_import_boundary.py .....                 [ 37%]
+tests/evals/test_chat_runtime_eval_manifest.py ............              [ 38%]
+tests/evals/test_chat_runtime_trajectory_harness.py .................... [ 38%]
+...............                                                          [ 38%]
+tests/evals/test_measurement_availability.py ..........                  [ 38%]
+tests/evals/test_measurement_delivery.py ............................... [ 39%]
+......................................................                   [ 39%]
+tests/evals/test_measurement_eval_dca_semantics.py ...                   [ 39%]
+tests/evals/test_measurement_eval_harness.py ..........................  [ 40%]
+tests/evals/test_measurement_eval_issue_498.py ...                       [ 40%]
+tests/evals/test_measurement_eval_live.py s                              [ 40%]
+tests/evals/test_measurement_eval_live_environment.py .......            [ 40%]
+tests/evals/test_measurement_eval_scorecard.py ..................        [ 40%]
+tests/evals/test_measurement_outcome.py .......................          [ 40%]
+tests/evals/test_measurement_registry_dispatch.py .................      [ 40%]
+tests/evals/test_measurement_registry_observation.py ................... [ 41%]
+...................                                                      [ 41%]
+tests/evals/test_measurement_research.py .........                       [ 41%]
+tests/evals/test_measurement_selection.py .............................. [ 41%]
+....                                                                     [ 41%]
+tests/evals/test_prose_evidence.py ..................................... [ 42%]
+...............                                                          [ 42%]
+tests/evals/test_research_routing_live.py s                              [ 42%]
+tests/evals/test_search_provider_eval.py ....................            [ 42%]
+tests/memory/test_api_guest_isolation.py ....                            [ 42%]
+tests/memory/test_api_registered_endpoints.py .....                      [ 43%]
+tests/memory/test_api_role_gate.py ........                              [ 43%]
+tests/memory/test_api_sensitivity_assessment.py .........                [ 43%]
+tests/memory/test_chat_memory_recall.py .....                            [ 43%]
+tests/memory/test_confirm_stored_sensitivity.py ...                      [ 43%]
+tests/memory/test_consent_integrity.py .........                         [ 43%]
+tests/memory/test_controls.py .......................................... [ 43%]
+.................                                                        [ 44%]
+tests/memory/test_conversion_zero_state.py ............................. [ 44%]
+...............                                                          [ 44%]
+tests/memory/test_guest_isolation.py ..                                  [ 44%]
+tests/memory/test_import_boundaries.py ....                              [ 44%]
+tests/memory/test_mem0_configuration.py ............                     [ 44%]
+tests/memory/test_memory_embedding.py ..........................         [ 45%]
+tests/memory/test_policy_and_suppression.py ............................ [ 45%]
+.........................                                                [ 45%]
+tests/memory/test_postgres_guest_isolation.py ssssssssssssssssssssssssss [ 46%]
+sssssss                                                                  [ 46%]
+tests/memory/test_postgres_reconciliation_concurrency.py sssssssssss     [ 46%]
+tests/memory/test_postgres_reconciliation_deletion.py ssssssssssssssssss [ 46%]
+sssssssssss                                                              [ 46%]
+tests/memory/test_postgres_schema_mutability.py sssssssssssssssss        [ 47%]
+tests/memory/test_postgres_semantic_index.py ssssss                      [ 47%]
+tests/memory/test_postgres_store_confirmation.py sssssssssssssssssssssss [ 47%]
+                                                                         [ 47%]
+tests/memory/test_postgres_store_controls.py sssssssssssssssssssssss     [ 47%]
+tests/memory/test_postgres_store_provider_reconciliation.py ssssssssssss [ 47%]
+ssssssssssssss                                                           [ 48%]
+tests/memory/test_postgres_store_reset_reconciliation.py ssssssss        [ 48%]
+tests/memory/test_postgres_store_settings_candidates.py sssssssssss      [ 48%]
+tests/memory/test_provider_fail_open.py ................                 [ 48%]
+tests/memory/test_retrieval.py ........                                  [ 48%]
+tests/memory/test_saved_decision_lifecycle.py ......F...                 [ 48%]
+tests/memory/test_semantic_index_boundary.py ................            [ 48%]
+tests/memory/test_semantic_recall_degradation.py ......................  [ 49%]
+tests/memory/test_semantic_recall_s10.py ...                             [ 49%]
+tests/memory/test_service_wiring.py ....                                 [ 49%]
+tests/memory/test_store_projection_parity.py ssssssssssssss              [ 49%]
+tests/memory/test_telemetry_privacy.py ................................. [ 49%]
+........................................................................ [ 50%]
+..                                                                       [ 50%]
+tests/nlp/test_fractional_durations.py ................................. [ 51%]
+........                                                                 [ 51%]
+tests/perf/section3/test_engine_latency.py .s                            [ 51%]
+tests/perf/test_backtest_infra_benchmark.py ....                         [ 51%]
+tests/perf/test_interpret_stage_ab.py ..                                 [ 51%]
+tests/perf/test_render_internet_benchmark.py ............                [ 51%]
+tests/perf/test_summarize_turn_latency.py ......                         [ 51%]
+tests/perf/test_turn_latency.py ..........................               [ 52%]
+tests/research/test_asset_identity.py ...........................        [ 52%]
+tests/research/test_confirmation_peer_assets.py .............            [ 52%]
+tests/research/test_discarded_spend.py ....................              [ 52%]
+tests/research/test_execution_evidence_invariant.py .................... [ 53%]
+........................................                                 [ 53%]
+tests/research/test_published_answers.py ................                [ 53%]
+tests/research/test_registered_research_jobs.py .........                [ 53%]
+tests/research/test_registered_research_publication.py ................  [ 54%]
+tests/research/test_registered_research_tools.py ....................    [ 54%]
+tests/research/test_registry_discarded_spend.py ....                     [ 54%]
+tests/research/test_research_action_identity.py ........................ [ 54%]
+                                                                         [ 54%]
+tests/research/test_research_allowance_concurrency.py ..                 [ 54%]
+tests/research/test_research_answer.py ........................          [ 54%]
+tests/research/test_research_cache.py ........                           [ 55%]
+tests/research/test_research_citations.py .........                      [ 55%]
+tests/research/test_research_client.py ...............................   [ 55%]
+tests/research/test_research_config.py ...                               [ 55%]
+tests/research/test_research_contract_example.py ...                     [ 55%]
+tests/research/test_research_declaration_contracts.py .................. [ 55%]
+...............                                                          [ 56%]
+tests/research/test_research_evidence.py ................                [ 56%]
+tests/research/test_research_evidence_policy.py ..............           [ 56%]
+tests/research/test_research_find_policy.py ..                           [ 56%]
+tests/research/test_research_jobs.py ...............                     [ 56%]
+tests/research/test_research_ledger_contract.py ......                   [ 56%]
+tests/research/test_research_observability.py .......................... [ 57%]
+.......                                                                  [ 57%]
+tests/research/test_research_pricing_delivery.py ....................... [ 57%]
+....                                                                     [ 57%]
+tests/research/test_research_router_absorption.py .................      [ 57%]
+tests/research/test_research_rows.py ...........                         [ 57%]
+tests/research/test_research_shapes.py ......................            [ 58%]
+tests/research/test_research_sidecar_builder.py .............            [ 58%]
+tests/research/test_research_source_selection.py ......                  [ 58%]
+tests/research/test_research_sources_and_voice.py ..........             [ 58%]
+tests/research/test_research_truth_boundary.py .........                 [ 58%]
+tests/research/test_retrieval_contract_probe.py FFFF.......              [ 58%]
+tests/research/test_retrieval_parameters.py ............................ [ 59%]
+...............................                                          [ 59%]
+tests/section3/test_engine_simulation.py ............................... [ 59%]
+....................                                                     [ 60%]
+tests/section3/test_market_data_provider.py ..........................   [ 60%]
+tests/test_access_approval_email.py .................................... [ 60%]
+...                                                                      [ 60%]
+tests/test_access_request_migration.py ..                                [ 60%]
+tests/test_access_request_postgres.py ssssssssssssssssssssss             [ 61%]
+tests/test_access_requests.py ..........................                 [ 61%]
+tests/test_access_welcome_claim_migration.py ......                      [ 61%]
+tests/test_access_welcome_delivery_migration.py ...                      [ 61%]
+tests/test_access_welcome_recovery_postgres.py sssss                     [ 61%]
+tests/test_access_welcome_recovery_routes.py ..                          [ 61%]
+tests/test_agent_jules_contracts.py ...                                  [ 61%]
+tests/test_agent_measurement_events.py ...                               [ 61%]
+tests/test_agent_runtime_checkpointer.py ....                            [ 61%]
+tests/test_allowance_accounting.py ........................              [ 62%]
+tests/test_allowance_accounting_postgres.py ssssssssssssssssssssssssssss [ 62%]
+ss                                                                       [ 62%]
+tests/test_alpha_api.py ................................................ [ 63%]
+................................................                         [ 63%]
+tests/test_alpha_api_supabase.py ....................................... [ 64%]
+.....................................................................    [ 65%]
+tests/test_alpha_artifacts.py .....................                      [ 65%]
+tests/test_alpha_orchestration_regression.py .                           [ 65%]
+tests/test_alpha_readiness_metrics.py ...                                [ 65%]
+tests/test_api_import_boundary.py .....                                  [ 65%]
+tests/test_artifact_assumptions_transport.py .                           [ 65%]
+tests/test_artifact_naming.py .....                                      [ 65%]
+tests/test_artifact_presentation.py ......................               [ 65%]
+tests/test_artifact_result_supabase.py .                                 [ 65%]
+tests/test_auth_sessions.py .....                                        [ 65%]
+tests/test_avatar_theme_migration.py .                                   [ 65%]
+tests/test_avatar_theme_rls_postgres.py s                                [ 66%]
+tests/test_backtest_admission_logs.py ......                             [ 66%]
+tests/test_backtest_evidence_backfill_postgres.py ss                     [ 66%]
+tests/test_backtest_finalization.py ............                         [ 66%]
+tests/test_backtest_job_by_action.py ....................                [ 66%]
+tests/test_backtest_job_lifecycle.py .....                               [ 66%]
+tests/test_backtest_job_link_postgres.py sssssss                         [ 66%]
+tests/test_backtest_job_scopes.py ..                                     [ 66%]
+tests/test_backtest_job_write_invariant.py ...                           [ 66%]
+tests/test_backtest_jobs_async.py .....................                  [ 66%]
+tests/test_backtest_jobs_shadow.py .....................                 [ 67%]
+tests/test_backtest_message_projection.py ............                   [ 67%]
+tests/test_backtest_service_calendar.py ..                               [ 67%]
+tests/test_backtest_state_machine.py ....                                [ 67%]
+tests/test_benchmark_comparison_language.py .....                        [ 67%]
+tests/test_bounded_read_indexes.py ........                              [ 67%]
+tests/test_bounded_read_indexes_postgres.py sss                          [ 67%]
+tests/test_browser_cookie_disclosure.py .....                            [ 67%]
+tests/test_canary_capture_replay.py .......                              [ 67%]
+tests/test_canary_capture_sanitizer.py ..                                [ 67%]
+tests/test_canary_deployed_sha.py ....                                   [ 67%]
+tests/test_canary_requested_signup_denial.py .......                     [ 67%]
+tests/test_chat_action_contract.py ....                                  [ 68%]
+tests/test_chat_admission_visitor_bound.py ......                        [ 68%]
+tests/test_chat_backtest_state_machine.py .............................. [ 68%]
+...........                                                              [ 68%]
+tests/test_chat_final_response_type.py ..                                [ 68%]
+tests/test_chat_mention_provenance.py ....                               [ 68%]
+tests/test_chat_request_admission.py .......                             [ 68%]
+tests/test_chat_runtime_cutover.py ..................                    [ 69%]
+tests/test_chat_runtime_reload_guardrails.py ........................... [ 69%]
+.................................................                        [ 69%]
+tests/test_chat_stream_contract.py ..................................... [ 70%]
+                                                                         [ 70%]
+tests/test_chat_turn_lifecycle.py ...................................... [ 70%]
+...........                                                              [ 71%]
+tests/test_chat_turn_lifecycle_gateway.py .................              [ 71%]
+tests/test_chat_turn_lifecycle_migration.py ..........                   [ 71%]
+tests/test_chat_turn_lifecycle_postgres.py sssssssssssssssssssssssssssss [ 71%]
+sssssssss                                                                [ 71%]
+tests/test_chat_turn_route_matrix.py ................................... [ 72%]
+.................                                                        [ 72%]
+tests/test_checkpoint_rls_migration.py ..                                [ 72%]
+tests/test_ci_workflow.py ...............                                [ 72%]
+tests/test_client_capabilities.py ..                                     [ 72%]
+tests/test_computations.py ........                                      [ 72%]
+tests/test_confirmation_direct_edit.py .................                 [ 73%]
+tests/test_confirmation_run_consumption.py .........                     [ 73%]
+tests/test_context_packet_runtime_attachment.py .......                  [ 73%]
+tests/test_conversation_activity.py .................................... [ 73%]
+..................                                                       [ 73%]
+tests/test_conversation_activity_migration.py ........                   [ 74%]
+tests/test_conversation_activity_postgres.py ssssssssssss                [ 74%]
+tests/test_conversation_previews.py ............                         [ 74%]
+tests/test_conversational_ux.py ...                                      [ 74%]
+tests/test_cost_ledger.py ..........................                     [ 74%]
+tests/test_cursor_encoding.py ..                                         [ 74%]
+tests/test_decision_attachment_api.py ...........                        [ 74%]
+tests/test_decision_attachment_gateway.py .....                          [ 74%]
+tests/test_decision_attachment_migration.py ...                          [ 75%]
+tests/test_decision_attachment_search_sql.py .....                       [ 75%]
+tests/test_decision_contract.py ..........                               [ 75%]
+tests/test_decision_message_reads.py ....                                [ 75%]
+tests/test_degraded_recovery_history.py .....                            [ 75%]
+tests/test_discovery_visitor_usage_postgres.py ssssss                    [ 75%]
+tests/test_dotenv_loading.py ..                                          [ 75%]
+tests/test_effective_window_confirmation.py ......                       [ 75%]
+tests/test_engine_signals.py .......                                     [ 75%]
+tests/test_environment_scripts.py ...................................... [ 76%]
+..........                                                               [ 76%]
+tests/test_facade_reexport_integrity.py .........                        [ 76%]
+tests/test_frontend_search_casefold.py ...                               [ 76%]
+tests/test_guest_access_policy.py .......                                [ 76%]
+tests/test_guest_allowance_accounting.py ........                        [ 76%]
+tests/test_guest_auth.py ...............                                 [ 76%]
+tests/test_guest_auth_local_supabase.py ssssssssssss                     [ 76%]
+tests/test_guest_cleanup.py ....                                         [ 76%]
+tests/test_guest_cleanup_postgres.py sssssssssssssssssssssssss           [ 77%]
+tests/test_guest_compute_ceiling.py .....                                [ 77%]
+tests/test_guest_conversation_policy.py ......                           [ 77%]
+tests/test_guest_conversion.py ......................                    [ 77%]
+tests/test_guest_funnel_milestone_idempotency.py ....................... [ 77%]
+.......                                                                  [ 78%]
+tests/test_guest_funnel_milestones_postgres.py sssssssssssssssssssss     [ 78%]
+tests/test_guest_handoff_postgres.py ssssssssssssssssssssss              [ 78%]
+tests/test_guest_observability.py ................................       [ 78%]
+tests/test_guest_signup_local_supabase.py sssssss                        [ 79%]
+tests/test_guest_visitor_settlement_postgres.py ssss                     [ 79%]
+tests/test_guest_workspace_postgres.py sssssssss                         [ 79%]
+tests/test_history_bounded_reads.py .....................                [ 79%]
+tests/test_history_postgres.py sssssssssssssssssssssssssssssssss         [ 79%]
+tests/test_i18n_coverage.py ....                                         [ 79%]
+tests/test_in_place_surface_flag.py ..                                   [ 79%]
+tests/test_interpreter_prompt_freeze.py F..                              [ 80%]
+tests/test_interpreter_prompt_surface.py .............                   [ 80%]
+tests/test_issue_440_cancelled_draft_dates.py ...                        [ 80%]
+tests/test_issue_542_durable_backtest_failures.py ....                   [ 80%]
+tests/test_legacy_orchestrator_retirement.py ......                      [ 80%]
+tests/test_legacy_surface_removal.py ....                                [ 80%]
+tests/test_local_qa_env_writer.py .                                      [ 80%]
+tests/test_local_smoke_contract.py .....                                 [ 80%]
+tests/test_localization.py .                                             [ 80%]
+tests/test_market_session_api.py ......                                  [ 80%]
+tests/test_memory_ledger_index.py .............                          [ 80%]
+tests/test_message_artifact_update_postgres.py sssssssssss               [ 80%]
+tests/test_message_previews.py ...                                       [ 80%]
+tests/test_message_store_retry_supersede.py ....                         [ 80%]
+tests/test_mobile_narrow_copy.py ...............                         [ 81%]
+tests/test_modularity_budget.py ........                                 [ 81%]
+tests/test_natural_time.py ..........................                    [ 81%]
+tests/test_observability_envelope.py .............                       [ 81%]
+tests/test_observability_product_events.py ..                            [ 81%]
+tests/test_onboarding_removal.py .........                               [ 81%]
+tests/test_openapi_compatibility.py .......................              [ 82%]
+tests/test_openrouter_policy.py ........................................ [ 82%]
+...........................................................              [ 83%]
+tests/test_p1_evidence_spine.py .........                                [ 83%]
+tests/test_pending_artifact_card_kind.py ..                              [ 83%]
+tests/test_pending_artifact_lifecycle.py ...................             [ 83%]
+tests/test_pending_card_checkpoint_sync.py ...                           [ 83%]
+tests/test_pending_card_conflict.py ....                                 [ 83%]
+tests/test_pending_card_nonturn_invariant.py .                           [ 83%]
+tests/test_phase6_api_structure.py ......                                [ 83%]
+tests/test_postgres_keyset_reader.py ............                        [ 84%]
+tests/test_postgres_keyset_reader_postgres.py ssss                       [ 84%]
+tests/test_preferred_name.py ...................                         [ 84%]
+tests/test_private_alpha_canary_split.py ....................            [ 84%]
+tests/test_private_alpha_readiness.py ....                               [ 84%]
+tests/test_private_alpha_release_docs.py ......................          [ 84%]
+tests/test_private_alpha_release_profile.py ........                     [ 85%]
+tests/test_private_launch_hardening.py ....                              [ 85%]
+tests/test_public_alpha_render_load.py ........                          [ 85%]
+tests/test_public_alpha_render_load_hardening.py ....................... [ 85%]
+.....                                                                    [ 85%]
+tests/test_public_excerpt_api.py ....................................... [ 86%]
+.........                                                                [ 86%]
+tests/test_public_excerpt_language.py .................................. [ 86%]
+.....................................................................    [ 87%]
+tests/test_public_excerpt_owner_notes.py ............................... [ 87%]
+........                                                                 [ 87%]
+tests/test_public_excerpt_read_path.py .....                             [ 88%]
+tests/test_public_excerpt_receipts.py .................................. [ 88%]
+.......................................                                  [ 88%]
+tests/test_public_excerpt_selections_postgres.py ssssssssssssssssss      [ 89%]
+tests/test_public_excerpt_snapshots_postgres.py sssssssssssssssssssss    [ 89%]
+tests/test_public_excerpt_turns.py ..................................... [ 89%]
+......................................................                   [ 90%]
+tests/test_refusal_log.py ............                                   [ 90%]
+tests/test_refusal_log_api.py .............                              [ 90%]
+tests/test_refusal_log_postgres.py ssssssssssssssss                      [ 91%]
+tests/test_registered_backtest_publication.py ...                        [ 91%]
+tests/test_registration_signal.py ..                                     [ 91%]
+tests/test_release_promotion_evidence_support.py ..                      [ 91%]
+tests/test_render_canary_script.py ..................................... [ 91%]
+...............................                                          [ 92%]
+tests/test_render_release_profile_contract.py ........                   [ 92%]
+tests/test_render_runtime_compatibility.py ...                           [ 92%]
+tests/test_render_workflow_execution.py ................................ [ 92%]
+...                                                                      [ 92%]
+tests/test_render_workflow_proof.py .................                    [ 92%]
+tests/test_request_boundaries.py ........................                [ 93%]
+tests/test_research_allowance_postgres.py s.                             [ 93%]
+tests/test_research_job_activity_migration.py .....                      [ 93%]
+tests/test_research_job_reconciliation.py ..                             [ 93%]
+tests/test_research_ledger_migration.py ...                              [ 93%]
+tests/test_research_ledger_postgres.py sssss                             [ 93%]
+tests/test_result_dca_readout.py ....................................... [ 93%]
+..................                                                       [ 94%]
+tests/test_result_figures.py .....................                       [ 94%]
+tests/test_result_link_outcome.py ......                                 [ 94%]
+tests/test_retention_purge_contract_postgres.py sssss                    [ 94%]
+tests/test_retention_purges_are_wired.py ......                          [ 94%]
+tests/test_retest_action.py .....................................        [ 95%]
+tests/test_retest_setup.py ...............................               [ 95%]
+tests/test_route_receipt_logs.py .....                                   [ 95%]
+tests/test_run_dossiers.py ...........                                   [ 95%]
+tests/test_run_dossiers_postgres.py .....                                [ 95%]
+tests/test_runtime_confirmation_card.py ........................         [ 96%]
+tests/test_scheduled_maintenance.py ...........                          [ 96%]
+tests/test_search_bounded_reads.py ..................................... [ 96%]
+...........                                                              [ 96%]
+tests/test_search_decision_attachment_postgres.py ssss                   [ 96%]
+tests/test_search_memory_bounded.py ..................                   [ 97%]
+tests/test_search_postgres.py ssssssssssssssssssssssssssssssss           [ 97%]
+tests/test_slot_normalizer.py ....                                       [ 97%]
+tests/test_spine_guardrails.py ...........................               [ 97%]
+tests/test_stale_backtest_jobs.py ..                                     [ 97%]
+tests/test_strategy_capabilities.py ..................                   [ 98%]
+tests/test_strategy_registry_i18n.py .                                   [ 98%]
+tests/test_supabase_backtest_finalization.py ...                         [ 98%]
+tests/test_supabase_gateway.py ......................................... [ 98%]
+.................                                                        [ 98%]
+tests/test_supabase_gateway_pagination.py .....................ss        [ 99%]
+tests/test_tool_checkpoint_serialization.py .                            [ 99%]
+tests/test_tool_job_binding.py .....                                     [ 99%]
+tests/test_tool_result_publication.py ......                             [ 99%]
+tests/test_tool_result_recompute.py ..........                           [ 99%]
+tests/test_usage_allowance_classes.py ...................                [ 99%]
+tests/test_versioning_boundary.py ..                                     [ 99%]
+tests/test_workflow_proof_jobs_migration.py ....                         [ 99%]
+tests/test_workflow_proof_jobs_postgres.py sss                           [ 99%]
+tests/test_workflow_withheld_cleanup.py ...                              [ 99%]
+tests/test_worktree_environment_setup.py ..............                  [100%]
+
+=================================== FAILURES ===================================
+____________ test_registered_default_off_proposal_creates_no_state _____________
+
+    def test_registered_default_off_proposal_creates_no_state() -> None:
+        """Catches default-off service access that creates a candidate or consent state."""
+        store = InMemoryCanonicalMemoryStore()
+    
+        def explode() -> object:
+            raise AssertionError("default-off proposal must not call clock or id factory")
+    
+        service = MemoryService(
+            store=store,
+            clock=explode,  # type: ignore[arg-type]
+            id_factory=explode,  # type: ignore[arg-type]
+        )
+        subject = MemorySubject(
+            owner_id=OWNER_ID,
+            kind=MemoryAccountKind.REGISTERED,
+        )
+        owner = require_registered(subject)
+    
+        with pytest.raises(PersonalizationMemoryUnavailable):
+>           _propose_saved(service, subject)
+
+tests/memory/test_saved_decision_lifecycle.py:290: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/memory/test_saved_decision_lifecycle.py:59: in _propose_saved
+    result = service.propose_saved_decision(
+src/argus/memory/service.py:223: in propose_saved_decision
+    return self._propose(
+src/argus/memory/service.py:929: in _propose
+    now = self._clock()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def explode() -> object:
+>       raise AssertionError("default-off proposal must not call clock or id factory")
+E       AssertionError: default-off proposal must not call clock or id factory
+
+tests/memory/test_saved_decision_lifecycle.py:276: AssertionError
+_ test_the_recorded_request_is_the_request_the_code_builds_today[fast_quote_typed] _
+
+name = 'fast_quote_typed'
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "fast_quote_typed",
+            "typed_rows_current_external",
+            "domain_filtered_local_source",
+            "thorough_typed_background",
+        ],
+    )
+    def test_the_recorded_request_is_the_request_the_code_builds_today(name: str) -> None:
+        """Instructions and schema are frozen by these recordings: a change here
+        has to be re-recorded, the way an interpreter change is re-measured."""
+        request = _request(name)
+        assert request["instructions"] == RETRIEVAL_INSTRUCTIONS
+>       assert request["response_format"] == typed_response_format()
+E       AssertionError: assert {'json_schema...'json_schema'} == {'json_schema...'json_schema'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}} != {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}}
+E         Use -v to get more diff
+
+tests/research/test_retrieval_contract_probe.py:57: AssertionError
+_ test_the_recorded_request_is_the_request_the_code_builds_today[typed_rows_current_external] _
+
+name = 'typed_rows_current_external'
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "fast_quote_typed",
+            "typed_rows_current_external",
+            "domain_filtered_local_source",
+            "thorough_typed_background",
+        ],
+    )
+    def test_the_recorded_request_is_the_request_the_code_builds_today(name: str) -> None:
+        """Instructions and schema are frozen by these recordings: a change here
+        has to be re-recorded, the way an interpreter change is re-measured."""
+        request = _request(name)
+        assert request["instructions"] == RETRIEVAL_INSTRUCTIONS
+>       assert request["response_format"] == typed_response_format()
+E       AssertionError: assert {'json_schema...'json_schema'} == {'json_schema...'json_schema'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}} != {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}}
+E         Use -v to get more diff
+
+tests/research/test_retrieval_contract_probe.py:57: AssertionError
+_ test_the_recorded_request_is_the_request_the_code_builds_today[domain_filtered_local_source] _
+
+name = 'domain_filtered_local_source'
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "fast_quote_typed",
+            "typed_rows_current_external",
+            "domain_filtered_local_source",
+            "thorough_typed_background",
+        ],
+    )
+    def test_the_recorded_request_is_the_request_the_code_builds_today(name: str) -> None:
+        """Instructions and schema are frozen by these recordings: a change here
+        has to be re-recorded, the way an interpreter change is re-measured."""
+        request = _request(name)
+        assert request["instructions"] == RETRIEVAL_INSTRUCTIONS
+>       assert request["response_format"] == typed_response_format()
+E       AssertionError: assert {'json_schema...'json_schema'} == {'json_schema...'json_schema'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}} != {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}}
+E         Use -v to get more diff
+
+tests/research/test_retrieval_contract_probe.py:57: AssertionError
+_ test_the_recorded_request_is_the_request_the_code_builds_today[thorough_typed_background] _
+
+name = 'thorough_typed_background'
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "fast_quote_typed",
+            "typed_rows_current_external",
+            "domain_filtered_local_source",
+            "thorough_typed_background",
+        ],
+    )
+    def test_the_recorded_request_is_the_request_the_code_builds_today(name: str) -> None:
+        """Instructions and schema are frozen by these recordings: a change here
+        has to be re-recorded, the way an interpreter change is re-measured."""
+        request = _request(name)
+        assert request["instructions"] == RETRIEVAL_INSTRUCTIONS
+>       assert request["response_format"] == typed_response_format()
+E       AssertionError: assert {'json_schema...'json_schema'} == {'json_schema...'json_schema'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}} != {'json_schema': {'name': 'argus_typed_retrieval', 'schema': {'additionalProperties': False, 'description': 'A grounded...es': {...}, 'required': [...], ...}, 'type': 'array'}}, 'required': ['answer_markdown', 'rows'], ...}, 'strict': True}}
+E         Use -v to get more diff
+
+tests/research/test_retrieval_contract_probe.py:57: AssertionError
+___________ test_model_facing_text_matches_its_measured_fingerprint ____________
+
+fingerprint = {'_comment': 'Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.', 'last_measure...py': {'chars': 1805, 'entries': 2, 'sha256': '1f8080fa6828678be712bac05db634a2a0563e4df744152fe18e68b99626e841'}, ...}}
+observed = {'generated/interpretation_response_schema.json': {'chars': 158911, 'entries': 4, 'profiles': [{'execution_realism_ena...py': {'chars': 6259, 'entries': 27, 'sha256': 'b5c35265877dceb432f9716677b1fe69f9c0bc38e1ed784d46086720db569bdc'}, ...}
+
+    def test_model_facing_text_matches_its_measured_fingerprint(
+        fingerprint: dict[str, object],
+        observed: dict[str, dict[str, object]],
+    ) -> None:
+        recorded = fingerprint["surface"]
+        assert isinstance(recorded, dict)
+    
+        changed, added, removed = surface_drift(recorded, observed)
+        if not (changed or added or removed):
+            return
+    
+        report = []
+        for name in changed:
+            was = recorded[name]
+            now = observed[name]
+            report.append(
+                f"  changed  {name}  ({was['chars']} -> {now['chars']} chars, "
+                f"{was['entries']} -> {now['entries']} entries)"
+            )
+        report.extend(f"  added    {name}" for name in added)
+        report.extend(f"  removed  {name}" for name in removed)
+    
+        measured = fingerprint["last_measured"]
+        assert isinstance(measured, dict)
+>       pytest.fail(
+            "Text the interpretation model reads changed since it was last measured.\n"
+            + "\n".join(report)
+            + f"\n\nLast measured at {measured['commit']}: "
+            + f"{measured['passed']} passed, {measured['failed']} failed.\n"
+            + _HOW_TO_UPDATE
+        )
+E       Failed: Text the interpretation model reads changed since it was last measured.
+E         changed  src/argus/agent_runtime/interpreter/unsupported_admission.py  (2370 -> 2664 chars, 2 -> 2 entries)
+E         changed  src/argus/agent_runtime/llm_interpreter.py  (20900 -> 20698 chars, 3 -> 3 entries)
+E         changed  src/argus/agent_runtime/llm_interpreter_types.py  (10304 -> 5052 chars, 40 -> 19 entries)
+E         changed  src/argus/agent_runtime/research_grounded.py  (1868 -> 1950 chars, 3 -> 3 entries)
+E         changed  src/argus/agent_runtime/stages/interpret_types.py  (713 -> 1060 chars, 2 -> 3 entries)
+E         added    generated/interpretation_response_schema.json
+E         added    generated/interpreter_system_prompt.json
+E         added    generated/tool_catalog.json
+E         added    src/argus/agent_runtime/backtest_input.py
+E         added    src/argus/agent_runtime/research_tools.py
+E       
+E       Last measured at 9fec4bf70c95383f4afa536674ceac4f38104787: 61 passed, 1 failed.
+E       
+E       This is the shared instruction text and response schema every interpreted turn
+E       passes through, so a change here can move behavior far from the lane that made
+E       it. To land one:
+E       
+E         1. Run the live measurement eval on the branch.
+E         2. Commit its scorecard under docs/reports/evidence/.
+E         3. Compare it against the scorecard named in .agent/interpreter_prompt_fingerprint.json and confirm no
+E            case regressed.
+E         4. Regenerate the fingerprint and point last_measured at the new scorecard.
+E       
+E       If you did not intend to touch model-facing text, revert instead.
+
+tests/test_interpreter_prompt_freeze.py:77: Failed
+=============================== warnings summary ===============================
+tests/research/test_registered_research_publication.py::test_optional_rows_still_fail_the_callable_contract_when_invalid[invalid_row_update0]
+  /Users/garces/.codex/worktrees/aa72/private-alpha-next/.venv/lib/python3.10/site-packages/pydantic/main.py:464: UserWarning: Pydantic serializer warnings:
+    PydanticSerializationUnexpectedValue(Expected `float` - serialized value may not be as expected [field_name='value', input_value='unknown', input_type=str])
+    return self.__pydantic_serializer__.to_python(
+
+tests/test_alpha_api_supabase.py::test_unauthorized_revoked_supabase_session
+  /Users/garces/.codex/worktrees/aa72/private-alpha-next/.venv/lib/python3.10/site-packages/starlette/testclient.py:445: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+tests/test_auth_sessions.py::test_auth_session_verifier_accepts_matching_active_session
+tests/test_auth_sessions.py::test_auth_session_verifier_rejects_revoked_session
+tests/test_auth_sessions.py::test_auth_session_verifier_rejects_missing_or_mismatched_claims
+tests/test_auth_sessions.py::test_auth_session_timeout_maps_to_verification_unavailable
+  /Users/garces/.codex/worktrees/aa72/private-alpha-next/.venv/lib/python3.10/site-packages/jwt/api_jwt.py:147: InsecureKeyLengthWarning: The HMAC key is 11 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/memory/test_saved_decision_lifecycle.py::test_registered_default_off_proposal_creates_no_state
+FAILED tests/research/test_retrieval_contract_probe.py::test_the_recorded_request_is_the_request_the_code_builds_today[fast_quote_typed]
+FAILED tests/research/test_retrieval_contract_probe.py::test_the_recorded_request_is_the_request_the_code_builds_today[typed_rows_current_external]
+FAILED tests/research/test_retrieval_contract_probe.py::test_the_recorded_request_is_the_request_the_code_builds_today[domain_filtered_local_source]
+FAILED tests/research/test_retrieval_contract_probe.py::test_the_recorded_request_is_the_request_the_code_builds_today[thorough_typed_background]
+FAILED tests/test_interpreter_prompt_freeze.py::test_model_facing_text_matches_its_measured_fingerprint
+===== 6 failed, 7340 passed, 585 skipped, 6 warnings in 197.86s (0:03:17) ======
