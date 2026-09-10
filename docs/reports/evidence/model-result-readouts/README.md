@@ -1,8 +1,10 @@
 # Model result readouts: requested stop report
 
-This is the preserved first-round report. The founder authorized one further
-input/structured-output correction and a separately approved tier comparison;
-see [round two](round2/README.md). The results below are not replaced by that work.
+This is the preserved first-round report. The later labeled-fact/reference
+correction is recorded in [round two](round2/README.md); its proposed paid
+comparison was declined and never run. The founder has now requested a
+[final writing-only round](final-writing/README.md), with a fresh cost approval
+required before its twelve drafts. The results below remain historical evidence.
 
 **Not ready to merge.** The implementation and approved targeted proof are
 committed for review. All 48 logical comparison tasks were attempted and
