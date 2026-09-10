@@ -1,0 +1,21 @@
+PROBE 2026-09-09T20:17:00-04:00 en
+ retest_period: {"original_date_range": {"start": "2024-01-01", "end": "2024-12-31"}, "requested_date_range": {"start": "2024-01-01", "end": "2026-09-09"}, "effective_date_range": {"start": "2024-01-01", "end": "2026-09-09"}, "duration_days": 982, "duration": {"unit": "year", "count": 2.7, "approximate": true}}
+ date rows: [{"key": "period", "label": "Period", "labelKey": "chat.confirmation.rows.period", "value": "January 1, 2024 - September 9, 2026"}]
+ launch date_range: {'start': '2024-01-01', 'end': '2026-09-09'}
+ 12mo period: September 9, 2025 - September 9, 2026
+PROBE 2026-09-10T12:00:00-04:00 en
+ retest_period: {"original_date_range": {"start": "2024-01-01", "end": "2024-12-31"}, "requested_date_range": {"start": "2024-01-01", "end": "2026-09-10"}, "effective_date_range": {"start": "2024-01-01", "end": "2026-09-10"}, "duration_days": 983, "duration": {"unit": "year", "count": 2.7, "approximate": true}}
+ date rows: [{"key": "period", "label": "Period", "labelKey": "chat.confirmation.rows.period", "value": "January 1, 2024 - September 10, 2026"}]
+ launch date_range: {'start': '2024-01-01', 'end': '2026-09-10'}
+ 12mo period: September 10, 2025 - September 10, 2026
+PROBE 2026-09-09T20:17:00-04:00 es-419
+ retest_period: {"original_date_range": {"start": "2024-01-01", "end": "2024-12-31"}, "requested_date_range": {"start": "2024-01-01", "end": "2026-09-09"}, "effective_date_range": {"start": "2024-01-01", "end": "2026-09-09"}, "duration_days": 982, "duration": {"unit": "year", "count": 2.7, "approximate": true}}
+ date rows: [{"key": "period", "label": "Period", "labelKey": "chat.confirmation.rows.period", "value": "1 de enero de 2024 al 9 de septiembre de 2026"}]
+ launch date_range: {'start': '2024-01-01', 'end': '2026-09-09'}
+ 12mo period: 9 de septiembre de 2025 al 9 de septiembre de 2026
+PROBE 2026-09-10T12:00:00-04:00 es-419
+ retest_period: {"original_date_range": {"start": "2024-01-01", "end": "2024-12-31"}, "requested_date_range": {"start": "2024-01-01", "end": "2026-09-10"}, "effective_date_range": {"start": "2024-01-01", "end": "2026-09-10"}, "duration_days": 983, "duration": {"unit": "year", "count": 2.7, "approximate": true}}
+ date rows: [{"key": "period", "label": "Period", "labelKey": "chat.confirmation.rows.period", "value": "1 de enero de 2024 al 10 de septiembre de 2026"}]
+ launch date_range: {'start': '2024-01-01', 'end': '2026-09-10'}
+ 12mo period: 10 de septiembre de 2025 al 10 de septiembre de 2026
+============================== 4 passed in 1.76s ===============================

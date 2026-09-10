@@ -1,0 +1,28 @@
+{
+  "frozen_at": "2026-09-09T20:17:00-04:00",
+  "process_tz": "UTC",
+  "host_date": "2026-09-10",
+  "new_york_date": "2026-09-09",
+  "conversations": {
+    "en": {
+      "symbol": "TSLA",
+      "conversation_id": "7f2c4531-06dc-4e47-b40c-98c3c7702556",
+      "run_id": "619a86de-dbc9-4f2c-94e1-5d6447ef9a45",
+      "run_window": [
+        "2024-01-01",
+        "2024-12-31"
+      ],
+      "retest_action_state": "new_data_available"
+    },
+    "es-419": {
+      "symbol": "NVDA",
+      "conversation_id": "b12ae5a7-c260-4037-88ca-fcd0bcf98238",
+      "run_id": "9744b639-f467-4a63-83db-312132644170",
+      "run_window": [
+        "2024-01-01",
+        "2024-12-31"
+      ],
+      "retest_action_state": "new_data_available"
+    }
+  }
+}

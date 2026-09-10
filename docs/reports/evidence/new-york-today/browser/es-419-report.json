@@ -1,0 +1,19 @@
+{
+  "language": "es-419",
+  "symbol": "NVDA",
+  "frozen_at": "2026-09-09T20:17:00-04:00",
+  "process_tz": "UTC",
+  "host_date": "2026-09-10",
+  "new_york_date": "2026-09-09",
+  "rendered_compact_end": "9 sept 2026",
+  "rendered_period_lines": [
+    "NVDA · Comprar y mantener · 1 ene 2024 – 31 dic 2024 → 1 ene 2024 – 9 sept 2026 · aproximadamente 2.7 años",
+    "1 ene 2024 → 9 sept 2026",
+    "1 ene 2024 – 31 dic 2024 → 1 ene 2024 – 9 sept 2026"
+  ],
+  "persisted_period_row": "1 de enero de 2024 al 9 de septiembre de 2026",
+  "persisted_effective_date_range": {
+    "start": "2024-01-01",
+    "end": "2026-09-09"
+  }
+}
