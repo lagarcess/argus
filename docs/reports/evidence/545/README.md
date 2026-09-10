@@ -13,6 +13,9 @@ response, the parsed packet and the candidate SHA. No credentials, no user
 data. Every recording was re-captured at runtime head `ca517e45`, the commit
 that typed the row's subject and kind, because the strict schema they freeze
 changed there; the first capture at `7ef0055b` is in the PR history.
+`fast_quote_typed` was re-recorded at `3140dc5f` on 2026-09-10 when the fast
+shape's step budget went from two to four (open the gates lane): the request
+the freeze test holds the recording against carries `max_steps: 4`.
 
 Captured 2026-09-09 between 01:20 and 01:24 UTC, after the US close. Total
 provider-reported spend for the fourteen files on disk: $1.07; the earlier
@@ -22,7 +25,7 @@ captures and the isolation probes bring the lane's spend to roughly $3.5.
 
 | Probe | Head | Shape | Exchanges | Status | Typed | Rows kept | Rows rejected | Tool results | Public sources | Served model | Cost USD | Seconds |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- | ---: | --- | ---: | ---: |
-| `fast_quote_typed` | `ca517e45` | fast | 1 | 200 | yes | 1 | 0 | finance_results | 0 | openai/gpt-5.6-sol | 0.049 | 8.46 |
+| `fast_quote_typed` | `3140dc5f` | fast | 1 | 200 | yes | 1 | 0 | finance_results | 0 | openai/gpt-5.6-sol | 0.045 | 8.08 |
 | `typed_rows_current_external` | `ca517e45` | balanced | 1 | 200 | yes | 3 | 0 | finance_results,search_results | 43 | openai/gpt-5.6-sol | 0.109 | 34.23 |
 | `domain_filtered_local_source` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 11 | openai/gpt-5.6-sol | 0.073 | 14.71 |
 | `domain_filtered_rate_publishers` | `ca517e45` | balanced | 1 | 200 | yes | 0 | 0 | search_results | 1 | openai/gpt-5.6-sol | 0.076 | 26.85 |
