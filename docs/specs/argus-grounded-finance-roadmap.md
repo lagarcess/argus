@@ -1022,6 +1022,48 @@ ten-terminal meter back.
 
 ---
 
+## The refusal we shipped, and reversed
+
+**2026-09-09. The worst defect of this board, caused by this board's own
+process, and worth keeping written down.**
+
+PR #562's item said one thing: *"Retrieved facts arrive as typed rows with
+citations, never as prose to be re-parsed."* During review it grew a rule the
+item never asked for, that an answer whose row could not be tied to a retrieved
+URL by exact string match is **withheld whole**. The captain chose that over
+trimming the claim, on the grounds that a prose matcher leaks and a withholding
+rule cannot. It shipped.
+
+**The result: Argus refused "what's the price of nike today."** Google,
+DeepSeek, ChatGPT and Perplexity all answered it in one line. Argus said it
+found sources and would not quote them. The founder found it in five minutes on
+a local instance, on the first question he asked.
+
+Three things this cost, all in one turn: the user got a refusal, the $0.045
+already paid to Perplexity was thrown away, and the invoice was rejected as
+`rate_mismatch` so the ledger recorded nothing either.
+
+**Reversed by PR #578, `a404c9a7`.** `_withheld_code` and the exact-string
+citation check are gone. A retrieved answer publishes; a row written with no
+citation is named under the answer rather than deleting it. The sharing cap of
+four, also invented during that spec conflict rather than decided, is withdrawn
+along with the `fast` shape exclusion that made every price question
+permanently unshareable. The sol rate table now follows the bill: Perplexity
+has charged $4 in, $20 out, $5 cache write, $0.40 cache read since 2026-09-03
+while its documentation still says $5 and $30.
+
+**Three rules this violated, all already on this board.** Rule 9, loosen before
+you build. Rule 4's intent, which was typed rows rather than refusal. And the
+subtractive thesis: a change that adds a rule the model could have followed on
+its own is probably wrong.
+
+**The acceptance test is now the founder's, and it outranks a green suite.**
+Ask Argus and ask a competitor the same question, side by side. **If Argus says
+it cannot do something the competitor just did, the work is not done.** A
+passing test suite told us this feature was correct for a full day.
+
+---
+
 ## Where this board actually stands
 
 **Recorded 2026-09-09 at integration `6fa3f55a`, CI green there. Production is
