@@ -81,7 +81,10 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   composition, where a cached withheld scenario would otherwise publish on
   the repeat question).
 - `src/argus/domain/research/config.py`: the balanced shape's ceiling moves
-  from 75s to 150s. A scenario answer took 122s in the probe below and every
+  from 75s to 150s. This applies to every balanced research question, not
+  only scenarios: a company read, a current-events claim or a survey that used
+  to degrade at 75s now waits up to 150s before degrading, while a quick
+  answer returns as quickly as before. A scenario answer took 122s in the probe below and every
   forward-looking question timed out at 75s in the first after picture. The
   ceiling is room, never a rule; a quick answer still returns quickly.
 - `src/argus/agent_runtime/research_rows.py`: after an answer about a named
@@ -96,7 +99,7 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   `scenario_framing` prose criterion (rubric v3).
 - Canon: `docs/PRODUCT.md` section 11 and `docs/API_CONTRACT.md`.
 
-## Cost estimate (posted before any paid run)
+## Cost estimate (posted before any paid run; the actual spend, about $12 to $13, exceeded it, see the PR)
 
 | Run | Turns | Estimate |
 | --- | ---: | ---: |
