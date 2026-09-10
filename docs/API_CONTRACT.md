@@ -3641,6 +3641,11 @@ both the recovery route and the facts available to deterministic fallback copy:
 - A surviving `unsupported_strategy_logic` capability constraint may use
   `unsupported_recovery` with supported simplification options. Only this
   capability route may say that Argus cannot run a strategy.
+- `future_performance` is a test asked over a window that points forward from
+  today. There is no market data for it, so the recovery says so, offers the
+  historical test, and mentions that Argus can research what analysts expect.
+  It is not a refusal of forward-looking questions: those are research answers
+  (decision 10, 2026-09-10) and never produce `unsupported_recovery`.
 - Incomplete or unparseable extraction is a normal clarification outcome. It
   asks for the missing executable detail and must not be represented as a
   strategy-capability refusal.
@@ -3757,7 +3762,18 @@ user evidence span contradicts it. Missing or unknown provenance is never a
 default, and no execution field is exempt merely because of its name.
 Explicit strategy intent or a strategy turn act keeps builder ownership even
 when all execution fields are defaults. Research admission derives that
-decision from the same strategy-route predicate as the interpret stage.
+decision from the same strategy-route predicate as the interpret stage. One
+exception is typed: a strategy claim whose `date_range_intent` is a
+`future_window` is not a runnable test, so it never outranks a question
+payload. Forward-looking and valuation questions (what an asset will be worth,
+what price it must grow into, fair value, analyst targets) are grounded on
+publisher pages and answered as labeled scenarios, with the historical test
+offered as a next experiment; the runtime records
+`research_answers_future_horizon_question` on the interpretation when that
+exception decided the route. A claim about crypto or a currency pair (a
+forecast, a company story, why it moved) is grounded the same way with the
+provider's finance tool left out of the request; a figure about them still
+answers from Argus's own data with the `asset_class_not_covered` note.
 For a find operation, `asset_discovery` owns the search parameters and
 `needs_current_facts`. A missing discovery payload uses missing-target
 recovery; it never implies that stale model knowledge is sufficient.
