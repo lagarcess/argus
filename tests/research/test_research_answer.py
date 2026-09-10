@@ -439,6 +439,100 @@ def test_a_scenario_question_sends_the_scenario_contract(monkeypatch) -> None:
     assert body["instructions"] != RETRIEVAL_INSTRUCTIONS
 
 
+def _scenario_rows(*, cited: bool) -> list[dict]:
+    from tests.research.conftest import retrieved_row
+
+    return [
+        retrieved_row(
+            subject="NVIDIA",
+            symbol="NVDA",
+            label="average twelve-month analyst price target",
+            value=327.18,
+            kind="currency",
+            unit="USD",
+            source_url="https://www.reuters.com/markets/nvidia-outlook/"
+            if cited
+            else None,
+        )
+    ]
+
+
+def _run_scenario(monkeypatch, *, cited: bool):
+    from tests.research.conftest import typed_answer_text
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="company_lookup",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "Bear $2,300 to $5,500; base $29,000 to $38,000; bull higher.",
+                    _scenario_rows(cited=cited),
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+    return _run("what will $10,000 in NVDA be worth in ten years?")
+
+
+def test_a_scenario_publishes_on_a_cited_input_row(monkeypatch) -> None:
+    result = _run_scenario(monkeypatch, cited=True)
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert "degraded" not in sidecar
+    assert "Bear" in result.stage_patch["assistant_response"]
+
+
+def test_a_scenario_with_no_cited_input_is_withheld_not_computed(monkeypatch) -> None:
+    """Decision 10: the arithmetic is only as grounded as its inputs. A page
+    in sources proves retrieval, not that a forecast was read from it; with no
+    input row citing a public page the range is withheld, on the inline path
+    and (below) the background one."""
+    result = _run_scenario(monkeypatch, cited=False)
+    assert result is not None
+    sidecar = result.stage_patch["research"]
+    assert sidecar["degraded"] == {"code": "scenario_inputs_uncited"}
+    text = result.stage_patch["assistant_response"]
+    assert "Bear" not in text
+    assert "won't compute a range" in text
+    # The subject the user named stays testable.
+    assert result.stage_patch["next_experiments"]["rows"]
+
+
+def test_the_background_scenario_applies_the_same_input_gate() -> None:
+    from argus.domain.research.contracts import (
+        ResearchPacket,
+        ResearchSource,
+        ResearchUsage,
+    )
+
+    packet = ResearchPacket(
+        answer_markdown="Bear to bull ranges written from memory.",
+        sources=(ResearchSource(url="https://www.reuters.com/markets/nvidia-outlook/"),),
+        usage=ResearchUsage(web_search_invocations=1),
+    )
+    job_request = {
+        "capability_class": "thorough_research",
+        "language": "en",
+        "question_kind": "cross_company",
+        "scenario_question": True,
+        "requires_publisher_sources": True,
+        "subjects": [{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
+    }
+    composed = grounded.compose_completed_research(job_request=job_request, packet=packet)
+    assert composed["research"]["degraded"] == {"code": "scenario_inputs_uncited"}
+    assert "won't compute a range" in composed["answer"]
+
+
 def test_a_crypto_claim_is_grounded_on_public_pages_without_the_finance_tool(
     monkeypatch,
 ) -> None:

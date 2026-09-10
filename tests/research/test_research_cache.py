@@ -168,3 +168,19 @@ def test_a_withheld_record_serves_for_its_class_capped_at_a_day() -> None:
         ttl_for_packet(question_kind="live_quote", closed_period=True, withheld=True)
         == WITHHELD_TTL_SECONDS
     )
+
+
+def test_the_scenario_contract_has_its_own_cache_identity() -> None:
+    """Decision 10: a packet answered under the retrieval contract never
+    serves a scenario question, and the reverse; the contract is part of the
+    public request identity, still with no user parameter."""
+    base = dict(
+        capability_class="balanced_lookup",
+        shape="balanced",
+        symbols=("NVDA",),
+        period_key="ten years",
+        question_fingerprint="what will $10,000 in nvda be worth in ten years?",
+        language="en",
+    )
+    assert research_cache_key(**base) == research_cache_key(**base, contract="retrieval")
+    assert research_cache_key(**base, contract="scenario") != research_cache_key(**base)

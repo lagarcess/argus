@@ -3995,8 +3995,13 @@ Contract rules:
   the typed contract, and the same no-retrieval rule for every other answer:
   `survey_synthesis_incomplete` when the survey retrieved but its prose names
   no asset the resolver verifies, `survey_not_grounded` when a survey never
-  retrieved, and `research_not_grounded` when any other answer never
-  retrieved. Whatever withholds the
+  retrieved, `research_not_grounded` when any other answer never
+  retrieved, and `scenario_inputs_uncited` when a computed scenario
+  (decision 10, `research_query.scenario_question`) retrieved but no input
+  row cites a public page, on the inline and the background path alike; the
+  scenario contract is also part of the research cache identity, so a packet
+  answered under the ordinary retrieval contract never serves a scenario
+  question. Whatever withholds the
   prose, the turn's `sources` are the pages the response actually retrieved,
   selected exactly as for a published answer (period-plausible, one page per
   publisher, retrieval order, at most five): no ranking, no content check,

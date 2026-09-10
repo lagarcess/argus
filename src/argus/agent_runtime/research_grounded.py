@@ -120,6 +120,9 @@ def _cache_key_for(
         period_key=(query.period_of_interest or "").strip().lower() or "current",
         question_fingerprint=" ".join(message.lower().split()),
         language=language,
+        contract=(
+            "scenario" if getattr(query, "scenario_question", False) else "retrieval"
+        ),
     )
 
 
@@ -347,6 +350,7 @@ async def grounded_result(
             question_as_of_date=question_as_of_date,
             decision=decision,
             withheld_code="research_unavailable_missing_public_sources",
+            scenario=scenario,
         )
     result = _packet_stage_result(
         packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
@@ -362,6 +366,7 @@ async def grounded_result(
         period_start_date=_coerce_date(query.period_start_date),
         question_as_of_date=question_as_of_date,
         decision=decision,
+        scenario=scenario,
     )
     if cache_status == "miss":
         # The response's own packet is what is stored, not the turn-total copy
@@ -394,6 +399,7 @@ def _packet_stage_result(
     question_as_of_date: date | None = None,
     decision: InterpretDecision | None = None,
     withheld_code: str | None = None,
+    scenario: bool = False,
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
@@ -407,7 +413,11 @@ def _packet_stage_result(
     resolver verifies."""
     survey = is_market_survey(question_kind)
     answer = published_answer(packet, language)
-    degraded_code = _not_grounded_code(packet, survey=survey) or withheld_code
+    degraded_code = (
+        _not_grounded_code(packet, survey=survey)
+        or withheld_code
+        or _scenario_inputs_code(packet, scenario=scenario)
+    )
     peers: list[dict[str, str]] = []
     if degraded_code is None:
         # A withheld answer shows no peer, so a reason already established
@@ -1001,12 +1011,34 @@ def _not_grounded_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     return "survey_not_grounded" if survey else "research_not_grounded"
 
 
+def _scenario_inputs_code(packet: ResearchPacket, *, scenario: bool) -> str | None:
+    """A computed scenario publishes only on cited inputs (decision 10).
+
+    The provider's schema allows an answer with no rows, and a page in
+    ``sources`` proves retrieval, not that a forecast, target or multiple the
+    arithmetic used was read from it. At least one input row must cite a
+    public page; the current price alone, read from the provider's own
+    finance page, is not a forecast."""
+    if not scenario:
+        return None
+    if any(row.source_url for row in packet.rows):
+        return None
+    logger.info(
+        "Scenario withheld: no input row cites a public page"
+        f" rows={len(packet.rows)} unsourced={len(packet.unsourced_rows)}"
+        f" sources={len(packet.sources)}"
+    )
+    return "scenario_inputs_uncited"
+
+
 def _withheld_note(language: str, *, code: str, question_kind: str | None) -> str:
     """The honest line for a withheld answer, keyed by its degraded code."""
     if code == "research_unavailable_missing_public_sources":
         return _missing_public_source_note(language)
     if code == "research_not_grounded":
         return _not_grounded_note(language)
+    if code == "scenario_inputs_uncited":
+        return _scenario_inputs_uncited_note(language)
     return _survey_recovery_note(
         language,
         question_kind=question_kind,
@@ -1271,6 +1303,22 @@ def _missing_public_source_note(language: str) -> str:
     )
 
 
+def _scenario_inputs_uncited_note(language: str) -> str:
+    if language == "es-419":
+        return (
+            "Encontré páginas sobre esto, pero ninguno de los insumos que un "
+            "escenario necesita (un pronóstico publicado, un objetivo o un "
+            "múltiplo) llegó con su cita, así que no voy a calcular un rango con "
+            "ellos. Puedes preguntar de nuevo, o probar la idea con datos históricos."
+        )
+    return (
+        "I found pages on this, but none of the inputs a scenario needs (a "
+        "published forecast, target or multiple) came with its citation, so I "
+        "won't compute a range from them. You can ask again, or test the idea "
+        "against historical data."
+    )
+
+
 def _not_grounded_note(language: str) -> str:
     if language == "es-419":
         return "No pude recuperar los datos para responder esta pregunta."
@@ -1387,12 +1435,16 @@ def compose_completed_research(
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
-    degraded_code = _not_grounded_code(
-        packet, survey=is_market_survey(question_kind)
-    ) or (
-        "research_unavailable_missing_public_sources"
-        if job_request.get("requires_publisher_sources") and not sources
-        else None
+    degraded_code = (
+        _not_grounded_code(packet, survey=is_market_survey(question_kind))
+        or (
+            "research_unavailable_missing_public_sources"
+            if job_request.get("requires_publisher_sources") and not sources
+            else None
+        )
+        or _scenario_inputs_code(
+            packet, scenario=bool(job_request.get("scenario_question"))
+        )
     )
     peers = (
         []

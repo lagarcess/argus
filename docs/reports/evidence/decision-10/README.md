@@ -50,7 +50,12 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   scenario values are the model's arithmetic and are never rowed. Every other
   question keeps the recorded contract byte for byte; the scenario contract is
   frozen by `probes/scenario_typed_balanced.json` through the same test that
-  freezes the others.
+  freezes the others. The contract is part of the research cache identity, so
+  a packet answered under one contract never serves a question asked under the
+  other, and a scenario publishes only when at least one input row cites a
+  public page (`scenario_inputs_uncited` otherwise, on the inline and the
+  background path); every recorded scenario answer carried three to seven
+  (Codex round 2, two P2s).
 - `src/argus/domain/research/config.py`: the balanced shape's ceiling moves
   from 75s to 150s. A scenario answer took 122s in the probe below and every
   forward-looking question timed out at 75s in the first after picture. The
