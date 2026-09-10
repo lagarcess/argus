@@ -802,7 +802,23 @@ still readable unchanged.
 
 ---
 
-### The five calculations  ·  ships in **The calculations**
+### Any grounded math  ·  ships in **The calculations**
+
+**Reframed 2026-09-10, founder: not five calculations.** Argus does any finance
+math a question needs, free form. The primitives below are examples of the
+math, never a list of what Argus answers. Three rules are fixed: every input is
+cited or given by the user; every figure is computed by code, with its inputs
+shown and editable; every answer returns to the money decision and offers the
+opportunity-cost contrast. **The AI answers first** (decision 10 and the lane
+that removes the blocking guardrails); polished cards and graphs for structured
+math, such as a valuation matrix, come later. In scope, by analogy to Driven's
+official skills without its agent skill: deep research, market pulse, sector
+radar, screening, competitor analysis, single-stock analysis and valuation, plus
+the consumer finance topics in the smoke test. **Deferred:** portfolio monitor,
+quant calculator, insider tracking. No skill store and no picker.
+
+**The original item, kept for its detail:**
+
 
 The board schedules all five, not one. Four of the smoke-test questions need
 ratios or comparison, and shipping only time value of money leaves the goalpost
@@ -994,6 +1010,11 @@ Both of Johana's suggestions, which are one request stated twice.
 
 **Done means.** A broad question returns derived follow-ups, never a catalogue.
 The guest empty state states the method in one line.
+
+**Solution agreed 2026-09-10, copy not chosen.** One line on arrival stating what
+Argus does with a money question, plus one rotating example sentence, never a
+grid. A broad question gets three follow-ups built from the user's own words.
+The founder rejected the first welcome-line draft; the copy stays open.
 
 **`chat.welcome` is rewritten.** It currently reads *"Tell me an investing idea
 in plain language and I will help test it with Alpha-safe assumptions."* That is
@@ -1188,7 +1209,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Research publisher honesty | outside the releases | **LANDED** `d6c908d9`, PR #585, closing #579 and #580. A research question is dated by the New York calendar through one owner, `question_date()`, so a survey asked after 20:00 ET keeps same-day pages. A turn that retrieved nothing is withheld with `research_not_grounded` on both the inline and background paths, and the Nike quote #578 fixed still publishes. Codex found that interpretation still dated "today" from the server clock; PR #587 fixed that, below. |
 | One owner for today | outside the releases | **LANDED** `e186fc24`, PR #587, closing #586. Every reading of the user's today comes from one New York clock, `src/argus/domain/market_data/new_york_clock.py`, so a question asked after 20:00 ET on a UTC host no longer dates tomorrow. Verified with the clock frozen at 20:17 EDT and 20:17 EST: today, the research question date and "to today" resolve to the New York date. The prompt fingerprint is unchanged. |
 | Let the model write the readout | its own promotion | **Unblocked 2026-09-10: #575 merged.** Prompt written, not yet sent. The Quick take and Breakdown show fixed templates since #551, while the model's text for both is generated, paid for, and hidden. |
-| The five calculations | The calculations | **Not started.** This is the product. |
+| Let the AI answer forward and valuation questions | its own promotion | **Decided 2026-09-10 as decision 10; lane prompt next.** Removes the future-performance refusal and the valuation-to-backtest steer so research answers with cited scenarios and shown math. Starts with a before picture of Driven-style questions, about $2 to $5. |
+| Any grounded math | The calculations | **Not started.** Reframed 2026-09-10 from "the five calculations": any finance math, grounded, never a list. The AI answers first; polished cards later. Portfolio monitor, quant calculator and insider tracking deferred. |
 | Teach the method | Grounding | **Not started.** |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
@@ -1229,7 +1251,7 @@ rules below.
 | **Plumbing** | metering, decisions | nothing, behavior preserving | no |
 | **Sharing** | sharing on, mobile verification | a result can be shared | probably not |
 | **The spine** | lift the loop, the registry | **nothing, if done right** | yes |
-| **The calculations** | the five calculations | Argus answers money questions it used to refuse | yes |
+| **The calculations** | any grounded math, the AI first, polished cards later | Argus answers money questions it used to refuse | yes |
 | **Grounding** | retrieval parameters, teach the method | cited local rates, guided broad questions | yes |
 
 **The ordering rule is distribution, not checkpoint number.** Founder,
@@ -1414,6 +1436,26 @@ committed scorecard ever compared them. Reassess after the registry lands.
 The registry now lands without the interpreter rewrite, which is parked with
 its live runs as the first evidence for that reassessment; see the status table.
 The registry landed on 2026-09-10 as `129ad084`, so that reassessment is now owed.
+
+**10. Forward-looking and valuation questions are answered, as grounded
+scenarios. Founder-approved 2026-09-10.** Argus will have advanced and
+professional users who price businesses and assets constantly. Refusing "what
+will $10,000 in NVDA be worth in ten years?" or "what price does NVDA need to
+grow into?" makes Argus a worse Perplexity. Argus answers them the way
+Perplexity's answers to those two questions did: cited forecasts and analyst
+targets, the math written out, results given as labeled scenario ranges, never a
+single prediction and never advice. Then it adds what Argus owns: what the idea
+actually did historically, the opportunity-cost contrast, and polished cards
+later.
+
+This reverses the future-performance boundary from issue #241: the clause in
+`src/argus/agent_runtime/interpreter/unsupported_admission.py` that tells every
+interpretation to classify a future-value question as unsupported, the "I cannot
+predict future performance" reply in `clarification_contract.py`, the three
+measurement cases that require that refusal (`capability_honesty.yaml` twice,
+`messy_spanish.yaml` once), and the instruction in `llm_interpreter.py` that
+steers valuation questions toward a backtest proxy. "Compute what the user gave
+you, never prescribe what they should do" still stands.
 
 ### Still open
 
