@@ -1,5 +1,9 @@
 # Registry scope reduction
 
+This is the historical reset checkpoint. The founder subsequently corrected
+the private cost-module removal and authorized a registry-owned backtest
+projection; see [the private dependency repair](private-dependency-repair.md).
+
 The founder's correction retains the registry, executable dispatch, editable
 inputs and chat cards, and removes the public receipt/excerpt surface.
 Integration `34866139861a5f06a3572edb2533bc42733371e8` is already an ancestor
