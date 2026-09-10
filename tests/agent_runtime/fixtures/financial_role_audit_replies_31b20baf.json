@@ -1,0 +1,86 @@
+{
+  "source": "29-candidate-r2.responses.jsonl",
+  "candidate_sha": "31b20baf7a036fdd9148bce8a90a838e076be201",
+  "case_id": "natural_language_establishes_modeled_costs_issue_271",
+  "replies": {
+    "LLMInterpretationResponse": {
+      "intent": "calculate",
+      "task_relation": "new_task",
+      "user_goal_summary": "Prepare daily buy-and-hold backtest confirmation for MSFT with specified capital, dates, benchmark, fees and slippage",
+      "tool_calls": [
+        {
+          "tool_name": "backtest",
+          "call_id": "backtest_prep_001",
+          "arguments": {
+            "strategy": {
+              "raw_user_phrasing": "Prepare a daily buy-and-hold confirmation for MSFT with $12,000 from January 3, 2023 through December 31, 2024, benchmark SPY, a 10 bps fee, and 5 bps slippage.",
+              "language": "en",
+              "strategy_type": "buy_and_hold",
+              "asset_universe": [
+                "MSFT"
+              ],
+              "comparison_baseline": "SPY",
+              "fee_rate": 0.001,
+              "slippage": 0.0005
+            }
+          }
+        }
+      ],
+      "requires_clarification": false,
+      "detected_user_language": "en",
+      "missing_required_fields": [],
+      "semantic_turn_act": "new_idea",
+      "artifact_target": "none"
+    },
+    "FocusedStrategyExtraction": {
+      "is_testable_strategy": true,
+      "user_goal_summary": "Daily buy-and-hold confirmation for MSFT with $12,000 from January 3, 2023 through December 31, 2024, benchmark SPY, a 10 bps fee, and 5 bps slippage.",
+      "raw_user_phrasing": "Prepare a daily buy-and-hold confirmation for MSFT with $12,000 from January 3, 2023 through December 31, 2024, benchmark SPY, a 10 bps fee, and 5 bps slippage.",
+      "language": "en",
+      "requested_strategy_template": "buy_and_hold",
+      "strategy_type": "buy_and_hold",
+      "asset_universe": [
+        "MSFT"
+      ],
+      "timeframe": "1D",
+      "capital_amount": 12000,
+      "initial_capital": 12000,
+      "comparison_baseline": "SPY",
+      "fee_rate": 0.001,
+      "slippage": 0.0005,
+      "missing_required_fields": [],
+      "confidence": 0.95
+    },
+    "FocusedDateWindowExtraction": {
+      "has_date_window": true,
+      "date_range_raw_text": "from January 3, 2023 through December 31, 2024",
+      "date_range_intent": null,
+      "date_range": {
+        "start": "2023-01-03",
+        "end": "2024-12-31"
+      },
+      "confidence": 0.95,
+      "evidence": "from January 3, 2023 through December 31, 2024"
+    },
+    "StatedRunFieldFidelityAudit": {
+      "capital_amount": 12000,
+      "recurring_contribution_amount": null,
+      "cadence": null,
+      "timeframe": "1D",
+      "date_range": {
+        "start": "2023-01-03",
+        "end": "2024-12-31"
+      },
+      "comparison_baseline": "SPY",
+      "fee": {
+        "rate": 0.001,
+        "evidence_span": "a 10 bps fee"
+      },
+      "slippage": {
+        "rate": 0.0005,
+        "evidence_span": "5 bps slippage"
+      },
+      "confidence": 0.8
+    }
+  }
+}

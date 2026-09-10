@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any, get_args
 
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
@@ -23,6 +23,11 @@ from argus.agent_runtime.strategy_contract import (
     normalize_date_range_candidate,
     resolve_date_range,
 )
+
+if TYPE_CHECKING:
+    from argus.agent_runtime.backtest_input import BacktestStrategyInput
+    from argus.agent_runtime.interpreter.audits import StatedRunFieldFidelityAudit
+    from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 
 # Money a recurring plan puts to work on day one, and money that bounds the
 # whole plan. Two different facts, so two key sets: reading them out of one
@@ -70,6 +75,105 @@ def canonical_capital_role(source: Any, *, strategy_type: Any = None) -> str | N
             else "starting_capital"
         )
     return None
+
+
+def declared_capital_role_fields(draft: BacktestStrategyInput) -> dict[str, str]:
+    roles = {}
+    for name, field_info in type(draft).model_fields.items():
+        metadata = field_info.json_schema_extra
+        role = (
+            metadata.get("x-argus-capital-role") if isinstance(metadata, dict) else None
+        )
+        if isinstance(role, str):
+            roles[name] = role
+    return roles
+
+
+def capital_role_records(
+    draft: BacktestStrategyInput,
+) -> list[tuple[str, str, Any, str | None]]:
+    """Every read projects the same typed carrier, semantic role and evidence."""
+    roles = declared_capital_role_fields(draft)
+    records: list[tuple[str, str, Any, str | None]] = []
+    for name, field_info in type(draft).model_fields.items():
+        role = roles.get(name) or canonical_capital_role(
+            draft.field_provenance.get(name),
+            strategy_type=draft.strategy_type if name == "capital_amount" else None,
+        )
+        annotation = get_args(field_info.annotation)
+        if name not in roles and not (
+            type(None) in annotation
+            and any(number_type in annotation for number_type in (int, float))
+        ):
+            continue
+        value = getattr(draft, name)
+        if value is None:
+            value = draft.extra_parameters.get(name)
+        if isinstance(role, str) and role in roles.values():
+            records.append((name, role, value, draft.evidence_spans.get(name)))
+    return records
+
+
+def apply_audited_capital_facts(
+    response: LLMInterpretationResponse, audit: StatedRunFieldFidelityAudit
+) -> bool:
+    """An independent audit owns both its amount and its financial meaning.
+
+    Only facts from this audit can settle an earlier ungrounded alias. Existing
+    typed roles survive, and a rejected alias is never populated as a side effect.
+    """
+    draft = response.candidate_strategy_draft
+    audited = capital_role_records(
+        type(draft)(
+            capital_amount=audit.capital_amount,
+            recurring_contribution=audit.recurring_contribution_amount,
+            field_provenance={"capital_amount": "starting_capital"},
+        )
+    )
+    facts = {role: value for _, role, value, _ in audited if value is not None}
+    changed = False
+    for role, value in facts.items():
+        if (draft.capital_amount, draft.field_provenance.get("capital_amount")) != (
+            value,
+            role,
+        ):
+            draft.capital_amount = value
+            draft.field_provenance["capital_amount"] = role
+            changed = True
+
+    roles = declared_capital_role_fields(draft)
+    known = capital_role_records(draft)
+    remaining = []
+    for ambiguity in response.ambiguous_fields:
+        pending_role = roles.get(ambiguity.field_name)
+        try:
+            value = float(ambiguity.raw_value)
+        except ValueError:
+            value = None
+        if (
+            ambiguity.reason_code == "financial_role_evidence_unresolved"
+            and pending_role in facts
+            and value == facts[pending_role]
+            and not any(
+                name in roles
+                and known_role == pending_role
+                and known_value is not None
+                and known_value != value
+                for name, known_role, known_value, _ in known
+            )
+        ):
+            continue
+        remaining.append(ambiguity)
+    if remaining != response.ambiguous_fields:
+        response.ambiguous_fields = remaining
+        response.requires_clarification = bool(
+            remaining
+            or response.missing_required_fields
+            or response.unsupported_constraints
+        )
+        response.assistant_response = None
+        changed = True
+    return changed
 
 
 # One identity for the ceiling refusal, so the producer and every reader that

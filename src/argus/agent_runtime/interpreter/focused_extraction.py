@@ -8,7 +8,7 @@ import json
 from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
-from typing import Any, get_args
+from typing import Any
 
 from langchain_core.messages import (
     AIMessage,
@@ -35,7 +35,11 @@ from argus.agent_runtime.rule_specs import (
     moving_average_crossover_text,
     opposite_moving_average_crossover_rule,
 )
-from argus.agent_runtime.semantic_integrity import canonical_capital_role
+from argus.agent_runtime.semantic_integrity import (
+    canonical_capital_role,
+    capital_role_records,
+    declared_capital_role_fields,
+)
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type_from_extracted_fields,
@@ -236,36 +240,6 @@ _REPAIR_MERGE_CLASSIFICATION_KEYS = frozenset({"raw_strategy_type", "template"})
 _REPAIR_MERGE_DICT_CHANNELS = ("extra_parameters", "field_provenance", "evidence_spans")
 
 
-def _capital_role_records(
-    draft: FocusedStrategyExtraction | LLMStrategyDraft,
-    roles: dict[str, str],
-    *,
-    resolve_known_carrier: bool = False,
-) -> list[tuple[str, str, Any, str | None]]:
-    records: list[tuple[str, str, Any, str | None]] = []
-    for name, field in type(draft).model_fields.items():
-        role = roles.get(name) or canonical_capital_role(
-            draft.field_provenance.get(name),
-            strategy_type=(
-                draft.strategy_type
-                if resolve_known_carrier and name == "capital_amount"
-                else None
-            ),
-        )
-        annotation = get_args(field.annotation)
-        if name not in roles and not (
-            type(None) in annotation
-            and any(number_type in annotation for number_type in (int, float))
-        ):
-            continue
-        value = getattr(draft, name)
-        if value is None:
-            value = draft.extra_parameters.get(name)
-        if isinstance(role, str) and role in roles.values():
-            records.append((name, role, value, draft.evidence_spans.get(name)))
-    return records
-
-
 def _accept_focused_capital_roles(
     extraction: FocusedStrategyExtraction,
     *,
@@ -278,28 +252,24 @@ def _accept_focused_capital_roles(
     arbitrary text. A number already assigned to another role is not evidence
     for a new role, even when the two values happen to be equal.
     """
-    roles: dict[str, str] = {}
-    for name, field in type(extraction).model_fields.items():
-        metadata = field.json_schema_extra
-        role = (
-            metadata.get("x-argus-capital-role") if isinstance(metadata, dict) else None
-        )
-        if isinstance(role, str):
-            roles[name] = role
+    roles = declared_capital_role_fields(extraction)
     known = (
-        _capital_role_records(
-            base_response.candidate_strategy_draft, roles, resolve_known_carrier=True
-        )
+        capital_role_records(base_response.candidate_strategy_draft)
         if base_response is not None
         else []
     )
-    proposed = _capital_role_records(extraction, roles)
+    proposed = capital_role_records(extraction)
     role_fields = {role: name for name, role in roles.items()}
 
     accepted = extraction.model_copy(deep=True)
     unresolved: list[LLMAmbiguousField] = []
     for name, role, value, _ in proposed:
-        if value is None:
+        # Canonical carrier evidence can support its role without introducing
+        # a second validator for amounts that field fidelity already owns.
+        if value is None or (
+            name not in roles
+            and canonical_capital_role(extraction.field_provenance.get(name)) is None
+        ):
             continue
         if any(
             known_role == role and known_value == value
