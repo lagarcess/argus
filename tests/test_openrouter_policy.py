@@ -44,6 +44,8 @@ from argus.llm.openrouter_key_policy import (
 from fastapi import FastAPI
 from langgraph.checkpoint.memory import MemorySaver
 
+from tests.result_readout_fixtures import readout_draft
+
 
 @pytest.fixture(autouse=True)
 def _provider_fixture_mode(monkeypatch: pytest.MonkeyPatch):
@@ -327,6 +329,8 @@ class FakeBreakdownSchemaClient:
             return self.response
         schema = kwargs["schema_model"]
         return schema(
+            language="en",
+            figures=[],
             text="The stored result is grounded in the completed backtest and its historical-simulation caveat.",
         )
 
@@ -661,14 +665,14 @@ def test_result_breakdown_prompt_carries_product_language_contract() -> None:
     assert "es-419" in messages[1]["content"]
 
 
-def test_result_breakdown_schema_requires_one_complete_text_field() -> None:
+def test_result_breakdown_schema_requires_complete_text_language_and_figures() -> None:
     from argus.api.chat.breakdown import ResultBreakdownDraft
     from pydantic import ValidationError
 
     schema = ResultBreakdownDraft.model_json_schema()
 
-    assert schema["required"] == ["text"]
-    assert set(schema["properties"]) == {"text"}
+    assert set(schema["required"]) == {"language", "text", "figures"}
+    assert set(schema["properties"]) == {"language", "text", "figures"}
     with pytest.raises(ValidationError):
         ResultBreakdownDraft.model_validate({})
     with pytest.raises(ValidationError):
@@ -679,7 +683,7 @@ def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
     from argus.api.chat import breakdown as chat_service
 
     fake_schema = FakeBreakdownSchemaClient(
-        {"text": "The fact_bank says here's the deeper read."}
+        readout_draft("The fact_bank says here's the deeper read.", [], language="en")
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2558,9 +2562,16 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
-        {
-            "text": "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +39.5% while SPY returned +25.6%, a 13.9 percentage point lead.\n\nThe largest drawdown was -13.8%. Assumptions: Universe: AAPL. Benchmark: SPY. This is historical simulation evidence, not a prediction."
-        }
+        readout_draft(
+            "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +39.5% while SPY returned +25.6%, a 13.9 percentage point lead.\n\nThe largest drawdown was -13.8%. Assumptions: Universe: AAPL. Benchmark: SPY. This is historical simulation evidence, not a prediction.",
+            [
+                ("portfolio.total_return", 39.5, "+39.5%"),
+                ("portfolio.benchmark_return", 25.6, "+25.6%"),
+                ("portfolio.benchmark_gap", 13.9, "13.9 percentage point"),
+                ("portfolio.max_drawdown", -13.8, "-13.8%"),
+            ],
+            language="en",
+        )
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2617,9 +2628,16 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
-        {
-            "text": "BABA Buy and Hold tested BABA over last month and returned +1.7%.\n\nSPY returned +26.6%, so BABA lagged by 24.9 percentage points versus that benchmark.\n\nThe max drawdown was -36.8%. Assumptions: Universe: BABA. Benchmark: SPY. A useful next check is one of the supported same-asset-class variations. This is historical simulation evidence, not a prediction."
-        }
+        readout_draft(
+            "BABA Buy and Hold tested BABA over last month and returned +1.7%.\n\nSPY returned +26.6%, so BABA lagged by 24.9 percentage points versus that benchmark.\n\nThe max drawdown was -36.8%. Assumptions: Universe: BABA. Benchmark: SPY. A useful next check is one of the supported same-asset-class variations. This is historical simulation evidence, not a prediction.",
+            [
+                ("portfolio.total_return", 1.7, "+1.7%"),
+                ("portfolio.benchmark_return", 26.6, "+26.6%"),
+                ("portfolio.benchmark_gap", -24.9, "24.9 percentage points"),
+                ("portfolio.max_drawdown", -36.8, "-36.8%"),
+            ],
+            language="en",
+        )
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2664,7 +2682,7 @@ def test_result_breakdown_rejects_empty_generated_body(
     from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient({"text": ""})
+    fake_schema = FakeBreakdownSchemaClient(readout_draft("", [], language="en"))
 
     text = chat_service.llm_result_breakdown_message(
         {
@@ -2699,9 +2717,15 @@ def test_result_breakdown_rejects_mismatched_visible_fact_values(monkeypatch) ->
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
-        {
-            "text": "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +46.7% while SPY returned +20.0%, a 13.9 percentage point lead.\n\nBenchmark: SPY. This is historical simulation evidence, not a prediction."
-        }
+        readout_draft(
+            "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +46.7% while SPY returned +20.0%, a 13.9 percentage point lead.\n\nBenchmark: SPY. This is historical simulation evidence, not a prediction.",
+            [
+                ("portfolio.total_return", 39.5, "+46.7%"),
+                ("portfolio.benchmark_return", 25.6, "+20.0%"),
+                ("portfolio.benchmark_gap", 13.9, "13.9 percentage point"),
+            ],
+            language="en",
+        )
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2735,7 +2759,11 @@ def test_result_breakdown_rejects_user_visible_internal_context_terms(
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
-        {"text": "The context_packet field provides background market conditions."}
+        readout_draft(
+            "The context_packet field provides background market conditions.",
+            [],
+            language="en",
+        )
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2900,7 +2928,7 @@ def test_result_breakdown_metadata_records_deterministic_fallback(
 
     assert message.source == "deterministic_fallback"
     assert message.fallback_used is True
-    assert message.failure_mode == "llm_unavailable_or_contract_rejected"
+    assert message.failure_mode == "invalid_draft"
     assert "**Setup.**" in message.text
 
 

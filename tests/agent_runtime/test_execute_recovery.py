@@ -31,6 +31,8 @@ from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 from argus.domain.market_data.new_york_clock import new_york_today
 from langgraph.checkpoint.memory import MemorySaver
 
+from tests.result_readout_fixtures import readout_draft
+
 
 def _coverage_approval(start: str, end: str) -> dict[str, object]:
     date_range = {"start": start, "end": end}
@@ -2400,9 +2402,18 @@ async def test_explain_stage_async_composes_spanish_quick_take_without_heading(
 
     async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
         captured.update(kwargs)
-        return {
-            "text": "ETH rindió +55.1%, pero quedó 6.3 puntos porcentuales detrás de BTC.\n\nSe probó comprar y mantener ETH en la ventana solicitada.\n\nLa comparación sirve como evidencia histórica, no como predicción.\n\nSimulación histórica solamente."
-        }
+        return readout_draft(
+            "ETH rindió +55.1%, pero quedó 6.3 puntos porcentuales detrás de BTC.\n\nSe probó comprar y mantener ETH en la ventana solicitada.\n\nLa comparación sirve como evidencia histórica, no como predicción.\n\nSimulación histórica solamente.",
+            [
+                ("portfolio.total_return", 55.1, "+55.1%"),
+                (
+                    "portfolio.benchmark_gap",
+                    -6.299999999999997,
+                    "6.3 puntos porcentuales",
+                ),
+            ],
+            language="es-419",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2439,10 +2450,10 @@ async def test_explain_stage_async_composes_spanish_quick_take_without_heading(
     assert "Answer in Spanish" in messages[0]["content"]
     context = json.loads(messages[1]["content"])
     assert context["product_language"] == "es-419"
-    assert context["run_facts"]["date_range"] == {
-        "start": "2024-01-01",
-        "end": "2024-03-31",
-    }
+    assert {
+        side: context["run_facts"]["facts"][f"window.{side}"]["value"]
+        for side in ("start", "end")
+    } == {"start": "2024-01-01", "end": "2024-03-31"}
 
 
 @pytest.mark.asyncio
@@ -2452,9 +2463,19 @@ async def test_explain_stage_async_accepts_spanish_decimal_comma_benchmark_gap(
     from argus.agent_runtime.stages import explain as explain_module
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "text": "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; quedaron por debajo por 3,1 puntos porcentuales.\n\nSe probó comprar y mantener AAPL y MSFT en la ventana confirmada.\n\nLa comparación nombra SPY y la brecha frente a la referencia.\n\nSimulación histórica solamente."
-        }
+        return readout_draft(
+            "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; quedaron por debajo por 3,1 puntos porcentuales.\n\nSe probó comprar y mantener AAPL y MSFT en la ventana confirmada.\n\nLa comparación nombra SPY y la brecha frente a la referencia.\n\nSimulación histórica solamente.",
+            [
+                ("portfolio.total_return", 13.56, "13,6%"),
+                ("portfolio.benchmark_return", 16.63, "16,6%"),
+                (
+                    "portfolio.benchmark_gap",
+                    -3.0699999999999985,
+                    "3,1 puntos porcentuales",
+                ),
+            ],
+            language="es-419",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2495,9 +2516,11 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
 
     async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
         captured.update(kwargs)
-        return {
-            "text": "TSLA lagged SPY in this historical test.\n\nTested the confirmed TSLA crossover setup.\n\nSPY is the benchmark comparison, not another tested asset.\n\nHistorical simulation only."
-        }
+        return readout_draft(
+            "TSLA lagged SPY in this historical test.\n\nTested the confirmed TSLA crossover setup.\n\nSPY is the benchmark comparison, not another tested asset.\n\nHistorical simulation only.",
+            [],
+            language="en",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2536,7 +2559,7 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
     assert facts["benchmark_symbol"] == "SPY"
     assert facts["symbols"] == ["TSLA"]
     assert facts["benchmark_comparison_claim"] == "lagged_benchmark"
-    assert facts["comparison"]["delta_vs_benchmark_pct"] == pytest.approx(-87.8)
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] == pytest.approx(-87.8)
     assert captured["context_packet_ids"] == ["packet-1"]
 
 
@@ -2547,9 +2570,16 @@ async def test_explain_stage_async_renders_quick_take_from_canonical_facts(
     from argus.agent_runtime.stages import explain as explain_module
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only."
-        }
+        return readout_draft(
+            "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only.",
+            [
+                ("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points"),
+                ("window.start", "2024-01-01", "2024"),
+                ("portfolio.total_return", 35.0, "35.0%"),
+                ("portfolio.benchmark_return", 26.9, "26.9%"),
+            ],
+            language="en",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2599,9 +2629,16 @@ async def test_explain_stage_async_rejects_mismatched_quick_take_return_values(
     from argus.agent_runtime.stages import explain as explain_module
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned +46.7%, while QQQ returned +38.6%.\n\nHistorical simulation only."
-        }
+        return readout_draft(
+            "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned +46.7%, while QQQ returned +38.6%.\n\nHistorical simulation only.",
+            [
+                ("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points"),
+                ("window.start", "2024-01-01", "2024"),
+                ("portfolio.total_return", 35.0, "+46.7%"),
+                ("portfolio.benchmark_return", 26.9, "+38.6%"),
+            ],
+            language="en",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2640,9 +2677,11 @@ async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
     from argus.agent_runtime.stages import explain as explain_module
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "text": "AAPL trailed QQQ by 5.3 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe benchmark comparison is still visible without template wording.\n\nHistorical simulation only."
-        }
+        return readout_draft(
+            "AAPL trailed QQQ by 5.3 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe benchmark comparison is still visible without template wording.\n\nHistorical simulation only.",
+            [("portfolio.benchmark_gap", -5.299999999999999, "5.3 percentage points")],
+            language="en",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2699,9 +2738,11 @@ async def test_result_readout_preserves_route_receipt_capture_inside_running_loo
             latency_ms=7,
             outcome="succeeded",
         )
-        return {
-            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe result is grounded in the completed backtest run.\n\nHistorical simulation only."
-        }
+        return readout_draft(
+            "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe result is grounded in the completed backtest run.\n\nHistorical simulation only.",
+            [("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points")],
+            language="en",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2742,9 +2783,16 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
 
     async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
         captured.update(kwargs)
-        return {
-            "text": "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only."
-        }
+        return readout_draft(
+            "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only.",
+            [
+                ("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points"),
+                ("window.start", "2024-01-01", "2024"),
+                ("portfolio.total_return", 35.0, "35.0%"),
+                ("portfolio.benchmark_return", 26.9, "26.9%"),
+            ],
+            language="en",
+        )
 
     monkeypatch.setattr(
         explain_module,
@@ -2781,8 +2829,12 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
     context = json.loads(messages[1]["content"])
     assert set(context) == {"run_facts", "product_language"}
     facts = context["run_facts"]
-    assert facts["metrics"] == {"sharpe_ratio": 1.45}
-    assert facts["comparison"]["delta_vs_benchmark_pct"] == pytest.approx(8.1)
+    assert facts["facts"]["metrics.sharpe_ratio"]["value"] == 1.45
+    assert (
+        facts["facts"]["metrics.sharpe_ratio"]["provenance"]["path"]
+        == "metrics.sharpe_ratio"
+    )
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] == pytest.approx(8.1)
     assert "result_card" not in facts
     assert "raw_user_phrasing" not in json.dumps(facts)
 

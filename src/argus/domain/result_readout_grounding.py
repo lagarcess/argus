@@ -4,17 +4,22 @@ from __future__ import annotations
 
 import math
 import re
-import unicodedata
 from collections.abc import Iterator
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
+from argus.domain.result_readout_content import (
+    ReadoutLanguage,
+    normalize_readout_language,
+)
+from argus.domain.result_readout_fact_sheet import build_labeled_fact_sheet
 from argus.domain.result_readout_facts import (
     engine_config_from_snapshot,
     result_readout_config,
 )
+from argus.domain.result_readout_quotes import validate_figure_references
 
 READOUT_GROUNDING_INSTRUCTIONS = (
     "Use only run_facts for every figure and historical claim, rounding reasonably. "
@@ -31,15 +36,44 @@ READOUT_GROUNDING_INSTRUCTIONS = (
     "claim about why a price moved. No forecasts, forward scenarios, advice or "
     "recommendations. No em dashes. Write all prose in product_language, "
     "translating source labels naturally; never copy internal fields or schema keys. "
-    "Return the entire finished prose in text."
+    "Return the entire finished prose in text and report the language actually "
+    "written. For every visible numeric occurrence, include a figures reference "
+    "with its exact fact_key and canonical value from run_facts, its exact visible "
+    "quote, and the one-based occurrence of that quote in text. Include the unit "
+    "in quote when written, and quote the whole visible date, not just its year. "
+    "Repeated figures need separate occurrences. The 500 "
+    "inside the name S&P 500 is part of the name, not a numerical fact. Use an "
+    "empty figures list when no figures are written."
 )
 
 
-class ResultReadoutDraft(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class ResultReadoutFigure(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
 
+    fact_key: str = Field(description="The exact key of the supplied fact being quoted.")
+    value: float | str = Field(
+        description="Copy that fact's canonical value exactly, including ISO dates."
+    )
+    quote: str = Field(
+        min_length=1,
+        description="The exact visible numeric quote, including its unit when written.",
+    )
+    occurrence: int = Field(
+        ge=1, description="The one-based occurrence of this exact quote in text."
+    )
+
+
+class ResultReadoutDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    language: ReadoutLanguage = Field(
+        description="The language actually written in text, not a copy of the requested language."
+    )
     text: str = Field(
         description="The complete user-visible readout in product_language."
+    )
+    figures: list[ResultReadoutFigure] = Field(
+        description="A fact reference for every visible numeric occurrence; empty when none are written."
     )
 
 
@@ -128,11 +162,11 @@ def stored_readout_facts(
             "meaning": "Illustration using the starting capital, not the actual "
             "peak-to-trough dollar loss. Contributions change the capital at risk.",
         }
-    return facts
+    return build_labeled_fact_sheet(facts)
 
 
 def accepted_readout_text(
-    draft: object, *, facts: dict[str, Any]
+    draft: object, *, facts: dict[str, Any], language: str
 ) -> tuple[str | None, str | None]:
     """Accept all of the draft or none; punctuation normalization is lossless."""
     try:
@@ -141,16 +175,28 @@ def accepted_readout_text(
         )
     except (TypeError, ValidationError):
         return None, "invalid_draft"
-    text = re.sub(r"[ \t]*—[ \t]*", ", ", response.text.strip())
-    if not text:
+    if response.language != normalize_readout_language(language):
+        return None, "language_mismatch"
+    text = response.text
+    if not text.strip():
         return None, "empty_draft"
     if _internal_field_name(text, facts):
         return None, "internal_field_name"
-    if _false_figure(text, facts):
-        return None, "unknown_figure"
+    try:
+        figure_failure = validate_figure_references(
+            text,
+            [ref.model_dump() for ref in response.figures],
+            facts=facts,
+            language=response.language,
+        )
+    except (ValueError, OverflowError):
+        # Malformed numbers/dates are rejected identically by both composers.
+        return None, "invalid_figure_reference"
+    if figure_failure:
+        return None, figure_failure
     if _contradicting_comparison(text, facts):
         return None, "contradicting_benchmark_claim"
-    return text, None
+    return re.sub(r"[ \t]*—[ \t]*", ", ", text.strip()), None
 
 
 def _mapping(value: object) -> dict[str, Any]:
@@ -176,212 +222,6 @@ def _leaves(value: object, path: str = "") -> Iterator[tuple[str, object]]:
         yield path, value
 
 
-_NUMBER = re.compile(
-    r"(?<!\w)[-+−]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?!\d)(?:[.,]\d+)?"
-    r"|\d+(?:[.,]\d+)*)(?:[eE][+-]?\d+|[kKmMbB](?!\w))?"
-)
-
-
-def _number(token: str, *, money: bool = False) -> tuple[float, int]:
-    token = re.sub(r"[ \u00a0\u202f]", "", token.replace("−", "-"))
-    suffix = re.search(r"([eE][+-]?\d+|[kKmMbB])$", token)
-    exponent = 0
-    if suffix:
-        scale = suffix.group()
-        exponent = (
-            int(scale[1:])
-            if scale[0].lower() == "e"
-            else {"k": 3, "m": 6, "b": 9}[scale.lower()]
-        )
-        token = token[: suffix.start()]
-    if "." in token and "," in token:
-        decimal = "." if token.rfind(".") > token.rfind(",") else ","
-        token = token.replace("," if decimal == "." else ".", "").replace(decimal, ".")
-    elif "," in token or "." in token:
-        separator = "," if "," in token else "."
-        pieces = token.split(separator)
-        # A leading zero cannot be a thousands group (e.g. Sharpe 0.456).
-        grouped = (
-            ((money and separator == ",") or len(pieces) > 2)
-            and pieces[0].lstrip("+-") != "0"
-            and all(len(p) == 3 for p in pieces[1:])
-        )
-        token = "".join(pieces) if grouped else token.replace(separator, ".")
-    decimals = len(token.rsplit(".", 1)[1]) if "." in token else 0
-    try:
-        return float(f"{token}e{exponent}"), decimals - exponent
-    except ValueError:
-        return math.nan, decimals
-
-
-_PERCENT_RATIOS = {"win_rate", "observed_ratio"}
-
-
-def _fact_unit(path: str) -> str:
-    key = path.rsplit(".", 1)[-1]
-    if "date" in path or key in {"time", "timestamp"}:
-        return "date"
-    if key.endswith(("_pct", "_percent")):
-        return "percent"
-    if key.endswith("_bps"):
-        return "basis_points"
-    if key.endswith(("_ratio", "_factor")) or key in _PERCENT_RATIOS:
-        return "ratio"
-    parts = set(key.split("_"))
-    if parts & {
-        "capital",
-        "contribution",
-        "contributions",
-        "profit",
-        "pnl",
-        "price",
-        "value",
-        "values",
-        "balance",
-        "cash",
-        "amount",
-        "principal",
-    }:
-        return "currency"
-    if parts & {
-        "trades",
-        "fills",
-        "count",
-        "period",
-        "periods",
-        "observations",
-        "points",
-        "signals",
-        "days",
-        "months",
-        "years",
-        "quantity",
-        "size",
-        "entries",
-        "exits",
-    }:
-        return "count"
-    return "scalar"
-
-
-def _numeric_facts(facts: dict[str, Any]) -> Iterator[tuple[str, str, float]]:
-    for path, value in _leaves(facts):
-        unit = _fact_unit(path)
-        if _finite_number(value):
-            if unit == "basis_points":
-                yield path, "percent", float(value) / 100
-            else:
-                yield path, unit, float(value)
-            if path.rsplit(".", 1)[-1] in _PERCENT_RATIOS:
-                yield path, "percent", float(value) * 100
-        elif isinstance(value, str) and unit == "date":
-            for match in _NUMBER.finditer(value):
-                yield path, "date", abs(_number(match.group())[0])
-
-
-_QUOTED_UNITS = {
-    "currency": re.compile(
-        r"[$€£]|\b(?:USD|EUR|GBP|dollars?|dolares?|capital|profit|balance|saldo|contribucion)\b",
-        re.I,
-    ),
-    "ratio": re.compile(r"\b(?:sharpe|ratio|profit factor|factor de beneficio)\b", re.I),
-    "count": re.compile(
-        r"\b(?:fills?|trades?|operations?|operaciones|periods?|periodos?|days?|dias?|shares?|acciones)\b",
-        re.I,
-    ),
-    "percent": re.compile(
-        r"\b(?:return|rendimiento|volatility|volatilidad|drawdown|caida)\b", re.I
-    ),
-}
-_PERCENT_SUFFIX = re.compile(
-    r"^\s*(?:%|percent(?:age points?)?\b|por ciento\b|puntos? porcentuales?\b|pp\b|pts\b)",
-    re.I,
-)
-_BASIS_SUFFIX = re.compile(r"^\s*(?:bps\b|basis points?\b|puntos? basicos?\b)", re.I)
-
-
-def _quoted_unit(text: str, match: re.Match[str]) -> str:
-    before, after = text[: match.start()], text[match.end() :]
-    if _PERCENT_SUFFIX.match(after):
-        return "percent"
-    if _BASIS_SUFFIX.match(after):
-        return "basis_points"
-    if re.search(r"[$€£][^\S\r\n]*$", before) or re.match(
-        r"\s*(?:USD|EUR|GBP|dollars?|dolares?)\b", after, re.I
-    ):
-        return "currency"
-    if _QUOTED_UNITS["count"].match(after.lstrip()):
-        return "count"
-    if re.match(r"\s*x\b", after):
-        return "ratio"
-    if any(
-        date.start() <= match.start() < date.end()
-        for date in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", text)
-    ):
-        return "date"
-    # The nearest preceding unit label supplies the unit for a bare figure.
-    # Stop at another figure so one metric's label cannot color the next one.
-    previous = list(_NUMBER.finditer(before))
-    local = before[previous[-1].end() :] if previous else before
-    labels = [
-        (label.start(), unit)
-        for unit, pattern in _QUOTED_UNITS.items()
-        for label in pattern.finditer(local)
-        # Count labels must attach locally, allowing a linking word, instead
-        # of spanning unrelated prose such as a following natural date.
-        if unit != "count"
-        or re.fullmatch(r"\W*(?:\w+\W*)?", local[label.end() :])
-    ]
-    return max(labels)[1] if labels else "scalar"
-
-
-def _false_figure(text: str, facts: dict[str, Any]) -> bool:
-    text = "".join(
-        char
-        for char in unicodedata.normalize("NFD", text)
-        if not unicodedata.combining(char)
-    )
-    allowed = list(_numeric_facts(facts))
-    for match in _NUMBER.finditer(text):
-        prefix = text[: match.start()].rsplit("\n", 1)[-1]
-        if not prefix.strip() and text[match.end() : match.end() + 2] in {". ", ") "}:
-            continue
-        unit = _quoted_unit(text, match)
-        number, decimals = _number(match.group(), money=unit == "currency")
-        if not math.isfinite(number):
-            return True
-        tolerance = float(f"5e{-decimals - 1}") + 1e-8
-        if unit == "basis_points":
-            unit, number, tolerance = "percent", number / 100, tolerance / 100
-        if unit == "date":
-            number = abs(number)
-        vicinity = text[max(0, match.start() - 70) : match.end() + 35].casefold()
-        magnitude = not match.group().startswith(("+", "-", "−")) and bool(
-            re.search(
-                r"drop|drawdown|declin|loss|lost|fall|lag|trail|behind|underperform|caída|caida|pérd|perd|descens|debajo|detrás|detras|rezag",
-                vicinity,
-            )
-        )
-        compatible = {unit} if unit != "scalar" else {"scalar", "count", "ratio", "date"}
-        if not any(
-            fact_unit in compatible
-            and (
-                abs(number - value) <= tolerance
-                or (
-                    not match.group().startswith(("+", "-", "−"))
-                    and (
-                        magnitude
-                        or path.endswith(("max_drawdown_pct", "delta_vs_benchmark_pct"))
-                    )
-                    and abs(number - abs(value)) <= tolerance
-                )
-            )
-            for path, fact_unit, value in allowed
-        ):
-            return True
-    return False
-
-
 def _internal_field_name(text: str, facts: dict[str, Any]) -> bool:
     if re.search(r"\b[a-zA-Z][a-zA-Z0-9]*_[a-zA-Z0-9_]+\b", text):
         return True
@@ -391,11 +231,14 @@ def _internal_field_name(text: str, facts: dict[str, Any]) -> bool:
         return True
     schemas = {
         ResultReadoutDraft.__name__,
+        ResultReadoutFigure.__name__,
         *(model.__name__ for model in ResultReadoutDraft.__subclasses__()),
     }
     if any(re.search(rf"\b{re.escape(name)}\b", text) for name in schemas):
         return True
     keys = {part for path, _ in _leaves(facts) for part in path.split(".") if part}
+    keys.update(ResultReadoutDraft.model_fields)
+    keys.update(ResultReadoutFigure.model_fields)
     return any(
         re.search(rf'`{re.escape(key)}`|"{re.escape(key)}"\s*:', text)
         or (
@@ -442,9 +285,7 @@ def _contradicting_comparison(text: str, facts: dict[str, Any]) -> bool:
         mentions = list(role_pattern.finditer(clause))
         if not any(roles[mention.group()] != "strategy" for mention in mentions):
             continue
-        explicit = [
-            mention for mention in mentions if roles[mention.group()] != "shared"
-        ]
+        explicit = [mention for mention in mentions if roles[mention.group()] != "shared"]
         for match in _COMPARISON.finditer(clause):
             claim = (
                 1 if match.lastgroup == "beat" else -1 if match.lastgroup == "lag" else 0
@@ -463,7 +304,9 @@ def _contradicting_comparison(text: str, facts: dict[str, Any]) -> bool:
                 if not objects:
                     continue
                 subject = (
-                    "strategy" if roles[objects[0].group()] == "benchmark" else "benchmark"
+                    "strategy"
+                    if roles[objects[0].group()] == "benchmark"
+                    else "benchmark"
                 )
             if subject == "benchmark":
                 claim *= -1

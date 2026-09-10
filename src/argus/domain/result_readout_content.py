@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 ReadoutSurface = Literal["quick_take", "breakdown"]
+ReadoutLanguage = Literal["en", "es-419"]
 READOUT_METADATA_KEYS = (
     "result_readout_content",
     "result_readout_source",
@@ -14,12 +15,24 @@ READOUT_METADATA_KEYS = (
 )
 
 
+def normalize_readout_language(language: object) -> ReadoutLanguage | None:
+    """One locale owner for requested composition and persisted readout stamps."""
+    if not isinstance(language, str):
+        return None
+    base = language.strip().lower().replace("_", "-").split("-")[0]
+    if base == "en":
+        return "en"
+    if base == "es":
+        return "es-419"
+    return None
+
+
 class ResultReadoutContent(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     schema_version: Literal["result_readout/v1"]
     surface: ReadoutSurface
-    language: Literal["en", "es-419"]
+    language: ReadoutLanguage
     text: str | None
 
     @field_validator("text")
@@ -47,13 +60,13 @@ def readout_metadata(
     failure_mode: str | None = None,
 ) -> dict[str, Any]:
     """Stamp a completed composition, never a historical read or raw draft."""
-    normalized_language = language.lower().replace("_", "-").split("-")[0]
+    normalized_language = normalize_readout_language(language)
     accepted = text.strip() if isinstance(text, str) and not fallback_used else None
     content = validated_readout(
         {
             "schema_version": "result_readout/v1",
             "surface": surface,
-            "language": "es-419" if normalized_language == "es" else normalized_language,
+            "language": normalized_language,
             "text": accepted or None,
         }
     )

@@ -19,7 +19,10 @@ from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
 )
-from argus.domain.result_readout_content import validated_readout
+from argus.domain.result_readout_content import (
+    normalize_readout_language,
+    validated_readout,
+)
 from argus.domain.result_readout_grounding import (
     READOUT_GROUNDING_INSTRUCTIONS,
     ResultReadoutDraft,
@@ -97,7 +100,27 @@ def llm_result_breakdown_message(
     log_openrouter_failure_func=log_openrouter_failure,
     timeout_seconds: float = RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS,
 ) -> str | None:
-    resolved_language = _response_language(language or context.get("language"))
+    text, _ = _llm_result_breakdown_with_metadata(
+        context,
+        language=language,
+        invoke_json_schema_func=invoke_json_schema_func,
+        log_openrouter_failure_func=log_openrouter_failure_func,
+        timeout_seconds=timeout_seconds,
+    )
+    return text
+
+
+def _llm_result_breakdown_with_metadata(
+    context: dict[str, Any],
+    *,
+    language: str = "en",
+    invoke_json_schema_func=invoke_openrouter_json_schema_sync,
+    log_openrouter_failure_func=log_openrouter_failure,
+    timeout_seconds: float = RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS,
+) -> tuple[str | None, str | None]:
+    resolved_language = normalize_readout_language(language)
+    if resolved_language is None:
+        return None, "language_mismatch"
     facts = stored_readout_facts(
         metrics=context.get("raw_metrics", context.get("metrics")),
         config_snapshot=context.get("config_snapshot"),
@@ -123,7 +146,7 @@ def llm_result_breakdown_message(
             exc=TimeoutError("Result breakdown LLM exceeded action budget"),
             message="LLM result breakdown timed out; using deterministic fallback",
         )
-        return None
+        return None, "llm_unavailable_or_contract_rejected"
     except Exception as exc:
         log_openrouter_failure_func(
             task="result_breakdown",
@@ -131,9 +154,8 @@ def llm_result_breakdown_message(
             exc=exc,
             message="LLM result breakdown failed; using deterministic fallback",
         )
-        return None
-    text, _ = accepted_readout_text(response, facts=facts)
-    return text
+        return None, "llm_unavailable_or_contract_rejected"
+    return accepted_readout_text(response, facts=facts, language=resolved_language)
 
 
 def _invoke_breakdown_llm_with_budget(
@@ -433,7 +455,9 @@ def result_breakdown_message_with_metadata(
         )
     context = result_breakdown_context(run)
     context_language = _response_language(language or context.get("language"))
-    llm_text = llm_result_breakdown_message(context, language=context_language)
+    llm_text, failure_mode = _llm_result_breakdown_with_metadata(
+        context, language=language
+    )
     if llm_text:
         return ResultBreakdownMessage(
             text=llm_text,
@@ -444,5 +468,5 @@ def result_breakdown_message_with_metadata(
         text=fallback_result_breakdown_message(context, language=context_language),
         source="deterministic_fallback",
         fallback_used=True,
-        failure_mode="llm_unavailable_or_contract_rejected",
+        failure_mode=failure_mode or "llm_unavailable_or_contract_rejected",
     )

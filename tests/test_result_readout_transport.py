@@ -6,9 +6,27 @@ import pytest
 from argus.api.artifact_presentation import reader_payload
 from argus.domain.result_readout_content import (
     ResultReadoutContent,
+    normalize_readout_language,
     readout_metadata,
     readout_metadata_from_stage,
 )
+
+
+@pytest.mark.parametrize(
+    "requested,expected",
+    [
+        ("en", "en"),
+        ("EN_us", "en"),
+        (" es-419 ", "es-419"),
+        ("es-MX", "es-419"),
+        ("fr", None),
+        ("", None),
+        (None, None),
+        (False, None),
+    ],
+)
+def test_readout_language_owner_normalizes_supported_requests(requested, expected):
+    assert normalize_readout_language(requested) == expected
 
 
 @pytest.mark.parametrize(
@@ -152,16 +170,17 @@ def test_new_breakdown_on_old_run_uses_current_language(
 
     def compose(context, *, language):
         calls.append(language)
+        if fallback:
+            return None, "language_mismatch"
         return (
-            None
-            if fallback
-            else {
+            {
                 "en": "A complete new explanation.",
                 "es-419": "Una explicación nueva y completa.",
-            }[language]
+            }[language],
+            None,
         )
 
-    monkeypatch.setattr(breakdown, "llm_result_breakdown_message", compose)
+    monkeypatch.setattr(breakdown, "_llm_result_breakdown_with_metadata", compose)
     original = deepcopy(run.model_dump())
     result = result_breakdown_message_with_metadata(run, language=language)
     assert calls == [language]
@@ -171,6 +190,9 @@ def test_new_breakdown_on_old_run_uses_current_language(
     assert envelope["surface"] == "breakdown"
     assert envelope["text"] == (None if fallback else result.text)
     assert metadata["result_readout_fallback_used"] is fallback
+    assert metadata["result_readout_failure_mode"] == (
+        "language_mismatch" if fallback else None
+    )
     assert (
         reader_payload({**metadata, "content": result.text})["result_readout_content"]
         == envelope

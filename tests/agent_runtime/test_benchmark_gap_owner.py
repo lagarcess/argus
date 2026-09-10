@@ -16,6 +16,8 @@ from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.state.models import ResponseProfile, RunState
 from argus.domain.backtesting.cards import build_result_card
 
+from tests.result_readout_fixtures import readout_draft
+
 # The issue's own shape: 53.44 - 7.1 = 46.34 prints 46.3, the engine gap
 # 46.35 prints 46.4.
 TOTAL_RETURN_PCT = 53.44
@@ -86,7 +88,7 @@ async def _composer_facts(monkeypatch, state: RunState) -> dict[str, object]:
 
     async def draft(**kwargs):
         captured.update(json.loads(kwargs["messages"][1]["content"])["run_facts"])
-        return {"text": text}
+        return readout_draft(text)
 
     monkeypatch.setattr(explain_module, "invoke_openrouter_json_schema", draft)
     result = await explain_module.explain_stage_async(state=state)
@@ -100,12 +102,19 @@ async def test_quick_take_facts_quote_the_card_gap_not_a_subtraction(monkeypatch
     facts = await _composer_facts(monkeypatch, _completed_state(_explanation_context()))
 
     assert _card_comparison() == "Beat by 46.4 percentage points"
-    assert facts["comparison"] == {
-        "delta_vs_benchmark_pct": ENGINE_DELTA_PCT,
-        "total_return_pct": TOTAL_RETURN_PCT,
-        "benchmark_return_pct": BENCHMARK_RETURN_PCT,
+    assert {
+        key: facts["facts"][key]["value"]
+        for key in (
+            "portfolio.benchmark_gap",
+            "portfolio.total_return",
+            "portfolio.benchmark_return",
+        )
+    } == {
+        "portfolio.benchmark_gap": ENGINE_DELTA_PCT,
+        "portfolio.total_return": TOTAL_RETURN_PCT,
+        "portfolio.benchmark_return": BENCHMARK_RETURN_PCT,
     }
-    assert facts["comparison"]["delta_vs_benchmark_pct"] != pytest.approx(
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] != pytest.approx(
         TOTAL_RETURN_PCT - BENCHMARK_RETURN_PCT
     )
 
@@ -147,8 +156,8 @@ async def test_an_engine_block_without_its_gap_makes_no_comparison_claim(
     facts = await _composer_facts(monkeypatch, _completed_state(context))
     result = explain_stage(state=_completed_state(context))
 
-    assert facts["comparison"].get("delta_vs_benchmark_pct") is None
-    assert facts["comparison"]["total_return_pct"] == TOTAL_RETURN_PCT
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] is None
+    assert facts["facts"]["portfolio.total_return"]["value"] == TOTAL_RETURN_PCT
     assert facts["benchmark_comparison_claim"] == "unknown"
     readout = result.patch["assistant_response"]
     assert readout.startswith(
@@ -171,5 +180,5 @@ async def test_legacy_fraction_payloads_still_derive_their_only_comparison(
     }
     facts = await _composer_facts(monkeypatch, state)
 
-    assert facts["comparison"]["delta_vs_benchmark_pct"] == pytest.approx(5)
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] == pytest.approx(5)
     assert facts["benchmark_comparison_claim"] == "beat_benchmark"

@@ -1489,6 +1489,7 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
 ) -> None:
     from argus.agent_runtime.stages import explain as explain_module
 
+    from tests.result_readout_fixtures import readout_draft
     from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
 
     model_takeaway = "AAPL beat SPY by 4.2 percentage points in this historical test."
@@ -1496,11 +1497,10 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
     model_meaning_bullet = "The result is grounded in the completed backtest run."
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
-        return {
-            "text": "\n\n".join(
-                [model_takeaway, model_tested_bullet, model_meaning_bullet]
-            )
-        }
+        return readout_draft(
+            "\n\n".join([model_takeaway, model_tested_bullet, model_meaning_bullet]),
+            [("portfolio.benchmark_gap", 4.2, "4.2 percentage points")],
+        )
 
     monkeypatch.setattr(
         explain_module,

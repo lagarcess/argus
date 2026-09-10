@@ -568,6 +568,11 @@ Represents individual messages within a conversation.
   read-time model call or rewritten historical content. Source and fallback
   provenance use the existing `result_readout_*` fields. The exact closed
   transport is documented in API_CONTRACT.md's Message section.
+  A new draft's structured reported language must match the requested workspace
+  language before accepted text is stamped. Its quoted-figure references are
+  checked against one labeled fact sheet and remain internal; they do not
+  widen the persisted/public envelope. Language or reference mismatch stores
+  null text with the existing fallback/failure provenance, never a partial.
   Existing `result_fact_bank` is a read projection, not a second metrics owner;
   missing historical transport facts are repaired on read using owner and
   conversation scoped run identity. Its `figures` (and a public run's

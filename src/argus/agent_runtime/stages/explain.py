@@ -29,6 +29,7 @@ from argus.domain.engine_launch.result_facts import (
 from argus.domain.engine_launch.result_facts import (
     resolved_rule_summary as result_rule_summary,
 )
+from argus.domain.result_readout_content import normalize_readout_language
 from argus.domain.result_readout_grounding import (
     READOUT_GROUNDING_INSTRUCTIONS,
     ResultReadoutDraft,
@@ -253,6 +254,10 @@ async def _llm_explanation(
     language: str,
 ) -> _LLMExplanationResult:
     del fallback_text
+    normalized_language = normalize_readout_language(language)
+    if normalized_language is None:
+        return _LLMExplanationResult(text=None, failure_mode="language_mismatch")
+    language = normalized_language
     strategy = _strategy_payload(state)
     result_payload = _result_payload(state)
     explanation_context = _explanation_context(state)
@@ -328,7 +333,7 @@ async def _llm_explanation(
                 explanation_context
             ),
         )
-        rendered, failure = accepted_readout_text(draft, facts=facts)
+        rendered, failure = accepted_readout_text(draft, facts=facts, language=language)
         return _LLMExplanationResult(text=rendered, failure_mode=failure)
     except Exception:
         # OpenRouter owns per-model route receipts. No partial draft is exposed.

@@ -1148,6 +1148,34 @@ model call, translation, historical rewrite or partial-draft display.
 `result_readout_failure_mode` record generation provenance for both surfaces;
 existing Breakdown provenance remains read-compatible.
 
+Before creating that public envelope, both composers use the same internal
+labeled fact sheet. Each fact identifies its canonical value, unit, meaning,
+scope, return basis and stored or derived source. Executed fills are distinct
+from completed trades; annualized volatility is distinct from daily returns;
+ending nominal equity is distinct from whole-period extrema; starting capital
+is distinct from recurring contributions. Optional chart data retains its
+dated series meaning. Historical drawdown endpoints are unavailable unless
+retained evidence supports their chronological reconstruction; a nominal DCA
+chart cannot establish a flow-adjusted drawdown event.
+
+The internal structured model draft contains `language`, complete `text`, and
+`figures`. Each quoted figure carries `fact_key`, canonical `value`, its exact
+visible `quote`, and a one-based `occurrence`. Code checks that specific fact's
+key and value, the visible quote's units/rounding, and complete, non-overlapping
+coverage of recognized numeric, cardinal and date occurrences. Names such as S&P 500 are identity
+text, not permission to quote an unsupported numerical 500. Missing or invalid
+references reject the complete draft. The model-reported written language must
+match the normalized workspace request; a mismatch records `language_mismatch`
+and uses complete fallback. This is a structured self-report, not an independent
+language classifier, and references do not establish arbitrary prose entailment.
+Model quality therefore still requires case-by-case factual review.
+
+Fact sheets and quote references are internal generation inputs/output, not
+additional public readout fields. The closed public envelope above is unchanged.
+Only accepted complete prose crosses it; language/figure rejection details use
+the existing source/fallback/failure metadata. No read-time composition or
+historical rewrite is introduced.
+
 Template readouts and dossier outcomes render from the same typed run facts
 in the current workspace language. The figures those
 surfaces share with the result card (returns, the benchmark gap, worst drop)
