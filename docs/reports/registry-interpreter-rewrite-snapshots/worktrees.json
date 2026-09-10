@@ -1,0 +1,438 @@
+{
+  "published_source_head": "31b20baf7a036fdd9148bce8a90a838e076be201",
+  "working_tree_snapshot": "b0b2ca6eddd83839df0f297769538164af77e4a6",
+  "unreconciled_snapshots": [
+    {
+      "path": "/private/tmp/registry-prompt-c6c28fef",
+      "head": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+      "common": "/Users/garces/Documents/projects/repos/argus/.git",
+      "status": [],
+      "error": "",
+      "snapshot_commit": "c6c28fefe5b30c1f5d0a67656dc9c6fa025a44e2",
+      "snapshot_created": false
+    },
+    {
+      "path": "/private/tmp/argus-registry-baseline-ba5a9fb7",
+      "head": "ba5a9fb71a2696cc7155d6c8241d20dc79bea4c7",
+      "common": "/Users/garces/Documents/projects/repos/argus/.git",
+      "status": [],
+      "error": "",
+      "snapshot_commit": "ba5a9fb71a2696cc7155d6c8241d20dc79bea4c7",
+      "snapshot_created": false
+    },
+    {
+      "path": "/private/tmp/registry-research-projection-31b20baf-Z4cyDB",
+      "head": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "common": ".git",
+      "status": [
+        " M src/argus/agent_runtime/research_grounded.py",
+        " M src/argus/agent_runtime/research_rows.py",
+        " M src/argus/domain/research/contracts.py",
+        " M src/argus/domain/research/perplexity_agent.py",
+        " M tests/research/test_research_rows.py",
+        " M tests/research/test_retrieval_parameters.py",
+        "?? tests/research/test_retrieval_named_entities.py",
+        "?? tests/research/test_typed_candidate_projection.py"
+      ],
+      "error": "",
+      "files": [
+        {
+          "path": "src/argus/agent_runtime/research_grounded.py",
+          "bytes": 68330,
+          "sha256": "56a86e2528d0dc903e462772943ff2e9b0da441a6bfce4fa2b4251c59e0bc69b"
+        },
+        {
+          "path": "src/argus/agent_runtime/research_rows.py",
+          "bytes": 17031,
+          "sha256": "829fc1b6fb06b652d1b4284dd4a8fef3e6ce2d68f564f7cdaebadb18215e7640"
+        },
+        {
+          "path": "src/argus/domain/research/contracts.py",
+          "bytes": 14292,
+          "sha256": "7a8e640a8fd78d8d416780b44e656d5580a2cc6861c37aa5d3f5421aebd07816"
+        },
+        {
+          "path": "src/argus/domain/research/perplexity_agent.py",
+          "bytes": 37015,
+          "sha256": "2d81cea5412e62c42bf5634b2681f0f8a94c1ff07aaf9370203916cda9ba58b4"
+        },
+        {
+          "path": "tests/research/test_research_rows.py",
+          "bytes": 7358,
+          "sha256": "05aa8424146606312292cc04d27ebd169daec09bf842d3a61c2d9c3f0f762d8f"
+        },
+        {
+          "path": "tests/research/test_retrieval_parameters.py",
+          "bytes": 28521,
+          "sha256": "e34b34c302192cf7dc8aabbdd3c6b7c371d5144abc9cf8df6aaa991a43dc1788"
+        },
+        {
+          "path": "tests/research/test_retrieval_named_entities.py",
+          "bytes": 4373,
+          "sha256": "7f7b9d66494a996bc5ee13620298b9ae7bb09b9b63f81695da87791febb10ebe"
+        },
+        {
+          "path": "tests/research/test_typed_candidate_projection.py",
+          "bytes": 8257,
+          "sha256": "fad11912dbf5fc2cf16a800d3dddc1689831795b3b6e2ca7e4a21e5fba8531d6"
+        }
+      ],
+      "snapshot_commit": "bf48ed973469157ad8f2ca5426d09955e621706e",
+      "snapshot_created": true
+    },
+    {
+      "path": "/private/tmp/registry-rules-repair-31b20baf",
+      "head": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "common": "/Users/garces/Documents/projects/repos/argus/.git",
+      "status": [
+        " M src/argus/agent_runtime/discovery/composer.py",
+        " M src/argus/agent_runtime/interpreter/discovery_act_guard.py",
+        " M src/argus/agent_runtime/interpreter/discovery_focused_read.py",
+        " M src/argus/agent_runtime/research_tools.py",
+        " M src/argus/agent_runtime/stages/interpret_types.py",
+        " M src/argus/domain/tool_declaration.py",
+        "?? tests/domain/test_tool_presence_rules.py",
+        "?? tests/research/test_discovery_target_contract.py"
+      ],
+      "error": "",
+      "files": [
+        {
+          "path": "src/argus/agent_runtime/discovery/composer.py",
+          "bytes": 33987,
+          "sha256": "d63ea424687502519fd37d9ff9c66e8b72d95a5e6cb3c7c8c15738aa78f65f50"
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/discovery_act_guard.py",
+          "bytes": 5074,
+          "sha256": "1b3d41d102e3cd3586e74cffbd5c97a5b48d5966788701446ec21a814140de86"
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/discovery_focused_read.py",
+          "bytes": 7473,
+          "sha256": "1282043d9b8c1954265538aa724e4e855e8b89a8724cb5fe7396351e9e55c96d"
+        },
+        {
+          "path": "src/argus/agent_runtime/research_tools.py",
+          "bytes": 21830,
+          "sha256": "2d577e6670d83fb971563217d25f745485ce76a2ee9942d0bc77863b5993fe9e"
+        },
+        {
+          "path": "src/argus/agent_runtime/stages/interpret_types.py",
+          "bytes": 11159,
+          "sha256": "2d56613f8c82994e692830e8e28d1447c0af8423ce972b96c527cbf038abc0cb"
+        },
+        {
+          "path": "src/argus/domain/tool_declaration.py",
+          "bytes": 28330,
+          "sha256": "113fe4969c2862a297d04a51ade76a57d9fd604f86ba54bb78f9e07debbc6eee"
+        },
+        {
+          "path": "tests/domain/test_tool_presence_rules.py",
+          "bytes": 4819,
+          "sha256": "3bbe9a30b70c4e6dbccf9a08ea6ed20a48fa41aefc072a5a26c607cf5e6f6f93"
+        },
+        {
+          "path": "tests/research/test_discovery_target_contract.py",
+          "bytes": 5576,
+          "sha256": "7b27a635a97370f807f131ca290a1488bde64a0f4f61bf930919213caffd4119"
+        }
+      ],
+      "snapshot_commit": "6726e1b7dd0babccc7e3b94b9d41922be7215a36",
+      "snapshot_created": true
+    },
+    {
+      "path": "/private/tmp/registry-tests-repair-31b20baf",
+      "head": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "common": "/Users/garces/Documents/projects/repos/argus/.git",
+      "status": [
+        " M tests/agent_runtime/test_declared_backtest_repair_boundaries.py",
+        " M tests/agent_runtime/test_strategy_route_cost_audit.py"
+      ],
+      "error": "",
+      "files": [
+        {
+          "path": "tests/agent_runtime/test_declared_backtest_repair_boundaries.py",
+          "bytes": 13570,
+          "sha256": "eb5d76d3074e0bef2f05ebed6f991b134a762f3747c930272e64750ff8a424a4"
+        },
+        {
+          "path": "tests/agent_runtime/test_strategy_route_cost_audit.py",
+          "bytes": 7451,
+          "sha256": "177b750632b3405ed40ac208557cc54a1550a8d33ee6078da0825a0a602f62b5"
+        }
+      ],
+      "snapshot_commit": "4616e29e7598e9c9c4bb532095c6098aea75dcd1",
+      "snapshot_created": true
+    },
+    {
+      "path": "/private/tmp/registry-combined-repairs-31b20baf",
+      "head": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "common": "/Users/garces/Documents/projects/repos/argus/.git",
+      "status": [
+        " M src/argus/agent_runtime/discovery/composer.py",
+        " M src/argus/agent_runtime/interpreter/discovery_act_guard.py",
+        " M src/argus/agent_runtime/interpreter/discovery_focused_read.py",
+        " M src/argus/agent_runtime/interpreter/focused_extraction.py",
+        " M src/argus/agent_runtime/interpreter/run_field_audits.py",
+        " M src/argus/agent_runtime/research_tools.py",
+        " M src/argus/agent_runtime/semantic_integrity.py",
+        " M src/argus/agent_runtime/stages/interpret_types.py",
+        " M src/argus/domain/tool_declaration.py",
+        " M tests/agent_runtime/test_declared_backtest_repair_boundaries.py",
+        " M tests/agent_runtime/test_strategy_route_cost_audit.py",
+        " M tests/evals/measurement_eval_harness.py",
+        " M tests/evals/measurement_selection.py",
+        " M tests/evals/test_measurement_availability.py",
+        " M tests/evals/test_measurement_selection.py",
+        "?? tests/agent_runtime/fixtures/financial_role_audit_replies_31b20baf.json",
+        "?? tests/agent_runtime/fixtures/financial_role_replies_31b20baf.json",
+        "?? tests/agent_runtime/test_audited_financial_roles.py",
+        "?? tests/agent_runtime/test_focused_financial_projection.py",
+        "?? tests/domain/test_tool_presence_rules.py",
+        "?? tests/research/test_discovery_target_contract.py"
+      ],
+      "error": "",
+      "files": [
+        {
+          "path": "src/argus/agent_runtime/discovery/composer.py",
+          "bytes": 33987,
+          "sha256": "d63ea424687502519fd37d9ff9c66e8b72d95a5e6cb3c7c8c15738aa78f65f50"
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/discovery_act_guard.py",
+          "bytes": 5074,
+          "sha256": "1b3d41d102e3cd3586e74cffbd5c97a5b48d5966788701446ec21a814140de86"
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/discovery_focused_read.py",
+          "bytes": 7473,
+          "sha256": "1282043d9b8c1954265538aa724e4e855e8b89a8724cb5fe7396351e9e55c96d"
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/focused_extraction.py",
+          "bytes": 33484,
+          "sha256": "2af3531769f91cf1b06ebb948d16c4ccf4d1d15972fcc01b95b028ea544175f4"
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/run_field_audits.py",
+          "bytes": 42499,
+          "sha256": "33e7b1438843709e0363a67a1778f811b7473340b44dc0cf9881f625866c0703"
+        },
+        {
+          "path": "src/argus/agent_runtime/research_tools.py",
+          "bytes": 21830,
+          "sha256": "2d577e6670d83fb971563217d25f745485ce76a2ee9942d0bc77863b5993fe9e"
+        },
+        {
+          "path": "src/argus/agent_runtime/semantic_integrity.py",
+          "bytes": 28697,
+          "sha256": "5bd5c985db56e8a956a2bede4e50122266421ec65d99fefad56c11e4a9f3ca2a"
+        },
+        {
+          "path": "src/argus/agent_runtime/stages/interpret_types.py",
+          "bytes": 11159,
+          "sha256": "2d56613f8c82994e692830e8e28d1447c0af8423ce972b96c527cbf038abc0cb"
+        },
+        {
+          "path": "src/argus/domain/tool_declaration.py",
+          "bytes": 28330,
+          "sha256": "113fe4969c2862a297d04a51ade76a57d9fd604f86ba54bb78f9e07debbc6eee"
+        },
+        {
+          "path": "tests/agent_runtime/test_declared_backtest_repair_boundaries.py",
+          "bytes": 13570,
+          "sha256": "eb5d76d3074e0bef2f05ebed6f991b134a762f3747c930272e64750ff8a424a4"
+        },
+        {
+          "path": "tests/agent_runtime/test_strategy_route_cost_audit.py",
+          "bytes": 7451,
+          "sha256": "177b750632b3405ed40ac208557cc54a1550a8d33ee6078da0825a0a602f62b5"
+        },
+        {
+          "path": "tests/evals/measurement_eval_harness.py",
+          "bytes": 44803,
+          "sha256": "2416248b9118d0d3f18f172f3c96231b3b7feb9c9c5677a52f8d3756c34c9784"
+        },
+        {
+          "path": "tests/evals/measurement_selection.py",
+          "bytes": 16942,
+          "sha256": "33f2e400d79ea33843ffcd76963e1618718cbb6a607aaa357958b87b0190e584"
+        },
+        {
+          "path": "tests/evals/test_measurement_availability.py",
+          "bytes": 10514,
+          "sha256": "3bef4de5628f4fc542ad108ccca197fbb5bad1092a5effd1e01c8fa2a4be19db"
+        },
+        {
+          "path": "tests/evals/test_measurement_selection.py",
+          "bytes": 26930,
+          "sha256": "74c1a4fd93abda34c83f29c8abb0f51ead7a0edb6874c757ebb3b0f104648330"
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/financial_role_audit_replies_31b20baf.json",
+          "bytes": 3030,
+          "sha256": "61ff9fcdcdc45f5d2efd0434ebd897f9d3e90b085c20c897aaa322d23a968586"
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/financial_role_replies_31b20baf.json",
+          "bytes": 4887,
+          "sha256": "3cc0cac5ed727978d2c139eff7e53a34da15914a10d6c8fdee6b9eb8b5fb2861"
+        },
+        {
+          "path": "tests/agent_runtime/test_audited_financial_roles.py",
+          "bytes": 8954,
+          "sha256": "320faa4646d0773a214e43cd6cb8de58732402ce48b734ed182a43809ef1650e"
+        },
+        {
+          "path": "tests/agent_runtime/test_focused_financial_projection.py",
+          "bytes": 8784,
+          "sha256": "ab15ac01b9fb59c86cdd0dfc849b8c1ac901894e841ecdcbd9d564726fc5d2e7"
+        },
+        {
+          "path": "tests/domain/test_tool_presence_rules.py",
+          "bytes": 4819,
+          "sha256": "3bbe9a30b70c4e6dbccf9a08ea6ed20a48fa41aefc072a5a26c607cf5e6f6f93"
+        },
+        {
+          "path": "tests/research/test_discovery_target_contract.py",
+          "bytes": 5576,
+          "sha256": "7b27a635a97370f807f131ca290a1488bde64a0f4f61bf930919213caffd4119"
+        }
+      ],
+      "snapshot_commit": "b0b2ca6eddd83839df0f297769538164af77e4a6",
+      "snapshot_created": true
+    },
+    {
+      "path": "/private/tmp/registry-money-repair-31b20baf",
+      "head": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "common": "/Users/garces/Documents/projects/repos/argus/.git",
+      "status": [
+        " M src/argus/agent_runtime/interpreter/focused_extraction.py",
+        " M src/argus/agent_runtime/interpreter/run_field_audits.py",
+        " M src/argus/agent_runtime/semantic_integrity.py",
+        "?? tests/agent_runtime/fixtures/financial_role_audit_replies_31b20baf.json",
+        "?? tests/agent_runtime/fixtures/financial_role_missing_replies_542fcfb2.json",
+        "?? tests/agent_runtime/fixtures/financial_role_replies_31b20baf.json",
+        "?? tests/agent_runtime/test_audited_financial_roles.py",
+        "?? tests/agent_runtime/test_focused_financial_projection.py"
+      ],
+      "error": "",
+      "files": [
+        {
+          "path": "src/argus/agent_runtime/interpreter/focused_extraction.py",
+          "bytes": 33484,
+          "sha256": "2af3531769f91cf1b06ebb948d16c4ccf4d1d15972fcc01b95b028ea544175f4"
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/run_field_audits.py",
+          "bytes": 42499,
+          "sha256": "33e7b1438843709e0363a67a1778f811b7473340b44dc0cf9881f625866c0703"
+        },
+        {
+          "path": "src/argus/agent_runtime/semantic_integrity.py",
+          "bytes": 28697,
+          "sha256": "5bd5c985db56e8a956a2bede4e50122266421ec65d99fefad56c11e4a9f3ca2a"
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/financial_role_audit_replies_31b20baf.json",
+          "bytes": 3030,
+          "sha256": "61ff9fcdcdc45f5d2efd0434ebd897f9d3e90b085c20c897aaa322d23a968586"
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/financial_role_missing_replies_542fcfb2.json",
+          "bytes": 3699,
+          "sha256": "5b66c32ce445e1863e9e2b2baea5fd120a3b8864c65850d8cb00792710d78864"
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/financial_role_replies_31b20baf.json",
+          "bytes": 4887,
+          "sha256": "3cc0cac5ed727978d2c139eff7e53a34da15914a10d6c8fdee6b9eb8b5fb2861"
+        },
+        {
+          "path": "tests/agent_runtime/test_audited_financial_roles.py",
+          "bytes": 11156,
+          "sha256": "c75d7f2fa96fee5ddec87e496db4e99de7a15bca54dcffb2311b8e9c923c08cc"
+        },
+        {
+          "path": "tests/agent_runtime/test_focused_financial_projection.py",
+          "bytes": 8784,
+          "sha256": "ab15ac01b9fb59c86cdd0dfc849b8c1ac901894e841ecdcbd9d564726fc5d2e7"
+        }
+      ],
+      "snapshot_commit": "3b9d99de4decfa6f1aa23a8638d7ac9c190a181d",
+      "snapshot_created": true
+    },
+    {
+      "path": "/private/tmp/registry-dca-completion-31b20baf",
+      "head": "31b20baf7a036fdd9148bce8a90a838e076be201",
+      "snapshot_commit": "6de7ff5a9564cf19660a3745083cfcd00df18ede",
+      "snapshot_created": true,
+      "files": [
+        {
+          "path": "src/argus/agent_runtime/interpreter/focused_extraction.py",
+          "sha256": "2af3531769f91cf1b06ebb948d16c4ccf4d1d15972fcc01b95b028ea544175f4",
+          "bytes": 33484
+        },
+        {
+          "path": "src/argus/agent_runtime/interpreter/run_field_audits.py",
+          "sha256": "33e7b1438843709e0363a67a1778f811b7473340b44dc0cf9881f625866c0703",
+          "bytes": 42499
+        },
+        {
+          "path": "src/argus/agent_runtime/llm_interpreter.py",
+          "sha256": "df15617adf2b6041d028e054de50b6021308ec73b95dd27a6ae3d667093a44e3",
+          "bytes": 211971
+        },
+        {
+          "path": "src/argus/agent_runtime/semantic_integrity.py",
+          "sha256": "5bd5c985db56e8a956a2bede4e50122266421ec65d99fefad56c11e4a9f3ca2a",
+          "bytes": 28697
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/financial_role_audit_replies_31b20baf.json",
+          "sha256": "61ff9fcdcdc45f5d2efd0434ebd897f9d3e90b085c20c897aaa322d23a968586",
+          "bytes": 3030
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/financial_role_replies_31b20baf.json",
+          "sha256": "3cc0cac5ed727978d2c139eff7e53a34da15914a10d6c8fdee6b9eb8b5fb2861",
+          "bytes": 4887
+        },
+        {
+          "path": "tests/agent_runtime/fixtures/registry_dca_repair_completion.json",
+          "sha256": "b6569973ea759bc5e9ccd57334542d45ec12be470ca3eafa87dc78f47189f0ba",
+          "bytes": 21659
+        },
+        {
+          "path": "tests/agent_runtime/test_audited_financial_roles.py",
+          "sha256": "320faa4646d0773a214e43cd6cb8de58732402ce48b734ed182a43809ef1650e",
+          "bytes": 8954
+        },
+        {
+          "path": "tests/agent_runtime/test_focused_financial_projection.py",
+          "sha256": "ab15ac01b9fb59c86cdd0dfc849b8c1ac901894e841ecdcbd9d564726fc5d2e7",
+          "bytes": 8784
+        },
+        {
+          "path": "tests/agent_runtime/test_registry_dca_repair_completion.py",
+          "sha256": "63047d738a9734b78bd50c26851441714b8db274bfa48445b8886a9708029aba",
+          "bytes": 19655
+        }
+      ],
+      "status": [
+        " M src/argus/agent_runtime/interpreter/focused_extraction.py",
+        " M src/argus/agent_runtime/interpreter/run_field_audits.py",
+        " M src/argus/agent_runtime/llm_interpreter.py",
+        " M src/argus/agent_runtime/semantic_integrity.py",
+        "?? tests/agent_runtime/fixtures/financial_role_audit_replies_31b20baf.json",
+        "?? tests/agent_runtime/fixtures/financial_role_replies_31b20baf.json",
+        "?? tests/agent_runtime/fixtures/registry_dca_repair_completion.json",
+        "?? tests/agent_runtime/test_audited_financial_roles.py",
+        "?? tests/agent_runtime/test_focused_financial_projection.py",
+        "?? tests/agent_runtime/test_registry_dca_repair_completion.py"
+      ],
+      "archive_initialized_for_preservation": true
+    }
+  ],
+  "note": "All changed worktrees are committed and reachable parents. The branch tree uses the combined snapshot; other variants are preserved intact in their named commits, without reconciliation or repair."
+}

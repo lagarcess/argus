@@ -1,0 +1,338 @@
+[
+  {
+    "repetition": 1,
+    "case": "natural_language_establishes_modeled_costs_issue_271",
+    "arm": "baseline",
+    "index": 1
+  },
+  {
+    "repetition": 1,
+    "case": "natural_language_establishes_modeled_costs_issue_271",
+    "arm": "candidate",
+    "index": 2
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_comparison_anchor_english_issue_244",
+    "arm": "candidate",
+    "index": 3
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_comparison_anchor_english_issue_244",
+    "arm": "baseline",
+    "index": 4
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_category_spanish_issue_244",
+    "arm": "baseline",
+    "index": 5
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_category_spanish_issue_244",
+    "arm": "candidate",
+    "index": 6
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_recent_ipo_exact_issue_344",
+    "arm": "candidate",
+    "index": 7
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_recent_ipo_exact_issue_344",
+    "arm": "baseline",
+    "index": 8
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_trending_crypto_exact_issue_344",
+    "arm": "baseline",
+    "index": 9
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_trending_crypto_exact_issue_344",
+    "arm": "candidate",
+    "index": 10
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_not_result_followup_issue_244",
+    "arm": "candidate",
+    "index": 11
+  },
+  {
+    "repetition": 1,
+    "case": "asset_discovery_not_result_followup_issue_244",
+    "arm": "baseline",
+    "index": 12
+  },
+  {
+    "repetition": 1,
+    "case": "metric_correctness_eth_default_crypto_benchmark",
+    "arm": "baseline",
+    "index": 13
+  },
+  {
+    "repetition": 1,
+    "case": "metric_correctness_eth_default_crypto_benchmark",
+    "arm": "candidate",
+    "index": 14
+  },
+  {
+    "repetition": 1,
+    "case": "capability_honesty_news_sentiment_rule_aapl",
+    "arm": "candidate",
+    "index": 15
+  },
+  {
+    "repetition": 1,
+    "case": "capability_honesty_news_sentiment_rule_aapl",
+    "arm": "baseline",
+    "index": 16
+  },
+  {
+    "repetition": 1,
+    "case": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+    "arm": "baseline",
+    "index": 17
+  },
+  {
+    "repetition": 1,
+    "case": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+    "arm": "candidate",
+    "index": 18
+  },
+  {
+    "repetition": 1,
+    "case": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+    "arm": "candidate",
+    "index": 19
+  },
+  {
+    "repetition": 1,
+    "case": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+    "arm": "baseline",
+    "index": 20
+  },
+  {
+    "repetition": 1,
+    "case": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+    "arm": "baseline",
+    "index": 21
+  },
+  {
+    "repetition": 1,
+    "case": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+    "arm": "candidate",
+    "index": 22
+  },
+  {
+    "repetition": 1,
+    "case": "capability_honesty_golden_cross_control_aapl",
+    "arm": "candidate",
+    "index": 23
+  },
+  {
+    "repetition": 1,
+    "case": "capability_honesty_golden_cross_control_aapl",
+    "arm": "baseline",
+    "index": 24
+  },
+  {
+    "repetition": 1,
+    "case": "messy_english_post_result_fact_then_capital_edit_issue_160",
+    "arm": "baseline",
+    "index": 25
+  },
+  {
+    "repetition": 1,
+    "case": "messy_english_post_result_fact_then_capital_edit_issue_160",
+    "arm": "candidate",
+    "index": 26
+  },
+  {
+    "repetition": 1,
+    "case": "ordinary_conversation_concept_inflation_es",
+    "arm": "candidate",
+    "index": 27
+  },
+  {
+    "repetition": 1,
+    "case": "ordinary_conversation_concept_inflation_es",
+    "arm": "baseline",
+    "index": 28
+  },
+  {
+    "repetition": 2,
+    "case": "natural_language_establishes_modeled_costs_issue_271",
+    "arm": "candidate",
+    "index": 29
+  },
+  {
+    "repetition": 2,
+    "case": "natural_language_establishes_modeled_costs_issue_271",
+    "arm": "baseline",
+    "index": 30
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_comparison_anchor_english_issue_244",
+    "arm": "baseline",
+    "index": 31
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_comparison_anchor_english_issue_244",
+    "arm": "candidate",
+    "index": 32
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_category_spanish_issue_244",
+    "arm": "candidate",
+    "index": 33
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_category_spanish_issue_244",
+    "arm": "baseline",
+    "index": 34
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_recent_ipo_exact_issue_344",
+    "arm": "baseline",
+    "index": 35
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_recent_ipo_exact_issue_344",
+    "arm": "candidate",
+    "index": 36
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_trending_crypto_exact_issue_344",
+    "arm": "candidate",
+    "index": 37
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_trending_crypto_exact_issue_344",
+    "arm": "baseline",
+    "index": 38
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_not_result_followup_issue_244",
+    "arm": "baseline",
+    "index": 39
+  },
+  {
+    "repetition": 2,
+    "case": "asset_discovery_not_result_followup_issue_244",
+    "arm": "candidate",
+    "index": 40
+  },
+  {
+    "repetition": 2,
+    "case": "metric_correctness_eth_default_crypto_benchmark",
+    "arm": "candidate",
+    "index": 41
+  },
+  {
+    "repetition": 2,
+    "case": "metric_correctness_eth_default_crypto_benchmark",
+    "arm": "baseline",
+    "index": 42
+  },
+  {
+    "repetition": 2,
+    "case": "capability_honesty_news_sentiment_rule_aapl",
+    "arm": "baseline",
+    "index": 43
+  },
+  {
+    "repetition": 2,
+    "case": "capability_honesty_news_sentiment_rule_aapl",
+    "arm": "candidate",
+    "index": 44
+  },
+  {
+    "repetition": 2,
+    "case": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+    "arm": "candidate",
+    "index": 45
+  },
+  {
+    "repetition": 2,
+    "case": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+    "arm": "baseline",
+    "index": 46
+  },
+  {
+    "repetition": 2,
+    "case": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+    "arm": "baseline",
+    "index": 47
+  },
+  {
+    "repetition": 2,
+    "case": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+    "arm": "candidate",
+    "index": 48
+  },
+  {
+    "repetition": 2,
+    "case": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+    "arm": "candidate",
+    "index": 49
+  },
+  {
+    "repetition": 2,
+    "case": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+    "arm": "baseline",
+    "index": 50
+  },
+  {
+    "repetition": 2,
+    "case": "capability_honesty_golden_cross_control_aapl",
+    "arm": "baseline",
+    "index": 51
+  },
+  {
+    "repetition": 2,
+    "case": "capability_honesty_golden_cross_control_aapl",
+    "arm": "candidate",
+    "index": 52
+  },
+  {
+    "repetition": 2,
+    "case": "messy_english_post_result_fact_then_capital_edit_issue_160",
+    "arm": "candidate",
+    "index": 53
+  },
+  {
+    "repetition": 2,
+    "case": "messy_english_post_result_fact_then_capital_edit_issue_160",
+    "arm": "baseline",
+    "index": 54
+  },
+  {
+    "repetition": 2,
+    "case": "ordinary_conversation_concept_inflation_es",
+    "arm": "baseline",
+    "index": 55
+  },
+  {
+    "repetition": 2,
+    "case": "ordinary_conversation_concept_inflation_es",
+    "arm": "candidate",
+    "index": 56
+  }
+]

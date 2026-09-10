@@ -1,0 +1,42 @@
+{
+  "baseline": {
+    "sha": "542fcfb2432e906663160d8cb874d955faeafd16",
+    "clean": true,
+    "inputs": {
+      "natural_language_establishes_modeled_costs_issue_271": "15f2687f5e87663d5aba6aa4e9d1ac9b4b9f91d71616035958946875741f02a3",
+      "asset_discovery_comparison_anchor_english_issue_244": "f6b76de2bd50f5f58ecd9ec834dbe684a3015687bf12e37be278b8244c79c0f5",
+      "asset_discovery_category_spanish_issue_244": "85b84f308cad6f0aaa09f9aa08b9714bcce6c11027e43497b233abe97e0ded9e",
+      "asset_discovery_recent_ipo_exact_issue_344": "02eab7cb5b9a6824efbbba34bca36af9f6e3232b5f78ce4bb2a2654cee61b811",
+      "asset_discovery_trending_crypto_exact_issue_344": "406b4b0c7790510ac67be3d21eb72af0b5901460ee19590691935a8053d29d43",
+      "asset_discovery_not_result_followup_issue_244": "ea50c27e7c1bc4153dd4d5c418456f0bdf52652c8131eaa140da6b0ddf914a0d",
+      "metric_correctness_eth_default_crypto_benchmark": "e76e4829e68e8e7f4a3302062d779a715cc225043dbdcca79a711698c5f56465",
+      "capability_honesty_golden_cross_control_aapl": "1b9339b93ebe9dd0a1ac4e3a330a9cd285ac76854322f33273ad53bf26fcb819",
+      "capability_honesty_news_sentiment_rule_aapl": "287ef348de97b7b30b4869ef7b61342b77539ebf9b7ec307e8d71b10b6a60487",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455": "bf951630e5e47517dbe4656ae29eea2b244200a1bc1843d81439648be39fe8f6",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run": "6a504b28fe9f592c20ed4d7bfe738fe727765d26a4674970ca51a213b5f9fe6f",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run": "06f6437c02626ae63895fe9b281061aaf4b3d108784f0a079de6fc4179b96057",
+      "messy_english_post_result_fact_then_capital_edit_issue_160": "e1e638284c639b95b436d8257bad986666438ecc53fca94eadf1ccad520532bc",
+      "ordinary_conversation_concept_inflation_es": "780f0f066dabafbb9c63f5217ca5f19378730e1d646ba51f4424a3f1881b8159"
+    }
+  },
+  "candidate": {
+    "sha": "31b20baf7a036fdd9148bce8a90a838e076be201",
+    "clean": true,
+    "inputs": {
+      "natural_language_establishes_modeled_costs_issue_271": "15f2687f5e87663d5aba6aa4e9d1ac9b4b9f91d71616035958946875741f02a3",
+      "asset_discovery_comparison_anchor_english_issue_244": "f6b76de2bd50f5f58ecd9ec834dbe684a3015687bf12e37be278b8244c79c0f5",
+      "asset_discovery_category_spanish_issue_244": "85b84f308cad6f0aaa09f9aa08b9714bcce6c11027e43497b233abe97e0ded9e",
+      "asset_discovery_recent_ipo_exact_issue_344": "02eab7cb5b9a6824efbbba34bca36af9f6e3232b5f78ce4bb2a2654cee61b811",
+      "asset_discovery_trending_crypto_exact_issue_344": "406b4b0c7790510ac67be3d21eb72af0b5901460ee19590691935a8053d29d43",
+      "asset_discovery_not_result_followup_issue_244": "ea50c27e7c1bc4153dd4d5c418456f0bdf52652c8131eaa140da6b0ddf914a0d",
+      "metric_correctness_eth_default_crypto_benchmark": "e76e4829e68e8e7f4a3302062d779a715cc225043dbdcca79a711698c5f56465",
+      "capability_honesty_golden_cross_control_aapl": "1b9339b93ebe9dd0a1ac4e3a330a9cd285ac76854322f33273ad53bf26fcb819",
+      "capability_honesty_news_sentiment_rule_aapl": "287ef348de97b7b30b4869ef7b61342b77539ebf9b7ec307e8d71b10b6a60487",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455": "bf951630e5e47517dbe4656ae29eea2b244200a1bc1843d81439648be39fe8f6",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run": "6a504b28fe9f592c20ed4d7bfe738fe727765d26a4674970ca51a213b5f9fe6f",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run": "06f6437c02626ae63895fe9b281061aaf4b3d108784f0a079de6fc4179b96057",
+      "messy_english_post_result_fact_then_capital_edit_issue_160": "e1e638284c639b95b436d8257bad986666438ecc53fca94eadf1ccad520532bc",
+      "ordinary_conversation_concept_inflation_es": "780f0f066dabafbb9c63f5217ca5f19378730e1d646ba51f4424a3f1881b8159"
+    }
+  }
+}

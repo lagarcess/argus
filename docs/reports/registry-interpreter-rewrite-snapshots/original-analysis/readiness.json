@@ -1,0 +1,10 @@
+{
+  "readiness": {
+    "expected_outputs": 56,
+    "missing_outputs": [],
+    "problems": [],
+    "terminal_summary_allowed": true,
+    "valid_outputs": 56
+  },
+  "scope": "complete_selected_56_probe_schedule"
+}

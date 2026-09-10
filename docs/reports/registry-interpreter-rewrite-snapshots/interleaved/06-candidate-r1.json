@@ -1,0 +1,927 @@
+{
+  "artifact_type": "partial_interleaved_case_probe",
+  "case_input_sha256": "85b84f308cad6f0aaa09f9aa08b9714bcce6c11027e43497b233abe97e0ded9e",
+  "elapsed_seconds": 21.811206250014948,
+  "is_full_suite_scorecard": false,
+  "label": "06-candidate-r1",
+  "observed_final_research_sidecar": {
+    "anchor_symbols": [],
+    "capability_class": "peer_expansion",
+    "evidence_policy": {
+      "closed_period": false,
+      "current_survey": false,
+      "data_class": "movers",
+      "max_age_seconds": 300.0,
+      "period_start_date": null,
+      "question_as_of_date": null,
+      "question_kind": "find_assets"
+    },
+    "follow_up": {
+      "comparison_set": [],
+      "open_thread": {
+        "category": "ciberseguridad",
+        "period_of_interest": null,
+        "shape": "find"
+      },
+      "peer_suggestions": [
+        "PANW",
+        "CRWD",
+        "FTNT",
+        "ZS",
+        "CHKP"
+      ],
+      "schema_version": "argus_research_follow_up/v1",
+      "subjects": []
+    },
+    "peers": [
+      {
+        "asset_class": "equity",
+        "name": "Palo Alto Networks, Inc. Common Stock",
+        "symbol": "PANW"
+      },
+      {
+        "asset_class": "equity",
+        "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+        "symbol": "CRWD"
+      },
+      {
+        "asset_class": "equity",
+        "name": "Fortinet, Inc. Common Stock",
+        "symbol": "FTNT"
+      },
+      {
+        "asset_class": "equity",
+        "name": "Zscaler, Inc. Common Stock",
+        "symbol": "ZS"
+      },
+      {
+        "asset_class": "equity",
+        "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+        "symbol": "CHKP"
+      }
+    ],
+    "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+    "rows": [],
+    "schema_version": "argus_research/v1",
+    "shape": "find",
+    "sources": [],
+    "usage": {
+      "cache_status": "bypass",
+      "cost_usd": null,
+      "invocations": 0,
+      "latency_ms": null
+    }
+  },
+  "provenance": {
+    "asset_provider_mode": "live_provider",
+    "candidate_sha": "31b20baf7a036fdd9148bce8a90a838e076be201",
+    "evaluation_mode": "live",
+    "fixture_case_ids": [
+      "action_chip_run_visible_confirmation_aapl",
+      "action_chip_change_asset_remove_aapl_issue_188",
+      "action_chip_change_asset_bare_ticker_append_issue_190",
+      "action_chip_change_asset_compound_replace_issue_188",
+      "action_chip_change_asset_changed_mind_capital_issue_188",
+      "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+      "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+      "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+      "natural_language_establishes_modeled_costs_issue_271",
+      "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "asset_discovery_category_english_issue_244",
+      "asset_discovery_peer_anchor_english_issue_244",
+      "asset_discovery_comparison_anchor_english_issue_244",
+      "asset_discovery_category_spanish_issue_244",
+      "asset_discovery_recent_ipo_exact_issue_344",
+      "asset_discovery_trending_crypto_exact_issue_344",
+      "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "asset_discovery_semantic_pharma_escalation_issue_344",
+      "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "asset_discovery_not_direct_backtest_issue_244",
+      "asset_discovery_not_result_followup_issue_244",
+      "asset_discovery_not_capability_question_issue_244",
+      "metric_correctness_eth_default_crypto_benchmark",
+      "capability_honesty_options_straddle_tsla",
+      "capability_honesty_golden_cross_control_aapl",
+      "capability_honesty_momentum_breakout_aapl",
+      "capability_honesty_news_sentiment_rule_aapl",
+      "capability_honesty_future_performance_nvda_golden_cross",
+      "capability_honesty_future_performance_btc_regression",
+      "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+      "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "dca_capital_semantics_crypto_weekly_btc_issue_455",
+      "dca_capital_semantics_truncated_window_measures_served_issue_455",
+      "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "graceful_recovery_weekly_options_aapl",
+      "graceful_recovery_spanish_weekly_options_aapl",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_english_aapl_simple_hold_2024",
+      "messy_english_company_name_multi_asset_issue_142",
+      "messy_english_complete_sma_crossover_benchmark_issue_270",
+      "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_btc_hold_q1_2024",
+      "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_future_performance_nvda_cruce_dorado",
+      "ordinary_conversation_concept_compound_interest_en",
+      "ordinary_conversation_concept_inflation_es",
+      "ordinary_conversation_concept_etf_es",
+      "ordinary_conversation_capability_indicator_question_en",
+      "ordinary_conversation_capability_indicator_question_es",
+      "ordinary_conversation_macro_curiosity_en",
+      "ordinary_conversation_price_question_en",
+      "spanish_ui_english_user_msft_hold_h1_2024"
+    ],
+    "fixture_sha256": "5d1fa589338f2a393a145229cb08a81e5e5513cb3e2b898b6e91dc792760b288",
+    "live_market_data_probe": {
+      "adjustment_reason": "calendar_alignment",
+      "effective_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-02"
+      },
+      "requested_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-01"
+      },
+      "symbol": "SPY"
+    },
+    "market_data_provider_mode": "live_provider",
+    "python_version": "3.10.20",
+    "worktree_clean": true
+  },
+  "provider_usage": {
+    "reported_cost_receipt_count": 5,
+    "reported_cost_usd": 0.03718942,
+    "route_receipt_count": 5,
+    "unreported_cost_receipt_count": 0
+  },
+  "results": [
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [
+        "prose_judge:selection_relevance"
+      ],
+      "id": "asset_discovery_category_spanish_issue_244",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [
+          "selection_relevance"
+        ],
+        "judged_assistant_text": {
+          "character_count": 100,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "7a448b6063a836a0b4cf55796fcb73ee4e0bb0b9de8eeeb5cb4ebe0944f128ef",
+          "text": "Puedes probar estas cinco acciones de ciberseguridad, todas ellas empresas reconocidas en el sector.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 2674,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "d87bceeababb4ce5c23ad42a1f73d000c24d1829b5fdca7cb6c4c259eaf87a89",
+          "text": "{\"can_request_search_action\": true, \"discovery_grounding\": \"general_knowledge_not_current_search\", \"discovery_rows\": [{\"name\": \"Palo Alto Networks, Inc. Common Stock\", \"reason_text\": \"Empresa l\\u00edder en soluciones de ciberseguridad empresarial y firewalls de nueva generaci\\u00f3n.\", \"symbol\": \"PANW\"}, {\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\", \"reason_text\": \"Proveedor de protecci\\u00f3n de endpoints y detecci\\u00f3n de amenazas basada en la nube.\", \"symbol\": \"CRWD\"}, {\"name\": \"Fortinet, Inc. Common Stock\", \"reason_text\": \"Ofrece plataformas integradas de ciberseguridad y redes seguras para empresas.\", \"symbol\": \"FTNT\"}, {\"name\": \"Zscaler, Inc. Common Stock\", \"reason_text\": \"Plataforma de seguridad en la nube que protege el tr\\u00e1fico web y las aplicaciones.\", \"symbol\": \"ZS\"}, {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\", \"reason_text\": \"Desarrolla soluciones de firewall y seguridad de red para empresas globales.\", \"symbol\": \"CHKP\"}], \"retrieved_at\": \"2026-09-10T07:00:01.843169+00:00\", \"tool_result_cards\": [{\"presentation\": {\"answer\": {\"label\": {\"interpolation_args\": {\"name\": \"Palo Alto Networks, Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_0\", \"unit\": null, \"value\": \"PANW\", \"value_text\": null}, \"inputs\": [{\"editable\": false, \"label\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.request\"}, \"name\": \"request\", \"unit\": null, \"unknown\": false, \"value\": \"\\u00bfqu\\u00e9 acciones de ciberseguridad podr\\u00eda probar?\", \"value_text\": null, \"visibility\": \"private\"}], \"narrative\": \"Puedes probar estas cinco acciones de ciberseguridad, todas ellas empresas reconocidas en el sector.\", \"notes\": [], \"rows\": [{\"label\": {\"interpolation_args\": {\"name\": \"CrowdStrike Holdings, Inc. Class A Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_1\", \"unit\": null, \"value\": \"CRWD\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Fortinet, Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_2\", \"unit\": null, \"value\": \"FTNT\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Zscaler, Inc. Common Stock\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_3\", \"unit\": null, \"value\": \"ZS\", \"value_text\": null}, {\"label\": {\"interpolation_args\": {\"name\": \"Check Point Software Technologies Ltd. Ordinary Shares\"}, \"locale_key\": \"chat.tools.research.subject\"}, \"name\": \"subject_4\", \"unit\": null, \"value\": \"CHKP\", \"value_text\": null}], \"sources\": [], \"title\": {\"interpolation_args\": {}, \"locale_key\": \"chat.tools.research.title\"}, \"visual\": null}, \"status\": \"succeeded\"}]}",
+          "truncated": false
+        },
+        "notes": "The user asked for 'acciones de ciberseguridad' (cybersecurity stocks). The delivered assets are all cybersecurity companies, matching the category. However, the selection_expectations specify relationship 'category' and the evidence shows the assets are correctly categorized. The prose states 'estas cinco acciones de ciberseguridad' and the rendered surface lists five cybersecurity stocks. The selection_relevance criterion is met. No other criteria failed: honesty holds (the stocks are presented as suggestions, not as executable trades), spanish_language_integrity holds (no English fallback), no_raw_runtime_error holds (no error details exposed).",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error",
+          "selection_relevance"
+        ],
+        "rubric_version": "argus-prose-quality-v2",
+        "selection_evidence": {
+          "assets": [
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "name": "Palo Alto Networks, Inc. Common Stock",
+                  "reason": "Empresa l\u00edder en soluciones de ciberseguridad empresarial y firewalls de nueva generaci\u00f3n.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "source_period": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "period_start_date": null,
+                    "question_as_of_date": null
+                  },
+                  "symbol": "PANW"
+                }
+              ],
+              "name": "Palo Alto Networks, Inc. Common Stock",
+              "symbol": "PANW"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                  "reason": "Proveedor de protecci\u00f3n de endpoints y detecci\u00f3n de amenazas basada en la nube.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "source_period": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "period_start_date": null,
+                    "question_as_of_date": null
+                  },
+                  "symbol": "CRWD"
+                }
+              ],
+              "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+              "symbol": "CRWD"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "name": "Fortinet, Inc. Common Stock",
+                  "reason": "Ofrece plataformas integradas de ciberseguridad y redes seguras para empresas.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "source_period": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "period_start_date": null,
+                    "question_as_of_date": null
+                  },
+                  "symbol": "FTNT"
+                }
+              ],
+              "name": "Fortinet, Inc. Common Stock",
+              "symbol": "FTNT"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "name": "Zscaler, Inc. Common Stock",
+                  "reason": "Plataforma de seguridad en la nube que protege el tr\u00e1fico web y las aplicaciones.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "source_period": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "period_start_date": null,
+                    "question_as_of_date": null
+                  },
+                  "symbol": "ZS"
+                }
+              ],
+              "name": "Zscaler, Inc. Common Stock",
+              "symbol": "ZS"
+            },
+            {
+              "asset_class": "equity",
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                  "reason": "Desarrolla soluciones de firewall y seguridad de red para empresas globales.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "source_period": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "period_start_date": null,
+                    "question_as_of_date": null
+                  },
+                  "symbol": "CHKP"
+                }
+              ],
+              "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+              "symbol": "CHKP"
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "observed_at": "2026-09-10T07:00:05.982546+00:00",
+          "structural_errors": []
+        },
+        "selection_expectations": {
+          "anchor_symbols": [],
+          "category_description_includes_any": [
+            "ciberseguridad",
+            "cybersecurity",
+            "cyber"
+          ],
+          "relationship": "category"
+        }
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:59:51.157304+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 879,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 785,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.00021735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T06:59:58.231874+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 7049,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 678,
+            "prompt_tokens": 26744,
+            "total_tokens": 27422
+          },
+          "usage_cost_usd": 0.0349234
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:00:01.842914+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3594,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 406,
+            "prompt_tokens": 476,
+            "total_tokens": 882
+          },
+          "usage_cost_usd": 0.0014756
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:00:05.925566+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1620,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 25,
+            "prompt_tokens": 373,
+            "total_tokens": 398
+          },
+          "usage_cost_usd": 3.807e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:00:11.893398+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 5904,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 157,
+            "prompt_tokens": 2404,
+            "total_tokens": 2561
+          },
+          "usage_cost_usd": 0.000535
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "acceptance_stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "assets": [
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Palo Alto Networks, Inc. Common Stock",
+                  "reason": "Empresa l\u00edder en soluciones de ciberseguridad empresarial y firewalls de nueva generaci\u00f3n.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "symbol": "PANW"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Palo Alto Networks, Inc. Common Stock",
+                "symbol": "PANW"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                  "reason": "Proveedor de protecci\u00f3n de endpoints y detecci\u00f3n de amenazas basada en la nube.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "symbol": "CRWD"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                "symbol": "CRWD"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Fortinet, Inc. Common Stock",
+                  "reason": "Ofrece plataformas integradas de ciberseguridad y redes seguras para empresas.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "symbol": "FTNT"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Fortinet, Inc. Common Stock",
+                "symbol": "FTNT"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Zscaler, Inc. Common Stock",
+                  "reason": "Plataforma de seguridad en la nube que protege el tr\u00e1fico web y las aplicaciones.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "symbol": "ZS"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Zscaler, Inc. Common Stock",
+                "symbol": "ZS"
+              },
+              "identity_matches": true
+            },
+            {
+              "facts": [
+                {
+                  "asset_class": "equity",
+                  "citation_origin": null,
+                  "citation_url": null,
+                  "evidence_policy": {
+                    "closed_period": false,
+                    "current_survey": false,
+                    "data_class": "movers",
+                    "max_age_seconds": 300.0,
+                    "period_start_date": null,
+                    "question_as_of_date": null,
+                    "question_kind": "find_assets"
+                  },
+                  "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                  "reason": "Desarrolla soluciones de firewall y seguridad de red para empresas globales.",
+                  "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                  "source": null,
+                  "symbol": "CHKP"
+                }
+              ],
+              "identity": {
+                "asset_class": "equity",
+                "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                "symbol": "CHKP"
+              },
+              "identity_matches": true
+            }
+          ],
+          "contract_version": "argus-selection-evidence/v2",
+          "errors": [],
+          "observed_at": "2026-09-10T07:00:05.982546+00:00"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "execution_trace": [
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "ready_to_respond",
+            "stage": "execute"
+          }
+        ],
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "follow_up",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [
+            "PANW",
+            "CRWD",
+            "FTNT",
+            "ZS",
+            "CHKP"
+          ],
+          "dropped_not_named": [
+            "CyberArk Software"
+          ],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "primary_intent": "explain",
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": {
+          "calls": [
+            {
+              "call_id": "peer_cybersec_001",
+              "degraded_code": null,
+              "published": true,
+              "rows": 0,
+              "shape": "find",
+              "sources": 0
+            }
+          ],
+          "degraded_code": null,
+          "published": true,
+          "rows": 0,
+          "shape": "find",
+          "sources": 0
+        },
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "approved_for_execution",
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null,
+        "tool_call_records": [
+          {
+            "call_id": "peer_cybersec_001",
+            "outcome": "succeeded",
+            "tool_name": "peer_expansion",
+            "tool_outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Puedes probar estas cinco acciones de ciberseguridad, todas ellas empresas reconocidas en el sector.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": false,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": null,
+                  "question_kind": "find_assets"
+                },
+                "peers": [
+                  {
+                    "name": "Palo Alto Networks, Inc. Common Stock",
+                    "symbol": "PANW"
+                  },
+                  {
+                    "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                    "symbol": "CRWD"
+                  },
+                  {
+                    "name": "Fortinet, Inc. Common Stock",
+                    "symbol": "FTNT"
+                  },
+                  {
+                    "name": "Zscaler, Inc. Common Stock",
+                    "symbol": "ZS"
+                  },
+                  {
+                    "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                    "symbol": "CHKP"
+                  }
+                ],
+                "relationship": "category",
+                "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": []
+              },
+              "status": "succeeded"
+            }
+          }
+        ],
+        "tool_calls": [
+          {
+            "arguments": {
+              "anchor_symbols": [],
+              "asset_class_hint": "equity",
+              "category_description": "ciberseguridad",
+              "needs_current_facts": false,
+              "relationship": "category",
+              "request": "\u00bfqu\u00e9 acciones de ciberseguridad podr\u00eda probar?"
+            },
+            "call_id": "peer_cybersec_001",
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_result_cards": [
+          {
+            "arguments": {
+              "anchor_symbols": [],
+              "asset_class_hint": "equity",
+              "category_description": "ciberseguridad",
+              "needs_current_facts": false,
+              "relationship": "category",
+              "request": "\u00bfqu\u00e9 acciones de ciberseguridad podr\u00eda probar?"
+            },
+            "artifact_id": "9ce09a8f-e170-4bb6-834d-dd7879c2c172",
+            "artifact_state": "active",
+            "call_id": "peer_cybersec_001",
+            "card_type": "research",
+            "card_version": 1,
+            "input_revision": 0,
+            "kind": "tool_result",
+            "outcome": {
+              "failure": null,
+              "result": {
+                "answer": "Puedes probar estas cinco acciones de ciberseguridad, todas ellas empresas reconocidas en el sector.",
+                "evidence_policy": {
+                  "closed_period": false,
+                  "current_survey": false,
+                  "data_class": "movers",
+                  "max_age_seconds": 300.0,
+                  "period_start_date": null,
+                  "question_as_of_date": null,
+                  "question_kind": "find_assets"
+                },
+                "peers": [
+                  {
+                    "name": "Palo Alto Networks, Inc. Common Stock",
+                    "symbol": "PANW"
+                  },
+                  {
+                    "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+                    "symbol": "CRWD"
+                  },
+                  {
+                    "name": "Fortinet, Inc. Common Stock",
+                    "symbol": "FTNT"
+                  },
+                  {
+                    "name": "Zscaler, Inc. Common Stock",
+                    "symbol": "ZS"
+                  },
+                  {
+                    "name": "Check Point Software Technologies Ltd. Ordinary Shares",
+                    "symbol": "CHKP"
+                  }
+                ],
+                "relationship": "category",
+                "retrieved_at": "2026-09-10T07:00:01.843169+00:00",
+                "rows": [],
+                "sources": [],
+                "status": "completed",
+                "subjects": []
+              },
+              "status": "succeeded"
+            },
+            "presentation": {
+              "answer": {
+                "label": {
+                  "interpolation_args": {
+                    "name": "Palo Alto Networks, Inc. Common Stock"
+                  },
+                  "locale_key": "chat.tools.research.subject"
+                },
+                "name": "subject_0",
+                "unit": null,
+                "value": "PANW",
+                "value_text": null
+              },
+              "inputs": [
+                {
+                  "editable": false,
+                  "label": {
+                    "interpolation_args": {},
+                    "locale_key": "chat.tools.research.request"
+                  },
+                  "name": "request",
+                  "unit": null,
+                  "unknown": false,
+                  "value": "\u00bfqu\u00e9 acciones de ciberseguridad podr\u00eda probar?",
+                  "value_text": null,
+                  "visibility": "private"
+                }
+              ],
+              "narrative": "Puedes probar estas cinco acciones de ciberseguridad, todas ellas empresas reconocidas en el sector.",
+              "notes": [],
+              "rows": [
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "CrowdStrike Holdings, Inc. Class A Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_1",
+                  "unit": null,
+                  "value": "CRWD",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Fortinet, Inc. Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_2",
+                  "unit": null,
+                  "value": "FTNT",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Zscaler, Inc. Common Stock"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_3",
+                  "unit": null,
+                  "value": "ZS",
+                  "value_text": null
+                },
+                {
+                  "label": {
+                    "interpolation_args": {
+                      "name": "Check Point Software Technologies Ltd. Ordinary Shares"
+                    },
+                    "locale_key": "chat.tools.research.subject"
+                  },
+                  "name": "subject_4",
+                  "unit": null,
+                  "value": "CHKP",
+                  "value_text": null
+                }
+              ],
+              "sources": [],
+              "title": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.research.title"
+              },
+              "visual": null
+            },
+            "schema_version": 1,
+            "tool_name": "peer_expansion"
+          }
+        ],
+        "tool_usage": [
+          {
+            "call_id": "peer_cybersec_001",
+            "tool_name": "peer_expansion",
+            "usage": {
+              "cache_status": "bypass",
+              "cost_usd": null,
+              "invocations": 0,
+              "latency_ms": null
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "selected_case_ids": [
+    "asset_discovery_category_spanish_issue_244"
+  ],
+  "started_at": "2026-09-10T06:59:50.239618+00:00"
+}

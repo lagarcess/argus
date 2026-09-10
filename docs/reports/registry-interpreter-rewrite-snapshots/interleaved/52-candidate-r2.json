@@ -1,0 +1,900 @@
+{
+  "artifact_type": "partial_interleaved_case_probe",
+  "case_input_sha256": "1b9339b93ebe9dd0a1ac4e3a330a9cd285ac76854322f33273ad53bf26fcb819",
+  "elapsed_seconds": 45.263609292014735,
+  "is_full_suite_scorecard": false,
+  "label": "52-candidate-r2",
+  "observed_final_research_sidecar": null,
+  "provenance": {
+    "asset_provider_mode": "live_provider",
+    "candidate_sha": "31b20baf7a036fdd9148bce8a90a838e076be201",
+    "evaluation_mode": "live",
+    "fixture_case_ids": [
+      "action_chip_run_visible_confirmation_aapl",
+      "action_chip_change_asset_remove_aapl_issue_188",
+      "action_chip_change_asset_bare_ticker_append_issue_190",
+      "action_chip_change_asset_compound_replace_issue_188",
+      "action_chip_change_asset_changed_mind_capital_issue_188",
+      "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+      "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+      "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+      "natural_language_establishes_modeled_costs_issue_271",
+      "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "asset_discovery_category_english_issue_244",
+      "asset_discovery_peer_anchor_english_issue_244",
+      "asset_discovery_comparison_anchor_english_issue_244",
+      "asset_discovery_category_spanish_issue_244",
+      "asset_discovery_recent_ipo_exact_issue_344",
+      "asset_discovery_trending_crypto_exact_issue_344",
+      "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "asset_discovery_semantic_pharma_escalation_issue_344",
+      "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "asset_discovery_not_direct_backtest_issue_244",
+      "asset_discovery_not_result_followup_issue_244",
+      "asset_discovery_not_capability_question_issue_244",
+      "metric_correctness_eth_default_crypto_benchmark",
+      "capability_honesty_options_straddle_tsla",
+      "capability_honesty_golden_cross_control_aapl",
+      "capability_honesty_momentum_breakout_aapl",
+      "capability_honesty_news_sentiment_rule_aapl",
+      "capability_honesty_future_performance_nvda_golden_cross",
+      "capability_honesty_future_performance_btc_regression",
+      "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+      "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "dca_capital_semantics_crypto_weekly_btc_issue_455",
+      "dca_capital_semantics_truncated_window_measures_served_issue_455",
+      "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "graceful_recovery_weekly_options_aapl",
+      "graceful_recovery_spanish_weekly_options_aapl",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_english_aapl_simple_hold_2024",
+      "messy_english_company_name_multi_asset_issue_142",
+      "messy_english_complete_sma_crossover_benchmark_issue_270",
+      "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_btc_hold_q1_2024",
+      "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_future_performance_nvda_cruce_dorado",
+      "ordinary_conversation_concept_compound_interest_en",
+      "ordinary_conversation_concept_inflation_es",
+      "ordinary_conversation_concept_etf_es",
+      "ordinary_conversation_capability_indicator_question_en",
+      "ordinary_conversation_capability_indicator_question_es",
+      "ordinary_conversation_macro_curiosity_en",
+      "ordinary_conversation_price_question_en",
+      "spanish_ui_english_user_msft_hold_h1_2024"
+    ],
+    "fixture_sha256": "5d1fa589338f2a393a145229cb08a81e5e5513cb3e2b898b6e91dc792760b288",
+    "live_market_data_probe": {
+      "adjustment_reason": "calendar_alignment",
+      "effective_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-02"
+      },
+      "requested_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-01"
+      },
+      "symbol": "SPY"
+    },
+    "market_data_provider_mode": "live_provider",
+    "python_version": "3.10.20",
+    "worktree_clean": true
+  },
+  "provider_usage": {
+    "reported_cost_receipt_count": 6,
+    "reported_cost_usd": 0.0309534,
+    "route_receipt_count": 9,
+    "unreported_cost_receipt_count": 3
+  },
+  "results": [
+    {
+      "category": "capability_honesty",
+      "expected_fail": null,
+      "failed_checks": [
+        "capability_verdict: expected 'executable', got 'needs_clarification'",
+        "effective_date_range: expected {'start': '2022-01-03', 'end': '2025-01-02'}, got {'start': '2022-01-02', 'end': '2025-01-02'}",
+        "adjustment_reason: expected 'calendar_alignment', got None",
+        "stage_outcomes: expected ['ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "id": "capability_honesty_golden_cross_control_aapl",
+      "infrastructure_errors": [],
+      "prose_judge": null,
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:09.372599+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 742,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 37,
+            "prompt_tokens": 805,
+            "total_tokens": 842
+          },
+          "usage_cost_usd": 0.00029235
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:19.317862+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 9773,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 16576,
+            "completion_tokens": 1574,
+            "prompt_tokens": 26850,
+            "total_tokens": 28424
+          },
+          "usage_cost_usd": 0.0200927
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:23.455102+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 4127,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "after_fingerprint": "6b27b535ea38dd85d0f6da197547e8edf657b5bcd5e99a1a49723b7cb30ecbb2",
+            "before_fingerprint": "36b04def166c5d48b1b726d33c952092b38af7b74d47b438cb2e29715b7e4ed3",
+            "changed_fields": [
+              "ambiguous_fields",
+              "candidate_strategy_draft.date_range",
+              "candidate_strategy_draft.date_range_intent",
+              "candidate_strategy_draft.entry_logic",
+              "candidate_strategy_draft.entry_rule",
+              "candidate_strategy_draft.exit_logic",
+              "candidate_strategy_draft.extra_parameters",
+              "candidate_strategy_draft.field_provenance",
+              "confidence",
+              "missing_required_fields",
+              "requires_clarification"
+            ],
+            "no_op_reason": null,
+            "repair_applied": true,
+            "schema_version": "argus_repair_effect/v1",
+            "tool_call_id": "backtest_001",
+            "tool_name": "backtest",
+            "trigger_reason": "required_strategy_shape_missing"
+          },
+          "schema_name": "FocusedStrategyExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 4672,
+            "completion_tokens": 683,
+            "prompt_tokens": 4707,
+            "total_tokens": 5390
+          },
+          "usage_cost_usd": 0.00268565
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:27.288895+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3833,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_001",
+            "tool_name": "backtest"
+          },
+          "schema_name": "SignalRuleGroundingAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 960,
+            "completion_tokens": 602,
+            "prompt_tokens": 1421,
+            "total_tokens": 2023
+          },
+          "usage_cost_usd": 0.00227325
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:28.433857+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1102,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_001",
+            "tool_name": "backtest"
+          },
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "task": "field_fidelity",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 96,
+            "prompt_tokens": 2507,
+            "total_tokens": 2603
+          },
+          "usage_cost_usd": 0.00323935
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:34.702961+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 4711,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_001",
+            "tool_name": "backtest"
+          },
+          "schema_name": "SignalRuleGroundingAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1088,
+            "completion_tokens": 704,
+            "prompt_tokens": 1402,
+            "total_tokens": 2106
+          },
+          "usage_cost_usd": 0.0023701
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:46.784523+00:00",
+          "failure_mode": "TimeoutError",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 12005,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "failed",
+          "schema_name": "ClarificationResponse",
+          "task": "clarification",
+          "tier": "chat",
+          "token_usage": null,
+          "usage_cost_usd": null
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:49.868439+00:00",
+          "failure_mode": "ValidationError",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": true,
+          "latency_ms": 3083,
+          "mode": "json_schema",
+          "model": "qwen/qwen3.5-9b",
+          "outcome": "failed",
+          "schema_name": "ClarificationResponse",
+          "task": "clarification",
+          "tier": "chat",
+          "token_usage": null,
+          "usage_cost_usd": null
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:39:53.713956+00:00",
+          "failure_mode": "ValidationError",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": true,
+          "latency_ms": 3845,
+          "mode": "json_schema",
+          "model": "qwen/qwen3.5-9b",
+          "outcome": "failed",
+          "schema_name": "ClarificationResponse",
+          "task": "clarification",
+          "tier": "chat",
+          "token_usage": null,
+          "usage_cost_usd": null
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "acceptance_stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "adjustment_reason": null,
+        "asset_class": "equity",
+        "asset_discovery": null,
+        "assets": [
+          "AAPL"
+        ],
+        "benchmark_symbol": "SPY",
+        "capability_verdict": "needs_clarification",
+        "capital_amount": 10000.0,
+        "clarification": {
+          "kind": "clarification",
+          "options": [],
+          "payload": {
+            "strategy": {
+              "asset_class": "equity",
+              "asset_universe": [
+                "AAPL"
+              ],
+              "assumptions": [],
+              "cadence": null,
+              "capital_amount": 10000.0,
+              "comparison_baseline": "SPY",
+              "date_range": {
+                "end": "2025-01-02",
+                "start": "2022-01-02"
+              },
+              "entry_logic": "50-day SMA crosses above 200-day SMA",
+              "entry_rule": {
+                "direction": "bullish",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "type": "moving_average_crossover"
+              },
+              "exit_logic": "50-day SMA crosses below 200-day SMA",
+              "exit_rule": {
+                "direction": "bearish",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "type": "moving_average_crossover"
+              },
+              "extra_parameters": {
+                "date_range_intent": {
+                  "anchor": "today",
+                  "confidence": 1.0,
+                  "count": null,
+                  "day_offset": null,
+                  "end": "2025-01-02",
+                  "endpoint": null,
+                  "evidence": "from January 2, 2022 through January 2, 2025",
+                  "kind": "explicit_range",
+                  "start": "2022-01-02",
+                  "unit": null,
+                  "year": null
+                },
+                "date_range_raw_text": "from January 2, 2022 through January 2, 2025",
+                "entry_rule": {
+                  "direction": "bullish",
+                  "fast_indicator": "sma",
+                  "fast_period": 50,
+                  "slow_indicator": "sma",
+                  "slow_period": 200,
+                  "type": "moving_average_crossover"
+                },
+                "evidence_spans": {
+                  "asset_universe": "AAPL",
+                  "capital_amount": "$10,000",
+                  "date_range": "from January 2, 2022 through January 2, 2025",
+                  "entry_rule": "golden cross",
+                  "strategy_type": "golden cross"
+                },
+                "exit_rule": {
+                  "direction": "bearish",
+                  "fast_indicator": "sma",
+                  "fast_period": 50,
+                  "slow_indicator": "sma",
+                  "slow_period": 200,
+                  "type": "moving_average_crossover"
+                },
+                "field_provenance": {
+                  "asset_universe": "explicit_user",
+                  "capital_amount": "explicit_user",
+                  "date_range": "explicit_user",
+                  "entry_rule": "explicit_user",
+                  "initial_capital": "starting_capital",
+                  "requested_strategy_template": "explicit_user",
+                  "strategy_type": "explicit_user"
+                },
+                "initial_capital": 10000.0,
+                "language": "en",
+                "provider_resolved_assets": [
+                  {
+                    "asset_class": "equity",
+                    "exchange": "AssetExchange.NASDAQ",
+                    "name": "Apple Inc. Common Stock",
+                    "provider": "alpaca",
+                    "raw_symbol": "AAPL",
+                    "raw_text": "AAPL",
+                    "symbol": "AAPL"
+                  }
+                ],
+                "raw_strategy_type": "signal_strategy"
+              },
+              "position_size": null,
+              "raw_user_phrasing": "Backtest $10,000 in AAPL from January 2, 2022 through January 2, 2025 using a golden cross.",
+              "refinement_of": null,
+              "requested_strategy_template": "moving_average_crossover",
+              "resolution_provenance": [
+                {
+                  "asset_class": "equity",
+                  "candidate_kind": "asset",
+                  "canonical_symbol": "AAPL",
+                  "confidence": "high",
+                  "field": "asset_universe",
+                  "raw_text": "AAPL",
+                  "resolution_status": "resolved",
+                  "source": "llm_extraction",
+                  "validated_by": null
+                },
+                {
+                  "asset_class": "equity",
+                  "candidate_kind": "asset",
+                  "canonical_symbol": "AAPL",
+                  "confidence": "medium",
+                  "field": "asset_universe[0]",
+                  "raw_text": "AAPL",
+                  "resolution_status": "resolved",
+                  "source": "llm_extraction",
+                  "validated_by": "provider_catalog"
+                }
+              ],
+              "risk_rules": [],
+              "rule_spec": {
+                "entry": {
+                  "conditions": [
+                    {
+                      "left": {
+                        "key": "sma",
+                        "kind": "indicator",
+                        "period": 50
+                      },
+                      "operator": "cross_above",
+                      "right": {
+                        "key": "sma",
+                        "kind": "indicator",
+                        "period": 200
+                      }
+                    }
+                  ]
+                },
+                "exit": {
+                  "conditions": [
+                    {
+                      "left": {
+                        "key": "sma",
+                        "kind": "indicator",
+                        "period": 50
+                      },
+                      "operator": "cross_below",
+                      "right": {
+                        "key": "sma",
+                        "kind": "indicator",
+                        "period": 200
+                      }
+                    }
+                  ]
+                }
+              },
+              "sizing_mode": null,
+              "strategy_thesis": "Backtest $10,000 in AAPL from January 2, 2022 through January 2, 2025 using a golden cross.",
+              "strategy_type": "signal_strategy",
+              "timeframe": null
+            }
+          },
+          "prompt_source": "degraded_fallback",
+          "reason_code": "clarification_needed",
+          "requested_field": "slippage",
+          "requested_fields": [
+            "slippage"
+          ],
+          "semantic_needs": []
+        },
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": {
+          "end": "2025-01-02",
+          "start": "2022-01-02"
+        },
+        "effective_date_range": {
+          "end": "2025-01-02",
+          "start": "2022-01-02"
+        },
+        "entry_rule": {
+          "direction": "bullish",
+          "fast_indicator": "sma",
+          "fast_period": 50,
+          "slow_indicator": "sma",
+          "slow_period": 200,
+          "type": "moving_average_crossover"
+        },
+        "execution_trace": [
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "needs_clarification",
+            "stage": "execute"
+          },
+          {
+            "outcome": "await_user_reply",
+            "stage": "clarify"
+          }
+        ],
+        "exit_rule": {
+          "direction": "bearish",
+          "fast_indicator": "sma",
+          "fast_period": 50,
+          "slow_indicator": "sma",
+          "slow_period": 200,
+          "type": "moving_average_crossover"
+        },
+        "fee_rate": null,
+        "intent": "calculate",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": false,
+          "clarification": {
+            "kind": "clarification",
+            "options": [],
+            "payload": {
+              "strategy": {
+                "asset_class": "equity",
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "assumptions": [],
+                "cadence": null,
+                "capital_amount": 10000.0,
+                "comparison_baseline": "SPY",
+                "date_range": {
+                  "end": "2025-01-02",
+                  "start": "2022-01-02"
+                },
+                "entry_logic": "50-day SMA crosses above 200-day SMA",
+                "entry_rule": {
+                  "direction": "bullish",
+                  "fast_indicator": "sma",
+                  "fast_period": 50,
+                  "slow_indicator": "sma",
+                  "slow_period": 200,
+                  "type": "moving_average_crossover"
+                },
+                "exit_logic": "50-day SMA crosses below 200-day SMA",
+                "exit_rule": {
+                  "direction": "bearish",
+                  "fast_indicator": "sma",
+                  "fast_period": 50,
+                  "slow_indicator": "sma",
+                  "slow_period": 200,
+                  "type": "moving_average_crossover"
+                },
+                "extra_parameters": {
+                  "date_range_intent": {
+                    "anchor": "today",
+                    "confidence": 1.0,
+                    "count": null,
+                    "day_offset": null,
+                    "end": "2025-01-02",
+                    "endpoint": null,
+                    "evidence": "from January 2, 2022 through January 2, 2025",
+                    "kind": "explicit_range",
+                    "start": "2022-01-02",
+                    "unit": null,
+                    "year": null
+                  },
+                  "date_range_raw_text": "from January 2, 2022 through January 2, 2025",
+                  "entry_rule": {
+                    "direction": "bullish",
+                    "fast_indicator": "sma",
+                    "fast_period": 50,
+                    "slow_indicator": "sma",
+                    "slow_period": 200,
+                    "type": "moving_average_crossover"
+                  },
+                  "evidence_spans": {
+                    "asset_universe": "AAPL",
+                    "capital_amount": "$10,000",
+                    "date_range": "from January 2, 2022 through January 2, 2025",
+                    "entry_rule": "golden cross",
+                    "strategy_type": "golden cross"
+                  },
+                  "exit_rule": {
+                    "direction": "bearish",
+                    "fast_indicator": "sma",
+                    "fast_period": 50,
+                    "slow_indicator": "sma",
+                    "slow_period": 200,
+                    "type": "moving_average_crossover"
+                  },
+                  "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "explicit_user",
+                    "date_range": "explicit_user",
+                    "entry_rule": "explicit_user",
+                    "initial_capital": "starting_capital",
+                    "requested_strategy_template": "explicit_user",
+                    "strategy_type": "explicit_user"
+                  },
+                  "initial_capital": 10000.0,
+                  "language": "en",
+                  "provider_resolved_assets": [
+                    {
+                      "asset_class": "equity",
+                      "exchange": "AssetExchange.NASDAQ",
+                      "name": "Apple Inc. Common Stock",
+                      "provider": "alpaca",
+                      "raw_symbol": "AAPL",
+                      "raw_text": "AAPL",
+                      "symbol": "AAPL"
+                    }
+                  ],
+                  "raw_strategy_type": "signal_strategy"
+                },
+                "position_size": null,
+                "raw_user_phrasing": "Backtest $10,000 in AAPL from January 2, 2022 through January 2, 2025 using a golden cross.",
+                "refinement_of": null,
+                "requested_strategy_template": "moving_average_crossover",
+                "resolution_provenance": [
+                  {
+                    "asset_class": "equity",
+                    "candidate_kind": "asset",
+                    "canonical_symbol": "AAPL",
+                    "confidence": "high",
+                    "field": "asset_universe",
+                    "raw_text": "AAPL",
+                    "resolution_status": "resolved",
+                    "source": "llm_extraction",
+                    "validated_by": null
+                  },
+                  {
+                    "asset_class": "equity",
+                    "candidate_kind": "asset",
+                    "canonical_symbol": "AAPL",
+                    "confidence": "medium",
+                    "field": "asset_universe[0]",
+                    "raw_text": "AAPL",
+                    "resolution_status": "resolved",
+                    "source": "llm_extraction",
+                    "validated_by": "provider_catalog"
+                  }
+                ],
+                "risk_rules": [],
+                "rule_spec": {
+                  "entry": {
+                    "conditions": [
+                      {
+                        "left": {
+                          "key": "sma",
+                          "kind": "indicator",
+                          "period": 50
+                        },
+                        "operator": "cross_above",
+                        "right": {
+                          "key": "sma",
+                          "kind": "indicator",
+                          "period": 200
+                        }
+                      }
+                    ]
+                  },
+                  "exit": {
+                    "conditions": [
+                      {
+                        "left": {
+                          "key": "sma",
+                          "kind": "indicator",
+                          "period": 50
+                        },
+                        "operator": "cross_below",
+                        "right": {
+                          "key": "sma",
+                          "kind": "indicator",
+                          "period": 200
+                        }
+                      }
+                    ]
+                  }
+                },
+                "sizing_mode": null,
+                "strategy_thesis": "Backtest $10,000 in AAPL from January 2, 2022 through January 2, 2025 using a golden cross.",
+                "strategy_type": "signal_strategy",
+                "timeframe": null
+              }
+            },
+            "prompt_source": "degraded_fallback",
+            "reason_code": "clarification_needed",
+            "requested_field": "slippage",
+            "requested_fields": [
+              "slippage"
+            ],
+            "semantic_needs": []
+          },
+          "discovery_symbols": [],
+          "dropped_not_named": [],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": "clarification_generation_unavailable",
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "primary_intent": "calculate",
+        "recurring_contribution": null,
+        "requested_date_range": {
+          "end": "2025-01-02",
+          "start": "2022-01-02"
+        },
+        "requested_field": "slippage",
+        "requested_strategy_template": "moving_average_crossover",
+        "research": null,
+        "rule_spec": {
+          "entry": {
+            "conditions": [
+              {
+                "left": {
+                  "key": "sma",
+                  "kind": "indicator",
+                  "period": 50
+                },
+                "operator": "cross_above",
+                "right": {
+                  "key": "sma",
+                  "kind": "indicator",
+                  "period": 200
+                }
+              }
+            ]
+          },
+          "exit": {
+            "conditions": [
+              {
+                "left": {
+                  "key": "sma",
+                  "kind": "indicator",
+                  "period": 50
+                },
+                "operator": "cross_below",
+                "right": {
+                  "key": "sma",
+                  "kind": "indicator",
+                  "period": 200
+                }
+              }
+            ]
+          }
+        },
+        "semantic_turn_act": "new_idea",
+        "slippage": null,
+        "stage_outcomes": [
+          "approved_for_execution",
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "starting_capital": null,
+        "strategy_type": "signal_strategy",
+        "tool_call_records": [],
+        "tool_calls": [
+          {
+            "arguments": {
+              "strategy": {
+                "asset_class": "equity",
+                "asset_exclusions": [],
+                "asset_inclusions": [],
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "asset_universe_operation": null,
+                "assumptions": [],
+                "cadence": null,
+                "capital_amount": 10000.0,
+                "comparison_baseline": null,
+                "date_range": null,
+                "date_range_intent": null,
+                "date_range_raw_text": null,
+                "entry_logic": null,
+                "entry_rule": null,
+                "entry_threshold": null,
+                "evidence_spans": {
+                  "asset_universe": "AAPL",
+                  "capital_amount": "$10,000",
+                  "date_range": "January 2, 2022 through January 2, 2025",
+                  "strategy_type": "golden cross"
+                },
+                "exit_logic": null,
+                "exit_rule": null,
+                "exit_threshold": null,
+                "extra_parameters": {},
+                "fee_rate": 0.0,
+                "field_provenance": {
+                  "asset_universe": "explicit_user",
+                  "capital_amount": "explicit_user",
+                  "date_range": "explicit_user",
+                  "initial_capital": "explicit_user",
+                  "requested_strategy_template": "explicit_user",
+                  "strategy_type": "explicit_user"
+                },
+                "indicator": null,
+                "indicator_period": null,
+                "initial_capital": 10000.0,
+                "language": "en",
+                "position_size": null,
+                "raw_user_phrasing": "Backtest $10,000 in AAPL from January 2, 2022 through January 2, 2025 using a golden cross.",
+                "recurring_contribution": null,
+                "refinement_of": null,
+                "requested_strategy_template": "moving_average_crossover",
+                "resolution_provenance": [
+                  {
+                    "asset_class": "equity",
+                    "candidate_kind": "asset",
+                    "canonical_symbol": "AAPL",
+                    "confidence": "high",
+                    "field": "asset_universe",
+                    "raw_text": "AAPL",
+                    "resolution_status": "resolved",
+                    "source": "llm_extraction",
+                    "validated_by": null
+                  }
+                ],
+                "risk_rules": [],
+                "rule_spec": null,
+                "sizing_mode": null,
+                "slippage": 0.0005,
+                "strategy_thesis": "Golden cross moving average crossover strategy",
+                "strategy_type": "signal_strategy",
+                "timeframe": null,
+                "total_capital": null
+              }
+            },
+            "call_id": "backtest_001",
+            "tool_name": "backtest"
+          }
+        ],
+        "tool_result_cards": [],
+        "tool_usage": []
+      }
+    }
+  ],
+  "selected_case_ids": [
+    "capability_honesty_golden_cross_control_aapl"
+  ],
+  "started_at": "2026-09-10T07:39:08.604394+00:00"
+}

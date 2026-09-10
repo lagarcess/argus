@@ -1,0 +1,741 @@
+{
+  "artifact_type": "partial_interleaved_case_probe",
+  "case_input_sha256": "6a504b28fe9f592c20ed4d7bfe738fe727765d26a4674970ca51a213b5f9fe6f",
+  "elapsed_seconds": 126.97441799999797,
+  "is_full_suite_scorecard": false,
+  "label": "19-candidate-r1",
+  "observed_final_research_sidecar": null,
+  "provenance": {
+    "asset_provider_mode": "live_provider",
+    "candidate_sha": "31b20baf7a036fdd9148bce8a90a838e076be201",
+    "evaluation_mode": "live",
+    "fixture_case_ids": [
+      "action_chip_run_visible_confirmation_aapl",
+      "action_chip_change_asset_remove_aapl_issue_188",
+      "action_chip_change_asset_bare_ticker_append_issue_190",
+      "action_chip_change_asset_compound_replace_issue_188",
+      "action_chip_change_asset_changed_mind_capital_issue_188",
+      "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+      "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+      "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+      "natural_language_establishes_modeled_costs_issue_271",
+      "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "asset_discovery_category_english_issue_244",
+      "asset_discovery_peer_anchor_english_issue_244",
+      "asset_discovery_comparison_anchor_english_issue_244",
+      "asset_discovery_category_spanish_issue_244",
+      "asset_discovery_recent_ipo_exact_issue_344",
+      "asset_discovery_trending_crypto_exact_issue_344",
+      "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "asset_discovery_semantic_pharma_escalation_issue_344",
+      "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "asset_discovery_not_direct_backtest_issue_244",
+      "asset_discovery_not_result_followup_issue_244",
+      "asset_discovery_not_capability_question_issue_244",
+      "metric_correctness_eth_default_crypto_benchmark",
+      "capability_honesty_options_straddle_tsla",
+      "capability_honesty_golden_cross_control_aapl",
+      "capability_honesty_momentum_breakout_aapl",
+      "capability_honesty_news_sentiment_rule_aapl",
+      "capability_honesty_future_performance_nvda_golden_cross",
+      "capability_honesty_future_performance_btc_regression",
+      "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+      "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "dca_capital_semantics_crypto_weekly_btc_issue_455",
+      "dca_capital_semantics_truncated_window_measures_served_issue_455",
+      "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "graceful_recovery_weekly_options_aapl",
+      "graceful_recovery_spanish_weekly_options_aapl",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_english_aapl_simple_hold_2024",
+      "messy_english_company_name_multi_asset_issue_142",
+      "messy_english_complete_sma_crossover_benchmark_issue_270",
+      "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_btc_hold_q1_2024",
+      "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_future_performance_nvda_cruce_dorado",
+      "ordinary_conversation_concept_compound_interest_en",
+      "ordinary_conversation_concept_inflation_es",
+      "ordinary_conversation_concept_etf_es",
+      "ordinary_conversation_capability_indicator_question_en",
+      "ordinary_conversation_capability_indicator_question_es",
+      "ordinary_conversation_macro_curiosity_en",
+      "ordinary_conversation_price_question_en",
+      "spanish_ui_english_user_msft_hold_h1_2024"
+    ],
+    "fixture_sha256": "5d1fa589338f2a393a145229cb08a81e5e5513cb3e2b898b6e91dc792760b288",
+    "live_market_data_probe": {
+      "adjustment_reason": "calendar_alignment",
+      "effective_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-02"
+      },
+      "requested_date_range": {
+        "end": "2024-01-10",
+        "start": "2024-01-01"
+      },
+      "symbol": "SPY"
+    },
+    "market_data_provider_mode": "live_provider",
+    "python_version": "3.10.20",
+    "worktree_clean": true
+  },
+  "provider_usage": {
+    "reported_cost_receipt_count": 14,
+    "reported_cost_usd": 0.11559698,
+    "route_receipt_count": 14,
+    "unreported_cost_receipt_count": 0
+  },
+  "results": [
+    {
+      "category": "dca_capital_semantics",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "infrastructure_errors": [],
+      "prose_judge": null,
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:08:47.501890+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 11337,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 48,
+            "prompt_tokens": 788,
+            "total_tokens": 836
+          },
+          "usage_cost_usd": 0.0002986
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:09:03.074434+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 14554,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1387,
+            "prompt_tokens": 27010,
+            "total_tokens": 28397
+          },
+          "usage_cost_usd": 0.0370284
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:09:14.945714+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 9564,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_001",
+            "tool_name": "backtest"
+          },
+          "schema_name": "DcaContractAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1022,
+            "prompt_tokens": 995,
+            "total_tokens": 2017
+          },
+          "usage_cost_usd": 0.00359715
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:09:19.686521+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 4739,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_001",
+            "tool_name": "backtest"
+          },
+          "schema_name": "DcaContractAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 493,
+            "prompt_tokens": 1087,
+            "total_tokens": 1580
+          },
+          "usage_cost_usd": 0.003552
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:09:36.295195+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 16607,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_001",
+            "tool_name": "backtest"
+          },
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 2145,
+            "prompt_tokens": 6451,
+            "total_tokens": 8596
+          },
+          "usage_cost_usd": 0.01329185
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:09:39.168753+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1952,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ClarificationResponse",
+          "task": "clarification",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 83,
+            "prompt_tokens": 2141,
+            "total_tokens": 2224
+          },
+          "usage_cost_usd": 0.00020763
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:09:50.215924+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 11021,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 777,
+            "total_tokens": 794
+          },
+          "usage_cost_usd": 0.00020735
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:09:59.425147+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 9182,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 1039,
+            "prompt_tokens": 27370,
+            "total_tokens": 28409
+          },
+          "usage_cost_usd": 0.03681
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:10:16.594449+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 17160,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_dca_ko_200",
+            "tool_name": "backtest"
+          },
+          "schema_name": "DcaContractAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 1860,
+            "prompt_tokens": 960,
+            "total_tokens": 2820
+          },
+          "usage_cost_usd": 0.00585
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:10:20.545554+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 3950,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_dca_ko_200",
+            "tool_name": "backtest"
+          },
+          "schema_name": "DcaContractAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 453,
+            "prompt_tokens": 1046,
+            "total_tokens": 1499
+          },
+          "usage_cost_usd": 0.003311
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:10:30.249758+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 9704,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_dca_ko_200",
+            "tool_name": "backtest"
+          },
+          "schema_name": "StrategyFamilyContinuityAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 781,
+            "prompt_tokens": 1011,
+            "total_tokens": 1792
+          },
+          "usage_cost_usd": 0.00301465
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:10:38.586111+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 8334,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_dca_ko_200",
+            "tool_name": "backtest"
+          },
+          "schema_name": "DcaContributionRoleAudit",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1005,
+            "prompt_tokens": 854,
+            "total_tokens": 1859
+          },
+          "usage_cost_usd": 0.0033784
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:10:39.892970+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1093,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "after_fingerprint": "278492dce5b7726a22de9e38aed62688010612a0a09557bd4af3cd1c3315456d",
+            "before_fingerprint": "278492dce5b7726a22de9e38aed62688010612a0a09557bd4af3cd1c3315456d",
+            "changed_fields": [],
+            "no_op_reason": "no_date_window",
+            "repair_applied": false,
+            "schema_version": "argus_repair_effect/v1",
+            "tool_call_id": "backtest_dca_ko_200",
+            "tool_name": "backtest",
+            "trigger_reason": "date_window_intent_uncertain"
+          },
+          "schema_name": "FocusedDateWindowExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 34,
+            "prompt_tokens": 2008,
+            "total_tokens": 2042
+          },
+          "usage_cost_usd": 0.0024606
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-10T07:10:40.957072+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1004,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "repair_effect": {
+            "tool_call_id": "backtest_dca_ko_200",
+            "tool_name": "backtest"
+          },
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "task": "field_fidelity",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 49,
+            "prompt_tokens": 2081,
+            "total_tokens": 2130
+          },
+          "usage_cost_usd": 0.00258935
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "acceptance_stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply",
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "adjustment_reason": "none",
+        "asset_class": "equity",
+        "asset_discovery": null,
+        "assets": [
+          "KO"
+        ],
+        "benchmark_symbol": "SPY",
+        "capability_verdict": "executable",
+        "capital_amount": 200.0,
+        "clarification": null,
+        "contribution_period": "monthly",
+        "cost_provenance": {},
+        "date_range": {
+          "end": "2026-08-19",
+          "start": "2021-08-19"
+        },
+        "effective_date_range": {
+          "end": "2026-08-19",
+          "start": "2021-08-19"
+        },
+        "entry_rule": null,
+        "execution_trace": [
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "needs_clarification",
+            "stage": "execute"
+          },
+          {
+            "outcome": "await_user_reply",
+            "stage": "clarify"
+          },
+          {
+            "outcome": "approved_for_execution",
+            "stage": "interpret"
+          },
+          {
+            "outcome": "ready_for_confirmation",
+            "stage": "execute"
+          },
+          {
+            "outcome": "await_approval",
+            "stage": "confirm"
+          }
+        ],
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "calculate",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [],
+          "dropped_not_named": [],
+          "launch_payload": {
+            "asset_class": "equity",
+            "benchmark_symbol": "SPY",
+            "cadence": "monthly",
+            "capital_amount": 200.0,
+            "coverage_preflight": {
+              "adjustment_reason": "none",
+              "effective_date_range": {
+                "end": "2026-08-19",
+                "start": "2021-08-19"
+              },
+              "observations_by_symbol": {
+                "KO": 1254,
+                "SPY": 1255
+              },
+              "outcome": "full_coverage",
+              "preflight_id": "sha256:1767ea6eec5da76ef375ef08d2dcc9f25404d1e3e0b2e3b3e3d51c89d50cb372",
+              "requested_date_range": {
+                "end": "2026-08-19",
+                "start": "2021-08-19"
+              },
+              "schema_version": "market_data_coverage_v1"
+            },
+            "date_range": {
+              "end": "2026-08-19",
+              "start": "2021-08-19"
+            },
+            "entry_rule": null,
+            "exit_rule": null,
+            "language": "en",
+            "parameters": {},
+            "position_size": null,
+            "recurring_contribution": 200.0,
+            "requested_date_range": {
+              "end": "2026-08-19",
+              "start": "2021-08-19"
+            },
+            "risk_rules": [],
+            "rule_spec": null,
+            "sizing_mode": "capital_amount",
+            "starting_capital": 0.0,
+            "strategy_type": "dca_accumulation",
+            "symbol": "KO",
+            "symbols": [
+              "KO"
+            ],
+            "timeframe": "1D"
+          },
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": false
+        },
+        "primary_intent": "calculate",
+        "recurring_contribution": 200.0,
+        "requested_date_range": {
+          "end": "2026-08-19",
+          "start": "2021-08-19"
+        },
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": null,
+        "rule_spec": null,
+        "semantic_turn_act": "answer_pending_need",
+        "slippage": null,
+        "stage_outcomes": [
+          "approved_for_execution",
+          "needs_clarification",
+          "await_user_reply",
+          "approved_for_execution",
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "starting_capital": 0.0,
+        "strategy_type": "dca_accumulation",
+        "tool_call_records": [],
+        "tool_calls": [
+          {
+            "arguments": {
+              "strategy": {
+                "asset_class": "equity",
+                "asset_exclusions": [],
+                "asset_inclusions": [],
+                "asset_universe": [
+                  "KO"
+                ],
+                "asset_universe_operation": null,
+                "assumptions": [],
+                "cadence": "monthly",
+                "capital_amount": null,
+                "comparison_baseline": null,
+                "date_range": {
+                  "end": "2026-08-19",
+                  "start": "2021-08-19"
+                },
+                "date_range_intent": null,
+                "date_range_raw_text": null,
+                "entry_logic": null,
+                "entry_rule": null,
+                "entry_threshold": null,
+                "evidence_spans": {},
+                "exit_logic": null,
+                "exit_rule": null,
+                "exit_threshold": null,
+                "extra_parameters": {},
+                "fee_rate": null,
+                "field_provenance": {
+                  "asset_universe": "inherited",
+                  "cadence": "inherited",
+                  "date_range": "inherited",
+                  "strategy_type": "inherited"
+                },
+                "indicator": null,
+                "indicator_period": null,
+                "initial_capital": null,
+                "language": "en",
+                "position_size": null,
+                "raw_user_phrasing": "What if I had bought Coca-Cola every month for five years?",
+                "recurring_contribution": null,
+                "refinement_of": null,
+                "requested_strategy_template": null,
+                "resolution_provenance": [],
+                "risk_rules": [],
+                "rule_spec": null,
+                "sizing_mode": null,
+                "slippage": null,
+                "strategy_thesis": "Buy Coca-Cola every month for the last five years.",
+                "strategy_type": "dca_accumulation",
+                "timeframe": null,
+                "total_capital": null
+              }
+            },
+            "call_id": "backtest_001",
+            "tool_name": "backtest"
+          },
+          {
+            "arguments": {
+              "strategy": {
+                "asset_class": "equity",
+                "asset_exclusions": [],
+                "asset_inclusions": [],
+                "asset_universe": [
+                  "KO"
+                ],
+                "asset_universe_operation": null,
+                "assumptions": [],
+                "cadence": "monthly",
+                "capital_amount": 200.0,
+                "comparison_baseline": "SPY",
+                "date_range": {
+                  "end": "2026-08-19",
+                  "start": "2021-08-19"
+                },
+                "date_range_intent": null,
+                "date_range_raw_text": "five years",
+                "entry_logic": null,
+                "entry_rule": null,
+                "entry_threshold": null,
+                "evidence_spans": {
+                  "capital_amount": "200$"
+                },
+                "exit_logic": null,
+                "exit_rule": null,
+                "exit_threshold": null,
+                "extra_parameters": {},
+                "fee_rate": null,
+                "field_provenance": {
+                  "asset_universe": "inherited",
+                  "cadence": "inherited",
+                  "capital_amount": "explicit_user",
+                  "comparison_baseline": "inherited",
+                  "date_range": "inherited",
+                  "strategy_type": "inherited"
+                },
+                "indicator": null,
+                "indicator_period": null,
+                "initial_capital": null,
+                "language": "en",
+                "position_size": null,
+                "raw_user_phrasing": "200$",
+                "recurring_contribution": null,
+                "refinement_of": null,
+                "requested_strategy_template": null,
+                "resolution_provenance": [],
+                "risk_rules": [],
+                "rule_spec": null,
+                "sizing_mode": null,
+                "slippage": null,
+                "strategy_thesis": "Buy Coca-Cola every month for the last five years.",
+                "strategy_type": "dca_accumulation",
+                "timeframe": null,
+                "total_capital": null
+              }
+            },
+            "call_id": "backtest_dca_ko_200",
+            "tool_name": "backtest"
+          }
+        ],
+        "tool_result_cards": [],
+        "tool_usage": []
+      }
+    }
+  ],
+  "selected_case_ids": [
+    "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run"
+  ],
+  "started_at": "2026-09-10T07:08:36.128398+00:00"
+}

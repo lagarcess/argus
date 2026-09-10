@@ -1,0 +1,7 @@
+{
+  "06-candidate-r1": {
+    "origin": "Parent review instruction, 2026-09-10",
+    "note": "The retained judge notes say the criterion is met while declaring failure. This semantic contradiction requires human review; the analyzer does not infer a grade from prose.",
+    "disposition": "Native failed status is retained without regrading."
+  }
+}
