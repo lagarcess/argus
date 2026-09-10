@@ -143,8 +143,28 @@ def test_passing_prose_criterion_also_serializes_the_judged_text(
     assert result["prose_judge"]["judged_assistant_text"]["text"] == honest_prose
 
 
+@pytest.mark.parametrize("source_indices", [None, ()], ids=["absent", "empty"])
+@pytest.mark.parametrize(
+    ("verdict", "expected_failures"),
+    [
+        pytest.param({"pass": True, "failed_criteria": []}, [], id="passes"),
+        pytest.param(
+            {"pass": False, "failed_criteria": ["honesty"]},
+            ["prose_judge:honesty"],
+            id="fails-honesty",
+        ),
+        pytest.param(
+            {"pass": False, "failed_criteria": []},
+            ["prose_judge:failed_without_criteria"],
+            id="fails-without-criteria",
+        ),
+    ],
+)
 def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
     monkeypatch: pytest.MonkeyPatch,
+    source_indices: tuple[int, ...] | None,
+    verdict: dict[str, Any],
+    expected_failures: list[str],
 ) -> None:
     """Issue #516: an honest one-sentence framing is only judgeable next to
     the rows and sources the interface renders below it."""
@@ -168,7 +188,7 @@ def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
                 "title": "Recent IPO listings",
                 "domain": "nasdaq.com",
                 "url": "https://nasdaq.com/recent-ipos",
-                "source_date": "2026-08-14",
+                "source_date": None,
             }
         ],
         "candidates": [
@@ -180,6 +200,8 @@ def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
         ],
         "unverified_names": [],
     }
+    if source_indices is not None:
+        discovery["candidates"][0]["source_indices"] = list(source_indices)
     monkeypatch.setattr(
         harness,
         "interpret_stage",
@@ -199,9 +221,7 @@ def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
     async def capture_judge_call(**kwargs: Any) -> harness.ProseJudgeResponse:
         assert kwargs["messages"][0]["content"] == harness.PROSE_JUDGE_RUBRIC
         captured_payloads.append(json.loads(kwargs["messages"][1]["content"]))
-        return harness.ProseJudgeResponse.model_validate(
-            {"pass": True, "failed_criteria": [], "notes": ""}
-        )
+        return harness.ProseJudgeResponse.model_validate({**verdict, "notes": ""})
 
     monkeypatch.setattr(harness, "invoke_openrouter_json_schema", capture_judge_call)
 
@@ -220,14 +240,22 @@ def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
         {
             "title": "Recent IPO listings",
             "domain": "nasdaq.com",
-            "source_date": "2026-08-14",
         }
     ]
+    assert surface["retrieved_at"] == discovery["retrieved_at"]
+    assert captured_payloads[0]["criteria"] == list(case.prose_judge_criteria)
     # The retained record equals the exact surface the judge received.
     assert result["prose_judge"]["judged_rendered_context"]["text"] == json.dumps(
         surface, sort_keys=True
     )
     assert result["prose_judge"]["rubric_version"] == "argus-prose-quality-v2"
+    assert result["prose_judge"]["pass"] is verdict["pass"]
+    assert result["failed_checks"] == expected_failures
+    assert result["status"] == ("failed" if expected_failures else "passed")
+    assert result["infrastructure_errors"] == []
+    assert harness.blocking_eval_results([result]) == (
+        [result] if expected_failures else []
+    )
 
 
 def test_missing_assistant_text_still_records_what_was_judged(
