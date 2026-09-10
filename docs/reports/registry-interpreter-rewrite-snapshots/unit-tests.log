@@ -1,0 +1,13 @@
+test_baseline_sidecar_and_unknown_timeouts_remain_distinct (test_analyze_run.AnalysisTests) ... ok
+test_captured_rejected_fallback_is_paid_once_separate_from_receipts (test_analyze_run.AnalysisTests) ... ok
+test_grade_contradictions_flag_acceptance_without_regrading (test_analyze_run.AnalysisTests) ... ok
+test_manifest_and_human_annotation_do_not_mutate_inputs (test_analyze_run.AnalysisTests) ... ok
+test_provenance_mismatch_refuses_terminal (test_analyze_run.AnalysisTests) ... ok
+test_repeated_tools_distinct_calls_count_once_each_cache_hit_excluded (test_analyze_run.AnalysisTests) ... ok
+test_research_cost_survives_zero_invocations_and_duplicate_sidecar (test_analyze_run.AnalysisTests) ... ok
+test_terminal_refuses_missing_output_without_creating_summary (test_analyze_run.AnalysisTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.139s
+
+OK
