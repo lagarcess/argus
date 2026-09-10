@@ -87,7 +87,6 @@ def record_unpriced_research_spend(spend: UnpricedResearchSpend) -> None:
             "cost_currency": "USD",
             "cost_source": "unavailable",
             "latency_ms": spend.usage.latency_ms,
-            "status": "succeeded",
             "usage_metadata": {"pricing_status": "unpriced", **report},
         }
     )

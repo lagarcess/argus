@@ -3809,6 +3809,16 @@ Contract rules:
   read posts no sidecar to a reader, so its spend is recorded on the ledger
   directly. None of this is reader-facing: `usage` is server-side evidence,
   and cost never appears on a public surface.
+- Research-rail cost rows (`source = "research"`, `feature_area =
+  "research_rail"`) carry SQL `status = NULL`, including capability-class
+  turns and `invoice_reconciliation` anomalies. The shared insert normalizer
+  stamps `metadata.research_ledger_contract = "argus_research_ledger/v2"`.
+  Unversioned historical rows retain their original values; they are not
+  correctly scored successes. `degraded_code`, `cache_status`, and
+  `pricing_status` keep their existing meanings. Legacy discovery rows
+  (`feature_area = "discovery"`) retain status derived from `fallback_code`;
+  other sources retain their existing status contract. This is ledger-only:
+  no provider-read channel, sidecar field, reader projection, or backfill.
 - Retrieval evidence is independent of the invoice. The provider's returned
   output is the retrieval record: finance and web result items and the
   citations they carry. Survey grounding and the single survey retry read

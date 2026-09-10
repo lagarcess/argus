@@ -191,6 +191,8 @@ def test_unpriced_invoice_reaches_real_gateway_insert_and_error_alert(
     monkeypatch.setattr(billing, "_recorder", record_unpriced_research_spend)
     _netflix_result(monkeypatch, netflix_response)
     entry = client.inserted_by_table["cost_ledger_entries"]
+    assert entry["status"] is None
+    assert entry["metadata"] == {"research_ledger_contract": "argus_research_ledger/v2"}
     assert entry["cost_amount"] is None
     assert entry["cost_source"] == "unavailable"
     assert entry["provider_request_id"] == netflix_response["id"]
