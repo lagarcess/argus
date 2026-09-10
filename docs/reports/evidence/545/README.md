@@ -39,8 +39,11 @@ captures and the isolation probes bring the lane's spend to roughly $3.5.
 
 "Public sources" is the bounded pool the parser retains (up to 64); the
 drawer shows at most five. "Rows rejected" counts rows whose citation matched
-no page the same response retrieved; one rejected row withholds the answer
-and the turn names the figure it will not quote.
+no page the same response retrieved, as the parser stood when these were
+captured. That rejection was deleted on 2026-09-10 (open the gates,
+`docs/reports/evidence/open-the-gates`): a row keeps the citation the model
+wrote and the answer publishes; only a row written with no citation is named
+beneath the answer.
 
 ## The two proofs
 

@@ -381,12 +381,13 @@ def _packet_stage_result(
     sidecar. One composition whether the packet came from the provider or the
     shared cache, for any shape.
 
-    ``withheld_code`` is a reason the caller already established and the
-    packet cannot show for itself, such as a claim whose retrieval kept no
-    public publisher. It wins over what the packet says about itself."""
+    A retrieved answer publishes. ``withheld_code`` is a reason the caller
+    already established and the packet cannot show for itself, such as a
+    claim whose retrieval kept no public publisher; a survey is withheld
+    only when it did not retrieve or names nothing the resolver verifies."""
     survey = is_market_survey(question_kind)
-    answer = packet.answer_markdown
-    degraded_code = withheld_code or _withheld_code(packet, survey=survey)
+    answer = published_answer(packet, language)
+    degraded_code = withheld_code
     peers: list[dict[str, str]] = []
     if degraded_code is None:
         # A withheld answer shows no peer, so a reason already established
@@ -418,18 +419,25 @@ def _packet_stage_result(
             scan_limit=SURVEY_CANDIDATE_SCAN_LIMIT if survey else MAX_PEER_PAIRS,
         )
     if degraded_code is None and survey:
-        named_symbols = _named_verified_symbols(answer, [*subjects, *peers])
+        # A survey is grounded when it retrieved and its prose names an
+        # asset the resolver verifies; the model's word that it looked, or
+        # a name nothing here can trade, is neither.
+        retrieved = _retrieval_happened(packet)
+        named_symbols = (
+            _named_verified_symbols(packet.answer_markdown, [*subjects, *peers])
+            if retrieved
+            else set()
+        )
         if named_symbols:
             subjects = [s for s in subjects if s["symbol"] in named_symbols]
             peers = [p for p in peers if p["symbol"] in named_symbols]
         else:
-            degraded_code = "survey_synthesis_incomplete"
+            degraded_code = (
+                "survey_synthesis_incomplete" if retrieved else "survey_not_grounded"
+            )
     if degraded_code is not None:
-        # The prose is withheld whole: it cannot be trimmed of one claim.
         # The subjects the user named stay testable; a survey named none.
-        answer = _withheld_note(
-            language, code=degraded_code, question_kind=question_kind, packet=packet
-        )
+        answer = _withheld_note(language, code=degraded_code, question_kind=question_kind)
         peers = []
         if survey:
             subjects = []
@@ -908,48 +916,12 @@ def _retrieval_happened(packet: ResearchPacket) -> bool:
 
 
 def _has_figures(packet: ResearchPacket) -> bool:
-    """Under the typed contract an answer's figures are its rows: a typed
-    answer that retrieved pages and wrote no row stated nothing verifiable,
-    whatever its prose says. A prose answer, the schema not honored, keeps
-    the retrieval-only test and is recorded as prose by the parser."""
+    """Whether a survey packet carries a figure to build on: a typed
+    answer's rows, or for a prose answer the fact that it retrieved at all.
+    This drives the one concrete retry, never a refusal."""
     if not _retrieval_happened(packet):
         return False
     return bool(packet.rows) if packet.typed_answer else True
-
-
-def _rejected_figures(packet: ResearchPacket) -> bool:
-    """The typed answer stated a figure it could not cite to a retrieved page.
-    The parser keeps such rows apart and drops their citation; the prose
-    still states the figure, and prose cannot be trimmed of one claim."""
-    return bool(packet.rejected_rows)
-
-
-def _withheld_code(packet: ResearchPacket, *, survey: bool) -> str | None:
-    """Why a packet's prose cannot be published, or None.
-
-    The one owner of the honesty line at the composition seam, for every
-    shape and both composition paths. A typed answer is publishable only
-    when it carries at least one cited row and no rejected one; the model's
-    word that its prose states no figure is never trusted. Prose cannot be
-    trimmed of one claim, so a withheld packet is withheld whole and the
-    turn says why through its typed degraded code; the pages it retrieved
-    stay its sources, and ``_cache_ttl`` decides how long the record serves."""
-    if not _retrieval_happened(packet):
-        # Nothing was retrieved, so nothing in the answer can be verified,
-        # whatever rows the model wrote: every one is uncited by
-        # construction, and the note must not claim sources were found. A
-        # prose answer that never retrieved keeps the pre-contract test on
-        # the shapes that had one.
-        if survey:
-            return "survey_not_grounded"
-        return "research_not_grounded" if packet.typed_answer else None
-    if _rejected_figures(packet):
-        return "research_figures_unverified"
-    if survey and not _has_figures(packet):
-        return "survey_synthesis_incomplete"
-    if packet.typed_answer and not packet.rows:
-        return "research_figures_unverified"
-    return None
 
 
 def _sidecar_withheld(sidecar: dict[str, Any]) -> bool:
@@ -981,24 +953,23 @@ def _cache_ttl(
     )
 
 
-def _withheld_note(
-    language: str, *, code: str, question_kind: str | None, packet: ResearchPacket
-) -> str:
-    """The honest line for a withheld answer, keyed by its degraded code. A
-    rejected row names the figure the turn will not quote, from the row's
-    own typed subject and label."""
-    if code == "research_figures_unverified":
-        return _unverified_figure_note(
-            language,
-            figures=[
-                " ".join(
-                    part for part in (row.subject.strip(), row.label.strip()) if part
-                )
-                for row in packet.rejected_rows
-            ],
-        )
-    if code == "research_not_grounded":
-        return _unavailable_note(language)
+def published_answer(packet: ResearchPacket, language: str) -> str:
+    """The answer as the reader gets it: the prose the provider wrote and,
+    under it, the figures the model wrote with no citation, named from their
+    own typed subject and label. An answer is never withheld for a row; a
+    figure without a source is said to be one, beneath the answer."""
+    if not packet.unsourced_rows:
+        return packet.answer_markdown
+    figures = [
+        " ".join(part for part in (row.subject.strip(), row.label.strip()) if part)
+        for row in packet.unsourced_rows
+    ]
+    note = _unsourced_figure_note(language, figures=figures)
+    return f"{packet.answer_markdown}\n\n{note}"
+
+
+def _withheld_note(language: str, *, code: str, question_kind: str | None) -> str:
+    """The honest line for a withheld answer, keyed by its degraded code."""
     if code == "research_unavailable_missing_public_sources":
         return _missing_public_source_note(language)
     return _survey_recovery_note(
@@ -1257,28 +1228,17 @@ def _missing_public_source_note(language: str) -> str:
     )
 
 
-def _unverified_figure_note(language: str, *, figures: list[str]) -> str:
-    """Names the figures the turn will not quote when it knows them."""
+def _unsourced_figure_note(language: str, *, figures: list[str]) -> str:
+    """The line under an answer naming the figures it could not tie to a
+    source. The figures stay in the answer; only their standing is said."""
     named = [figure for figure in figures if figure]
     if language == "es-419":
         if named:
-            return (
-                "Encontré fuentes, pero no pude verificar con ellas "
-                f"{_joined(named, 'ni')}, así que no citaré esa respuesta."
-            )
-        return (
-            "Encontré fuentes, pero no pude verificar con ellas las cifras de "
-            "esa respuesta, así que no las citaré."
-        )
+            return f"No pude vincular {_joined(named, 'ni')} a una fuente."
+        return "No pude vincular todas las cifras de esta respuesta a una fuente."
     if named:
-        return (
-            f"I found sources, but couldn't verify {_joined(named, 'or')} against "
-            "them, so I won't quote that answer."
-        )
-    return (
-        "I found sources, but couldn't verify the figures in that answer "
-        "against them, so I won't quote them."
-    )
+        return f"I couldn't tie {_joined(named, 'or')} to a source."
+    return "I couldn't tie every figure in this answer to a source."
 
 
 def _joined(items: list[str], conjunction: str) -> str:
@@ -1376,13 +1336,11 @@ def compose_completed_research(
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
-    degraded_code = _withheld_code(packet, survey=is_market_survey(question_kind))
-    if (
-        degraded_code is None
-        and job_request.get("requires_publisher_sources")
-        and not sources
-    ):
-        degraded_code = "research_unavailable_missing_public_sources"
+    degraded_code = (
+        "research_unavailable_missing_public_sources"
+        if job_request.get("requires_publisher_sources") and not sources
+        else None
+    )
     peers = (
         []
         if degraded_code is not None
@@ -1398,11 +1356,9 @@ def compose_completed_research(
         subjects=subjects, peers=peers, language=language
     )
     answer = (
-        _withheld_note(
-            language, code=degraded_code, question_kind=question_kind, packet=packet
-        )
+        _withheld_note(language, code=degraded_code, question_kind=question_kind)
         if degraded_code is not None
-        else packet.answer_markdown
+        else published_answer(packet, language)
     )
     if not rows and subjects:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
@@ -1612,12 +1568,13 @@ def typed_sources(
 
 
 def typed_rows(packet: ResearchPacket) -> list[dict[str, Any]]:
-    """The packet's cited figures in the one shape the sidecar carries.
-
-    Every row already passed the parse-time citation check: its page was
-    retrieved in the same response, and a provider-host citation was
-    scrubbed to null there, so nothing here can name the provider."""
-    return [row.model_dump() for row in packet.rows]
+    """Every figure the answer states, in the one shape the sidecar carries:
+    cited rows first, then the rows the model wrote with no citation. A
+    citation is the model's own. It is null for a figure read from the
+    provider's finance data, scrubbed at parse time so nothing here can name
+    the provider, and null for a figure the turn names beneath the answer as
+    having no source."""
+    return [row.model_dump() for row in (*packet.rows, *packet.unsourced_rows)]
 
 
 def _coerce_date(value: date | str | None) -> date | None:
