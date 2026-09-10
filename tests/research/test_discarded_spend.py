@@ -13,6 +13,7 @@ import json
 from typing import Any
 
 import pytest
+from argus.agent_runtime.stages.interpret_types import StageResult
 from argus.api import state as api_state
 from argus.api.chat import research_evidence as evidence
 from argus.domain.research.contracts import ResearchUsage, combined_research_usage
@@ -76,9 +77,11 @@ def ledger(monkeypatch: pytest.MonkeyPatch) -> _LedgerGateway:
     return gateway
 
 
-def _settle(result, ledger: _LedgerGateway) -> dict[str, Any]:
+def _settle(result: StageResult, ledger: _LedgerGateway) -> dict[str, Any]:
     """Run the turn's sidecar through the same settlement the API calls."""
-    reader_bytes = json.dumps(result.stage_patch, sort_keys=True).encode()
+    reader_bytes = json.dumps(
+        result.model_dump(mode="json")["stage_patch"], sort_keys=True
+    ).encode()
     evidence.settle_research_turn(
         dict(result.stage_patch),
         user_id="user-569",
@@ -91,7 +94,10 @@ def _settle(result, ledger: _LedgerGateway) -> dict[str, Any]:
     assert ledger.entries[0]["metadata"] == {
         "research_ledger_contract": "argus_research_ledger/v2"
     }
-    assert json.dumps(result.stage_patch, sort_keys=True).encode() == reader_bytes
+    assert (
+        json.dumps(result.model_dump(mode="json")["stage_patch"], sort_keys=True).encode()
+        == reader_bytes
+    )
     return ledger.entries[0]
 
 
