@@ -388,6 +388,14 @@ def test_serialized_judge_payload_keeps_semantic_evidence_without_cache_policy(
     assert context["assets"][0] == {
         **recorded["assets"][0]["identity"],
         "facts": [projected],
+        "deliveries": [
+            {
+                "retrieved_at": recorded["assets"][0]["deliveries"][0]["retrieved_at"],
+                "sources": recorded["assets"][0]["deliveries"][0]["sources"],
+                "answer": recorded["assets"][0]["deliveries"][0]["answer"],
+                "source_period": projected["source_period"],
+            }
+        ],
     }
     assert result["prose_judge"]["selection_evidence"] == context
     assert judged[0]["selection_expectations"] == selection_case.expected.asset_discovery
@@ -510,7 +518,7 @@ def test_same_ticker_wrong_asset_action_fails(monkeypatch, selection_case):
 
 
 @pytest.mark.parametrize("linked", [False, True])
-def test_validated_candidate_requires_its_own_source_link(
+def test_candidate_link_is_retained_separately_from_its_delivery_source_drawer(
     monkeypatch, selection_case, linked
 ):
     patch = _selection_patch(figures=False, discovery=True)
@@ -520,9 +528,8 @@ def test_validated_candidate_requires_its_own_source_link(
 
     result = harness.run_eval_case(selection_case)
 
-    assert (result["status"] == "passed") is linked
+    assert result["status"] == "passed"
     if not linked:
-        assert any("current-source" in check for check in result["failed_checks"])
         facts = result["prose_judge"]["selection_evidence"]["assets"][0]["facts"]
         assert facts[0]["reason"] == patch["discovery"]["candidates"][0]["reason_text"]
         assert facts[0]["source"] is None
@@ -662,3 +669,47 @@ def test_legacy_no_call_discovery_keeps_its_original_contract(selection_case):
         failures,
     )
     assert failures == []
+
+
+@pytest.mark.parametrize("has_figure", [False, True])
+def test_current_selection_uses_bound_delivery_sources_without_inventing_row_citations(
+    monkeypatch, selection_case, has_figure
+):
+    patch = _selection_patch()
+    if has_figure:
+        patch["research"]["rows"][0]["source_url"] = None
+    else:
+        patch["research"]["rows"] = []
+    _, judged = _wire_delivery(monkeypatch, patches=[patch], names=("read",))
+
+    result = harness.run_eval_case(selection_case)
+
+    assert result["failed_checks"] == [], result["failed_checks"]
+    asset = result["typed_outcome"]["asset_discovery"]["assets"][0]
+    assert asset["deliveries"][0]["sources"] == patch["research"]["sources"]
+    assert asset["deliveries"][0]["answer"] == patch["assistant_response"]
+    if has_figure:
+        assert asset["facts"][0]["citation_url"] is None
+        assert asset["facts"][0]["source"] is None
+    else:
+        assert asset["facts"] == []
+    context = judged[0]["selection_evidence"]["assets"][0]
+    assert context["deliveries"][0]["sources"] == patch["research"]["sources"]
+    assert "selection_relevance" in judged[0]["criteria"]
+
+
+def test_source_drawer_from_an_unrelated_completed_delivery_cannot_supply_currentness(
+    monkeypatch, selection_case
+):
+    current_other_asset = _selection_patch(symbol="ETH")
+    unsourced_action = _selection_patch(figures=False, discovery=True)
+    _wire_delivery(
+        monkeypatch,
+        patches=[current_other_asset, unsourced_action],
+        names=("read", "read"),
+    )
+
+    result = harness.run_eval_case(selection_case)
+
+    assert any("current-source" in check for check in result["failed_checks"])
+    assert result["typed_outcome"]["offered"]["discovery_symbols"] == ["BTC"]

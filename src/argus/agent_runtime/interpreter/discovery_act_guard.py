@@ -56,13 +56,7 @@ def _payload_owns_discovery_route(response: Any) -> bool:
     a conflicting deterministic surface (draft, clarification, results,
     capability answer)."""
     discovery = response.asset_discovery
-    if discovery is None:
-        return False
-    category = (discovery.category_description or "").strip()
-    anchors = [symbol for symbol in discovery.anchor_symbols if symbol.strip()]
-    if discovery.relationship == "category" and not category:
-        return False
-    if discovery.relationship != "category" and not (anchors or category):
+    if discovery is None or not discovery.has_executable_target():
         return False
     return response_shape_open_to_discovery(response)
 

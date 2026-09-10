@@ -60,6 +60,7 @@ from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
 )
+from argus.agent_runtime.semantic_integrity import apply_audited_capital_facts
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
@@ -1059,19 +1060,7 @@ def _response_from_stated_run_field_fidelity_audit(
 ) -> LLMInterpretationResponse | None:
     repaired = response.model_copy(deep=True)
     draft = repaired.candidate_strategy_draft
-    changed = False
-    if audit.capital_amount is not None and draft.capital_amount != audit.capital_amount:
-        draft.capital_amount = audit.capital_amount
-        draft.field_provenance["capital_amount"] = "starting_capital"
-        changed = True
-    if audit.recurring_contribution_amount is not None:
-        recurring_amount = float(audit.recurring_contribution_amount)
-        if draft.capital_amount != recurring_amount:
-            draft.capital_amount = recurring_amount
-            changed = True
-        if draft.field_provenance.get("capital_amount") != "recurring_contribution":
-            draft.field_provenance["capital_amount"] = "recurring_contribution"
-            changed = True
+    changed = apply_audited_capital_facts(repaired, audit)
     if audit.cadence:
         cadence = _supported_dca_cadence_value(audit.cadence)
         if cadence is not None:

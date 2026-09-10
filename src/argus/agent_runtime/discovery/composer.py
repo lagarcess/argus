@@ -517,7 +517,7 @@ def _search_subject(request: AssetDiscoveryRequest) -> str | None:
 
 def _search_query(request: AssetDiscoveryRequest | None) -> str | None:
     """Deterministic machine query for the Search provider; never user prose."""
-    if request is None:
+    if request is None or not request.has_executable_target():
         return None
     anchors = ", ".join(
         symbol.strip().upper() for symbol in request.anchor_symbols if symbol.strip()
@@ -528,11 +528,7 @@ def _search_query(request: AssetDiscoveryRequest | None) -> str | None:
         "currency_pair": "tradable currency pairs",
     }.get(request.asset_class_hint or "", "publicly traded companies")
     if request.relationship == "category":
-        if not category:
-            return None
         return f"{universe}: {category}"
-    if not anchors and not category:
-        return None
     subject = anchors or category
     if request.relationship == "peer":
         return f"{universe} similar to {subject}"

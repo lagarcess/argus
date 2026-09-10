@@ -43,6 +43,9 @@ def _captured_cases():
 
 @pytest.fixture(autouse=True)
 def provider_free(monkeypatch):
+    # The captured DCA trace includes the fallback after an inconclusive audit.
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "primary/model")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "fallback/model")
     monkeypatch.setenv("ARGUS_ASSET_PROVIDER_MODE", "synthetic_unit_fixture")
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")

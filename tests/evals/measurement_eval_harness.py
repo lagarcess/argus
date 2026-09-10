@@ -26,7 +26,7 @@ from argus.llm.openrouter import (
     end_openrouter_route_receipt_capture,
     invoke_openrouter_json_schema,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from tests.evals.measurement_assertions import (
     _compare,
@@ -175,6 +175,12 @@ class ProseJudgeResponse(BaseModel):
     passed: bool = Field(alias="pass")
     failed_criteria: list[str] = Field(default_factory=list)
     notes: str = ""
+
+    @model_validator(mode="after")
+    def verdict_matches_criteria(self) -> ProseJudgeResponse:
+        if self.passed == bool(self.failed_criteria):
+            raise ValueError("Judge verdict and failed criteria must agree")
+        return self
 
 
 def load_eval_cases(path: Path = FIXTURE_DIR) -> list[EvalCase]:

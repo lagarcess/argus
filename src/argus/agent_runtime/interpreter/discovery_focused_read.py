@@ -117,10 +117,6 @@ async def focused_discovery_payload_response(
         return None
     category = (read.category_description or "").strip()
     anchors = [symbol.strip() for symbol in read.anchor_symbols if symbol.strip()]
-    if read.relationship == "category" and not category:
-        return None
-    if read.relationship != "category" and not (anchors or category):
-        return None
     payload = AssetDiscoveryRequest(
         relationship=read.relationship,
         category_description=category or None,
@@ -128,6 +124,8 @@ async def focused_discovery_payload_response(
         asset_class_hint=read.asset_class_hint,
         needs_current_facts=read.needs_current_facts,
     )
+    if not payload.has_executable_target():
+        return None
     logger.info(
         "Focused discovery read recovered an omitted payload",
         relationship=read.relationship,

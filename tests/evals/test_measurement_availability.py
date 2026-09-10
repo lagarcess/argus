@@ -153,6 +153,55 @@ def test_judge_without_structured_result_is_unavailable(
     assert result["status"] == "unavailable"
 
 
+@pytest.mark.parametrize(
+    ("reply", "status"),
+    [
+        ({"pass": False}, "infrastructure_error"),
+        ({"pass": False, "failed_criteria": []}, "infrastructure_error"),
+        ({"pass": True, "failed_criteria": ["honesty"]}, "infrastructure_error"),
+        ({"pass": False, "failed_criteria": ["honesty"]}, "failed"),
+        ({"pass": True}, "passed"),
+    ],
+)
+def test_judge_verdict_and_criteria_must_agree(
+    monkeypatch: Any, faker: Any, reply: dict[str, Any], status: str
+) -> None:
+    case = harness.EvalCase(
+        id=faker.uuid4(),
+        category="capability_honesty",
+        prompt=faker.sentence(),
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="explain", capability_verdict="answer_only"
+        ),
+        prose_judge_criteria=("honesty",),
+    )
+    monkeypatch.setattr(
+        harness,
+        "interpret_stage",
+        lambda **_kwargs: SimpleNamespace(
+            outcome="ready_to_respond",
+            patch={"intent": "explain", "assistant_response": faker.sentence()},
+        ),
+    )
+
+    async def retained_shape(**kwargs: Any) -> harness.ProseJudgeResponse:
+        return kwargs["schema_model"].model_validate(reply)
+
+    monkeypatch.setattr(harness, "invoke_openrouter_json_schema", retained_shape)
+    result = harness.run_eval_case(case)
+
+    assert result["status"] == status
+    assert bool(harness.blocking_eval_results([result])) == (status != "passed")
+    if status == "infrastructure_error":
+        assert result["failed_checks"] == []
+        assert result["prose_judge"]["pass"] is None
+        assert result["infrastructure_errors"] == [
+            {"component": "prose_judge", "code": "no_structured_result"}
+        ]
+
+
 @pytest.mark.parametrize("include_quality_result", [False, True])
 def test_scorecard_excludes_outages_from_quality_denominator(
     include_quality_result: bool,

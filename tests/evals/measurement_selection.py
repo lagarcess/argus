@@ -16,7 +16,7 @@ from argus.domain.tool_contracts import ToolCall, ToolOutcome, ToolResultCard
 from argus.domain.tool_declaration import _validate_return
 from pydantic import TypeAdapter, ValidationError
 
-SELECTION_CONTRACT_VERSION = "argus-selection-evidence/v2"
+SELECTION_CONTRACT_VERSION = "argus-selection-evidence/v3"
 SELECTION_RELEVANCE = "selection_relevance"
 SELECTION_RUBRIC = f"""
 Selection contract: {SELECTION_CONTRACT_VERSION}
@@ -30,8 +30,11 @@ drawer is retained as such, not described as a fetched page. Judge the
 collective delivery: any valid combination of operations may supply the answer.
 No operation name or input form is required. Input requests are not results.
 selection_evidence contains retained delivered facts, not additional user-visible
-content. Structural identity, class, citations, freshness, completion, and action
-binding are checked separately; a relevance pass cannot override those failures.
+content. Structural identity, class, published-source eligibility, retrieval freshness,
+completion, and action binding are checked separately. A shared source drawer
+is evidence for its completed delivery, not a citation for every figure or
+proof of the requested selection meaning. A relevance pass cannot override
+structural failures.
 Missing evidence is not permission to assume the requested meaning was delivered.
 """
 
@@ -168,6 +171,7 @@ def observe_selection(
     deliveries = completed_research_deliveries(calls, patch)
     owners: list[dict] = []
     facts: list[dict] = []
+    delivered_evidence: list[dict] = []
     for card, result, effect in deliveries:
         provenance = {
             "retrieved_at": result.retrieved_at,
@@ -184,6 +188,18 @@ def observe_selection(
             for source in card.presentation.sources
             if source in result.sources
         }
+        delivered_evidence.append(
+            {
+                "entities": [
+                    {"symbol": item.symbol, "name": item.name}
+                    for item in (*result.subjects, *result.peers)
+                ]
+                + [{"symbol": row.symbol, "name": row.subject} for row in result.rows],
+                **provenance,
+                "sources": list(sources.values()),
+                "answer": result.answer,
+            }
+        )
         for raw_candidate in discovery.get("candidates", []):
             try:
                 candidate = ValidatedCandidate.model_validate(raw_candidate)
@@ -286,7 +302,16 @@ def observe_selection(
                 f"identity mismatch between cited entity and action for {asset['symbol']}"
             )
         assets.append(
-            {"identity": asset, "facts": related, "identity_matches": not mismatched}
+            {
+                "identity": asset,
+                "facts": related,
+                "identity_matches": not mismatched,
+                "deliveries": [
+                    {key: value for key, value in delivery.items() if key != "entities"}
+                    for delivery in delivered_evidence
+                    if any(_same_entity(asset, **entity) for entity in delivery["entities"])
+                ],
+            }
         )
     if not assets:
         errors.append("identity unproven: no completed result bound to selectable assets")
@@ -318,33 +343,28 @@ def compare_selection(expected: dict, evidence: dict, failures: list[str]) -> No
             )
         if expected.get("needs_current_facts") is not True:
             continue
-        sourced = [
-            fact
-            for fact in asset["facts"]
-            if fact.get("source") or fact.get("citation_url")
-        ]
+        sourced = [delivery for delivery in asset["deliveries"] if delivery["sources"]]
         if not sourced:
             failures.append(
                 f"asset_discovery: current-source evidence unproven for {identity['symbol']}"
             )
             continue
         current = []
-        for fact in sourced:
+        for delivery in sourced:
             try:
-                policy = ResearchEvidencePolicy.model_validate(
-                    fact.get("evidence_policy")
-                )
+                policy = ResearchEvidencePolicy.model_validate(delivery["evidence_policy"])
             except ValidationError:
                 continue
-            retrieved = _timestamp(fact.get("retrieved_at"))
+            retrieved = _timestamp(delivery["retrieved_at"])
             if observed is None or retrieved is None:
                 continue
             if not 0 <= (observed - retrieved).total_seconds() <= policy.max_age_seconds:
                 continue
-            source = ResearchSource.model_validate(
-                fact["source"] if fact.get("source") else {"url": fact["citation_url"]}
+            current.extend(
+                policy.select_sources(
+                    [ResearchSource.model_validate(source) for source in delivery["sources"]]
+                )
             )
-            current.extend(policy.select_sources([source]))
         if not current:
             failures.append(
                 f"asset_discovery: currentness unproven for {identity['symbol']}"
@@ -371,6 +391,7 @@ def selection_judge_context(evidence: dict) -> dict:
             {
                 **item["identity"],
                 "facts": [_semantic_fact(fact) for fact in item["facts"]],
+                "deliveries": [_semantic_fact(delivery) for delivery in item["deliveries"]],
             }
             for item in evidence["assets"]
         ],
@@ -391,6 +412,8 @@ def _semantic_fact(fact: dict) -> dict:
             "citation_url",
             "citation_origin",
             "retrieved_at",
+            "sources",
+            "answer",
         )
         if key in fact
     }

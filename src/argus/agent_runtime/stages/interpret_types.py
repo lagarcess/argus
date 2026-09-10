@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, ClassVar, Literal, Protocol, runtime_checkable
 
 from argus.agent_runtime.recovery_messages import recovery_state_from_text
 from argus.agent_runtime.research_query import ResearchQueryExtraction
@@ -19,6 +19,7 @@ from argus.agent_runtime.state.models import (
     normalize_legacy_interpretation,
 )
 from argus.domain.tool_contracts import MAX_TOOL_CALLS, ToolCall
+from argus.domain.tool_declaration import RequireAnyPresent
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 StageOutcome = Literal[
@@ -80,6 +81,15 @@ ArtifactTarget = Literal[
 
 class AssetDiscoveryRequest(BaseModel):
     """Typed payload for an explicit peer/category asset-discovery request."""
+
+    execution_requirements: ClassVar[tuple[RequireAnyPresent, ...]] = (
+        RequireAnyPresent(("anchor_symbols", "category_description")),
+        RequireAnyPresent(("category_description",), when=("relationship", "category")),
+    )
+
+    def has_executable_target(self) -> bool:
+        """Incomplete legacy payloads remain readable until execution admission."""
+        return all(rule.is_satisfied(self) for rule in self.execution_requirements)
 
     relationship: AssetDiscoveryRelationship = Field(
         description=(

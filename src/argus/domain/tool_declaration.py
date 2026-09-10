@@ -73,6 +73,92 @@ class ExactlyOneUnknown:
         }
 
 
+@dataclass(frozen=True)
+class RequireAnyPresent:
+    """Require a populated scalar or string list, optionally for a typed case."""
+
+    fields: tuple[str, ...]
+    when: tuple[str, str] | None = None
+
+    def __post_init__(self) -> None:
+        if not self.fields or len(set(self.fields)) != len(self.fields):
+            raise ValueError("A presence rule needs distinct argument fields")
+
+    def validate_definition(self, model: type[BaseModel]) -> None:
+        for name in self.fields:
+            if name not in model.model_fields:
+                raise ValueError("Presence rule references an unknown argument field")
+            argument = model.model_fields[name]
+            if not _progress_annotation(argument.annotation):
+                raise ValueError("Presence rules require scalar values or string lists")
+            if argument.default_factory is not None:
+                if (
+                    argument.default_factory is not list
+                    or get_origin(argument.annotation) is not list
+                ):
+                    raise ValueError("Presence rules support only the empty list factory")
+            elif not argument.is_required() and _argument_is_present(argument.default):
+                raise ValueError(
+                    "Presence-rule fields require explicit values or empty defaults"
+                )
+        if self.when is not None:
+            name, value = self.when
+            selector = model.model_fields.get(name)
+            if (
+                selector is None
+                or not selector.is_required()
+                or get_origin(selector.annotation) is not Literal
+                or value not in get_args(selector.annotation)
+            ):
+                raise ValueError(
+                    "Presence condition requires a declared value of a required Literal field"
+                )
+
+    def is_satisfied(self, arguments: BaseModel) -> bool:
+        if self.when is not None and getattr(arguments, self.when[0]) != self.when[1]:
+            return True
+        return any(_argument_is_present(getattr(arguments, name)) for name in self.fields)
+
+    def validate(self, arguments: BaseModel) -> None:
+        if not self.is_satisfied(arguments):
+            raise ToolInvocationError(
+                "invalid", code="required_argument", fields=self.fields
+            )
+
+    def schema(self) -> dict[str, Any]:
+        present = {
+            "anyOf": [
+                {"type": "number"},
+                {"type": "boolean"},
+                {"type": "string", "pattern": r"\S"},
+                {"type": "array", "contains": {"type": "string", "pattern": r"\S"}},
+            ]
+        }
+        requirement = {
+            "anyOf": [
+                {"properties": {name: present}, "required": [name]}
+                for name in self.fields
+            ]
+        }
+        if self.when is None:
+            return requirement
+        name, value = self.when
+        return {
+            "anyOf": [
+                {"properties": {name: {"not": {"const": value}}}, "required": [name]},
+                requirement,
+            ]
+        }
+
+
+def _argument_is_present(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, list):
+        return any(isinstance(item, str) and item.strip() for item in value)
+    return isinstance(value, (bool, int, float))
+
+
 PublicReceiptPolicy = Literal["disabled", "typed_facts", "cited_facts"]
 
 
@@ -229,7 +315,7 @@ class ToolDeclaration:
     policy: ToolPolicy
     progress: ToolProgressTemplate
     card: ToolCardBinding
-    rules: tuple[ExactlyOneUnknown, ...] = ()
+    rules: tuple[ExactlyOneUnknown | RequireAnyPresent, ...] = ()
     domain: tuple[str, ...] = ()
     units: tuple[ToolUnit, ...] = ()
     confirmation_handler: Callable[..., Any] | None = None
@@ -269,6 +355,9 @@ class ToolDeclaration:
         if not named_fields <= argument_fields:
             raise ValueError("Tool policy references an unknown argument field")
         for rule in self.rules:
+            if isinstance(rule, RequireAnyPresent):
+                rule.validate_definition(argument_type)
+                continue
             for name in rule.fields:
                 model_field = argument_type.model_fields[name]
                 if (
@@ -412,6 +501,8 @@ class ToolDeclaration:
         revised = {**previous, **changes}
         if self.policy.retain_unknown:
             for rule in self.rules:
+                if not isinstance(rule, ExactlyOneUnknown):
+                    continue
                 before = {name for name in rule.fields if previous[name] is None}
                 after = {name for name in rule.fields if revised[name] is None}
                 if before != after:
@@ -469,7 +560,9 @@ class ToolDeclaration:
                                 **fact.model_dump(mode="python"),
                                 "value": original[fact.name],
                                 "unknown": any(
-                                    fact.name in rule.fields for rule in self.rules
+                                    fact.name in rule.fields
+                                    for rule in self.rules
+                                    if isinstance(rule, ExactlyOneUnknown)
                                 )
                                 and original[fact.name] is None,
                                 "editable": fact.name in self.policy.editable_fields

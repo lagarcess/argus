@@ -61,6 +61,8 @@ _PRIMARY: dict[str, Any] = {
 
 @pytest.fixture(autouse=True)
 def provider_free_cost_route(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "primary/model")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "")
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
     monkeypatch.setenv("ARGUS_ENABLE_PERSONALIZATION_MEMORY", "false")
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
