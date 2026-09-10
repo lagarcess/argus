@@ -1066,9 +1066,9 @@ def _research_prompt(
         "into, or what it is worth today, answer as scenarios: build them from "
         "cited forecasts, analyst targets and valuation multiples, write the "
         "arithmetic out step by step from those inputs, and give the result as "
-        "labeled scenario ranges (for example bear, base and bull). Never "
-        "present one number as the future, and never say what the reader "
-        "should do."
+        "labeled scenario ranges (for example bear, base and bull), each range "
+        "written as low to high. Never present one number as the future, and "
+        "never say what the reader should do."
     )
     lines.append(
         "Answer the question directly for a curious non-expert, leading with "

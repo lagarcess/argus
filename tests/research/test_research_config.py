@@ -50,3 +50,11 @@ def test_flag_defaults_off(monkeypatch) -> None:
     assert research_rail_enabled() is False
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
     assert research_rail_enabled() is True
+
+
+def test_the_balanced_ceiling_leaves_room_for_a_scenario_answer() -> None:
+    """Decision 10: a forward-looking answer builds scenarios from cited
+    forecasts and targets. The probe took 122s on the balanced configuration
+    and every such question timed out at the old 75s ceiling."""
+    balanced = RESEARCH_CONFIG_SPECS["balanced"]
+    assert balanced.timeout_seconds >= 150.0

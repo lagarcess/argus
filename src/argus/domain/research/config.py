@@ -157,7 +157,12 @@ RESEARCH_CONFIG_SPECS: dict[QuestionShape, ResearchConfigSpec] = {
         max_output_tokens=2048,
         tools=("web_search", "finance_search", "fetch_url"),
         reasoning_effort="low",
-        timeout_seconds=75.0,
+        # A scenario answer (forecasts, targets and multiples, the arithmetic
+        # written out) took 122s on this configuration and timed out at 75s
+        # on every forward-looking question in the decision 10 after picture
+        # (docs/reports/evidence/decision-10/probes/scenario-balanced-180s.json).
+        # The ceiling is room, never a rule; a quick answer still returns quickly.
+        timeout_seconds=150.0,
         search_context_size="medium",
     ),
     "thorough": ResearchConfigSpec(
