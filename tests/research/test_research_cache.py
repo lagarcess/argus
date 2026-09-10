@@ -184,3 +184,33 @@ def test_the_scenario_contract_has_its_own_cache_identity() -> None:
     )
     assert research_cache_key(**base) == research_cache_key(**base, contract="retrieval")
     assert research_cache_key(**base, contract="scenario") != research_cache_key(**base)
+
+
+def test_a_scenario_lives_in_the_analyst_estimates_class() -> None:
+    """Decision 10: a computed scenario is built from forecasts, targets and
+    multiples, so its cache TTL and its recency filter follow the
+    analyst-estimates class whatever kind the question was typed as, and a
+    closed window still wins."""
+    from argus.domain.research.cache import (
+        DATA_CLASS_TTL_SECONDS,
+        data_class_for,
+        ttl_for_packet,
+    )
+    from argus.domain.research.config import retrieval_spec
+
+    assert data_class_for(question_kind="company_lookup") == "fundamentals"
+    assert (
+        data_class_for(question_kind="company_lookup", scenario=True)
+        == "analyst_estimates"
+    )
+    assert data_class_for(
+        question_kind="company_lookup", scenario=True, closed_period=True
+    ) == ("closed_ohlcv")
+    assert (
+        ttl_for_packet(question_kind="company_lookup", scenario=True)
+        == (DATA_CLASS_TTL_SECONDS["analyst_estimates"])
+    )
+    assert retrieval_spec(
+        "balanced", question_kind="company_lookup", scenario=True
+    ).recency == ("month")
+    assert retrieval_spec("balanced", question_kind="company_lookup").recency is None

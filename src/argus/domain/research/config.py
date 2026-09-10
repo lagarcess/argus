@@ -274,7 +274,11 @@ def retrieval_spec(
             "language": iso_language(language_tag),
             "location": location,
             "recency": RECENCY_BY_DATA_CLASS[
-                data_class_for(question_kind=question_kind, closed_period=closed_period)
+                data_class_for(
+                    question_kind=question_kind,
+                    closed_period=closed_period,
+                    scenario=scenario,
+                )
             ],
             "source_domains": (local_source_domains(location) if local_sources else ()),
             "instructions": (

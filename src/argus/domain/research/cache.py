@@ -118,10 +118,18 @@ def data_class_for(
     question_kind: str | None,
     categories: Sequence[str] = (),
     closed_period: bool = False,
+    scenario: bool = False,
 ) -> DataClass:
-    """The section 7 data class governing one cache entry."""
+    """The section 7 data class governing one cache entry.
+
+    A computed scenario (decision 10) is built from forecasts, targets and
+    multiples whatever kind the question was typed as, so it lives in the
+    analyst-estimates class: its recency filter and its TTL follow those
+    inputs, not the company read it may have been typed as."""
     if closed_period:
         return "closed_ohlcv"
+    if scenario:
+        return "analyst_estimates"
     families = {
         family
         for family in (_family_for_category(category) for category in categories)
@@ -138,6 +146,7 @@ def ttl_for_packet(
     categories: Sequence[str] = (),
     closed_period: bool = False,
     withheld: bool = False,
+    scenario: bool = False,
 ) -> float:
     """The class TTL of one entry; a withheld packet's is capped at one day."""
     ttl = DATA_CLASS_TTL_SECONDS[
@@ -145,6 +154,7 @@ def ttl_for_packet(
             question_kind=question_kind,
             categories=categories,
             closed_period=closed_period,
+            scenario=scenario,
         )
     ]
     return min(ttl, WITHHELD_TTL_SECONDS) if withheld else ttl

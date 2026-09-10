@@ -398,6 +398,7 @@ async def grounded_result(
             withheld=_sidecar_withheld(result.stage_patch["research"]),
             question_kind=query.question_kind,
             closed_period=query.period_is_closed_window,
+            scenario=scenario,
         )
         if ttl_seconds is not None:
             cache_put(key, packet, ttl_seconds=ttl_seconds)
@@ -995,6 +996,7 @@ def _cache_ttl(
     withheld: bool,
     question_kind: str | None,
     closed_period: bool,
+    scenario: bool = False,
 ) -> float | None:
     """How long the shared cache serves this packet, or None to not store it.
 
@@ -1012,6 +1014,7 @@ def _cache_ttl(
         categories=packet.categories,
         closed_period=closed_period,
         withheld=withheld,
+        scenario=scenario,
     )
 
 
@@ -1432,6 +1435,7 @@ def store_research_packet_for_job(
         withheld=_sidecar_withheld(composed["research"]),
         question_kind=question_kind,
         closed_period=bool(job_request.get("period_is_closed_window")),
+        scenario=bool(job_request.get("scenario_question")),
     )
     if ttl_seconds is not None:
         cache_put(key, packet, ttl_seconds=ttl_seconds)

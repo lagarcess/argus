@@ -48,7 +48,10 @@ fingerprint now names, the browser proof, and the drivers that produced them.
   draft is the second, independent fact, and `scenario_contract_applies()`
   is the one owner that reads either (Codex round 4), including the
   off-coverage branch of the dispatch, so a crypto scenario typed only by its
-  horizon is grounded rather than answered with closes (Codex round 5). `retrieval_spec(scenario=True)` then sends
+  horizon is grounded rather than answered with closes (Codex round 5). A
+  scenario lives in the analyst-estimates data class: three-day cache TTL and a
+  one-month web recency filter whatever kind it was typed as, and the
+  recording was re-captured under that filter (Codex round 7). `retrieval_spec(scenario=True)` then sends
   `SCENARIO_RETRIEVAL_INSTRUCTIONS`, the recorded retrieval contract plus the
   carve-out that the inputs are the retrieved figures and are rowed while the
   scenario values are the model's arithmetic and are never rowed. Every other
