@@ -61,6 +61,15 @@ from tests.evals.measurement_registry import (
 from tests.evals.measurement_registry import (
     followup_thread_metadata as _followup_thread_metadata,
 )
+from tests.evals.measurement_selection import (
+    SELECTION_RELEVANCE,
+    SELECTION_RUBRIC,
+    compare_selection,
+    is_selection_evidence,
+    observe_selection,
+    selection_judge_context,
+    selection_offered,
+)
 
 LOCKED_EVAL_CATEGORIES = {
     "messy_english",
@@ -263,7 +272,18 @@ def run_eval_case(
     failed_checks = typed_expectation_failures(case=case, outcome=typed_outcome)
     infrastructure_errors = composer_unavailability(route_receipts)
     judge_result = None
-    if run_prose_judge and case.prose_judge_criteria:
+    selection = typed_outcome.get("asset_discovery")
+    selection_context = (
+        selection_judge_context(selection) if is_selection_evidence(selection) else None
+    )
+    criteria = (
+        (*case.prose_judge_criteria, SELECTION_RELEVANCE)
+        if selection_context is not None
+        else case.prose_judge_criteria
+    )
+    if selection_context is not None and not run_prose_judge:
+        failed_checks.append("prose_judge:selection_relevance_unproven")
+    if run_prose_judge and criteria:
         judged_final_patch = _final_patch(
             interpret_result=interpret_result,
             dispatch_result=dispatch_result,
@@ -290,6 +310,11 @@ def run_eval_case(
                     case=case,
                     assistant_text=assistant_text,
                     rendered_beside_reply=rendered_surface,
+                    **(
+                        {"selection_evidence": selection_context}
+                        if selection_context is not None
+                        else {}
+                    ),
                 )
             finally:
                 route_receipts.extend(
@@ -307,10 +332,15 @@ def run_eval_case(
                 )
         retain_prose_context(
             judge_result,
-            criteria=case.prose_judge_criteria,
+            criteria=criteria,
             text=assistant_text,
             rendered_surface=rendered_surface,
         )
+        if selection_context is not None:
+            judge_result["selection_evidence"] = selection_context
+            judge_result["selection_expectations"] = dict(
+                case.expected.asset_discovery or {}
+            )
 
     status = _result_status(failed_checks, expected_fail=case.expected_fail)
     if infrastructure_errors:
@@ -522,6 +552,7 @@ def judge_prose_quality(
     case: EvalCase,
     assistant_text: str,
     rendered_beside_reply: dict[str, Any] | None = None,
+    selection_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
         response = asyncio.run(
@@ -529,6 +560,7 @@ def judge_prose_quality(
                 case=case,
                 assistant_text=assistant_text,
                 rendered_beside_reply=rendered_beside_reply or {},
+                selection_evidence=selection_evidence,
             )
         )
     except Exception as exc:
@@ -635,6 +667,7 @@ async def _judge_prose_quality_async(
     case: EvalCase,
     assistant_text: str,
     rendered_beside_reply: dict[str, Any],
+    selection_evidence: dict[str, Any] | None = None,
 ) -> ProseJudgeResponse | None:
     payload = {
         "case_id": case.id,
@@ -646,10 +679,16 @@ async def _judge_prose_quality_async(
         "assistant_text": assistant_text,
         "rendered_beside_reply": rendered_beside_reply,
     }
+    rubric = PROSE_JUDGE_RUBRIC
+    if selection_evidence is not None:
+        payload["criteria"].append(SELECTION_RELEVANCE)
+        payload["selection_expectations"] = dict(case.expected.asset_discovery or {})
+        payload["selection_evidence"] = selection_evidence
+        rubric += SELECTION_RUBRIC
     result = await invoke_openrouter_json_schema(
         task="chat_composer",
         messages=[
-            {"role": "system", "content": PROSE_JUDGE_RUBRIC},
+            {"role": "system", "content": rubric},
             {"role": "user", "content": json.dumps(payload, sort_keys=True)},
         ],
         schema_model=ProseJudgeResponse,
@@ -892,11 +931,29 @@ def _typed_outcome(
         followup=followup_result,
         stage_results=stage_results,
     )
-    discovery_arguments = [
-        call["arguments"]
-        for call in execution_evidence["tool_calls"]
-        if call["tool_name"] == "peer_expansion"
-    ]
+    selection = None
+    if (
+        case.expected.asset_discovery is not None
+        and case.expected.tool_dispatch is not None
+    ):
+        selection = observe_selection(
+            calls=[
+                call.model_dump(mode="json")
+                if hasattr(call, "model_dump")
+                else dict(call)
+                for call in interpret_patch.get("tool_calls", [])
+            ],
+            patch=payload_dispatch_result.patch
+            if payload_dispatch_result is not None
+            else {},
+            final_patch=final_patch,
+        )
+    offered = offered_to_user(
+        final_patch=final_patch,
+        interpret_patch=interpret_patch,
+        launch_payload=launch_payload,
+        assistant_text=_assistant_text(final_patch),
+    )
 
     return {
         **execution_evidence,
@@ -950,17 +1007,12 @@ def _typed_outcome(
         "requested_field": final_patch.get("requested_field"),
         "clarification": final_patch.get("clarification"),
         "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
-        "asset_discovery": (
-            discovery_arguments
-            if execution_evidence["tool_calls"]
-            else interpret_patch.get("asset_discovery")
-        ),
-        "offered": offered_to_user(
-            final_patch=final_patch,
-            interpret_patch=interpret_patch,
-            launch_payload=launch_payload,
-            assistant_text=_assistant_text(final_patch),
-        ),
+        "asset_discovery": selection
+        if selection is not None
+        else interpret_patch.get("asset_discovery"),
+        "offered": selection_offered(offered, selection)
+        if selection is not None
+        else offered,
     }
 
 
@@ -1056,6 +1108,11 @@ def _compare_asset_discovery(
     actual: Any,
     failures: list[str],
 ) -> None:
+    if is_selection_evidence(actual):
+        compare_selection(expected, actual, failures)
+        return
+    # Historical scorecards and authored baseline payloads keep their input
+    # contract. Fresh catalog runs always carry the versioned result evidence.
     if isinstance(actual, list):
         candidate_failures = []
         for arguments in actual:
@@ -1065,7 +1122,7 @@ def _compare_asset_discovery(
                 return
             candidate_failures.append(argument_failures)
         failures.append(
-            "asset_discovery: no declared peer-expansion call preserved the expected "
+            "asset_discovery: no legacy call payload preserved the expected "
             f"discovery facts: {candidate_failures!r}"
         )
         return
