@@ -18,6 +18,7 @@ from unittest.mock import patch
 try:
     from .result_readout_eval import (
         MAX_ATTEMPTS,
+        MAX_INPUT_BYTES,
         TASK_OUTPUT_LIMITS,
         CostGuard,
         encoded,
@@ -26,11 +27,14 @@ try:
 except ImportError:  # Direct script entry in the other checkout's subprocess.
     from result_readout_eval import (
         MAX_ATTEMPTS,
+        MAX_INPUT_BYTES,
         TASK_OUTPUT_LIMITS,
         CostGuard,
         encoded,
         sha256,
     )
+
+PRIOR_QUICK_TAKE_ALLOWANCE_BYTES = 8192  # Free sizing stress, not a prose limit.
 
 
 def install_http_guards(
@@ -372,6 +376,7 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
         "market_data_provider_mode": "recorded_run_fixture_no_fetch",
         "asset_provider_mode": "recorded_run_fixture_no_fetch",
         "credential_present": bool(resolve_openrouter_api_key()),
+        "max_input_bytes": request.get("max_input_bytes", MAX_INPUT_BYTES),
         "tasks": {
             task: {
                 "tier": openrouter.openrouter_model_tier_for_task(task),
@@ -383,6 +388,10 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
                     task
                 ).timeout_seconds,
                 "temperature": openrouter.openrouter_profile_for_task(task).temperature,
+                "reasoning_effort": openrouter.openrouter_profile_for_task(
+                    task
+                ).reasoning_effort,
+                "max_retries": openrouter.openrouter_profile_for_task(task).max_retries,
             }
             for task in TASK_OUTPUT_LIMITS
         },
@@ -397,7 +406,11 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
         "preflight_payloads": [],
         "composition_mode": "fresh composition from a stored run fixture; no persistence",
     }
-    guard = CostGuard(budget_usd=request["budget_usd"], rates=request["rates"])
+    guard = CostGuard(
+        budget_usd=request["budget_usd"],
+        rates=request["rates"],
+        max_input_bytes=configuration["max_input_bytes"],
+    )
 
     def dry_completion(**kwargs: Any) -> None:
         task = kwargs["task"]
@@ -416,6 +429,15 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
                     "model": model,
                     "bytes": len(encoded(payload)),
                     "payload_sha256": sha256(encoded(payload)),
+                    "prior_quick_take_allowance_bytes": PRIOR_QUICK_TAKE_ALLOWANCE_BYTES
+                    if task == "result_breakdown"
+                    else 0,
+                    "bytes_with_prior_quick_take_allowance": len(encoded(payload))
+                    + (
+                        PRIOR_QUICK_TAKE_ALLOWANCE_BYTES
+                        if task == "result_breakdown"
+                        else 0
+                    ),
                 }
             )
         return None
@@ -472,9 +494,16 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
             }
             context = breakdown.result_breakdown_context(run)
             deeper_started = time.monotonic()
-            deeper = breakdown.llm_result_breakdown_message(
-                context, language=language, invoke_json_schema_func=tracker
-            )
+            detailed = getattr(breakdown, "_llm_result_breakdown_with_metadata", None)
+            if detailed is not None:
+                deeper, failure = detailed(
+                    context, language=language, invoke_json_schema_func=tracker
+                )
+            else:
+                deeper = breakdown.llm_result_breakdown_message(
+                    context, language=language, invoke_json_schema_func=tracker
+                )
+                failure = None if deeper else "llm_unavailable_or_contract_rejected"
             fallback_text = breakdown.fallback_result_breakdown_message(
                 context, language=language
             )
@@ -483,9 +512,7 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
                 "accepted_text": deeper,
                 "source": "llm_breakdown_stage" if deeper else "deterministic_fallback",
                 "fallback_used": not bool(deeper),
-                "failure_mode": None
-                if deeper
-                else "llm_unavailable_or_contract_rejected",
+                "failure_mode": failure,
                 "latency_ms": round((time.monotonic() - deeper_started) * 1000),
             }
         except BaseException as exc:

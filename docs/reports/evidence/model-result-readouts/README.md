@@ -1,5 +1,9 @@
 # Model result readouts: requested stop report
 
+This is the preserved first-round report. The founder authorized one further
+input/structured-output correction and a separately approved tier comparison;
+see [round two](round2/README.md). The results below are not replaced by that work.
+
 **Not ready to merge.** The implementation and approved targeted proof are
 committed for review. All 48 logical comparison tasks were attempted and
 reviewed, with no attempted case retried. Candidate quality passed **1/24**;

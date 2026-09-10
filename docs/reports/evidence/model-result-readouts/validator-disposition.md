@@ -1,5 +1,7 @@
 # Result readout validator dispositions
 
+## First measured round
+
 Both composers now return one complete `text` field. The shared owner is
 `src/argus/domain/result_readout_grounding.py`; the run owns every metric and
 the retained engine configuration owns execution inputs. Stored charts are
@@ -85,3 +87,28 @@ Review delta: the unit-mixing, generic benchmark-subject, and compact/scientific
 number regressions produced 40 failed / 14 passed before the fix. After the
 shared checker fix, all 105 model-readout cases and all 295 tests across the
 five affected suites passed; Ruff passed. Prompt text and schema were unchanged.
+
+## Second-round changes requested by the founder
+
+This section supersedes the first round's flat-number membership and requested-
+language stamping decisions. The first-round observations above remain intact.
+
+| Check or rule | Disposition and reason |
+| --- | --- |
+| Flat pool of compatible stored numbers | Replace: the same number under another metric cannot establish the claimed fact; resolve the draft's explicit fact key and verify its canonical value. |
+| Exact quote and occurrence binding | Keep: catches unattached, missing, duplicate or overlapping figure references; every quoted figure must have a reference, without requiring any particular figure to be written. |
+| Per-fact unit and rounding | Keep: catches a false amount, wrong date, incompatible unit, or percentage-points/percent substitution against the referenced fact. |
+| Written-out numbers | Keep under the same figure boundary: English/Spanish number words must not bypass a check that applies to their digit form. |
+| S&P 500 name recognition | Exempt only the supported instrument name in its supplied instrument context: the name is not a numerical statement; unrelated standalone 500 values still require a fact. |
+| Written-language report | Keep: a structured language report that differs from the requested workspace language prevents a false transport stamp and causes complete fallback. |
+| Complete schema validation | Keep: missing/malformed language, text or references cannot become a partial visible readout. |
+| Explicit benchmark contradiction | Keep: catches visible beat, lag or match claims contradicting the run, independently of valid numeric references. |
+| Internal field/schema leakage | Keep: catches implementation names in visible prose; fact references stay internal. |
+| Required fact mentions, figure-count allowances, word/block caps | Stay removed: omission and richer honest content are not false statements. References document what the model chose to write and do not prescribe its content. |
+| Historical interpretation, surface ownership and punctuation instructions | Unchanged: this round fixes the evidence input and structured response contract rather than adding prose rules. Em-dash normalization happens only after complete acceptance. |
+
+The language report remains self-reported, and a correct key/value reference
+does not prove arbitrary prose entailment. Every accepted text must therefore
+be reviewed against the canonical run in the separately approved second-round
+comparison. Zero accepted factual errors is the founder's bar. No second-round
+paid result or tier-quality claim exists yet.

@@ -31,6 +31,145 @@ def test_schedule_interleaves_both_languages_and_pairs_both_frames() -> None:
         assert [row["replicate"] for row in block] == [1, 1, 2, 2]
 
 
+def test_tier_schedule_has_four_replicates_per_arm_and_96_frame_tasks() -> None:
+    schedule = build_schedule(
+        ["buyhold", "dca", "rsi"], replicates=4, variants=("current", "structured")
+    )
+    assert len(schedule) * 2 == 96
+    for offset in range(0, len(schedule), 8):
+        block = schedule[offset : offset + 8]
+        assert [(row["variant"], row["replicate"]) for row in block] == [
+            ("current", 1),
+            ("structured", 1),
+            ("structured", 2),
+            ("current", 2),
+            ("current", 3),
+            ("structured", 3),
+            ("structured", 4),
+            ("current", 4),
+        ]
+
+
+@pytest.mark.parametrize(
+    "mutation", ["none", "profile", "other_task", "comment", "duplicate"]
+)
+def test_tier_source_proof_allows_only_two_exact_mapping_changes(mutation: str) -> None:
+    from tests.evals.result_readout_eval_tiers import validate_tier_sources
+
+    current = b"""PROFILE = {"result_summary": 700}
+OPENROUTER_TASK_MODEL_TIERS: dict[str, str] = {
+    "result_summary": "chat", "result_breakdown": "context", "interpretation": "structured",
+}
+"""
+    structured = current.replace(b'"chat"', b'"structured"').replace(
+        b'"context"', b'"structured"'
+    )
+    mutations = {
+        "profile": (b"700", b"900"),
+        "other_task": (b'"interpretation": "structured"', b'"interpretation": "chat"'),
+        "comment": (b"PROFILE", b"# extra change\nPROFILE"),
+        "duplicate": (
+            b'"result_summary": "structured",',
+            b'"result_summary": "structured", "result_summary": "structured",',
+        ),
+    }
+    if mutation == "none":
+        validate_tier_sources(current, structured)
+    else:
+        structured = structured.replace(*mutations[mutation])
+        with pytest.raises(ValueError):
+            validate_tier_sources(current, structured)
+
+
+def test_tier_tree_proof_rejects_another_changed_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.evals import result_readout_eval_tiers as tiers
+
+    monkeypatch.setattr(
+        tiers,
+        "committed_tree",
+        lambda root: {
+            tiers.TASK_PATH: ("100644", str(root)),
+            "src/argus/example.py": ("100644", str(root)),
+        },
+    )
+    with pytest.raises(ValueError, match="only_readout_tier_file_may_differ"):
+        tiers.validate_tier_checkouts(Path("current"), Path("structured"))
+
+
+@pytest.mark.parametrize("mode,expected_tasks", [("legacy", 48), ("tiers", 96)])
+def test_runner_report_uses_mode_specific_counts_and_display_roles(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    mode: str,
+    expected_tasks: int,
+) -> None:
+    import sys
+
+    from tests.evals import result_readout_eval as runner
+    from tests.evals import result_readout_eval_tiers as tiers
+
+    control = tmp_path / "control"
+    (control / ".agent").mkdir(parents=True)
+    (control / ".agent/interpreter_prompt_fingerprint.json").write_text(
+        json.dumps({"last_measured": {"scorecard": "prior.json"}})
+    )
+    (control / "prior.json").write_text(
+        json.dumps({"totals": {"passed": 1, "failed": 0}, "results": []})
+    )
+    monkeypatch.setattr(
+        runner, "checkout_provenance", lambda *args, **kwargs: {"worktree_clean": True}
+    )
+    monkeypatch.setattr(
+        tiers, "validate_tier_checkouts", lambda *args: {"test_only": True}
+    )
+    monkeypatch.setattr(
+        runner,
+        "invoke_probe",
+        lambda **kwargs: {
+            "configuration": {"credential_present": True},
+            "preflight_payloads": [],
+            "observed_cost_usd": 0,
+            "unknown_cost_attempts": 0,
+            "unknown_cost_reserved_usd": 0,
+            "accounted_upper_bound_usd": 0,
+            "cost_complete": False,
+        },
+    )
+    output = tmp_path / "report.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "runner",
+            "--baseline",
+            str(control),
+            "--candidate",
+            str(tmp_path / "candidate"),
+            "--comparison-mode",
+            mode,
+            "--output",
+            str(output),
+        ],
+    )
+    runner.main()
+    report = json.loads(output.read_text())
+    assert report["scheduled_task_completions"] == expected_tasks
+    assert report["totals"]["pending_review"] == expected_tasks
+    assert len(report["results"]) * 2 == expected_tasks
+    if mode == "tiers":
+        assert {row["variant"] for row in report["results"]} == {"current", "structured"}
+        assert all(
+            "Private baseline" not in row["display_evidence_role"]
+            for row in report["results"]
+        )
+    else:
+        assert report["results"][0]["display_evidence_role"].startswith(
+            "Private baseline"
+        )
+
+
 def test_paid_fixtures_refuse_authored_test_numbers() -> None:
     path = Path(__file__).with_name("result_readout_fixtures.json")
     assert len(load_fixture_set(path, live=False)["cases"]) == 3
@@ -97,6 +236,49 @@ def test_recorded_chart_sized_request_fits_proposed_input_bound() -> None:
         task="result_breakdown",
     )
     assert guard.attempts == 1
+
+
+def test_explicit_larger_input_ceiling_prices_and_accepts_full_payload() -> None:
+    rate = {"fixture-model": {"input_per_million": 0.35, "output_per_million": 0.95}}
+    payload = {
+        "model": "fixture-model",
+        "max_tokens": 2400,
+        "messages": [{"content": "x" * 70_000}],
+    }
+    default = CostGuard(budget_usd=1, rates=rate)
+    with pytest.raises(ValueError, match="payload_too_large"):
+        default.reserve(payload, task="result_breakdown")
+    configured = CostGuard(budget_usd=1, rates=rate, max_input_bytes=90_000)
+    reservation = configured.reserve(payload, task="result_breakdown")
+    probe = {
+        "configuration": {
+            "max_input_bytes": 90_000,
+            "tasks": {"result_breakdown": {"models": ["fixture-model"]}},
+        }
+    }
+    assert estimate_ceiling([probe], rate) == pytest.approx(reservation * 4)
+    assert reservation == pytest.approx((90_000 * 0.35 + 2400 * 0.95) / 1_000_000)
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 1.5, float("inf"), "90000"])
+def test_invalid_input_ceiling_is_refused(limit: object) -> None:
+    with pytest.raises(ValueError, match="positive_integer_input_ceiling_required"):
+        CostGuard(budget_usd=1, rates={}, max_input_bytes=limit)
+
+
+def test_live_probe_cannot_change_input_ceiling_after_preflight(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="input_ceiling_changed_after_preflight"):
+        invoke_probe(
+            python="never-invoked",
+            checkout=tmp_path,
+            case={},
+            language="en",
+            live=True,
+            budget_usd=1,
+            rates={},
+            max_input_bytes=100_000,
+            preflight={"configuration": {"max_input_bytes": 90_000}},
+        )
 
 
 def test_full_comparison_bound_prices_all_configured_fallbacks() -> None:
@@ -209,6 +391,41 @@ def test_preflight_runs_actual_composers_without_a_provider_call(
     assert probe["breakdown"]["fallback_used"] is True
     assert probe["quick_take"]["complete_text"]
     assert probe["breakdown"]["complete_text"]
+    from tests.evals.result_readout_probe import PRIOR_QUICK_TAKE_ALLOWANCE_BYTES
+
+    for payload in probe["preflight_payloads"]:
+        allowance = (
+            PRIOR_QUICK_TAKE_ALLOWANCE_BYTES
+            if payload["task"] == "result_breakdown"
+            else 0
+        )
+        assert (
+            payload["bytes_with_prior_quick_take_allowance"]
+            == payload["bytes"] + allowance
+        )
+
+
+@pytest.fixture
+def fake_live_probe_request(monkeypatch: pytest.MonkeyPatch) -> dict:
+    from argus.llm import openrouter, openrouter_key_policy
+
+    monkeypatch.setattr(openrouter, "resolve_openrouter_api_key", lambda: "test-only")
+    monkeypatch.setattr(
+        openrouter_key_policy, "resolve_openrouter_api_key", lambda: "test-only"
+    )
+    for tier in ("CHAT", "CONTEXT", "STRUCTURED"):
+        monkeypatch.setenv(f"ARGUS_{tier}_MODEL", "fixture-model")
+        monkeypatch.setenv(f"ARGUS_{tier}_FALLBACK_MODEL", "")
+    fixture = load_fixture_set(
+        Path(__file__).with_name("result_readout_fixtures.json"), live=False
+    )
+    return {
+        "case": fixture["cases"][0],
+        "language": "en",
+        "live": True,
+        "budget_usd": 1,
+        "rates": {"fixture-model": {"input_per_million": 0.1, "output_per_million": 0.2}},
+    }
 
 
 @pytest.mark.parametrize("false_figure", [False, True])
@@ -220,29 +437,27 @@ def test_probe_retains_raw_drafts_receipts_and_complete_accepted_text(
     false_figure: bool,
     reasoning_rejection: bool,
     late_response: bool,
+    fake_live_probe_request: dict,
 ) -> None:
     import time
 
     import httpx
     from argus.api.chat import breakdown
-    from argus.llm import openrouter, openrouter_key_policy
 
     from tests.evals.result_readout_probe import run_probe
 
-    monkeypatch.setattr(openrouter, "resolve_openrouter_api_key", lambda: "test-only")
-    monkeypatch.setattr(
-        openrouter_key_policy, "resolve_openrouter_api_key", lambda: "test-only"
-    )
-    for tier in ("CHAT", "CONTEXT"):
-        monkeypatch.setenv(f"ARGUS_{tier}_MODEL", "fixture-model")
-        monkeypatch.setenv(f"ARGUS_{tier}_FALLBACK_MODEL", "")
     if late_response:
-        actual_breakdown = breakdown.llm_result_breakdown_message
+        owner = (
+            "_llm_result_breakdown_with_metadata"
+            if hasattr(breakdown, "_llm_result_breakdown_with_metadata")
+            else "llm_result_breakdown_message"
+        )
+        actual_breakdown = getattr(breakdown, owner)
 
         def short_deadline(*args, **kwargs):
             return actual_breakdown(*args, **kwargs, timeout_seconds=0.1)
 
-        monkeypatch.setattr(breakdown, "llm_result_breakdown_message", short_deadline)
+        monkeypatch.setattr(breakdown, owner, short_deadline)
 
     def completion(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
@@ -274,7 +489,15 @@ def test_probe_retains_raw_drafts_receipts_and_complete_accepted_text(
             200,
             json={
                 "model": "fixture-model",
-                "choices": [{"message": {"content": json.dumps({"text": body})}}],
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {"text": body, "language": "en", "figures": []}
+                            )
+                        }
+                    }
+                ],
                 "usage": {"prompt_tokens": 200, "completion_tokens": 30, "cost": 0.0001},
             },
         )
@@ -282,20 +505,7 @@ def test_probe_retains_raw_drafts_receipts_and_complete_accepted_text(
     route = respx_mock.post("https://openrouter.ai/api/v1/chat/completions").mock(
         side_effect=completion
     )
-    fixture = load_fixture_set(
-        Path(__file__).with_name("result_readout_fixtures.json"), live=False
-    )
-    report = run_probe(
-        {
-            "case": fixture["cases"][0],
-            "language": "en",
-            "live": True,
-            "budget_usd": 1,
-            "rates": {
-                "fixture-model": {"input_per_million": 0.1, "output_per_million": 0.2}
-            },
-        }
-    )
+    report = run_probe(fake_live_probe_request)
     expected_attempts = 3 if reasoning_rejection else 2
     assert route.call_count == expected_attempts
     assert report["http_attempts"] == expected_attempts
@@ -320,6 +530,54 @@ def test_probe_retains_raw_drafts_receipts_and_complete_accepted_text(
         else:
             assert report[surface]["accepted_text"] == report[surface]["complete_text"]
         assert report[surface]["fallback_used"] is expected_fallback
+
+
+@pytest.mark.parametrize("invalid", ["language", "figures", "json"])
+def test_probe_retains_malformed_drafts_and_whole_composition_failures(
+    respx_mock,
+    fake_live_probe_request: dict,
+    invalid: str,
+) -> None:
+    import httpx
+    from argus.api.chat import breakdown
+
+    from tests.evals.result_readout_probe import run_probe
+
+    draft = {"text": "The ride was rough.", "language": "en", "figures": []}
+    if invalid == "language":
+        draft["language"] = "es-419"
+    elif invalid == "figures":
+        draft["figures"] = [{"fact_key": "missing_value_and_quote"}]
+    raw = '{"text":' if invalid == "json" else json.dumps(draft)
+    route = respx_mock.post("https://openrouter.ai/api/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "model": "fixture-model",
+                "choices": [{"message": {"content": raw}}],
+                "usage": {"cost": 0.0001},
+            },
+        )
+    )
+    report = run_probe(fake_live_probe_request)
+    assert route.call_count == 2
+    assert all(
+        response["raw_drafts"] == [raw] for response in report["provider_responses"]
+    )
+    for surface in ("quick_take", "breakdown"):
+        assert report[surface]["fallback_used"]
+        assert report[surface]["accepted_text"] is None
+        assert report[surface]["complete_text"]
+        assert report[surface]["failure_mode"]
+    if invalid == "language":
+        assert report["quick_take"]["failure_mode"] == "language_mismatch"
+        if hasattr(breakdown, "_llm_result_breakdown_with_metadata"):
+            assert report["breakdown"]["failure_mode"] == "language_mismatch"
+    else:
+        assert all(
+            receipt["failure_mode"] == "ValidationError"
+            for receipt in report["route_receipts"]
+        )
 
 
 def test_recorded_fixture_must_match_immutable_source_bytes(tmp_path: Path) -> None:

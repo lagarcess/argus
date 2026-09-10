@@ -21,7 +21,7 @@ from typing import Any
 
 LANGUAGES = ("en", "es-419")
 TASK_OUTPUT_LIMITS = {"result_summary": 700, "result_breakdown": 2400}
-MAX_INPUT_BYTES = 60_000  # Retain the recorded run's full optional chart.
+MAX_INPUT_BYTES = 60_000  # Original default; larger measured ceilings are explicit.
 MAX_ATTEMPTS = 4  # Two configured models, each with one reasoning retry.
 
 
@@ -31,6 +31,12 @@ def sha256(value: bytes) -> str:
 
 def encoded(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True).encode("utf-8")
+
+
+def checked_input_limit(value: Any) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError("positive_integer_input_ceiling_required")
+    return value
 
 
 def load_fixture_set(path: Path, *, live: bool) -> dict[str, Any]:
@@ -64,7 +70,14 @@ def load_fixture_set(path: Path, *, live: bool) -> dict[str, Any]:
     return fixtures
 
 
-def build_schedule(case_ids: list[str]) -> list[dict[str, Any]]:
+def build_schedule(
+    case_ids: list[str],
+    *,
+    replicates: int = 2,
+    variants: tuple[str, str] = ("baseline", "candidate"),
+) -> list[dict[str, Any]]:
+    if replicates < 2 or replicates % 2 or len(set(variants)) != 2:
+        raise ValueError("paired_replicates_and_two_distinct_variants_required")
     return [
         {
             "case_id": case_id,
@@ -74,11 +87,12 @@ def build_schedule(case_ids: list[str]) -> list[dict[str, Any]]:
         }
         for case_id in case_ids
         for language in LANGUAGES
+        for first in range(1, replicates, 2)
         for variant, replicate in (
-            ("baseline", 1),
-            ("candidate", 1),
-            ("candidate", 2),
-            ("baseline", 2),
+            (variants[0], first),
+            (variants[1], first),
+            (variants[1], first + 1),
+            (variants[0], first + 1),
         )
     ]
 
@@ -94,6 +108,9 @@ class CostGuard:
     reserved_usd: float = 0
     attempts: int = 0
     by_task: dict[str, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        checked_input_limit(self.max_input_bytes)
 
     def reserve(self, payload: dict[str, Any], *, task: str) -> float:
         if not math.isfinite(self.budget_usd) or self.budget_usd <= 0:
@@ -202,7 +219,16 @@ def invoke_probe(
     budget_usd: float,
     rates: dict[str, Any],
     preflight: dict[str, Any] | None = None,
+    max_input_bytes: int | None = None,
 ) -> dict[str, Any]:
+    preflight_limit = (
+        (preflight or {}).get("configuration", {}).get("max_input_bytes", MAX_INPUT_BYTES)
+    )
+    input_limit = checked_input_limit(
+        preflight_limit if max_input_bytes is None else max_input_bytes
+    )
+    if live and input_limit != preflight_limit:
+        raise ValueError("input_ceiling_changed_after_preflight")
     timeout_seconds = 180.0
     visit_reservation = 0.0
     if live:
@@ -257,6 +283,7 @@ def invoke_probe(
         "live": live,
         "budget_usd": budget_usd,
         "rates": rates,
+        "max_input_bytes": input_limit,
     }
     try:
         child = subprocess.run(
@@ -285,6 +312,9 @@ def invoke_probe(
 def estimate_ceiling(probes: list[dict[str, Any]], rates: dict[str, Any]) -> float:
     total = 0.0
     for probe in probes:
+        input_limit = checked_input_limit(
+            probe["configuration"].get("max_input_bytes", MAX_INPUT_BYTES)
+        )
         for task, configuration in probe["configuration"]["tasks"].items():
             models = configuration["models"]
             if not models or any(model not in rates for model in models):
@@ -297,7 +327,7 @@ def estimate_ceiling(probes: list[dict[str, Any]], rates: dict[str, Any]) -> flo
                 raise ValueError("invalid_price")
             total += MAX_ATTEMPTS * max(
                 (
-                    MAX_INPUT_BYTES * rates[model]["input_per_million"]
+                    input_limit * rates[model]["input_per_million"]
                     + TASK_OUTPUT_LIMITS[task] * rates[model]["output_per_million"]
                 )
                 / 1_000_000
@@ -311,6 +341,12 @@ def main() -> None:
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument(
+        "--comparison-mode",
+        choices=("legacy", "tiers"),
+        default="legacy",
+        help="tiers: --baseline is fixed current tiers; --candidate is the same code on structured tiers",
+    )
+    parser.add_argument(
         "--fixtures",
         type=Path,
         default=Path(__file__).with_name("result_readout_fixtures.json"),
@@ -320,26 +356,47 @@ def main() -> None:
     parser.add_argument("--pricing", type=Path)
     parser.add_argument("--budget-usd", type=float, default=0)
     parser.add_argument(
+        "--max-input-bytes",
+        type=int,
+        default=MAX_INPUT_BYTES,
+        help="Explicit measured full-request ceiling; re-estimate and obtain approval before increasing for live work",
+    )
+    parser.add_argument(
         "--live", action="store_true", help="Paid; founder approval required"
     )
     args = parser.parse_args()
+    checked_input_limit(args.max_input_bytes)
+    tier_mode = args.comparison_mode == "tiers"
     fixtures = load_fixture_set(args.fixtures.resolve(), live=args.live)
-    roots = {"baseline": args.baseline.resolve(), "candidate": args.candidate.resolve()}
+    variants = ("current", "structured") if tier_mode else ("baseline", "candidate")
+    roots = dict(
+        zip(variants, (args.baseline.resolve(), args.candidate.resolve()), strict=False)
+    )
     if args.live and any(
         args.output.resolve().is_relative_to(root) for root in roots.values()
     ):
         raise ValueError("live_output_must_be_outside_checkouts")
     provenance = {
-        key: checkout_provenance(path, require_clean=args.live)
+        key: checkout_provenance(path, require_clean=args.live or tier_mode)
         for key, path in roots.items()
     }
+    tier_proof = None
+    if tier_mode:
+        from tests.evals.result_readout_eval_tiers import validate_tier_checkouts
+
+        tier_proof = validate_tier_checkouts(roots["current"], roots["structured"])
     rates = {}
     if args.pricing:
         pricing = json.loads(args.pricing.read_text())
         if not pricing.get("verified_at") or not pricing.get("source"):
             raise ValueError("pricing_source_and_date_required")
         rates = pricing["models"]
-    schedule = build_schedule([case["id"] for case in fixtures["cases"]])
+    schedule = build_schedule(
+        [case["id"] for case in fixtures["cases"]],
+        replicates=4 if tier_mode else 2,
+        variants=variants,
+    )
+    task_count = len(schedule) * len(TASK_OUTPUT_LIMITS)
     cases = {case["id"]: case for case in fixtures["cases"]}
     preflight = {}
     for row in schedule:
@@ -353,6 +410,7 @@ def main() -> None:
                 live=False,
                 budget_usd=0,
                 rates=rates,
+                max_input_bytes=args.max_input_bytes,
             )
     probes = [preflight[(r["variant"], r["case_id"], r["language"])] for r in schedule]
     ceiling = estimate_ceiling(probes, rates) if rates else None
@@ -368,7 +426,8 @@ def main() -> None:
     if any(not probe["configuration"]["credential_present"] for probe in probes):
         prerequisites.append("Provider credential required in subprocess environment.")
     oversized = any(
-        row["bytes"] > MAX_INPUT_BYTES
+        row.get("bytes_with_prior_quick_take_allowance", row["bytes"])
+        > args.max_input_bytes
         for probe in probes
         for row in probe["preflight_payloads"]
     )
@@ -381,12 +440,16 @@ def main() -> None:
     if args.live and (ceiling is None or ceiling > args.budget_usd):
         raise ValueError("approved_budget_below_worst_case_estimate")
     prior_manifest = json.loads(
-        (roots["baseline"] / ".agent/interpreter_prompt_fingerprint.json").read_text()
+        (roots[variants[0]] / ".agent/interpreter_prompt_fingerprint.json").read_text()
     )
-    prior = roots["baseline"] / prior_manifest["last_measured"]["scorecard"]
+    prior = roots[variants[0]] / prior_manifest["last_measured"]["scorecard"]
     report = {
         "schema_version": "targeted_readout_scorecard/v1",
         "scope": "result_summary + result_breakdown only; not a full eval suite",
+        "comparison_mode": args.comparison_mode,
+        "replicates_per_variant": 4 if tier_mode else 2,
+        "scheduled_task_completions": task_count,
+        "tier_source_proof": tier_proof,
         "fingerprint_authority": {
             "eligible": False,
             "reason": "Targeted readout evidence cannot authorize a fingerprint update.",
@@ -406,10 +469,10 @@ def main() -> None:
         "budget": {
             "approved_usd": args.budget_usd,
             "worst_case_usd": ceiling,
-            "max_input_bytes": MAX_INPUT_BYTES,
+            "max_input_bytes": args.max_input_bytes,
             "max_attempts_per_task": MAX_ATTEMPTS,
         },
-        "totals": {"passed": 0, "failed": 0, "pending_review": 48},
+        "totals": {"passed": 0, "failed": 0, "pending_review": task_count},
         "quality_review": "Required: language, helpful interpretation beyond card, short/deep distinction, no repetition, false figures/claims, causal claims, forecasts, advice, em dashes.",
         "results": [],
     }
@@ -440,7 +503,9 @@ def main() -> None:
                 **row,
                 **probe,
                 "display_evidence_role": (
-                    "Private baseline composer output; baseline reader showed the web template."
+                    "Fixed-code composer output for this tier setting; generation evidence, not browser transport proof."
+                    if tier_mode
+                    else "Private baseline composer output; baseline reader showed the web template."
                     if row["variant"] == "baseline"
                     else "Candidate composer output; reader and template fallback require separate browser evidence."
                 ),
@@ -469,7 +534,7 @@ def main() -> None:
                 "output": str(args.output),
                 "live": args.live,
                 "worst_case_usd": ceiling,
-                "scheduled_task_completions": 48,
+                "scheduled_task_completions": task_count,
                 "remaining_prerequisites": prerequisites,
             }
         )

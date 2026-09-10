@@ -1,0 +1,33 @@
+{
+  "verified_at": "2026-09-10T22:27:00.770293+00:00",
+  "source": [
+    "https://openrouter.ai/deepseek/deepseek-v4-flash",
+    "https://openrouter.ai/qwen/qwen3.5-9b",
+    "https://openrouter.ai/openai/gpt-oss-120b",
+    "https://openrouter.ai/x-ai/grok-4.3",
+    "https://openrouter.ai/anthropic/claude-haiku-4.5"
+  ],
+  "basis": "Conservative independently highest displayed input/output provider rates, USD per million tokens; includes Grok Priority and Haiku regional providers; no cache discount. Grok bound applies below 200000 total tokens.",
+  "models": {
+    "deepseek/deepseek-v4-flash": {
+      "input_per_million": 0.21,
+      "output_per_million": 0.56
+    },
+    "qwen/qwen3.5-9b": {
+      "input_per_million": 0.17,
+      "output_per_million": 0.25
+    },
+    "openai/gpt-oss-120b": {
+      "input_per_million": 0.35,
+      "output_per_million": 0.95
+    },
+    "x-ai/grok-4.3": {
+      "input_per_million": 2.5,
+      "output_per_million": 5.0
+    },
+    "anthropic/claude-haiku-4.5": {
+      "input_per_million": 1.1,
+      "output_per_million": 5.5
+    }
+  }
+}
