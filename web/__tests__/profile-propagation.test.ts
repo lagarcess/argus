@@ -147,7 +147,8 @@ describe("a saved profile reaches the greeting", () => {
     const writers = WRITERS.map((file) => file.path);
     expect(writers).toContain(MENU);
     expect(writers).toContain("components/settings/LanguageModal.tsx");
-    expect(writers).toContain("components/settings/AppearanceModal.tsx");
+    // The account holds no theme, so the appearance panel has nothing to save.
+    expect(writers).not.toContain("components/settings/AppearanceModal.tsx");
   });
 
   test("every save hands the saved profile on, wherever it is made", () => {

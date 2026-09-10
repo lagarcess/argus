@@ -9,12 +9,16 @@ import {
   type Route,
 } from "@playwright/test";
 
-import { LANGUAGE_STORAGE_KEY } from "../lib/browser-storage";
+import {
+  LANGUAGE_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from "../lib/browser-storage";
 import { ALL_LANGUAGES, type ArgusLanguage } from "../lib/language-features";
 
 /**
  * A language change either reaches the account or is shown as refused and put
- * back, so the page never holds a language the account does not.
+ * back, so the page never holds a language the account does not. A theme
+ * change never reaches the account: it stays in this browser.
  *
  * Every `/me` is answered here, so a failed save is chosen rather than waited
  * for. Set PROFILE_WRITE_EVIDENCE_DIR to keep a screenshot of each outcome.
@@ -22,12 +26,18 @@ import { ALL_LANGUAGES, type ArgusLanguage } from "../lib/language-features";
 
 test.describe.configure({ timeout: 90_000 });
 
+type Theme = "light" | "dark";
+
 type Catalog = {
   common: { settings: string };
   guest: { shell: { language: string } };
   settings: {
     preferences: { title: string };
-    app: { language: string; appearance: string };
+    app: {
+      language: string;
+      appearance: string;
+      appearance_options: Record<Theme, string>;
+    };
     profile: { language_save_error: string };
   };
 };
@@ -268,18 +278,45 @@ test("a save that outlives its panel cannot close the panel that replaced it", a
   await expect(appearance).toBeVisible();
 });
 
-test("the front door keeps a language in this browser and writes no profile", async ({
-  page,
-}) => {
-  const writes: string[] = [];
+function storedTheme(page: Page) {
+  return page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    THEME_STORAGE_KEY,
+  );
+}
+
+/** Every `PATCH /me` the page sends from here on. */
+function profileWrites(page: Page) {
+  const writes: unknown[] = [];
   page.on("request", (request) => {
     if (
       request.method() === "PATCH" &&
       new URL(request.url()).pathname.endsWith("/api/v1/me")
     ) {
-      writes.push(request.url());
+      writes.push(request.postDataJSON());
     }
   });
+  return writes;
+}
+
+/**
+ * Requests are reported in the order they were sent, so one sent now is
+ * reported after any write already started.
+ */
+async function afterRequestsSoFar(page: Page) {
+  const sentinel = `/locales/en/common.json?sentinel=${Date.now()}`;
+  await Promise.all([
+    page.waitForRequest((request) => request.url().includes(sentinel)),
+    page.evaluate(async (url) => {
+      await fetch(url);
+    }, sentinel),
+  ]);
+}
+
+test("the front door keeps a language in this browser and writes no profile", async ({
+  page,
+}) => {
+  const writes = profileWrites(page);
   await page.goto("/?auth=login", { waitUntil: "networkidle" });
 
   await activate(page, page.getByRole("button", { name: "Settings", exact: true }));
@@ -291,15 +328,48 @@ test("the front door keeps a language in this browser and writes no profile", as
   await activate(page, languages.getByRole("button", { name: languageRow("es-419") }));
   await expect(languages).toHaveCount(0);
 
-  // Requests are reported in the order they were sent, so one sent now is
-  // reported after any write the language change started.
-  const sentinel = `/locales/en/common.json?after-language-change=${Date.now()}`;
-  await Promise.all([
-    page.waitForRequest((request) => request.url().includes(sentinel)),
-    page.evaluate(async (url) => {
-      await fetch(url);
-    }, sentinel),
-  ]);
+  await afterRequestsSoFar(page);
   expect(writes).toEqual([]);
   await expect.poll(() => storedLanguage(page)).toBe("es-419");
 });
+
+for (const [language, system, picked] of [
+  ["en", "dark", "light"],
+  ["es-419", "light", "dark"],
+] as const) {
+  test(`a theme change stays in this browser and writes no profile (${language})`, async ({
+    page,
+  }) => {
+    const writes = profileWrites(page);
+    await page.emulateMedia({ colorScheme: system });
+    await mockAccount(page, language, "saves");
+    await page.goto("/chat", { waitUntil: "networkidle" });
+    const root = page.locator("html");
+    await expect(root).toHaveClass(new RegExp(`\\b${system}\\b`));
+
+    const panel = await openPreference(page, language, "appearance");
+    await activate(
+      page,
+      panel.getByRole("button", {
+        name: COPY[language].settings.app.appearance_options[picked],
+        exact: true,
+      }),
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(root).toHaveClass(new RegExp(`\\b${picked}\\b`));
+    await expect.poll(() => storedTheme(page)).toBe(picked);
+    await afterRequestsSoFar(page);
+    expect(writes).toEqual([]);
+
+    // The system still prefers the other theme, so what survives is the choice.
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(
+      page.getByRole("button", { name: COPY[language].common.settings }),
+    ).toBeVisible();
+    await expect(root).toHaveClass(new RegExp(`\\b${picked}\\b`));
+    await openPreference(page, language, "appearance");
+    await capture(page, `${language}-theme-${picked}-after-reload`);
+    await afterRequestsSoFar(page);
+    expect(writes).toEqual([]);
+  });
+}
