@@ -1,0 +1,544 @@
+{
+  "purpose": "The five non-baseline failures of live-measurement.json re-run once at the lane head and once on the pinned base tree without this lane's changes; value-free.",
+  "head": {
+    "label": "head",
+    "tree": "/Users/garces/Documents/projects/repos/argus/.claude/worktrees/argus-retrieval-parameters-1d0d3c",
+    "candidate_sha": "53c35ff8fc437349465d7caa9c37d0d61251dd9f",
+    "captured_at": "2026-09-10T21:08:26.176845+00:00",
+    "records": [
+      {
+        "id": "asset_discovery_category_spanish_issue_244",
+        "status": "failed",
+        "failed_checks": [
+          "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'discovery_no_verified_candidates', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})"
+        ],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "rubric_version": "argus-prose-quality-v3"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "discovery_model_knowledge",
+            "schema": "discovery_model_knowledge",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": null,
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "find",
+          "rows": 0,
+          "sources": 0
+        }
+      },
+      {
+        "id": "asset_discovery_not_result_followup_issue_244",
+        "status": "failed",
+        "failed_checks": [
+          "offered.min_next_experiment_rows: expected at least 1, got []"
+        ],
+        "infrastructure_errors": [],
+        "judge": {},
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LatestResultRoutingAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LatestResultSaveAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "result_summary",
+            "schema": "ResultFollowupDraft",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "result_summary",
+            "schema": "ResultFollowupDraft",
+            "outcome": "failed",
+            "failure_mode": "result_followup_draft_rejected"
+          }
+        ],
+        "research": null
+      },
+      {
+        "id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+        "status": "failed",
+        "failed_checks": [
+          "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'discovery_no_verified_candidates', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})"
+        ],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "rubric_version": "argus-prose-quality-v3"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "discovery_extraction",
+            "schema": "discovery_extraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "discovery_model_knowledge",
+            "schema": "discovery_model_knowledge",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": null,
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "find",
+          "rows": 0,
+          "sources": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_spanish_weekly_options_aapl",
+        "status": "passed",
+        "failed_checks": [],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "rubric_version": "argus-prose-quality-v3"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "DcaContractAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "DcaContractAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": null
+      },
+      {
+        "id": "ordinary_conversation_concept_compound_interest_en",
+        "status": "passed",
+        "failed_checks": [],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "rubric_version": "argus-prose-quality-v3"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": null,
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": null
+      }
+    ]
+  },
+  "base": {
+    "label": "base",
+    "tree": "/private/tmp/claude-501/-Users-garces-Documents-projects-repos-argus--claude-worktrees-argus-retrieval-parameters-1d0d3c/3ee56513-28d0-499b-b37a-b7aafcd50d03/scratchpad/base-d0884c3d",
+    "candidate_sha": "d0884c3de81f8c53d454ac4f68f461d3b5dd77e3",
+    "captured_at": "2026-09-10T21:08:48.952514+00:00",
+    "records": [
+      {
+        "id": "asset_discovery_category_spanish_issue_244",
+        "status": "failed",
+        "failed_checks": [
+          "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'discovery_no_verified_candidates', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})"
+        ],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "discovery_model_knowledge",
+            "schema": "discovery_model_knowledge",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": null,
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "find",
+          "rows": 0,
+          "sources": 0
+        }
+      },
+      {
+        "id": "asset_discovery_not_result_followup_issue_244",
+        "status": "failed",
+        "failed_checks": [
+          "offered.min_next_experiment_rows: expected at least 1, got []"
+        ],
+        "infrastructure_errors": [],
+        "judge": {},
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LatestResultRoutingAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LatestResultSaveAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "result_summary",
+            "schema": "ResultFollowupDraft",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "result_summary",
+            "schema": "ResultFollowupDraft",
+            "outcome": "failed",
+            "failure_mode": "result_followup_draft_rejected"
+          }
+        ],
+        "research": null
+      },
+      {
+        "id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+        "status": "failed",
+        "failed_checks": [
+          "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'discovery_no_verified_candidates', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})",
+          "prose_judge:honesty"
+        ],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": false,
+          "failed_criteria": [
+            "honesty"
+          ],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "discovery_extraction",
+            "schema": "discovery_extraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "discovery_model_knowledge",
+            "schema": "discovery_model_knowledge",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": null,
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "find",
+          "rows": 0,
+          "sources": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_spanish_weekly_options_aapl",
+        "status": "passed",
+        "failed_checks": [],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "DcaContractAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "DcaContractAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation_repair",
+            "schema": "FocusedStrategyExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "SignalRulePlan",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "capability_conflict",
+            "schema": "SupportedStrategyCapabilityConflictAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "capability_conflict",
+            "schema": "SupportedStrategyCapabilityConflictAudit",
+            "outcome": "failed",
+            "failure_mode": "TimeoutError"
+          },
+          {
+            "task": "capability_conflict",
+            "schema": "SupportedStrategyCapabilityConflictAudit",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "SignalRulePlan",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "clarification",
+            "schema": "ClarificationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": null
+      },
+      {
+        "id": "ordinary_conversation_concept_compound_interest_en",
+        "status": "passed",
+        "failed_checks": [],
+        "infrastructure_errors": [],
+        "judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "rubric_version": "argus-prose-quality-v2"
+        },
+        "receipt_outcomes": [
+          {
+            "task": "asset_mention_preflight",
+            "schema": "LLMAssetMentionExtraction",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "interpretation",
+            "schema": "LLMInterpretationResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          },
+          {
+            "task": "chat_composer",
+            "schema": "ArgusProseJudgeResponse",
+            "outcome": "succeeded",
+            "failure_mode": null
+          }
+        ],
+        "research": null
+      }
+    ]
+  }
+}

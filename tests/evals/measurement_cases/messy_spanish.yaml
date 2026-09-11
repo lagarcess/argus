@@ -72,27 +72,19 @@ cases:
       capital_amount: 2000
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
   - id: messy_spanish_future_performance_nvda_cruce_dorado
+    # Decision 10 in Spanish: the same forward-looking question is answered
+    # as grounded scenarios in the user's language, never refused.
     prompt: "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?"
     user_language: es-419
     ui_language: es-419
     expected:
       offered:
         response: true
-        clarification_matches_expected: true
-      intent:
-        [
-          "unsupported_or_out_of_scope",
-          "backtest_execution",
-          "strategy_drafting",
-        ]
-      capability_verdict: unsupported
-      assets: ["NVDA"]
-      asset_class: equity
-      capital_amount: 10000
-      benchmark_symbol: SPY
-      stage_outcomes: ["needs_clarification", "await_user_reply"]
-      clarification:
-        kind: unsupported_recovery
-        reason_code: future_performance
+        min_next_experiment_rows: 1
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+      research:
+        published: true
     prose_judge:
-      criteria: ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
+      criteria: ["honesty", "scenario_framing", "spanish_language_integrity", "no_raw_runtime_error"]

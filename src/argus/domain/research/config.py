@@ -59,6 +59,26 @@ RETRIEVAL_INSTRUCTIONS = (
     "read from."
 )
 
+# The same contract for a question whose answer is computed (decision 10):
+# the inputs are the retrieved figures and are rowed; the scenario values are
+# the model's arithmetic and are never rowed. Frozen by its own recording
+# under docs/reports/evidence/decision-10/probes.
+SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
+    " This question asks what something will be worth, what it must grow "
+    "into, or what it is worth today, so the answer is a set of scenarios you "
+    "compute. The retrieved figures are the inputs: the current price, "
+    "published forecasts, analyst targets, growth rates and valuation "
+    "multiples, each rowed with the page it was read from. The scenario values "
+    "are your own arithmetic from those inputs, written out step by step in "
+    "answer_markdown and never rowed; no page needs to state them. Give the "
+    "result as labeled scenario ranges (for example bear, base and bull), each "
+    "written as low to high. When no published forecast covers the full "
+    "horizon, build the scenarios from the nearest published horizon and say "
+    "what you assumed. Say that a figure could not be retrieved only when no "
+    "input at all was retrieved. Never present one number as the future, and "
+    "never say what the reader should do."
+)
+
 
 def research_rail_enabled() -> bool:
     """Default-off kill switch; the founder flips it at promotion."""
@@ -98,6 +118,8 @@ class ResearchConfigSpec(BaseModel):
     search_context_size: SearchContextSize | None = None
     # Request the strict typed shape (answer plus cited rows) instead of prose.
     typed_output: bool = True
+    # The provider-facing contract sent with a typed request.
+    instructions: str = RETRIEVAL_INSTRUCTIONS
     # Per-call retrieval facts, derived from the question by retrieval_spec().
     language: str | None = None
     location: RetrievalLocation | None = None
@@ -157,7 +179,12 @@ RESEARCH_CONFIG_SPECS: dict[QuestionShape, ResearchConfigSpec] = {
         max_output_tokens=2048,
         tools=("web_search", "finance_search", "fetch_url"),
         reasoning_effort="low",
-        timeout_seconds=75.0,
+        # A scenario answer (forecasts, targets and multiples, the arithmetic
+        # written out) took 122s on this configuration and timed out at 75s
+        # on every forward-looking question in the decision 10 after picture
+        # (docs/reports/evidence/decision-10/probes/scenario-balanced-180s.json).
+        # The ceiling is room, never a rule; a quick answer still returns quickly.
+        timeout_seconds=150.0,
         search_context_size="medium",
     ),
     "thorough": ResearchConfigSpec(
@@ -234,20 +261,29 @@ def retrieval_spec(
     closed_period: bool = False,
     language_tag: str | None = "en",
     local_sources: bool = False,
+    scenario: bool = False,
 ) -> ResearchConfigSpec:
     """The documented configuration for a shape, with this question's
     retrieval parameters: response language, home-market location, recency
-    by data class, and the local publisher list when the question is local
-    and the market has one."""
+    by data class, the local publisher list when the question is local and
+    the market has one, and the scenario contract when the answer is
+    computed from published inputs."""
     location = home_location()
     return RESEARCH_CONFIG_SPECS[shape].model_copy(
         update={
             "language": iso_language(language_tag),
             "location": location,
             "recency": RECENCY_BY_DATA_CLASS[
-                data_class_for(question_kind=question_kind, closed_period=closed_period)
+                data_class_for(
+                    question_kind=question_kind,
+                    closed_period=closed_period,
+                    scenario=scenario,
+                )
             ],
             "source_domains": (local_source_domains(location) if local_sources else ()),
+            "instructions": (
+                SCENARIO_RETRIEVAL_INSTRUCTIONS if scenario else RETRIEVAL_INSTRUCTIONS
+            ),
         }
     )
 

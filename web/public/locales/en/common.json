@@ -424,8 +424,8 @@
         "daily": "Retry with daily bars",
         "hour_1": "Retry with 1-hour bars"
       },
-      "future_performance": "I can't predict future performance. I can test how the same idea performed over a historical period instead. What historical period would you like to examine?",
-      "future_performance_with_options": "I can't predict future performance. I can test how the same idea performed over a historical period instead: {{options}}?"
+      "future_performance": "There's no market data for a period that hasn't happened yet, so I can't run a test over it. I can test how the same idea performed over a historical period, or research what analysts expect. What historical period would you like to examine?",
+      "future_performance_with_options": "There's no market data for a period that hasn't happened yet, so I can't run a test over it. I can test how the same idea performed over a historical period, or research what analysts expect: {{options}}?"
     },
     "coverage_recovery": {
       "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",

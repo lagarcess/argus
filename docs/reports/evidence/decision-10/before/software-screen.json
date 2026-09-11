@@ -1,0 +1,359 @@
+{
+  "label": "software-screen",
+  "language": "en",
+  "question": "Screen profitable US software companies with ROE above 15% and a free cash flow yield above 3%.",
+  "asked_at": "2026-09-10T20:09:40.880213+00:00",
+  "tree": "base-rerun",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "- **Adobe (ADBE): ROE 62.76%; free-cash-flow yield 10.39%; net income $7.229 billion.** ROE and profitability use trailing results through May 29, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n- **Intuit (INTU): ROE 24.04%; free-cash-flow yield 10.13%; net income $4.566 billion.** ROE and profitability use trailing results through July 31, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n\nBoth candidates satisfy positive profitability, ROE above the requested threshold, and free-cash-flow yield above the requested threshold. ROE is calculated as trailing net income divided by period-end common equity; free-cash-flow yield is trailing operating cash flow plus capital expenditures divided by current market capitalization."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "- **Adobe (ADBE): ROE 62.76%; free-cash-flow yield 10.39%; net income $7.229 billion.** ROE and profitability use trailing results through May 29, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n- **Intuit (INTU): ROE 24.04%; free-cash-flow yield 10.13%; net income $4.566 billion.** ROE and profitability use trailing results through July 31, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n\nBoth candidates satisfy positive profitability, ROE above the requested threshold, and free-cash-flow yield above the requested threshold. ROE is calculated as trailing net income divided by period-end common equity; free-cash-flow yield is trailing operating cash flow plus capital expenditures divided by current market capitalization.",
+        "next_experiments": {
+          "version": "argus_next_experiments/v1",
+          "rows": [
+            {
+              "kind": "research_test_single",
+              "label": "Test Adobe (ADBE) over the last 3 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Adobe"
+                },
+                {
+                  "type": "ticker",
+                  "value": "ADBE"
+                },
+                {
+                  "type": "text",
+                  "value": " over the last 3 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding ADBE over the last three years"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "screening",
+          "shape": "balanced",
+          "sources": [],
+          "rows": [
+            {
+              "subject": "Adobe Inc.",
+              "symbol": "ADBE",
+              "label": "trailing ROE",
+              "value": 62.76,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-05-29",
+              "source_url": null
+            },
+            {
+              "subject": "Adobe Inc.",
+              "symbol": "ADBE",
+              "label": "trailing free cash flow yield",
+              "value": 10.39,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-10",
+              "source_url": null
+            },
+            {
+              "subject": "Adobe Inc.",
+              "symbol": "ADBE",
+              "label": "trailing net income attributable to common shareholders",
+              "value": 7229000000.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-05-29",
+              "source_url": null
+            },
+            {
+              "subject": "Intuit Inc.",
+              "symbol": "INTU",
+              "label": "trailing ROE",
+              "value": 24.04,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-07-31",
+              "source_url": null
+            },
+            {
+              "subject": "Intuit Inc.",
+              "symbol": "INTU",
+              "label": "trailing free cash flow yield",
+              "value": 10.13,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-10",
+              "source_url": null
+            },
+            {
+              "subject": "Intuit Inc.",
+              "symbol": "INTU",
+              "label": "trailing net income attributable to common shareholders",
+              "value": 4566000000.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-07-31",
+              "source_url": null
+            }
+          ],
+          "retrieved_at": "2026-09-10T20:11:26.242930+00:00",
+          "anchor_symbols": [
+            "ADBE"
+          ],
+          "peers": [],
+          "usage": {
+            "invocations": 5,
+            "latency_ms": 91523,
+            "cost_usd": 0.30222000000000004,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [
+              {
+                "symbol": "ADBE",
+                "name": "Adobe Inc. Common Stock",
+                "asset_class": "equity"
+              }
+            ],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            }
+          }
+        },
+        "message_id": "53c20eda-7ce5-417e-9693-e8d00655c037",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "26de1f7c-24f5-4103-859f-1e1b152cc031",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "2f0a76c6-1a23-41c2-a951-d27acc32f99f",
+        "conversation_id": "26de1f7c-24f5-4103-859f-1e1b152cc031",
+        "role": "user",
+        "content": "Screen profitable US software companies with ROE above 15% and a free cash flow yield above 3%.",
+        "created_at": "2026-09-10T20:09:40.922354Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "26de1f7c-24f5-4103-859f-1e1b152cc031",
+            "request_id": "1c5dc213-0fcb-470a-9120-0f826c6f9beb",
+            "started_at": "2026-09-10T20:09:40.922337+00:00"
+          }
+        }
+      },
+      {
+        "id": "53c20eda-7ce5-417e-9693-e8d00655c037",
+        "conversation_id": "26de1f7c-24f5-4103-859f-1e1b152cc031",
+        "role": "assistant",
+        "content": "- **Adobe (ADBE): ROE 62.76%; free-cash-flow yield 10.39%; net income $7.229 billion.** ROE and profitability use trailing results through May 29, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n- **Intuit (INTU): ROE 24.04%; free-cash-flow yield 10.13%; net income $4.566 billion.** ROE and profitability use trailing results through July 31, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n\nBoth candidates satisfy positive profitability, ROE above the requested threshold, and free-cash-flow yield above the requested threshold. ROE is calculated as trailing net income divided by period-end common equity; free-cash-flow yield is trailing operating cash flow plus capital expenditures divided by current market capitalization.",
+        "created_at": "2026-09-10T20:11:27.383632Z",
+        "metadata": {
+          "conversation_mode": "guide",
+          "agent_runtime_stage_outcome": "ready_to_respond",
+          "next_experiments": {
+            "version": "argus_next_experiments/v1",
+            "rows": [
+              {
+                "kind": "research_test_single",
+                "label": "Test Adobe (ADBE) over the last 3 years",
+                "label_parts": [
+                  {
+                    "type": "text",
+                    "value": "Test "
+                  },
+                  {
+                    "type": "text",
+                    "value": "Adobe"
+                  },
+                  {
+                    "type": "ticker",
+                    "value": "ADBE"
+                  },
+                  {
+                    "type": "text",
+                    "value": " over the last 3 years"
+                  }
+                ],
+                "label_key": "chat.next_experiments.labels.research_dynamic",
+                "send_text": "Test buying and holding ADBE over the last three years"
+              }
+            ]
+          },
+          "research": {
+            "schema_version": "argus_research/v1",
+            "capability_class": "screening",
+            "shape": "balanced",
+            "sources": [],
+            "rows": [
+              {
+                "subject": "Adobe Inc.",
+                "symbol": "ADBE",
+                "label": "trailing ROE",
+                "value": 62.76,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-05-29",
+                "source_url": null
+              },
+              {
+                "subject": "Adobe Inc.",
+                "symbol": "ADBE",
+                "label": "trailing free cash flow yield",
+                "value": 10.39,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-10",
+                "source_url": null
+              },
+              {
+                "subject": "Adobe Inc.",
+                "symbol": "ADBE",
+                "label": "trailing net income attributable to common shareholders",
+                "value": 7229000000.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-05-29",
+                "source_url": null
+              },
+              {
+                "subject": "Intuit Inc.",
+                "symbol": "INTU",
+                "label": "trailing ROE",
+                "value": 24.04,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-07-31",
+                "source_url": null
+              },
+              {
+                "subject": "Intuit Inc.",
+                "symbol": "INTU",
+                "label": "trailing free cash flow yield",
+                "value": 10.13,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-10",
+                "source_url": null
+              },
+              {
+                "subject": "Intuit Inc.",
+                "symbol": "INTU",
+                "label": "trailing net income attributable to common shareholders",
+                "value": 4566000000.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-07-31",
+                "source_url": null
+              }
+            ],
+            "retrieved_at": "2026-09-10T20:11:26.242930+00:00",
+            "anchor_symbols": [
+              "ADBE"
+            ],
+            "peers": [],
+            "usage": {
+              "invocations": 5,
+              "latency_ms": 91523,
+              "cost_usd": 0.30222000000000004,
+              "cache_status": "miss"
+            },
+            "follow_up": {
+              "schema_version": "argus_research_follow_up/v1",
+              "subjects": [
+                {
+                  "symbol": "ADBE",
+                  "name": "Adobe Inc. Common Stock",
+                  "asset_class": "equity"
+                }
+              ],
+              "comparison_set": [],
+              "peer_suggestions": [],
+              "open_thread": {
+                "shape": "balanced",
+                "period_of_interest": null
+              }
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "2f0a76c6-1a23-41c2-a951-d27acc32f99f",
+            "request_id": "1c5dc213-0fcb-470a-9120-0f826c6f9beb",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 106.51,
+  "summary": {
+    "label": "software-screen",
+    "language": "en",
+    "elapsed_seconds": 106.51,
+    "stage_outcomes": [
+      "ready_to_respond"
+    ],
+    "answered": true,
+    "recovery_code": null,
+    "clarification_kind": null,
+    "clarification_reason_code": null,
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "- **Adobe (ADBE): ROE 62.76%; free-cash-flow yield 10.39%; net income $7.229 billion.** ROE and profitability use trailing results through May 29, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n- **Intuit (INTU): ROE 24.04%; free-cash-flow yield 10.13%; net income $4.566 billion.** ROE and profitability use trailing results through July 31, 2026. The yield uses trailing free cash flow through that date and market capitalization at September 10, 2026, 20:00:01 UTC.\n\nBoth candidates satisfy positive profitability, ROE above the requested threshold, and free-cash-flow yield above the requested threshold. ROE is calculated as trailing net income divided by period-end common equity; free-cash-flow yield is trailing operating cash flow plus capital expenditures divided by current market capitalization.",
+    "shape": "balanced",
+    "degraded": null,
+    "rows": 6,
+    "sources": [],
+    "research_usage": {
+      "invocations": 5,
+      "latency_ms": 91523,
+      "cost_usd": 0.30222000000000004,
+      "cache_status": "miss"
+    },
+    "next_experiments": [
+      "Test Adobe (ADBE) over the last 3 years"
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+[
+  {
+    "id": "nvda-future-value",
+    "language": "en",
+    "question": "what will $10,000 in NVDA be worth in ten years?",
+    "group": "founder"
+  },
+  {
+    "id": "nvda-grow-into",
+    "language": "en",
+    "question": "What price does NVDA need to grow into?",
+    "group": "founder"
+  },
+  {
+    "id": "nvda-future-value-es",
+    "language": "es-419",
+    "question": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+    "group": "founder"
+  },
+  {
+    "id": "nvda-grow-into-es",
+    "language": "es-419",
+    "question": "¿A qué precio necesita crecer NVDA?",
+    "group": "founder"
+  },
+  {
+    "id": "deep-dive-msft",
+    "language": "en",
+    "question": "Give me a deep dive on Microsoft: its growth drivers and the biggest risks to the business.",
+    "group": "driven"
+  },
+  {
+    "id": "rate-cut-repricing",
+    "language": "en",
+    "question": "How is the most recent Fed rate cut repricing stocks, bonds and currencies?",
+    "group": "driven"
+  },
+  {
+    "id": "sector-radar",
+    "language": "en",
+    "question": "Which US sectors are accelerating or rolling over this month?",
+    "group": "driven"
+  },
+  {
+    "id": "software-screen",
+    "language": "en",
+    "question": "Screen profitable US software companies with ROE above 15% and a free cash flow yield above 3%.",
+    "group": "driven"
+  },
+  {
+    "id": "nflx-vs-dis-wbd",
+    "language": "en",
+    "question": "Compare margins and revenue growth for NFLX against DIS and WBD.",
+    "group": "driven"
+  },
+  {
+    "id": "aapl-quick-read",
+    "language": "en",
+    "question": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+    "group": "driven"
+  },
+  {
+    "id": "savings-500-5pct",
+    "language": "en",
+    "question": "If I save $500 a month at 5%, how much will I have in 20 years?",
+    "group": "consumer"
+  },
+  {
+    "id": "ahorro-5000-6pct",
+    "language": "es-419",
+    "question": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+    "group": "consumer"
+  },
+  {
+    "id": "golden-cross-future",
+    "language": "en",
+    "question": "If I invest $10,000 in NVDA using a golden cross strategy, how much will it be worth in ten years?",
+    "group": "measurement"
+  }
+]

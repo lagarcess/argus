@@ -1,0 +1,1153 @@
+{
+  "label": "aapl-quick-read",
+  "language": "en",
+  "question": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+  "asked_at": "2026-09-10T20:05:48.108997+00:00",
+  "tree": "base",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "needs_clarification"
+    },
+    {
+      "type": "stage_start",
+      "stage": "clarify"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "await_user_reply"
+    },
+    {
+      "type": "token",
+      "content": "Argus can't run that rule directly yet for AAPL. Which supported direction should I use: Use a supported RSI threshold rule, Compare with buy and hold, or Use a supported moving-average crossover?"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "await_user_reply",
+        "assistant_prompt": "Argus can't run that rule directly yet for AAPL. Which supported direction should I use: Use a supported RSI threshold rule, Compare with buy and hold, or Use a supported moving-average crossover?",
+        "assistant_response": "Argus can't run that rule directly yet for AAPL. Which supported direction should I use: Use a supported RSI threshold rule, Compare with buy and hold, or Use a supported moving-average crossover?",
+        "clarification": {
+          "kind": "unsupported_recovery",
+          "reason_code": "unsupported_strategy_logic",
+          "prompt_source": "degraded_fallback",
+          "requested_field": "unsupported_constraints",
+          "requested_fields": [
+            "unsupported_constraints"
+          ],
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "payload": {
+            "strategy": {
+              "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+              "requested_strategy_template": null,
+              "strategy_type": null,
+              "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+              "asset_universe": [
+                "AAPL"
+              ],
+              "asset_class": "equity",
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": null,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": "SPY",
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "AAPL",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "AAPL",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "confidence": "medium"
+                }
+              ],
+              "extra_parameters": {
+                "provider_resolved_assets": [
+                  {
+                    "raw_text": "AAPL",
+                    "symbol": "AAPL",
+                    "asset_class": "equity",
+                    "name": "Apple Inc. Common Stock",
+                    "raw_symbol": "AAPL",
+                    "provider": "alpaca",
+                    "exchange": "AssetExchange.NASDAQ"
+                  }
+                ],
+                "evidence_spans": {
+                  "asset_universe": "AAPL",
+                  "user_goal_summary": "fundamentals, valuation and sentiment"
+                }
+              }
+            },
+            "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment"
+          },
+          "options": [
+            {
+              "id": "rsi_threshold",
+              "replacement_values": {
+                "simplify_logic": "rsi_only"
+              },
+              "compatibility_label": "Use a supported RSI threshold rule"
+            },
+            {
+              "id": "buy_and_hold",
+              "replacement_values": {
+                "strategy_type": "buy_and_hold"
+              },
+              "compatibility_label": "Compare with buy and hold"
+            },
+            {
+              "id": "moving_average_crossover",
+              "replacement_values": {
+                "strategy_type": "signal_strategy",
+                "rule_family": "moving_average_crossover"
+              },
+              "compatibility_label": "Use a supported moving-average crossover"
+            }
+          ]
+        },
+        "response_intent": {
+          "kind": "unsupported_recovery",
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "requested_fields": [],
+          "facts": {
+            "strategy": {
+              "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+              "requested_strategy_template": null,
+              "strategy_type": null,
+              "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+              "asset_universe": [
+                "AAPL"
+              ],
+              "asset_class": "equity",
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": null,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": "SPY",
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "AAPL",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "AAPL",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "confidence": "medium"
+                }
+              ],
+              "extra_parameters": {
+                "provider_resolved_assets": [
+                  {
+                    "raw_text": "AAPL",
+                    "symbol": "AAPL",
+                    "asset_class": "equity",
+                    "name": "Apple Inc. Common Stock",
+                    "raw_symbol": "AAPL",
+                    "provider": "alpaca",
+                    "exchange": "AssetExchange.NASDAQ"
+                  }
+                ],
+                "evidence_spans": {
+                  "asset_universe": "AAPL",
+                  "user_goal_summary": "fundamentals, valuation and sentiment"
+                }
+              }
+            },
+            "current_user_message": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+            "language": "en",
+            "unsupported_constraints": [
+              {
+                "category": "unsupported_strategy_logic",
+                "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                "explanation": "AAPL fundamentals, valuation, and sentiment request is a draft-only strategy that cannot be expressed with the supported executable strategy families. The runtime will route this to unsupported recovery.",
+                "simplification_options": [
+                  {
+                    "label": "Use a supported RSI threshold rule",
+                    "replacement_values": {
+                      "simplify_logic": "rsi_only"
+                    }
+                  },
+                  {
+                    "label": "Compare with buy and hold",
+                    "replacement_values": {
+                      "strategy_type": "buy_and_hold"
+                    }
+                  },
+                  {
+                    "label": "Use a supported moving-average crossover",
+                    "replacement_values": {
+                      "strategy_type": "signal_strategy",
+                      "rule_family": "moving_average_crossover"
+                    }
+                  }
+                ]
+              }
+            ],
+            "preserved_optional_parameter_status": {
+              "optional_parameter_opportunity": [
+                "initial_capital",
+                "timeframe",
+                "fees",
+                "slippage",
+                "engine_options"
+              ],
+              "user_preference_overridden_for_turn": false,
+              "confidence": 0.9,
+              "arbitration_mode": "structured_arbitration",
+              "ambiguous_fields": []
+            }
+          },
+          "options": [
+            {
+              "label": "Use a supported RSI threshold rule",
+              "replacement_values": {
+                "simplify_logic": "rsi_only"
+              },
+              "id": "rsi_threshold"
+            },
+            {
+              "label": "Compare with buy and hold",
+              "replacement_values": {
+                "strategy_type": "buy_and_hold"
+              },
+              "id": "buy_and_hold"
+            },
+            {
+              "label": "Use a supported moving-average crossover",
+              "replacement_values": {
+                "strategy_type": "signal_strategy",
+                "rule_family": "moving_average_crossover"
+              },
+              "id": "moving_average_crossover"
+            }
+          ]
+        },
+        "resolution_provenance": [
+          {
+            "field": "asset_universe[0]",
+            "raw_text": "AAPL",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "AAPL",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "medium"
+          }
+        ],
+        "pending_strategy": {
+          "strategy": {
+            "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+            "requested_strategy_template": null,
+            "strategy_type": null,
+            "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+            "asset_universe": [
+              "AAPL"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": null,
+            "sizing_mode": null,
+            "capital_amount": null,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": "SPY",
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "raw_text": "AAPL",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "resolved",
+                "canonical_symbol": "AAPL",
+                "asset_class": "equity",
+                "validated_by": "provider_catalog",
+                "confidence": "medium"
+              }
+            ],
+            "extra_parameters": {
+              "provider_resolved_assets": [
+                {
+                  "raw_text": "AAPL",
+                  "symbol": "AAPL",
+                  "asset_class": "equity",
+                  "name": "Apple Inc. Common Stock",
+                  "raw_symbol": "AAPL",
+                  "provider": "alpaca",
+                  "exchange": "AssetExchange.NASDAQ"
+                }
+              ],
+              "evidence_spans": {
+                "asset_universe": "AAPL",
+                "user_goal_summary": "fundamentals, valuation and sentiment"
+              }
+            }
+          },
+          "requested_field": null,
+          "missing_required_fields": [],
+          "response_intent": {
+            "kind": "unsupported_recovery",
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "requested_fields": [],
+            "facts": {
+              "strategy": {
+                "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+                "requested_strategy_template": null,
+                "strategy_type": null,
+                "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": null,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "AAPL",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "AAPL",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "AAPL",
+                      "symbol": "AAPL",
+                      "asset_class": "equity",
+                      "name": "Apple Inc. Common Stock",
+                      "raw_symbol": "AAPL",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "evidence_spans": {
+                    "asset_universe": "AAPL",
+                    "user_goal_summary": "fundamentals, valuation and sentiment"
+                  }
+                }
+              },
+              "current_user_message": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+              "language": "en",
+              "unsupported_constraints": [
+                {
+                  "category": "unsupported_strategy_logic",
+                  "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                  "explanation": "AAPL fundamentals, valuation, and sentiment request is a draft-only strategy that cannot be expressed with the supported executable strategy families. The runtime will route this to unsupported recovery.",
+                  "simplification_options": [
+                    {
+                      "label": "Use a supported RSI threshold rule",
+                      "replacement_values": {
+                        "simplify_logic": "rsi_only"
+                      }
+                    },
+                    {
+                      "label": "Compare with buy and hold",
+                      "replacement_values": {
+                        "strategy_type": "buy_and_hold"
+                      }
+                    },
+                    {
+                      "label": "Use a supported moving-average crossover",
+                      "replacement_values": {
+                        "strategy_type": "signal_strategy",
+                        "rule_family": "moving_average_crossover"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "preserved_optional_parameter_status": {
+                "optional_parameter_opportunity": [
+                  "initial_capital",
+                  "timeframe",
+                  "fees",
+                  "slippage",
+                  "engine_options"
+                ],
+                "user_preference_overridden_for_turn": false,
+                "confidence": 0.9,
+                "arbitration_mode": "structured_arbitration",
+                "ambiguous_fields": []
+              }
+            },
+            "options": [
+              {
+                "label": "Use a supported RSI threshold rule",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "id": "rsi_threshold"
+              },
+              {
+                "label": "Compare with buy and hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold"
+                },
+                "id": "buy_and_hold"
+              },
+              {
+                "label": "Use a supported moving-average crossover",
+                "replacement_values": {
+                  "strategy_type": "signal_strategy",
+                  "rule_family": "moving_average_crossover"
+                },
+                "id": "moving_average_crossover"
+              }
+            ]
+          },
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "unsupported_strategy_logic",
+            "prompt_source": "degraded_fallback",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+                "requested_strategy_template": null,
+                "strategy_type": null,
+                "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": null,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "AAPL",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "AAPL",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "AAPL",
+                      "symbol": "AAPL",
+                      "asset_class": "equity",
+                      "name": "Apple Inc. Common Stock",
+                      "raw_symbol": "AAPL",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "evidence_spans": {
+                    "asset_universe": "AAPL",
+                    "user_goal_summary": "fundamentals, valuation and sentiment"
+                  }
+                }
+              },
+              "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment"
+            },
+            "options": [
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold"
+                },
+                "compatibility_label": "Compare with buy and hold"
+              },
+              {
+                "id": "moving_average_crossover",
+                "replacement_values": {
+                  "strategy_type": "signal_strategy",
+                  "rule_family": "moving_average_crossover"
+                },
+                "compatibility_label": "Use a supported moving-average crossover"
+              }
+            ]
+          }
+        },
+        "message_id": "47937b28-f3bd-4192-9de6-ec1f72410bc8",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "88a1949e-f1d7-4ae9-a8e9-9350c7e11e26",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "be1bbbe5-0198-4457-93c8-0a5530b4da07",
+        "conversation_id": "88a1949e-f1d7-4ae9-a8e9-9350c7e11e26",
+        "role": "user",
+        "content": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+        "created_at": "2026-09-10T20:05:48.139595Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "88a1949e-f1d7-4ae9-a8e9-9350c7e11e26",
+            "request_id": "ddff53a6-24fc-4097-a67a-72ba3a273c51",
+            "started_at": "2026-09-10T20:05:48.139587+00:00"
+          }
+        }
+      },
+      {
+        "id": "47937b28-f3bd-4192-9de6-ec1f72410bc8",
+        "conversation_id": "88a1949e-f1d7-4ae9-a8e9-9350c7e11e26",
+        "role": "assistant",
+        "content": "Argus can't run that rule directly yet for AAPL. Which supported direction should I use: Use a supported RSI threshold rule, Compare with buy and hold, or Use a supported moving-average crossover?",
+        "created_at": "2026-09-10T20:06:32.968889Z",
+        "metadata": {
+          "conversation_mode": "setup",
+          "agent_runtime_stage_outcome": "await_user_reply",
+          "response_intent": {
+            "kind": "unsupported_recovery",
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "requested_fields": [],
+            "facts": {
+              "strategy": {
+                "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+                "requested_strategy_template": null,
+                "strategy_type": null,
+                "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": null,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "AAPL",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "AAPL",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "AAPL",
+                      "symbol": "AAPL",
+                      "asset_class": "equity",
+                      "name": "Apple Inc. Common Stock",
+                      "raw_symbol": "AAPL",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "evidence_spans": {
+                    "asset_universe": "AAPL",
+                    "user_goal_summary": "fundamentals, valuation and sentiment"
+                  }
+                }
+              },
+              "current_user_message": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+              "language": "en",
+              "unsupported_constraints": [
+                {
+                  "category": "unsupported_strategy_logic",
+                  "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                  "explanation": "AAPL fundamentals, valuation, and sentiment request is a draft-only strategy that cannot be expressed with the supported executable strategy families. The runtime will route this to unsupported recovery.",
+                  "simplification_options": [
+                    {
+                      "label": "Use a supported RSI threshold rule",
+                      "replacement_values": {
+                        "simplify_logic": "rsi_only"
+                      }
+                    },
+                    {
+                      "label": "Compare with buy and hold",
+                      "replacement_values": {
+                        "strategy_type": "buy_and_hold"
+                      }
+                    },
+                    {
+                      "label": "Use a supported moving-average crossover",
+                      "replacement_values": {
+                        "strategy_type": "signal_strategy",
+                        "rule_family": "moving_average_crossover"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "preserved_optional_parameter_status": {
+                "optional_parameter_opportunity": [
+                  "initial_capital",
+                  "timeframe",
+                  "fees",
+                  "slippage",
+                  "engine_options"
+                ],
+                "user_preference_overridden_for_turn": false,
+                "confidence": 0.9,
+                "arbitration_mode": "structured_arbitration",
+                "ambiguous_fields": []
+              }
+            },
+            "options": [
+              {
+                "label": "Use a supported RSI threshold rule",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "id": "rsi_threshold"
+              },
+              {
+                "label": "Compare with buy and hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold"
+                },
+                "id": "buy_and_hold"
+              },
+              {
+                "label": "Use a supported moving-average crossover",
+                "replacement_values": {
+                  "strategy_type": "signal_strategy",
+                  "rule_family": "moving_average_crossover"
+                },
+                "id": "moving_average_crossover"
+              }
+            ]
+          },
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "unsupported_strategy_logic",
+            "prompt_source": "degraded_fallback",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+                "requested_strategy_template": null,
+                "strategy_type": null,
+                "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": null,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "AAPL",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "AAPL",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "AAPL",
+                      "symbol": "AAPL",
+                      "asset_class": "equity",
+                      "name": "Apple Inc. Common Stock",
+                      "raw_symbol": "AAPL",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "evidence_spans": {
+                    "asset_universe": "AAPL",
+                    "user_goal_summary": "fundamentals, valuation and sentiment"
+                  }
+                }
+              },
+              "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment"
+            },
+            "options": [
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold"
+                },
+                "compatibility_label": "Compare with buy and hold"
+              },
+              {
+                "id": "moving_average_crossover",
+                "replacement_values": {
+                  "strategy_type": "signal_strategy",
+                  "rule_family": "moving_average_crossover"
+                },
+                "compatibility_label": "Use a supported moving-average crossover"
+              }
+            ]
+          },
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "AAPL",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "AAPL",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "pending_strategy": {
+            "strategy": {
+              "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+              "requested_strategy_template": null,
+              "strategy_type": null,
+              "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+              "asset_universe": [
+                "AAPL"
+              ],
+              "asset_class": "equity",
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": null,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": "SPY",
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "AAPL",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "AAPL",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "confidence": "medium"
+                }
+              ],
+              "extra_parameters": {
+                "provider_resolved_assets": [
+                  {
+                    "raw_text": "AAPL",
+                    "symbol": "AAPL",
+                    "asset_class": "equity",
+                    "name": "Apple Inc. Common Stock",
+                    "raw_symbol": "AAPL",
+                    "provider": "alpaca",
+                    "exchange": "AssetExchange.NASDAQ"
+                  }
+                ],
+                "evidence_spans": {
+                  "asset_universe": "AAPL",
+                  "user_goal_summary": "fundamentals, valuation and sentiment"
+                }
+              }
+            },
+            "requested_field": null,
+            "missing_required_fields": [],
+            "response_intent": {
+              "kind": "unsupported_recovery",
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "requested_fields": [],
+              "facts": {
+                "strategy": {
+                  "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+                  "requested_strategy_template": null,
+                  "strategy_type": null,
+                  "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                  "asset_universe": [
+                    "AAPL"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": null,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "AAPL",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "AAPL",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "AAPL",
+                        "symbol": "AAPL",
+                        "asset_class": "equity",
+                        "name": "Apple Inc. Common Stock",
+                        "raw_symbol": "AAPL",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "evidence_spans": {
+                      "asset_universe": "AAPL",
+                      "user_goal_summary": "fundamentals, valuation and sentiment"
+                    }
+                  }
+                },
+                "current_user_message": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+                "language": "en",
+                "unsupported_constraints": [
+                  {
+                    "category": "unsupported_strategy_logic",
+                    "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                    "explanation": "AAPL fundamentals, valuation, and sentiment request is a draft-only strategy that cannot be expressed with the supported executable strategy families. The runtime will route this to unsupported recovery.",
+                    "simplification_options": [
+                      {
+                        "label": "Use a supported RSI threshold rule",
+                        "replacement_values": {
+                          "simplify_logic": "rsi_only"
+                        }
+                      },
+                      {
+                        "label": "Compare with buy and hold",
+                        "replacement_values": {
+                          "strategy_type": "buy_and_hold"
+                        }
+                      },
+                      {
+                        "label": "Use a supported moving-average crossover",
+                        "replacement_values": {
+                          "strategy_type": "signal_strategy",
+                          "rule_family": "moving_average_crossover"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "preserved_optional_parameter_status": {
+                  "optional_parameter_opportunity": [
+                    "initial_capital",
+                    "timeframe",
+                    "fees",
+                    "slippage",
+                    "engine_options"
+                  ],
+                  "user_preference_overridden_for_turn": false,
+                  "confidence": 0.9,
+                  "arbitration_mode": "structured_arbitration",
+                  "ambiguous_fields": []
+                }
+              },
+              "options": [
+                {
+                  "label": "Use a supported RSI threshold rule",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "id": "rsi_threshold"
+                },
+                {
+                  "label": "Compare with buy and hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold"
+                  },
+                  "id": "buy_and_hold"
+                },
+                {
+                  "label": "Use a supported moving-average crossover",
+                  "replacement_values": {
+                    "strategy_type": "signal_strategy",
+                    "rule_family": "moving_average_crossover"
+                  },
+                  "id": "moving_average_crossover"
+                }
+              ]
+            },
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "unsupported_strategy_logic",
+              "prompt_source": "degraded_fallback",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Give me a quick read on AAPL: fundamentals, valuation and sentiment.",
+                  "requested_strategy_template": null,
+                  "strategy_type": null,
+                  "strategy_thesis": "Quick read on AAPL fundamentals, valuation, and sentiment",
+                  "asset_universe": [
+                    "AAPL"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": null,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "AAPL",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "AAPL",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "AAPL",
+                        "symbol": "AAPL",
+                        "asset_class": "equity",
+                        "name": "Apple Inc. Common Stock",
+                        "raw_symbol": "AAPL",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "evidence_spans": {
+                      "asset_universe": "AAPL",
+                      "user_goal_summary": "fundamentals, valuation and sentiment"
+                    }
+                  }
+                },
+                "raw_value": "Quick read on AAPL fundamentals, valuation, and sentiment"
+              },
+              "options": [
+                {
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "compatibility_label": "Use a supported RSI threshold rule"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold"
+                  },
+                  "compatibility_label": "Compare with buy and hold"
+                },
+                {
+                  "id": "moving_average_crossover",
+                  "replacement_values": {
+                    "strategy_type": "signal_strategy",
+                    "rule_family": "moving_average_crossover"
+                  },
+                  "compatibility_label": "Use a supported moving-average crossover"
+                }
+              ]
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "be1bbbe5-0198-4457-93c8-0a5530b4da07",
+            "request_id": "ddff53a6-24fc-4097-a67a-72ba3a273c51",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 44.87,
+  "summary": {
+    "label": "aapl-quick-read",
+    "language": "en",
+    "elapsed_seconds": 44.87,
+    "stage_outcomes": [
+      "needs_clarification",
+      "await_user_reply"
+    ],
+    "answered": false,
+    "recovery_code": null,
+    "clarification_kind": "unsupported_recovery",
+    "clarification_reason_code": "unsupported_strategy_logic",
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "Argus can't run that rule directly yet for AAPL. Which supported direction should I use: Use a supported RSI threshold rule, Compare with buy and hold, or Use a supported moving-average crossover?",
+    "shape": null,
+    "degraded": null,
+    "rows": 0,
+    "sources": [],
+    "research_usage": null,
+    "next_experiments": []
+  }
+}

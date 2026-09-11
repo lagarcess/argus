@@ -509,3 +509,20 @@ def strategy_has_execution_evidence(
             continue
         return True
     return False
+
+
+def strategy_draft_future_horizon(draft: Any) -> dict[str, Any] | None:
+    """Typed future horizon carried by a strategy draft, route-label blind.
+
+    One reader for both consumers: research routing, where a horizon means the
+    strategy claim is not a runnable test, and admission, where a test asked
+    over it fails closed because the data does not exist."""
+
+    extra_parameters = getattr(draft, "extra_parameters", None) or {}
+    intent = extra_parameters.get("date_range_intent")
+    if (
+        isinstance(intent, dict)
+        and str(intent.get("kind") or "").strip() == "future_window"
+    ):
+        return dict(intent)
+    return None

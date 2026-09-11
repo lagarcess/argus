@@ -21,6 +21,7 @@ from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.interpreter.research_routing import (
     primary_research_query,
     research_turn_has_conflicting_owner,
+    scenario_is_typed,
 )
 
 # Re-exported composition surface: the job lifecycle and tests reach these
@@ -104,6 +105,18 @@ async def discovery_turn_stage_result(
         return None
     query = interpretation.research_query
     request = decision.asset_discovery
+    if query is not None and query.symbols and scenario_is_typed(query, interpretation):
+        # A discovery act that names its subjects and asks for a computed
+        # scenario is a scenario, whatever survey or find kind it was typed
+        # as: the dispatch applies the scenario owner, never the find run.
+        return await _dispatch(
+            query,
+            interpretation=interpretation,
+            state=state,
+            user=user,
+            discovery_request=request,
+            decision=decision,
+        )
     if query is None or query.question_kind not in _TYPED_DISCOVERY_DIVERT_KINDS:
         # No primary question shape, or the turn stays discovery-shaped: the
         # find operation runs with the interpreter's typed request, so a
@@ -165,11 +178,16 @@ async def _dispatch(
     if ka.refusal_route_survives_classification(interpretation):
         ka.note_refusal_route_kept(interpretation)
         return None
+    # One owner decides whether this turn is a computed scenario (decision
+    # 10), before any kind branch: a scenario is grounded on public pages
+    # whatever kind it was typed as, never voiced from Argus's own statistics
+    # or a survey, and never sent to the find operation.
+    scenario = grounded.scenario_contract_applies(query, interpretation)
     # Current external facts ("why is it moving") take the grounded balanced
     # path like every other claim: typed, dated sources in the sidecar, never
     # publisher URLs written into prose (#545). Statistics stay on Argus's
     # own data.
-    if query.question_kind == "market_stats":
+    if query.question_kind == "market_stats" and not scenario:
         return await _legacy_kind_result(
             query=query,
             interpretation=interpretation,
@@ -177,7 +195,7 @@ async def _dispatch(
             user=user,
             decision=decision,
         )
-    if query.question_kind in _MARKET_SURVEY_KINDS:
+    if query.question_kind in _MARKET_SURVEY_KINDS and not scenario:
         return await grounded.grounded_result(
             query=query,
             subjects=_resolved_subjects(query),
@@ -187,7 +205,7 @@ async def _dispatch(
             user=user,
             decision=decision,
         )
-    if query.question_kind == "find_assets":
+    if query.question_kind == "find_assets" and not scenario:
         from argus.agent_runtime.research_find import find_assets_stage_result
 
         return await find_assets_stage_result(
@@ -197,20 +215,41 @@ async def _dispatch(
             state=state,
             user=user,
         )
-    if query.question_kind in ("concept", "none"):
+    if query.question_kind in ("concept", "none") and not scenario:
         return None
     subjects = _resolved_subjects(query)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
     if off_coverage or query.asset_class_hint in ("crypto", "currency_pair"):
-        return await grounded.off_coverage_result(
+        if not (grounded.requires_publisher_sources(query) or scenario):
+            return await grounded.off_coverage_result(
+                query=query,
+                subjects=subjects,
+                interpretation=interpretation,
+                state=state,
+                user=user,
+                decision=decision,
+            )
+        # A claim about crypto or a currency pair (a forecast, a company
+        # story, why it moved) is grounded on public pages: the provider's
+        # finance tool never covers these classes, publishers do, and a
+        # figure from Argus's own data cannot answer a claim.
+        return await grounded.grounded_result(
             query=query,
             subjects=subjects,
+            shape="balanced",
             interpretation=interpretation,
             state=state,
             user=user,
             decision=decision,
+            provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
+    if scenario and query.question_kind != "cross_company":
+        # A computed scenario is never a quote and needs no background job:
+        # it runs on the balanced shape with public pages, whatever kind it
+        # was typed as. Only a named multi-company comparison keeps the
+        # thorough job it would take without the scenario.
+        shape = "balanced"
     if shape == "thorough":
         return grounded.thorough_job_result(
             query=query,

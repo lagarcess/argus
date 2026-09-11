@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from argus.agent_runtime.interpreter.draft_shape import strategy_draft_future_horizon
 from argus.agent_runtime.interpreter.provider_context_assets import (
     resolved_asset_records_from_strategy_context,
 )
@@ -44,8 +45,10 @@ FUTURE_PERFORMANCE_ADMISSION_BLOCKED = "future_performance_admission_blocked"
 FUTURE_HORIZON_EVIDENCE_KEY = "future_horizon_intent"
 
 _FUTURE_PERFORMANCE_EXPLANATION = (
-    "Argus cannot predict future performance. It can test how the same idea "
-    "performed over a historical period instead."
+    "There is no market data for a period that has not happened yet, so Argus "
+    "cannot run a test over it. It can test how the same idea performed over a "
+    "historical period the user chooses, or research what analysts expect for "
+    "the asset."
 )
 
 
@@ -72,32 +75,40 @@ def requested_strategy_template_capability_clause() -> str:
     )
 
 
-def future_performance_capability_clause() -> str:
-    """Interpreter-prompt contract for the future-performance boundary."""
+def future_test_window_capability_clause() -> str:
+    """Interpreter-prompt contract for the one future boundary that remains.
+
+    A question about the future is research (decision 10); only a test over a
+    future window is impossible, because that market data does not exist."""
 
     return (
-        "Future-performance questions are a general class in any language and "
-        "for any asset, basket, strategy, or amount: what something will be "
-        "worth, return, become, or do over a future period ('in ten years', "
-        "'over the next 3 years', 'by 2031', 'dentro de diez años'). Argus "
-        "cannot predict future performance, so classify the request as "
-        "unsupported_or_out_of_scope with semantic_turn_act="
-        "unsupported_request, even when the user names a supported strategy "
-        "such as a golden cross; a supported strategy does not make the "
-        "requested future result executable. Set date_range_intent.kind="
-        "future_window with the exact phrase as evidence; never convert the "
-        "future horizon into rolling_window, calendar dates, or any "
-        "historical date_range. If you record a date_range evidence span for "
-        "a forward-looking period, the temporal intent must be future_window; "
-        "never leave the intent empty for forward-looking evidence. "
-        "Still extract the compatible facts — "
-        "asset_universe, capital_amount, strategy_type, cadence — with "
-        "evidence_spans so a later explicit historical test can reuse them. "
-        "Author assistant_response with two separate facts in the user's "
-        "language: Argus cannot predict future performance, and it can test "
-        "how the same idea performed over a historical period the user "
-        "chooses. Offer that historical test without selecting it for the "
-        "user and without presenting any historical result as a forecast.\n\n"
+        "Forward-looking and valuation questions are research questions, in any "
+        "language and for any asset: what something will be worth, return or "
+        "become over a future period ('in ten years', 'dentro de diez años'), "
+        "what price a company needs to grow into, what it is worth today, "
+        "analyst targets, forecasts, fair value, multiples. Classify them as a "
+        "question turn (conversation_followup or beginner_guidance with an "
+        "educational_question act), fill research_query with the fitting "
+        "question_kind and subjects, and set research_query.scenario_question="
+        "true when the answer is a value, target or fair value to compute; "
+        "never classify them as "
+        "unsupported_or_out_of_scope, never add an unsupported constraint for "
+        "them, and leave candidate_strategy_draft without execution fields: a "
+        "named strategy, an amount or a horizon inside a question does not make "
+        "it a test request. A projection on the user's own stated numbers with "
+        "no market subject (a monthly saving at a stated rate over a stated "
+        "horizon) is arithmetic, not a prediction: answer it in "
+        "assistant_response with the formula and the steps written out, labeled "
+        "as assuming the stated rate, with research_query.question_kind=none. "
+        "The one thing that cannot run is a backtest over a future period, "
+        "because that market data does not exist: only when the user asks to "
+        "test, backtest or run a strategy over a period that points forward "
+        "from today, keep the strategy route, set date_range_intent.kind="
+        "future_window with the exact phrase as evidence, never convert the "
+        "horizon into rolling_window, calendar dates or any historical "
+        "date_range, and keep the compatible facts (asset_universe, "
+        "capital_amount, strategy_type, cadence) with evidence_spans so a "
+        "historical test can reuse them.\n\n"
     )
 
 
@@ -433,29 +444,18 @@ def _draft_with_conserved_resolved_assets(draft: Any) -> Any:
     return draft.model_copy(update=update)
 
 
-def strategy_draft_future_horizon(draft: Any) -> dict[str, Any] | None:
-    """Typed future horizon carried by a strategy draft, route-label blind.
-
-    Capability truth lives on this typed field alone; callers use it to keep
-    any model-authored route label from bypassing the future boundary."""
-
-    extra_parameters = getattr(draft, "extra_parameters", None) or {}
-    intent = extra_parameters.get("date_range_intent")
-    if (
-        isinstance(intent, dict)
-        and str(intent.get("kind") or "").strip() == "future_window"
-    ):
-        return dict(intent)
-    return None
-
-
 def strategy_route_flags_with_future_precedence(
     *,
     interpretation: Any,
     expects_strategy_route: bool,
 ) -> tuple[bool, bool]:
-    """Typed future horizon forces the strategy route and disables educational
-    suppression, so admission fires regardless of the model's route label."""
+    """A typed future horizon research did not answer keeps its recovery.
+
+    Research claims a question read before this stage runs (decision 10), so a
+    future horizon still here belongs to a turn with no grounded answer. Forcing
+    the strategy route and disabling educational suppression sends it to the
+    future test-window recovery, which offers the historical test and analyst
+    research, instead of returning the model's own forecast as prose."""
 
     if strategy_draft_future_horizon(interpretation.candidate_strategy_draft):
         return True, False
@@ -475,13 +475,13 @@ def future_performance_admission_result(
     contract: Any,
     optional_parameter_values: dict[str, Any],
 ) -> StageResult | None:
-    """Fail closed when the typed horizon points forward from today.
+    """Fail closed when a strategy-route turn asks to test a future window.
 
-    The horizon moves to original-intent evidence, compatible facts stay on the
+    Only a test over a period that has not happened yet is impossible; a
+    question about the future is research and never reaches this route. The
+    horizon moves to original-intent evidence, compatible facts stay on the
     draft, and the historical period is re-requested after an explicit
-    supported-alternative selection. Interpreter prose never crosses this
-    boundary — no typed field separates a refusal from a forecast — so the
-    clarify stage owns the replacement voice."""
+    supported-alternative selection. The clarify stage owns the voice."""
 
     horizon = _typed_future_horizon(decision)
     if horizon is None:
