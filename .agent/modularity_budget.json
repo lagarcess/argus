@@ -58,6 +58,7 @@
     "tests/agent_runtime/test_llm_interpreter_date_window_repairs.py": 4693,
     "tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py": 4562,
     "tests/agent_runtime/test_llm_interpreter_semantic_contracts.py": 5292,
+    "tests/agent_runtime/test_pending_setup_continuation.py": 1081,
     "tests/agent_runtime/test_post_result_edit_routing.py": 1238,
     "tests/agent_runtime/test_provider_asset_ownership.py": 1772,
     "tests/agent_runtime/test_recognition_contract_guards.py": 1122,
