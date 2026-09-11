@@ -293,6 +293,7 @@ from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _supported_signal_rule_planning_response,
 )
 from argus.agent_runtime.interpreter import simplification_options as _options
+from argus.agent_runtime.interpreter.latest_result_context import latest_result_interpreter_context
 from argus.agent_runtime.interpreter.starting_capital import (  # noqa: F401
     _draft_has_grounded_non_dca_starting_capital,
     _focused_strategy_extraction_has_material_fields,
@@ -732,8 +733,8 @@ class OpenRouterStructuredInterpreter:
                     )
                 )
             if request.latest_task_snapshot.latest_backtest_result_reference is not None:
-                latest_result = (
-                    request.latest_task_snapshot.latest_backtest_result_reference.metadata
+                latest_result = latest_result_interpreter_context(
+                    request.latest_task_snapshot.latest_backtest_result_reference
                 )
             if request.latest_task_snapshot.latest_failed_action_reference is not None:
                 latest_failed_action = request.latest_task_snapshot.latest_failed_action_reference.model_dump(
@@ -788,7 +789,7 @@ class OpenRouterStructuredInterpreter:
                     f"Active confirmation reference JSON, if any: "
                     f"{active_confirmation if active_confirmation else 'none'}\n"
                     f"Latest result fact bank JSON, if any: "
-                    f"{latest_result if latest_result else 'none'}\n"
+                    f"{json.dumps(latest_result, sort_keys=True) if latest_result else 'none'}\n"
                     + (
                         "When the current message reuses the latest result's "
                         "window ('same time period', 'mismo periodo', 'same "
