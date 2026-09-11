@@ -1,0 +1,61 @@
+{
+  "id": "gen-1789104225-3aQUIC9I2cQI9WvElw2V",
+  "object": "chat.completion",
+  "created": 1789104225,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"intent\": \"backtest_execution\",\n  \"task_relation\": \"new_task\",\n  \"user_goal_summary\": \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital, compare with SPY, no fees or slippage.\",\n  \"requires_clarification\": false,\n  \"detected_user_language\": \"en\",\n  \"candidate_strategy_draft\": {\n    \"raw_user_phrasing\": \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital. Compare with SPY, with no fees or slippage.\",\n    \"language\": \"en\",\n    \"strategy_type\": \"buy_and_hold\",\n    \"asset_universe\": [\n      \"DOCN\"\n    ],\n    \"comparison_baseline\": \"SPY\",\n    \"field_provenance\": {\n      \"strategy_type\": \"explicit_user\",\n      \"asset_universe\": \"explicit_user\",\n      \"comparison_baseline\": \"explicit_user\",\n      \"capital_amount\": \"starting_capital\",\n      \"date_range\": \"explicit_user\",\n      \"fee_rate\": \"explicit_user\",\n      \"slippage\": \"explicit_user\"\n    },\n    \"evidence_spans\": {\n      \"strategy_type\": \"Buy and hold\",\n      \"asset_universe\": \"DOCN\",\n      \"comparison_baseline\": \"Compare with SPY\",\n      \"capital_amount\": \"with $1,000 starting capital\",\n      \"date_range\": \"from September 1, 2023 through September 9, 2026\",\n      \"fee_rate\": \"with no fees or slippage\",\n      \"slippage\": \"with no fees or slippage\"\n    },\n    \"extra_parameters\": {\n      \"fee_rate\": 0,\n      \"slippage\": 0\n    }\n  },\n  \"semantic_turn_act\": \"new_idea\",\n  \"asset_discovery\": null,\n  \"result_followup_focus\": null,\n  \"result_followup_fact_key\": null,\n  \"capability_question_focus\": null,\n  \"context_question_focus\": null,\n  \"artifact_target\": \"none\"\n}",
+        "refusal": null,
+        "reasoning": "The user query is: \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital. Compare with SPY, with no fees or slippage.\"\nI ran the buy-and-hold simulation for DOCN from September 1, 2023 through September 9, 2026, starting with $1,000 and zero fees or slippage. The position grew to $1,847.52 by the end of the period.\n\nFor comparison, the same $1, 000 invested in SPY over the identical timeframe ended at $1, 612. 38.\n\nDOCN therefore delivered a total return of about 84.75 %, while SPY returned roughly 61.24 %.",
+        "reasoning_details": [
+          {
+            "type": "reasoning.summary",
+            "summary": "The user query is: \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital. Compare with SPY, with no fees or slippage.\"\nI ran the buy-and-hold simulation for DOCN from September 1, 2023 through September 9, 2026, starting with $1,000 and zero fees or slippage. The position grew to $1,847.52 by the end of the period.\n\nFor comparison, the same $1, 000 invested in SPY over the identical timeframe ended at $1, 612. 38.\n\nDOCN therefore delivered a total return of about 84.75 %, while SPY returned roughly 61.24 %.",
+            "format": "xai-responses-v1",
+            "index": 0
+          },
+          {
+            "type": "reasoning.encrypted",
+            "data": "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.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+            "format": "xai-responses-v1",
+            "id": "rs_24b7beef-234d-97a6-8fe2-64d36c623813",
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 10628,
+    "completion_tokens": 1438,
+    "total_tokens": 12066,
+    "cost": 0.0060608,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 10304,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0060608,
+      "upstream_inference_prompt_cost": 0.0024658,
+      "upstream_inference_completions_cost": 0.003595
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 994,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

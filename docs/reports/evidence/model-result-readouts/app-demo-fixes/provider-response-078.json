@@ -1,0 +1,61 @@
+{
+  "id": "gen-1789105084-rmGU9EF02P8q8ElSlnWN",
+  "object": "chat.completion",
+  "created": 1789105084,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"recurring_contribution_explicit\": true,\n  \"total_budget_not_recurring\": false,\n  \"confidence\": 0.95\n}",
+        "refusal": null,
+        "reasoning": "The task is to decide whether the money amount in the current user message is the recurring contribution for each DCA purchase, or a total budget/capital amount for the whole plan.\n",
+        "reasoning_details": [
+          {
+            "type": "reasoning.summary",
+            "summary": "The task is to decide whether the money amount in the current user message is the recurring contribution for each DCA purchase, or a total budget/capital amount for the whole plan.\n",
+            "format": "xai-responses-v1",
+            "index": 0
+          },
+          {
+            "type": "reasoning.encrypted",
+            "data": "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.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+            "format": "xai-responses-v1",
+            "id": "rs_a1632237-79b2-9339-9432-2bf1a6f09197",
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1140,
+    "completion_tokens": 382,
+    "total_tokens": 1522,
+    "cost": 0.0021784,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 192,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0021784,
+      "upstream_inference_prompt_cost": 0.0012234,
+      "upstream_inference_completions_cost": 0.000955
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 351,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

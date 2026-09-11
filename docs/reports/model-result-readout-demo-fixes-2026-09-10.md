@@ -92,3 +92,16 @@ locally by the web build. A production Turbopack build using only the web contex
 passes. The wheel contains the policy and can read it from an isolated installed
 layout. Deployment configuration is unchanged. Updated runtime assertions pass
 68 focused tests; the packaging/readout regression check passes 102 tests.
+
+
+At `7141b0dc`, the English DOCN and DCA cases produced both Luna readouts. Sources
+were shown live and after reload. Known billed spend reached $0.43636727; the
+same two earlier provider errors still have no invoice. Screenshots and source
+records are retained even where the accepted wording needs improvement.
+
+The founder then requested one pending Breakdown state instead of two and natural
+strategy-action wording. The duplicate is the general streaming-status row in
+ChatInterface plus the Breakdown frame's own working label, not the tool-job
+row. The follow-up also covers in-flight reload from the durable typed request
+lifecycle. The writing brief now describes actions such as buying once and
+holding rather than narrating record keeping. Fingerprint remains held.
