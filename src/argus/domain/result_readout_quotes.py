@@ -18,6 +18,22 @@ def _finite(value: object) -> bool:
     )
 
 
+def _is_figure_fact(row: dict[str, Any]) -> bool:
+    unit, value = row.get("unit"), row.get("value")
+    if unit in {"date", "timestamp"}:
+        return isinstance(value, str)
+    return unit not in {None, "unknown", "text", "boolean"} and _finite(value)
+
+
+def readout_figure_keys(facts: dict[str, Any]) -> tuple[str, ...]:
+    """The same numeric/date fact domain the value check accepts."""
+    return tuple(
+        key
+        for key, row in (facts.get("facts") or {}).items()
+        if isinstance(row, dict) and _is_figure_fact(row)
+    )
+
+
 def validate_figure_references(
     text: str,
     references: list[dict[str, Any]],
@@ -28,7 +44,7 @@ def validate_figure_references(
     """Check only declared facts; unreferenced prose never fails this check."""
     for reference in references:
         row = resolve_readout_fact(facts, reference["fact_key"])
-        if not row:
+        if not row or not _is_figure_fact(row):
             return "invalid_figure_reference"
         expected, value = row.get("value"), reference["value"]
         unit = row.get("unit")
@@ -44,9 +60,7 @@ def validate_figure_references(
             except ValueError:
                 return "invalid_figure_reference"
             continue
-        if unit in {None, "unknown", "text", "boolean"} or not (
-            _finite(expected) and _finite(value)
-        ):
+        if not _finite(value):
             return "invalid_figure_reference"
         # The precision of the declared visible number owns its rounding window.
         precision = Decimal(format(value, ".15g")).as_tuple().exponent

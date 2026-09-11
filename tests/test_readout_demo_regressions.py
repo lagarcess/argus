@@ -85,7 +85,13 @@ def test_breakdown_schema_offers_the_actual_headline_labels():
     from argus.domain.result_readout_sources import result_breakdown_schema
     from pydantic import ValidationError
 
-    facts = {"facts": {"Executed fills": {"value": 13, "unit": "count"}}}
+    facts = {
+        "facts": {
+            "Executed fills": {"value": 13, "unit": "count"},
+            "Contribution schedule": {"value": "monthly", "unit": "text"},
+            "Completed round trips": {"value": None, "unit": "count"},
+        }
+    }
     schema = result_breakdown_schema(facts)
     draft = {
         "language": "en",
@@ -94,5 +100,8 @@ def test_breakdown_schema_offers_the_actual_headline_labels():
     }
     assert schema.model_validate(draft).figures[0].fact_key == "Executed fills"
     draft["figures"][0]["fact_key"] = "executed_fills"
+    with pytest.raises(ValidationError):
+        schema.model_validate(draft)
+    draft["figures"][0] = {"fact_key": "Contribution schedule", "value": "monthly"}
     with pytest.raises(ValidationError):
         schema.model_validate(draft)

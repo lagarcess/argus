@@ -8,7 +8,7 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from babel.dates import format_date
-from pydantic import create_model
+from pydantic import Field, create_model
 
 from argus.domain.research.contracts import ResearchSource
 from argus.domain.result_readout_grounding import (
@@ -16,6 +16,7 @@ from argus.domain.result_readout_grounding import (
     ResultReadoutFigure,
     accepted_readout_text,
 )
+from argus.domain.result_readout_quotes import readout_figure_keys
 
 
 class ResultBreakdownDraft(ResultReadoutDraft):
@@ -24,9 +25,13 @@ class ResultBreakdownDraft(ResultReadoutDraft):
 
 def result_breakdown_schema(facts: dict[str, Any]) -> type[ResultBreakdownDraft]:
     """Use the supplied labels as the model's allowed reference names."""
-    labels = tuple(facts.get("facts", {}))
+    labels = readout_figure_keys(facts)
     if not labels:
-        return ResultBreakdownDraft
+        return create_model(
+            "ResultBreakdownDraft",
+            __base__=ResultBreakdownDraft,
+            figures=(list[ResultReadoutFigure], Field(max_length=0)),
+        )
     figure = create_model(
         "ResultBreakdownFigure",
         __base__=ResultReadoutFigure,
