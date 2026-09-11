@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789102343-uXKDlu0dzQUTF3yddU6F",
+  "object": "chat.completion",
+  "created": 1789102343,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"is_testable_strategy\": true,\n  \"user_goal_summary\": \"Test an RSI strategy in SPY from September 10, 2025 through September 9, 2026 with $1,000 starting capital. Buy when the 14-day RSI drops below 30 and sell when it rises above 70. Compare with SPY. No fees or slippage.\",\n  \"requires_clarification\": false,\n  \"language\": null,\n  \"strategy_type\": \"indicator_threshold\",\n  \"strategy_thesis\": null,\n  \"asset_universe\": [\"SPY\"],\n  \"asset_class\": null,\n  \"timeframe\": null,\n  \"date_range\": null,\n  \"date_range_raw_text\": \"September 10, 2025 through September 9, 2026\",\n  \"date_range_intent\": {\n    \"kind\": \"explicit_range\",\n    \"start\": \"2025-09-10\",\n    \"end\": \"2026-09-09\",\n    \"day_offset\": null,\n    \"count\": null,\n    \"unit\": null,\n    \"anchor\": null,\n    \"year\": null,\n    \"endpoint\": null,\n    \"confidence\": 0.95,\n    \"evidence\": \"September 10, 2025 through September 9, 2026\"\n  },\n  \"comparison_baseline\": \"SPY\",\n  \"capital_amount\": 1000,\n  \"recurring_contribution\": null,\n  \"cadence\": null,\n  \"entry_logic\": null,\n  \"exit_logic\": null,\n  \"entry_rule\": null,\n  \"exit_rule\": null,\n  \"rule_spec\": null,\n  \"indicator\": \"rsi\",\n  \"indicator_period\": 14,\n  \"entry_threshold\": 30,\n  \"exit_threshold\": 70,\n  \"missing_required_fields\": [],\n  \"assistant_response\": null,\n  \"confidence\": 0.9,\n  \"evidence_spans\": {\n    \"strategy_type\": \"RSI strategy\",\n    \"asset_universe\": \"SPY\",\n    \"date_range_raw_text\": \"September 10, 2025 through September 9, 2026\",\n    \"comparison_baseline\": \"Compare with SPY\",\n    \"capital_amount\": \"$1,000\",\n    \"indicator\": \"RSI\",\n    \"indicator_period\": \"14-day\",\n    \"entry_threshold\": \"drops below 30\",\n    \"exit_threshold\": \"rises above 70\"\n  }\n}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 3519,
+    "completion_tokens": 512,
+    "total_tokens": 4031,
+    "cost": 0.00554435,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.00554435,
+      "upstream_inference_prompt_cost": 0.00426435,
+      "upstream_inference_completions_cost": 0.00128
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

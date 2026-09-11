@@ -1,0 +1,61 @@
+{
+  "id": "gen-1789099104-OHOIyqccTZORLfKDS4XA",
+  "object": "chat.completion",
+  "created": 1789099104,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"should_rebind_strategy_family\": false,\n  \"strategy_type\": null,\n  \"total_budget_not_recurring\": false,\n  \"confidence\": 0.9\n}",
+        "refusal": null,
+        "reasoning": "The task is to decide if the current user message is answering a visible recent setup offer for a specific executable strategy family, and whether the primary interpretation chose the wrong family.\nYes, the current message is clearly answering the recent setup offer by specifying the exact asset (DOCN), date range, benchmark (SPY), capital structure ($1,000 starting + $100 monthly with no cap), and costs (10 bps fee + 5 bps slippage). It matches the prior clarification perfectly, so the strategy family remains dca_accumulation and should_rebind_strategy_family is false.",
+        "reasoning_details": [
+          {
+            "type": "reasoning.summary",
+            "summary": "The task is to decide if the current user message is answering a visible recent setup offer for a specific executable strategy family, and whether the primary interpretation chose the wrong family.\nYes, the current message is clearly answering the recent setup offer by specifying the exact asset (DOCN), date range, benchmark (SPY), capital structure ($1,000 starting + $100 monthly with no cap), and costs (10 bps fee + 5 bps slippage). It matches the prior clarification perfectly, so the strategy family remains dca_accumulation and should_rebind_strategy_family is false.",
+            "format": "xai-responses-v1",
+            "index": 0
+          },
+          {
+            "type": "reasoning.encrypted",
+            "data": "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.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+            "format": "xai-responses-v1",
+            "id": "rs_d264b467-e136-94ed-9bc5-80e0b94cf379",
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1652,
+    "completion_tokens": 972,
+    "total_tokens": 2624,
+    "cost": 0.0042934,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 192,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0042934,
+      "upstream_inference_prompt_cost": 0.0018634,
+      "upstream_inference_completions_cost": 0.00243
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 934,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

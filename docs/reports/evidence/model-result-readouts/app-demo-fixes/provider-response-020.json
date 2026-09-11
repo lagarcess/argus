@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789101661-96vBQCGYWMOG4U7l1uzq",
+  "object": "chat.completion",
+  "created": 1789101661,
+  "model": "openai/gpt-5.6-luna",
+  "provider": "OpenAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\"language\":\"en\",\"text\":\"This historical DOCN run had a strong outcome, but the ride was demanding: the portfolio climbed sharply, then gave back a substantial portion of its high before finishing well above the money contributed. Holding through it meant accepting a 42.1% flow-adjusted drawdown, shown here only as a $421.20 illustration against the $1,000 starting capital, not as the actual peak-to-trough dollar loss.\\n\\nAgainst the same monthly funding plan in SPY, DOCN came out ahead by 176.8 percentage points over this test window. The tradeoff was concentration and volatility: the result was much stronger historically, but with a bumpier path. A useful next question is whether the same monthly contribution plan produces a similar balance between return and drawdown over a different historical window.\",\"figures\":[{\"fact_key\":\"portfolio.max_drawdown\",\"value\":-42.12},{\"fact_key\":\"portfolio.drawdown_illustration\",\"value\":421.2},{\"fact_key\":\"configuration.starting_capital\",\"value\":1000},{\"fact_key\":\"portfolio.benchmark_gap\",\"value\":176.8}]}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 18467,
+    "completion_tokens": 242,
+    "total_tokens": 18709,
+    "cost": 0.004907,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 18464,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.004907,
+      "upstream_inference_prompt_cost": 0.0046166,
+      "upstream_inference_completions_cost": 0.0002904
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

@@ -16,7 +16,7 @@ the pending Breakdown frame uses the existing localized working label.
 
 Both model drafts contain `language`, complete `text` and `figures`. A declared
 run reference contains only `fact_key` and its displayed `value`. Perplexity's
-returned sources are appended as links, with their dates when available. Search
+returned sources use the existing Sources panel, with their dates when available. Search
 context never changes the run facts.
 
 The first repeat-demo Breakdown searched, but changed the supplied fact labels
@@ -55,3 +55,25 @@ demo's screenshots, source/search evidence, model-versus-template outcomes and
 billed spend, with a stop if spend passes $3. This note records implementation
 intent and check dispositions, not a completed live acceptance claim. The prompt
 fingerprint remains held. No full measurement or merge is authorized.
+
+## Sources, wording and rounding follow-up (September 11)
+
+The founder's real app review requested three further changes. Breakdown now
+transports returned sources through the canonical research sidecar and opens the
+existing panel, live and after reload. In-text links remain; no bibliography is
+appended. Both composers receive display-ready figures matching card precision.
+The brief asks for the holding experience in everyday language and keeps accuracy
+reasoning silent; hypothetical capital-scaled losses are absent from model input.
+Stored run facts and the light acceptance checks are unchanged.
+
+Verification before the next paid demo: 157 focused backend tests and 82 frontend
+tests passed, including real mocked SSE persistence/readback and bilingual panel
+projection. Formatter verification separately passed 44 Python tests, 18 web
+tests and 16 direct card/helper currency comparisons. Ruff and diff checks pass.
+The prompt fingerprint remains held; no full live measurement or merge was run.
+
+Earlier live attempts are retained under `evidence/model-result-readouts/app-demo`
+and `app-demo-fixes`, with each provider attempt carrying its source SHA. The
+known billed total before this follow-up demo is $0.32597547. Two provider error
+responses supplied no billing data. Earlier screenshots are historical findings,
+not acceptance evidence for this new source change.

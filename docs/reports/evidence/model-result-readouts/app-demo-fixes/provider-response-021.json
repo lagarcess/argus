@@ -1,0 +1,232 @@
+{
+  "background": false,
+  "completed_at": 1789101685,
+  "created_at": 1789101685,
+  "error": null,
+  "frequency_penalty": 0,
+  "id": "resp_9e7fde85-d589-4370-bfc6-9e6f7fcb1af5",
+  "incomplete_details": null,
+  "instructions": "Explain this historical backtest for a normal person. Answer in English. The card already shows the numbers; tell the story instead. Use a run figure only when it helps, with its label as fact_key and the number as written in figures. One reference per fact is enough. Report the language actually written. No jargon, forecasts, investing advice or em dashes. Search the web for sources about what happened during this historical window. Use them to explain events and distinguish evidence from inference. The supplied run facts alone own this backtest's figures; web context must not replace them. We show the sources returned by search, so do not recreate a source list.",
+  "max_output_tokens": 2200,
+  "max_tool_calls": null,
+  "metadata": {},
+  "model": "openai/gpt-5.6-luna",
+  "object": "response",
+  "output": [
+    {
+      "queries": [
+        "DigitalOcean DOCN September 2025 2026 stock news earnings AI cloud",
+        "DigitalOcean 2025 2026 earnings revenue guidance DOCN",
+        "SPY September 2025 September 2026 market performance events"
+      ],
+      "results": [
+        {
+          "date": "2026-08-04",
+          "id": 1,
+          "last_updated": "2026-08-26",
+          "snippet": "Raising 2026 revenue outlook ; RPO increased to $894 million, up 12x from a year ago ; Q2 2026 Revenue of $281 million grew 29% year-over-year.",
+          "source": "web",
+          "title": "DigitalOcean Announces Second Quarter 2026 Financial ...",
+          "url": "https://investors.digitalocean.com/news/news-details/2026/DigitalOcean-Announces-Second-Quarter-2026-Financial-Results/default.aspx"
+        },
+        {
+          "date": "2026-02-24",
+          "id": 2,
+          "last_updated": "2026-09-09",
+          "snippet": "### DigitalOcean Announces Fourth Quarter and Fiscal Year 2025 Financial Results\nFebruary 24, 2026\n- **Company raises 2026 and 2027 revenue outlook after strong Q4 2025 on back of top customer growth and growing AI traction**\n- **Q4 2025 revenue of $242 million, up 18% year-over-year; Reached $1B annualized monthly revenue in Dec 2025; Raised 2026 guidance to 21% growth**\n- **2025 net income was $259 million, up 207% year-over-year, at 29% margin and Adjusted EBITDA was $375 million, up 1\n4% year-over-year, at 42% margin**\n- **Delivered record $51 million incremental organic ARR; Million+ dollar customers driving $133 million ARR, up 123% year-over-year**\nBROOMFIELD, Colo.--(BUSINESS WIRE)-- DigitalOcean Holdings, Inc.\n(NYSE: DOCN), the agentic inference cloud, today announced results for its fourth quarter and fiscal year ended December 31, 2025.\n...\nWe delivered 18% top-line growth in Q4 and reached $1 billion in annualized monthly run-rate revenue in December.\nWe added a record $51 million in organic incremental ARR.\nOur million+ dollar customer ARR was $133 million, growing 123% year-over-year.\nWe reached $12\n...\nWith this growing momentum, we are raising our growth outlook again after raising it just last quarter.\nWe now expect to deliver 21% growth in 2026, to exit 2026 at 25%+ growth and to reach 30% growth in 2027 - and we expect to do so prof\nitably, as we are on track to being a weighted Rule of 50 company in 2027.\u201d\n**Fourth Quarter 2025 Financial Highlights:**\n- Revenue was $242 million, an increase of 18% year-over-year.\n- Annual Run-Rate Revenue (\u201cARR\u201d) ended the quarter at $970 million, an increase of 18% year-over-year.\n- Gross profit was $142 million, an increase of 13% year-over-year, and gross profit margin was 59%.\n- Net income attributable to common stockholders was $26 million, an increase of 40% year-over-year, and net income marg\n\u2026\n...\nAI-driven workflows directly into the core cloud experience.\n...\n**Fiscal Year 2025 Financial Highlights:**\n- Revenue was $901 million, an increase of 15% year-over-year.\n- Gross profit was $540 million, an increase of 16% year-over-year, and gross profit m\n...\n**Financial Outlook:**\nDigitalOcean is initiating guidance for the first quarter ending March 31, 2026 as follows:\n- Total revenue of $249 to $25\n0 million.\n- Adjusted EBITDA margin of 36% to 37%.\n- Non-GAAP diluted net income per share of $0.22 to $0.27.\n- Fully diluted weighted average shares outstanding of approximately 111 to 112 million shares.\nFor the full year 2026, we expect:\n- Total revenue of $1.075 to $1.105 billion.\n- Adjusted EBITDA margin of 36% to 38%.\n- Adjusted free cash flow margin in the range of 15% to 17% of revenue.\n- Unlevered adjusted free cash flow margin in the range of 18% to 20% of revenue.\n- Non-GAAP diluted net income \n...\nDigitalOcean will host a conference call today, February 24, 2026, at 8:00 a.m.\nET to review its results.\nThe conference call and presentation can be accessed by registering for the webcast at https://events.q4inc.com/attendee/812774949.\nA live webcast and replay of the conference call \nin addition to the presentation can be accessed from the DigitalOcean investor relations website at http://investors.digitalocean.com.\n...\nMelanie Strate\ninvestors@digitalocean.com",
+          "source": "web",
+          "title": "DigitalOcean Announces Fourth Quarter and Fiscal Year 2025 ...",
+          "url": "https://investors.digitalocean.com/news/news-details/2026/DigitalOcean-Announces-Fourth-Quarter-and-Fiscal-Year-2025-Financial-Results/"
+        },
+        {
+          "date": "2026-02-24",
+          "id": 3,
+          "last_updated": "2026-06-24",
+          "snippet": "Tuesday, Feb. 24, 2026 at 8 a.m.\nET\n...\n## Takeaways\n- **Revenue** -- $242 million in the quarter, up 18% year over year; full-year revenue reached $901 million.\n- **Organic incremental ARR** -- $51 million in the quarter and $150 million on a trailing twelve-month basis; both are record figures for the company and balanced between AI and cloud customers.\n- **DNE (Digital Native Enterprise) ARR** -- $640 million in the quarter, 62% of total ARR, growing 30% year over year.\n...\n- **AI customer ARR** -- $120 million in the quarter, up 150% year over year and representing 12% of total ARR; 70% of this ARR comes from inference services or general cloud, not bare metal GPU rentals.\n- **Gross profit and margin** -- Quarterly gross profit was $102 million, up 13% year over year, with a 59% margin; full-year gross profit $540 million, up 16% with a 60% margin.\n...\n- **Guidance: Q1 2026 revenue** -- $249 million to $250 million, representing 18%-19% year-over-year growth; adjusted EBITDA margin guidance of 36%-37%.\n- **Guidance: full-year 2026** -- Revenue growth of 19%-23% (21% midpoint); adjusted EBITDA margin 36%-38%; unlevered adjusted free cash flow $207 million at midpoint (18%-20% margin); non-GAAP EPS $0.75-$1.00 on 111 million-112 million shares.\n- **Capacity expansion** -- 31 megawatts of new data center capacity to come online in 2026, with the first facility ramping in Q2 and the remaining in the second half; projected to enable exit growth rate above 25% in Q4 2026 and 30% for 2027 with existing committed capacity.\n...\n**DigitalOcean Holdings** (DOCN 5.45%) reported a return to accelerated growth, highlighted by 18% year-over-year revenue growth and over $1 billion in annualized run-rate revenue, both driven by rapid AI and DNE customer expansion.\nCustomer ARR from AI reached $120 million, rising 150% and now comprising 12% of total ARR, with these AI workloads also accounting for 70% of AI revenue through higher-value inference and general cloud products.\nManagement set a full-year 2026 growth target of 19%-23%, projecting an exit rate above 25% for Q4 and laying out a path to 30% year-over-year growth in 2027 through onboarding of 31 megawatts of new data center capacity.\n...\nWithout chasing the GPU training arms race, we expect to deliver 21% revenue growth in 2026, reaching 25% plus growth by Q4 2026, and 30% growth in 2027.\n...\nWe exited 2025 at 18% year-over-year growth, and are on a path to deliver 21% growth in 2026 with an exit growth rate of 25% plus in 2026.\n...\nWe now expect to deliver 21% revenue growth for the full year 2026, with an exit growth rate of 25% plus by Q4 and reaching 30% growth in 2027.\n...\nFor the first quarter of 2026, we expect revenue in the range of $249 to $250 million, which is approximately 18% to 19% year-over-year growth.\n...\nFor the full year 2026, we expect revenue growth between 19% to 23%.\nThis is 21% at the midpoint, beyond the 18% to 20% growth outlook that we shared just last quarter, and it is important to highlight that this would be 21% to 24% projected growth if we exclude the impact of our discontinued legacy bare metal CPU offering.\n...\nWe project full-year 36% to 38% adjusted EBITDA margins, and 18% to 20% unlevered adjusted free cash flow margins, which is $207 million at the midpoint.\n...\nAligned with this capacity ramp, we expect second quarter revenue growth to remain around 18% to 19%, with revenue growth then ramping in Q3 before exiting the year at 25% plus in Q4.\n...\nAs we reach full utilization on our existing committed capacity, we expect to reach 30% revenue growth in 2027.\n...\nWe are projecting to exit 2026 at 25% plus revenue growth with a clear path to 30% growth in 2027 with the existing committed data center capacity alone.",
+          "source": "web",
+          "title": "DigitalOcean (DOCN) Q4 2025 Earnings Transcript | The Motley Fool",
+          "url": "https://www.fool.com/earnings/call-transcripts/2026/02/24/digitalocean-docn-q4-2025-earnings-transcript/"
+        },
+        {
+          "date": "2026-05-05",
+          "id": 4,
+          "last_updated": "2026-08-23",
+          "snippet": "Tuesday, May 5, 2026 at 8 a.m.\nET\n...\n## Takeaways\n- **Revenue** -- $258 million, reflecting 22% year-over-year growth and over 400 basis points sequential acceleration from Q4 2025\u2019s 18% exit growth rate.\n...\n- **AI customer ARR** -- Achieved $170 million, growing 221% year over year, with inference and core cloud representing over 80% of total AI ARR, up from 70% in Q4 2025.\n...\n- **2026 guidance (full year)** -- Revenue projected at $1.13 billion to $1.145 billion (25%-27% growth), adjusted EBITDA margin of 37%-39%, and adjusted free cash flow margin of 9%-12%, including up to $100 million one-time startup costs for new capacity.\n- **2027 preliminary guidance** -- Revenue expected to exceed $1.7 billion (\u226550% growth), with approximately 40% adjusted EBITDA margin and high teens adjusted free cash flow margin.\n...\n**DigitalOcean** (DOCN +1.13%) reported record revenue and accelerated growth, emphasizing its strategic pivot toward AI-native cloud infrastructure and inference services.\nThe company executed a major product expansion, launching a comprehensive AI native cloud platform and securing several fast-scaling AI-native customers that rely on the breadth and depth of its integrated stack.\n...\nQ1 revenue was $258 million up 22% year-over-year, with million dollar plus customers growing 179% year-over-year to $183 million in ARR.\n...\nFor 2026, we are increasing our full year revenue growth projection from 21% and to approximately 26% year-over-year and expect to exit Q4 approaching 30%.\nAnd this revised 2026 growth is entirely driven by our previously committed capacity, without any top line benefit in 2026 from the new 60 megawatts.\nWith the projected ramp of the incremental 60 megawatts in 2027, we are now projecting revenue growth of 50% or more in 2027, meaningfully higher than the 30% growth we communicated just last quarter.\n...\nWe now expect revenue growth of approximately 25% to 27% year-over-year with an exit growth rate approaching 30%, a full year ahead of the guidance we provided just last quarter.\n...\nFor the second quarter of 2026, we expect revenue of $272 million to $274 million, representing 24% to 25% year-over-year growth.\n...\nWe now expect full year 2026 revenue of $1.13 billion to $1.145 billion, representing 25% to 27% year-over-year growth, with a negative growth rate approaching 30% in Q4.",
+          "source": "web",
+          "title": "DigitalOcean (DOCN) Q1 2026 Earnings Transcript",
+          "url": "https://www.fool.com/earnings/call-transcripts/2026/05/05/digitalocean-docn-q1-2026-earnings-transcript/"
+        }
+      ],
+      "type": "search_results"
+    },
+    {
+      "queries": [
+        "DOCN stock September 2025 price drop news",
+        "DOCN stock November 2025 earnings reaction",
+        "DOCN stock 2026 rally AI earnings May August 2026"
+      ],
+      "results": [
+        {
+          "date": "2026-08-04",
+          "id": 5,
+          "last_updated": "2026-09-05",
+          "snippet": "DigitalOcean Holdings (NYSE:DOCN) presented its second quarter 2026 earnings results on August 4, 2026, showcasing a dramatic acceleration in growth driven by its AI-native cloud platform.\nThe company reported revenue growth of 29% year-over-year, more than double the 14% growth rate from the same quarter a year earlier, as AI-focused customers increasingly adopted its integrated infrastructure and inference services.\nDespite beating Wall Street expectations with adjusted earnings of $0.45 per share on revenue of $281.2 million, shares initially fell 7.85% in premarket trading before recovering.\nThe stock has since rebounded to $131.50, up 3.4% from the previous close of $127.17, reflecting investor reassessment of the company\u2019s long-term growth trajectory after a 371% gain over the past year.\n...\nAI Customer ARR reached $234 million, growing 212% year-over-year.\nThe composition of this growth is particularly noteworthy: inference services grew 762% year-over-year, while core cloud services for AI customers expanded 158%.\nThe shift away from bare metal infrastructure is evident, with non-bare-metal services now representing 85% of AI Customer ARR, up from just 43% in Q2 2025.\n...\nFor the third quarter, the company expects revenue of $304-$307 million, representing 32-34% year-over-year growth.\nFull-year 2026 revenue guidance increased to $1.17-$1.18 billion from the prior range of $1.13-$1.15 billion, representing a $37.5 million increase at the midpoint.\nThis implies full-year growth of 30-31%, up from the previous expectation of 25-27%.\nThe company also raised its adjusted EBITDA margin guidance to 38.5-39.5% and increased non-GAAP diluted earnings per share expectations to $1.35-$1.40 from $1.10-$1.20.\n...\nManagement expects to exit Q4 2026 with revenue growth of 35% or higher and reiterated\u2014with increased confidence\u2014its expectation for fiscal year 2027 revenue growth exceeding 50%.",
+          "source": "web",
+          "title": "DigitalOcean Q2 2026 slides: AI growth drives 29% ...",
+          "url": "https://www.investing.com/news/company-news/digitalocean-q2-2026-slides-ai-growth-drives-29-revenue-surge-93CH-4834748"
+        },
+        {
+          "date": "2025-08-11",
+          "id": 6,
+          "last_updated": "2025-11-14",
+          "snippet": "DigitalOcean (DOCN) announces $500M convertible notes offering and $100M stock repurchase program\n**Summary**\n\u2022 Intraday price drops 9.15% to $30.025, hitting a 52-week low of $28.94\n\u2022 Options market sees heavy volume in August 15th $30 call and September 19th $30 call/put contracts\nDigitalOcean\u2019s stock is in freefall after a surprise convertible debt issuance and stock repurchase plan announcement.\n...\nDigitalOcean\u2019s 9.15% intraday drop stems from its announcement of a $500M convertible senior notes offering and a $100M stock repurchase program.\nThe convertible notes, set to mature in 2030, will be used to repurchase existing 2026 notes and fund the repurchase program.\nInvestors are reacting to the perceived dilution risk from the new notes and the potential for increased share supply from the repurchase program.\n...\n**Leverage Ratio**: 31.48% (moderate)\n...\n**DOCN20250919P30** (Put, $30 strike, Sep 19 exp):\n**IV**: 51.62% (moderate volatility)\n**Leverage Ratio**: 14.88% (low)\n**Delta**: -0.4621 (moderate bearish exposure)",
+          "source": "web",
+          "title": "DigitalOcean Plummets 9.15%: What's Behind the Sudden Selloff?",
+          "url": "https://www.ainvest.com/news/digitalocean-plummets-9-15-sudden-selloff-2508/"
+        },
+        {
+          "date": "2026-09-08",
+          "id": 7,
+          "last_updated": "2026-09-08",
+          "snippet": "## Key Takeaways\n- DOCN topped Q1 2026 estimates: revenue $258M ( 22%), non-GAAP EPS 44 despite y/y drop.\n- DigitalOcean AI Customer ARR reached $170M, up 221% YoY; AI-Native Cloud debuted at Deploy 2026.\n- DOCN lifted 2026 revenue outlook to $1.130B-$1.145B as committed data center capacity rose to ~135MW.\n**DigitalOcean Holdings** (DOCN - Free Report) posted a sizable first-quarter 2026 earnings beat, even as profitability moved lower from the year-ago period.\nNon-GAAP earnings came in at 44 cents, down 21.4% year over year, but the figure beat the Zacks Consensus Estimate by 63%.\nRevenue was $258.0 million, up 22.4% year over year and beat the consensus by 3.1%.\nThe quarter\u2019s outperformance was supported by retention and expansion in larger customer cohorts, with Annual Run-Rate Revenues (ARR) ending the period at $1.032 billion, up 22% year over year.\nAI Customer ARR was $170 million, which jumped 221% year over year.\nDOCN shares rose 5.4% to close at $160.99 on May 6, following the results.\n...\nDigitalOcean positioned the quarter around product breadth, highlighting the launch of its AI-Native Cloud at Deploy 2026.\n...\nDOCN guided second-quarter revenue to $272 million-$274 million, implying 24%-25% year-over-year growth.\nThe company expects an adjusted EBITDA margin of 37%-38% and non-GAAP earnings between 20 cents per share and 23 cents per share.\nFor 2026, DigitalOcean raised its revenue outlook to $1.130 billion-$1.145 billion, calling for 25%-27% year-over-year growth, alongside an adjusted EBITDA margin of 37%-39% and an adjusted free cash flow margin of 9%-12%.\nNon-GAAP earnings are expected to be $1.10-$1.20 per share.\nManagement also pointed to incremental committed data center capacity of about 60 megawatts, bringing total committed capacity to roughly 135 megawatts, and said it now expects 2027 revenue growth to exceed 50%, with 2027 revenues projected to exceed $1.7 billion.",
+          "source": "web",
+          "title": "DOCN Q1 Earnings Beat Estimates, Revenues Up AI- ...",
+          "url": "https://www.zacks.com/stock/news/2917383/docn-q1-earnings-beat-estimates-revenues-up-ai-native-customer-demand"
+        },
+        {
+          "date": "2025-11-07",
+          "id": 8,
+          "last_updated": "2026-06-12",
+          "snippet": "# DigitalOcean Holdings, Inc.\n...\nDigitalOcean delivered a robust third quarter, outperforming expectations with 16% revenue growth and record organic ARR, bolstered by strong demand from AI-native and digital enterprise customers.\nEarnings Per Share Beat\n$0.33 vs $0.31 est.\n+6.5% surprise\nRevenue Miss\n229634000 vs 237729640 est.\n-3.4% surprise\n## Market Reaction\n1-Day +5.1%\n5-Day -4.01%\n30-Day -5.23%",
+          "source": "web",
+          "title": "DigitalOcean Holdings, Inc. Q3 2025 Earnings Recap | AllInvestView",
+          "url": "https://www.allinvestview.com/earnings/DOCN/q3-2025/"
+        }
+      ],
+      "type": "search_results"
+    },
+    {
+      "queries": [
+        "site:investors.digitalocean.com/news/news-details/2025 DigitalOcean third quarter 2025 financial results",
+        "site:investors.digitalocean.com/news/news-details/2026 DigitalOcean first quarter 2026 financial results",
+        "site:investors.digitalocean.com/news/news-details/2026 DigitalOcean second quarter 2026 financial results"
+      ],
+      "results": [
+        {
+          "date": "2025-11-05",
+          "id": 9,
+          "last_updated": "2026-09-10",
+          "snippet": "Revenue of $230 million, up 16% year-over-year; Raised full year revenue guidance to $896 to $897 million Net Income was $158 million, up 381% ...",
+          "source": "web",
+          "title": "DigitalOcean Announces Third Quarter 2025 Financial Results",
+          "url": "https://investors.digitalocean.com/news/news-details/2025/DigitalOcean-Announces-Third-Quarter-2025-Financial-Results/default.aspx"
+        },
+        {
+          "date": "2025-10-13",
+          "id": 10,
+          "last_updated": "2026-05-05",
+          "snippet": "it will report financial results for the third quarter ended September 30, 2025 before the market opens on Wednesday, November 5, 2025.",
+          "source": "web",
+          "title": "DigitalOcean Announces Date of Third Quarter 2025 Earnings ...",
+          "url": "https://investors.digitalocean.com/news/news-details/2025/DigitalOcean-Announces-Date-of-Third-Quarter-2025-Earnings-Conference-Call/default.aspx"
+        },
+        {
+          "date": "2026-07-07",
+          "id": 11,
+          "last_updated": "2026-08-26",
+          "snippet": "### DigitalOcean Expects to Report Record Q2 2026 Results with RPO to Exceed $800M, Up More Than 10X Year Over Year\n...\n*Revenue growth expected to accelerate to 29%, up from 14% in same quarter 2025\n* *RPO expected to increase by over $550M in Q2 2026\n* *Expects Q2 aEBITDA margin and non-GAAP Net Income per Share at or above high end of guidance\n...\nFor Q2 2026, the Company expects year over year revenue growth of approximately 29%, and projects to be at or above the top end of the range of its previously provided guidance for aEBITDA margin and non-GAAP Net Income per Share.\n...\n**Investor Relations\n**\ninvestors@digitalocean.com\n**Media Relations\n...\npress@digitalocean.com",
+          "source": "web",
+          "title": "DigitalOcean Expects to Report Record Q2 2026 Results with ...",
+          "url": "https://investors.digitalocean.com/news/news-details/2026/DigitalOcean-Expects-to-Report-Record-Q2-2026-Results-with-RPO-to-Exceed-800M-Up-More-Than-10X-Year-Over-Year/default.aspx"
+        },
+        {
+          "date": "2026-05-05",
+          "id": 12,
+          "last_updated": "2026-07-14",
+          "snippet": "### DigitalOcean Announces First Quarter 2026 Financial Results\nMay 5, 2026\n...\n**Q1 2026 Revenue of $258 million grew 22%** year-over-year\n**Million+ Dollar Customer ARR grew 179% ** year-over-year to $183 million\n**AI Customer ARR grew 221%** year-over-year to $170 million\n**Delivered record $62 million in incremental organic ARR\n**\n...\nBROOMFIELD, Colo.--(BUSINESS WIRE)-- DigitalOcean Holdings, Inc.\n(NYSE: DOCN), the AI-Native Cloud purpose-built for inference and agentic workloads, today announced results for its first quarter ended March 31, 2026.\n...\n**First Quarter 2026 Financial Highlights:**\n- Revenue was $258 million, an increase of 22% year-over-year.\n- Annual Run-Rate Revenue (\u201cARR\u201d) ended the quarter at $1,032 million, an increase of 22% year-over-year.\nAI Customer ARR was $170 million, an incr\nease of 221% year-over-year.\n- Net income attributable to common stockholders was $16 million, a decrease of 59% year-over-year, and net income margin was 6%.\n- Operating income was $37 million, a decrease of 3% year-over-year, and operating income margin was 14%.\n- Adjusted operating income, a new non-GAAP financial measure, was $64 million, an increase of 3% year-over-year, and adjusted operating income margin was 25%.\n- Adjusted EBITDA was $105 million, an increase of 21% year-over-year, and adjusted EBI\nTDA margin was 41%.\n- Diluted net income per share was $0.15 and non-GAAP diluted net income per share was $0.44.\n- Net cash from operating activities was $47 million at 18% margin, compared to $64 million at 30% margin in the first quarter of 2025.\n- Adjusted free cash flow was $2 million at 1% margin, compared to negative $821 thousand in the first quarter of 2025.\n- Cash and cash equivalents was $741 million as of March 31, 2026.\n- Remaining Performance Obligation (\u201cRPO\u201d) ^(1)^ was $243 million, of which\n, $167 million is expected to be recognized over the next 12 months.\nRPO was $14 million in the first quarter of 2025.\n- Completed a follow-on offering of 11.9 million shares with net proceeds of $888 million, a portion of which was used to repay $500 million principal outstanding of our Term Loan Facility.\n...\n- **Unveiled the DigitalOcean AI-Native Cloud at Deploy 2026 in April,** the most significant product launch in our history, with 15+ new product launches\n...\n- The number of $100K+ Customers ^(2)^ grew 12%, while the revenue from these customers, which now represents 30% of t\notal revenue, grew 73% year-over-year.\n- The number of $500K+ and $1M+ Customers grew 54% and 78%, respectively.\nRevenue from these customers, which now represents 21% and 18% of total revenue, grew 132% and 179% year-over-year, respectively.\n...\n- Total revenue of $272 to $274 million, up 24% to 25% year-over-year.\n...\nDigitalOcean will host a conference call today, May 5, 2026, at 8:00 a.m.\n...\nRadu Patrichi\ninvestors@digitalocean.com",
+          "source": "web",
+          "title": "DigitalOcean, LLC - DigitalOcean Announces First Quarter 2026 ...",
+          "url": "https://investors.digitalocean.com/news/news-details/2026/DigitalOcean-Announces-First-Quarter-2026-Financial-Results/"
+        }
+      ],
+      "type": "search_results"
+    },
+    {
+      "content": [
+        {
+          "annotations": [],
+          "text": "{\"figures\":[{\"fact_key\":\"Start date\",\"value\":\"2025-09-10\"},{\"fact_key\":\"End date\",\"value\":\"2026-09-09\"},{\"fact_key\":\"Total return on contributions\",\"value\":188.87},{\"fact_key\":\"Benchmark return\",\"value\":12.07},{\"fact_key\":\"Return difference versus benchmark\",\"value\":176.8},{\"fact_key\":\"Worst drop from a prior high\",\"value\":-42.12},{\"fact_key\":\"Total money contributed\",\"value\":2300.0},{\"fact_key\":\"Ending portfolio value\",\"value\":6644.07},{\"fact_key\":\"Highest portfolio value\",\"value\":8648.6},{\"fact_key\":\"Contribution schedule\",\"value\":\"monthly\"},{\"fact_key\":\"Executed fills\",\"value\":13}],\"language\":\"en\",\"text\":\"From September 10, 2025 to September 9, 2026, DOCN went from being a relatively ordinary cloud-computing story to a major AI-growth story in the market\u2019s eyes. The business results improved steadily: DigitalOcean reported third-quarter 2025 revenue up 16% year over year and raised its full-year outlook. In February, it reported fourth-quarter revenue of $242 million, up 18%, while saying that larger customers and AI demand were accelerating. Its first-quarter 2026 report showed revenue up 22%, AI customer annual recurring revenue up 221%, and the launch of a broader AI-native cloud platform. By August, second-quarter revenue growth had accelerated to 29%, and the company raised its 2026 outlook again. These company-reported results are evidence of improving growth and stronger AI demand, not proof that every share-price move was caused by one announcement.\\n\\nThe stock\u2019s rise appears to have reflected investors placing a much higher value on that AI opportunity. The inference is supported by the sequence of faster growth, sharply higher AI-related customer revenue, and repeated increases to management\u2019s outlook. The market also had reasons to hesitate. DigitalOcean disclosed an 11.9 million-share follow-on offering in its first-quarter results, which can concern investors because issuing more shares can reduce each existing shareholder\u2019s slice of the company. The stock therefore did not behave like a smooth climb. It suffered a 42.12% drop from a previous high during the test, meaning that holding through the period included a very painful temporary loss before the later recovery.\\n\\nFor the monthly-contribution test, that rough ride mattered. The strategy made 13 purchases rather than putting all the money in at once, so some later contributions bought shares after declines. That can make a recovery more helpful, but it does not remove the emotional difficulty of watching a holding fall sharply. The portfolio ultimately ended at $6644.07 after $2300.0 had been contributed, although its highest recorded value was $8648.6. In other words, the test finished well above the amount paid in, but below its peak, so the experience was profitable and still unsettled at the end.\\n\\nAgainst SPY, the result was unusually strong. DOCN produced a 188.87% return on contributions, while the benchmark returned 12.07%. That is a 176.8 percentage-point advantage for the test. The comparison says that this particular concentrated bet benefited enormously from DOCN\u2019s re-rating around AI and accelerating growth during this window. It does not show that DOCN was safer: the large drawdown and the fact that one company drove the result show the opposite. SPY offered exposure to a much broader group of companies, so its more modest result came with a much less company-specific story.\"}",
+          "type": "output_text"
+        }
+      ],
+      "id": "msg_11de4d36-6326-4271-a326-76801984cdde",
+      "role": "assistant",
+      "status": "completed",
+      "type": "message"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "presence_penalty": 0,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "reasoning": null,
+  "safety_identifier": null,
+  "service_tier": "default",
+  "status": "completed",
+  "store": true,
+  "temperature": 1,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "web_search",
+      "max_tokens": 8000,
+      "max_tokens_per_page": 2000,
+      "max_results": 4
+    },
+    {
+      "type": "fetch_url",
+      "max_urls": 2,
+      "total_budget_tokens": 8000
+    }
+  ],
+  "top_logprobs": 0,
+  "top_p": 1,
+  "truncation": "",
+  "usage": {
+    "cost": {
+      "cache_creation_cost": 0.00403,
+      "cache_read_cost": 5e-05,
+      "currency": "USD",
+      "input_cost": 2e-05,
+      "output_cost": 0.00196,
+      "tool_calls_cost": 0.0075,
+      "tool_calls_cost_details": {
+        "search_web": 0.0075
+      },
+      "total_cost": 0.01356
+    },
+    "input_tokens": 18822,
+    "input_tokens_details": {
+      "cache_creation_input_tokens": 16100,
+      "cache_read_input_tokens": 2638,
+      "cached_tokens": 2638
+    },
+    "output_tokens": 1630,
+    "output_tokens_details": {
+      "reasoning_tokens": 542
+    },
+    "tool_calls_details": {
+      "search_web": {
+        "cost_usd": 0.0075,
+        "invocation": 3
+      }
+    },
+    "total_tokens": 20452
+  },
+  "user": null
+}

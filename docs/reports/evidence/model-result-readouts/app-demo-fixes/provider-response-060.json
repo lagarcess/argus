@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789102792-Oii9PRxtZggMe2RPPBkM",
+  "object": "chat.completion",
+  "created": 1789102792,
+  "model": "openai/gpt-5.6-luna",
+  "provider": "OpenAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\"language\":\"es-419\",\"text\":\"En esta simulaci\u00f3n hist\u00f3rica de comprar y mantener DOCN, el recorrido fue muy amplio: primero cay\u00f3 con fuerza, luego avanz\u00f3 de forma marcada y m\u00e1s tarde volvi\u00f3 a retroceder antes de cerrar con una ganancia hist\u00f3rica importante. Mantener la posici\u00f3n implic\u00f3 tolerar una ca\u00edda m\u00e1xima de 44.9% desde un m\u00e1ximo previo. Como ilustraci\u00f3n sobre el capital inicial, eso equivale a una baja de unos US$449, no a la p\u00e9rdida real medida desde el m\u00e1ximo de la cartera.\\n\\nEl resultado super\u00f3 al SPY en este periodo, aunque con bastante m\u00e1s variaci\u00f3n en el camino. Adem\u00e1s, el registro muestra una sola ejecuci\u00f3n de compra, as\u00ed que esta lectura refleja principalmente la experiencia hist\u00f3rica de mantener la posici\u00f3n, no una serie de operaciones cerradas. Una comparaci\u00f3n \u00fatil para investigar ser\u00eda repetir la prueba con otra ventana hist\u00f3rica para ver cu\u00e1nto depende el resultado del periodo elegido.\",\"figures\":[{\"fact_key\":\"portfolio.max_drawdown\",\"value\":44.86},{\"fact_key\":\"portfolio.drawdown_illustration\",\"value\":448.6},{\"fact_key\":\"portfolio.benchmark_gap\",\"value\":327.27},{\"fact_key\":\"portfolio.executed_fills\",\"value\":1}]}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 31449,
+    "completion_tokens": 261,
+    "total_tokens": 31710,
+    "cost": 0.0081753,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 31446,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0081753,
+      "upstream_inference_prompt_cost": 0.0078621,
+      "upstream_inference_completions_cost": 0.0003132
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

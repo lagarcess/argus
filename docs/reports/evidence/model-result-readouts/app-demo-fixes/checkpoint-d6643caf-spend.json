@@ -1,0 +1,247 @@
+{
+  "source_sha": "d6643cafaae7a0c639d991b42a445d785546b064",
+  "stop_after_billed_usd": "3",
+  "billed_usd": "0.04178105",
+  "halted": false,
+  "unknown_cost_attempts": 0,
+  "attempts": [
+    {
+      "attempt": 1,
+      "case": "docn-en",
+      "provider": "openrouter.ai",
+      "model": "x-ai/grok-4.3",
+      "started_at": "2026-09-11T04:27:53.931511+00:00",
+      "schema": "LLMAssetMentionExtraction",
+      "billed_usd": "0.00102685",
+      "status": 200,
+      "temperature_present": true,
+      "request_characters": 3176,
+      "error_class": null,
+      "usage": {
+        "prompt_tokens": 813,
+        "completion_tokens": 58,
+        "total_tokens": 871,
+        "cost": 0.00102685,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 128,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00102685,
+          "upstream_inference_prompt_cost": 0.00088185,
+          "upstream_inference_completions_cost": 0.000145
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "finished_at": "2026-09-11T04:27:55.487362+00:00",
+      "response_artifact": "provider-response-001.json"
+    },
+    {
+      "attempt": 2,
+      "case": "docn-en",
+      "provider": "openrouter.ai",
+      "model": "x-ai/grok-4.3",
+      "started_at": "2026-09-11T04:27:55.986054+00:00",
+      "schema": "LLMInterpretationResponse",
+      "billed_usd": "0.0168709",
+      "status": 200,
+      "temperature_present": true,
+      "request_characters": 51449,
+      "error_class": null,
+      "usage": {
+        "prompt_tokens": 10626,
+        "completion_tokens": 1516,
+        "total_tokens": 12142,
+        "cost": 0.0168709,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 192,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0168709,
+          "upstream_inference_prompt_cost": 0.0130809,
+          "upstream_inference_completions_cost": 0.00379
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 973,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "finished_at": "2026-09-11T04:28:07.473086+00:00",
+      "response_artifact": "provider-response-002.json"
+    },
+    {
+      "attempt": 3,
+      "case": "docn-en",
+      "provider": "openrouter.ai",
+      "model": "x-ai/grok-4.3",
+      "started_at": "2026-09-11T04:28:09.755418+00:00",
+      "schema": "StatedRunFieldFidelityAudit",
+      "billed_usd": "0.0031631",
+      "status": 200,
+      "temperature_present": true,
+      "request_characters": 9483,
+      "error_class": null,
+      "usage": {
+        "prompt_tokens": 2358,
+        "completion_tokens": 140,
+        "total_tokens": 2498,
+        "cost": 0.0031631,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 128,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0031631,
+          "upstream_inference_prompt_cost": 0.0028131,
+          "upstream_inference_completions_cost": 0.00035
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "finished_at": "2026-09-11T04:28:21.068743+00:00",
+      "response_artifact": "provider-response-003.json"
+    },
+    {
+      "attempt": 4,
+      "case": "docn-en",
+      "provider": "openrouter.ai",
+      "model": "google/gemini-2.5-flash-lite",
+      "started_at": "2026-09-11T04:28:21.723709+00:00",
+      "schema": "name_suggestion",
+      "billed_usd": "0.0000293",
+      "status": 200,
+      "temperature_present": true,
+      "request_characters": 1145,
+      "error_class": null,
+      "usage": {
+        "prompt_tokens": 221,
+        "completion_tokens": 18,
+        "total_tokens": 239,
+        "cost": 2.93e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 2.93e-05,
+          "upstream_inference_prompt_cost": 2.21e-05,
+          "upstream_inference_completions_cost": 7.2e-06
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "finished_at": "2026-09-11T04:28:22.315323+00:00",
+      "response_artifact": "provider-response-004.json"
+    },
+    {
+      "attempt": 5,
+      "case": "docn-en",
+      "provider": "openrouter.ai",
+      "model": "openai/gpt-5.6-luna",
+      "started_at": "2026-09-11T04:29:12.385812+00:00",
+      "schema": "QuickTakeDraft",
+      "billed_usd": "0.0080309",
+      "status": 200,
+      "temperature_present": false,
+      "request_characters": 96606,
+      "error_class": null,
+      "usage": {
+        "prompt_tokens": 31265,
+        "completion_tokens": 179,
+        "total_tokens": 31444,
+        "cost": 0.0080309,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 31262,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0080309,
+          "upstream_inference_prompt_cost": 0.0078161,
+          "upstream_inference_completions_cost": 0.0002148
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "finished_at": "2026-09-11T04:29:15.068900+00:00",
+      "response_artifact": "provider-response-005.json"
+    },
+    {
+      "attempt": 6,
+      "case": "docn-en",
+      "provider": "api.perplexity.ai",
+      "model": [
+        "openai/gpt-5.6-luna"
+      ],
+      "started_at": "2026-09-11T04:30:09.793558+00:00",
+      "schema": "ResultBreakdownDraft",
+      "billed_usd": "0.01266",
+      "status": 200,
+      "temperature_present": false,
+      "request_characters": 3023,
+      "error_class": null,
+      "usage": {
+        "cost": {
+          "cache_creation_cost": 0.00297,
+          "cache_read_cost": 0.00011,
+          "currency": "USD",
+          "input_cost": 2e-05,
+          "output_cost": 0.00206,
+          "tool_calls_cost": 0.0075,
+          "tool_calls_cost_details": {
+            "search_web": 0.0075
+          },
+          "total_cost": 0.01266
+        },
+        "input_tokens": 17306,
+        "input_tokens_details": {
+          "cache_creation_input_tokens": 11860,
+          "cache_read_input_tokens": 5362,
+          "cached_tokens": 5362
+        },
+        "output_tokens": 1713,
+        "output_tokens_details": {
+          "reasoning_tokens": 609
+        },
+        "tool_calls_details": {
+          "search_web": {
+            "cost_usd": 0.0075,
+            "invocation": 3
+          }
+        },
+        "total_tokens": 19019
+      },
+      "finished_at": "2026-09-11T04:30:34.343379+00:00",
+      "response_artifact": "provider-response-006.json"
+    }
+  ]
+}

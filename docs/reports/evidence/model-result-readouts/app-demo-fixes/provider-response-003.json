@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789100889-Izm57dxN7BYCB8enIdjc",
+  "object": "chat.completion",
+  "created": 1789100889,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"capital_amount\": 1000,\n  \"recurring_contribution_amount\": null,\n  \"cadence\": null,\n  \"timeframe\": null,\n  \"date_range\": {\n    \"start\": \"2023-09-01\",\n    \"end\": \"2026-09-09\"\n  },\n  \"comparison_baseline\": \"SPY\",\n  \"fee\": {\n    \"rate\": 0.0,\n    \"evidence_span\": \"No fees or slippage\"\n  },\n  \"slippage\": {\n    \"rate\": 0.0,\n    \"evidence_span\": \"No fees or slippage\"\n  },\n  \"confidence\": 0.8\n}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2358,
+    "completion_tokens": 140,
+    "total_tokens": 2498,
+    "cost": 0.0031631,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0031631,
+      "upstream_inference_prompt_cost": 0.0028131,
+      "upstream_inference_completions_cost": 0.00035
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

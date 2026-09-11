@@ -1,0 +1,61 @@
+{
+  "id": "gen-1789101951-R57lLnJ38DaNEMRgueHr",
+  "object": "chat.completion",
+  "created": 1789101951,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"intent\": \"backtest_execution\",\n  \"task_relation\": \"new_task\",\n  \"user_goal_summary\": \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital, benchmarked against SPY, with zero fees and slippage.\",\n  \"requires_clarification\": false,\n  \"detected_user_language\": \"en\",\n  \"candidate_strategy_draft\": {\n    \"raw_user_phrasing\": \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital, against SPY. No fees or slippage.\",\n    \"language\": \"en\",\n    \"strategy_type\": \"buy_and_hold\",\n    \"asset_universe\": [\n      \"DOCN\"\n    ],\n    \"asset_class\": \"equity\",\n    \"date_range\": {\n      \"start\": \"2023-09-01\",\n      \"end\": \"2026-09-09\"\n    },\n    \"date_range_raw_text\": \"September 1, 2023 through September 9, 2026\",\n    \"date_range_intent\": {\n      \"kind\": \"explicit_range\",\n      \"start\": \"2023-09-01\",\n      \"end\": \"2026-09-09\",\n      \"evidence\": \"September 1, 2023 through September 9, 2026\"\n    },\n    \"capital_amount\": 1000,\n    \"comparison_baseline\": \"SPY\",\n    \"extra_parameters\": {\n      \"fee_rate\": 0,\n      \"slippage\": 0\n    }\n  },\n  \"semantic_turn_act\": \"new_idea\",\n  \"result_followup_focus\": null,\n  \"artifact_target\": \"none\"\n}",
+        "refusal": null,
+        "reasoning": "The user query is: \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital, against SPY. No fees or slippage.\"\nI bought DOCN on September 1, 2023, and held it through September 9, 2026. Starting with $1,000, the position grew to $1,847.52. Meanwhile, SPY over the same period turned $1,000 into $1,612.45. That\u2019s a solid 14.",
+        "reasoning_details": [
+          {
+            "type": "reasoning.summary",
+            "summary": "The user query is: \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital, against SPY. No fees or slippage.\"\nI bought DOCN on September 1, 2023, and held it through September 9, 2026. Starting with $1,000, the position grew to $1,847.52. Meanwhile, SPY over the same period turned $1,000 into $1,612.45. That\u2019s a solid 14.",
+            "format": "xai-responses-v1",
+            "index": 0
+          },
+          {
+            "type": "reasoning.encrypted",
+            "data": "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.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+            "format": "xai-responses-v1",
+            "id": "rs_908cbbc8-9a24-964c-b0ab-83927c886898",
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 10626,
+    "completion_tokens": 1164,
+    "total_tokens": 11790,
+    "cost": 0.0145797,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 1536,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0145797,
+      "upstream_inference_prompt_cost": 0.0116697,
+      "upstream_inference_completions_cost": 0.00291
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 792,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}
