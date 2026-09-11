@@ -10,7 +10,7 @@
   },
   "evaluation_mode": "preflight_no_calls",
   "remaining_prerequisites": [],
-  "generated_at": "2026-09-11T00:36:34.691271+00:00",
+  "generated_at": "2026-09-11T00:52:54.768821+00:00",
   "fixture_sha256": "b255b3b18050a6c7ca7b39fd99645ca3297a4b50a373bf109895ea4fe9793851",
   "fixture_sources": {
     "docn_buyhold_recorded": {
@@ -76,7 +76,7 @@
   },
   "checkouts": {
     "candidate": {
-      "commit": "4dc1afeebd9b7a3dda7ef0a9bafbaafff64c4d1e",
+      "commit": "26404e837f075deb1c318672e9748554ddd40139",
       "worktree_clean": true,
       "checkout": "/Users/garces/.codex/worktrees/7c2d/private-alpha-next"
     }
@@ -228,7 +228,7 @@
         "source": "deterministic_fallback",
         "fallback_used": true,
         "failure_mode": "invalid_draft",
-        "latency_ms": 6
+        "latency_ms": 7
       },
       "breakdown": {
         "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Beat by 327.3 percentage points versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",
@@ -345,7 +345,7 @@
         "source": "deterministic_fallback",
         "fallback_used": true,
         "failure_mode": "invalid_draft",
-        "latency_ms": 7
+        "latency_ms": 10
       },
       "breakdown": {
         "complete_text": "Here's the deeper read on the completed run.\n\n**Setup.** DOCN Buy and Hold tested DOCN over September 1, 2023 to September 9, 2026 using the stored backtest configuration. Entry rule: buy at the start of the period; exit rule: hold through the end.\n\n**How to read it.** **Total return:** +396.3%. The comparison benchmark was SPY at +69.0%. Superó por 327.3 puntos porcentuales versus the benchmark. This is a comparison of historical returns, not an explanation of why the move happened.\n\n**Risk and assumptions.** Max drawdown was -44.9%, the largest peak-to-trough decline captured by the simulation. The run used Long-only; Equal weight; No fees/slippage; Benchmark: SPY.\n\nUse this as historical simulation evidence, not a prediction or trading recommendation.",

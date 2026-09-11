@@ -1,6 +1,6 @@
 {
-  "candidate": "4dc1afeebd9b7a3dda7ef0a9bafbaafff64c4d1e",
-  "review": "Bounded code review clean after malformed URL and cancellation-accounting fixes; 25 tests passed. Harness review clean with 43 tests passed. Dollar arithmetic checked separately against d730 and unchanged final-head payloads. GitHub final review not yet claimed. Final nested-schema guard delta reviewed clean; both new class-name regression cases pass.",
+  "candidate": "26404e837f075deb1c318672e9748554ddd40139",
+  "review": "Bounded code review clean after malformed URL and cancellation-accounting fixes; 25 tests passed. Harness review clean with 43 tests passed. Dollar arithmetic checked separately against d730 and unchanged final-head payloads. GitHub final review not yet claimed. Final nested-schema guard delta reviewed clean; both new class-name regression cases pass. GitHub review at 94dbefec found missing shared admission and citations overlapping run-owned figures. Both were reproduced, fixed, and reviewed clean in a bounded independent pass; 41 focused tests passed. A clean follow-up GitHub review is still pending.",
   "tests": {
     "focused_backend": 640,
     "mocked_eval": 257,
@@ -10,18 +10,20 @@
     "readout_probe": 43,
     "prompt_surface_coverage": 9,
     "readout_policy_after_format_cleanup": 122,
-    "nested_schema_guard_followup": 374
+    "nested_schema_guard_followup": 374,
+    "stale_wiring_regressions": 198,
+    "review_followup": 41
   },
   "fingerprint": "Held unchanged; model-facing fingerprint comparison fails as expected. No full live eval authorized.",
   "paid_provider_calls": 0,
   "source_hashes": {
-    "src/argus/api/chat/breakdown.py": "75898364a2cf2dbe8f6048d622eaaa9bddad5a9c7ad619e2bf588eab63b61264",
+    "src/argus/api/chat/breakdown.py": "ba610b35b0059dbf1d8f61e010008d0d70972f144dcf9865c2f36b00fea82dc7",
     "src/argus/api/chat/research_evidence.py": "b3be9b27f1955bdae74410e6d0d5907de67f39758d566c1e64b8065dcc8b2aba",
     "src/argus/api/routers/agent.py": "78e00b52c6753d078a383f1619e95724d8407e7b27a795c4f464e615ab69afb8",
     "src/argus/domain/research/perplexity_agent.py": "8e805299941e6d741b1909c668d2a54f8cb9c0b5aeac9ea8dfac5cbf8bfe38ba",
-    "src/argus/domain/result_readout_grounding.py": "2974cd5232ff056320d98c5031dd770cca893e5db1684ae4799d667d3a05f9ae",
-    "src/argus/domain/result_readout_quotes.py": "8b1f4915fbf1831dd417e539728a89347b29159fb77a0ad0ba330baa24da3c0b",
-    "src/argus/domain/result_readout_sources.py": "4563b42714fc79b275afc20e4469d0c485130487b9bc4dfac02a3639d19f6f81",
+    "src/argus/domain/result_readout_grounding.py": "0d00317fdace7d0a38597b76aec8aab2e0aebc77dababc831db6652ab4a4a239",
+    "src/argus/domain/result_readout_quotes.py": "63402ed4b4c40d0ca9b18de88e0e1dff6a4a8d7d3f68c47ff7dffe9ab335d897",
+    "src/argus/domain/result_readout_sources.py": "84eddccaddb23b2ab99d2d5d7220383b404be28a81a49e6d9c4575ceccf33c62",
     "src/argus/llm/openrouter.py": "4d38d2d5d1472e7dd0df252d8163e3fb9d3c9f801ddfe204f8b4b8f59c23ac43",
     "src/argus/llm/openrouter_model_env.py": "b63b47580a59168db9768c60339816d7c9b590d78b148b28ba5d992544b2a154",
     "src/argus/llm/openrouter_tasks.py": "e7ee3fde262f4c2b4900ee478e1f9c44c8b2e4d8fba3cd903f52e1fd3e49b90f",
@@ -51,7 +53,8 @@
       "result_breakdown removed from OpenRouterTask, profile, mapping and policy mocks",
       "Breakdown OpenRouter injection, executor timeout constant and wrapper removed",
       "Old tier-comparison runner removed; active probe calls the production Agent path",
-      "CONVERSATIONAL_RUNTIME and API_CONTRACT describe new provider ownership; active roadmap marks old diagnosis as history"
+      "CONVERSATIONAL_RUNTIME and API_CONTRACT describe new provider ownership; active roadmap marks old diagnosis as history",
+      "Updated workflow receipt tier assertion to readout and migrated reload/transport tests away from the removed router composer import; removed obsolete exact prompt wording assertion."
     ],
     "remaining": [
       "result_breakdown presentation/message kinds, schema names and negative registry test are intentional",
@@ -60,9 +63,41 @@
     ]
   },
   "payload_revalidation": "Final clean-head free preflight has identical twelve payload hashes, limits and estimate to the reviewed preflight. Zero requests or provider responses.",
-  "github_review_threads_before_push": {
-    "unresolved": 0,
-    "total": 3,
-    "new_head_review": "pending"
+  "free_full_suite": {
+    "candidate": "26404e837f075deb1c318672e9748554ddd40139",
+    "passed": 7523,
+    "failed": 18,
+    "skipped": 585,
+    "live_evals_enabled": false,
+    "provider_credentials": "Emptied by the existing provider_free_env fixture.",
+    "local_environment_followup": {
+      "cases": 17,
+      "passed": 17,
+      "failed": 0,
+      "changes": "Reran macOS loopback/process-stat tests outside sandbox; set research rail and personalization memory flags false in the test process for three default-off tests. No source edits for these cases."
+    },
+    "remaining_failure": "test_model_facing_text_matches_its_measured_fingerprint, held unchanged by founder"
+  },
+  "review_regression_red": {
+    "failed": 9,
+    "passed": 32,
+    "scope": "Shared admission before provider work and run-owned numerals/cardinal words/dates inside external citations."
+  },
+  "github_review_followup": {
+    "reviewed_head": "94dbefecf4729fcbf742d92299af13094e5b6950",
+    "findings": [
+      {
+        "comment": 3984875977,
+        "fix": "Shared request admission before provider work, full template on denial."
+      },
+      {
+        "comment": 3984875984,
+        "fix": "Shared numeric occurrence validator rejects external citation overlap with run-owned figures."
+      }
+    ],
+    "fix_head": "26404e837f075deb1c318672e9748554ddd40139",
+    "local_review": "clean",
+    "final_github_review": "pending",
+    "terminal_readiness_claim": false
   }
 }

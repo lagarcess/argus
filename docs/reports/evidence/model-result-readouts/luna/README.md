@@ -4,7 +4,7 @@ Status: implemented and verified without paid calls. This is not a readiness
 or quality approval. The fingerprint is held, no merge has occurred, and the
 new twelve-draft check still needs the founder's explicit approval.
 
-The measured source candidate is `4dc1afeebd9b7a3dda7ef0a9bafbaafff64c4d1e`.
+The measured source candidate is `26404e837f075deb1c318672e9748554ddd40139`.
 `preflight.json` records six saved-run/language pairs, twelve frames and zero
 HTTP attempts. Later evidence-only commits can be checked against the source
 hashes in `preapproval-audit.json`. The former structured-tier check and its
@@ -27,6 +27,8 @@ approval request are cancelled; the old evidence remains historical.
 - Received Breakdown invoices use the shared research ledger writer, including
   rejected drafts and work completed after a browser disconnect. Existing
   unpriced-spend recording remains active.
+- Breakdown claims the request's existing research capacity before dispatch.
+  Exhausted guest or global capacity selects the full template without a call.
 
 ## Approval estimate
 
@@ -67,6 +69,7 @@ row and reconcile the retained invoices offline. This requires no extra draft.
 | Run fact key, value, unit and rounded visible quote | Kept: prevents a quoted number from resolving to a missing or different run value. |
 | Numeric occurrence coverage and duplicate ownership | Kept: rejects uncited figures and overlapping run/source references. |
 | Returned web URL, citation date, claim span and source figure unit/value | Added for the new source channel: every external figure must have a dated citation attached to its visible occurrence. |
+| Web citation overlapping a run-owned numeric occurrence | Kept: a web source cannot appear to establish a simulated figure, including a date or spelled-out count. |
 | Beat/lag contradiction | Kept: catches a claim that reverses the stored benchmark result. |
 | Internal field/schema names | Kept: prevents machine contract details leaking into visible prose. |
 | Model-reported written language | Kept: mismatch rejects the entire draft; existing saved-language display rules remain. |
@@ -89,6 +92,19 @@ and the frontend readout/privacy guard 76. The new measurement harness passed
 43 tests. New additive-client behavior and existing client/retrieval/ledger
 paths passed their focused tests. The final nested-schema guard delta passed 374 focused tests. Nine prompt-surface coverage tests pass; the
 frozen fingerprint comparison intentionally remains failed and unchanged.
+
+GitHub review at `94dbefec` found a missing shared capacity claim and citation
+spans that could enclose run figures. Nine new regression cases failed before
+the fixes. All 41 focused tests now pass, and a bounded independent review is
+clean. Four stale test files were updated for the new wiring and passed 198
+tests. A fresh final GitHub review remains pending.
+
+The full free suite passed 7,523 tests and skipped 585. Its 18 failures were the
+held fingerprint check, fourteen macOS sandbox restrictions, and three tests
+affected by local feature flags. The seventeen local failures all passed when
+rerun outside the sandbox with the expected test-only flags. The existing test
+fixture removed provider credentials; no paid call was made. Exact-head CI
+remains the delivery gate, and the fingerprint failure has not been waived.
 
 `merged-modularity.json` and `.txt` record a passing check across 1,430 source
 files in a computed tree with current integration
