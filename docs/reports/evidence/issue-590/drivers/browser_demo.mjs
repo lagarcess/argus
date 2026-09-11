@@ -152,15 +152,25 @@ for (const [language, script] of Object.entries(SCRIPT)) {
       try { sent.push(JSON.parse(request.postData() || "{}")); } catch { sent.push({ unparsed: true }); }
     }
   });
-  t = Date.now();
-  await sections.last().getByRole("button", { name: script.dateRow }).first().click();
-  await composerEnabled(page);
-  await settled(page);
-  timings.date_row_seconds = Math.round((Date.now() - t) / 100) / 10;
-  await page.evaluate(() => document.querySelectorAll("nextjs-portal").forEach((node) => node.remove()));
-  await page.screenshot({ path: `${OUT}/${language}-4-date-row-1280.png`, fullPage: true });
-  const dateRowRequest = sent[0] ? { message: sent[0].message, action: sent[0].action ?? sent[0].structured_action ?? null } : null;
-  const afterDateRow = (await page.locator('[data-testid="conversation-transcript-region"]').innerText().catch(() => "")).replace(/\s+/g, " ");
+  // When the structured tier is unavailable the turn has no typed focus and
+  // the interpreter-unavailable path answers in composer prose with no rows;
+  // record that instead of failing the run, so the report says which path ran.
+  let dateRowRequest = null;
+  let afterDateRow = "";
+  const dateRow = sectionCount
+    ? sections.last().getByRole("button", { name: script.dateRow }).first()
+    : null;
+  if (dateRow && (await dateRow.count()) > 0) {
+    t = Date.now();
+    await dateRow.click();
+    await composerEnabled(page);
+    await settled(page);
+    timings.date_row_seconds = Math.round((Date.now() - t) / 100) / 10;
+    await page.evaluate(() => document.querySelectorAll("nextjs-portal").forEach((node) => node.remove()));
+    await page.screenshot({ path: `${OUT}/${language}-4-date-row-1280.png`, fullPage: true });
+    dateRowRequest = sent[0] ? { message: sent[0].message, action: sent[0].action ?? sent[0].structured_action ?? null } : null;
+    afterDateRow = (await page.locator('[data-testid="conversation-transcript-region"]').innerText().catch(() => "")).replace(/\s+/g, " ");
+  }
   const messages = await page.locator('[data-testid="conversation-transcript-region"]').innerText().catch(() => text);
   const followupIndex = messages.lastIndexOf(script.followup);
   const afterFollowup = followupIndex >= 0 ? messages.slice(followupIndex + script.followup.length) : messages;
@@ -182,8 +192,9 @@ for (const [language, script] of Object.entries(SCRIPT)) {
     rows,
     after_followup_text: afterFollowup.replace(/\s+/g, " ").trim().slice(0, 600),
     recovery_shown: script.recovery.test(text),
+    followup_typed_next_experiment: sectionCount > 0,
     date_row_request: dateRowRequest,
-    after_date_row_text: afterDateRow.slice(afterDateRow.lastIndexOf(script.dateRow)).slice(0, 500),
+    after_date_row_text: afterDateRow ? afterDateRow.slice(afterDateRow.lastIndexOf(script.dateRow)).slice(0, 500) : null,
     page_errors: errors,
     screenshots: [1, 2, 3, 4].map((n) => `${language}-${n}-*.png`),
   });

@@ -10,7 +10,8 @@ attached the rows. The measurement case
 `offered.min_next_experiment_rows` in every live run since the check arrived.
 
 Lane branch `claude/result-followup-next-experiments-383492`, base integration
-`46d43c1d`. Code head `3cc37cfd`; the commits after it are evidence only.
+`46d43c1d`, PR #592. Code head `67067751` (`3cc37cfd` plus the Codex round 1
+fix); the commits after it are evidence only.
 
 ## What changed
 
@@ -33,6 +34,16 @@ Lane branch `claude/result-followup-next-experiments-383492`, base integration
   fact bank reads (`delta_vs_benchmark_pct`, `max_drawdown_pct`) are shared
   constants, so the rows' `why` reason and the fact bank quote the same figures.
 - `docs/API_CONTRACT.md`: the Try next section documents the follow-up answer.
+- Codex round 1 (P1, fixed in `67067751`): the follow-up message has no result
+  card, so its `change_date_range` and `compare_buy_and_hold` rows had no run
+  to anchor on and a tap would have sent their label as prose. The sidecar now
+  names its run as `source_run_id` (the latest result reference's id, the same
+  identity `latest_run_id_for_action` falls back to); the web client reads it
+  on hydration and on the streamed final payload and falls back to it when the
+  message has no card, so those rows submit the contract's `refine_strategy`
+  action with `run_id` and `next_experiment_kind`. Knowledge-answer rows also
+  ride a card-less message but belong to no run; their prose turn is the
+  contract's path and they are unchanged.
 
 Decisions worth knowing:
 
@@ -83,30 +94,53 @@ and `tests/evals/README.md` allows one rerun of a surprising failure. The rerun
 typed the turn `next_experiment` and answered with three rows, no recovery and
 no composer receipt.
 
-### Browser demo
+### Browser demo at the code head `67067751`
 
 `drivers/serve.py` serves this tree on 8590 (memory persistence, mock auth,
 real interpreter, live market data and asset provider); the web dev server on
 3590 ran with `NEXT_PUBLIC_MOCK_AUTH=true` and `NEXT_PUBLIC_ENABLE_SPANISH=true`.
 `drivers/browser_demo.mjs` drives the production repro in the real app, once per
-language: the Apple 2024 question, Run backtest from the confirmation card,
-then the what-next follow-up. `browser/report.json` records the rows, timings
-and page errors (none).
+language: the Apple 2024 question, Run backtest from the confirmation card, the
+what-next follow-up, then a tap on the date-range row of the follow-up message
+while recording the request the client sends. `browser/report.json` records the
+rows, the captured request, timings and page errors (none).
 
 | Language | Follow-up answer | Rows | Recovery | Follow-up turn |
 | --- | --- | --- | --- | ---: |
-| `en` | Here is what you can try next from this result. | Try monthly recurring buys (Worst drop was -15.5%), Try a supported SMA/EMA crossover, Test a different date range | no | 26.2 s |
-| `es-419` | Esto es lo que puedes probar después a partir de este resultado. | Probar compras mensuales recurrentes (La peor caída fue -15.5%), Probar un cruce SMA/EMA compatible, Probar otro rango de fechas | no | 21.1 s |
+| `en` | Here is what you can try next from this result. | Try monthly recurring buys (Worst drop was -15.5%), Try a supported SMA/EMA crossover, Test a different date range | no | 21.6 s |
+| `es-419` | Esto es lo que puedes probar después a partir de este resultado. | Probar compras mensuales recurrentes (La peor caída fue -15.5%), Probar un cruce SMA/EMA compatible, Probar otro rango de fechas | no | 37.4 s |
+
+The date-range row tapped from the follow-up message sent
+`{"type": "refine_strategy", "presentation": "result", "payload": {"run_id":
+<the run's id>, "next_experiment_kind": "change_date_range"}}` in both
+languages, and Argus answered with the date-only clarification anchored on the
+run ("What period would you like to test instead?" / "¿Qué período te gustaría
+probar?"). That is the Codex round 1 finding closed in the real app.
 
 Screenshots: `browser/<language>-1-confirmation-1280.png`,
-`-2-result-1280.png`, `-3-what-next-1280.png`, `-3-what-next-390.png`. The
-rows lead with the drawdown reason because the real run's worst drop (-15.5%)
-crosses the sidecar's deep-drawdown threshold, read from the same persisted
-metrics the fact bank quotes.
+`-2-result-1280.png`, `-3-what-next-1280.png`, `-3-what-next-390.png`,
+`-4-date-row-1280.png`. The rows lead with the drawdown reason because the real
+run's worst drop (-15.5%) crosses the sidecar's deep-drawdown threshold, read
+from the same persisted metrics the fact bank quotes.
 
-Billed, from the API's route receipts: $0.16 for the two conversations, plus
-$0.02 for a first attempt aborted by a bug in the driver (it matched
-`innerText`, which carries the CSS uppercase of the section labels).
+Billed, from the API's route receipts: $0.16 for the two conversations at this
+head, plus $0.02 for an attempt at the same head that the structured tier's
+outage sent down the interpreter-unavailable path (below), plus $0.19 for the
+runs at `3cc37cfd` (two conversations and one attempt aborted by a driver bug:
+it matched `innerText`, which carries the CSS uppercase of the section labels).
+
+### Observed beside the fix: the structured tier's outage path
+
+Two of the six live what-next turns driven for this lane never carried a typed
+focus: the primary interpreter model timed out (12 to 20 s) and the fallback
+model's read failed local validation, so the turn went through the
+interpreter-unavailable path. That path composes a general-focus answer; in
+the browser it produced a "What happened" prose answer that listed the same
+options as bullets (no rows, no recovery), and in the harness its draft was
+rejected and the recovery appeared. Neither is the dead end #590 describes,
+and both are outside this lane: with no typed focus there is no honest way to
+attach rows without a phrase gate before interpretation. It is recorded here
+because it decides whether the measurement case passes on a given run.
 
 ### Full live measurement
 
@@ -118,9 +152,10 @@ with `drivers/compare_baseline.py`. This section is updated when it lands.
 
 | Step | Billed |
 | --- | ---: |
-| Measurement case, run 1 and rerun | $0.02 |
-| Browser demo, including the aborted attempt | $0.19 |
-| **Total so far** | **$0.21** |
+| Measurement case, run 1 and rerun (`3cc37cfd`) | $0.02 |
+| Browser demo at `3cc37cfd`, including the aborted attempt | $0.19 |
+| Browser demo at `67067751`, including the outage-path attempt | $0.18 |
+| **Total so far** | **$0.39** |
 
 ## Reproduce
 
