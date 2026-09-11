@@ -25,6 +25,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     has_partial_explicit_date_range,
 )
+from argus.domain.dca_capital import DCA_SEED_ROLES
 
 
 def _response_needs_strategy_family_continuity_audit(
@@ -106,11 +107,18 @@ def _response_from_dca_contract_audit(
         # decides the field, so a seed never lands under a ceiling key.
         if _draft_types_amount_as_seed(draft, field_provenance, budget):
             audit_reason_codes.append("dca_budget_audit_outranked_by_typed_seed")
-        elif budget_source in _DCA_SEED_ROLE_SOURCES:
+        elif budget_source in _DCA_SEED_ROLE_SOURCES and draft.initial_capital is None:
             draft.initial_capital = budget
             field_provenance["initial_capital"] = budget_source
             audit_reason_codes.append("dca_budget_audit_typed_as_seed")
         else:
+            # A second plan-wide amount beside an occupied seed can only bound
+            # the plan; the audit never replaces a role the draft already holds.
+            if budget_source in _DCA_SEED_ROLE_SOURCES:
+                budget_source = "total_budget"
+                audit_reason_codes.append(
+                    "dca_budget_audit_seed_role_occupied_read_as_ceiling"
+                )
             draft.total_capital = budget
             field_provenance["total_capital"] = budget_source
             extra_parameters["total_budget"] = budget
@@ -145,18 +153,8 @@ def _response_from_dca_contract_audit(
     )
 
 
-# Roles that put money to work on day one; a budget audit that names one of
-# these has read the seed, not a plan-wide ceiling.
-_DCA_SEED_ROLE_SOURCES = frozenset(
-    {
-        "initial_capital",
-        "starting_capital",
-        "starting_principal",
-        "initial_lump_sum",
-        "initial_lump",
-        "lump_sum",
-    }
-)
+# A budget audit that names a seed role has read the seed, not a ceiling.
+_DCA_SEED_ROLE_SOURCES = frozenset(DCA_SEED_ROLES)
 
 
 def _draft_types_amount_as_seed(

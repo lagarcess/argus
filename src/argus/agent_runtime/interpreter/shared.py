@@ -17,6 +17,7 @@ from argus.agent_runtime.llm_interpreter_types import (
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import TaskSnapshot
+from argus.domain.dca_capital import DCA_CEILING_ROLES, DCA_SEED_ROLES
 from argus.domain.slot_normalizer import normalize_parameter_value
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import (
@@ -55,20 +56,8 @@ _TOTAL_CAPITAL_SOURCES = {
     "user",
     "explicit_user",
     "prior",
-    "initial_capital",
-    "starting_capital",
-    "starting_principal",
-    "initial_lump_sum",
-    "initial_lump",
-    "lump_sum",
-    "total_capital",
-    "total_budget",
-    "max_budget",
-    "investment_budget",
-    "cap",
-    "contribution_cap",
-    "capital_cap",
-    "investment_cap",
+    *DCA_SEED_ROLES,
+    *DCA_CEILING_ROLES,
 }
 
 

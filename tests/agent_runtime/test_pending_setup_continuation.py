@@ -623,3 +623,88 @@ async def test_recorded_two_turns_reach_the_card_with_every_fact(
         assert launch["benchmark_symbol"] == "SPY"
         assert launch["_execution_realism"]["fee_bps"] == 10.0
         assert launch["_execution_realism"]["slippage_bps"] == 5.0
+
+
+# --- Codex round 1 on PR #591 -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("semantic_turn_act", "task_relation", "message"),
+    [
+        ("new_idea", "new_task", "Actually test $SPY instead"),
+        (
+            "refine_current_idea",
+            "refine",
+            "Use $SPY instead of AAPL, keep everything else",
+        ),
+    ],
+)
+def test_an_explicit_switch_to_the_benchmark_symbol_trades_that_symbol(
+    semantic_turn_act: str, task_relation: str, message: str
+) -> None:
+    # Benchmark identity never overrides explicit traded-asset evidence.
+    pending = _pending("dca_accumulation")
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation=task_relation,
+        requires_clarification=False,
+        user_goal_summary="Trade SPY instead.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            asset_universe=["SPY"],
+            asset_class="equity",
+            extra_parameters={"field_provenance": {"asset_universe": "explicit_user"}},
+        ),
+        semantic_turn_act=semantic_turn_act,
+    )
+
+    result = _run(
+        message=message,
+        language="en",
+        pending=pending,
+        response=response,
+        thread_metadata=dict(AWAITING_REPLY_WITHOUT_FIELD),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["SPY"]
+    assert strategy.strategy_type == "dca_accumulation"
+    if task_relation == "refine":
+        # An edit keeps the rest of the setup; a new idea starts clean.
+        assert strategy.date_range == pending.date_range
+        assert strategy.cadence == "monthly"
+
+
+def test_a_benchmark_the_repair_misread_as_the_asset_does_not_replace_the_pending_asset() -> (
+    None
+):
+    # The interpreter's benchmark-misplacement repair filled the asset
+    # universe from the benchmark mention and left its receipt; the reply
+    # named no traded asset, so the setup keeps AAPL.
+    pending = _pending("dca_accumulation")
+    draft = _reply_draft(pending, "asset_and_dates")
+    draft.asset_universe = ["SPY"]
+    draft.asset_class = "equity"
+    draft.comparison_baseline = None
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Restate the money.",
+        candidate_strategy_draft=draft,
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+        reason_codes=["misplaced_benchmark_asset_recovered"],
+    )
+
+    result = _run(
+        message=REPLIES["en"],
+        language="en",
+        pending=pending,
+        response=response,
+        thread_metadata=dict(AWAITING_REPLY_WITHOUT_FIELD),
+    )
+
+    assert result.outcome == "ready_for_confirmation", result.decision.reason_codes
+    _assert_pending_facts_survived(result.decision.candidate_strategy_draft, pending)
+    assert "pending_setup_continuation_merged" in result.decision.reason_codes

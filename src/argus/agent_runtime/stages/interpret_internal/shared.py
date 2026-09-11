@@ -94,6 +94,12 @@ _PENDING_SETUP_TURN_ACTS = frozenset(
 )
 
 
+# The interpreter's own receipt for filling an empty asset universe from a
+# benchmark mention; the one signal that an incoming asset is that repair's
+# artifact rather than something the user named.
+MISPLACED_BENCHMARK_REPAIR_REASON = "misplaced_benchmark_asset_recovered"
+
+
 def _turn_continues_pending_setup(
     *,
     prior: StrategySummary | None,
@@ -102,6 +108,7 @@ def _turn_continues_pending_setup(
     semantic_turn_act: str | None,
     task_relation: str | None,
     current_user_message: str | None = None,
+    reason_codes: list[str] | None = None,
 ) -> bool:
     if prior is None:
         return False
@@ -119,6 +126,7 @@ def _turn_continues_pending_setup(
             prior=prior,
             strategy=strategy,
             current_user_message=current_user_message,
+            reason_codes=reason_codes,
         )
     ):
         return False
@@ -127,23 +135,24 @@ def _turn_continues_pending_setup(
 
 def _pending_setup_continuation_reason_codes(
     *,
+    interpretation: Any,
     prior: StrategySummary | None,
-    strategy: StrategySummary,
     selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: str | None,
-    task_relation: str | None,
     current_user_message: str | None = None,
 ) -> list[str]:
     """Name the override when the runtime kept a setup the model called new."""
+    semantic_turn_act = interpretation.semantic_turn_act
+    task_relation = interpretation.task_relation
     if semantic_turn_act != "new_idea" and task_relation != "new_task":
         return []
     if not _turn_continues_pending_setup(
         prior=prior,
-        strategy=strategy,
+        strategy=interpretation.candidate_strategy_draft,
         selected_thread_metadata=selected_thread_metadata,
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
         current_user_message=current_user_message,
+        reason_codes=list(interpretation.reason_codes),
     ):
         return []
     return ["pending_setup_continuation_merged"]
@@ -291,11 +300,15 @@ def _strategy_has_explicit_asset_evidence(
     return False
 
 
-def _incoming_assets_are_benchmarks_only(
+def _incoming_asset_is_misplaced_benchmark(
     *,
     prior: StrategySummary,
     strategy: StrategySummary,
+    reason_codes: list[str] | None,
 ) -> bool:
+    """The asset universe holds only what the benchmark repair put there."""
+    if MISPLACED_BENCHMARK_REPAIR_REASON not in set(reason_codes or []):
+        return False
     if not strategy.asset_universe:
         return False
     benchmarks = {
@@ -313,20 +326,21 @@ def _strategy_names_another_traded_asset(
     prior: StrategySummary,
     strategy: StrategySummary,
     current_user_message: str | None,
+    reason_codes: list[str] | None = None,
 ) -> bool:
     """The reply itself names a traded asset the pending setup does not hold.
 
-    A benchmark mention is not a traded asset, and an asset the reply never
-    named is a repair artifact; neither changes what is being tested.
+    An asset the benchmark repair inserted is not something the reply named;
+    any other symbol counts on its own evidence, the benchmark's included.
     """
-    benchmarks = {
-        _compact_asset_evidence_token(strategy.comparison_baseline),
-        _compact_asset_evidence_token(prior.comparison_baseline),
-    } - {""}
+    if _incoming_asset_is_misplaced_benchmark(
+        prior=prior, strategy=strategy, reason_codes=reason_codes
+    ):
+        return False
     held = {_compact_asset_evidence_token(symbol) for symbol in prior.asset_universe}
     for symbol in strategy.asset_universe:
         target = _compact_asset_evidence_token(symbol)
-        if not target or target in benchmarks or target in held:
+        if not target or target in held:
             continue
         if _message_has_cashtag_for_asset(current_user_message, target=target):
             return True

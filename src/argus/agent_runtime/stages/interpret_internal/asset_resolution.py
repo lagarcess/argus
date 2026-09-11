@@ -221,6 +221,7 @@ def _strategy_with_hidden_context_guard(
         semantic_turn_act=interpretation.semantic_turn_act,
         task_relation=interpretation.task_relation,
         current_user_message=current_user_message,
+        reason_codes=list(interpretation.reason_codes),
     ):
         # The asset came from the setup the runtime is waiting on, by design.
         return strategy, [], False

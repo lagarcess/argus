@@ -28,7 +28,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _compact_asset_evidence_token,
     _current_turn_has_strong_asset_override,
     _field_base,
-    _incoming_assets_are_benchmarks_only,
+    _incoming_asset_is_misplaced_benchmark,
     _message_has_cashtag_for_asset,
     _message_has_uppercase_asset_token,
     _should_preserve_prior_asset_context,
@@ -96,6 +96,7 @@ def _strategy_with_contextual_merge(
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
         current_user_message=current_user_message,
+        reason_codes=reason_codes,
     )
     should_merge = (
         semantic_turn_act in CONTEXTUAL_EDIT_TURN_ACTS
@@ -152,10 +153,12 @@ def _strategy_with_contextual_merge(
     if (
         continues_pending_setup
         and not asset_field_requested
-        and _incoming_assets_are_benchmarks_only(prior=prior, strategy=strategy)
+        and _incoming_asset_is_misplaced_benchmark(
+            prior=prior, strategy=strategy, reason_codes=reason_codes
+        )
     ):
-        # A benchmark mention read as the traded asset is a repair artifact,
-        # not an edit; the setup keeps what it is testing.
+        # The benchmark repair's artifact is not an edit; the setup keeps
+        # what it is testing.
         preserve_prior_asset_context = True
     if (
         normalized_asset_universe_operation(

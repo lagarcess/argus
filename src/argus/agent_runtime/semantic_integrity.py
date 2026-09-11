@@ -16,41 +16,15 @@ from argus.agent_runtime.strategy_contract import (
     normalize_date_range_candidate,
     resolve_date_range,
 )
+from argus.domain.dca_capital import DCA_CEILING_ROLES, DCA_SEED_ROLES
 from argus.domain.market_data.new_york_clock import new_york_today
 
 # Money a recurring plan puts to work on day one, and money that bounds the
-# whole plan. Two different facts, so two key sets: reading them out of one
-# enumerated tuple made the order load-bearing and let a seed hide a cap.
-_DCA_SEED_KEYS: tuple[str, ...] = (
-    "initial_capital",
-    "starting_capital",
-    "starting_principal",
-    "initial_lump_sum",
-    "initial_lump",
-    "lump_sum",
-)
-# Provenance roles that mean money on day one. A ceiling key carrying one of
-# these was written by a layer that mislabeled a seed.
-_DCA_SEED_ROLE_SOURCES: frozenset[str] = frozenset(
-    {
-        "initial_capital",
-        "starting_capital",
-        "starting_principal",
-        "initial_lump_sum",
-        "initial_lump",
-        "lump_sum",
-    }
-)
-_DCA_CEILING_KEYS: tuple[str, ...] = (
-    "total_capital",
-    "total_budget",
-    "max_budget",
-    "investment_budget",
-    "cap",
-    "contribution_cap",
-    "capital_cap",
-    "investment_cap",
-)
+# whole plan. Two different facts, two key sets, both read from the DCA money
+# owner so no layer can call a seed a ceiling.
+_DCA_SEED_KEYS: tuple[str, ...] = DCA_SEED_ROLES
+_DCA_CEILING_KEYS: tuple[str, ...] = DCA_CEILING_ROLES
+_DCA_SEED_ROLE_SOURCES: frozenset[str] = frozenset(DCA_SEED_ROLES)
 
 # One identity for the ceiling refusal, so the producer and every reader that
 # defers or filters it cannot drift apart under a rename.
@@ -267,22 +241,7 @@ def _structured_money_role_evidence(
         total_key, total = ceiling_key, ceiling
 
     capital_source = str(field_provenance.get("capital_amount") or "").strip()
-    if capital_source in {
-        "initial_capital",
-        "starting_capital",
-        "starting_principal",
-        "initial_lump_sum",
-        "initial_lump",
-        "lump_sum",
-        "total_capital",
-        "total_budget",
-        "max_budget",
-        "investment_budget",
-        "cap",
-        "contribution_cap",
-        "capital_cap",
-        "investment_cap",
-    }:
+    if capital_source in _DCA_SEED_KEYS or capital_source in _DCA_CEILING_KEYS:
         total = total if total is not None else _coerce_number(strategy.capital_amount)
         total_key = total_key or capital_source
     elif capital_source in {
@@ -320,13 +279,17 @@ def _structured_money_role_evidence(
         ceiling, ceiling_key = total, resolved_source
     ceiling_key_read_as_seed = False
     if ceiling is not None and _dca_ceiling_provenance_names_seed(field_provenance):
-        # The key says ceiling, the provenance says seed. The role wins: the
-        # number is money on day one, never a limit.
+        # The key says ceiling, the provenance says seed. The role wins only
+        # for the seed's own money: a lone number is the seed, an equal number
+        # is the seed read twice, and a distinct number is still a limit.
         if total is None or total_key == ceiling_key:
             total, total_key = ceiling, "initial_capital"
-        ceiling, ceiling_key = None, None
-        ceiling_key_read_as_seed = True
-        resolved_source = total_key
+            ceiling, ceiling_key = None, None
+            ceiling_key_read_as_seed = True
+            resolved_source = total_key
+        elif ceiling == total:
+            ceiling, ceiling_key = None, None
+            ceiling_key_read_as_seed = True
     return _MoneyRoleEvidence(
         recurring_contribution=recurring,
         total_capital=total,
@@ -457,16 +420,7 @@ def _coerce_number(value: Any) -> float | None:
     return None
 
 
-_DCA_CONTRIBUTION_CEILING_SOURCES = {
-    "cap",
-    "contribution_cap",
-    "capital_cap",
-    "investment_cap",
-    "max_budget",
-    "total_budget",
-    "total_capital",
-    "investment_budget",
-}
+_DCA_CONTRIBUTION_CEILING_SOURCES = frozenset(DCA_CEILING_ROLES)
 
 
 def _dca_total_capital_is_a_ceiling(source: str | None) -> bool:
