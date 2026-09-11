@@ -735,6 +735,138 @@ merged as `129ad084`. Prompt written 2026-09-10, not yet sent.
 
 ---
 
+### Home country per user  ·  ships in **its own promotion**
+
+**Founder, 2026-09-10:** one server-wide country for every user is a huge issue
+and not state of the art. Argus adapts to each user's own home country, and
+personalization means stable declared settings, country and currency (decision
+9's condition). Scoped 2026-09-11 from the lane brief held on 2026-09-10, whose
+wait on the decision 10 lane ended when #589 landed.
+
+**Today.** `home_location()` in `src/argus/domain/research/config.py` reads
+`ARGUS_RESEARCH_HOME_COUNTRY`, and `retrieval_spec()` puts it on every research
+request, which `src/argus/domain/research/perplexity_agent.py` sends as
+`user_location`. No country or currency exists on the profile, `/me` or
+Settings. Personalization memory (#386, #392) stores saved decisions and holds
+no country. The variable is not declared in `render.yaml`, so production most
+likely sends no location at all.
+
+**The rules.**
+
+- Country is a declared profile setting, ISO 3166-1 alpha-2, chosen by the user
+  in Settings like language. Nothing else writes it: never inferred from
+  conversation, IP or behavior (decision 8). The picker may pre-select from the
+  browser's region; nothing saves until the user picks.
+- Currency, ISO 4217, is derived from the country, with an optional user
+  override stored the same way. The profile exposes the resolved currency.
+- Research sends the asking user's country through the provider's location
+  parameter, never through prompt text. A user with no country sends no
+  location. A guest has no stored country; the lane reports what a session-only
+  pick would cost.
+- `ARGUS_RESEARCH_HOME_COUNTRY` and `home_location()` are removed, not kept as a
+  fallback.
+
+**Done means.** A registered user picks a country in Settings in English or
+Spanish, sees the currency it implies and can override it, and both survive a
+reload; a refused save rolls back with a visible error, as language does. A
+research question from that user, inline or as a thorough job, carries that
+country as the location; a question from a user with none carries no location.
+The server-wide setting no longer exists anywhere in the tree.
+
+**Surface.** An additive, nullable migration following
+`supabase/migrations/20260809140000_add_preferred_name.sql`. `User`,
+`ProfilePatch` and `PATCH /me` (`src/argus/api/schemas.py`,
+`src/argus/api/routers/profile.py`), not `GuestUser`, and the runtime's
+`UserState`. The Settings picker, saved through `saveProfile` in
+`web/lib/profile-writes.ts` beside `web/components/settings/LanguageModal.tsx`
+and `web/components/sidebar/ProfileSettingsPanels.tsx`, in both locales.
+`retrieval_spec()` and both research paths in
+`src/argus/agent_runtime/research_grounded.py`: `grounded_result` has the user,
+and `retrieval_spec_for_job` rebuilds from the typed job request, which must
+therefore carry the country. Removal of the server setting from `config.py`,
+`.env.example`, `docs/API_CONTRACT.md` and `tests/research/`, together with the
+unused `LOCAL_SOURCE_DOMAINS` and `local_sources` parameter. `docs/DATA_MODEL.md`,
+`docs/API_CONTRACT.md` and a regenerated `docs/api/openapi.yaml`.
+
+**Do not touch.** Currency in calculations, cards or any model-facing text; that
+use arrives with any grounded math. Prompt text anywhere, including in
+`research_grounded.py`, which is fingerprinted. `perplexity_agent.py`, which
+already sends the spec's location. `render.yaml` and the release contract, which
+never declared the variable.
+
+**Proof.** Focused backend and web tests. A research request built for a user
+with country MX carries MX, and one for a user with none carries no location, on
+both paths, with no provider calls. Bilingual browser proof in Settings,
+including a reload and a refused save. The sanctioned pre-merge live
+measurement, because research requests change, compared case by case against
+the scorecard named in `.agent/interpreter_prompt_fingerprint.json`, with the
+fingerprint unchanged. The founder merges and applies the migration.
+
+---
+
+### The conversation after a result  ·  ships in **its own promotion, after the readout**
+
+**Founder, 2026-09-11, side by side with Perplexity in the live app.** Asked
+"what should I try next?", Perplexity answered with a plan grounded in the
+conversation: a comparison of candidates, an order to work through, a useful
+next prompt and related questions. Argus answered with one fixed sentence and
+three generic rows. The founder's bar holds here: the AI writes; Argus supplies
+the run's facts, the tested math, what the data can support, and the actions.
+One lane owns this whole surface, not one defect at a time.
+
+**Today.**
+
+- "What should I try next?" gets a fixed sentence, "Here is what you can try
+  next from this result." or "Esto es lo que puedes probar después a partir de
+  este resultado.", from `src/argus/agent_runtime/next_experiments.py`, then the
+  rows from `next_experiments_sidecar` (PR #592). The rows are right: they go
+  away once used and a tap sends a typed refine action.
+- Every equity date question says history starts in 2016. That is the provider
+  floor, `ALPACA_EQUITY_HISTORY_START` in `src/argus/domain/market_data/capabilities.py`,
+  repeated in `llm_clarifier.py`, `llm_interpreter.py`, `stages/confirm.py`,
+  `stages/execute.py` and `src/argus/api/backtest_service.py`. For an asset listed
+  later it is false: DOCN began trading in March 2021.
+- Questions about a result go through `src/argus/agent_runtime/result_followups.py`
+  and `result_followup_answers.py`.
+
+**Done means.** On the same result, side by side with Perplexity, in English and
+Spanish, the founder prefers or matches Argus:
+
+- "What should I try next?" is answered by the model from the result, the
+  conversation and, when it helps, cited research: what to test and why, in an
+  order, with the Try next rows kept as the actions.
+- A question about the result, such as why it fell or whether it was good, is
+  answered by the model from the run's facts, with cited context when the answer
+  needs the world.
+- A few next questions built from this conversation are offered to tap, never a
+  fixed catalogue.
+- Any date or availability statement uses the asset's own first available date,
+  never the provider floor.
+- No fixed prose answers on these surfaces; fixed text is only the recovery when
+  the model is unavailable.
+
+**Surface.** `next_experiments.py`, `result_followup_answers.py`,
+`result_followups.py`, the result follow-up paths in `stages/interpret.py` and
+`stages/interpret_actions.py`, every history-start statement listed above and
+the capability that owns the floor, the web rows and suggested questions, both
+locales.
+
+**Do not touch.** The Quick take and Breakdown frames, owned by "Let the model
+write the readout". Money math stays in tested code and is never computed in
+prose (operating rule 6). No advice and no forecast stated as fact. No template
+answer and no question catalogue.
+
+**Proof.** Side-by-side screenshots against Perplexity on DOCN buy and hold, DOCN
+DCA and SPY RSI, in English and Spanish. Focused tests. This lane changes
+model-facing text, and the fingerprint covers every model-facing string under
+`src/argus/agent_runtime`, `src/argus/domain`, `src/argus/llm`, `src/argus/context`
+and `src/argus/nlp`, not only the files it last recorded, so the lane owns the
+fingerprint: one full live measurement at the end, compared case by case, then
+the refreeze. It starts when the readout lane lands, because one lane changes
+model-facing text at a time.
+
+---
+
 ### Share the answer  ·  ships with **The calculations**
 
 **Promoted from a note under the registry to its own item, founder 2026-09-09.**
@@ -882,6 +1014,62 @@ No live eval required, because nothing reaches the measured code.
 
 **Timing.** Not first for its own sake. It ships before distribution so it is
 collecting when signal arrives.
+
+---
+
+### Ask for feedback  ·  ships in **Instrumentation, before the next distribution**
+
+**Founder, 2026-09-11.** People rarely use the feedback Argus already has.
+Borrow the pattern that works: ask once, at a good moment, with one tap, and
+make "tell us more" optional.
+
+**Today.** Every answer has a thumbs up and down that saves a rating to
+`public.feedback` through `POST /api/v1/feedback`
+(`src/argus/api/routers/feedback.py`), with conversation context sanitized by
+`src/argus/api/feedback_context.py`. `web/components/feedback/FeedbackDialog.tsx`
+takes written feedback, and guests can send it without an email. Nothing asks,
+and nothing shows the feedback to the founder. In production there are 17
+feedback rows between 2026-05-30 and 2026-07-16: 12 thumbs from internal or test
+accounts, 2 thumbs from registered users outside the team, 3 written notes with
+no account, and nothing since 2026-07-16. No guest feedback milestone has ever
+been recorded.
+
+**Done means.**
+
+- After a result lands, at most once per conversation, Argus asks how it is
+  doing with three one-tap answers, in English and Spanish. Never while an
+  answer is still arriving, and not again in that conversation after a dismissal,
+  including after a reload.
+- A tap saves the rating through the existing endpoint. "Tell us more" opens the
+  existing dialog.
+- The new ask attaches the conversation only when the user chooses to. Stated
+  personal financial figures follow decision 8.
+- Each submission emails the founder at support@get-argus.com through the existing
+  Resend sender (the `src/argus/domain/access_approval_email.py` pattern and
+  `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`), with no new release setting. A failed
+  email never fails the submission.
+- Guests and signed-in users both work, and the existing feedback quota still
+  applies.
+
+**Surface.** A new ask component beside `FeedbackDialog.tsx`, mounted with the
+smallest change to the chat screen. `web/lib/feedback-context.ts`.
+`FeedbackRequest` in `src/argus/api/schemas.py` and `routers/feedback.py` if a
+rating or consent field is needed. An additive migration only if the table's
+`type` check must widen. A notification sender following the access email. Both
+locales. `docs/API_CONTRACT.md` section 18, `docs/api/openapi.yaml`, and
+`docs/DATA_MODEL.md` if the table changes.
+
+**Do not touch.** Model-facing text: the prompt fingerprint scans every prompt
+string and `Field(description=...)` under `src/argus/agent_runtime`,
+`src/argus/domain`, `src/argus/llm`, `src/argus/context` and `src/argus/nlp`, so new
+code there carries none. The readout frames and the result rows. `render.yaml`
+and the release contract. No analytics vendor and no third-party widget.
+
+**Proof.** Focused backend and web tests, including a failed email that still
+saves the feedback. Bilingual browser proof: the ask appears after a result, a
+tap saves, "tell us more" opens the dialog, and a dismissal holds after a reload.
+One test email, marked as a test, received at support@get-argus.com from a local
+run. No live measurement, because no model-facing text or routing changes.
 
 ---
 
@@ -1196,6 +1384,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | --- | --- | --- |
 | Refusal log | Instrumentation | **Landed** `fa69466c`. #314 closed. |
 | #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
+| Ask for feedback | Instrumentation | **Scoped 2026-09-11 in its item section; can start now.** A one-tap ask after a result, optional detail through the existing dialog, the conversation attached only by choice, and each submission emailed to the founder. Production has 17 feedback rows ever, 2 from registered users outside the team, and none since 2026-07-16. |
 | Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
 | Decisions | Plumbing | **Landed** `67facaf5`. |
 | Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569, answered by PR #571: a turn now reports what it paid rather than what it published, so a discarded packet, a retry either kept or thrown away, and a response rejected after its invoice all reach the ledger. Eleven inline degraded turns between 2026-08-13 and 2026-09-02 recorded zero spend, under about $1.50 and not worth a backfill; the three thorough `missing_public_sources` turns on 2026-09-08 were already correct, and no research job has ever failed in production. |
@@ -1212,7 +1401,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | What to try next after a result | outside the releases | **LANDED** `aadd70eb`, PR #592, closing #590. Asking what to try next after a result answers with that result's Try next rows and a one-sentence lead-in in the workspace language, on both follow-up paths and for every strategy family, through the one rows owner `next_experiments_sidecar`; the retry message appears only when no row can be built. No model-facing text changed. Its live run was 61 passed and 8 failed against the baseline's 63 and 6; six of the seven flips passed a rerun, and the one that failed twice got no read from the structured tier, so it never reached this code. |
 | A clarification reply keeps what the user said | outside the releases | **LANDED** `05196b33`, PR #591. After Argus asks a question, the reply keeps every fact the user already gave (asset, dates, money, costs), an explicit new idea starts clean, money the user typed outranks an audit's guess, and one owner removes em dashes from visible replies. Its full live run on the merged tree was 65 passed and 6 failed; four passed a rerun, and the other two failed outside its code (research publishing on a Spanish forward question, and a discovery answer whose voicing model timed out). On the Haiku fallback it refused a named cap three times out of three where integration lost it once. The founder kept the rule that money the user typed outranks an audit's cap of the same amount. |
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
-| Home country per user | its own promotion | **Not started; founder priority 2026-09-10.** `ARGUS_RESEARCH_HOME_COUNTRY` sends one country for every user, which the founder called a huge issue and not state of the art. Country, with currency inferred from it and overridable, becomes a declared profile setting chosen in Settings like language, and research sends each user's own country. **The server-wide `ARGUS_RESEARCH_HOME_COUNTRY` is removed, not kept as a fallback** (founder, 2026-09-10): a user who has not chosen a country sends no location. Additive columns only. Decision 8 still holds: never inferred from conversation. |
+| Home country per user | its own promotion | **Scoped 2026-09-11 in its item section; lane not started; founder priority 2026-09-10.** `ARGUS_RESEARCH_HOME_COUNTRY` sends one country for every user, which the founder called a huge issue and not state of the art. Country, with currency inferred from it and overridable, becomes a declared profile setting chosen in Settings like language, and research sends each user's own country. **The server-wide `ARGUS_RESEARCH_HOME_COUNTRY` is removed, not kept as a fallback** (founder, 2026-09-10): a user who has not chosen a country sends no location. Additive columns only. Decision 8 still holds: never inferred from conversation. |
+| The conversation after a result | its own promotion | **Scoped 2026-09-11 in its item section; starts when #588 lands.** "What should I try next?" and questions about a result are answered by the model, with the Try next rows kept as actions and a few next questions offered; availability dates use the asset's own first date instead of the 2016 provider floor. Judged side by side with Perplexity. |
 | Any grounded math | The calculations | **Not started.** Reframed 2026-09-10 from "the five calculations": any finance math, grounded, never a list. The AI answers first; polished cards later. Portfolio monitor, quant calculator and insider tracking deferred. |
 | Teach the method | Grounding | **Not started.** |
 
@@ -1247,7 +1437,7 @@ interpreter promotes **without a $1.33 live eval run**.
 | Release | Ships | What a user sees | Live eval |
 | --- | --- | --- | --- |
 | **The fixes** | three bug fixes already on integration | drawer dates, benchmark gap, retrieval evidence | no |
-| **Instrumentation** | refusal log, plus #462 latency | nothing | no |
+| **Instrumentation** | refusal log, #462 latency, ask for feedback | a one-tap feedback ask after a result | no |
 
 Release names are cut boundaries, not a running order. The order is in the
 rules below.
