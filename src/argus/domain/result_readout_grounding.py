@@ -36,8 +36,9 @@ READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "recommendation to trade. No forecasts, investment advice or em dashes. "
     "Write in product_language and report the language actually written. Put "
     "complete prose in text; keep fact names private in figures. For each run "
-    "figure used, give its exact fact_key and the supplied rounded value, or ISO "
-    "date. One reference per fact is enough; no figures used means an empty list."
+    "figure used, give its exact fact_key. In figures.value use a JSON number "
+    "without currency symbols, percent signs or separators; only dates use an ISO "
+    "string. One reference per fact is enough; no figures used means an empty list."
 )
 
 
@@ -53,7 +54,7 @@ class ResultReadoutFigure(BaseModel):
 
     fact_key: str = Field(description="The exact key of the supplied fact being quoted.")
     value: float | str = Field(
-        description="The supplied rounded value used in the prose; ISO date for a date."
+        description="A JSON number at display precision (no symbols or separators), or an ISO date string. Never a formatted numeric string."
     )
 
 
