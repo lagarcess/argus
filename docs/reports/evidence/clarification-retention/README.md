@@ -75,14 +75,18 @@ the merge ignores it. That replay is a committed test.
 - `src/argus/agent_runtime/stages/interpret_internal/shared.py`:
   `_turn_continues_pending_setup`. The runtime asked (the previous stage
   awaited the user) and a pending strategy exists, so the reply continues that
-  setup whatever act the interpreter labeled it. An explicit fresh-task read
-  wins over asset equality: a new idea that names another traded asset (a
-  cashtag, an uppercase ticker, a user mention or explicit provenance, the
-  benchmark symbol included) or that states a complete task on its own starts
-  clean; an asset the interpreter's benchmark-misplacement repair inserted,
-  marked by its own `misplaced_benchmark_asset_recovered` receipt, is not one
-  the reply named. `_pending_setup_continuation_reason_codes` records the
+  setup whatever act the interpreter labeled it, with one exception: an
+  explicit fresh-task read (`new_idea` and `new_task`) starts clean whatever
+  the draft holds, complete or not, and what it lacks is asked for rather
+  than inherited. `_pending_setup_continuation_reason_codes` records the
   override as `pending_setup_continuation_merged`.
+- `interpreter/shared.py`: `repaired_turn_act`, the one owner of the act a
+  repaired read carries. A known act is the model's read and stays; an act a
+  repair replaces (none, `unsupported_request`) is decided by whether the
+  runtime is waiting on its own question, and that assumption is recorded as
+  `pending_setup_reply_assumed_without_model_read`. The focused strategy
+  repair, the DCA contract audit and the seedless fallback read it; the
+  prose override keeps the act it was handed.
 - `contextual_merge.py`: the merge gate reads that predicate; an incoming
   asset universe that holds only the benchmark repair's artifact does not
   replace the pending asset. `asset_resolution.py`: the hidden-context guard, which clears an
@@ -102,7 +106,10 @@ the merge ignores it. That replay is a committed test.
 - `semantic_integrity.py`: a ceiling key whose provenance names a seed role is
   read as the seed when it is the seed's own money, a lone or an equal amount
   (`semantic_dca_seed_role_read_over_ceiling_key`); a distinct amount stays a
-  ceiling.
+  ceiling. A seed key whose provenance names a ceiling role is read as the
+  ceiling (`semantic_dca_ceiling_role_read_over_seed_key`). When both slots
+  are crossed, each amount moves to the slot its role names and both codes
+  are recorded.
 - `src/argus/api/chat/visible_reply.py`: the one owner of the em dash rule at
   the point a reply becomes visible. Token frames, the final payload text and
   the persisted message pass through it; the turn records `reply_rewrites`
@@ -117,12 +124,13 @@ the merge ignores it. That replay is a committed test.
 
 | Suite | Result |
 | --- | ---: |
-| `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the new-idea escape, the recorded two turns through the real workflow) | 85 passed |
-| `tests/agent_runtime/test_dca_money_role_audits.py` | 13 passed |
-| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 11 passed |
+| `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the recorded two turns through the real workflow) | 96 passed |
+| `tests/agent_runtime/test_dca_money_role_audits.py` | 31 passed |
+| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 21 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
-| Hermetic `tests/agent_runtime` + `tests/test_spine_guardrails.py` | 2294 passed |
-| `tests/test_chat_stream_contract.py`, `test_interpreter_prompt_freeze.py`, the mocked eval suites, `tests/test_alpha_api.py` | 408 passed |
+| Hermetic `tests/agent_runtime`, `tests/evals`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `506b38a7` | 2606 passed, 2 skipped |
+| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `506b38a7` | 1106 passed, 2 skipped |
+| `tests/test_spine_guardrails.py` | 27 passed |
 | `scripts/check_modularity_budget.py` | no violations |
 
 ## Measurement cases, run live on the fix (`live_cases_after.json`)
@@ -268,6 +276,22 @@ The money-role change reaches every DCA case that states a seed or a cap:
 recorded-repro cases (en, es-419). All six passed with the judge on, $0.13.
 The stream flush touches no measurement case; the SSE contract test covers it.
 
+## Codex round 4 (two P1s on `69be7253`, fixed in `506b38a7`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| "New idea: DCA $200 monthly into AAPL" read as `new_idea`/`new_task` without dates still merged with the pending setup because the completeness gate called a partial fresh task a reply, so the card inherited the 2024 dates, the $1,000 seed, the fee and the slippage | The completeness gate is gone: a `new_idea`/`new_task` read starts clean whatever the draft holds, and what it lacks is asked for. The same class swept: the focused strategy repair, the DCA contract audit and the seedless fallback each relabeled the act on their own; the act now has one owner, `interpreter/shared.repaired_turn_act` (a known act is the model's read and stays; an act a repair replaces is decided by the runtime's own pending question and recorded as `pending_setup_reply_assumed_without_model_read`) | `test_a_partial_fresh_task_read_stays_fresh_and_asks_for_what_it_lacks` (en, es-419), `test_a_repair_keeps_a_known_act_and_decides_a_replaced_one_from_the_pending_state` |
+| `initial_capital=5000` under the role `total_budget` beside `total_capital=1000` under the role `starting_capital` lost the $5,000: the first branch cleared it because a distinct number already sat in the ceiling slot, then the mirror rule moved $1,000 to the seed and left no ceiling | The reader looks at both slots before moving anything; when both are crossed each amount moves to the slot its role names (seed 1000, ceiling 5000) and both codes are recorded | `test_semantic_reader_swaps_crossed_money_roles_and_keeps_both_amounts` |
+
+### Measurement cases the round-4 fix touches, live at `506b38a7` (`live-touched-cases-506b38a7.json`)
+
+The fresh-task rule and the act owner reach every case that answers a pending
+setup or opens a fresh idea beside one: the two recorded-repro cases (en,
+es-419), the two prebaked-chip followups, and
+`action_chip_change_asset_no_active_ref_fresh_idea_issue_188`. The money-role
+change reaches the four DCA seed-or-cap cases again. All nine passed with the
+judge on, $0.32.
+
 ## Billed cost
 
 | Item | Cost |
@@ -281,7 +305,8 @@ The stream flush touches no measurement case; the SSE contract test covers it.
 | Haiku check of the cap case, three runs on the base and three on this head | $0.165 |
 | Five touched measurement cases live at `a658c7ad` | $0.187 |
 | Six touched measurement cases live at `1d41d9f4` | $0.130 |
-| **Total** | **$2.58** |
+| Nine touched measurement cases live at `506b38a7` | $0.321 |
+| **Total** | **$2.90** |
 
 ## Observed, not changed here
 
