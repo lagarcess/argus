@@ -1,7 +1,0 @@
-{
-  "error": {
-    "message": "Stream error from backend",
-    "type": "internal_error",
-    "code": 500
-  }
-}

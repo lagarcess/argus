@@ -9,9 +9,9 @@ from argus.domain.research.perplexity_agent import _usage_from_response
 
 _EVIDENCE = (
     Path(__file__).resolve().parents[2]
-    / "docs/reports/evidence/model-result-readouts/luna-billed-usage.json"
+    / "docs/reports/evidence/model-result-readouts/provider-responses.json"
 )
-_OBSERVATIONS = json.loads(_EVIDENCE.read_text())["observations"]
+_OBSERVATIONS = json.loads(_EVIDENCE.read_text())["luna_billed_usage"]["observations"]
 
 
 @pytest.mark.parametrize("observation", _OBSERVATIONS, ids=lambda row: row["capture"])

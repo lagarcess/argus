@@ -12,7 +12,7 @@ from faker import Faker
 
 FIXTURES = (
     Path(__file__).parents[1]
-    / "docs/reports/evidence/model-result-readouts/recorded-fixtures.json"
+    / "tests/fixtures/result_readouts/recorded_runs.json"
 )
 CASES = {case["id"]: case["run"] for case in json.loads(FIXTURES.read_text())["cases"]}
 

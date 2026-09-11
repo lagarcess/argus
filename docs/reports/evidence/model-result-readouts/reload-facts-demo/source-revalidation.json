@@ -1,9 +1,0 @@
-{
-  "source_sha": "fba5a03620efc71ab4eb1f423180052714947cef",
-  "web_served_from_source_sha": "3016129ed75016b494274cb28a5268c2d3ff5134",
-  "web_source_hashes_revalidated": true,
-  "unchanged_frontend_files": 677,
-  "fingerprint_changed_in_this_round": false,
-  "full_live_measurement_run": false,
-  "merge_performed": false
-}
