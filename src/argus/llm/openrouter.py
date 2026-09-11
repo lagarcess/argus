@@ -42,14 +42,7 @@ from argus.llm.tool_call_receipts import (
 
 load_project_dotenv()
 
-_OpenRouterRetryAttempt = tuple[
-    OpenRouterTask,
-    float,
-    str,
-    Literal["json_schema", "chat_model"],
-    str | None,
-    list[str] | None,
-]
+_OpenRouterRetryAttempt = tuple[OpenRouterTask, float, str, Literal["json_schema", "chat_model"], str | None, list[str] | None]
 
 SchemaModelT = TypeVar("SchemaModelT", bound=BaseModel)
 
@@ -105,16 +98,12 @@ _ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = Contex
 _TIER_PRIMARY_ENV = TIER_PRIMARY_ENV
 _TIER_FALLBACK_ENV = TIER_FALLBACK_ENV
 
-_VALID_REASONING_EFFORTS = frozenset(
-    ("xhigh", "high", "medium", "low", "minimal", "none")
-)
+_VALID_REASONING_EFFORTS = frozenset(("xhigh", "high", "medium", "low", "minimal", "none"))
 _REASONING_EFFORT_ENV_BY_TASK: dict[OpenRouterTask, str] = {
     "interpretation": "ARGUS_STRUCTURED_REASONING_EFFORT",
     "capability_conflict": "ARGUS_CAPABILITY_REASONING_EFFORT",
 }
-_PROMPT_CACHE_STRUCTURED_ARTIFACT_TASKS = frozenset(
-    ("interpretation", "interpretation_repair", "field_fidelity", "capability_conflict")
-)
+_PROMPT_CACHE_STRUCTURED_ARTIFACT_TASKS = frozenset(("interpretation", "interpretation_repair", "field_fidelity", "capability_conflict"))
 
 
 def openrouter_model_tier_for_task(task: OpenRouterTask | None) -> OpenRouterModelTier:
@@ -256,9 +245,7 @@ def _task_timeout_override_seconds(task: OpenRouterTask) -> int | None:
     return timeout_seconds
 
 
-def _task_reasoning_effort_override(
-    task: OpenRouterTask,
-) -> OpenRouterReasoningEffort | None:
+def _task_reasoning_effort_override(task: OpenRouterTask) -> OpenRouterReasoningEffort | None:
     env_name = _REASONING_EFFORT_ENV_BY_TASK.get(task)
     raw_value = os.getenv(env_name, "") if env_name else ""
     normalized = raw_value.strip().lower()
@@ -266,11 +253,7 @@ def _task_reasoning_effort_override(
         return None
     if normalized in _VALID_REASONING_EFFORTS:
         return cast(OpenRouterReasoningEffort, normalized)
-    logger.warning(
-        "Ignoring invalid OpenRouter reasoning effort override",
-        llm_task=task,
-        reasoning_effort_env_value=raw_value,
-    )
+    logger.warning("Ignoring invalid OpenRouter reasoning effort override", llm_task=task, reasoning_effort_env_value=raw_value)
     return None
 
 
@@ -341,10 +324,7 @@ def annotate_latest_openrouter_route_receipt(
     scope = current_tool_call_receipt_scope()
     for receipt in reversed(capture):
         if receipt.task == task and receipt.schema_name == schema_name:
-            if (
-                scope
-                and receipt.repair_effect.get("tool_call_id") != scope["tool_call_id"]
-            ):
+            if scope and receipt.repair_effect.get("tool_call_id") != scope["tool_call_id"]:
                 continue
             identity = {
                 key: receipt.repair_effect[key]
@@ -367,28 +347,10 @@ def annotate_latest_openrouter_route_receipt(
     return False
 
 
-def _reserve_openrouter_attempt(
-    task: OpenRouterTask,
-    timeout_seconds: float,
-    model_name: str,
-    mode: Literal["json_schema", "chat_model"],
-    schema_name: str | None,
-    context_packet_ids: list[str] | None,
-) -> turn_execution.ProviderCallPermit | None:
-    if (
-        permit := turn_execution.reserve_provider_call(task, timeout_seconds)
-    ) is not None:
+def _reserve_openrouter_attempt(task: OpenRouterTask, timeout_seconds: float, model_name: str, mode: Literal["json_schema", "chat_model"], schema_name: str | None, context_packet_ids: list[str] | None) -> turn_execution.ProviderCallPermit | None:
+    if (permit := turn_execution.reserve_provider_call(task, timeout_seconds)) is not None:
         return permit
-    record_openrouter_route_receipt(
-        task=task,
-        model_name=model_name,
-        mode=mode,
-        schema_name=schema_name,
-        latency_ms=0,
-        outcome="skipped",
-        failure_mode=turn_execution.turn_budget_block_reason(),
-        context_packet_ids=context_packet_ids,
-    )
+    record_openrouter_route_receipt(task=task, model_name=model_name, mode=mode, schema_name=schema_name, latency_ms=0, outcome="skipped", failure_mode=turn_execution.turn_budget_block_reason(), context_packet_ids=context_packet_ids)
     return None
 
 
@@ -402,9 +364,7 @@ def clear_openrouter_route_receipts() -> None:
         _ROUTE_RECEIPTS.clear()
 
 
-def begin_openrouter_route_receipt_capture() -> (
-    Token[list[OpenRouterRouteReceipt] | None]
-):
+def begin_openrouter_route_receipt_capture() -> Token[list[OpenRouterRouteReceipt] | None]:
     return _ROUTE_RECEIPT_CAPTURE.set([])
 
 
@@ -426,9 +386,7 @@ def summarize_openrouter_route_receipts(
     capability validation, context replayability, or fallback observability.
     """
 
-    active_receipts = (
-        list(receipts) if receipts is not None else get_openrouter_route_receipts()
-    )
+    active_receipts = list(receipts) if receipts is not None else get_openrouter_route_receipts()
     route_waterfall: list[dict[str, object]] = []
     for receipt in active_receipts:
         row: dict[str, object] = {
@@ -449,9 +407,7 @@ def summarize_openrouter_route_receipts(
     return {
         "receipt_count": len(active_receipts),
         "total_latency_ms": sum(receipt.latency_ms for receipt in active_receipts),
-        "failure_count": sum(
-            1 for receipt in active_receipts if receipt.outcome == "failed"
-        ),
+        "failure_count": sum(1 for receipt in active_receipts if receipt.outcome == "failed"),
         "fallback_count": sum(1 for receipt in active_receipts if receipt.fallback_used),
         "slowest_task": slowest.task if slowest is not None else None,
         "slowest_latency_ms": slowest.latency_ms if slowest is not None else 0,
@@ -505,16 +461,7 @@ async def invoke_openrouter_json_schema(
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
-        if (
-            permit := _reserve_openrouter_attempt(
-                task,
-                profile.timeout_seconds,
-                candidate_model,
-                "json_schema",
-                schema_name,
-                context_packet_ids,
-            )
-        ) is None:
+        if (permit := _reserve_openrouter_attempt(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids)) is None:
             return None
         payload = _json_schema_payload(
             model=candidate_model,
@@ -525,24 +472,15 @@ async def invoke_openrouter_json_schema(
         )
         try:
             async with httpx.AsyncClient(timeout=permit.timeout_seconds) as client:
-                if (
-                    response := await asyncio.wait_for(
-                        _post_openrouter_json_schema(
-                            client=client,
-                            api_key=api_key,
-                            payload=payload,
-                            retry_attempt=(
-                                task,
-                                profile.timeout_seconds,
-                                candidate_model,
-                                "json_schema",
-                                schema_name,
-                                context_packet_ids,
-                            ),
-                        ),
-                        timeout=permit.timeout_seconds,
-                    )
-                ) is None:
+                if (response := await asyncio.wait_for(
+                    _post_openrouter_json_schema(
+                        client=client,
+                        api_key=api_key,
+                        payload=payload,
+                        retry_attempt=(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids),
+                    ),
+                    timeout=permit.timeout_seconds,
+                )) is None:
                     return None
             data = response.json()
             _raise_openrouter_payload_error(data)
@@ -634,16 +572,7 @@ async def invoke_openrouter_chat_completion(
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
-        if (
-            permit := _reserve_openrouter_attempt(
-                task,
-                profile.timeout_seconds,
-                candidate_model,
-                "chat_model",
-                None,
-                context_packet_ids,
-            )
-        ) is None:
+        if (permit := _reserve_openrouter_attempt(task, profile.timeout_seconds, candidate_model, "chat_model", None, context_packet_ids)) is None:
             return None
         payload: dict[str, object] = {
             "model": candidate_model,
@@ -658,14 +587,7 @@ async def invoke_openrouter_chat_completion(
                         client=client,
                         api_key=api_key,
                         payload=payload,
-                        retry_attempt=(
-                            task,
-                            profile.timeout_seconds,
-                            candidate_model,
-                            "chat_model",
-                            None,
-                            context_packet_ids,
-                        ),
+                        retry_attempt=(task, profile.timeout_seconds, candidate_model, "chat_model", None, context_packet_ids),
                     ),
                     timeout=permit.timeout_seconds,
                 )
@@ -775,16 +697,7 @@ def invoke_openrouter_json_schema_sync(
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
-        if (
-            permit := _reserve_openrouter_attempt(
-                task,
-                profile.timeout_seconds,
-                candidate_model,
-                "json_schema",
-                schema_name,
-                context_packet_ids,
-            )
-        ) is None:
+        if (permit := _reserve_openrouter_attempt(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids)) is None:
             return None
         payload = _json_schema_payload(
             model=candidate_model,
@@ -799,14 +712,7 @@ def invoke_openrouter_json_schema_sync(
                     client=client,
                     api_key=api_key,
                     payload=payload,
-                    retry_attempt=(
-                        task,
-                        profile.timeout_seconds,
-                        candidate_model,
-                        "json_schema",
-                        schema_name,
-                        context_packet_ids,
-                    ),
+                    retry_attempt=(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids),
                 )
             if response is None:
                 return None
@@ -909,23 +815,11 @@ def _messages_with_stable_prefix_prompt_cache(
         return payload_messages
 
     cache_index = 0
-    content = (
-        payload_messages[0].get("content")
-        if payload_messages and payload_messages[0].get("role") == "system"
-        else None
-    )
-    has_later_system_context = any(
-        message.get("role") in {"system", "developer"} for message in payload_messages[1:]
-    )
-    if (
-        not isinstance(content, str)
-        or not content
-        or (model.startswith("google/gemini") and has_later_system_context)
-    ):
+    content = payload_messages[0].get("content") if payload_messages and payload_messages[0].get("role") == "system" else None
+    has_later_system_context = any(message.get("role") in {"system", "developer"} for message in payload_messages[1:])
+    if not isinstance(content, str) or not content or (model.startswith("google/gemini") and has_later_system_context):
         return payload_messages
-    payload_messages[cache_index]["content"] = [
-        {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
-    ]
+    payload_messages[cache_index]["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
     return payload_messages
 
 
@@ -958,9 +852,7 @@ def _json_schema_payload(
         }
         payload: dict[str, object] = {
             "model": model,
-            "messages": _messages_with_stable_prefix_prompt_cache(
-                [schema_message, *messages], model=model, task=profile.task
-            ),
+            "messages": _messages_with_stable_prefix_prompt_cache([schema_message, *messages], model=model, task=profile.task),
             "temperature": profile.temperature,
             "max_tokens": profile.max_tokens,
         }
@@ -968,9 +860,7 @@ def _json_schema_payload(
         return payload
     payload = {
         "model": model,
-        "messages": _messages_with_stable_prefix_prompt_cache(
-            messages, model=model, task=profile.task
-        ),
+        "messages": _messages_with_stable_prefix_prompt_cache(messages, model=model, task=profile.task),
         "response_format": {
             "type": "json_schema",
             "json_schema": {
@@ -1016,7 +906,9 @@ def _json_content_without_code_fences(content: str) -> str:
         text = text[fence_at:]
     text = text[len("```") :]
     info_end = 0
-    while info_end < len(text) and (text[info_end].isalnum() or text[info_end] in "_-"):
+    while info_end < len(text) and (
+        text[info_end].isalnum() or text[info_end] in "_-"
+    ):
         info_end += 1
     text = text[info_end:]
     closing = text.rfind("```")
@@ -1033,9 +925,7 @@ async def _post_openrouter_json_schema(
     retry_attempt: _OpenRouterRetryAttempt,
 ) -> httpx.Response | None:
     response = await client.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers=_openrouter_headers(api_key),
-        json=payload,
+        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=payload
     )
     try:
         response.raise_for_status()
@@ -1044,12 +934,9 @@ async def _post_openrouter_json_schema(
             raise
         if (permit := _reserve_openrouter_attempt(*retry_attempt)) is None:
             return None
-        fallback_payload = {
-            key: value for key, value in payload.items() if key != "reasoning"
-        }
+        fallback_payload = {key: value for key, value in payload.items() if key != "reasoning"}
         response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=_openrouter_headers(api_key),
+            "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key),
             json=fallback_payload,
             timeout=permit.timeout_seconds,
         )
@@ -1065,9 +952,7 @@ def _post_openrouter_json_schema_sync(
     retry_attempt: _OpenRouterRetryAttempt,
 ) -> httpx.Response | None:
     response = client.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers=_openrouter_headers(api_key),
-        json=payload,
+        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=payload
     )
     try:
         response.raise_for_status()
@@ -1076,18 +961,14 @@ def _post_openrouter_json_schema_sync(
             raise
         if (permit := _reserve_openrouter_attempt(*retry_attempt)) is None:
             return None
-        fallback_payload = {
-            key: value for key, value in payload.items() if key != "reasoning"
-        }
+        fallback_payload = {key: value for key, value in payload.items() if key != "reasoning"}
         response = client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=_openrouter_headers(api_key),
+            "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key),
             json=fallback_payload,
             timeout=permit.timeout_seconds,
         )
         response.raise_for_status()
     return response
-
 
 def _openrouter_headers(api_key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
