@@ -21,39 +21,30 @@ from argus.domain.result_readout_facts import (
 from argus.domain.result_readout_quotes import validate_figure_references
 
 READOUT_RUN_GROUNDING_INSTRUCTIONS = (
-    "Use only run_facts for every backtest figure and simulation claim. The card owns "
-    "the numbers; do not restate its figures or turn the readout into a metric "
-    "inventory. Tell the historical story those facts support: the shape of the "
-    "ride, what holding through it involved, and the tradeoff against the "
-    "benchmark. Use a figure only when a sentence needs it to explain a point, "
-    "rounding reasonably and using the required fact reference. When useful, "
-    "suggest a next historical test by changing a supported input of this run, "
-    "as a question to investigate rather than a recommendation to trade. "
-    "A drawdown is a decline from a prior "
-    "peak, not the ending loss. If illustrating the drop in money, use only the "
-    "supplied starting-capital illustration and explicitly call it an illustration, "
-    "never the actual dollar loss from the portfolio's peak. Contributions change "
-    "the capital at risk. Stored chart data is optional; without it do not invent "
-    "the path, recovery times or dates of extremes. Do not invent the holder's "
-    "feelings or decisions. Trade counts are executed fills, "
-    "not necessarily completed round trips; sampled markers are not a full ledger. "
-    "Annualized return is historical, not a forecast. Costs may be in percentage "
-    "points or basis points; do not invent dollar fees. No forecasts, forward scenarios, advice to "
-    "buy or sell, or claims that a next test will improve results. No em dashes. "
-    "Write all prose in product_language, "
-    "translating source labels naturally; never copy internal fields or schema keys. "
-    "Return the complete prose in text and report the language actually written. "
-    "For a run figure you cite, include its fact_key and the value as written "
-    "in figures, using the supplied unit and an ISO date for dates. "
-    "One reference per distinct fact is enough, even if mentioned again. "
-    "Use an empty figures list when no run figures are cited."
+    "Tell the story of this historical experience in plain language: what staying "
+    "invested involved and the meaningful tradeoff against the benchmark. The card "
+    "already carries the numbers. Choose a figure only when it makes a sentence "
+    "clearer, and use its supplied display text and rounded value. Describe money "
+    "lost only when recorded balances establish the actual loss. Keep deposits "
+    "separate from investment gains, and compare the roughness of two investments "
+    "only when both are measured. Let these accuracy choices guide your reasoning "
+    "silently; give the reader the experience, not calculation methods, data "
+    "availability commentary or explanations of your instructions. Use everyday "
+    "words for purchases, sales and ups and downs. Stay within the evidence, "
+    "without inventing a holder's feelings or decisions. Any next step is a "
+    "question for another supported historical test, never a prediction or "
+    "recommendation to trade. No forecasts, investment advice or em dashes. "
+    "Write in product_language and report the language actually written. Put "
+    "complete prose in text; keep fact names private in figures. For each run "
+    "figure used, give its exact fact_key and the supplied rounded value, or ISO "
+    "date. One reference per fact is enough; no figures used means an empty list."
 )
 
 
 READOUT_GROUNDING_INSTRUCTIONS = (
     READOUT_RUN_GROUNDING_INSTRUCTIONS
-    + " Use only run_facts for every figure and historical claim. Explain without "
-    "a causal claim about why a price moved. Do not search or add external context."
+    + " Use only run_facts. Explain the observed experience without claims about "
+    "why market prices moved or outside research."
 )
 
 
@@ -62,7 +53,7 @@ class ResultReadoutFigure(BaseModel):
 
     fact_key: str = Field(description="The exact key of the supplied fact being quoted.")
     value: float | str = Field(
-        description="The number used in the prose, without its unit; ISO date for a date. Rounding is allowed."
+        description="The supplied rounded value used in the prose; ISO date for a date."
     )
 
 

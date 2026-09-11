@@ -27,7 +27,7 @@ METRIC_DEFINITIONS = {
     "profit": (
         "profit",
         "currency",
-        "Ending nominal equity minus total money invested",
+        "Ending account balance minus all money deposited",
         "nominal_money",
     ),
     "annualized_return_pct": (
@@ -39,31 +39,31 @@ METRIC_DEFINITIONS = {
     "max_drawdown_pct": (
         "max_drawdown",
         "percent",
-        "Largest decline from a prior high on the baseline-anchored flow-adjusted wealth path; not from the global nominal peak",
+        "Largest investment decline from an earlier high, excluding the effect of new deposits",
         "flow_adjusted_drawdown",
     ),
     "volatility_pct": (
         "annualized_volatility",
         "percent",
-        "Annualized sample dispersion of flow-adjusted return intervals; not daily volatility or the largest loss",
+        "Variation in investment returns, expressed on an annual scale and excluding new deposits",
         "annualized_flow_adjusted_return_dispersion",
     ),
     "total_trades": (
         "executed_fills",
         "count",
-        "Executed fills, including buys and sells; not completed round-trip trades",
+        "Purchases and sales executed during the test",
         "execution_fills",
     ),
     "completed_trades": (
         "completed_trades",
         "count",
-        "Explicitly stored completed round-trip trade count",
+        "Completed buy-and-sell pairs recorded by the run",
         "closed_trade_ledger",
     ),
     "closed_trade_count": (
         "completed_trades",
         "count",
-        "Explicitly stored completed round-trip trade count",
+        "Completed buy-and-sell pairs recorded by the run",
         "closed_trade_ledger",
     ),
     "win_rate": (
@@ -81,7 +81,7 @@ METRIC_DEFINITIONS = {
     "sharpe_ratio": (
         "sharpe_ratio",
         "ratio",
-        "Annualized mean return divided by return dispersion; no risk-free rate is subtracted",
+        "Average return relative to its variability, expressed on an annual scale",
         "annualized_flow_adjusted_return_ratio",
     ),
     "fee_bps": (
@@ -117,13 +117,13 @@ METRIC_DEFINITIONS = {
     "peak_value": (
         "peak_equity",
         "currency",
-        "Highest nominal portfolio equity close in the whole window; not necessarily the drawdown peak",
+        "Highest account balance at a recorded close, including deposits",
         "nominal_equity_close",
     ),
     "lowest_value": (
         "lowest_equity",
         "currency",
-        "Lowest nominal portfolio equity close in the whole window; may predate the global peak",
+        "Lowest account balance at a recorded close, including deposits",
         "nominal_equity_close",
     ),
     "observed_points": (

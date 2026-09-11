@@ -151,6 +151,16 @@ def test_new_breakdown_on_old_run_uses_current_language(
     from argus.api.artifact_presentation import result_breakdown_metadata
     from argus.api.chat import breakdown
     from argus.api.schemas import BacktestRun
+    from argus.domain.research.contracts import ResearchSource
+
+    sources = (
+        ResearchSource(
+            title="Earnings report",
+            url="https://example.com/earnings",
+            source_date="2025-08-01",
+        ),
+        ResearchSource(title="Historical context", url="https://example.org/context"),
+    )
 
     run = BacktestRun(
         id=faker.uuid4(),
@@ -170,7 +180,7 @@ def test_new_breakdown_on_old_run_uses_current_language(
     def compose(context, *, language, client):
         calls.append(language)
         if fallback:
-            return None, "language_mismatch", None, ()
+            return None, "language_mismatch", None, sources
         return (
             {
                 "en": "A complete new explanation.",
@@ -178,7 +188,7 @@ def test_new_breakdown_on_old_run_uses_current_language(
             }[language],
             None,
             None,
-            (),
+            sources,
         )
 
     monkeypatch.setattr(breakdown, "_llm_result_breakdown_with_metadata", compose)
@@ -194,6 +204,17 @@ def test_new_breakdown_on_old_run_uses_current_language(
     assert metadata["result_readout_failure_mode"] == (
         "language_mismatch" if fallback else None
     )
+    research = metadata["research"]
+    assert research["schema_version"] == "argus_research/v1"
+    assert research["sources"] == [
+        {**source.model_dump(), "domain": domain}
+        for source, domain in zip(sources, ("example.com", "example.org"), strict=True)
+    ]
+    assert research.get("degraded") == (
+        {"code": "language_mismatch"} if fallback else None
+    )
+    assert reader_payload({**metadata, "content": result.text})["research"] == research
+    assert "Earnings report" not in (envelope["text"] or "")
     assert (
         reader_payload({**metadata, "content": result.text})["result_readout_content"]
         == envelope

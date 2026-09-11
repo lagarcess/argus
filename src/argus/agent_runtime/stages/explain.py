@@ -36,6 +36,7 @@ from argus.domain.result_readout_grounding import (
     accepted_readout_text,
     stored_readout_facts,
 )
+from argus.domain.result_readout_prompt_facts import readout_prompt_facts
 from argus.llm.openrouter import invoke_openrouter_json_schema
 
 RESULT_READOUT_SOURCE_LLM = "llm_explain_stage"
@@ -320,7 +321,10 @@ async def _llm_explanation(
         {
             "role": "user",
             "content": json.dumps(
-                {"run_facts": facts, "product_language": language},
+                {
+                    "run_facts": readout_prompt_facts(facts, language=language),
+                    "product_language": language,
+                },
                 default=str,
             ),
         },

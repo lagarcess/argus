@@ -116,7 +116,12 @@ def result_breakdown_metadata(
     message: Any, run: Any, *, language: str = "en"
 ) -> dict[str, Any]:
     """Keep composition provenance beside the typed, reloadable reply facts."""
+    from argus.agent_runtime.research_grounded import (
+        build_research_sidecar,
+        typed_sources,
+    )
     from argus.domain.backtest_message_projection import result_fact_bank
+    from argus.domain.research.contracts import ResearchPacket
 
     metadata = {
         "response_intent": {
@@ -140,4 +145,23 @@ def result_breakdown_metadata(
             failure_mode=message.failure_mode,
         )
     )
+    if message.sources:
+        packet = ResearchPacket(answer_markdown="", sources=message.sources)
+        usage = message.usage
+        metadata["research"] = build_research_sidecar(
+            capability_class="balanced_lookup",
+            shape="balanced",
+            sources=typed_sources(packet),
+            retrieved_at=packet.retrieved_at.isoformat(),
+            subjects=[],
+            peers=[],
+            usage={
+                "invocations": usage.invocations if usage else None,
+                "latency_ms": usage.latency_ms if usage else None,
+                "cost_usd": usage.cost_usd if usage else None,
+                "cache_status": "miss",
+            },
+            period_of_interest=None,
+            degraded_code=message.failure_mode if message.fallback_used else None,
+        )
     return metadata

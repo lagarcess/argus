@@ -438,6 +438,8 @@ export function hydrateMessagesFromApi(
         return {
           ...hydratedText,
           content: undefined,
+          researchSources: researchSourcesFromMetadata(metadata),
+          researchDegradedCode: researchDegradedCodeFromMetadata(metadata),
           recoveryDisplay: hydratedText.recoveryDisplay?.kind === "result_breakdown" ? hydratedText.recoveryDisplay : {
             kind: "result_breakdown" as const,
             facts: resultReadoutFacts(metadata.result_fact_bank),

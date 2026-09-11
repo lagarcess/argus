@@ -327,11 +327,16 @@ Breakdown explores the holding experience and historical tradeoffs without
 repeating the card or Quick take. The frames, labels, ordering and result card
 stay unchanged. Both composers derive their facts from one labeled stored-run
 fact sheet with units, meaning, money roles and available dated path relationships.
-Quick take receives that sheet. Breakdown receives only
+Quick take receives a projection with plain meanings and display-ready values;
+hypothetical capital-scaled losses and storage metadata stay out of the prompt.
+Breakdown receives only
 its labeled headline scalar facts, such as the tested dates, returns, worst drop,
-capital, contributions, costs and fills versus completed round trips. The full
+capital, contributions, costs and purchases/sales versus completed buy-and-sell pairs. The full
 chart series, markers and internal field paths never enter the Breakdown request.
 A figure appears only when a sentence needs it, with its checked fact reference.
+Both composers receive the card's precision: one decimal for percentages, whole
+dollars for account values, and localized dates. Accuracy instructions guide the
+model silently; prose describes the holding experience, not calculation rules.
 
 `result_summary` uses the OpenRouter `readout` tier with
 `openai/gpt-5.6-luna`. Both readout model keys select Luna; a failure uses the
@@ -352,8 +357,10 @@ The Breakdown request asks plainly what happened to the asset over the tested
 window and why, what holding through it was like, and how the test compared with
 the benchmark, with a web search for sources. Run facts alone own simulation
 numbers; web context must not replace or merge with those facts. Returned
-Perplexity sources are appended as links, with dates when the provider supplies
-them. The model does not recreate a source list or per-claim citation records.
+Perplexity sources travel in `metadata.research.sources`, with dates when the
+provider supplies them. Breakdown reuses the existing Sources link and panel
+both live and after reload. In-text links remain in the prose; no bibliography
+is appended. The model does not recreate source lists or per-claim records.
 
 Both structured drafts contain `language`, complete `text` and `figures`; each
 run reference carries `fact_key` and the displayed `value`. One reference per

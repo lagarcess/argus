@@ -34,6 +34,7 @@ from argus.domain.result_readout_content import (
     normalize_readout_language,
 )
 from argus.domain.result_readout_grounding import (
+    READOUT_RUN_GROUNDING_INSTRUCTIONS,
     stored_readout_facts,
 )
 from argus.domain.result_readout_headlines import (
@@ -180,7 +181,6 @@ def _llm_result_breakdown_with_metadata(
         response.draft,
         facts=headline_facts,
         language=resolved_language,
-        sources=response.sources,
     )
     return text, failure, response.usage, response.sources
 
@@ -197,10 +197,8 @@ def _result_breakdown_llm_messages(
             "content": (
                 "Explain this historical backtest for a normal person. "
                 f"{response_language_instruction(language)} "
-                "The card already shows the numbers; tell the story instead. "
-                "Use a run figure only when it helps, with its label as fact_key "
-                "and the number as written in figures. One reference per fact is enough. "
-                "Report the language actually written. No jargon, forecasts, investing advice or em dashes. "
+                f"{READOUT_RUN_GROUNDING_INSTRUCTIONS} "
+                "Use the supplied headline label as fact_key. "
                 f"{BREAKDOWN_SOURCE_INSTRUCTIONS}"
             ),
         },
@@ -211,7 +209,11 @@ def _result_breakdown_llm_messages(
                 "Search for sources. Explain what holding through it was like and "
                 "how this test compared with the benchmark.\n\n"
                 + (f"Strategy: {title}\n" if title else "")
-                + "\n".join(headline_request_lines(headline_readout_facts(facts)))
+                + "\n".join(
+                    headline_request_lines(
+                        headline_readout_facts(facts), language=language
+                    )
+                )
             ),
         },
     ]

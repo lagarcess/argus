@@ -2,15 +2,10 @@
 
 from __future__ import annotations
 
-import re
-from datetime import date
 from typing import Any, Literal
-from urllib.parse import quote
 
-from babel.dates import format_date
 from pydantic import Field, create_model
 
-from argus.domain.research.contracts import ResearchSource
 from argus.domain.result_readout_grounding import (
     ResultReadoutDraft,
     ResultReadoutFigure,
@@ -48,13 +43,9 @@ BREAKDOWN_SOURCE_INSTRUCTIONS = (
     "Search the web for sources about what happened during this historical window. "
     "Use them to explain events and distinguish evidence from inference. "
     "The supplied run facts alone own this backtest's figures; web context must not replace them. "
-    "We show the sources returned by search, so do not recreate a source list."
+    "Link evidence in the relevant sentence. We show the returned sources in a separate "
+    "panel, so do not recreate a source list."
 )
-
-
-def _label(value: str) -> str:
-    value = re.sub(r"[ \t]*—[ \t]*", ", ", value)
-    return re.sub(r"([\\`*{}\[\]<>()])", r"\\\1", value).replace("\n", " ")
 
 
 def accepted_breakdown_text(
@@ -62,22 +53,6 @@ def accepted_breakdown_text(
     *,
     facts: dict[str, Any],
     language: str,
-    sources: tuple[ResearchSource, ...],
 ) -> tuple[str | None, str | None]:
-    text, failure = accepted_readout_text(draft, facts=facts, language=language)
-    if failure or text is None:
-        return None, failure
-    links = []
-    for source in sources:
-        label = _label(source.title or source.url)
-        if source.source_date:
-            try:
-                source_date = format_date(
-                    date.fromisoformat(source.source_date),
-                    locale="es_MX" if language == "es-419" else "en",
-                )
-            except ValueError:
-                source_date = source.source_date
-            label += f" ({_label(source_date)})"
-        links.append(f"- [{label}]({quote(source.url, safe='/:?&=#%+;,@~!$*-')})")
-    return text + ("\n\n" + "\n".join(links) if links else ""), None
+    """Keep the complete prose and in-text citations; sources travel separately."""
+    return accepted_readout_text(draft, facts=facts, language=language)

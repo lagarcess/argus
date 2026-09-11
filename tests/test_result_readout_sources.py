@@ -3,7 +3,6 @@
 from copy import deepcopy
 
 import pytest
-from argus.domain.research.contracts import ResearchSource
 from argus.domain.result_readout_sources import accepted_breakdown_text
 
 
@@ -23,36 +22,26 @@ def source_draft():
         ("es-419", "Los ingresos reportados crecieron 18%."),
     ],
 )
-def test_provider_sources_render_with_optional_dates_without_mutating_run_facts(
+def test_in_text_citations_remain_without_appending_a_source_list(
     source_draft, language, text
 ):
+    text += " [Quarterly report](https://example.com/earnings)"
     source_draft.update(language=language, text=text)
-    sources = (
-        ResearchSource(
-            url="https://example.com/earnings",
-            title="Quarterly report",
-            source_date="2025-08-01",
-        ),
-        ResearchSource(url="https://example.com/filing", title="Filing"),
-    )
     facts = {"facts": {"portfolio.ending_value": {"value": 1000.0, "unit": "currency"}}}
     before = deepcopy(facts)
     rendered, failure = accepted_breakdown_text(
-        source_draft, facts=facts, language=language, sources=sources
+        source_draft, facts=facts, language=language
     )
     assert failure is None
-    assert rendered.startswith(text)
-    for source in sources:
-        assert f"]({source.url})" in rendered
-        assert source.title in rendered
-    assert "2025" in rendered
+    assert rendered == text
     assert facts == before
 
 
 def test_no_returned_sources_preserves_complete_text(source_draft):
-    assert accepted_breakdown_text(
-        source_draft, facts={}, language="en", sources=()
-    ) == (source_draft["text"], None)
+    assert accepted_breakdown_text(source_draft, facts={}, language="en") == (
+        source_draft["text"],
+        None,
+    )
 
 
 def test_external_figure_does_not_require_quote_occurrence_or_date(source_draft):
@@ -60,11 +49,10 @@ def test_external_figure_does_not_require_quote_occurrence_or_date(source_draft)
         source_draft,
         facts={},
         language="en",
-        sources=(ResearchSource(url="https://example.com/earnings"),),
     )
     assert failure is None
     assert source_draft["text"] in rendered
-    assert "](https://example.com/earnings)" in rendered
+    assert rendered == source_draft["text"]
 
 
 @pytest.mark.parametrize(
@@ -81,7 +69,6 @@ def test_source_cannot_override_invalid_run_reference(source_draft, reference):
         source_draft,
         facts=facts,
         language="en",
-        sources=(ResearchSource(url="https://example.com/earnings"),),
     ) == (None, "invalid_figure_reference")
 
 
@@ -93,13 +80,13 @@ def test_run_reference_and_web_figures_keep_separate_owners(source_draft):
         source_draft,
         facts=facts,
         language="en",
-        sources=(ResearchSource(url="https://example.com/earnings"),),
     )
     assert failure is None
     assert rendered.startswith(source_draft["text"])
 
 
 def test_reported_language_mismatch_still_falls_back(source_draft):
-    assert accepted_breakdown_text(
-        source_draft, facts={}, language="es-419", sources=()
-    ) == (None, "language_mismatch")
+    assert accepted_breakdown_text(source_draft, facts={}, language="es-419") == (
+        None,
+        "language_mismatch",
+    )

@@ -12,8 +12,6 @@ from argus.domain.research.perplexity_agent import StructuredAgentResult
 
 from tests.result_readout_fixtures import (
     readout_draft,
-    scalar_leaves,
-    stored_scalar_values,
 )
 
 
@@ -108,7 +106,7 @@ async def compose(surface, text, result, monkeypatch, language="en", figures=())
 async def test_readouts_accept_repeated_and_unreferenced_numbers(
     surface, language, text, stored_result, monkeypatch
 ):
-    key = "Executed fills" if surface == "breakdown" else "portfolio.executed_fills"
+    key = "Purchases and sales" if surface == "breakdown" else "portfolio.executed_fills"
     rendered, _ = await compose(
         surface, text, stored_result, monkeypatch, language, figures=[(key, 17)]
     )
@@ -152,9 +150,15 @@ async def test_breakdown_sends_headline_facts_without_chart_or_internal_paths(
     prompt = captured["prompt"]
     assert rendered == "A complete readout."
     assert "DOCN" in prompt and "SPY" in prompt
-    assert "2023-09-01" in prompt and "2026-09-09" in prompt
+    assert (
+        "September 1, 2023" if language == "en" else "1 de septiembre de 2023"
+    ) in prompt
+    assert (
+        "September 9, 2026" if language == "en" else "9 de septiembre de 2026"
+    ) in prompt
+    assert "15.1%" in prompt and "15.126" not in prompt
     assert "Total return on starting capital" in prompt
-    assert "Executed fills" in prompt
+    assert "Purchases and sales" in prompt
     for internal in (
         "series",
         "markers",
@@ -209,26 +213,15 @@ async def test_readout_model_inputs_omit_provenance_and_preserve_run_evidence(
 
     assert rendered == "The ride was uneven."
     facts = json.loads(captured["prompt"])["run_facts"]
-    scalars = stored_scalar_values(facts)
-    assert {
-        path: value
-        for path, value in scalars.items()
-        if path.startswith("configuration.")
-    } == scalar_leaves(execution, "configuration")
-    assert {
-        path: value for path, value in scalars.items() if path.startswith("metrics.")
-    } == scalar_leaves(stored_result["metrics"], "metrics")
+    assert facts["facts"]["portfolio.total_return"]["display"] == "15.1%"
+    assert facts["facts"]["portfolio.max_drawdown"]["display"] == "31.2%"
+    assert facts["facts"]["configuration.starting_capital"]["display"] == "$10,000"
+    assert facts["facts"]["configuration.fee_bps"]["value"] == 5
+    assert facts["facts"]["portfolio.executed_fills"]["value"] == 17
     assert facts["series"]["portfolio_equity"]["points"] == chart["series"]
     assert facts["series"]["execution_markers"]["points"] == chart["markers"]
-    assert {
-        path: value for path, value in scalars.items() if path.startswith("chart.")
-    } == scalar_leaves(
-        {
-            key: value
-            for key, value in chart.items()
-            if key not in {"series", "markers", "attribution"}
-        },
-        "chart",
+    assert all(
+        "provenance" not in row and "basis" not in row for row in facts["facts"].values()
     )
     assert "provider_metadata" not in json.dumps(facts)
     assert chart["attribution"] not in json.dumps(facts)
@@ -280,7 +273,8 @@ async def test_production_quick_take_uses_optional_card_chart_for_ending_value(
     assert response.fallback_used is not with_chart
     if with_chart:
         assert response.text == text
-        assert facts["series"]["portfolio_equity"]["points"] == card["chart"]["series"]
+        assert facts["series"]["portfolio_equity"]["points"][-1]["value"] == 11513
+        assert card["chart"]["series"][-1]["value"] == 11512.6
     else:
         assert "portfolio_equity" not in facts["series"]
         assert response.failure_mode == "invalid_figure_reference"

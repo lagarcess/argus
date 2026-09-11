@@ -59,7 +59,7 @@ def test_stored_metrics_keep_units_scope_and_nulls(case_id):
         == aggregate["efficiency"]["total_trades"]
     )
     assert rows["portfolio.executed_fills"]["unit"] == "count"
-    assert "completed" in rows["portfolio.executed_fills"]["meaning"]
+    assert "purchases and sales" in rows["portfolio.executed_fills"]["meaning"].lower()
     assert (
         rows["portfolio.annualized_volatility"]["value"]
         == aggregate["risk"]["volatility_pct"]

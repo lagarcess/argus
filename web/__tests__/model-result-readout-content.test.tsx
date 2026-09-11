@@ -3,6 +3,7 @@ import { createInstance } from "i18next";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import ChatMessage from "../components/chat/ChatMessage";
+import DiscoverySourcesPanel from "../components/chat/DiscoverySourcesPanel";
 import { hydrateMessagesFromApi, messageStreamPresentation } from "../components/chat/chat-message-projection";
 import type { Message } from "../components/chat/types";
 import { resultCardFromRun, type ApiMessage, type BacktestRun } from "../lib/argus-api";
@@ -15,6 +16,7 @@ import { chatMessageCopyText } from "../lib/chat-message-copy-text";
 import { mergeFinalTextMessage } from "../lib/chat-final-message";
 import { resultReadoutContentFromMetadata } from "../lib/result-readout-content";
 import { localizeArtifactFinalPayload } from "../lib/artifact-response-transport";
+import { researchDegradedCodeFromMetadata, researchSourcesForFinalPayload } from "../lib/chat-discovery-sidecar";
 import en from "../public/locales/en/common.json";
 import es from "../public/locales/es-419/common.json";
 
@@ -108,6 +110,38 @@ for (const surface of ["quick_take", "breakdown"] as const) {
 }
 
 describe("model readout transport", () => {
+  for (const language of ["en", "es-419"] as const) {
+    test.each([false, true])(`a ${language} Breakdown keeps its Sources panel live and after reload (fallback=%s)`, async (fallback) => {
+      const i18n = await translations(language);
+      const sources = [
+        { title: "Earnings report", url: "https://example.com/earnings", domain: "example.com", source_date: "2025-08-01" },
+        { title: "Historical context", url: "https://example.org/context", domain: "example.org", source_date: null },
+      ];
+      const api = savedMessage("breakdown", { ...envelope("breakdown", language), text: fallback ? null : texts[language].breakdown });
+      api.metadata!.research = { sources: [...sources, { title: "Invalid source", url: "javascript:alert(1)", domain: "example.invalid" }], ...(fallback ? { degraded: { code: "invalid_figure_reference" } } : {}) };
+      const [hydrated] = hydrateMessagesFromApi([api]).messages;
+      const live = mergeFinalTextMessage({ id: api.id, role: "ai", kind: "text", content: "" }, {
+        assistantId: api.id, finalText: "", finalActions: [], contentPresentation: "result_breakdown",
+        resultReadoutContent: resultReadoutContentFromMetadata(api.metadata), recoveryDisplay: hydrated.recoveryDisplay,
+        researchSources: researchSourcesForFinalPayload(api.metadata),
+        researchDegradedCode: researchDegradedCodeFromMetadata(api.metadata),
+      });
+      for (const message of [hydrated, live]) {
+        expect(message.researchSources).toEqual(sources);
+        expect(message.researchDegradedCode ?? null).toBe(fallback ? "invalid_figure_reference" : null);
+        const html = renderToStaticMarkup(<I18nextProvider i18n={i18n}><ChatMessage message={message} /></I18nextProvider>);
+        expect(html.match(/data-testid="research-sources-open"/g)).toHaveLength(1);
+        expect(html).not.toContain("Earnings report");
+        expect(chatMessageCopyText(message, i18n.t, language)).not.toContain("example.com");
+        const panel = renderToStaticMarkup(<I18nextProvider i18n={i18n}><DiscoverySourcesPanel
+          onClose={() => {}} sidecar={{ sources: message.researchSources!, retrieved_at: "" }} withheld={fallback}
+        /></I18nextProvider>);
+        expect(panel).toContain('href="https://example.com/earnings"');
+        expect(panel).toContain("2025");
+        expect(panel).toContain("Historical context");
+      }
+    });
+  }
   test.each(["en", "es-419"] as const)("renders dated %s citations inside the saved Breakdown text", async (language) => {
     const i18n = await translations(language);
     const date = language === "en" ? "Aug 1, 2025" : "1 ago 2025";

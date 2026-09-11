@@ -69,28 +69,38 @@ def test_breakdown_request_is_plain_and_does_not_transport_series():
     assert "search" in request.lower()
     assert "sources" in request.lower()
     assert "DOCN" in request and "SPY" in request
-    assert "2023-09-01" in request and "15.126" in request
+    assert "September 1, 2023" in request and "15.1%" in request
+    assert "15.126" not in request
     assert "portfolio.total_return" not in request
     assert "portfolio_equity" not in request
     assert "points" not in json.dumps(messages)
 
 
-def test_returned_source_titles_obey_readout_punctuation_without_changing_url():
+def test_returned_sources_travel_separately_from_complete_readout_text():
+    from argus.api.artifact_presentation import result_breakdown_metadata
+    from argus.api.chat.breakdown import ResultBreakdownMessage
     from argus.domain.research.contracts import ResearchSource
     from argus.domain.result_readout_sources import accepted_breakdown_text
 
+    source = ResearchSource(title="Company results", url="https://example.com/results")
     text, failure = accepted_breakdown_text(
         {"language": "en", "text": "An uneven ride.", "figures": []},
         facts={},
         language="en",
-        sources=(
-            ResearchSource(title="Company — results", url="https://example.com/results"),
-        ),
     )
     assert failure is None
-    assert "—" not in text
-    assert "Company, results" in text
-    assert "https://example.com/results" in text
+    assert text == "An uneven ride."
+    metadata = result_breakdown_metadata(
+        ResultBreakdownMessage(
+            text=text,
+            source="llm_breakdown_stage",
+            fallback_used=False,
+            sources=(source,),
+        ),
+        None,
+    )
+    assert metadata["research"]["sources"][0]["url"] == source.url
+    assert metadata["result_readout_content"]["text"] == text
 
 
 def test_breakdown_schema_offers_the_actual_headline_labels():

@@ -1177,7 +1177,10 @@ source for this projection; search cannot add to or replace stored run facts.
 The internal structured model draft contains `language`, complete `text`, and
 `figures`. Each declared run figure carries its supplied `fact_key` and the
 `value` as written, without a quote or occurrence index. Breakdown uses the
-supplied plain-language fact label as the key. One reference per distinct fact
+supplied plain-language fact label as the key. Model input provides the card's
+rounded display values: one decimal for percentages, whole dollars for USD
+account values, and localized dates. Stored facts retain their original precision.
+One reference per distinct fact
 is sufficient even when the prose repeats the number. Code checks each declared
 key and value against that run fact within display rounding, with exact counts
 and calendar dates. It does not require numeric occurrence coverage: a number
@@ -1211,12 +1214,19 @@ output fields. Code does not request or validate per-claim quotes, occurrences
 or dates. The run remains the sole owner of simulation figures; web search adds
 historical context and never modifies or resolves a run fact.
 
-After draft acceptance, code appends the sources returned by Perplexity as
-Markdown links, using their titles and dates when the provider supplies them.
-Available dates are formatted for the stored readout language. An absent source
-date does not discard the prose. The links travel inside accepted `text`; no
-additional public envelope fields, source packets, figure references or provider
-usage are exposed. The writing brief asks the model to distinguish documented
+Perplexity's returned sources travel separately in the existing
+`research.sources` sidecar on live finals and persisted message metadata. The
+shared research source projection owns each entry's `title`, `domain`, `url` and
+optional `source_date`, including the existing source selection and cap. The
+web uses its existing Sources button and panel for Breakdown on completion and
+after reload; dates use the current workspace locale. Fallbacks retain returned
+sources with the research sidecar's degraded code, so the panel describes where
+Argus looked. An absent source date does not discard prose.
+
+Code does not append a bibliography to accepted `text`. Citation links already
+inside the model's complete prose remain intact. No additional readout envelope
+fields or figure references are exposed. The writing brief asks the model to
+distinguish documented
 events from inference and excludes forecasts and investing advice. Returned
 sources do not prove the truth of every claim; factual review remains required.
 Received Breakdown usage is recorded through the shared

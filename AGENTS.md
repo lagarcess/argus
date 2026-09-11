@@ -848,7 +848,9 @@ Pattern:
 - Deterministic facts ground LLM language
 - No raw enums or internal field names in user-facing text
 - Result readouts interpret the card instead of restating its figures. A figure
-  belongs in prose only when needed to explain a point, with its fact reference.
+  belongs in prose only when needed to explain a point, with its fact reference
+  and the card's rounding. Accuracy rules guide writing silently; describe the
+  experience in everyday language without explaining calculation safeguards.
   A supported next historical test may appear in the story without a "Try next"
   heading or experiment checklist. Quick take stays first-glance; Explain
   result adds depth without repeating it or reusing frame headings.

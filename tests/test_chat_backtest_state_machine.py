@@ -1250,7 +1250,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         result_breakdown_context,
     )
     from argus.api.routers import agent as agent_router
-    from argus.domain.research.contracts import ResearchUsage
+    from argus.domain.research.contracts import ResearchSource, ResearchUsage
 
     runtime_calls = 0
 
@@ -1264,6 +1264,11 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     breakdown_languages: list[str] = []
     ledger_calls: list[dict[str, Any]] = []
     usage = ResearchUsage(model=breakdown_service.RESULT_BREAKDOWN_MODEL, cost_usd=0.01)
+    source = ResearchSource(
+        title="Historical context",
+        url="https://example.com/context",
+        source_date="2025-08-01",
+    )
 
     def _forced_breakdown(run: Any, *, language: str = "en") -> ResultBreakdownMessage:
         breakdown_languages.append(language)
@@ -1276,6 +1281,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
             fallback_used=True,
             failure_mode="test_forced_fallback",
             usage=usage,
+            sources=(source,),
         )
 
     monkeypatch.setattr(
@@ -1352,6 +1358,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     final = _stream_payloads(second.text, "final")[0]["payload"]
     assert final["assistant_response"] == ""
     assert final["response_intent"]["kind"] == "result_breakdown"
+    assert final["research"]["sources"] == [
+        {**source.model_dump(), "domain": "example.com"}
+    ]
     bank = final["response_intent"]["facts"]["result_fact_bank"]
     assert bank["run_id"] == run_id
     assert bank["symbols"] == ["AAPL"]
@@ -1378,6 +1387,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert assistant["content"] == ""
     assert breakdown not in messages.text
     assert assistant["metadata"]["response_intent"] == final["response_intent"]
+    assert assistant["metadata"]["research"] == final["research"]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
     assert assistant["metadata"]["result_breakdown_source"] == "deterministic_fallback"
