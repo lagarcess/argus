@@ -12,8 +12,8 @@ import es419 from "../public/locales/es-419/common.json";
  * identifiers, "tell us more" opens the existing dialog, and closing the ask
  * holds across a reload.
  *
- * FEEDBACK_ASK_LIVE_API=1 sends the tap to the real backend instead of a stub,
- * so the save is the real endpoint's. FEEDBACK_ASK_EVIDENCE_DIR keeps
+ * FEEDBACK_ASK_LIVE_API=1 sends feedback to the real backend instead of a stub,
+ * so the saves are the real endpoint's. FEEDBACK_ASK_EVIDENCE_DIR keeps
  * screenshots.
  */
 
@@ -22,6 +22,7 @@ type Language = "en" | "es-419";
 const COPY = { en: en.feedback, "es-419": es419.feedback } as const;
 const CONVERSATION_ID = "feedback-ask";
 const NOW = "2026-09-11T12:00:00.000Z";
+const RESULT_REGION = "Hero + Delta Evidence Card";
 
 const RESULT_CARD = {
   title: "AAPL Buy and Hold",
@@ -170,9 +171,20 @@ async function capture(page: Page, name: string) {
 
 async function openConversation(page: Page) {
   await page.goto(`/chat?conversation=${CONVERSATION_ID}`);
-  await expect(
-    page.getByRole("region", { name: "Hero + Delta Evidence Card" }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: RESULT_REGION })).toBeVisible();
+}
+
+async function reloadConversation(page: Page) {
+  await page.reload();
+  await expect(page.getByRole("region", { name: RESULT_REGION })).toBeVisible();
+}
+
+function feedbackPosted(page: Page) {
+  return page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/v1/feedback") &&
+      response.request().method() === "POST",
+  );
 }
 
 for (const language of ["en", "es-419"] as const) {
@@ -194,19 +206,15 @@ for (const language of ["en", "es-419"] as const) {
     }
     await capture(page, `${language}-1-ask-after-result`);
 
-    const saved = page.waitForResponse(
-      (response) =>
-        response.url().endsWith("/api/v1/feedback") &&
-        response.request().method() === "POST",
-    );
+    const tapSaved = feedbackPosted(page);
     await ask
       .getByRole("button", { name: copy.ask.answers.positive, exact: true })
       .click();
-    const response = await saved;
-    expect(response.status()).toBe(200);
-    const submission = response.request().postDataJSON();
-    expect(submission.type).toBe("general");
-    expect(submission.context).toEqual({
+    const tap = await tapSaved;
+    expect(tap.status()).toBe(200);
+    const rated = tap.request().postDataJSON();
+    expect(rated.type).toBe("general");
+    expect(rated.context).toEqual({
       source: "feedback_ask",
       surface: "chat",
       rating: "positive",
@@ -214,12 +222,14 @@ for (const language of ["en", "es-419"] as const) {
       hasAttachments: false,
       attachmentCount: 0,
     });
-    expect(JSON.stringify(submission)).not.toContain(CONVERSATION_ID);
+    expect(JSON.stringify(rated)).not.toContain(CONVERSATION_ID);
 
     await expect(ask).toContainText(copy.ask.thanks);
+    const tellUsMore = ask.getByRole("button", { name: copy.ask.tell_more });
+    await expect(tellUsMore).toBeFocused();
     await capture(page, `${language}-2-tap-saved`);
 
-    await ask.getByRole("button", { name: copy.ask.tell_more }).click();
+    await tellUsMore.click();
     const dialog = page.getByRole("dialog", { name: copy.title });
     await expect(dialog).toBeVisible();
     const includeConversation = dialog.getByRole("checkbox", {
@@ -230,10 +240,25 @@ for (const language of ["en", "es-419"] as const) {
     await expect(ask).toHaveCount(0);
     await capture(page, `${language}-3-tell-us-more-dialog`);
 
-    await page.reload();
-    await expect(
-      page.getByRole("region", { name: "Hero + Delta Evidence Card" }),
-    ).toBeVisible();
+    // The detail row keeps the ask's source, but the rating stays on the tap's row.
+    await dialog.getByRole("textbox").fill(
+      language === "es-419"
+        ? "La tarjeta del resultado fue clara."
+        : "The result card was clear.",
+    );
+    const detailSaved = feedbackPosted(page);
+    await dialog.getByRole("button", { name: copy.submit }).click();
+    const detail = await detailSaved;
+    expect(detail.status()).toBe(200);
+    expect(detail.request().postDataJSON().context).toEqual({
+      source: "feedback_ask",
+      surface: "chat",
+      tags: [],
+      hasAttachments: false,
+      attachmentCount: 0,
+    });
+
+    await reloadConversation(page);
     await expect(page.getByTestId("feedback-ask")).toHaveCount(0);
   });
 
@@ -246,11 +271,49 @@ for (const language of ["en", "es-419"] as const) {
     await ask.getByRole("button", { name: copy.ask.dismiss }).click();
     await expect(ask).toHaveCount(0);
 
-    await page.reload();
-    await expect(
-      page.getByRole("region", { name: "Hero + Delta Evidence Card" }),
-    ).toBeVisible();
+    await reloadConversation(page);
     await expect(page.getByTestId("feedback-ask")).toHaveCount(0);
     await capture(page, `${language}-4-dismissed-after-reload`);
+  });
+
+  test(`${language}: a failed tap keeps the ask open`, async ({ page }) => {
+    await installFixture(page, language);
+    await page.route("**/api/v1/feedback", (route) =>
+      json(route, { code: "unavailable" }, 503),
+    );
+    await openConversation(page);
+
+    const ask = page.getByTestId("feedback-ask");
+    const good = ask.getByRole("button", {
+      name: copy.ask.answers.positive,
+      exact: true,
+    });
+    await good.click();
+    await expect(page.getByText(copy.error)).toBeVisible();
+    await expect(good).toBeEnabled();
+    await expect(ask).not.toContainText(copy.ask.thanks);
+    await capture(page, `${language}-5-failed-tap-stays-open`);
+
+    await reloadConversation(page);
+    await expect(page.getByTestId("feedback-ask")).toBeVisible();
+  });
+
+  test(`${language}: sending the next turn closes an unanswered ask for good`, async ({
+    page,
+  }) => {
+    await installFixture(page, language);
+    await openConversation(page);
+    await expect(page.getByTestId("feedback-ask")).toBeVisible();
+
+    await page.locator("[contenteditable='true']").first().click();
+    await page.keyboard.type(
+      language === "es-419" ? "Ahora prueba con SPY" : "Now try SPY",
+    );
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("feedback-ask")).toHaveCount(0);
+
+    await reloadConversation(page);
+    await expect(page.getByTestId("feedback-ask")).toHaveCount(0);
+    await capture(page, `${language}-6-next-turn-closed-after-reload`);
   });
 }

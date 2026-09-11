@@ -23,7 +23,8 @@ type FeedbackAskProps = {
   answerArriving: boolean;
   /** The account's feedback capability. */
   enabled: boolean;
-  onTellUsMore: (context: Record<string, unknown>, rating: FeedbackRating) => void;
+  /** Opens the feedback dialog. The tap's saved row alone carries the rating. */
+  onTellUsMore: (context: Record<string, unknown>) => void;
   onToast: (message: string, variant?: ChatToastVariant) => void;
 };
 
@@ -39,26 +40,22 @@ export default function FeedbackAsk({
   onToast,
 }: FeedbackAskProps) {
   const { t } = useTranslation();
-  const [thanks, setThanks] = useState<{
-    conversationId: string;
-    rating: FeedbackRating;
-  } | null>(null);
+  const [thankedIn, setThankedIn] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [, rerender] = useReducer((count: number) => count + 1, 0);
   const shownFor = useRef<string | null>(null);
+  const tellUsMore = useRef<HTMLButtonElement>(null);
+  const focusTellUsMore = useRef(false);
 
-  const thankedRating =
-    conversationId !== null && thanks?.conversationId === conversationId
-      ? thanks.rating
-      : null;
+  const thanked = conversationId !== null && thankedIn === conversationId;
   const asking =
     enabled &&
     conversationId !== null &&
     !answerArriving &&
-    thankedRating === null &&
+    !thanked &&
     resultLandedThisTurn(messages) &&
     !hasAskedForFeedback(conversationId);
-  const visible = asking || (thankedRating !== null && !answerArriving);
+  const visible = asking || (thanked && !answerArriving);
 
   // Sending the next turn closes an unanswered ask too, so it asks once.
   useEffect(() => {
@@ -71,16 +68,23 @@ export default function FeedbackAsk({
     ) {
       shownFor.current = null;
       markAskedForFeedback(conversationId);
-      setThanks(null);
+      setThankedIn(null);
     }
   }, [answerArriving, conversationId, visible]);
+
+  // A tap removes the answer buttons, so keyboard focus moves to the next step.
+  useEffect(() => {
+    if (!thanked || !focusTellUsMore.current) return;
+    focusTellUsMore.current = false;
+    tellUsMore.current?.focus();
+  }, [thanked]);
 
   if (!visible || conversationId === null) return null;
   const askedIn = conversationId;
 
   const close = () => {
     markAskedForFeedback(askedIn);
-    setThanks(null);
+    setThankedIn(null);
     rerender();
   };
 
@@ -94,7 +98,8 @@ export default function FeedbackAsk({
         context: feedbackAskContext(rating),
       });
       markAskedForFeedback(askedIn);
-      setThanks({ conversationId: askedIn, rating });
+      focusTellUsMore.current = true;
+      setThankedIn(askedIn);
     } catch {
       onToast(
         t("feedback.error", "We could not submit that yet. Please try again."),
@@ -108,44 +113,41 @@ export default function FeedbackAsk({
   const question = t("feedback.ask.question", "How is Argus doing?");
 
   return (
-    <aside
-      data-testid="feedback-ask"
+    <div
+      role="group"
       aria-label={question}
+      data-testid="feedback-ask"
       className="flex w-full max-w-[min(100%,660px)] flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border border-black/10 bg-black/[0.02] py-1.5 pl-4 pr-1.5 text-[13px] text-black/70 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/70"
     >
-      {thankedRating === null ? (
-        <>
-          <p className="flex-1 leading-[1.45]">{question}</p>
-          <div className="flex flex-wrap gap-2">
-            {FEEDBACK_ASK_ANSWERS.map((rating) => (
-              <button
-                key={rating}
-                type="button"
-                disabled={saving}
-                onClick={() => void answer(rating)}
-                className={choiceClass}
-              >
-                {t(`feedback.ask.answers.${rating}`)}
-              </button>
-            ))}
-          </div>
-        </>
+      <p aria-live="polite" className="flex-1 leading-[1.45]">
+        {thanked ? t("feedback.ask.thanks", "Thanks for telling us.") : question}
+      </p>
+      {thanked ? (
+        <button
+          ref={tellUsMore}
+          type="button"
+          onClick={() => {
+            close();
+            onTellUsMore({ ...FEEDBACK_ASK_SOURCE });
+          }}
+          className={choiceClass}
+        >
+          {t("feedback.ask.tell_more", "Tell us more")}
+        </button>
       ) : (
-        <>
-          <p role="status" className="flex-1 leading-[1.45]">
-            {t("feedback.ask.thanks", "Thanks for telling us.")}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              close();
-              onTellUsMore({ ...FEEDBACK_ASK_SOURCE }, thankedRating);
-            }}
-            className={choiceClass}
-          >
-            {t("feedback.ask.tell_more", "Tell us more")}
-          </button>
-        </>
+        <div className="flex flex-wrap gap-2">
+          {FEEDBACK_ASK_ANSWERS.map((rating) => (
+            <button
+              key={rating}
+              type="button"
+              disabled={saving}
+              onClick={() => void answer(rating)}
+              className={choiceClass}
+            >
+              {t(`feedback.ask.answers.${rating}`)}
+            </button>
+          ))}
+        </div>
       )}
       <button
         type="button"
@@ -155,6 +157,6 @@ export default function FeedbackAsk({
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>
-    </aside>
+    </div>
   );
 }

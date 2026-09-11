@@ -2508,7 +2508,7 @@ export default function ChatInterface() {
                         </span>
                       </div>
                     )}
-                    <FeedbackAsk conversationId={conversationId} messages={messages} answerArriving={isStreamingResponse} enabled={canSubmitFeedback} onToast={showToast} onTellUsMore={(context, rating) => setFeedbackState(openFeedbackDialogState("general", context, rating, conversationId))} />
+                    <FeedbackAsk conversationId={conversationId} messages={messages} answerArriving={isStreamingResponse} enabled={canSubmitFeedback} onToast={showToast} onTellUsMore={(context) => setFeedbackState(openFeedbackDialogState("general", context, undefined, conversationId))} />
                     <div ref={latestActivitySentinelRef} data-testid="latest-activity-sentinel" className="h-px" aria-hidden="true" />
                     <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>

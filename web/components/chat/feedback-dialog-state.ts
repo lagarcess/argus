@@ -1,9 +1,7 @@
-import type { FeedbackRating } from "@/lib/feedback-context";
-
 export type ChatFeedbackDialogState = {
   isOpen: boolean;
   type: "bug" | "feature" | "general" | "rating";
-  rating?: FeedbackRating;
+  rating?: "positive" | "negative";
   context?: Record<string, unknown>;
 };
 

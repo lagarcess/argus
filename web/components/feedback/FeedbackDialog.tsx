@@ -23,10 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { postFeedback } from "@/lib/argus-api";
-import {
-  feedbackContextForSubmission,
-  type FeedbackRating,
-} from "@/lib/feedback-context";
+import { feedbackContextForSubmission } from "@/lib/feedback-context";
 
 type FeedbackType = "bug" | "feature" | "general" | "rating";
 
@@ -34,7 +31,7 @@ interface FeedbackDialogProps {
   isOpen: boolean;
   onClose: () => void;
   type: FeedbackType;
-  rating?: FeedbackRating;
+  rating?: "positive" | "negative";
   context?: Record<string, unknown>;
 }
 

@@ -57,6 +57,7 @@ import {
   retryableNoticeRetryPillClass,
 } from "@/lib/failure-treatment";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
+import { isSettledStrategyResult } from "@/lib/chat-result-message";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
@@ -384,7 +385,7 @@ export default function ChatMessage({
       )}
       <div className="flex flex-col max-w-[85%]">
         <div className="flex flex-col mt-1.5">
-          {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
+          {isSettledStrategyResult(message) ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard
                 result={message.result}

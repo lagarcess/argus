@@ -1,5 +1,6 @@
 import type { Message } from "@/components/chat/types";
 import { readStored, writeStored } from "./browser-storage";
+import { isSettledStrategyResult } from "./chat-result-message";
 import {
   feedbackContextForSubmission,
   type FeedbackRating,
@@ -51,13 +52,12 @@ export function markAskedForFeedback(conversationId: string): void {
 
 function isLandedResult(message: Message): boolean {
   if (message.role !== "ai") return false;
-  if (message.kind === "strategy_result") {
-    return Boolean(message.result) && !message.isLoadingResult;
-  }
   return (
-    message.toolResultCards?.some(
+    isSettledStrategyResult(message) ||
+    (message.toolResultCards?.some(
       (card) => card.outcome.status === "succeeded",
-    ) ?? false
+    ) ??
+      false)
   );
 }
 
