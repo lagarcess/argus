@@ -2,7 +2,7 @@
 
 Lane branch `claude/dca-clarification-retention-1578cd`, base integration
 `46d43c1d` (`origin/codex/private-alpha-next` on 2026-09-11). Fix commits
-`368fe918` and `ee15a349` (Codex round 1). This folder holds the reproduction on the base, the deterministic
+`368fe918`, `ee15a349` (Codex round 1) and `a658c7ad` (Codex round 2). This folder holds the reproduction on the base, the deterministic
 replay of the recorded provider reads before and after, the live browser demo
 in English and Spanish before and after, the two new measurement cases run
 live, the engine check of the start-day contribution, and every billed cost.
@@ -74,12 +74,13 @@ the merge ignores it. That replay is a committed test.
 - `src/argus/agent_runtime/stages/interpret_internal/shared.py`:
   `_turn_continues_pending_setup`. The runtime asked (the previous stage
   awaited the user) and a pending strategy exists, so the reply continues that
-  setup whatever act the interpreter labeled it. Only a reply that itself
-  names another traded asset (a cashtag, an uppercase ticker, a user mention
-  or explicit provenance, the benchmark symbol included) starts a new idea;
-  an asset the interpreter's benchmark-misplacement repair inserted, marked
-  by its own `misplaced_benchmark_asset_recovered` receipt, is not one the
-  reply named. `_pending_setup_continuation_reason_codes` records the
+  setup whatever act the interpreter labeled it. An explicit fresh-task read
+  wins over asset equality: a new idea that names another traded asset (a
+  cashtag, an uppercase ticker, a user mention or explicit provenance, the
+  benchmark symbol included) or that states a complete task on its own starts
+  clean; an asset the interpreter's benchmark-misplacement repair inserted,
+  marked by its own `misplaced_benchmark_asset_recovered` receipt, is not one
+  the reply named. `_pending_setup_continuation_reason_codes` records the
   override as `pending_setup_continuation_merged`.
 - `contextual_merge.py`: the merge gate reads that predicate; an incoming
   asset universe that holds only the benchmark repair's artifact does not
@@ -215,6 +216,40 @@ invest more than" statement is lost on that path.
 The prompt fingerprint is untouched; `tests/test_interpreter_prompt_freeze.py`
 passes at this head, so the fingerprint's own `last_measured` is not moved.
 
+## Codex round 2 (a P1 and a P2 on `b1e506ea`, fixed in `a658c7ad`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| "New idea: DCA $200 monthly into AAPL during 2025" read as a new idea and a new task still merged with the pending AAPL setup because the symbol did not change, so the card inherited the $1,000 seed, fees and slippage | An explicit fresh-task read wins over asset equality: a new idea that names another traded asset, or that states a complete task on its own (the contract's own required-fields owner decides), starts clean. Only a partial new-idea read while the runtime awaits a reply is that reply | `test_an_explicit_fresh_task_on_the_same_asset_does_not_inherit_the_pending_setup` (en, es-419); the continuation matrix now skips complete fresh-task reads under the same owner |
+| An em dash arriving as its own stream chunk was dropped with no replacement, so the live reply read "Hello world" while the saved reply read "Hello, world" | `ReplyRewrites.token` holds a chunk's trailing boundary characters (spaces, dashes) for the next chunk and rewrites a chunk that opens on a dash against the text already shown, so live and persisted text are the same | `test_streamed_chunks_render_exactly_what_the_final_reply_persists` (English and Spanish chunkings, punctuation and line-start cases) |
+
+### The haiku path for `dca_capital_semantics_explicit_cap_refused_by_name_issue_455` (`haiku-check/`)
+
+In the full live run this case failed after grok timed out and haiku answered
+the interpretation (executable, starting capital 0.0). Its rerun passed on
+grok and never exercised that path. With `ARGUS_STRUCTURED_MODEL` and
+`ARGUS_STRUCTURED_FALLBACK_MODEL` set to `anthropic/claude-haiku-4.5` in the
+process environment (`drivers/haiku_case.py`), three runs each:
+
+| Tree | Attempt 1 | Attempt 2 | Attempt 3 | Cost |
+| --- | --- | --- | --- | ---: |
+| `origin/codex/private-alpha-next` at `46d43c1d` | passed, ceiling refused | **failed, executable, starting capital 0.0** | passed, ceiling refused | $0.076 |
+| this head (`ee15a349` code) | passed, ceiling refused | passed, ceiling refused | passed, ceiling refused | $0.089 |
+
+This PR does not change the outcome for the worse: the integration base
+already loses the cap one time in three when haiku reads the interpretation,
+and this head held it three times. The loss is haiku's read of the cap, not
+a layer this lane owns; no code change was made for it.
+
+### Measurement cases the round-2 fix touches, live at `a658c7ad` (`live-touched-cases-a658c7ad.json`)
+
+The continuation rule change reaches every case where a reply arrives while a
+setup is pending: the two recorded-repro cases (en, es-419), the two prebaked
+chip followups (en, es-419) and `action_chip_change_asset_no_active_ref_fresh_idea_issue_188`,
+the fresh idea stated during a pending clarification. All five passed with the
+judge on, $0.19. The em dash change touches no measurement case; it lives in
+the SSE and persistence boundary that `tests/test_visible_reply.py` covers.
+
 ## Billed cost
 
 | Item | Cost |
@@ -225,7 +260,9 @@ passes at this head, so the fingerprint's own `last_measured` is not moved.
 | Two measurement cases live | $0.068 |
 | Full live measurement at `ee15a349` | $1.412 |
 | Six regressed cases rerun with the judge | $0.081 |
-| **Total** | **$2.09** |
+| Haiku check of the cap case, three runs on the base and three on this head | $0.165 |
+| Five touched measurement cases live at `a658c7ad` | $0.187 |
+| **Total** | **$2.45** |
 
 ## Observed, not changed here
 
