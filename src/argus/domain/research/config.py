@@ -258,17 +258,21 @@ def retrieval_spec(
     shape: QuestionShape,
     *,
     question_kind: str | None,
+    country: str | None,
     closed_period: bool = False,
     language_tag: str | None = "en",
     local_sources: bool = False,
     scenario: bool = False,
 ) -> ResearchConfigSpec:
     """The documented configuration for a shape, with this question's
-    retrieval parameters: response language, home-market location, recency
-    by data class, the local publisher list when the question is local and
-    the market has one, and the scenario contract when the answer is
-    computed from published inputs."""
-    location = home_location()
+    retrieval parameters: response language, the asking user's declared
+    country as the location, recency by data class, the local publisher list
+    when the question is local and the country has one, and the scenario
+    contract when the answer is computed from published inputs.
+
+    ``country`` has no default: every caller says whose question it builds,
+    and a user without a country sends no location."""
+    location = RetrievalLocation(country=country) if country else None
     return RESEARCH_CONFIG_SPECS[shape].model_copy(
         update={
             "language": iso_language(language_tag),

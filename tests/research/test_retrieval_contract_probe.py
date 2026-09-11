@@ -196,7 +196,11 @@ def test_the_scenario_recording_is_the_request_the_code_builds_today() -> None:
     recording = json.loads(SCENARIO_PROBE.read_text(encoding="utf-8"))
     request = recording["exchanges"][0]["request"]
     spec = retrieval_spec(
-        "balanced", question_kind="company_lookup", language_tag="en", scenario=True
+        "balanced",
+        question_kind="company_lookup",
+        language_tag="en",
+        country=None,
+        scenario=True,
     )
     assert request["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert request["instructions"] == spec.instructions

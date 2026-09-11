@@ -300,10 +300,14 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     assert "scenarios" not in _prompt(scenario=False)
 
     scenario_spec = retrieval_spec(
-        "balanced", question_kind="company_lookup", language_tag="en", scenario=True
+        "balanced",
+        question_kind="company_lookup",
+        language_tag="en",
+        country=None,
+        scenario=True,
     )
     plain_spec = retrieval_spec(
-        "balanced", question_kind="company_lookup", language_tag="en"
+        "balanced", question_kind="company_lookup", language_tag="en", country=None
     )
     assert scenario_spec.instructions == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert plain_spec.instructions == RETRIEVAL_INSTRUCTIONS

@@ -118,7 +118,10 @@ def test_recency_follows_the_section_7_data_class(
     """Freshness has one owner: how fast the answer goes stale. A closed
     window is never filtered to the past week."""
     spec = retrieval_spec(
-        "balanced", question_kind=question_kind, closed_period=closed_period
+        "balanced",
+        question_kind=question_kind,
+        closed_period=closed_period,
+        country=None,
     )
     assert spec.recency == recency
 
@@ -132,30 +135,19 @@ def test_home_market_comes_from_the_release_contract(monkeypatch) -> None:
     assert home_location() is None, "a malformed market sends no location"
 
 
-def test_local_sources_need_a_market_with_a_list(monkeypatch) -> None:
-    assert (
-        retrieval_spec(
-            "balanced", question_kind="current_external", local_sources=True
+def test_local_sources_need_a_country_with_a_list() -> None:
+    def domains(country: str | None, *, local_sources: bool = True) -> tuple[str, ...]:
+        return retrieval_spec(
+            "balanced",
+            question_kind="current_external",
+            country=country,
+            local_sources=local_sources,
         ).source_domains
-        == ()
-    )
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "US")
-    assert (
-        retrieval_spec(
-            "balanced", question_kind="current_external", local_sources=True
-        ).source_domains
-        == ()
-    )
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "DO")
-    assert (
-        retrieval_spec(
-            "balanced", question_kind="current_external", local_sources=True
-        ).source_domains
-        == LOCAL_SOURCE_DOMAINS["DO"]
-    )
-    assert (
-        retrieval_spec("balanced", question_kind="current_external").source_domains == ()
-    ), "a market alone never restricts the web"
+
+    assert domains(None) == ()
+    assert domains("US") == ()
+    assert domains("DO") == LOCAL_SOURCE_DOMAINS["DO"]
+    assert domains("DO", local_sources=False) == (), "a country never restricts the web"
 
 
 @pytest.mark.parametrize(
@@ -164,7 +156,9 @@ def test_local_sources_need_a_market_with_a_list(monkeypatch) -> None:
 def test_the_response_language_is_iso_639_1(tag: str | None, code: str) -> None:
     assert iso_language(tag) == code
     assert (
-        retrieval_spec("fast", question_kind="live_quote", language_tag=tag).language
+        retrieval_spec(
+            "fast", question_kind="live_quote", language_tag=tag, country=None
+        ).language
         == code
     )
 
@@ -189,11 +183,11 @@ def test_the_thorough_job_rebuilds_its_parameters_from_the_typed_request() -> No
 
 
 def test_the_request_carries_every_retrieval_parameter(monkeypatch) -> None:
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "DO")
     spec = retrieval_spec(
         "balanced",
         question_kind="current_external",
         language_tag="es-419",
+        country="DO",
         local_sources=True,
     )
     client = PerplexityAgentClient("k", transport=RecordingTransport([agent_response()]))
@@ -224,7 +218,8 @@ def test_the_request_carries_every_retrieval_parameter(monkeypatch) -> None:
 
 
 def test_the_fast_shape_sends_no_web_options_and_no_location() -> None:
-    spec = retrieval_spec("fast", question_kind="live_quote")
+    # A quote searches no web, so even a user's country has nowhere to go.
+    spec = retrieval_spec("fast", question_kind="live_quote", country="MX")
     client = PerplexityAgentClient("k", transport=RecordingTransport([agent_response()]))
 
     client.run_research("What is Apple at?", spec)
