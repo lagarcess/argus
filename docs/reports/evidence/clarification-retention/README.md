@@ -1,8 +1,8 @@
 # A clarification reply keeps what the user already said
 
 Lane branch `claude/dca-clarification-retention-1578cd`, base integration
-`46d43c1d` (`origin/codex/private-alpha-next` on 2026-09-11). Fix commit
-`368fe918`. This folder holds the reproduction on the base, the deterministic
+`46d43c1d` (`origin/codex/private-alpha-next` on 2026-09-11). Fix commits
+`368fe918` and `ee15a349` (Codex round 1). This folder holds the reproduction on the base, the deterministic
 replay of the recorded provider reads before and after, the live browser demo
 in English and Spanish before and after, the two new measurement cases run
 live, the engine check of the start-day contribution, and every billed cost.
@@ -66,8 +66,8 @@ set, and an unsupported-recovery question sets neither, so the facts were
 lost even in the variant whose turn 1 had reached a card.
 `replay_hermetic.json` is the same replay with the synthetic fixture (AAPL),
 where the interpreter's benchmark-misplacement repair also put SPY into the
-asset universe on turn 2; the merge now treats an incoming asset that is only
-a benchmark mention as a repair artifact. That replay is a committed test.
+asset universe on turn 2; that repair's own receipt now marks the artifact so
+the merge ignores it. That replay is a committed test.
 
 ## What changed
 
@@ -76,23 +76,31 @@ a benchmark mention as a repair artifact. That replay is a committed test.
   awaited the user) and a pending strategy exists, so the reply continues that
   setup whatever act the interpreter labeled it. Only a reply that itself
   names another traded asset (a cashtag, an uppercase ticker, a user mention
-  or explicit provenance; never a benchmark mention) starts a new idea.
-  `_pending_setup_continuation_reason_codes` records the override as
-  `pending_setup_continuation_merged`.
+  or explicit provenance, the benchmark symbol included) starts a new idea;
+  an asset the interpreter's benchmark-misplacement repair inserted, marked
+  by its own `misplaced_benchmark_asset_recovered` receipt, is not one the
+  reply named. `_pending_setup_continuation_reason_codes` records the
+  override as `pending_setup_continuation_merged`.
 - `contextual_merge.py`: the merge gate reads that predicate; an incoming
-  asset universe that is only benchmark symbols does not replace the pending
-  asset. `asset_resolution.py`: the hidden-context guard, which clears an
+  asset universe that holds only the benchmark repair's artifact does not
+  replace the pending asset. `asset_resolution.py`: the hidden-context guard, which clears an
   asset a new idea did not name, does not run on a continuation.
 - `interpreter/dca_audits.py`: an audit may add a money role only for a
   distinct amount, and the role it names decides the field. A seed the user
   typed is never re-typed as a cap (`dca_budget_audit_outranked_by_typed_seed`);
-  a budget the audit calls starting capital lands in `initial_capital`
-  (`dca_budget_audit_typed_as_seed`); a distinct cap is still a ceiling.
+  a budget the audit calls starting capital lands in `initial_capital` only
+  while that role is empty (`dca_budget_audit_typed_as_seed`); beside an
+  occupied seed it can only bound the plan, so it becomes the ceiling
+  (`dca_budget_audit_seed_role_occupied_read_as_ceiling`); a distinct cap is
+  still a ceiling. The role names come from `DCA_SEED_ROLES` and
+  `DCA_CEILING_ROLES` in `argus/domain/dca_capital.py`.
   `_seed_corroborated_by_fidelity_audit`: a seed the primary typed without
   provenance keeps its value when the fidelity audit reads the same distinct
   starting capital beside the contribution (`stated_run_field_seed_corroborated`).
 - `semantic_integrity.py`: a ceiling key whose provenance names a seed role is
-  read as the seed (`semantic_dca_seed_role_read_over_ceiling_key`).
+  read as the seed when it is the seed's own money, a lone or an equal amount
+  (`semantic_dca_seed_role_read_over_ceiling_key`); a distinct amount stays a
+  ceiling.
 - `src/argus/api/chat/visible_reply.py`: the one owner of the em dash rule at
   the point a reply becomes visible. Token frames, the final payload text and
   the persisted message pass through it; the turn records `reply_rewrites`
@@ -122,7 +130,7 @@ and its Spanish twin, typed assertions only (no judge): both **passed**.
 Turn 1 reached the card with DOCN, 2025-09-10 to 2026-09-09, SPY, seed
 $1,000, contribution $100 monthly, fee 0.001 and slippage 0.0005 with
 `explicit_user` provenance, so the harness did not need the followup. Billed
-$0.068 for both. The full live measurement suite was not run in this lane.
+$0.068 for both. The full suite ran afterwards on the round-1 head, below.
 
 ## Browser demo (`browser/`)
 
@@ -156,6 +164,57 @@ the first bar of every window, including the window the run opens in), not
 an interpretation defect. The user said the $100 starts after the initial
 investment; the engine does not distinguish that. Not changed in this lane.
 
+## Codex round 1 (four P1 findings on `2a1be28d`, fixed in `ee15a349`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| An explicit switch to the benchmark symbol ("Actually test $SPY instead") kept the prior asset because the continuation rule excluded benchmark symbols | Benchmark identity is no longer evidence. Only the interpreter's own receipt, `misplaced_benchmark_asset_recovered`, marks an incoming benchmark symbol as a repair artifact the pending setup ignores | `test_an_explicit_switch_to_the_benchmark_symbol_trades_that_symbol`, `test_a_benchmark_the_repair_misread_as_the_asset_does_not_replace_the_pending_asset` |
+| A seed-role budget from the audit overwrote a different typed seed and lost the cap | The seed branch runs only when the seed role is empty; a different amount beside an occupied seed becomes the ceiling under `total_budget`, recorded as `dca_budget_audit_seed_role_occupied_read_as_ceiling` | `test_budget_audit_never_replaces_an_occupied_seed_with_a_different_amount`, `test_budget_audit_never_replaces_a_seed_typed_without_provenance` |
+| The reader cleared a numerically distinct ceiling whose provenance said `starting_capital` | The seed-role reading applies only to the seed's own money: lone number, or equal number; a distinct number stays a ceiling | `test_semantic_reader_keeps_a_distinct_ceiling_whose_provenance_says_seed`, `test_semantic_reader_reads_a_lone_seed_role_under_a_ceiling_key_as_the_seed` |
+| The seed-role set was defined twice and repeated `_DCA_SEED_KEYS` | `DCA_SEED_ROLES` and `DCA_CEILING_ROLES` live once in `argus/domain/dca_capital.py`; the reader, the audit writer and the interpreter's total-capital vocabulary derive from them | `test_seed_and_ceiling_role_names_have_one_owner`, `test_every_seed_role_is_written_and_read_as_the_seed` |
+
+Hermetic sweeps at `ee15a349`: 2308 passed (`tests/agent_runtime`, spine guardrails) and 980 passed (chat stream contract, prompt freeze, mocked evals, alpha API, `tests/domain`). No modularity violations, prompt fingerprint untouched.
+
+## Full live measurement at `ee15a349` (`live-measurement.json`, `baseline-comparison.json`)
+
+The sanctioned pre-merge gate for a runtime-behavior change (tests/evals/README.md,
+Test Tiers), run once on the round-1 head with a clean worktree,
+`ARGUS_MARKET_DATA_PROVIDER_MODE` and `ARGUS_ASSET_PROVIDER_MODE` assigned to
+`live_provider` in the process environment, the live asset catalog and the
+calendar probe passing. 71 cases, 64 passed, 7 failed, no infrastructure
+errors, $1.41 billed, 40 minutes. Compared case by case against the
+fingerprint's baseline, `docs/reports/evidence/decision-10/live-measurement.json`
+(63 passed, 6 failed at `60e7c0ec`), with `drivers/compare_baseline.py`:
+
+| Verdict | Count | Cases |
+| --- | ---: | --- |
+| unchanged | 58 | 57 passing both times, plus `asset_discovery_not_result_followup_issue_244`, the known open bug (#590) |
+| fixed | 5 | `asset_discovery_category_spanish_issue_244` and `asset_discovery_old_pharma_escalation_exact_issue_344` (the baseline's synthetic-market-data failures, now on live data), `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`, `graceful_recovery_spanish_weekly_options_aapl`, `ordinary_conversation_concept_compound_interest_en` |
+| added | 2 | the two recorded-repro cases, both passed |
+| regressed | 6 | see below |
+
+The six "regressed" verdicts were each rerun once, alone, with the prose judge
+on (`rerun-regressed-cases.json`, $0.08): all six passed. Their first-run
+failure modes were provider-side. `action_chip_add_asset_preserves_modeled_costs_issue_271`
+and `dca_capital_semantics_truncated_window_measures_served_issue_455` ended in
+`coverage_recovery` with `market_data_unavailable` from the market-data
+preflight (MSFT/AAPL and RDDT). `dca_capital_semantics_explicit_cap_refused_by_name_issue_455`
+hit a 20-second grok timeout and then a haiku response that failed schema
+validation, so the seedless focused repair ran, and that path has no field for
+a plan-wide cap; eight grok timeouts landed in the run overall.
+`asset_discovery_peer_anchor_english_issue_244` and
+`ordinary_conversation_price_question_en` were prose-judge honesty verdicts.
+`action_chip_change_asset_compound_replace_issue_188` was answered as a
+conversation follow-up on the first run and as the expected compound edit on
+the rerun. No case failed on a typed check that this lane's code owns.
+
+Observed, not changed: after both interpretation candidates fail, the
+seedless focused-extraction repair cannot carry a plan-wide cap, so a "don't
+invest more than" statement is lost on that path.
+
+The prompt fingerprint is untouched; `tests/test_interpreter_prompt_freeze.py`
+passes at this head, so the fingerprint's own `last_measured` is not moved.
+
 ## Billed cost
 
 | Item | Cost |
@@ -164,7 +223,9 @@ investment; the engine does not distinguish that. Not changed in this lane.
 | Base backend during the browser demo, including two aborted driver attempts | $0.246 |
 | Fixed backend during the browser demo | $0.112 |
 | Two measurement cases live | $0.068 |
-| **Total** | **$0.60** |
+| Full live measurement at `ee15a349` | $1.412 |
+| Six regressed cases rerun with the judge | $0.081 |
+| **Total** | **$2.09** |
 
 ## Observed, not changed here
 
