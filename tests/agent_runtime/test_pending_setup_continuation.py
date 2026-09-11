@@ -862,6 +862,15 @@ def test_a_partial_fresh_task_read_stays_fresh_and_asks_for_what_it_lacks(
             True,
             ("continue", "answer_pending_need", True, ()),
         ),
+        # Only new_idea with new_task is a fresh task; new_idea that continues
+        # answers what is pending, as the stage predicate already holds.
+        (
+            "new_idea",
+            "continue",
+            {"last_stage_outcome": "await_user_reply"},
+            True,
+            ("continue", "new_idea", True, ()),
+        ),
         # An act the repair replaces is decided by the runtime's own question,
         # and the assumption is recorded.
         (
@@ -995,3 +1004,78 @@ async def test_a_focused_repair_of_a_partial_fresh_task_does_not_fill_it_from_th
     assert draft.date_range in (None, {}, [])
     assert draft.initial_capital is None
     assert not set(draft.extra_parameters) & set(COSTS)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("language", "message"),
+    [
+        ("en", "Use 2023 instead"),
+        ("es-419", "Usa 2023 en su lugar"),
+    ],
+)
+async def test_a_focused_repair_of_a_date_only_reply_read_as_a_continuing_new_idea_keeps_the_pending_setup(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str
+) -> None:
+    # The runtime asked for the capital of a pending AAPL DCA; the reply gives
+    # only a year and the model labels it new_idea with task_relation continue.
+    # The pair continues at the stage, so the focused re-read must keep the
+    # pending family and facts rather than fall to unsupported recovery.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def focused_stub(**kwargs: Any) -> Any:
+        schema_name = kwargs["schema_name"]
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary=message,
+                language=language,
+                date_range={"start": "2023-01-01", "end": "2023-12-31"},
+                confidence=0.9,
+                evidence_spans={"date_range": "2023"},
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(confidence=0.9)
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", focused_stub)
+    failed_response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary=message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_thesis=message,
+            language=language,
+        ),
+        missing_required_fields=["strategy_type"],
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=_pending("dca_accumulation")
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "capital_amount",
+        },
+        user=UserState(user_id="u1", language_preference=language),
+    )
+
+    repaired = await interpreter_module._repair_incomplete_strategy_extraction(
+        failed_response=failed_response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert repaired is not None
+    assert repaired.intent != "unsupported_or_out_of_scope"
+    draft = repaired.candidate_strategy_draft
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.date_range == {"start": "2023-01-01", "end": "2023-12-31"}
+    assert draft.initial_capital == 1000.0

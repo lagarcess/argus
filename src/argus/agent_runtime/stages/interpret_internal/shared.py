@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.capabilities.answers import EXECUTABLE_STRATEGY_FAMILIES
+from argus.agent_runtime.interpreter.shared import KNOWN_TURN_ACTS, is_explicit_fresh_task
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
@@ -86,12 +87,10 @@ _EXPLICIT_TURN_MONEY_SOURCES = frozenset(
 
 
 # The runtime asked and is waiting: a reply continues the setup that is
-# pending, whatever act the interpreter labeled it. Only a new idea about
-# another asset starts over.
+# pending, whatever act the interpreter labeled it. Only an explicit
+# fresh-task read (new_idea with new_task) starts over.
 _PENDING_SETUP_OUTCOMES = frozenset({"await_user_reply", "await_approval"})
-_PENDING_SETUP_TURN_ACTS = frozenset(
-    {"new_idea", "answer_pending_need", "refine_current_idea", "approval"}
-)
+_PENDING_SETUP_TURN_ACTS = KNOWN_TURN_ACTS
 
 
 # The interpreter's own receipt for filling an empty asset universe from a
@@ -119,7 +118,7 @@ def _turn_continues_pending_setup(
         and semantic_turn_act is not None
     ):
         return False
-    if semantic_turn_act == "new_idea" and task_relation == "new_task":
+    if is_explicit_fresh_task(semantic_turn_act, task_relation):
         # The interpreter's fresh-task read wins, whatever the draft holds:
         # a new task inherits nothing, and what it lacks is asked for.
         return False

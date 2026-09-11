@@ -61,6 +61,12 @@ _AWAITING_REPLY_OUTCOMES = frozenset({"await_user_reply", "await_approval"})
 PENDING_REPLY_ASSUMED_REASON = "pending_setup_reply_assumed_without_model_read"
 
 
+def is_explicit_fresh_task(act: str | None, relation: str | None) -> bool:
+    """Only new_idea with new_task starts a fresh task; a new idea that
+    continues answers what is pending."""
+    return act == "new_idea" and relation == "new_task"
+
+
 class RepairedTurnAct(NamedTuple):
     task_relation: str
     semantic_turn_act: str
@@ -90,7 +96,7 @@ def repaired_turn_act(
         return RepairedTurnAct(
             base_relation or "new_task",
             base_act,
-            has_pending_setup and base_act in CONTINUATION_TURN_ACTS,
+            has_pending_setup and not is_explicit_fresh_task(base_act, base_relation),
             (),
         )
     metadata = request.selected_thread_metadata
