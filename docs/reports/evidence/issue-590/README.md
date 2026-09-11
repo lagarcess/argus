@@ -187,10 +187,13 @@ Spanish forward question), each rerun once as `tests/evals/README.md` allows
 
 Reading: this head's run met a structured tier three times less available
 than the baseline's (17 primary timeouts against 5, and a fallback read that
-failed validation five times against none), and every flipped case that is not
-a judge verdict carries that receipt pair. The one case that failed its rerun
-failed it the same way. The diff does not touch discovery, DCA, capability or
-forward-question routing; the follow-up path it changes passed its case on
+failed validation five times against none). Of the five flipped cases that are
+not judge verdicts, four carry that primary-timeout and fallback-validation
+pair; the fifth, the DCA stated-seed case, had a successful primary read and
+lost its launch to a `DcaContributionRoleAudit` timeout, a separate
+structured-tier call, and passed its rerun. The one case that failed its rerun
+failed it on the same pair. The diff does not touch discovery, DCA, capability
+or forward-question routing; the follow-up path it changes passed its case on
 both runs at this head. `.agent/interpreter_prompt_fingerprint.json` is not
 repointed: no fingerprinted text changed, and the fingerprint's surface hash
 still matches (`tests/test_interpreter_prompt_freeze.py` passes), so the
