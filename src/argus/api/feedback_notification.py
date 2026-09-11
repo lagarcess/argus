@@ -7,10 +7,10 @@ from typing import Any
 
 from loguru import logger
 
-from argus.domain.resend_email import send_resend_email
+from argus.domain.resend_email import SUPPORT_EMAIL_ADDRESS, send_resend_email
 from argus.domain.store import utcnow
 
-FEEDBACK_NOTIFICATION_RECIPIENT = "support@get-argus.com"
+FEEDBACK_NOTIFICATION_RECIPIENT = SUPPORT_EMAIL_ADDRESS
 _SUBJECT_EXCERPT_LENGTH = 80
 _MAX_RECEIPT_LENGTH = 256
 

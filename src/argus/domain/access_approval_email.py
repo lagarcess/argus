@@ -5,7 +5,7 @@ import html
 from dataclasses import dataclass
 
 from argus.api.schemas import Language
-from argus.domain.resend_email import send_resend_email
+from argus.domain.resend_email import SUPPORT_EMAIL_ADDRESS, send_resend_email
 
 _MAX_RECEIPT_LENGTH = 256
 _IDEMPOTENCY_NAMESPACE = "argus-access-welcome"
@@ -47,7 +47,7 @@ def build_access_welcome_email(
         cta_line = "Crea tu cuenta de Argus:"
         button_label = "Crea tu cuenta de Argus"
         fallback_line = "Si el botón no funciona, abre este enlace:"
-        support_line = "¿Tienes preguntas? Escribe a support@get-argus.com."
+        support_line = f"¿Tienes preguntas? Escribe a {SUPPORT_EMAIL_ADDRESS}."
     elif language == "en":
         subject = "Welcome to Argus"
         html_language = "en"
@@ -62,7 +62,7 @@ def build_access_welcome_email(
         cta_line = "Create your Argus account:"
         button_label = "Create your Argus account"
         fallback_line = "If the button does not work, open this link:"
-        support_line = "Questions? Contact support@get-argus.com."
+        support_line = f"Questions? Contact {SUPPORT_EMAIL_ADDRESS}."
     else:
         raise ValueError("Unsupported access welcome email language.")
 

@@ -104,9 +104,12 @@ at code head `044b9713`. One `POST /api/v1/feedback` went through FastAPI's
 The route returned 200 and saved one row. The notification task logged
 `Feedback notification sent` with Resend receipt
 `0e15b6d0-e9e1-4553-830e-1820002c2947`. The founder confirmed it arrived at
-support@get-argus.com. The sender and notification code have not changed since;
-later backend changes only add `evidence_artifact_id` to the sanitizer's kept
-keys.
+support@get-argus.com. The Resend transport and the notification's content have
+not changed since. Later backend changes add `evidence_artifact_id` to the
+sanitizer's kept keys and move the support address into one API owner,
+`SUPPORT_EMAIL_ADDRESS` in `src/argus/domain/resend_email.py`, with the same
+value. That change is backend-only, so the browser evidence at `794aa2e6`
+still stands.
 
 The test run read the credential from the integration `.env` into its own
 process and never printed it. In that file

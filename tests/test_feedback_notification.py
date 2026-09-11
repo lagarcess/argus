@@ -18,6 +18,7 @@ from argus.api.feedback_notification import (
 from argus.api.main import app
 from argus.api.schemas import OnboardingState, User
 from argus.domain.guest_workspaces import GuestWorkspace
+from argus.domain.resend_email import SUPPORT_EMAIL_ADDRESS
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from fastapi.testclient import TestClient
@@ -211,7 +212,12 @@ def test_notification_goes_to_support_through_the_shared_resend_transport(
     )
 
     [smtp] = instances
-    assert FEEDBACK_NOTIFICATION_RECIPIENT == "support@get-argus.com"
+    # The recipient is the API's one support address, the one the access email shows.
+    assert (
+        FEEDBACK_NOTIFICATION_RECIPIENT
+        == SUPPORT_EMAIL_ADDRESS
+        == "support@get-argus.com"
+    )
     assert (smtp.host, smtp.port) == ("smtp.resend.com", 465)
     assert smtp.login_args == ("resend", "re_test_password")
     assert smtp.mail_from == "noreply@get-argus.com"
