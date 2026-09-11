@@ -1,7 +1,7 @@
 # Ask for feedback: evidence
 
 Roadmap item "Ask for feedback" in `docs/specs/argus-grounded-finance-roadmap.md`
-(added at `ff98fec7`). Integration base `ff98fec7`. Code head `044b9713`.
+(added at `ff98fec7`). Integration base `ff98fec7`. Code head `87dbf51b`.
 
 ## Browser proof, both languages
 
@@ -12,17 +12,20 @@ mock auth, no `.env`, and the SMTP credential blank on purpose.
 FEEDBACK_ASK_LIVE_API=1 FEEDBACK_ASK_EVIDENCE_DIR=../docs/reports/evidence/ask-for-feedback PLAYWRIGHT_PORT=3100 bunx playwright test e2e/feedback-ask.spec.ts --workers=1
 ```
 
-Result: 4 passed. The transcript, one user turn and one result card, is a route
-fixture in the same shape as `e2e/issue-509-card-copy-language.spec.ts`. With
-`FEEDBACK_ASK_LIVE_API=1` the tap goes to the real endpoint; without it the save
-is stubbed and the spec also passes.
+Result at `87dbf51b`: 8 passed, four tests per language. The transcript, one user
+turn and one result card, is a route fixture in the same shape as
+`e2e/issue-509-card-copy-language.spec.ts`. With `FEEDBACK_ASK_LIVE_API=1`,
+feedback goes to the real endpoint. Without it the save is stubbed and the spec
+also passes. The failed-tap test stubs a 503 in both modes.
 
 | Screenshot | What it shows |
 | --- | --- |
 | `en-1-ask-after-result.png`, `es-419-1-ask-after-result.png` | The ask under a result: three one-tap answers and a dismiss button |
-| `en-2-tap-saved.png`, `es-419-2-tap-saved.png` | After a tap: thanks and "Tell us more" |
+| `en-2-tap-saved.png`, `es-419-2-tap-saved.png` | After a tap: thanks, with focus on "Tell us more" |
 | `en-3-tell-us-more-dialog.png`, `es-419-3-tell-us-more-dialog.png` | The existing feedback dialog, opened from the ask |
 | `en-4-dismissed-after-reload.png`, `es-419-4-dismissed-after-reload.png` | No ask after a dismissal and a reload |
+| `en-5-failed-tap-stays-open.png`, `es-419-5-failed-tap-stays-open.png` | A failed save: the error toast, and the answers still offered |
+| `en-6-next-turn-closed-after-reload.png`, `es-419-6-next-turn-closed-after-reload.png` | No ask after sending the next turn without answering, then reloading |
 
 The quick take on the fixture card says its saved facts are not sufficient
 because the fixture carries no readout facts. That text is not part of this
@@ -33,30 +36,36 @@ The spec also asserts, per language:
 - the tap's request is `type: "general"` with context exactly
   `{source: "feedback_ask", surface: "chat", rating: "positive", tags: [], hasAttachments: false, attachmentCount: 0}`,
   and the conversation id appears nowhere in the body;
-- the endpoint answered 200;
+- keyboard focus lands on "Tell us more" after the tap;
 - the dialog's "include approved context from this conversation" checkbox is
   present and unchecked;
-- the ask stays gone after a reload, both after a tap and after a dismissal.
+- the detail sent from that dialog keeps `source: "feedback_ask"` and carries no
+  rating and no conversation id, so only the tap's row holds the rating;
+- a failed save leaves the ask open, and it asks again after a reload;
+- the ask stays gone after a reload following a tap, a dismissal, or the next
+  turn.
 
-API log for the two real taps, one per language:
+The next-turn test was checked against a mutation. With the line that closes an
+unanswered ask on the next turn removed from `FeedbackAsk.tsx`, it fails, because
+the ask returns after the reload.
+
+API log for the four real saves (per language, the tap and the dialog detail):
 
 ```text
 INFO     | argus.api.routers.feedback:feedback:116 - Feedback submitted
 "POST /api/v1/feedback HTTP/1.1" 200 OK
 WARNING  | argus.api.feedback_notification:notify_feedback_submitted:93 - Feedback notification failed
-INFO     | argus.api.routers.feedback:feedback:116 - Feedback submitted
-"POST /api/v1/feedback HTTP/1.1" 200 OK
-WARNING  | argus.api.feedback_notification:notify_feedback_submitted:93 - Feedback notification failed
 ```
 
-Because the credential was blank, both taps also show a failed email that still
-saved the feedback.
+That block appears four times. Because the credential was blank, every save
+also shows a failed email that still saved the feedback.
 
 ## Test email
 
 One email, marked as a test, sent on 2026-09-11 from a local run of the real app
-at code head `044b9713`. One `POST /api/v1/feedback` went through FastAPI's
-`TestClient` with memory persistence and the message:
+at code head `044b9713`. The backend has not changed since then; the later
+commits touch only the web app and docs. One `POST /api/v1/feedback` went through
+FastAPI's `TestClient` with memory persistence and the message:
 
 > [TEST] Ask for feedback lane, local run on 2026-09-11. Please ignore: this
 > only checks that feedback reaches support@get-argus.com.
@@ -74,15 +83,17 @@ process and never printed it. In that file
 `source .env`, sees the password as empty. The run resolved that one reference
 itself; no `.env` was edited. Hosted services set the password directly.
 
-## Checks at code head `044b9713`
+## Checks
 
-| Check | Result |
-| --- | --- |
-| `poetry run pytest tests -q --no-cov` | 7249 passed, 585 skipped |
-| `tests/test_interpreter_prompt_freeze.py` | 3 passed, no model-facing text changed |
-| `cd web && bun test` | 1713 pass, 0 fail |
-| `cd web && bun run lint` on changed files | clean |
-| `bunx playwright test e2e/browser-storage-disclosure.spec.ts` | 2 passed |
-| `scripts/check_modularity_budget.py` | no violations; `ChatInterface.tsx` 2584 to 2581 lines |
+| Check | Head | Result |
+| --- | --- | --- |
+| `poetry run pytest tests -q --no-cov` | `044b9713` (backend unchanged since) | 7249 passed, 585 skipped |
+| `poetry run ruff check src tests workflows scripts` | `87dbf51b` | clean |
+| `tests/test_interpreter_prompt_freeze.py` | `87dbf51b` | passed, no model-facing text changed |
+| `cd web && bun test` | `87dbf51b` | 1713 pass, 0 fail |
+| `cd web && bunx eslint` on changed files | `87dbf51b` | clean |
+| `cd web && bun run build` | `87dbf51b` | compiled |
+| `bunx playwright test e2e/browser-storage-disclosure.spec.ts` | `87dbf51b` | 2 passed |
+| `scripts/check_modularity_budget.py` | `87dbf51b` | no violations; `ChatInterface.tsx` 2584 to 2581 lines |
 
 No live measurement: no model-facing text or routing changed.
