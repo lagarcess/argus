@@ -9,6 +9,7 @@ recorded on the turn so a model that keeps writing em dashes stays visible.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,8 +22,18 @@ _CLOSING_PUNCTUATION = ".,;:!?"
 # A dash set directly between two figures, no space on either side, is the
 # model's range notation ("5%—10%", "$1,000—$2,000"); a comma would change
 # the fact, so the range keeps a hyphen in every language.
-_RANGE_LEFT = frozenset("0123456789%")
-_RANGE_RIGHT = frozenset("0123456789$€£")
+
+
+def _ends_a_figure(char: str) -> bool:
+    """A digit or a percent-like sign closes a figure."""
+    return char.isdigit() or unicodedata.name(char, "").endswith(
+        ("PERCENT SIGN", "PER MILLE SIGN")
+    )
+
+
+def _opens_a_figure(char: str) -> bool:
+    """A digit or any currency sign (Unicode category Sc) opens a figure."""
+    return char.isdigit() or unicodedata.category(char) == "Sc"
 
 
 @dataclass(frozen=True)
@@ -69,8 +80,8 @@ def _without_em_dashes(text: str, *, trailing: str, left_tail: str = "") -> str:
         if (
             raw_left
             and piece
-            and raw_left[-1] in _RANGE_LEFT
-            and piece[0] in _RANGE_RIGHT
+            and _ends_a_figure(raw_left[-1])
+            and _opens_a_figure(piece[0])
         ):
             result = f"{result}-{piece}"
             continue
