@@ -40,6 +40,8 @@ from fastapi.testclient import TestClient
         # Adjacent dashes are one dash; every dash is still counted.
         ("Wait——actually, no cap.", "Wait, actually, no cap.", 2),
         ("Espera——en realidad, sin tope.", "Espera, en realidad, sin tope.", 2),
+        ("Wait— —actually, no cap.", "Wait, actually, no cap.", 2),
+        ("Espera — — en realidad, sin tope.", "Espera, en realidad, sin tope.", 2),
         # A dash set directly between two figures is the model's range
         # notation; a comma would change the fact, so it keeps a hyphen.
         ("Expect 5%—10% a year.", "Expect 5%-10% a year.", 1),
@@ -213,6 +215,8 @@ def test_chat_stream_records_nothing_when_no_em_dash_was_shown(
         (["Wait——", "actually"], "Wait, actually"),
         (["Wait—", "—actually"], "Wait, actually"),
         (["Espera", "——en realidad"], "Espera, en realidad"),
+        (["Wait— ", "—actually"], "Wait, actually"),
+        (["Espera —", " — en realidad"], "Espera, en realidad"),
         (["First line\n", "— second"], "First line\nsecond"),
         (["Expect 5%", "—10%", " a year."], "Expect 5%-10% a year."),
         (["Expect 5%—", "10% a year."], "Expect 5%-10% a year."),
