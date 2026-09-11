@@ -1227,8 +1227,12 @@ after reload; dates use the current workspace locale. Fallbacks retain returned
 sources with the research sidecar's degraded code, so the panel describes where
 Argus looked. An absent source date does not discard prose.
 
-Code does not append a bibliography to accepted `text`. Citation links already
-inside the model's complete prose remain intact. No additional readout envelope
+Code does not append a bibliography to accepted `text`. The writing brief asks
+for short descriptive inline link text in the supporting sentence, never a bare
+URL. Before saving an accepted Breakdown, code retains hyperlinks only to URLs
+returned with that draft. A bare returned URL uses its source title; a link to
+an unreturned URL loses its link while preserving its visible words. This same
+saved text travels in live finals and reloads. No additional readout envelope
 fields or figure references are exposed. The writing brief asks the model to
 distinguish documented
 events from inference and excludes forecasts and investing advice. Returned

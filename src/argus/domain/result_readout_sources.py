@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal
 
 from pydantic import Field, create_model
 
+from argus.domain.research.contracts import ResearchSource
 from argus.domain.result_readout_grounding import (
     ResultReadoutDraft,
     ResultReadoutFigure,
     accepted_readout_text,
 )
+from argus.domain.result_readout_links import returned_source_links
 from argus.domain.result_readout_quotes import readout_figure_keys
 
 
@@ -43,7 +46,8 @@ BREAKDOWN_SOURCE_INSTRUCTIONS = (
     "Search the web for sources about what happened during this historical window. "
     "Use them to explain events and distinguish evidence from inference. "
     "The supplied run facts alone own this backtest's figures; web context must not replace them. "
-    "Link evidence in the relevant sentence. We show the returned sources in a separate "
+    "Use short descriptive link text in the sentence the source supports, never a bare URL. "
+    "We show the returned sources in a separate "
     "panel, so do not recreate a source list."
 )
 
@@ -53,6 +57,12 @@ def accepted_breakdown_text(
     *,
     facts: dict[str, Any],
     language: str,
+    sources: Sequence[ResearchSource] = (),
 ) -> tuple[str | None, str | None]:
     """Keep the complete prose and in-text citations; sources travel separately."""
-    return accepted_readout_text(draft, facts=facts, language=language)
+    text, failure = accepted_readout_text(draft, facts=facts, language=language)
+    return (
+        (returned_source_links(text, sources), None)
+        if text is not None
+        else (None, failure)
+    )

@@ -181,6 +181,7 @@ def _llm_result_breakdown_with_metadata(
         response.draft,
         facts=headline_facts,
         language=resolved_language,
+        sources=response.sources,
     )
     return text, failure, response.usage, response.sources
 

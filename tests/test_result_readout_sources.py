@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 import pytest
+from argus.domain.research.contracts import ResearchSource
 from argus.domain.result_readout_sources import accepted_breakdown_text
 
 
@@ -30,7 +31,12 @@ def test_in_text_citations_remain_without_appending_a_source_list(
     facts = {"facts": {"portfolio.ending_value": {"value": 1000.0, "unit": "currency"}}}
     before = deepcopy(facts)
     rendered, failure = accepted_breakdown_text(
-        source_draft, facts=facts, language=language
+        source_draft,
+        facts=facts,
+        language=language,
+        sources=[
+            ResearchSource(url="https://example.com/earnings", title="Quarterly report")
+        ],
     )
     assert failure is None
     assert rendered == text
