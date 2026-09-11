@@ -78,8 +78,11 @@ the merge ignores it. That replay is a committed test.
   setup whatever act the interpreter labeled it, with one exception: an
   explicit fresh-task read (`new_idea` and `new_task`) starts clean whatever
   the draft holds, complete or not, and what it lacks is asked for rather
-  than inherited. `_pending_setup_continuation_reason_codes` records the
-  override as `pending_setup_continuation_merged`.
+  than inherited. That pair has one owner, `is_explicit_fresh_task` in
+  `interpreter/shared.py`, read by this predicate and by the act owner, and
+  the stage's act set is the owner's `KNOWN_TURN_ACTS`.
+  `_pending_setup_continuation_reason_codes` records the override as
+  `pending_setup_continuation_merged`.
 - `interpreter/shared.py`: `repaired_turn_act`, the one owner of the act a
   repaired read carries. A known act is the model's read and stays; an act a
   repair replaces (none, `unsupported_request`) is decided by whether the
@@ -134,12 +137,12 @@ the merge ignores it. That replay is a committed test.
 
 | Suite | Result |
 | --- | ---: |
-| `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task, the recorded two turns through the real workflow) | 98 passed |
+| `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task and of a continuing new idea, the recorded two turns through the real workflow) | 101 passed |
 | `tests/agent_runtime/test_dca_money_role_audits.py` | 35 passed |
 | `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 21 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
-| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `ef6b38a1` | 2639 passed, 2 skipped |
-| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `ef6b38a1` | 822 passed |
+| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `f7fc6d74` | 2642 passed, 2 skipped |
+| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `f7fc6d74` | 822 passed |
 | `scripts/check_modularity_budget.py` | no violations |
 
 ## Measurement cases, run live on the fix (`live_cases_after.json`)
@@ -340,6 +343,19 @@ only, so the runtime asked for the period before it could refuse the cap
 (`missing_period`); the money fields never held the shape this round
 changed. Rerun alone with grok on the primary it passed ($0.03).
 
+## Codex round 8 (one P1 on `5327ad23`, fixed in `f7fc6d74`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| The act owner treated every `new_idea` as fresh while the stage predicate treated only `new_idea` with `new_task` as fresh, so a date-only reply the model labelled `new_idea`/`continue` lost its pending base in the focused re-read and fell to unsupported recovery | One owner for the pair: `is_explicit_fresh_task` in `interpreter/shared.py`; `repaired_turn_act` and `_turn_continues_pending_setup` both derive from it, and the stage's act set is the owner's `KNOWN_TURN_ACTS` | the act owner's table gains the `new_idea`/`continue` row; `test_a_focused_repair_of_a_date_only_reply_read_as_a_continuing_new_idea_keeps_the_pending_setup` (en, es-419) |
+
+### Measurement cases the round-8 fix touches, live at `f7fc6d74` (`live-touched-cases-f7fc6d74.json`)
+
+The continuation cases only (the money-role code is untouched this round):
+the two recorded repros (en, es-419), the two prebaked-chip followups and
+`action_chip_change_asset_no_active_ref_fresh_idea_issue_188`. All five
+passed with the judge on, $0.17.
+
 ## Billed cost
 
 | Item | Cost |
@@ -357,7 +373,8 @@ changed. Rerun alone with grok on the primary it passed ($0.03).
 | Nine touched measurement cases live at `8241f56d` | $0.255 |
 | Nine touched measurement cases live at `cda7a1a3` | $0.281 |
 | Nine touched measurement cases live at `ef6b38a1`, plus one solo rerun | $0.325 |
-| **Total** | **$3.76** |
+| Five continuation cases live at `f7fc6d74` | $0.175 |
+| **Total** | **$3.94** |
 
 ## Observed, not changed here
 
