@@ -1213,19 +1213,7 @@ async def chat_stream(
                     or typed_artifact_answer
                     or lifecycle_hooks.turn_id is not None
                 ):
-                    # Discovery codes only; other retryable recoveries keep
-                    # completed-turn settlement.
-                    retryable_recovery_code = (
-                        str(recovery.get("code"))
-                        if isinstance(recovery, dict)
-                        and recovery.get("retryable") is True
-                        and recovery.get("code")
-                        in {
-                            "discovery_search_failed",
-                            "discovery_suggestions_unavailable",
-                        }
-                        else None
-                    )
+                    retryable_recovery_code = chat_retry.discovery_recovery_code(recovery)
                     if retryable_recovery_code is not None:
                         # Retryable discovery recovery: the lifecycle owns the
                         # durable retry; completed turns strip it by design.
@@ -1235,19 +1223,9 @@ async def chat_stream(
                             failure_code=retryable_recovery_code,
                             retryable=True,
                         )
-                        durable_retry = (
-                            assistant_message.metadata.get("retry_last_turn")
-                            if isinstance(assistant_message.metadata, dict)
-                            else None
-                        )
-                        if isinstance(durable_retry, dict):
-                            # Live final event carries the message-shape retry;
-                            # the anchored shape renders only from hydration.
-                            runtime_result["retry_last_turn"] = {
-                                key: durable_retry[key]
-                                for key in ("message", "action")
-                                if key in durable_retry
-                            }
+                        live_retry = chat_retry.live_retry_payload(assistant_message)
+                        if live_retry is not None:
+                            runtime_result["retry_last_turn"] = live_retry
                     else:
                         memory_recalls = await memory_recalls_for_turn_async(
                             user=user,

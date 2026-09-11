@@ -7,6 +7,19 @@ from argus.api.chat.breakdown import _result_breakdown_llm_messages
 from argus.domain.result_readout_grounding import accepted_readout_text
 
 
+@pytest.mark.parametrize("language", ["en", "es-419"])
+@pytest.mark.parametrize("text", ["5%—10%", "A — B", "A —", "— A"])
+def test_readouts_use_the_same_punctuation_owner_as_other_replies(language, text):
+    from argus.api.chat.visible_reply import rewrite_visible_reply
+
+    expected = rewrite_visible_reply(text, surface="test").text
+    assert accepted_readout_text(
+        {"language": language, "text": text, "figures": []},
+        facts={},
+        language=language,
+    ) == (expected, None)
+
+
 @pytest.mark.parametrize("language,provider_language", [("en", "en"), ("es-419", "es")])
 def test_breakdown_uses_provider_language_code_without_changing_draft_language(
     language, provider_language

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -19,6 +18,7 @@ from argus.domain.result_readout_facts import (
     result_readout_config,
 )
 from argus.domain.result_readout_quotes import validate_figure_references
+from argus.domain.visible_reply import rewrite_visible_reply
 
 READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "Tell the story of this historical experience in plain language: what staying "
@@ -192,7 +192,7 @@ def accepted_readout_text(
         return None, "invalid_figure_reference"
     if figure_failure:
         return None, figure_failure
-    return re.sub(r"[ \t]*—[ \t]*", ", ", text.strip()), None
+    return rewrite_visible_reply(text.strip(), surface="result_readout").text, None
 
 
 def _mapping(value: object) -> dict[str, Any]:
