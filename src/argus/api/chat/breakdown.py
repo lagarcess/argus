@@ -66,7 +66,7 @@ def result_breakdown_spec(language: str) -> ResearchConfigSpec:
         max_output_tokens=2200,
         tools=("web_search", "fetch_url"),
         timeout_seconds=75.0,
-        language=language,
+        language=language.split("-", 1)[0],
     )
 
 

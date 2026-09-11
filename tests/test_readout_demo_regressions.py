@@ -7,6 +7,18 @@ from argus.api.chat.breakdown import _result_breakdown_llm_messages
 from argus.domain.result_readout_grounding import accepted_readout_text
 
 
+@pytest.mark.parametrize("language,provider_language", [("en", "en"), ("es-419", "es")])
+def test_breakdown_uses_provider_language_code_without_changing_draft_language(
+    language, provider_language
+):
+    from argus.api.chat.breakdown import result_breakdown_spec
+
+    assert result_breakdown_spec(language).language == provider_language
+    facts = {"symbols": ["DOCN"], "facts": {}}
+    messages = _result_breakdown_llm_messages(facts=facts, language=language)
+    assert ("Spanish" if language == "es-419" else "English") in messages[0]["content"]
+
+
 def test_repeated_number_does_not_require_occurrence_bookkeeping():
     text = "There were 13 executed fills, not 13 completed round trips."
     facts = {"facts": {"Executed fills": {"value": 13, "unit": "count"}}}
