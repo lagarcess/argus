@@ -37,6 +37,14 @@ from fastapi.testclient import TestClient
         ("— starts with a dash", "starts with a dash", 1),
         ("ends with a dash —", "ends with a dash.", 1),
         ("Comma already, — twice", "Comma already, twice", 1),
+        # A dash set directly between two figures is the model's range
+        # notation; a comma would change the fact, so it keeps a hyphen.
+        ("Expect 5%—10% a year.", "Expect 5%-10% a year.", 1),
+        ("Between $1,000—$2,000 a month.", "Between $1,000-$2,000 a month.", 1),
+        ("Espera 5%—10% al año.", "Espera 5%-10% al año.", 1),
+        ("Entre $1,000—$2,000 al mes.", "Entre $1,000-$2,000 al mes.", 1),
+        # A spaced dash between figures is an aside, not a range.
+        ("It returned 12% — 3% above SPY.", "It returned 12%, 3% above SPY.", 1),
         (
             "No dash here, only a hyphen-joined word.",
             "No dash here, only a hyphen-joined word.",
@@ -192,6 +200,9 @@ def test_chat_stream_records_nothing_when_no_em_dash_was_shown(
         ),
         (["Comma already,", " — twice"], "Comma already, twice"),
         (["First line\n", "— second"], "First line\nsecond"),
+        (["Expect 5%", "—10%", " a year."], "Expect 5%-10% a year."),
+        (["Expect 5%—", "10% a year."], "Expect 5%-10% a year."),
+        (["Entre $1,000", "—", "$2,000 al mes."], "Entre $1,000-$2,000 al mes."),
     ],
 )
 def test_streamed_chunks_render_exactly_what_the_final_reply_persists(

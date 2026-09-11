@@ -18,6 +18,11 @@ EM_DASH = "—"
 REPLY_REWRITES_METADATA_KEY = "reply_rewrites"
 
 _CLOSING_PUNCTUATION = ".,;:!?"
+# A dash set directly between two figures, no space on either side, is the
+# model's range notation ("5%—10%", "$1,000—$2,000"); a comma would change
+# the fact, so the range keeps a hyphen in every language.
+_RANGE_LEFT = frozenset("0123456789%")
+_RANGE_RIGHT = frozenset("0123456789$€£")
 
 
 @dataclass(frozen=True)
@@ -33,7 +38,8 @@ def rewrite_visible_reply(
     trailing: str = "sentence",
     left_tail: str = "",
 ) -> VisibleReply:
-    """Replace every em dash with the comma the copy rule asks for.
+    """Replace every em dash with the comma the copy rule asks for, or the
+    hyphen of a numeric range.
 
     ``trailing`` says what a dash with nothing after it means: the end of a
     whole reply ("sentence") or the end of a streamed token ("clause") whose
@@ -59,6 +65,15 @@ def _without_em_dashes(text: str, *, trailing: str, left_tail: str = "") -> str:
     pieces = text.split(EM_DASH)
     result = pieces[0]
     for piece in pieces[1:]:
+        raw_left = result or left_tail
+        if (
+            raw_left
+            and piece
+            and raw_left[-1] in _RANGE_LEFT
+            and piece[0] in _RANGE_RIGHT
+        ):
+            result = f"{result}-{piece}"
+            continue
         left = result.rstrip(" ")
         # What the dash follows: this piece's own text, or the text already
         # shown when the dash opens a stream chunk.
