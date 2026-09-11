@@ -25,6 +25,7 @@ from argus.domain.market_data.new_york_clock import new_york_today
 _DCA_SEED_KEYS: tuple[str, ...] = DCA_SEED_ROLES
 _DCA_CEILING_KEYS: tuple[str, ...] = DCA_CEILING_ROLES
 _DCA_SEED_ROLE_SOURCES: frozenset[str] = frozenset(DCA_SEED_ROLES)
+_DCA_CONTRIBUTION_CEILING_SOURCES: frozenset[str] = frozenset(DCA_CEILING_ROLES)
 
 # One identity for the ceiling refusal, so the producer and every reader that
 # defers or filters it cannot drift apart under a rename.
@@ -128,6 +129,8 @@ def conserve_semantic_constraints(
     if executable_strategy_type(updated) == "dca_accumulation":
         if money_evidence.ceiling_key_read_as_seed:
             reason_codes.append("semantic_dca_seed_role_read_over_ceiling_key")
+        if money_evidence.seed_key_read_as_ceiling:
+            reason_codes.append("semantic_dca_ceiling_role_read_over_seed_key")
         # A seed and a ceiling can both be stated in one breath, and they are
         # answered independently: the seed executes, the ceiling is refused.
         if money_evidence.contribution_ceiling is not None:
@@ -212,6 +215,7 @@ class _MoneyRoleEvidence:
     contribution_ceiling: float | None = None
     contribution_ceiling_source: str | None = None
     ceiling_key_read_as_seed: bool = False
+    seed_key_read_as_ceiling: bool = False
 
 
 def _structured_money_role_evidence(
@@ -272,6 +276,19 @@ def _structured_money_role_evidence(
     ):
         recurring = _coerce_number(strategy.capital_amount)
 
+    seed_key_read_as_ceiling = False
+    seed_source = str(field_provenance.get(total_key) or "").strip().lower()
+    if (
+        total is not None
+        and total_key in _DCA_SEED_KEYS
+        and seed_source in _DCA_CONTRIBUTION_CEILING_SOURCES
+    ):
+        # The key says seed, the provenance says ceiling: a cap in the wrong
+        # slot bounds the plan, it is never money on day one.
+        if ceiling is None or ceiling == total:
+            ceiling, ceiling_key = total, seed_source
+        total, total_key = None, None
+        seed_key_read_as_ceiling = True
     resolved_source = total_key or capital_source or None
     if ceiling is None and resolved_source in _DCA_CEILING_KEYS:
         # The provenance named a cap even though no ceiling key carried a
@@ -297,6 +314,7 @@ def _structured_money_role_evidence(
         contribution_ceiling=ceiling,
         contribution_ceiling_source=ceiling_key,
         ceiling_key_read_as_seed=ceiling_key_read_as_seed,
+        seed_key_read_as_ceiling=seed_key_read_as_ceiling,
     )
 
 
@@ -418,9 +436,6 @@ def _coerce_number(value: Any) -> float | None:
         except ValueError:
             return None
     return None
-
-
-_DCA_CONTRIBUTION_CEILING_SOURCES = frozenset(DCA_CEILING_ROLES)
 
 
 def _dca_total_capital_is_a_ceiling(source: str | None) -> bool:

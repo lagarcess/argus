@@ -125,6 +125,22 @@ class ReplyRewrites:
         self._shown_tail = f"{self._shown_tail}{shown}"[-32:]
         return shown
 
+    def flush(self) -> str:
+        """Show what a chunk held for a next chunk that never came."""
+        held, self._carry = self._carry, ""
+        if not held:
+            return ""
+        rewritten = rewrite_visible_reply(
+            held,
+            surface=f"{self.surface}:token",
+            trailing="sentence",
+            left_tail=self._shown_tail,
+        )
+        self.em_dash_count += rewritten.em_dash_count
+        shown = rewritten.text or ""
+        self._shown_tail = f"{self._shown_tail}{shown}"[-32:]
+        return shown
+
     def text(self, value: Any) -> Any:
         if not isinstance(value, str):
             return value

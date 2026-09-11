@@ -899,6 +899,9 @@ async def chat_stream(
                     continue
 
                 final_seen = True
+                if (flushed := reply_rewrites.flush()) and not private_result_stream:
+                    streamed_text_parts.append(flushed)
+                    yield sse_data({"type": "token", "content": flushed})
                 apply_turn_progress_evidence(runtime_event.get("_turn_progress"))
                 discovery_usage_evidence = runtime_event.get("_discovery_usage")
                 runtime_result = dict(runtime_event.get("payload") or {})

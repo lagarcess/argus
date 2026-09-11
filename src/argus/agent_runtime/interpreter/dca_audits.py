@@ -155,6 +155,9 @@ def _response_from_dca_contract_audit(
 
 # A budget audit that names a seed role has read the seed, not a ceiling.
 _DCA_SEED_ROLE_SOURCES = frozenset(DCA_SEED_ROLES)
+# Provenance that makes a seed the user's own: their words, a carried setup,
+# or a seed role. A ceiling role under the seed key is a cap in the wrong slot.
+_USER_SEED_SOURCES = frozenset({"user", "explicit_user", "prior", *DCA_SEED_ROLES})
 
 
 def _draft_types_amount_as_seed(
@@ -164,7 +167,7 @@ def _draft_types_amount_as_seed(
 ) -> bool:
     if draft.initial_capital is None or float(draft.initial_capital) != amount:
         return False
-    return _capital_source(field_provenance, "initial_capital") in _TOTAL_CAPITAL_SOURCES
+    return _capital_source(field_provenance, "initial_capital") in _USER_SEED_SOURCES
 
 
 def _seed_corroborated_by_fidelity_audit(

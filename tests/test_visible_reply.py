@@ -215,3 +215,76 @@ def test_streamed_chunks_render_exactly_what_the_final_reply_persists(
     assert final_text == expected
     assert runtime_result["assistant_response"] == expected
     assert metadata[REPLY_REWRITES_METADATA_KEY] == {"em_dash": full.count(EM_DASH)}
+
+
+# --- Codex round 3 on PR #591 -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("chunks", "expected"),
+    [
+        (["Hello", " —"], "Hello."),
+        (["Hola, capital inicial de $1,000 —"], "Hola, capital inicial de $1,000."),
+        (["Trailing space", " "], "Trailing space "),
+    ],
+)
+def test_a_reply_that_ends_on_a_held_boundary_is_flushed_when_the_stream_closes(
+    chunks: list[str], expected: str
+) -> None:
+    from argus.api.chat.visible_reply import ReplyRewrites
+
+    rewrites = ReplyRewrites(surface="test")
+    live = "".join(rewrites.token(chunk) for chunk in chunks) + rewrites.flush()
+    full = "".join(chunks)
+    final_text, _ = rewrites.finalize(
+        runtime_result={"assistant_response": full},
+        metadata={},
+        assistant_text=full,
+        persisted_text=full,
+    )
+
+    assert live == expected
+    assert final_text == expected
+    assert rewrites.flush() == ""
+
+
+def test_chat_stream_flushes_a_trailing_em_dash_before_the_final_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "clarify"}
+        yield {"type": "token", "content": "Hello"}
+        yield {"type": "token", "content": " —"}
+        yield {"type": "stage_outcome", "outcome": "await_user_reply"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_response": "Hello —",
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router, "stream_agent_turn_events", _fake_stream_agent_turn_events
+    )
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"conversation_id": conversation["id"], "message": "hi", "language": "en"},
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    tokens = "".join(event["content"] for event in events if event.get("type") == "token")
+    final = next(event for event in events if event.get("type") == "final")["payload"]
+    assert tokens == "Hello."
+    assert final["assistant_response"] == "Hello."
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant = next(message for message in messages if message["role"] == "assistant")
+    assert assistant["content"] == "Hello."

@@ -367,3 +367,73 @@ def test_every_seed_role_is_written_and_read_as_the_seed(role: str) -> None:
     )
     assert report.unsupported_constraints == []
     assert report.optional_parameter_values["initial_capital"] == 1000.0
+
+
+# --- Codex round 3 on PR #591 -------------------------------------------------
+
+
+def test_a_cap_slotted_as_the_seed_with_a_ceiling_role_is_not_a_typed_seed() -> None:
+    # The primary read put the cap under initial_capital but kept its role as
+    # total_budget. That is a ceiling in the wrong slot, not a seed the user
+    # typed, so the audit's matching cap is applied, not outranked.
+    response = _dca_response(initial_capital=5000.0, seed_provenance="total_budget")
+
+    repaired = _response_from_dca_contract_audit(
+        response=response,
+        audit=_contract_audit(total_budget_amount=5000.0, total_budget_source="cap"),
+    )
+
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.total_capital == 5000.0
+    assert draft.extra_parameters["total_budget"] == 5000.0
+    assert "dca_budget_audit_outranked_by_typed_seed" not in repaired.reason_codes
+    projected = _strategy_from_llm(draft, "$200 a month, no more than $5,000 total.")
+    report = conserve_semantic_constraints(
+        strategy=projected, selected_thread_metadata={}
+    )
+    assert [c.category for c in report.unsupported_constraints] == [
+        UNSUPPORTED_DCA_CONTRIBUTION_CEILING
+    ]
+    assert report.optional_parameter_values.get("initial_capital") in (None, 5000.0)
+    assert report.evidence.contribution_ceiling == 5000.0
+
+
+def test_semantic_reader_treats_a_seed_key_with_a_ceiling_role_as_the_ceiling() -> None:
+    # The mirror of the seed-role-under-ceiling-key rule: the role wins.
+    strategy = _pending_dca(
+        {
+            "recurring_contribution": 200.0,
+            "initial_capital": 5000.0,
+            "field_provenance": {
+                "recurring_contribution": "explicit_user",
+                "initial_capital": "total_budget",
+            },
+        }
+    )
+
+    report = conserve_semantic_constraints(strategy=strategy, selected_thread_metadata={})
+
+    assert [c.category for c in report.unsupported_constraints] == [
+        UNSUPPORTED_DCA_CONTRIBUTION_CEILING
+    ]
+    assert report.evidence.contribution_ceiling == 5000.0
+    assert "semantic_dca_ceiling_role_read_over_seed_key" in report.reason_codes
+
+
+@pytest.mark.parametrize(
+    "seed_source", ["user", "explicit_user", "prior", "starting_capital"]
+)
+def test_a_seed_typed_under_a_seed_or_user_role_still_outranks_the_audit(
+    seed_source: str,
+) -> None:
+    response = _dca_response(initial_capital=1000.0, seed_provenance=seed_source)
+
+    repaired = _response_from_dca_contract_audit(
+        response=response,
+        audit=_contract_audit(total_budget_amount=1000.0, total_budget_source="cap"),
+    )
+
+    assert repaired is not None
+    assert repaired.candidate_strategy_draft.total_capital is None
+    assert "dca_budget_audit_outranked_by_typed_seed" in repaired.reason_codes
