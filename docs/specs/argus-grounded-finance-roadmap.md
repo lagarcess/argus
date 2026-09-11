@@ -1428,6 +1428,8 @@ runtime behind it at all.
 
 ## Releases
 
+**Founder, 2026-09-11: no promotion until the entire roadmap is ready.** The release names below group the work; they are not separate promotions. Every landed migration waits for that one promotion.
+
 The board does not wait for the vision to be complete. Each checkpoint is
 cohesive on its own, and cutting them small is cheaper as well as safer:
 `eval_measured_code_unchanged` in the promotion gate returns early when a change
