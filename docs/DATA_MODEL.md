@@ -149,8 +149,6 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `preferred_name`: `text` (Nullable; 1 to 40 characters when present)
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
-- `theme`: `text` (Default: `'dark'`; retired: nothing reads or writes it, the
-  chosen theme stays in the browser, and a later migration drops the column)
 - `avatar_theme`: `avatar_theme` enum (Default: `'ocean'`; one of `ocean`,
   `plum`, `teal`, `ember`, `gold`, `indigo`, or `slate`)
 - `is_admin`: `boolean` (Default: `false`)

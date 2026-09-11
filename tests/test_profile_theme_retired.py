@@ -1,8 +1,7 @@
 """Theme is a browser preference, and the account does not hold one.
 
-next-themes keeps the choice in the browser under `argus-theme`. The
-`profiles.theme` column outlives this change until a later migration drops it,
-so rows read in between still carry it.
+next-themes keeps the choice in the browser under `argus-theme`, and
+`profiles` has no `theme` column.
 """
 
 from __future__ import annotations
@@ -36,14 +35,13 @@ def _client() -> TestClient:
     return client
 
 
-def _row(user_id: str = "user-1", **columns: object) -> dict[str, object]:
+def _row(user_id: str) -> dict[str, object]:
     now = datetime.now(timezone.utc).isoformat()
     return {
         "id": user_id,
         "email": "a@b.c",
         "created_at": now,
         "updated_at": now,
-        **columns,
     }
 
 
@@ -59,13 +57,6 @@ def test_the_contract_declares_no_theme() -> None:
 
     for model in PROFILE_MODELS:
         assert "theme" not in schemas[model.__name__]["properties"]
-
-
-def test_a_row_that_still_has_the_column_is_read_without_it() -> None:
-    row = _row(theme="light")
-
-    assert "theme" not in User.model_validate(row).model_dump()
-    assert "theme" not in GuestUser.model_validate(row).model_dump()
 
 
 def test_patch_me_ignores_a_theme_and_saves_the_rest() -> None:
