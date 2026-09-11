@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
 from argus.api.feedback_context import sanitize_feedback_context
+from argus.api.feedback_notification import notify_feedback_submitted
 from argus.api.guest_access import account_context
 from argus.api.guest_observability import emit_guest_funnel_event
 from argus.api.schemas import FeedbackRequest, SuccessResponse, User
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/v1", tags=["feedback"])
 def feedback(
     payload: FeedbackRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     user: User = Depends(current_user),  # noqa: B008
 ) -> SuccessResponse:
     account = account_context(request)
@@ -95,6 +97,14 @@ def feedback(
             }
         )
 
+    background_tasks.add_task(
+        notify_feedback_submitted,
+        feedback_type=payload.type,
+        message=payload.message,
+        context=context,
+        account_kind=account.kind,
+        language=user.language,
+    )
     emit_guest_funnel_event(
         account=account,
         kind="guest_feedback_submitted",

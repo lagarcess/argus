@@ -355,7 +355,7 @@ def test_access_welcome_sender_preserves_smtp_and_multipart_contract(
 
     monkeypatch.setenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD", "re_test_password")
     monkeypatch.setattr(
-        "argus.domain.access_approval_email.smtplib.SMTP_SSL",
+        "argus.domain.resend_email.smtplib.SMTP_SSL",
         _smtp,
     )
 
@@ -428,7 +428,7 @@ def test_access_welcome_hash_uses_only_stable_namespace_and_claim_token(
 
     monkeypatch.setenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD", "re_test_password")
     monkeypatch.setattr(
-        "argus.domain.access_approval_email.smtplib.SMTP_SSL",
+        "argus.domain.resend_email.smtplib.SMTP_SSL",
         _smtp,
     )
 
@@ -490,7 +490,7 @@ def test_access_welcome_receipt_is_bounded_to_256_characters(
 
     monkeypatch.setenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD", "re_test_password")
     monkeypatch.setattr(
-        "argus.domain.access_approval_email.smtplib.SMTP_SSL",
+        "argus.domain.resend_email.smtplib.SMTP_SSL",
         _smtp,
     )
 

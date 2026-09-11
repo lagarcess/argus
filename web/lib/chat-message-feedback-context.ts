@@ -18,18 +18,22 @@ export function feedbackContextForMessage(
   const result = message.result;
   const confirmation = message.confirmation;
   const job = message.backtestJob;
+  const calculation = message.toolResultCards?.findLast(
+    (card) => card.outcome.status === "succeeded",
+  );
   const artifactId =
     message.artifactId ??
     result?.artifactId ??
     result?.runId ??
     confirmation?.artifactId ??
     confirmation?.confirmation_id ??
-    job?.id;
+    job?.id ??
+    calculation?.artifact_id;
   const artifactType =
     message.artifactType ??
     result?.artifactType ??
     confirmation?.artifactType ??
-    (job ? "backtest_job" : undefined);
+    (job ? "backtest_job" : calculation?.kind);
   const artifactStatus =
     message.artifactStatus ??
     result?.artifactStatus ??
@@ -44,6 +48,7 @@ export function feedbackContextForMessage(
     artifact_type: artifactType,
     artifact_status: artifactStatus,
     result_run_id: result?.runId,
+    evidence_artifact_id: result?.evidenceArtifactId,
     strategy_id: result?.strategyId,
     saved_strategy_id: message.savedStrategyId ?? result?.savedStrategyId,
     confirmation_id: confirmation?.confirmation_id,

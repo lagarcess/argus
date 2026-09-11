@@ -2,21 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import html
-import os
-import smtplib
-import ssl
 from dataclasses import dataclass
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
 from argus.api.schemas import Language
+from argus.domain.resend_email import SUPPORT_EMAIL_ADDRESS, send_resend_email
 
-_SMTP_HOST = "smtp.resend.com"
-_SMTP_PORT = 465
-_SMTP_USERNAME = "resend"
-_SMTP_TIMEOUT_SECONDS = 10.0
-_SENDER_ADDRESS = "noreply@get-argus.com"
-_SENDER_HEADER = "Argus <noreply@get-argus.com>"
 _MAX_RECEIPT_LENGTH = 256
 _IDEMPOTENCY_NAMESPACE = "argus-access-welcome"
 
@@ -57,7 +47,7 @@ def build_access_welcome_email(
         cta_line = "Crea tu cuenta de Argus:"
         button_label = "Crea tu cuenta de Argus"
         fallback_line = "Si el botón no funciona, abre este enlace:"
-        support_line = "¿Tienes preguntas? Escribe a support@get-argus.com."
+        support_line = f"¿Tienes preguntas? Escribe a {SUPPORT_EMAIL_ADDRESS}."
     elif language == "en":
         subject = "Welcome to Argus"
         html_language = "en"
@@ -72,7 +62,7 @@ def build_access_welcome_email(
         cta_line = "Create your Argus account:"
         button_label = "Create your Argus account"
         fallback_line = "If the button does not work, open this link:"
-        support_line = "Questions? Contact support@get-argus.com."
+        support_line = f"Questions? Contact {SUPPORT_EMAIL_ADDRESS}."
     else:
         raise ValueError("Unsupported access welcome email language.")
 
@@ -147,11 +137,6 @@ def _idempotency_key(
     return f"sha256:{hashlib.sha256(material.encode('utf-8')).hexdigest()}"
 
 
-def _require_accepted(code: int) -> None:
-    if code not in {250, 251}:
-        raise RuntimeError("Access welcome email SMTP delivery was not accepted.")
-
-
 def send_access_welcome_email(
     *,
     recipient: str,
@@ -159,10 +144,6 @@ def send_access_welcome_email(
     signup_url: str,
     claim_token: str,
 ) -> AccessWelcomeSendResult:
-    password = (os.getenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD") or "").strip()
-    if not password:
-        raise RuntimeError("Access welcome email SMTP configuration is unavailable.")
-
     normalized_recipient = recipient.strip().lower()
     if not normalized_recipient:
         raise ValueError("Access welcome email recipient is required.")
@@ -171,31 +152,13 @@ def send_access_welcome_email(
         raise ValueError("Access welcome email claim token is required.")
     content = build_access_welcome_email(language=language, signup_url=signup_url)
 
-    message = MIMEMultipart("alternative")
-    message["From"] = _SENDER_HEADER
-    message["To"] = normalized_recipient
-    message["Subject"] = content.subject
-    message["Resend-Idempotency-Key"] = _idempotency_key(
-        claim_token=normalized_claim_token,
+    receipt = send_resend_email(
+        recipient=normalized_recipient,
+        subject=content.subject,
+        plain_text=content.plain_text,
+        html=content.html,
+        idempotency_key=_idempotency_key(claim_token=normalized_claim_token),
     )
-    message.attach(MIMEText(content.plain_text, "plain", "utf-8"))
-    message.attach(MIMEText(content.html, "html", "utf-8"))
-
-    with smtplib.SMTP_SSL(
-        _SMTP_HOST,
-        _SMTP_PORT,
-        timeout=_SMTP_TIMEOUT_SECONDS,
-        context=ssl.create_default_context(),
-    ) as smtp:
-        smtp.login(_SMTP_USERNAME, password)
-        mail_code, _ = smtp.mail(_SENDER_ADDRESS)
-        _require_accepted(mail_code)
-        recipient_code, _ = smtp.rcpt(normalized_recipient)
-        _require_accepted(recipient_code)
-        data_code, raw_receipt = smtp.data(message.as_string())
-        _require_accepted(data_code)
-
-    receipt = raw_receipt.decode("utf-8", errors="replace").strip()
     return AccessWelcomeSendResult(
         subject=content.subject,
         content_version=ACCESS_WELCOME_CONTENT_VERSION,

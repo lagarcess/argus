@@ -362,7 +362,11 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(chat).toContain("content: message.content");
-    expect(message).toContain('message.kind === "strategy_result"');
+    // The card's gate is the shared settled-result check, which owns the kind test.
+    expect(message).toContain("isSettledStrategyResult(message)");
+    expect(
+      readFileSync(join(root, "lib/chat-result-message.ts"), "utf-8"),
+    ).toContain('message.kind === "strategy_result"');
     expect(message).toContain("const displayContent = getDisplayContent()");
     expect(message).toContain("displayContent &&");
     expect(message).toContain("<StrategyResultCard");

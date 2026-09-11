@@ -226,6 +226,17 @@
         "other": "Other"
       }
     },
+    "ask": {
+      "question": "How is Argus doing?",
+      "answers": {
+        "negative": "Bad",
+        "neutral": "Okay",
+        "positive": "Good"
+      },
+      "thanks": "Thanks for telling us.",
+      "tell_more": "Tell us more",
+      "dismiss": "Don't ask again in this chat"
+    },
     "close": "Close feedback"
   },
   "chat": {
