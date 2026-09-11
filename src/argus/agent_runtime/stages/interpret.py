@@ -276,6 +276,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _selected_requested_field,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
+    _pending_setup_continuation_reason_codes,
     _strategy_supplies_explicit_turn_money,
     _supported_experiment_fact_packet,
 )
@@ -580,6 +581,15 @@ async def _stage_result_from_interpretation(
         interpretation=interpretation,
         snapshot=snapshot,
         artifact_target=artifact_target,
+        current_user_message=state.current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    hidden_context_guard_reason_codes += _pending_setup_continuation_reason_codes(
+        prior=_active_strategy_from_snapshot(snapshot),
+        strategy=interpretation.candidate_strategy_draft,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=interpretation.semantic_turn_act,
+        task_relation=interpretation.task_relation,
         current_user_message=state.current_user_message,
     )
     if clear_assistant_response_for_hidden_context:

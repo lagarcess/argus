@@ -1029,7 +1029,11 @@ messages may store `pending_strategy`, `confirmation_card`,
 may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
 `failed_action`, `retry_last_turn`, `recovery`, `clarification`,
-`result_fact_bank`, and `discovery`. User messages created by action chips may store
+`result_fact_bank`, and `discovery`. When the reply's punctuation was rewritten
+at the point it became visible (the copy rule allows no em dash in any
+language), the assistant message and the live `final` payload carry
+`reply_rewrites`, for example `{"em_dash": 1}`; the key is absent when nothing
+was rewritten. User messages created by action chips may store
 `chat_action` so the transcript can hydrate the selected chip as an action item
 after reload. Action chip requests and
 persisted `chat_action` metadata should preserve `label` plus `labelKey` so

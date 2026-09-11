@@ -85,6 +85,262 @@ _EXPLICIT_TURN_MONEY_SOURCES = frozenset(
 )
 
 
+# The runtime asked and is waiting: a reply continues the setup that is
+# pending, whatever act the interpreter labeled it. Only a new idea about
+# another asset starts over.
+_PENDING_SETUP_OUTCOMES = frozenset({"await_user_reply", "await_approval"})
+_PENDING_SETUP_TURN_ACTS = frozenset(
+    {"new_idea", "answer_pending_need", "refine_current_idea", "approval"}
+)
+
+
+def _turn_continues_pending_setup(
+    *,
+    prior: StrategySummary | None,
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: str | None,
+    task_relation: str | None,
+    current_user_message: str | None = None,
+) -> bool:
+    if prior is None:
+        return False
+    if selected_thread_metadata.get("last_stage_outcome") not in _PENDING_SETUP_OUTCOMES:
+        return False
+    if (
+        semantic_turn_act not in _PENDING_SETUP_TURN_ACTS
+        and semantic_turn_act is not None
+    ):
+        return False
+    if (
+        semantic_turn_act == "new_idea"
+        and task_relation == "new_task"
+        and _strategy_names_another_traded_asset(
+            prior=prior,
+            strategy=strategy,
+            current_user_message=current_user_message,
+        )
+    ):
+        return False
+    return True
+
+
+def _pending_setup_continuation_reason_codes(
+    *,
+    prior: StrategySummary | None,
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: str | None,
+    task_relation: str | None,
+    current_user_message: str | None = None,
+) -> list[str]:
+    """Name the override when the runtime kept a setup the model called new."""
+    if semantic_turn_act != "new_idea" and task_relation != "new_task":
+        return []
+    if not _turn_continues_pending_setup(
+        prior=prior,
+        strategy=strategy,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=semantic_turn_act,
+        task_relation=task_relation,
+        current_user_message=current_user_message,
+    ):
+        return []
+    return ["pending_setup_continuation_merged"]
+
+
+def _current_turn_has_strong_asset_override(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str | None,
+) -> bool:
+    for symbol in strategy.asset_universe:
+        target = _compact_asset_evidence_token(symbol)
+        if not target:
+            continue
+        if _message_has_cashtag_for_asset(current_user_message, target=target):
+            return True
+        if _message_has_uppercase_asset_token(current_user_message, target=target):
+            return True
+        if _strategy_has_strong_asset_evidence(strategy=strategy, target=target):
+            return True
+    return False
+
+
+def _strategy_has_strong_asset_evidence(
+    *,
+    strategy: StrategySummary,
+    target: str,
+) -> bool:
+    evidence_spans = strategy.extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for field_name, evidence in evidence_spans.items():
+            if _field_base(str(field_name)) != "asset_universe":
+                continue
+            evidence_text = str(evidence or "")
+            if _message_has_cashtag_for_asset(evidence_text, target=target):
+                return True
+            if _message_has_uppercase_asset_token(evidence_text, target=target):
+                return True
+    for item in strategy.resolution_provenance:
+        if _field_base(_provenance_field_name(item)) != "asset_universe":
+            continue
+        source = getattr(item, "source", None)
+        raw_text = getattr(item, "raw_text", "")
+        canonical_symbol = getattr(item, "canonical_symbol", "")
+        if str(source or "") == "user_mention" and target in {
+            _compact_asset_evidence_token(raw_text),
+            _compact_asset_evidence_token(canonical_symbol),
+        }:
+            return True
+    return False
+
+
+def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
+    for token in str(message or "").split():
+        cleaned = "".join(
+            character
+            for character in token.strip()
+            if character.isalnum() or character == "$"
+        )
+        if (
+            cleaned.startswith("$")
+            and _compact_asset_evidence_token(cleaned[1:]) == target
+        ):
+            return True
+    return False
+
+
+def _message_has_uppercase_asset_token(message: str | None, *, target: str) -> bool:
+    for token in str(message or "").split():
+        cleaned = "".join(
+            character
+            for character in token.strip()
+            if character.isalnum() or character in {"/", "-"}
+        )
+        if not cleaned or cleaned != cleaned.upper():
+            continue
+        if not any(character.isalpha() and character.isupper() for character in cleaned):
+            continue
+        if _compact_asset_evidence_token(cleaned) == target:
+            return True
+    return False
+
+
+def _compact_asset_evidence_token(value: Any) -> str:
+    return "".join(
+        character.casefold() for character in str(value or "") if character.isalnum()
+    )
+
+
+def _provenance_field_name(item: Any) -> str:
+    field = getattr(item, "field", None)
+    if field is None and isinstance(item, dict):
+        field = item.get("field")
+    return field if isinstance(field, str) else ""
+
+
+def _strategy_has_explicit_asset_evidence(
+    strategy: StrategySummary,
+    *,
+    symbol: str,
+    current_user_message: str | None,
+) -> bool:
+    target = _compact_asset_evidence_token(symbol)
+    if not target:
+        return False
+    if _message_has_cashtag_for_asset(current_user_message, target=target):
+        return True
+
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if isinstance(field_provenance, dict):
+        for field_name, source in field_provenance.items():
+            if _field_base(str(field_name)) != "asset_universe":
+                continue
+            if str(source or "").strip() in {
+                "asset_field",
+                "asset_mention",
+                "cashtag",
+                "composer_mention",
+                "explicit_user",
+                "user",
+                "user_mention",
+            }:
+                return True
+
+    evidence_spans = strategy.extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for field_name, evidence in evidence_spans.items():
+            if _field_base(str(field_name)) != "asset_universe":
+                continue
+            evidence_text = str(evidence or "")
+            if _message_has_cashtag_for_asset(evidence_text, target=target):
+                return True
+
+    for item in strategy.resolution_provenance:
+        if _field_base(_provenance_field_name(item)) != "asset_universe":
+            continue
+        source = getattr(item, "source", None)
+        raw_text = getattr(item, "raw_text", "")
+        canonical_symbol = getattr(item, "canonical_symbol", "")
+        if str(source or "") == "user_mention" and target in {
+            _compact_asset_evidence_token(raw_text),
+            _compact_asset_evidence_token(canonical_symbol),
+        }:
+            return True
+    return False
+
+
+def _incoming_assets_are_benchmarks_only(
+    *,
+    prior: StrategySummary,
+    strategy: StrategySummary,
+) -> bool:
+    if not strategy.asset_universe:
+        return False
+    benchmarks = {
+        _compact_asset_evidence_token(strategy.comparison_baseline),
+        _compact_asset_evidence_token(prior.comparison_baseline),
+    } - {""}
+    return all(
+        _compact_asset_evidence_token(symbol) in benchmarks
+        for symbol in strategy.asset_universe
+    )
+
+
+def _strategy_names_another_traded_asset(
+    *,
+    prior: StrategySummary,
+    strategy: StrategySummary,
+    current_user_message: str | None,
+) -> bool:
+    """The reply itself names a traded asset the pending setup does not hold.
+
+    A benchmark mention is not a traded asset, and an asset the reply never
+    named is a repair artifact; neither changes what is being tested.
+    """
+    benchmarks = {
+        _compact_asset_evidence_token(strategy.comparison_baseline),
+        _compact_asset_evidence_token(prior.comparison_baseline),
+    } - {""}
+    held = {_compact_asset_evidence_token(symbol) for symbol in prior.asset_universe}
+    for symbol in strategy.asset_universe:
+        target = _compact_asset_evidence_token(symbol)
+        if not target or target in benchmarks or target in held:
+            continue
+        if _message_has_cashtag_for_asset(current_user_message, target=target):
+            return True
+        if _message_has_uppercase_asset_token(current_user_message, target=target):
+            return True
+        if _strategy_has_strong_asset_evidence(strategy=strategy, target=target):
+            return True
+        if _strategy_has_explicit_asset_evidence(
+            strategy, symbol=symbol, current_user_message=current_user_message
+        ):
+            return True
+    return False
+
+
 def _strategy_supplies_explicit_turn_money(strategy: StrategySummary) -> bool:
     extra_parameters = strategy.extra_parameters or {}
     field_provenance = extra_parameters.get("field_provenance")
