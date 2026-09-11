@@ -356,6 +356,15 @@ the two recorded repros (en, es-419), the two prebaked-chip followups and
 `action_chip_change_asset_no_active_ref_fresh_idea_issue_188`. All five
 passed with the judge on, $0.17.
 
+## Codex round 9 (one P1 on `416e7348`, not changed)
+
+| Finding | Disposition |
+| --- | --- |
+| An audit that reports a cap equal to the seed the user typed (`total_budget_source="cap"`) is outranked by the typed seed, so an equal-valued cap stated separately would not be refused | Rejected with evidence. The equal amount beside a typed seed is the recorded turn-1 defect (the audit returned the typed $1,000 seed as `total_budget_amount`; the clarifier asked about a cap the user had ruled out). The lane's rule is that an explicit user statement about an amount outranks an audit's guess, and an audit adds a role only for a distinct amount; `test_budget_audit_cannot_re_role_money_the_user_typed_as_the_seed` covers the "cap" and "total_budget" roles since round 1. The suppression is recorded on every turn (`dca_budget_audit_outranked_by_typed_seed`). Honoring an equal-amount cap over the typed seed is a product call for the founder |
+
+The round-8 fix head also gained the modularity budget entry for the grown
+continuation test file (`416e7348`), which the budget test in CI requires.
+
 ## Billed cost
 
 | Item | Cost |
