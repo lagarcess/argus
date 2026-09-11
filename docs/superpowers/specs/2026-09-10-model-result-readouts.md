@@ -266,3 +266,30 @@ Before approval, complete implementation, deterministic verification and the
 bounded measurement setup. After approved proof, report its results and the
 remaining held release gates. Stop if any required change exceeds the precise
 additive client boundary or touches either other forbidden research file.
+
+## 10. Reload persistence and computed headline facts
+
+Founder-directed follow-up, 2026-09-11. This supersedes the canceled harness
+and prior demo scope. Keep the current light figure checks, Sources panel,
+language fallback, provider wiring and single working frame.
+
+- Give Breakdown completion an owner independent of the browser stream.
+  Reuse research job rows, task retention and message-first settlement in
+  production. The existing development memory mode has no job endpoint; its
+  existing ordinary-turn lifecycle must still persist completion after the
+  requesting stream disconnects. Do not add another provider client.
+- Supply the already computed drawdown dollar loss beside its dated endpoints,
+  plus the whole-period peak date and a chronological headline event list.
+  Compute from unrounded stored evidence, then apply card display rounding.
+  Keep series and markers out of the Breakdown request; missing evidence stays
+  unavailable. Do not change acceptance checks to police model arithmetic.
+- Prove cancellation followed by successful persistence, reload hydration,
+  one working state and source-panel continuity with focused free tests.
+  Repeat only DOCN buy and hold and SPY RSI in English and Spanish in the real
+  app, including a reload during generation. Record drafts, screenshots,
+  sources and provider invoices; stop paid work if known billed spend exceeds
+  the founder-authorized $2 round limit, and report uninvoiced attempts.
+- Push the fixes and durable evidence to PR #588. Keep the prompt fingerprint
+  held. No full live measurement, environment-file writes, stash, merge or
+  deployment. Existing forbidden research files remain untouched. Stop and
+  report if a required change cannot fit those boundaries.
