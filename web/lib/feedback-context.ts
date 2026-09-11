@@ -18,9 +18,11 @@ const CONVERSATION_KEYS = [
   "retryable",
 ] as const;
 
+export type FeedbackRating = "positive" | "neutral" | "negative";
+
 type FeedbackContextOptions = {
   includeConversationContext: boolean;
-  rating?: "positive" | "negative";
+  rating?: FeedbackRating;
   tags: string[];
   attachmentCount: number;
 };
