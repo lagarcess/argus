@@ -516,3 +516,32 @@ def test_a_seed_the_audit_reads_keeps_its_role_beside_a_cap_in_the_seed_slot() -
     assert report.evidence.total_capital == 1000.0
     assert report.evidence.contribution_ceiling == 5000.0
     assert report.optional_parameter_values["initial_capital"] == 1000.0
+
+
+def test_an_audit_that_repeats_a_mis_slotted_cap_as_the_seed_adds_no_role() -> None:
+    # The primary typed the $5,000 cap under initial_capital with a ceiling
+    # role; the audit repeats the same $5,000 as starting capital. The same
+    # money read twice adds no role: the plan has a cap and no day-one seed.
+    response = _dca_response(initial_capital=5000.0, seed_provenance="total_budget")
+
+    repaired = _response_from_dca_contract_audit(
+        request=_request(),
+        response=response,
+        audit=_contract_audit(
+            total_budget_amount=5000.0, total_budget_source="starting_capital"
+        ),
+    )
+
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.initial_capital == 5000.0
+    assert draft.total_capital is None
+    assert "total_budget" not in draft.extra_parameters
+    assert "dca_budget_audit_same_amount_already_typed" in repaired.reason_codes
+    projected = _strategy_from_llm(draft, "$100 a month, no more than $5,000 total.")
+    report = conserve_semantic_constraints(
+        strategy=projected, selected_thread_metadata={}
+    )
+    assert report.evidence.contribution_ceiling == 5000.0
+    assert report.evidence.total_capital is None
+    assert report.optional_parameter_values.get("initial_capital") is None
