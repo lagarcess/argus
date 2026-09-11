@@ -1,3 +1,4 @@
+import displayPolicy from "../argus_display_contract/result_display_policy.json";
 import type { StrategyResultPayload } from "@/components/chat/types";
 import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
@@ -661,7 +662,8 @@ export function formatCurrency(value: number, locale = "en-US", currency = "USD"
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: displayPolicy.currency_fraction_digits,
+    maximumFractionDigits: displayPolicy.currency_fraction_digits,
+    roundingMode: displayPolicy.currency_rounding_mode as "halfExpand",
   }).format(value);
 }

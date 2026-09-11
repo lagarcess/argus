@@ -377,9 +377,11 @@ Milestone guardrails:
 - Add out-of-focus chat attention state without inventing backend facts in the
   frontend.
 - Treat Quick take, Explain result, and Try next as distinct result surfaces:
-  Quick take is the first-glance result readout, Explain result is the deeper
-  fact-grounded breakdown action, and Try next must come from supported next
-  experiments rather than generic advice or duplicated Quick take prose.
+  the card owns numerical reporting, Quick take tells the first-glance story,
+  and Explain result develops the fact-grounded holding experience and
+  tradeoffs without repeating it. A supported next historical test may follow
+  naturally in the prose; Try next actions remain structured experiments,
+  not investment advice or a duplicated readout.
 - Do not restore "copy conversation link" or "share conversation id" as a
   pseudo-share action. Until the public excerpt feature exists, the header menu
   should expose only real owner actions such as rename, pin, and delete.
@@ -845,9 +847,25 @@ Pattern:
 - Anti-patterns: dense PDF tone, metric dumps, generic lists, jargon
 - Deterministic facts ground LLM language
 - No raw enums or internal field names in user-facing text
-- Result readouts must preserve surface ownership: Quick take should not render
-  supported next experiments as visible "Try next" copy, while Explain result
-  must not reuse Quick take / Quick Breakdown headings.
+- Result readouts interpret the card instead of restating its figures. A figure
+  belongs in prose only when needed to explain a point, with its fact reference
+  and the card's rounding. Accuracy rules guide writing silently; describe the
+  experience in everyday language without explaining calculation safeguards.
+  A supported next historical test may appear in the story without a "Try next"
+  heading or experiment checklist. Quick take stays first-glance; Explain
+  result adds depth without repeating it or reusing frame headings.
+- Run facts alone own backtest figures. Quick take uses no search. Breakdown may
+  add searched historical context with the sources Perplexity returns, including
+  their dates when provided; it must not substitute web figures for run facts or
+  imply unsupported causality. Its short, plain request receives labeled headline
+  facts, never chart series, markers or internal field paths. Forecasts and
+  investing advice remain outside both readouts.
+- Readout acceptance keeps one light factual guard: declared run figure keys and
+  values must match stored facts within display rounding. Missing references,
+  repeated figures and optional source dates do not reject prose. Language,
+  schema, empty-draft and provider failures still select the complete template;
+  writing requirements are not enforced through per-occurrence or prose regex
+  bookkeeping. The pending Breakdown frame shows localized working text.
 
 Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
 

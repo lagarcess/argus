@@ -322,23 +322,87 @@ Result presentation is a single product moment:
    original user wording.
 3. Offer result actions.
 
-The main card shows only high-signal metrics: total return, final value, max drawdown, and benchmark delta. Win rate appears only when closed trades make it meaningful. Secondary metrics and caveats belong in the breakdown.
+The card owns numerical reporting. Quick take tells the first-glance story;
+Breakdown explores the holding experience and historical tradeoffs without
+repeating the card or Quick take. The frames, labels, ordering and result card
+stay unchanged. Both composers derive their facts from one labeled stored-run
+fact sheet with units, meaning, money roles and available dated path relationships.
+Quick take receives a projection with plain meanings and display-ready values;
+hypothetical capital-scaled losses and storage metadata stay out of the prompt.
+Breakdown receives only
+its labeled headline scalar facts, such as the tested dates, returns, worst drop,
+capital, contributions, costs and purchases/sales versus completed buy-and-sell pairs. The full
+chart series, markers and internal field paths never enter the Breakdown request.
+The worst drop includes its high, low, dates and dollar decline computed from
+unrounded balances. The whole-period peak includes its date. Dated groups enter
+the request in chronological order, with arithmetic done before display rounding;
+missing endpoint or date evidence remains unavailable.
+A figure appears only when a sentence needs it, with its checked fact reference.
+Both composers receive the card's precision: one decimal for percentages, whole
+dollars for account values, and localized dates. Accuracy instructions guide the
+model silently; prose describes the holding experience, not calculation rules.
 
-`Show breakdown` is an educational follow-up, not a second source of result
-truth. The preferred path is an LLM-authored markdown explanation that can vary
-its headings and framing so the conversation does not feel templated. The
-backend derives an internal fact bank from the stored run/result context, asks
-the LLM to structure sections with fact references, then renders those facts
-deterministically. If the generated breakdown is malformed or references facts
-outside that bank, Argus should fall back to the deterministic grounded
-breakdown.
+`result_summary` uses the OpenRouter `readout` tier with
+`openai/gpt-5.6-luna`. Both readout model keys select Luna; a failure uses the
+existing template, with no weaker-model fallback and no search.
+Readout-tier requests omit `temperature` because Luna's available OpenRouter
+endpoints do not support it. Other tiers keep their existing request parameters.
+
+The `Show breakdown` action uses that same model through the existing
+`PerplexityAgentClient.run_structured` interface. Its model, deadline and bounded
+tool configuration are owned by `api/chat/breakdown.py`, not an environment key.
+Only `web_search` and `fetch_url` are allowed. There is no Breakdown OpenRouter
+task/profile/tier mapping. The `result_breakdown` message kind remains unchanged.
+Before provider dispatch, Breakdown uses the request's shared research capacity
+claim. An exhausted guest allowance or global ceiling selects the complete
+template without a provider call.
+
+The Breakdown request asks plainly what happened to the asset over the tested
+window and why, what holding through it was like, and how the test compared with
+the benchmark, with a web search for sources. Run facts alone own simulation
+numbers; web context must not replace or merge with those facts. Returned
+Perplexity sources travel in `metadata.research.sources`, with dates when the
+provider supplies them. Breakdown reuses the existing Sources link and panel
+both live and after reload. In-text links remain in the prose; no bibliography
+is appended. The model does not recreate source lists or per-claim records.
+
+Both structured drafts contain `language`, complete `text` and `figures`; each
+run reference carries `fact_key` and the displayed `value`. One reference per
+distinct fact is sufficient. The light numerical guard checks only declared
+references against their run facts within display rounding. Missing references
+or repeated numbers do not reject prose. Quote/occurrence coverage, per-claim web
+dates, benchmark-claim regexes and internal-field regexes are not acceptance
+checks. Invalid schema, empty text, language mismatch, invalid declared references
+or provider failure selects the complete template. This boundary does not prove
+that every sentence is true; live review still checks accepted claims. Plain
+language, no forecasts and no investing advice remain writing requirements.
+
+Accepted prose is saved once in the closed language-tagged
+`result_readout_content` envelope described in `docs/API_CONTRACT.md`. Readers
+show it only when their workspace language matches. Older readouts and language
+mismatches use today's template; a new Breakdown request composes a new message
+in the current language without rewriting the saved Quick take.
+
+Quick take spend retains OpenRouter receipt accounting. Every received Breakdown
+invoice, including a rejected draft, reaches the shared research ledger writer
+with task `result_breakdown` and feature area `result_readout`. The Agent client
+retains existing unpriced-spend recording. There is no second Perplexity client.
 
 Breakdown suggestions must respect capability truth. The assistant may suggest
 tests that are runnable now, ideas it can help draft, or future engine
 capabilities, but it must not imply unsupported strategies are executable today.
 Structured breakdown actions should emit an `explain` stage before final text so
 the UI can show a clear working state while preserving canonical SSE frame
-types.
+types. The existing Breakdown frame owns one localized working state, without
+a second generic status line. Durable persistence reserves a `chat.research` job
+and saves its acknowledgement before provider work starts. The existing research
+task owner and message-first finalizer complete it outside the browser stream;
+job polling replaces the pending frame with its saved answer, including after
+reload. The Perplexity call still uses its existing structured client interface.
+Development memory mode retains completion independently and uses its existing
+ordinary-turn finalizer and recovery reader because it has no job endpoint.
+Only a completed response selects model prose or the
+template; the pending frame does not claim saved facts are insufficient.
 
 The chart is a TradingView Lightweight Charts baseline chart using the aggregate portfolio equity curve. Multi-symbol runs must show the portfolio curve, not a cluttered symbol comparison. Entry and exit markers may be capped for readability. TradingView attribution must remain visible.
 
@@ -357,12 +421,14 @@ Required model and data variables:
 - `OPENROUTER_API_KEY`
 - `ARGUS_UTILITY_MODEL` / `ARGUS_UTILITY_FALLBACK_MODEL`: cheap background
   utility tasks such as titles and labels.
-- `ARGUS_CHAT_MODEL` / `ARGUS_CHAT_FALLBACK_MODEL`: normal chat,
-  clarification, education, and flexible prose.
+- `ARGUS_CHAT_MODEL` / `ARGUS_CHAT_FALLBACK_MODEL`: clarification,
+  `chat_composer`, `discovery_voicing` and `knowledge_voicing`.
+- `ARGUS_READOUT_MODEL` / `ARGUS_READOUT_FALLBACK_MODEL`: Quick take
+  (`result_summary`), both set to `openai/gpt-5.6-luna`.
 - `ARGUS_STRUCTURED_MODEL` / `ARGUS_STRUCTURED_FALLBACK_MODEL`: durable
   JSON-schema artifact interpretation, repair, and draft edits.
-- `ARGUS_CONTEXT_MODEL` / `ARGUS_CONTEXT_FALLBACK_MODEL`: grounded context
-  synthesis from run facts plus structured context packets.
+- `ARGUS_CONTEXT_MODEL` / `ARGUS_CONTEXT_FALLBACK_MODEL`: `capability_conflict`.
+- `PERPLEXITY_API_KEY`: existing Agent credentials, also used by Breakdown.
 - `ARGUS_FRED_CONTEXT_SERIES`: curated comma-separated macro series for context
   packets. Default: `FEDFUNDS,DGS10,DGS2,T10Y2Y,CPIAUCSL,CPILFESL,UNRATE,PAYEMS,INDPRO,USREC`.
 - `ARGUS_CONTEXT_PACKETS_ENABLED`: enables best-effort context packet collection

@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from argus.api.schemas import BacktestRun, Message
+from argus.domain.result_readout_content import stored_readout_metadata
 from argus.domain.result_readout_facts import result_readout_config
 
 _PUBLIC_BACKTEST_JOB_KEYS = (
@@ -84,6 +85,7 @@ def hydrate_completed_backtest_job_messages(
         next_metadata = dict(metadata)
         next_metadata.update(
             {
+                **stored_readout_metadata(run.conversation_result_card),
                 "conversation_mode": "result_review",
                 "agent_runtime_stage_outcome": "ready_to_respond",
                 "backtest_job": _public_backtest_job(job),

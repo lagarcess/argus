@@ -34,6 +34,7 @@ import {
   resultMetricDisplayOrder,
 } from "./result-card-display";
 import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
+import { resultReadoutContentFromMetadata, type ResultReadoutContent } from "./result-readout-content";
 import { resultReadoutFacts } from "./result-readout-facts";
 import {
   ARGUS_API_BASE_URL,
@@ -131,6 +132,7 @@ export type ResultChartPayload = {
 };
 
 export type ConversationResultCard = {
+  result_readout_content?: ResultReadoutContent | null;
   title: string;
   symbols?: string[];
   strategy_label?: string;
@@ -206,6 +208,7 @@ export type BacktestJobResponse = {
   result_message?: ApiMessage | null;
   /** Private source prose is never transported; retained slot for old clients. */
   result_readout?: null;
+  result_readout_content?: ResultReadoutContent | null;
   result_readout_source?: string | null;
   next_experiments?: Record<string, unknown> | null;
   result_readout_fallback_used?: boolean | null;
@@ -357,6 +360,7 @@ export type ChatStreamEvent =
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
+  result_readout_content?: ResultReadoutContent | null;
   code?: string;
   final_response_payload?: ChatFinalResponsePayload | null;
   stage_outcome?: string;
@@ -493,6 +497,7 @@ export function resultCardFromConversationCard(
       label: displayResultMetricLabel(row, run?.benchmark_symbol),
       value: row.value,
     })),
+    readoutContent: resultReadoutContentFromMetadata(card),
     readoutFacts: resultReadoutFacts({ ...run, symbols: run?.symbols ?? card.symbols, result_card: card }),
     assetClass: run?.asset_class ?? card.asset_class ?? undefined,
     configSnapshot: run?.config_snapshot,

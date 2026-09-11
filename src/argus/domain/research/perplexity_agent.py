@@ -61,6 +61,52 @@ PERPLEXITY_AGENT_URL = "https://api.perplexity.ai/v1/agent"
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
 
 
+@dataclass(frozen=True)
+class StructuredAgentLimits:
+    """Optional provider request limits, explicit and caller-owned."""
+
+    max_tool_calls: int | None = None
+    parallel_tool_calls: bool | None = None
+    web_search_max_tokens: int | None = None
+    web_search_max_tokens_per_page: int | None = None
+    web_search_max_results: int | None = None
+    fetch_url_max_urls: int | None = None
+    fetch_url_total_budget_tokens: int | None = None
+
+    def __post_init__(self) -> None:
+        for name, minimum, maximum in (
+            ("max_tool_calls", 0, None),
+            ("web_search_max_tokens", 1, None),
+            ("web_search_max_tokens_per_page", 1, None),
+            ("web_search_max_results", 1, 50),
+            ("fetch_url_max_urls", 1, 10),
+            ("fetch_url_total_budget_tokens", 1, 120000),
+        ):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value < minimum
+                or (maximum is not None and value > maximum)
+            ):
+                raise ValueError(f"invalid structured request limit: {name}")
+        if self.parallel_tool_calls is not None and not isinstance(
+            self.parallel_tool_calls, bool
+        ):
+            raise ValueError("parallel_tool_calls must be boolean")
+
+
+@dataclass(frozen=True)
+class StructuredAgentResult:
+    """Complete caller-validated output beside the existing retrieval invoice."""
+
+    draft: dict[str, Any]
+    sources: tuple[ResearchSource, ...]
+    usage: ResearchUsage
+    tool_results: tuple[str, ...]
+    provider_response_id: str | None
+
+
 class PerplexityAgentClient:
     def __init__(
         self,
@@ -71,6 +117,107 @@ class PerplexityAgentClient:
         self._api_key = api_key.strip()
         self._transport = transport
         self._reported_unpriced_ids: set[str] = set()
+
+    def run_structured(
+        self,
+        prompt: str,
+        spec: ResearchConfigSpec,
+        *,
+        schema_model: Any,
+        schema_name: str,
+        instructions: str,
+        limits: StructuredAgentLimits | None = None,
+    ) -> StructuredAgentResult:
+        """Run the caller's closed contract without research prose processing."""
+        from argus.domain.research.contracts import _strict_schema
+
+        schema = schema_model.model_json_schema()
+        definitions = schema.pop("$defs", {})
+        payload = self._request_body(prompt, spec)
+        if limits is not None:
+            for key in ("max_tool_calls", "parallel_tool_calls"):
+                if (value := getattr(limits, key)) is not None:
+                    payload[key] = value
+            tool_fields = {
+                "web_search": ("max_tokens", "max_tokens_per_page", "max_results"),
+                "fetch_url": ("max_urls", "total_budget_tokens"),
+            }
+            for tool in payload["tools"]:
+                for key in tool_fields.get(tool["type"], ()):
+                    if (value := getattr(limits, f"{tool['type']}_{key}")) is not None:
+                        tool[key] = value
+        payload["instructions"] = instructions
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_name,
+                "strict": True,
+                "schema": _strict_schema(schema, definitions),
+            },
+        }
+        started = time.monotonic()
+        response = self._post(payload, timeout_seconds=spec.timeout_seconds)
+        usage = _usage_from_response(
+            response,
+            latency_ms=int((time.monotonic() - started) * 1000),
+            on_unpriced=self._record_unpriced,
+        )
+        try:
+            if (
+                response.get("status") not in (None, "completed")
+                or response.get("incomplete_details")
+                or response.get("error")
+            ):
+                raise ValueError("incomplete structured response")
+            output = response.get("output")
+            if not isinstance(output, list):
+                raise ValueError("missing output list")
+            text_blocks: list[str] = []
+            parsed = _ParsedToolResults()
+            for item in output:
+                if not isinstance(item, dict) or not isinstance(item.get("type"), str):
+                    raise ValueError("invalid output item")
+                item_type = item["type"]
+                reader = _TOOL_RESULT_READERS.get(item_type)
+                if reader is not None:
+                    parsed.tool_results.append(item_type)
+                    reader(item, parsed)
+                elif item_type == "message":
+                    if item.get("status") not in (None, "completed"):
+                        raise ValueError("incomplete output message")
+                    content = item.get("content")
+                    if not isinstance(content, list):
+                        raise ValueError("invalid message content")
+                    for chunk in content:
+                        if (
+                            not isinstance(chunk, dict)
+                            or chunk.get("type") != "output_text"
+                            or not isinstance(chunk.get("text"), str)
+                        ):
+                            raise ValueError("invalid structured text chunk")
+                        text_blocks.append(chunk["text"])
+                        for annotation in chunk.get("annotations") or []:
+                            _append_public_source(parsed, annotation)
+            draft = schema_model.model_validate_json(
+                "".join(text_blocks), strict=True, extra="forbid"
+            ).model_dump()
+            if not isinstance(draft, dict):
+                raise ValueError("structured draft is not an object")
+            return StructuredAgentResult(
+                draft=draft,
+                sources=tuple(parsed.sources),
+                usage=usage,
+                tool_results=tuple(parsed.tool_results),
+                provider_response_id=str(response.get("id") or "") or None,
+            )
+        except Exception:  # noqa: BLE001
+            # The response was billed even if its whole draft cannot be read.
+            # Neither partial prose nor schema errors containing it escape.
+            raise ResearchUnavailableError(
+                "malformed_response",
+                "structured output did not match the caller contract",
+                usage=usage,
+            ) from None
 
     def run_research(self, prompt: str, spec: ResearchConfigSpec) -> ResearchPacket:
         payload = self._request_body(prompt, spec)

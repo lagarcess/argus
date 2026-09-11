@@ -1123,15 +1123,167 @@ clients print those digits verbatim with locale separators and grouping and
 never round `metrics` for display. Legacy `saved_strategy_id` metadata remains
 readable after reload, but clients must not use it to expose a new write action.
 
-Result Quick Take, result breakdown, and dossier outcome prose render from the
-same typed run facts in the current workspace language. The figures those
+Result Quick Take and Breakdown may carry the additive, closed
+`result_readout_content` object:
+
+```json
+{
+  "schema_version": "result_readout/v1",
+  "surface": "quick_take",
+  "language": "en",
+  "text": "The complete, validated model readout."
+}
+```
+
+`surface` is `quick_take | breakdown`; `language` is `en | es-419` and records
+the workspace language at composition time. `text` is the accepted complete
+model draft, or null when generation/grounding failed. Unknown envelope fields
+are invalid. The envelope is persisted at creation, transported through live
+finals, message metadata, completed job responses and the canonical result
+card, and never reconstructed from legacy prose. Breakdown messages carry
+their own envelope. The web displays text only for a supported envelope whose
+surface and language match the frame and current workspace language.
+Missing/legacy, malformed, failed or mismatched envelopes use the existing
+typed template. Readouts saved before this lane remain template-only. A new
+Breakdown request, including one for an older run, creates a new message with
+the current workspace language; it does not replace any saved readout. There is no read-time
+model call, translation, historical rewrite or partial-draft display.
+`result_readout_source`, `result_readout_fallback_used` and optional
+`result_readout_failure_mode` record generation provenance for both surfaces;
+existing Breakdown provenance remains read-compatible.
+
+The card owns numerical reporting. Quick take tells the first-glance historical
+story; Breakdown develops what holding through the run involved and the
+tradeoffs, without repeating Quick take or the card's figures. A figure appears
+in prose only when needed to explain a point, through the existing fact
+references. A supported next historical test may follow naturally from that
+story; it is not investment advice and does not replace the typed action
+controls. Frames, labels and their order are unchanged.
+
+Before creating that public envelope, both composers derive facts from the same
+internal labeled fact sheet. Each fact identifies its canonical value, unit, meaning,
+scope, return basis and stored or derived source. Executed fills are distinct
+from completed trades; annualized volatility is distinct from daily returns;
+ending nominal equity is distinct from whole-period extrema; starting capital
+is distinct from recurring contributions. Optional chart data retains its
+dated series meaning. Historical drawdown endpoints are unavailable unless
+retained evidence supports their chronological reconstruction; a nominal DCA
+chart cannot establish a flow-adjusted drawdown event.
+
+Quick take receives the full labeled sheet. Breakdown receives only labeled
+headline scalar facts a sentence could need: tested dates, return and benchmark
+comparison, risk, capital and contributions, costs, ending and peak value, and
+executed fills versus completed round trips. Available drawdown endpoints remain
+explicitly labeled. Chart series, markers, internal field paths and full row
+metadata never enter its provider request. The full sheet remains an internal
+source for this projection; search cannot add to or replace stored run facts.
+
+The internal structured model draft contains `language`, complete `text`, and
+`figures`. Each declared run figure carries its supplied `fact_key` and the
+`value` as written, without a quote or occurrence index. Breakdown uses the
+supplied plain-language fact label as the key. Model input provides the card's
+rounded display values: one decimal for percentages, whole dollars for USD
+account values, and localized dates. Stored facts retain their original precision.
+One reference per distinct fact
+is sufficient even when the prose repeats the number. Code checks each declared
+key and value against that run fact within display rounding, with exact counts
+and calendar dates. It does not require numeric occurrence coverage: a number
+without a reference, including a number in an asset name such as S&P 500, does
+not reject the readout. Invalid declared references reject the complete draft.
+The model-reported written language must
+match the normalized workspace request; a mismatch records `language_mismatch`
+and uses complete fallback. This is a structured self-report, not an independent
+language classifier, and references do not establish arbitrary prose entailment.
+Model quality therefore still requires case-by-case factual review. Invalid
+schema, empty drafts and provider failure also select complete fallback. There
+are no benchmark-claim or internal-field prose regex gates, required mentions,
+figure limits, or per-occurrence bookkeeping.
+
+Quick take is composed on the OpenRouter `readout` tier, with both model keys
+set to `openai/gpt-5.6-luna` and no search. Only readout-tier requests omit
+`temperature`; every other tier keeps its existing parameters. Breakdown uses a readout-owned Luna
+constant through the existing Perplexity Agent client with only `web_search`
+and `fetch_url`. Its public message kind stays `result_breakdown`; it is no
+longer an OpenRouter task. The chat and context environment keys retain their
+other task owners. Before dispatch, Breakdown claims capacity through the same
+request-scoped research admission owner as research answers. Guest allowance or
+global capacity refusal makes no provider call and selects the complete template
+with `result_readout_failure_mode = research_capacity_exhausted`.
+
+Breakdown uses the same three-field internal draft contract. Its short request
+asks what happened to the assets during the tested window and why, what holding
+through it was like, and how the test compared with the benchmark, explained for
+a normal person with sources. `source_figures` and `citations` are not model
+output fields. Code does not request or validate per-claim quotes, occurrences
+or dates. The run remains the sole owner of simulation figures; web search adds
+historical context and never modifies or resolves a run fact.
+
+Perplexity's returned sources travel separately in the existing
+`research.sources` sidecar on live finals and persisted message metadata. The
+shared research source projection owns each entry's `title`, `domain`, `url` and
+optional `source_date`, including the existing source selection and cap. The
+web uses its existing Sources button and panel for Breakdown on completion and
+after reload; dates use the current workspace locale. Fallbacks retain returned
+sources with the research sidecar's degraded code, so the panel describes where
+Argus looked. An absent source date does not discard prose.
+
+Code does not append a bibliography to accepted `text`. The writing brief asks
+for short descriptive inline link text in the supporting sentence, never a bare
+URL. Before saving an accepted Breakdown, code retains hyperlinks only to URLs
+returned with that draft. A bare returned URL uses its source title; a link to
+an unreturned URL loses its link while preserving its visible words. This same
+saved text travels in live finals and reloads. No additional readout envelope
+fields or figure references are exposed. The writing brief asks the model to
+distinguish documented
+events from inference and excludes forecasts and investing advice. Returned
+sources do not prove the truth of every claim; factual review remains required.
+Received Breakdown usage is recorded through the shared
+research cost ledger even when the draft is rejected; unpriced usage retains the
+existing invoice-reconciliation path.
+
+Fact sheets and figure references are internal generation inputs/output, not
+additional public readout fields. The closed public envelope above is unchanged.
+Only accepted complete prose crosses it; language/figure rejection details use
+the existing source/fallback/failure metadata. No read-time composition or
+historical rewrite is introduced.
+
+While a Breakdown is pending, its existing frame owns exactly one localized
+working state; the generic stream status row does not repeat it. With durable
+persistence, the action first reserves a `chat.research` job and saves its
+acknowledgement, then starts completion work outside the browser stream. The
+acknowledgement carries `artifact_presentation_kind = breakdown` and the existing
+`backtest_job` envelope. Job polling serves the saved complete answer as
+`result_message`; its `backtest_job_id` replaces that job's pending frame, live
+and after reload. The shared research finalizer persists the answer before
+linking `execution_metadata.research_result_message_id` and settling the job.
+The job stores the source run id and requested language, never another run or
+chart series. A disconnect neither cancels composition nor starts another call.
+
+Development memory persistence has no job endpoint. Its retained completion task
+uses the existing ordinary-turn finalizer even when the stream is canceled.
+Reload derives its pending frame from the saved `show_breakdown` user action and
+accepted/running lifecycle, then the existing turn-recovery reader obtains the
+saved terminal answer without calling a model. The completed response selects
+accepted prose or the template. Empty
+pending content is not evidence that saved run facts are insufficient, and empty
+legacy message content does not leave a completed envelope permanently working.
+
+The internal headline facts include the worst drawdown's high and low balances,
+dates and dollar decline computed from unrounded balances, plus the whole-test
+peak date. Dated headline groups are ordered before composition. Display rounding
+is applied after arithmetic; chart series and markers stay out of the Breakdown
+request. Missing dated evidence remains unavailable.
+
+Template readouts and dossier outcomes render from the same typed run facts
+in the current workspace language. The figures those
 surfaces share with the result card (returns, the benchmark gap, worst drop)
 are the backend's `figures`: rounded once, from the engine's own
 `delta_vs_benchmark_pct` and returns, and printed verbatim in the workspace
 locale. No reader subtracts two rounded returns or rounds a figure a second
 time, so the card, the prose beside it, and the dossier cannot show two numbers
 for one fact. Original LLM result prose remains immutable audit/model context,
-not a presentation fallback.
+not a presentation fallback. Only the versioned, creation-time envelope above
+authorizes visible model readout text.
 Public result messages carry empty `content`; live result finals carry empty
 `assistant_response`. Public run/card payloads omit stored `quick_take`,
 `breakdown`, `result_readout`, and `audit_context`, including nested copies.
@@ -3173,7 +3325,19 @@ returns `422 tool_inputs_not_editable`.
 - `show_breakdown` requires canonical result run context. A stale
   `save_strategy` request also requires that context, but is non-mutating and
   returns the historical-run continuity response.
-- `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
+- `show_breakdown` composes complete model text from labeled headline run facts
+  and searched historical context, without sending chart series or internal paths. New
+  run readouts use the versioned `result_readout_content` transport described
+  under Message. Declared run figures must match their fact keys within display
+  rounding; missing references do not reject prose. Language, schema or declared
+  figure failure selects the whole template; there are no quote/occurrence,
+  required-mention, figure-count, benchmark-claim or internal-field regex checks.
+  Generation failure selects the typed template and
+  records `result_readout_source`, `result_readout_fallback_used`, and
+  `result_readout_failure_mode`. Existing `result_breakdown_*` provenance is
+  retained for compatibility. An older run can receive a newly requested,
+  newly language-stamped Breakdown; readouts already saved before this lane
+  remain on the current templates.
 - `select_response_option` is valid only for typed response-intent options. Its
   payload must include the durable assistant `message_id` that presented the
   option as `source_assistant_id`, plus the exact `option_id` and
@@ -4484,13 +4648,16 @@ Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
 with the current chat turn instead of staying open for workflow-duration
 execution.
 
-For completed workflow-backed jobs, `result_readout` retains the original
-explain-stage prose privately in storage and is always null in the public
-response. Readers voice canonical run facts at the same presentation boundary
-used for in-stream and reloaded results. `result_readout_source` and
-`result_readout_fallback_used` expose whether the normal LLM/schema-grounded
-path produced the readout or whether Argus intentionally fell back to the
-deterministic safety renderer.
+For completed workflow-backed jobs, legacy `result_readout` remains private
+in storage and is always null in the public response. New jobs expose
+`result_readout_content`, the closed, language-tagged envelope derived from the
+canonical run card, through the same presentation boundary used for in-stream
+and reloaded results. Readers show its complete text only when its language
+matches the workspace; missing, null, invalid, or mismatched envelopes use the
+current template. `result_readout_source`, `result_readout_fallback_used`, and
+`result_readout_failure_mode` record whether composition succeeded or selected
+the template fallback. A reader-language mismatch does not change these saved
+creation-time diagnostics or trigger another model call.
 
 For a terminal `chat.research` job, `run` is null and `result_message` is the
 message the job produced: the persisted answer on success, the persisted

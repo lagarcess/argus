@@ -46,6 +46,7 @@ from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_SERIALIZED_LENGTH,
     MAX_FEEDBACK_MESSAGE_LENGTH,
 )
+from argus.domain.result_readout_content import ResultReadoutContent
 from argus.domain.strategy_template_contract import (
     ExecutableStrategyTemplate as StrategyTemplate,
 )
@@ -427,6 +428,7 @@ class BacktestJobResponse(ReaderJobResponse):
     # way a backtest's result is ``run``; clients render it in place.
     result_message: Message | None = None
     result_readout: str | None = None
+    result_readout_content: ResultReadoutContent | None = None
     result_readout_source: str | None = None
     result_readout_fallback_used: bool | None = None
     result_readout_failure_mode: str | None = None

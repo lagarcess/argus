@@ -26,7 +26,7 @@ from argus.agent_runtime.turn_execution import (
     turn_execution_summary,
 )
 from argus.api import state as api_state
-from argus.api.artifact_presentation import reader_chat_result, result_breakdown_metadata
+from argus.api.artifact_presentation import reader_chat_result
 from argus.api.chat import confirmation as chat_confirmation
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
@@ -54,7 +54,7 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.breakdown import result_breakdown_message_with_metadata
+from argus.api.chat.breakdown_jobs import start_result_breakdown
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -136,6 +136,10 @@ from argus.api.schemas import (
 from argus.domain.artifact_presentation_kind import artifact_presentation_kind
 from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.research.admission import research_attempt_admission_context
+from argus.domain.result_readout_content import (
+    READOUT_METADATA_KEYS,
+    stored_readout_metadata,
+)
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
     allowance_windows,
@@ -946,6 +950,7 @@ async def chat_stream(
                 envelope = runtime_result_envelope(runtime_result)
                 backtest_job = tool_publication.backtest_job
                 run = None
+                completed_breakdown_message = None
                 result_action_run = validated_result_action_run
                 result_action_type = result_action_request_type(runtime_result)
                 if (
@@ -960,6 +965,7 @@ async def chat_stream(
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
 
+                    result_card.update(stored_readout_metadata(runtime_result))
                     active_finalization_execution_identity = chat_retry.backtest_finalization_execution_identity(
                         backtest_job=backtest_job,
                         retry_execution_identity=retry_finalization_execution_identity,
@@ -1003,18 +1009,23 @@ async def chat_stream(
                             require_run_id=True,
                         )
                     if result_action_type == "show_breakdown":
-                        yield sse_data({"type": "stage_start", "stage": "explain"})
-                        breakdown_message = result_breakdown_message_with_metadata(
+                        completion = start_result_breakdown(
                             result_action_run,
                             language=runtime_user.language_preference,
+                            lifecycle=lifecycle_hooks,
+                            settle_usage=guest_compute_settlement(
+                                turn_account,
+                                is_run_backtest_turn=is_run_backtest_turn,
+                                visitor_key=turn_visitor_key,
+                            ),
                         )
-                        assistant_text = breakdown_message.text
-                        metadata.update(
-                            result_breakdown_metadata(
-                                breakdown_message, result_action_run
-                            )
-                        )
-                        runtime_result["response_intent"] = metadata["response_intent"]
+                        yield sse_data({"type": "stage_start", "stage": "explain"})
+                        dispatched = await asyncio.shield(completion)
+                        backtest_job = dispatched.job
+                        completed_breakdown_message = dispatched.message
+                        assistant_text = dispatched.text
+                        metadata.update(dispatched.metadata)
+                        runtime_result.update(dispatched.metadata)
                     elif result_action_type == "save_strategy":
                         yield sse_data({"type": "stage_start", "stage": "next_step"})
                         if result_action_run is None:
@@ -1047,6 +1058,7 @@ async def chat_stream(
                             result_action_run.strategy_id
                         )
                 for key in (
+                    *READOUT_METADATA_KEYS,
                     "latest_run_id",
                     "source_result_run_id",
                     "strategy_path_id",
@@ -1195,25 +1207,13 @@ async def chat_stream(
                         final_payload_keys=sorted(runtime_result.keys()),
                     )
                     raise RuntimeError("agent_runtime_empty_final")
-                assistant_message = None
-                if (
+                assistant_message = completed_breakdown_message
+                if assistant_message is None and (
                     persisted_text
                     or typed_artifact_answer
                     or lifecycle_hooks.turn_id is not None
                 ):
-                    # Discovery codes only; other retryable recoveries keep
-                    # completed-turn settlement.
-                    retryable_recovery_code = (
-                        str(recovery.get("code"))
-                        if isinstance(recovery, dict)
-                        and recovery.get("retryable") is True
-                        and recovery.get("code")
-                        in {
-                            "discovery_search_failed",
-                            "discovery_suggestions_unavailable",
-                        }
-                        else None
-                    )
+                    retryable_recovery_code = chat_retry.discovery_recovery_code(recovery)
                     if retryable_recovery_code is not None:
                         # Retryable discovery recovery: the lifecycle owns the
                         # durable retry; completed turns strip it by design.
@@ -1223,19 +1223,9 @@ async def chat_stream(
                             failure_code=retryable_recovery_code,
                             retryable=True,
                         )
-                        durable_retry = (
-                            assistant_message.metadata.get("retry_last_turn")
-                            if isinstance(assistant_message.metadata, dict)
-                            else None
-                        )
-                        if isinstance(durable_retry, dict):
-                            # Live final event carries the message-shape retry;
-                            # the anchored shape renders only from hydration.
-                            runtime_result["retry_last_turn"] = {
-                                key: durable_retry[key]
-                                for key in ("message", "action")
-                                if key in durable_retry
-                            }
+                        live_retry = chat_retry.live_retry_payload(assistant_message)
+                        if live_retry is not None:
+                            runtime_result["retry_last_turn"] = live_retry
                     else:
                         memory_recalls = await memory_recalls_for_turn_async(
                             user=user,
@@ -1260,6 +1250,8 @@ async def chat_stream(
                         and retryable_recovery_code is None
                     ):
                         runtime_result.pop("retry_last_turn", None)
+                    receipt_message_id = assistant_message.id
+                elif assistant_message is not None:
                     receipt_message_id = assistant_message.id
                 settle_metered_turn(
                     runtime_result,

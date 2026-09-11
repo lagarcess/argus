@@ -16,6 +16,7 @@ import {
 import { commandPaletteRequestIsCurrent } from "../lib/command-palette-items";
 import { effectivePaletteLayout } from "../components/sidebar/command-palette/paletteLayout";
 import ChatMessage from "../components/chat/ChatMessage";
+import { standaloneStreamStatusVisible } from "../components/chat/chat-message-projection";
 import type { Message } from "../components/chat/types";
 import en from "../public/locales/en/common.json";
 
@@ -1069,10 +1070,10 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("latestAssistantContent");
-    expect(chat).toMatch(
-      /const showStreamStatus = Boolean\s*\(\s*visibleStreamStatus && latestAssistantContent\.length === 0,?\s*\)/,
-    );
+    const message: Message = { id: crypto.randomUUID(), role: "ai", kind: "text", content: "" };
+    expect(standaloneStreamStatusVisible([message], true)).toBe(true);
+    expect(standaloneStreamStatusVisible([{ ...message, content: "The answer has begun." }], true)).toBe(false);
+    expect(chat).toContain("standaloneStreamStatusVisible(messages, Boolean(visibleStreamStatus))");
     expect(chat).toContain("{showStreamStatus && (");
   });
 

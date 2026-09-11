@@ -18,6 +18,7 @@ import asyncio
 import hashlib
 import json
 import time
+from collections.abc import Coroutine
 from typing import Any
 
 from loguru import logger
@@ -51,7 +52,17 @@ from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.tool_job_binding import ToolJobBinding
 
 # Keep strong references so in-flight pollers never get garbage collected.
-_POLLER_TASKS: set[asyncio.Task[None]] = set()
+_POLLER_TASKS: set[asyncio.Task[Any]] = set()
+
+
+def retain_research_work(
+    work: Coroutine[Any, Any, Any], *, name: str
+) -> asyncio.Task[Any]:
+    """Research completion outlives the request that admitted it."""
+    task = asyncio.create_task(work, name=name)
+    _POLLER_TASKS.add(task)
+    task.add_done_callback(_POLLER_TASKS.discard)
+    return task
 
 
 def _client() -> PerplexityAgentClient | None:
@@ -283,7 +294,7 @@ def _spawn_poller(
     conversation_id: str,
     request_id: str | None,
 ) -> None:
-    task = asyncio.create_task(
+    retain_research_work(
         _poll_and_finalize(
             job_id=job_id,
             background_id=background_id,
@@ -294,8 +305,6 @@ def _spawn_poller(
         ),
         name=f"research-job-{job_id}",
     )
-    _POLLER_TASKS.add(task)
-    task.add_done_callback(_POLLER_TASKS.discard)
 
 
 async def _poll_and_finalize(
@@ -412,7 +421,6 @@ async def _finalize_success(
         compose_completed_research,
         store_research_packet_for_job,
     )
-    from argus.api.message_store import create_message
 
     composed = compose_completed_research(job_request=job_request, packet=packet)
     store_research_packet_for_job(job_request, packet, composed)
@@ -428,12 +436,42 @@ async def _finalize_success(
         metadata["tool_result_cards"] = [card]
     if composed.get("next_experiments") is not None:
         metadata["next_experiments"] = composed["next_experiments"]
+    message = await persist_research_job_answer(
+        job_id=job_id,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        content=composed["answer"],
+        metadata=metadata,
+    )
+    if message is None:
+        return
+    record_research_turn_evidence(
+        research=composed["research"],
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message.id,
+        request_id=request_id,
+        tool_call_id=card["call_id"] if card is not None else None,
+    )
+
+
+async def persist_research_job_answer(
+    *,
+    job_id: str,
+    user_id: str,
+    conversation_id: str,
+    content: str,
+    metadata: dict[str, Any],
+) -> Any:
+    """Persist the complete answer before the shared job settlement can succeed."""
+    from argus.api.message_store import create_message
+
     try:
         message = create_message(
             user_id=user_id,
             conversation_id=conversation_id,
             role="assistant",
-            content=composed["answer"],
+            content=content,
             metadata=metadata,
             settle_usage=None,
         )
@@ -444,16 +482,9 @@ async def _finalize_success(
             error=str(exc),
         )
         _fail_job(job_id=job_id, user_id=user_id, detail="result persistence failed")
-        return
+        return None
     await _mark_completed(job_id=job_id, user_id=user_id, message_id=message.id)
-    record_research_turn_evidence(
-        research=composed["research"],
-        user_id=user_id,
-        conversation_id=conversation_id,
-        message_id=message.id,
-        request_id=request_id,
-        tool_call_id=card["call_id"] if card is not None else None,
-    )
+    return message
 
 
 async def _mark_completed(*, job_id: str, user_id: str, message_id: str) -> None:

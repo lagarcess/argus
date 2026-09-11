@@ -36,6 +36,7 @@ from argus.agent_runtime.workflow_contract import (
     TOKEN_STREAM_NODES,
     WORKFLOW_NODE_NAMES,
 )
+from argus.domain.result_readout_content import READOUT_METADATA_KEYS
 from argus.observability.product_events import capture_product_event
 
 MAX_RECENT_THREAD_HISTORY = 6
@@ -356,6 +357,7 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
 
 def _public_result(result: dict[str, Any]) -> dict[str, Any]:
     allowed_keys = {
+        *READOUT_METADATA_KEYS,
         "stage_outcome",
         "assistant_prompt",
         "assistant_response",

@@ -42,6 +42,10 @@ from argus.agent_runtime.state.models import (
     dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.workflow_contract import WorkflowNode
+from argus.domain.result_readout_content import (
+    READOUT_METADATA_KEYS,
+    readout_metadata_from_stage,
+)
 from langgraph.graph import END, StateGraph
 
 
@@ -76,6 +80,10 @@ class WorkflowState(TypedDict, total=False):
     stage_outcome: WorkflowStageOutcome
     assistant_prompt: str | None
     assistant_response: str | None
+    result_readout_content: dict[str, Any] | None
+    result_readout_source: str | None
+    result_readout_fallback_used: bool | None
+    result_readout_failure_mode: str | None
     requested_field: str | None
     optional_parameter_choices: list[str]
     confirmation_payload: dict[str, Any]
@@ -105,6 +113,7 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
     {
         "assistant_prompt",
         "assistant_response",
+        *READOUT_METADATA_KEYS,
         "requested_field",
         "optional_parameter_choices",
         # The launch hand-off between interpret and execute lives one turn;
@@ -317,13 +326,12 @@ async def _execute_node_async(
 
 
 async def _explain_node_async(state: WorkflowState) -> WorkflowState:
-    return _apply_stage_result(
-        state,
-        await explain_stage_async(
-            state=_run_state(state),
-            language=_user(state).language_preference,
-        ),
+    language = _user(state).language_preference
+    result = await explain_stage_async(state=_run_state(state), language=language)
+    result.stage_patch.update(
+        readout_metadata_from_stage(result.stage_patch, language=language)
     )
+    return _apply_stage_result(state, result)
 
 
 async def _next_step_node_async(state: WorkflowState) -> WorkflowState:
@@ -360,6 +368,7 @@ def _apply_stage_result(
         and isinstance(state.get("assistant_response"), str)
     ):
         cleared_output_keys.discard("assistant_response")
+        cleared_output_keys.difference_update(READOUT_METADATA_KEYS)
     # The Try next sidecar survives the closing no-op stage the same way the
     # response text does; only a stage that patches it may replace it.
     if (
