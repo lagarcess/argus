@@ -79,3 +79,20 @@ def test_returned_source_titles_obey_readout_punctuation_without_changing_url():
     assert "—" not in text
     assert "Company, results" in text
     assert "https://example.com/results" in text
+
+
+def test_breakdown_schema_offers_the_actual_headline_labels():
+    from argus.domain.result_readout_sources import result_breakdown_schema
+    from pydantic import ValidationError
+
+    facts = {"facts": {"Executed fills": {"value": 13, "unit": "count"}}}
+    schema = result_breakdown_schema(facts)
+    draft = {
+        "language": "en",
+        "text": "There were 13 fills.",
+        "figures": [{"fact_key": "Executed fills", "value": 13}],
+    }
+    assert schema.model_validate(draft).figures[0].fact_key == "Executed fills"
+    draft["figures"][0]["fact_key"] = "executed_fills"
+    with pytest.raises(ValidationError):
+        schema.model_validate(draft)

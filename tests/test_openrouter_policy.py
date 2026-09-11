@@ -697,7 +697,7 @@ def test_result_breakdown_prompt_carries_product_language_contract() -> None:
 
 
 def test_result_breakdown_schema_requires_complete_text_language_and_figures() -> None:
-    from argus.api.chat.breakdown import ResultBreakdownDraft
+    from argus.domain.result_readout_sources import ResultBreakdownDraft
     from pydantic import ValidationError
 
     schema = ResultBreakdownDraft.model_json_schema()

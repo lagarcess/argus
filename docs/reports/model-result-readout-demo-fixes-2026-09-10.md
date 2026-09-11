@@ -19,6 +19,12 @@ run reference contains only `fact_key` and its displayed `value`. Perplexity's
 returned sources are appended as links, with their dates when available. Search
 context never changes the run facts.
 
+The first repeat-demo Breakdown searched, but changed the supplied fact labels
+into underscored names and fell back. The response schema now derives its allowed
+reference names directly from the supplied headline labels, so the request and
+validation share one set of names. The failed attempt and its bill are retained
+in the demo evidence.
+
 | Check | Disposition and reason |
 | --- | --- |
 | Declared run figure key/value | Stays: rejects an unknown fact or a declared value outside display rounding; counts and calendar dates must match exactly. |

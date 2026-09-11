@@ -4,20 +4,39 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 
 from babel.dates import format_date
+from pydantic import create_model
 
 from argus.domain.research.contracts import ResearchSource
 from argus.domain.result_readout_grounding import (
     ResultReadoutDraft,
+    ResultReadoutFigure,
     accepted_readout_text,
 )
 
 
 class ResultBreakdownDraft(ResultReadoutDraft):
     """The same small language, text and run-reference contract as Quick take."""
+
+
+def result_breakdown_schema(facts: dict[str, Any]) -> type[ResultBreakdownDraft]:
+    """Use the supplied labels as the model's allowed reference names."""
+    labels = tuple(facts.get("facts", {}))
+    if not labels:
+        return ResultBreakdownDraft
+    figure = create_model(
+        "ResultBreakdownFigure",
+        __base__=ResultReadoutFigure,
+        fact_key=(Literal[labels], ...),
+    )
+    return create_model(
+        "ResultBreakdownDraft",
+        __base__=ResultBreakdownDraft,
+        figures=(list[figure], ...),
+    )
 
 
 BREAKDOWN_SOURCE_INSTRUCTIONS = (

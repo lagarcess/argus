@@ -42,8 +42,8 @@ from argus.domain.result_readout_headlines import (
 )
 from argus.domain.result_readout_sources import (
     BREAKDOWN_SOURCE_INSTRUCTIONS,
-    ResultBreakdownDraft,
     accepted_breakdown_text,
+    result_breakdown_schema,
 )
 
 RESULT_BREAKDOWN_MODEL = "openai/gpt-5.6-luna"
@@ -155,6 +155,7 @@ def _llm_result_breakdown_with_metadata(
         title=context.get("title"),
         language=resolved_language,
     )
+    headline_facts = headline_readout_facts(facts)
     try:
         active_client = client if client is not None else _client()
         if active_client is None:
@@ -164,7 +165,7 @@ def _llm_result_breakdown_with_metadata(
         response = active_client.run_structured(
             messages[1]["content"],
             result_breakdown_spec(resolved_language),
-            schema_model=ResultBreakdownDraft,
+            schema_model=result_breakdown_schema(headline_facts),
             schema_name="ResultBreakdownDraft",
             instructions=messages[0]["content"],
             limits=RESULT_BREAKDOWN_LIMITS,
@@ -177,7 +178,7 @@ def _llm_result_breakdown_with_metadata(
         return None, "llm_unavailable_or_contract_rejected", None, ()
     text, failure = accepted_breakdown_text(
         response.draft,
-        facts=headline_readout_facts(facts),
+        facts=headline_facts,
         language=resolved_language,
         sources=response.sources,
     )
