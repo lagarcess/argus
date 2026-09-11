@@ -173,6 +173,33 @@ def test_the_request_carries_each_assets_own_history_start_and_never_a_floor_yea
         assert f"{row['kind']}: " in prompt
 
 
+def test_a_costs_question_can_quote_the_runs_modeled_cost_figures() -> None:
+    metadata = _metadata("dca_costs_test_only")
+    facts = conversation.run_headline_facts(metadata)
+    cost_labels = {
+        "Return before modeled costs",
+        "Return after modeled costs",
+        "Return given up to modeled costs",
+    }
+    assert cost_labels <= set(readout_figure_keys(facts))
+    drag = facts["facts"]["Return given up to modeled costs"]["value"]
+    agent = _Agent(
+        draft=_draft(
+            "en",
+            text=f"Modeled costs took {drag} points off the return.",
+            figures=[{"fact_key": "Return given up to modeled costs", "value": drag}],
+        )
+    )
+
+    answer = _compose(
+        metadata, "en", client=agent, user_message="How much did fees and slippage cost?"
+    )
+
+    assert answer.source == "research_agent"
+    for label in cost_labels:
+        assert f"{label}: " in agent.calls[0]["prompt"]
+
+
 def test_a_figure_that_contradicts_the_run_is_rewritten_without_search() -> None:
     metadata = _metadata()
     facts = conversation.run_headline_facts(metadata)

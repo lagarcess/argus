@@ -366,7 +366,7 @@ def result_followup_fact_bank(
     )
     if trade_count is not None:
         fact_bank["trade_count"] = f"{int(trade_count)} trades"
-    fact_bank.update(execution_cost_fact_entries(metadata))
+    fact_bank.update(_execution_cost_fact_entries(metadata))
     # Deterministic enrichment (equity-curve extrema, supplemental metrics,
     # result-card rows). Canonical entries above win on key collisions.
     for fact_id, value in enriched_facts.items():
@@ -403,7 +403,7 @@ def result_followup_fact_bank(
     return fact_bank
 
 
-def execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
+def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
     result_card = _mapping(
         metadata.get("result_card") or metadata.get("conversation_result_card")
     )

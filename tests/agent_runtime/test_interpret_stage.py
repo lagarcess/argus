@@ -15,7 +15,7 @@ from argus.agent_runtime.artifact_edit_planner import (
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
-from argus.agent_runtime.next_experiments import next_experiments_lead_in
+from argus.agent_runtime.result_conversation import ResultConversationAnswer
 from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
@@ -497,6 +497,15 @@ def test_dca_starter_turn_suppresses_grounded_amount_ambiguity(
     assert "resolved_strategy_ambiguity_suppressed" in result.decision.reason_codes
 
 
+def _answering(compose: Any) -> Any:
+    """Adapt a prose stub to the result conversation owner's answer shape."""
+
+    async def answer(**kwargs: Any) -> ResultConversationAnswer:
+        return ResultConversationAnswer(text=await compose(**kwargs))
+
+    return answer
+
+
 def test_result_followup_response_does_not_leave_underfilled_strategy_draft(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -505,8 +514,8 @@ def test_result_followup_response_does_not_leave_underfilled_strategy_draft(
         return "TSLA underperformed SPY because the rule went to cash."
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3030,14 +3039,13 @@ def test_result_followup_uses_latest_result_fact_bank(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
-        assert kwargs["focus"] == "max_drawdown"
         assert kwargs["metadata"]["symbols"] == ["MSFT"]
         assert kwargs["language"] == "en"
         return "MSFT's max drawdown was 34.2% in the latest run."
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3097,8 +3105,8 @@ def test_result_followup_uses_latest_result_when_interpreter_unavailable(
         return "Grounded answer from the latest result facts."
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3162,8 +3170,8 @@ def test_result_followup_heading_uses_typed_chrome_when_interpreter_unavailable(
         return "Respuesta fundamentada en el resultado más reciente."
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3224,8 +3232,8 @@ def test_result_followup_uses_llm_composer_before_recovery(
         return "LLM-composed answer grounded in the result fact bank."
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3272,7 +3280,6 @@ def test_result_followup_uses_llm_composer_before_recovery(
         in result.patch["assistant_response"]
     )
     assert captured["metadata"]["symbols"] == ["AAPL"]
-    assert captured["focus"] == "why_underperformed"
     assert captured["user_message"] == "Why did this happen?"
 
 
@@ -3284,8 +3291,8 @@ def test_empty_non_strategy_turn_after_result_uses_followup_recovery(
         return None
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        empty_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(empty_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3340,15 +3347,19 @@ def test_empty_non_strategy_turn_after_result_uses_followup_recovery(
 def test_latest_result_next_experiment_followup_answers_with_rows_and_keeps_focus(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#590: a what-next follow-up is the Try next rows for the latest result,
-    never a composer call and never the recovery while rows can be built."""
+    """A what-next follow-up is the model's plan above the latest result's Try
+    next rows, never the recovery while an answer exists."""
 
-    async def unexpected_compose_result_followup_response(**kwargs: Any) -> None:
-        raise AssertionError(f"composer called for a next_experiment follow-up: {kwargs}")
+    plan = "Test a different date range first, then compare with buy and hold."
+    calls: list[dict[str, Any]] = []
+
+    async def compose_plan(**kwargs: Any) -> ResultConversationAnswer:
+        calls.append(kwargs)
+        return ResultConversationAnswer(text=plan)
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        unexpected_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        compose_plan,
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3392,11 +3403,15 @@ def test_latest_result_next_experiment_followup_answers_with_rows_and_keeps_focu
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"] == next_experiments_lead_in("en")
+    assert result.patch["assistant_response"] == plan
     rows = result.patch["next_experiments"]["rows"]
     assert rows and all(row["kind"] and row["label_key"] for row in rows)
+    # The model was told exactly the tests the rows offer.
+    assert [row["kind"] for row in calls[0]["next_test_rows"]] == [
+        row["kind"] for row in rows
+    ]
     assert "recovery" not in result.patch
-    # The Try next section is the heading; the rows answer wears no chrome.
+    # The Try next section is the heading; the plan wears no chrome.
     assert "response_intent" not in result.patch
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "next_experiment"
@@ -3417,8 +3432,8 @@ def test_latest_result_save_request_is_history_preserved_without_mutation(
         return "I cannot move this into Strategies here, but the run stays reachable from this chat and Recents."
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
-        unexpected_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(unexpected_compose_result_followup_response),
     )
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret.compose_private_alpha_save_response",
@@ -3476,8 +3491,8 @@ def test_unanchored_clarification_after_result_uses_followup_recovery(
         return None
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        empty_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(empty_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3535,82 +3550,6 @@ def test_unanchored_clarification_after_result_uses_followup_recovery(
     assert result.decision.artifact_target == "latest_result"
 
 
-def test_result_followup_timeout_uses_localized_recovery(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import asyncio
-
-    from argus.agent_runtime.stages import interpret_actions
-    from argus.llm import openrouter
-
-    async def slow_compose_result_followup_response(**kwargs: Any) -> str:
-        del kwargs
-        await asyncio.sleep(1)
-        return "late answer"
-
-    monkeypatch.setattr(
-        interpret_actions,
-        "RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS",
-        0.01,
-    )
-    monkeypatch.setattr(
-        interpret_actions,
-        "compose_result_followup_response",
-        slow_compose_result_followup_response,
-    )
-    openrouter.clear_openrouter_route_receipts()
-    snapshot = TaskSnapshot(
-        latest_backtest_result_reference=ArtifactReference(
-            artifact_kind="backtest_result",
-            artifact_id="run-followup-timeout",
-            artifact_status="completed",
-            metadata={
-                "symbols": ["TSLA"],
-                "benchmark_symbol": "SPY",
-                "metrics": {
-                    "aggregate": {
-                        "performance": {
-                            "total_return_pct": 27.5,
-                            "benchmark_return_pct": 23.8,
-                            "delta_vs_benchmark_pct": 3.8,
-                        },
-                        "risk": {"max_drawdown_pct": -17.7},
-                    }
-                },
-                "config_snapshot": {
-                    "template": "indicator_threshold",
-                    "symbols": ["TSLA"],
-                    "date_range": {"start": "2025-05-20", "end": "2026-05-20"},
-                },
-            },
-        )
-    )
-    response = StructuredInterpretation(
-        intent="results_explanation",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="User asks why the result happened.",
-        semantic_turn_act="result_followup",
-        result_followup_focus="general",
-    )
-
-    result, _ = run_interpret_with_llm(
-        message="why did that happen?",
-        response=response,
-        snapshot=snapshot,
-    )
-
-    assert result.outcome == "ready_to_respond"
-    answer = result.patch["assistant_response"]
-    assert not answer.startswith("**")
-    # Issue #249: failure prose never wears result chrome.
-    assert "response_intent" not in result.patch
-    assert answer == "I couldn’t answer that follow-up. Your result is still here."
-    receipts = openrouter.get_openrouter_route_receipts()
-    assert receipts[-1].task == "result_summary"
-    assert receipts[-1].failure_mode == "result_followup_timeout"
-
-
 def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3622,8 +3561,8 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3684,7 +3623,6 @@ def test_underperformance_followup_corrects_false_premise_when_run_outperformed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
-        assert kwargs["focus"] == "why_underperformed"
         assert kwargs["metadata"]["symbols"] == ["TSLA"]
         return (
             "TSLA beat SPY in this run: the strategy returned +33.4%, "
@@ -3692,8 +3630,8 @@ def test_underperformance_followup_corrects_false_premise_when_run_outperformed(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3744,7 +3682,6 @@ def test_zero_return_followup_uses_result_reason_without_repeating_readout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
-        assert kwargs["focus"] == "general"
         assert kwargs["metadata"]["symbols"] == ["TSLA"]
         return (
             "The strategy returned 0.0% while SPY returned +8.9%. "
@@ -3752,8 +3689,8 @@ def test_zero_return_followup_uses_result_reason_without_repeating_readout(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3817,7 +3754,6 @@ def test_result_followup_summarizes_what_was_tested_from_fact_bank(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
-        assert kwargs["focus"] == "what_tested"
         assert kwargs["metadata"]["symbols"] == ["MSFT"]
         return (
             "I tested MSFT with buy and hold over May 13, 2025 to May 13, 2026. "
@@ -3825,8 +3761,8 @@ def test_result_followup_summarizes_what_was_tested_from_fact_bank(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3888,7 +3824,6 @@ def test_result_followup_uses_composer_question_when_llm_focus_is_wrong(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
-        assert kwargs["focus"] == "max_drawdown"
         assert kwargs["user_message"] == "What exactly did you test?"
         resolved_strategy = kwargs["metadata"]["config_snapshot"]["resolved_strategy"]
         assert resolved_strategy["entry_rule"]["fast_period"] == 20
@@ -3898,8 +3833,8 @@ def test_result_followup_uses_composer_question_when_llm_focus_is_wrong(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3963,7 +3898,6 @@ def test_result_followup_names_indicator_rules_and_no_trade_outcome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
-        assert kwargs["focus"] == "what_tested"
         assert kwargs["metadata"]["symbols"] == ["TSLA"]
         return (
             "I tested TSLA with an RSI mean reversion strategy: enter when "
@@ -3972,8 +3906,8 @@ def test_result_followup_names_indicator_rules_and_no_trade_outcome(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        fake_compose_result_followup_response,
+        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
+        _answering(fake_compose_result_followup_response),
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
