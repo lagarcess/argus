@@ -128,6 +128,20 @@ export function nextExperimentRowsFromMetadata(
   return rows.length > 0 ? rows : null;
 }
 
+/**
+ * The run the rows belong to when they ride a message without a result card
+ * (a what-next follow-up). A continuity row anchors its typed action on it.
+ */
+export function nextExperimentsSourceRunIdFromMetadata(
+  metadata: Record<string, unknown>,
+): string | null {
+  const sidecar = recordOrNull(metadata.next_experiments);
+  if (!sidecar || sidecar.version !== NEXT_EXPERIMENTS_VERSION) return null;
+  const runId =
+    typeof sidecar.source_run_id === "string" ? sidecar.source_run_id.trim() : "";
+  return runId || null;
+}
+
 const RESEARCH_ADD_PEER_KIND_PREFIX = "research_add_peer";
 
 export function nextExperimentAction(

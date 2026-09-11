@@ -4513,6 +4513,20 @@ number than the card above it. The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
 
+A result follow-up that asks what to try next (`semantic_turn_act:
+"result_followup"`, `result_followup_focus: "next_experiment"`) answers with
+this same sidecar on a plain assistant message: `assistant_response` is a
+one-sentence lead-in in the workspace language, `next_experiments` carries the
+latest result's rows (the same offer the result made when it was first
+explained), and no `response_intent` heading is attached because the Try next
+section is the heading. No composer call is spent on that turn. Because the
+message carries no result card, the sidecar names its run as `source_run_id`
+(the latest result's run id), and the client submits the same
+`refine_strategy` action for `change_date_range` and `compare_buy_and_hold`
+rows that it submits under a card, with that `run_id`. The retryable
+`recovery.code = "latest_result_followup_unavailable"` appears only when no
+row can be built for the latest result (#590).
+
 When the user selects `change_date_range` or `compare_buy_and_hold`, the web
 client submits a result-presented `refine_strategy` action whose payload carries
 the source `run_id` and `next_experiment_kind`. The backend seeds the follow-up

@@ -21,7 +21,10 @@ import {
 } from "@/lib/decision-contract";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
-import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
+import {
+  nextExperimentRowsFromMetadata,
+  nextExperimentsSourceRunIdFromMetadata,
+} from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
   backtestJobMessageFromApi,
@@ -475,7 +478,13 @@ export function hydrateMessagesFromApi(
             ...(!discovery && researchSources.length > 0
               ? { researchSources, researchDegradedCode }
               : {}),
-            ...(nextExperiments ? { nextExperiments } : {}),
+            ...(nextExperiments
+              ? {
+                  nextExperiments,
+                  nextExperimentsSourceRunId:
+                    nextExperimentsSourceRunIdFromMetadata(metadata),
+                }
+              : {}),
             ...(memoryRecalls ? { memoryRecalls } : {}),
           };
         }

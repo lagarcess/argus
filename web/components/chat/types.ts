@@ -363,6 +363,8 @@ export type Message = {
   /** Ephemeral optimistic presentation; never hydrated or persisted. */
   retestReceiptPending?: boolean;
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
+  /** The rows' run when the message carries no result card; continuity rows anchor on it. */
+  nextExperimentsSourceRunId?: string | null;
 };
 
 export type DiscoverySource = {
