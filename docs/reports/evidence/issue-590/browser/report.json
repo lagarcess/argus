@@ -1,0 +1,48 @@
+[
+  {
+    "language": "en",
+    "conversation_id": "922275fe-8a62-4a68-9f8b-7694b564698d",
+    "timings": {
+      "confirmation_seconds": 83.6,
+      "result_seconds": 13.6,
+      "followup_seconds": 26.2
+    },
+    "try_next_sections": 1,
+    "rows": [
+      "↳\nTry monthly recurring buys·Worst drop was -15.5%",
+      "↳\nTry a supported SMA/EMA crossover",
+      "↳\nTest a different date range"
+    ],
+    "after_followup_text": "Here is what you can try next from this result. TRY NEXT ↳ Try monthly recurring buys·Worst drop was -15.5% ↳ Try a supported SMA/EMA crossover ↳ Test a different date range",
+    "recovery_shown": false,
+    "page_errors": [],
+    "screenshots": [
+      "en-1-*.png",
+      "en-2-*.png",
+      "en-3-*.png"
+    ]
+  },
+  {
+    "language": "es-419",
+    "conversation_id": "e6b13b2a-ff20-4eaf-845b-39ed862740f5",
+    "timings": {
+      "confirmation_seconds": 64,
+      "result_seconds": 10.6,
+      "followup_seconds": 21.1
+    },
+    "try_next_sections": 1,
+    "rows": [
+      "↳\nProbar compras mensuales recurrentes·La peor caída fue -15.5%",
+      "↳\nProbar un cruce SMA/EMA compatible",
+      "↳\nProbar otro rango de fechas"
+    ],
+    "after_followup_text": "Esto es lo que puedes probar después a partir de este resultado. QUÉ PROBAR DESPUÉS ↳ Probar compras mensuales recurrentes·La peor caída fue -15.5% ↳ Probar un cruce SMA/EMA compatible ↳ Probar otro rango de fechas",
+    "recovery_shown": false,
+    "page_errors": [],
+    "screenshots": [
+      "es-419-1-*.png",
+      "es-419-2-*.png",
+      "es-419-3-*.png"
+    ]
+  }
+]

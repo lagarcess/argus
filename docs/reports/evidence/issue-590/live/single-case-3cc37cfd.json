@@ -1,0 +1,68 @@
+{
+  "label": "head-3cc37cfd",
+  "tree": "/Users/garces/Documents/projects/repos/argus/.claude/worktrees/scout-loop-extraction-cost-a90464",
+  "candidate_sha": "3cc37cfd81416dd87b63142212d679b2fe660331",
+  "market_data_provider_mode": "live_provider",
+  "asset_provider_mode": "live_provider",
+  "captured_at": "2026-09-11T07:47:48.565254+00:00",
+  "records": [
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "status": "failed",
+      "failed_checks": [
+        "offered.min_next_experiment_rows: expected at least 1, got []"
+      ],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "result_followup",
+      "next_experiment_kinds": [],
+      "recovery_code": "latest_result_followup_unavailable",
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0008856
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError",
+          "usage_cost_usd": null
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "failed",
+          "failure_mode": "ValidationError",
+          "usage_cost_usd": null
+        },
+        {
+          "task": "interpretation_repair",
+          "schema": "FocusedStrategyExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00116995
+        },
+        {
+          "task": "result_summary",
+          "schema": "ResultFollowupDraft",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0001088906
+        },
+        {
+          "task": "result_summary",
+          "schema": "ResultFollowupDraft",
+          "outcome": "failed",
+          "failure_mode": "result_followup_draft_rejected",
+          "usage_cost_usd": null
+        }
+      ],
+      "billed_cost_usd": 0.002164
+    }
+  ],
+  "billed_cost_usd": 0.002164
+}
