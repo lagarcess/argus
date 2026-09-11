@@ -48,6 +48,37 @@ submenu button a 44 px minimum, and the new row inherits it like its siblings.
 
 ## Live measurement
 
-Not yet recorded. The first full run, on `9af12545`, finished its cases but
-`write_scorecard` refused to write: its provenance check re-reads the head at
-write time, and a commit landed in this worktree during the run.
+The first full run, on `9af12545`, finished its cases but `write_scorecard`
+refused to write: its provenance check re-reads the head at write time, and a
+commit landed in this worktree during the run.
+
+By founder direction the re-measurement ran only the cases that reach
+research, because the measured users have no country and the baseline never
+sent one. Those are the 13 cases whose decision-10 baseline records a research
+outcome: 4 grounded (3 balanced, 1 fast) and 9 discovery `find`.
+`drivers/research_cases.py` ran them live on `03d9a089` with both provider
+modes assigned `live_provider`, the head unchanged and the tracked tree clean
+from start to end, and compared each against
+`docs/reports/evidence/decision-10/live-measurement.json`. The record is
+`live-research-cases.json`.
+
+- Every research request sent no location (`locations_sent: [None]`), as in
+  the baseline, because no measured user has a country.
+- 9 unchanged, 2 fixed, 2 regressed. No case failed in both runs.
+- Fixed: `asset_discovery_category_spanish_issue_244` and
+  `asset_discovery_old_pharma_escalation_exact_issue_344` failed in the
+  baseline and pass here. The discovery path builds no research spec and
+  sends no location, so this PR does not explain the change.
+- Regressed: `capability_honesty_future_performance_btc_regression`: the
+  research provider returned an HTTP error (`research_unavailable_http_error`),
+  so nothing was published and the judge failed scenario framing; the request
+  carried no location, as in the baseline.
+  `ordinary_conversation_price_question_en`: the answer published with its
+  cited row, as in the baseline, and the prose judge failed without naming a
+  criterion.
+- Not rerun. This run's measured spend is $0.72 ($0.21 routed model calls,
+  $0.51 research provider; the errored research call reported no cost). The
+  lost full run is estimated at about $2.2 (about $1.50 routed model calls from
+  two comparable full runs, plus about $0.70 research provider for the same
+  cases), so the lane stands near $2.9, and one rerun of each regression would
+  pass the founder's $3 cap.
