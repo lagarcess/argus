@@ -86,7 +86,9 @@ the merge ignores it. That replay is a committed test.
   runtime is waiting on its own question, and that assumption is recorded as
   `pending_setup_reply_assumed_without_model_read`. The focused strategy
   repair, the DCA contract audit and the seedless fallback read it; the
-  prose override keeps the act it was handed.
+  prose override keeps the act it was handed. The focused re-read's base is
+  the pending draft only for a turn that answers the runtime's question; a
+  fresh task is re-read from itself alone.
 - `contextual_merge.py`: the merge gate reads that predicate; an incoming
   asset universe that holds only the benchmark repair's artifact does not
   replace the pending asset. `asset_resolution.py`: the hidden-context guard, which clears an
@@ -97,7 +99,10 @@ the merge ignores it. That replay is a committed test.
   a budget the audit calls starting capital lands in `initial_capital` only
   while that role is empty (`dca_budget_audit_typed_as_seed`); beside an
   occupied seed it can only bound the plan, so it becomes the ceiling
-  (`dca_budget_audit_seed_role_occupied_read_as_ceiling`); a distinct cap is
+  (`dca_budget_audit_seed_role_occupied_read_as_ceiling`); beside a cap the
+  primary mis-slotted under the seed key it keeps its seed role
+  (`dca_budget_audit_seed_role_kept_beside_misplaced_cap`) and the reader
+  places both by role; a distinct cap is
   still a ceiling. The role names come from `DCA_SEED_ROLES` and
   `DCA_CEILING_ROLES` in `argus/domain/dca_capital.py`.
   `_seed_corroborated_by_fidelity_audit`: a seed the primary typed without
@@ -124,13 +129,12 @@ the merge ignores it. That replay is a committed test.
 
 | Suite | Result |
 | --- | ---: |
-| `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the recorded two turns through the real workflow) | 96 passed |
-| `tests/agent_runtime/test_dca_money_role_audits.py` | 31 passed |
+| `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task, the recorded two turns through the real workflow) | 98 passed |
+| `tests/agent_runtime/test_dca_money_role_audits.py` | 32 passed |
 | `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 21 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
-| Hermetic `tests/agent_runtime`, `tests/evals`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `506b38a7` | 2606 passed, 2 skipped |
-| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `506b38a7` | 1106 passed, 2 skipped |
-| `tests/test_spine_guardrails.py` | 27 passed |
+| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `8241f56d` | 2636 passed, 2 skipped |
+| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `8241f56d` | 822 passed |
 | `scripts/check_modularity_budget.py` | no violations |
 
 ## Measurement cases, run live on the fix (`live_cases_after.json`)
@@ -292,6 +296,19 @@ es-419), the two prebaked-chip followups, and
 change reaches the four DCA seed-or-cap cases again. All nine passed with the
 judge on, $0.32.
 
+## Codex round 5 (two P1s on `6d7d140c`, fixed in `8241f56d`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| With a field requested, `_repair_incomplete_strategy_extraction` swapped the re-read's base for the pending draft and the base merge filled every gap of a partial `new_idea`/`new_task` read from it, so a fresh task came back with the pending dates, seed, fee and slippage under the corrected act | The swap asks the act owner: only a turn that answers the runtime's question is re-read against the pending setup; a fresh task is re-read from itself alone and asked for what it lacks. The pending-option audit (a model reads the pick) and the requested-asset answer paths (the asset the runtime asked for, own reason codes, owned by the chip and recognition lanes) were audited and left as they are | `test_a_focused_repair_of_a_partial_fresh_task_does_not_fill_it_from_the_pending_setup` (en, es-419) |
+| A $5,000 cap the primary mis-slotted under `initial_capital` with a ceiling role, beside an audited $1,000 seed, made the writer re-role the seed to `total_budget`; the reader then saw two ceilings, dropped the cap and kept $1,000 as the ceiling with no seed | A cap does not own the seed slot: the audit's seed keeps its role under the free key (`dca_budget_audit_seed_role_kept_beside_misplaced_cap`, no `total_budget` extra for a seed) and the round-4 crossed-slot rule places both by role (seed 1000, ceiling 5000). Beside the user's own seed the round-1 rule stands | `test_a_seed_the_audit_reads_keeps_its_role_beside_a_cap_in_the_seed_slot` |
+
+### Measurement cases the round-5 fix touches, live at `8241f56d` (`live-touched-cases-8241f56d.json`)
+
+The same nine cases as round 4 (the focused re-read serves the recorded
+repros and the chip followups; the writer serves the four DCA seed-or-cap
+cases). All nine passed with the judge on, $0.25.
+
 ## Billed cost
 
 | Item | Cost |
@@ -306,7 +323,8 @@ judge on, $0.32.
 | Five touched measurement cases live at `a658c7ad` | $0.187 |
 | Six touched measurement cases live at `1d41d9f4` | $0.130 |
 | Nine touched measurement cases live at `506b38a7` | $0.321 |
-| **Total** | **$2.90** |
+| Nine touched measurement cases live at `8241f56d` | $0.255 |
+| **Total** | **$3.16** |
 
 ## Observed, not changed here
 
