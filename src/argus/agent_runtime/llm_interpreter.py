@@ -3289,9 +3289,14 @@ async def _repair_incomplete_strategy_extraction(
                 return None
             continue
         base_response = failed_response
-        if _request_has_active_strategy_context(
-            request
-        ) and _selected_requested_field_base(request):
+        # The pending setup fills the re-read only for a turn that answers
+        # the runtime's question; a fresh task is filled from itself alone.
+        turn = repaired_turn_act(
+            base_act=failed_response.semantic_turn_act,
+            base_relation=failed_response.task_relation,
+            request=request,
+        )
+        if turn.answers_pending and _selected_requested_field_base(request):
             pending_draft = _pending_strategy_draft_from_request_or_response(
                 response=failed_response,
                 request=request,

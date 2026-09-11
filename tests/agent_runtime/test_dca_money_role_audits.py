@@ -486,3 +486,33 @@ def test_semantic_reader_swaps_crossed_money_roles_and_keeps_both_amounts() -> N
     assert report.optional_parameter_values["initial_capital"] == 1000.0
     assert "semantic_dca_ceiling_role_read_over_seed_key" in report.reason_codes
     assert "semantic_dca_seed_role_read_over_ceiling_key" in report.reason_codes
+
+
+def test_a_seed_the_audit_reads_keeps_its_role_beside_a_cap_in_the_seed_slot() -> None:
+    # The primary put a $5,000 cap under initial_capital with a ceiling role
+    # and the audit reads a distinct $1,000 seed. A cap does not own the seed
+    # slot, so the seed keeps its role and the reader places both by role.
+    response = _dca_response(initial_capital=5000.0, seed_provenance="total_budget")
+
+    repaired = _response_from_dca_contract_audit(
+        request=_request(),
+        response=response,
+        audit=_contract_audit(
+            total_budget_amount=1000.0, total_budget_source="starting_capital"
+        ),
+    )
+
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.initial_capital == 5000.0
+    assert draft.total_capital == 1000.0
+    assert draft.field_provenance["total_capital"] == "starting_capital"
+    assert "total_budget" not in draft.extra_parameters
+    assert "dca_budget_audit_seed_role_kept_beside_misplaced_cap" in repaired.reason_codes
+    projected = _strategy_from_llm(draft, "No more than $5,000 total, $1,000 to start.")
+    report = conserve_semantic_constraints(
+        strategy=projected, selected_thread_metadata={}
+    )
+    assert report.evidence.total_capital == 1000.0
+    assert report.evidence.contribution_ceiling == 5000.0
+    assert report.optional_parameter_values["initial_capital"] == 1000.0

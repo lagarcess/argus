@@ -26,7 +26,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     has_partial_explicit_date_range,
 )
-from argus.domain.dca_capital import DCA_SEED_ROLES
+from argus.domain.dca_capital import DCA_CEILING_ROLES, DCA_SEED_ROLES
 
 
 def _response_needs_strategy_family_continuity_audit(
@@ -114,16 +114,26 @@ def _response_from_dca_contract_audit(
             field_provenance["initial_capital"] = budget_source
             audit_reason_codes.append("dca_budget_audit_typed_as_seed")
         else:
-            # A second plan-wide amount beside an occupied seed can only bound
-            # the plan; the audit never replaces a role the draft already holds.
+            # The audit never replaces a role the draft already holds. A seed
+            # beside the user's own seed can only bound the plan; a seed
+            # beside a cap in the seed slot keeps its role, and the reader
+            # places both by role.
             if budget_source in _DCA_SEED_ROLE_SOURCES:
-                budget_source = "total_budget"
-                audit_reason_codes.append(
-                    "dca_budget_audit_seed_role_occupied_read_as_ceiling"
-                )
+                if _capital_source(field_provenance, "initial_capital") in (
+                    _DCA_CEILING_ROLE_SOURCES
+                ):
+                    audit_reason_codes.append(
+                        "dca_budget_audit_seed_role_kept_beside_misplaced_cap"
+                    )
+                else:
+                    budget_source = "total_budget"
+                    audit_reason_codes.append(
+                        "dca_budget_audit_seed_role_occupied_read_as_ceiling"
+                    )
             draft.total_capital = budget
             field_provenance["total_capital"] = budget_source
-            extra_parameters["total_budget"] = budget
+            if budget_source not in _DCA_SEED_ROLE_SOURCES:
+                extra_parameters["total_budget"] = budget
 
     draft.field_provenance = field_provenance
     draft.extra_parameters = extra_parameters
@@ -167,6 +177,7 @@ def _response_from_dca_contract_audit(
 
 # A budget audit that names a seed role has read the seed, not a ceiling.
 _DCA_SEED_ROLE_SOURCES = frozenset(DCA_SEED_ROLES)
+_DCA_CEILING_ROLE_SOURCES = frozenset(DCA_CEILING_ROLES)
 # Provenance that makes a seed the user's own: their words, a carried setup,
 # or a seed role. A ceiling role under the seed key is a cap in the wrong slot.
 _USER_SEED_SOURCES = frozenset({"user", "explicit_user", "prior", *DCA_SEED_ROLES})

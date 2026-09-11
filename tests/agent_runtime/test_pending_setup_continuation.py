@@ -17,6 +17,10 @@ from argus.agent_runtime.interpreter.shared import (
     PENDING_REPLY_ASSUMED_REASON,
     repaired_turn_act,
 )
+from argus.agent_runtime.llm_interpreter_types import (
+    LLMInterpretationResponse,
+    LLMStrategyDraft,
+)
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
@@ -909,3 +913,85 @@ def test_a_repair_keeps_a_known_act_and_decides_a_replaced_one_from_the_pending_
     )
 
     assert tuple(turn) == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("language", "message"),
+    [
+        ("en", "New idea: DCA $200 monthly into AAPL"),
+        ("es-419", "Nueva idea: DCA de $200 mensuales en AAPL"),
+    ],
+)
+async def test_a_focused_repair_of_a_partial_fresh_task_does_not_fill_it_from_the_pending_setup(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str
+) -> None:
+    # The runtime asked for the capital of a pending AAPL setup; the reply is
+    # an explicit fresh task that lacks its dates. The focused re-read may fill
+    # the fresh draft from the turn itself, never from the pending setup.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def focused_stub(**kwargs: Any) -> Any:
+        schema_name = kwargs["schema_name"]
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=True,
+                user_goal_summary=message,
+                language=language,
+                strategy_type="dca_accumulation",
+                asset_universe=["AAPL"],
+                capital_amount=200,
+                recurring_contribution=200,
+                cadence="monthly",
+                missing_required_fields=["date_range"],
+                confidence=0.9,
+                evidence_spans={
+                    "asset_universe": "AAPL",
+                    "recurring_contribution": "$200",
+                },
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", focused_stub)
+    failed_response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_thesis=message,
+            language=language,
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=_pending("dca_accumulation")
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "capital_amount",
+        },
+        user=UserState(user_id="u1", language_preference=language),
+    )
+
+    repaired = await interpreter_module._repair_incomplete_strategy_extraction(
+        failed_response=failed_response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert repaired is not None
+    assert repaired.semantic_turn_act == "new_idea"
+    assert repaired.task_relation == "new_task"
+    draft = repaired.candidate_strategy_draft
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.recurring_contribution == 200
+    assert draft.date_range in (None, {}, [])
+    assert draft.initial_capital is None
+    assert not set(draft.extra_parameters) & set(COSTS)
