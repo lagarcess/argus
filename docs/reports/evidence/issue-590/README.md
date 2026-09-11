@@ -142,11 +142,59 @@ and both are outside this lane: with no typed focus there is no honest way to
 attach rows without a phrase gate before interpretation. It is recorded here
 because it decides whether the measurement case passes on a given run.
 
-### Full live measurement
+### Full live measurement at `b7bdca4e`
 
-Pending: run once on the final head after review, compared case by case
-against the scorecard named in `.agent/interpreter_prompt_fingerprint.json`
-with `drivers/compare_baseline.py`. This section is updated when it lands.
+Run once on the review-clean head with `drivers/run_measurement.sh` (both
+provider modes forced, research rail on, clean worktree, Python 3.10.20), after
+Codex round 2 returned clean. Scorecard: `measurement/live-measurement.json`
+(provenance `candidate_sha` `b7bdca4e`, `market_data_provider_mode` and
+`asset_provider_mode` `live_provider`). Compared case by case against the
+fingerprint's scorecard (`docs/reports/evidence/decision-10/live-measurement.json`,
+commit `60e7c0ec`) with `drivers/compare_baseline.py`:
+`measurement/baseline-comparison.json`.
+
+| | Baseline `60e7c0ec` | This head `b7bdca4e` |
+| --- | ---: | ---: |
+| Passed / failed | 63 / 6 | 61 / 8 |
+| Unchanged, fixed, regressed | | 57, 5, 7 |
+| Primary interpreter timeouts (receipts) | 5 | 17 |
+| Fallback reads that failed validation | 0 | 5 |
+| Turns that ended `interpreter_unavailable` | 0 | 4 |
+| Billed (OpenRouter receipts) | $1.48 | $1.32 |
+
+Fixed (baseline failed, this head passed): `asset_discovery_not_result_followup_issue_244`
+(the lane's case: three rows, no recovery, no composer receipt),
+`asset_discovery_old_pharma_escalation_exact_issue_344`,
+`dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`,
+`graceful_recovery_spanish_weekly_options_aapl`,
+`ordinary_conversation_concept_compound_interest_en`. Only the first is this
+lane's doing; the other four are model and judge variance in the lane's favor.
+
+Flipped to failed (baseline passed, this head failed), none of which reaches
+the follow-up path (discovery, capability answers, DCA launches, a messy
+Spanish forward question), each rerun once as `tests/evals/README.md` allows
+(`measurement/regressed-rerun-b7bdca4e.json`, $0.12):
+
+| Case | Failure at `b7bdca4e` | Rerun |
+| --- | --- | --- |
+| `asset_discovery_comparison_anchor_english_issue_244` | prose judge, honesty | passed |
+| `asset_discovery_trending_crypto_exact_issue_344` | primary timeout, fallback validation error, `interpreter_unavailable` | failed again on the same receipt pair |
+| `capability_honesty_options_straddle_tsla` | prose judge, honesty | passed |
+| `dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run` | primary timeout, fallback validation error, `interpreter_unavailable` | passed |
+| `dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455` | `DcaContributionRoleAudit` timeout, clarification instead of launch | passed |
+| `messy_spanish_future_performance_nvda_cruce_dorado` | primary timeout, fallback validation error | passed |
+| `ordinary_conversation_capability_indicator_question_en` | primary timeout, fallback validation error, `interpreter_unavailable` | passed |
+
+Reading: this head's run met a structured tier three times less available
+than the baseline's (17 primary timeouts against 5, and a fallback read that
+failed validation five times against none), and every flipped case that is not
+a judge verdict carries that receipt pair. The one case that failed its rerun
+failed it the same way. The diff does not touch discovery, DCA, capability or
+forward-question routing; the follow-up path it changes passed its case on
+both runs at this head. `.agent/interpreter_prompt_fingerprint.json` is not
+repointed: no fingerprinted text changed, and the fingerprint's surface hash
+still matches (`tests/test_interpreter_prompt_freeze.py` passes), so the
+baseline scorecard it names stays the measured one.
 
 ## Spend
 
@@ -155,7 +203,9 @@ with `drivers/compare_baseline.py`. This section is updated when it lands.
 | Measurement case, run 1 and rerun (`3cc37cfd`) | $0.02 |
 | Browser demo at `3cc37cfd`, including the aborted attempt | $0.19 |
 | Browser demo at `67067751`, including the outage-path attempt | $0.18 |
-| **Total so far** | **$0.39** |
+| Full live measurement at `b7bdca4e` | $1.32 |
+| Rerun of the seven flipped cases | $0.12 |
+| **Total** | **$1.83** |
 
 ## Reproduce
 
