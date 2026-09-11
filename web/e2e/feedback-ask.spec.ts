@@ -45,6 +45,7 @@ const RESULT_CARD = {
   actions: [],
   benchmark_note: "Universe: AAPL. Benchmark: SPY.",
   chart: null,
+  evidence_artifact_id: `${CONVERSATION_ID}-evidence`,
 };
 
 function json(route: Route, body: unknown, status = 200) {
@@ -243,6 +244,7 @@ for (const language of ["en", "es-419"] as const) {
       surface: "chat",
       conversation_id: CONVERSATION_ID,
       message_id: RESULT_MESSAGE_ID,
+      evidence_artifact_id: RESULT_CARD.evidence_artifact_id,
       rating: "positive",
       tags: [],
       hasAttachments: false,

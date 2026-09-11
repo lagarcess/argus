@@ -44,6 +44,7 @@ function backtestResult(id: string, overrides: Partial<Message> = {}): Message {
       period: "June 1, 2025 to June 1, 2026",
       metrics: [],
       runId: `${id}-run`,
+      evidenceArtifactId: `${id}-evidence`,
     },
     ...overrides,
   });
@@ -136,6 +137,7 @@ describe("feedback ask", () => {
         message_kind: "strategy_result",
         artifact_id: "result-1-run",
         result_run_id: "result-1-run",
+        evidence_artifact_id: "result-1-evidence",
         rating,
         tags: [],
         hasAttachments: false,
@@ -167,7 +169,11 @@ describe("feedback ask", () => {
     });
     expect(
       feedbackContextForSubmission(handed, { ...detail, includeConversationContext: true }),
-    ).toMatchObject({ conversation_id: "conversation-2", message_id: "result-2" });
+    ).toMatchObject({
+      conversation_id: "conversation-2",
+      message_id: "result-2",
+      evidence_artifact_id: "result-2-evidence",
+    });
   });
 
   test("a closed ask stays closed for its conversation when storage is blocked", () => {

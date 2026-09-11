@@ -41,6 +41,8 @@ ASK_PAYLOAD = {
         "conversation_id": "conversation-1",
         "message_id": "result-message-1",
         "message_kind": "strategy_result",
+        "result_run_id": "run-1",
+        "evidence_artifact_id": "evidence-1",
         "rating": "neutral",
         "tags": [],
         "email": "person@example.com",
@@ -54,6 +56,8 @@ SANITIZED_ASK_CONTEXT = {
     "conversation_id": "conversation-1",
     "message_id": "result-message-1",
     "message_kind": "strategy_result",
+    "result_run_id": "run-1",
+    "evidence_artifact_id": "evidence-1",
     "rating": "neutral",
 }
 

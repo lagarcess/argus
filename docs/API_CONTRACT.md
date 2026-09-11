@@ -5528,8 +5528,9 @@ limit returns `429` with `code: "too_many_requests"` and `Retry-After`.
 
 Feedback context is privacy-sanitized by the backend before persistence. The
 backend keeps only known scalar artifact/app keys such as `source`, `surface`,
-`message_id`, `conversation_id`, `artifact_id`, `artifact_type`, result,
-confirmation, backtest-job, rating, tag, timestamp, and attachment-count
+`message_id`, `conversation_id`, `artifact_id`, `artifact_type`,
+`evidence_artifact_id`, result, confirmation, backtest-job, rating, tag, timestamp,
+and attachment-count
 metadata. Raw browser URLs are not persisted; when a URL or legacy
 `metadata.path` is provided, the backend stores only a queryless `page_path`
 with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,

@@ -6,6 +6,7 @@ const CONVERSATION_KEYS = [
   "artifact_id",
   "artifact_type",
   "artifact_status",
+  "evidence_artifact_id",
   "result_run_id",
   "strategy_id",
   "saved_strategy_id",
