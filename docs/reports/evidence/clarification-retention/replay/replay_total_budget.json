@@ -1,0 +1,136 @@
+{
+  "variant": "total_budget",
+  "turns": [
+    {
+      "index": 1,
+      "outcome": "await_user_reply",
+      "assistant_text": "Argus can run the monthly DCA with $100 recurring buys, but it can't treat the $1,000 as both starting capital and a separate contribution cap. Which direction should we go?",
+      "em_dash": false,
+      "provider_calls": [
+        "LLMInterpretationResponse",
+        "DcaContractAudit",
+        "DcaContributionRoleAudit",
+        "StatedRunFieldFidelityAudit"
+      ],
+      "missing_required_fields": [],
+      "requested_field": null,
+      "unsupported_constraints": [
+        "unsupported_dca_contribution_ceiling"
+      ],
+      "draft": {
+        "strategy_type": "dca_accumulation",
+        "asset_universe": [
+          "DOCN"
+        ],
+        "date_range": {
+          "start": "2025-09-10",
+          "end": "2026-09-09"
+        },
+        "cadence": "monthly",
+        "capital_amount": 100.0,
+        "comparison_baseline": "SPY"
+      },
+      "extra": {
+        "initial_capital": 1000.0,
+        "recurring_contribution": 100.0,
+        "total_capital": 1000.0,
+        "total_budget": 1000.0,
+        "fee_rate": 0.001,
+        "slippage": 0.0005
+      },
+      "provenance": {
+        "strategy_type": "explicit_user",
+        "asset_universe": "explicit_user",
+        "date_range": "explicit_user",
+        "initial_capital": "explicit_user",
+        "recurring_contribution": "explicit_user",
+        "cadence": "explicit_user",
+        "comparison_baseline": "stated_run_field_fidelity_audit",
+        "capital_amount": "recurring_contribution",
+        "total_capital": "total_budget",
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user"
+      },
+      "semantic_turn_act": "new_idea",
+      "task_relation": "new_task",
+      "reason_codes": null,
+      "thread_metadata": {
+        "last_stage_outcome": "await_user_reply"
+      },
+      "launch": {
+        "symbols": null,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "cadence": null,
+        "date_range": null,
+        "benchmark_symbol": null
+      }
+    },
+    {
+      "index": 2,
+      "outcome": "await_user_reply",
+      "assistant_text": "Got it — $1,000 starting capital, $100 monthly buys, no cap. Which asset and date window should we use for this DCA test?",
+      "em_dash": true,
+      "provider_calls": [
+        "LLMInterpretationResponse",
+        "LLMInterpretationResponse",
+        "PendingResponseOptionSelectionAudit",
+        "PendingResponseOptionSelectionAudit",
+        "DcaContractAudit",
+        "StrategyFamilyContinuityAudit(unscripted)",
+        "DcaContributionRoleAudit",
+        "FocusedDateWindowExtraction",
+        "FocusedStrategyExtraction",
+        "FocusedDateWindowExtraction",
+        "StatedRunFieldFidelityAudit",
+        "FocusedDateWindowExtraction"
+      ],
+      "missing_required_fields": [
+        "asset_universe",
+        "date_range"
+      ],
+      "requested_field": null,
+      "unsupported_constraints": [],
+      "draft": {
+        "strategy_type": "dca_accumulation",
+        "asset_universe": [],
+        "date_range": null,
+        "cadence": "monthly",
+        "capital_amount": 100.0,
+        "comparison_baseline": "SPY"
+      },
+      "extra": {
+        "initial_capital": 1000.0,
+        "recurring_contribution": 100.0,
+        "total_capital": null,
+        "total_budget": null,
+        "fee_rate": 0.001,
+        "slippage": 0.0005
+      },
+      "provenance": {
+        "initial_capital": "explicit_user",
+        "recurring_contribution": "explicit_user",
+        "cadence": "explicit_user",
+        "comparison_baseline": "stated_run_field_fidelity_audit",
+        "capital_amount": "recurring_contribution",
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user"
+      },
+      "semantic_turn_act": "new_idea",
+      "task_relation": "new_task",
+      "reason_codes": null,
+      "thread_metadata": {
+        "last_stage_outcome": "await_user_reply",
+        "requested_field": "asset_universe"
+      },
+      "launch": {
+        "symbols": null,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "cadence": null,
+        "date_range": null,
+        "benchmark_symbol": null
+      }
+    }
+  ]
+}

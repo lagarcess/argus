@@ -27,6 +27,7 @@ type MergeFinalTextOptions = {
   researchDegradedCode?: string | null;
   memoryRecalls?: MemoryRecallItem[] | null;
   nextExperiments?: NextExperimentRow[] | null;
+  nextExperimentsSourceRunId?: string | null;
 };
 
 export function mergeFinalTextMessage(
@@ -48,6 +49,7 @@ export function mergeFinalTextMessage(
     researchDegradedCode,
     memoryRecalls,
     nextExperiments,
+    nextExperimentsSourceRunId,
   }: MergeFinalTextOptions,
 ): Message {
   if (message.id !== assistantId) {
@@ -72,5 +74,7 @@ export function mergeFinalTextMessage(
     researchDegradedCode: researchDegradedCode ?? message.researchDegradedCode,
     memoryRecalls: memoryRecalls ?? message.memoryRecalls,
     nextExperiments: nextExperiments ?? message.nextExperiments,
+    nextExperimentsSourceRunId:
+      nextExperimentsSourceRunId ?? message.nextExperimentsSourceRunId,
   };
 }

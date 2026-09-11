@@ -15,6 +15,7 @@ from argus.agent_runtime.artifact_edit_planner import (
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+from argus.agent_runtime.next_experiments import next_experiments_lead_in
 from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
@@ -3336,18 +3337,18 @@ def test_empty_non_strategy_turn_after_result_uses_followup_recovery(
     assert result.decision.artifact_target == "latest_result"
 
 
-def test_latest_result_recovery_preserves_next_experiment_focus(
+def test_latest_result_next_experiment_followup_answers_with_rows_and_keeps_focus(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured: dict[str, Any] = {}
+    """#590: a what-next follow-up is the Try next rows for the latest result,
+    never a composer call and never the recovery while rows can be built."""
 
-    async def empty_compose_result_followup_response(**kwargs: Any) -> None:
-        captured.update(kwargs)
-        return None
+    async def unexpected_compose_result_followup_response(**kwargs: Any) -> None:
+        raise AssertionError(f"composer called for a next_experiment follow-up: {kwargs}")
 
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        empty_compose_result_followup_response,
+        unexpected_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3391,17 +3392,12 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     )
 
     assert result.outcome == "ready_to_respond"
-    answer = result.patch["assistant_response"]
-    answer_lower = answer.lower()
-    assert not answer.startswith("**")
-    # Issue #249: failure prose never wears result chrome.
+    assert result.patch["assistant_response"] == next_experiments_lead_in("en")
+    rows = result.patch["next_experiments"]["rows"]
+    assert rows and all(row["kind"] and row["label_key"] for row in rows)
+    assert "recovery" not in result.patch
+    # The Try next section is the heading; the rows answer wears no chrome.
     assert "response_intent" not in result.patch
-    assert "couldn’t answer that follow-up" in answer_lower
-    assert "your result is still here" in answer_lower
-    assert result.patch["recovery"] == {
-        "code": "latest_result_followup_unavailable",
-        "retryable": True,
-    }
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "next_experiment"
     assert result.decision.artifact_target == "latest_result"

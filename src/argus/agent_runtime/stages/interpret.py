@@ -49,7 +49,6 @@ from argus.agent_runtime.profile.response_profile import (
 )
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
-    recovery_state_stage_patch,
     retry_last_turn_stage_patch,
 )
 from argus.agent_runtime.resolution import AssetResolution, callable_accepts_keyword
@@ -57,7 +56,11 @@ from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.response_style import result_followup_response_intent
+from argus.agent_runtime.result_followup_answers import (
+    composed_result_followup_patch,
+    next_experiment_followup_patch,
+    unavailable_result_followup_patch,
+)
 from argus.agent_runtime.result_followups import (
     compose_private_alpha_save_response,
     compose_result_followup_response,
@@ -276,6 +279,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _selected_requested_field,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
+    _pending_setup_continuation_reason_codes,
     _strategy_supplies_explicit_turn_money,
     _supported_experiment_fact_packet,
 )
@@ -580,6 +584,13 @@ async def _stage_result_from_interpretation(
         interpretation=interpretation,
         snapshot=snapshot,
         artifact_target=artifact_target,
+        current_user_message=state.current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    hidden_context_guard_reason_codes += _pending_setup_continuation_reason_codes(
+        interpretation=interpretation,
+        prior=_active_strategy_from_snapshot(snapshot),
+        selected_thread_metadata=selected_thread_metadata,
         current_user_message=state.current_user_message,
     )
     if clear_assistant_response_for_hidden_context:
@@ -2762,18 +2773,17 @@ async def _latest_result_followup_when_interpreter_unavailable(
         return None
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
-    response = await compose_result_followup_response(
-        metadata=metadata,
-        focus="general",
-        user_message=current_user_message,
-        language=user.language_preference,
-    )
-    used_recovery = response is None
-    if response is None:
-        response = recovery_message(
-            "latest_result_followup_unavailable",
+    stage_patch = composed_result_followup_patch(
+        await compose_result_followup_response(
+            metadata=metadata,
+            focus="general",
+            user_message=current_user_message,
             language=user.language_preference,
-        )
+        ),
+        focus="general",
+    )
+    if stage_patch is None:
+        stage_patch = unavailable_result_followup_patch(language=user.language_preference)
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -2802,20 +2812,7 @@ async def _latest_result_followup_when_interpreter_unavailable(
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
-        stage_patch={
-            "assistant_response": response,
-            # Failure prose never wears result chrome; the recovery patch
-            # owns this message's presentation.
-            **(
-                recovery_state_stage_patch(
-                    "latest_result_followup_unavailable",
-                    language=user.language_preference,
-                    retryable=True,
-                )
-                if used_recovery
-                else {"response_intent": result_followup_response_intent("general")}
-            ),
-        },
+        stage_patch=stage_patch,
     )
 
 
@@ -2844,6 +2841,7 @@ async def _latest_result_followup_recovery_if_applicable(
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     focus = decision.result_followup_focus or "general"
+    stage_patch: dict[str, Any] | None
     if save_requested:
         response = await compose_private_alpha_save_response(
             metadata=metadata,
@@ -2854,35 +2852,25 @@ async def _latest_result_followup_recovery_if_applicable(
             response = fallback_private_alpha_save_response(
                 language=user.language_preference
             )
-    else:
-        response = await compose_result_followup_response(
-            metadata=metadata,
-            focus=focus,
-            user_message=current_user_message,
+        stage_patch = {"assistant_response": response}
+    elif focus == "next_experiment":
+        stage_patch = next_experiment_followup_patch(
+            metadata,
             language=user.language_preference,
+            source_run_id=reference.artifact_id,
         )
-        used_recovery = response is None
-        if response is None:
-            response = recovery_message(
-                "latest_result_followup_unavailable",
+    else:
+        stage_patch = composed_result_followup_patch(
+            await compose_result_followup_response(
+                metadata=metadata,
+                focus=focus,
+                user_message=current_user_message,
                 language=user.language_preference,
-            )
-    if save_requested:
-        used_recovery = False
-    stage_patch: dict[str, Any] = {
-        "assistant_response": response,
-    }
-    # Failure prose never wears result chrome; the recovery patch owns it.
-    if not save_requested and not used_recovery:
-        stage_patch["response_intent"] = result_followup_response_intent(focus)
-    if used_recovery:
-        stage_patch.update(
-            recovery_state_stage_patch(
-                "latest_result_followup_unavailable",
-                language=user.language_preference,
-                retryable=True,
-            )
+            ),
+            focus=focus,
         )
+    if stage_patch is None:
+        stage_patch = unavailable_result_followup_patch(language=user.language_preference)
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,

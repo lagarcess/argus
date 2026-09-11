@@ -727,7 +727,9 @@ export default function ChatMessage({
                             nextExperimentAction(
                               row,
                               rowLabel,
-                              message.result?.runId,
+                              message.result?.runId ??
+                                message.nextExperimentsSourceRunId ??
+                                undefined,
                             ),
                           )
                         }

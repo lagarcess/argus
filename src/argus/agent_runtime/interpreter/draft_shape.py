@@ -22,6 +22,7 @@ from argus.agent_runtime.interpreter.shared import (
     _field_path_base,
     _llm_strategy_draft_has_extractable_fields,
     _llm_strategy_draft_has_rule_or_indicator_fields,
+    _request_has_active_strategy_context,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
 )
@@ -453,17 +454,6 @@ def _request_has_latest_result(request: InterpretationRequest) -> bool:
     return bool(snapshot and snapshot.latest_backtest_result_reference is not None)
 
 
-def _request_has_active_strategy_context(request: InterpretationRequest) -> bool:
-    snapshot = request.latest_task_snapshot
-    if snapshot is None:
-        return False
-    return bool(
-        snapshot.pending_strategy_summary
-        or snapshot.confirmed_strategy_summary
-        or snapshot.active_confirmation_reference
-    )
-
-
 _EXECUTION_EVIDENCE_FIELDS = (
     "strategy_type",
     "requested_strategy_template",
@@ -509,3 +499,20 @@ def strategy_has_execution_evidence(
             continue
         return True
     return False
+
+
+def strategy_draft_future_horizon(draft: Any) -> dict[str, Any] | None:
+    """Typed future horizon carried by a strategy draft, route-label blind.
+
+    One reader for both consumers: research routing, where a horizon means the
+    strategy claim is not a runnable test, and admission, where a test asked
+    over it fails closed because the data does not exist."""
+
+    extra_parameters = getattr(draft, "extra_parameters", None) or {}
+    intent = extra_parameters.get("date_range_intent")
+    if (
+        isinstance(intent, dict)
+        and str(intent.get("kind") or "").strip() == "future_window"
+    ):
+        return dict(intent)
+    return None

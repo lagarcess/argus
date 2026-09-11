@@ -339,8 +339,15 @@ The AI assistant should **not** pretend unsupported capabilities exist, **and
 should not refuse a question it can compute or ground.** A refusal that names a
 capability the user did not ask about is a defect.
 
-It does **not** predict, forecast, or extrapolate future prices or returns, in
-any framing. That boundary is permanent and is not a gap to close.
+Forward-looking and valuation questions are answered, as grounded scenarios
+(decision 10, 2026-09-10). "What will $10,000 in NVDA be worth in ten years"
+and "what price does NVDA need to grow into" get cited forecasts, analyst
+targets and valuation multiples, the arithmetic written out, and the result as
+labeled scenario ranges. Argus never presents one number as the future and
+never says what the user should do. A projection on the user's own numbers is
+arithmetic, not a prediction. The one thing that stays impossible is a backtest
+over a future window, because that data does not exist: Argus says so, offers
+the historical test, and can research what analysts expect instead.
 
 ---
 

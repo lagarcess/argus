@@ -484,7 +484,7 @@ describe("chat recovery display", () => {
     );
   });
 
-  test("renders degraded future-performance recovery truthfully in English and Spanish", () => {
+  test("renders the degraded future test-window recovery truthfully in English and Spanish", () => {
     const display = recoveryDisplayFromMetadata({
       clarification: {
         kind: "unsupported_recovery",
@@ -514,10 +514,10 @@ describe("chat recovery display", () => {
     });
 
     expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
-      "I can't predict future performance. I can test how the same idea performed over a historical period instead: Test it over a historical period or Compare with buy and hold?",
+      "There's no market data for a period that hasn't happened yet, so I can't run a test over it. I can test how the same idea performed over a historical period, or research what analysts expect: Test it over a historical period or Compare with buy and hold?",
     );
     expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
-      "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico: Probarlo en un período histórico o Comparar con comprar y mantener?",
+      "No hay datos de mercado para un período que todavía no ocurre, así que no puedo correr una prueba sobre él. Puedo probar cómo se comportó la misma idea en un período histórico, o investigar qué esperan los analistas: Probarlo en un período histórico o Comparar con comprar y mantener?",
     );
   });
 

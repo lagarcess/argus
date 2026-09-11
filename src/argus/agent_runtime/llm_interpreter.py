@@ -179,7 +179,7 @@ from argus.agent_runtime.interpreter.execution_cost_capability import (
     has_execution_cost_candidate,
 )
 from argus.agent_runtime.interpreter.unsupported_admission import (
-    future_performance_capability_clause,
+    future_test_window_capability_clause,
     requested_strategy_template_capability_clause,
 )
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
@@ -269,6 +269,7 @@ from argus.agent_runtime.interpreter.shared import (  # noqa: F401
     _latest_result_date_window,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
+    repaired_turn_act,
 )
 from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _asset_recovery_query_is_explicit_ticker,
@@ -888,17 +889,17 @@ class OpenRouterStructuredInterpreter:
             "other executable signal by yourself. If the user does not name the "
             "indicator, threshold, crossover, or price rule, mark the entry rule as "
             "missing or ask for the executable definition.\n\n"
-            + future_performance_capability_clause()
+            + future_test_window_capability_clause()
             + "Valuation and fundamental language is valid investing intent, not user "
-            "error. If the user says a stock looked cheap, undervalued, expensive, "
-            "or references P/E, earnings, revenue, margins, or fundamentals, preserve "
-            "that meaning. The current engine cannot execute valuation or fundamental "
-            "data as entry/exit rules, so do not pretend those rules are runnable. "
-            "Ask for a supported proxy when needed, such as buy-and-hold over the "
-            "period they care about, DCA, a supported RSI threshold, or a supported "
-            "moving-average/signal rule. Explain the boundary in product language: "
-            "the concept is financially real, but Argus needs an executable historical "
-            "price/indicator rule to simulate it today.\n\n"
+            "error. Whether a stock is cheap, expensive or fairly valued, and what "
+            "its P/E, earnings, revenue, margins or fundamentals say, is a research "
+            "question: fill research_query and let it be answered; do not steer it "
+            "toward a backtest. Only when the user wants to test a rule built on "
+            "valuation or fundamentals (buy when the P/E is under 15) does the "
+            "engine boundary apply: it cannot execute valuation or fundamental data "
+            "as entry/exit rules, so preserve the meaning, say so in product "
+            "language, and offer a supported proxy such as buy-and-hold, DCA, an RSI "
+            "threshold, or a moving-average/signal rule over the period they care about.\n\n"
             "Use data-availability allowances as deterministic capability truth. "
             "Equity launch history starts in 2016 for the current launch path, so "
             "do not invent a shorter 3-year limit for equities. Currency-pair "
@@ -2033,7 +2034,9 @@ async def _dca_contract_audited_response(
                 message="DCA contract audit failed; trying next candidate model",
             )
             continue
-        repaired = _response_from_dca_contract_audit(response=response, audit=audit)
+        repaired = _response_from_dca_contract_audit(
+            response=response, audit=audit, request=request
+        )
         if repaired is not None:
             return repaired
     return response
@@ -3286,9 +3289,14 @@ async def _repair_incomplete_strategy_extraction(
                 return None
             continue
         base_response = failed_response
-        if _request_has_active_strategy_context(
-            request
-        ) and _selected_requested_field_base(request):
+        # The pending setup fills the re-read only for a turn that answers
+        # the runtime's question; a fresh task is filled from itself alone.
+        turn = repaired_turn_act(
+            base_act=failed_response.semantic_turn_act,
+            base_relation=failed_response.task_relation,
+            request=request,
+        )
+        if turn.answers_pending and _selected_requested_field_base(request):
             pending_draft = _pending_strategy_draft_from_request_or_response(
                 response=failed_response,
                 request=request,
@@ -4877,17 +4885,19 @@ async def _focused_strategy_repair_after_candidate_failures(
         request
     ) and not _request_current_turn_has_material_execution_evidence(request):
         return None
+    # No model read the act; the owner decides it from the pending state.
+    turn = repaired_turn_act(base_act=None, base_relation=None, request=request)
     seed_response = LLMInterpretationResponse(
         intent="strategy_drafting",
-        task_relation="new_task",
+        task_relation=turn.task_relation,
         requires_clarification=True,
         user_goal_summary=request.current_user_message,
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing=request.current_user_message,
             strategy_thesis=request.current_user_message,
         ),
-        reason_codes=["structured_interpretation_candidates_failed"],
-        semantic_turn_act="new_idea",
+        reason_codes=["structured_interpretation_candidates_failed", *turn.reason_codes],
+        semantic_turn_act=turn.semantic_turn_act,
     )
     logger.bind(
         llm_task=_INTERPRETATION_REPAIR_TASK,

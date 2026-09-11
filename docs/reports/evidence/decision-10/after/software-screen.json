@@ -1,0 +1,524 @@
+{
+  "label": "software-screen",
+  "language": "en",
+  "question": "Screen profitable US software companies with ROE above 15% and a free cash flow yield above 3%.",
+  "asked_at": "2026-09-10T20:34:29.018927+00:00",
+  "tree": "head",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "**Screen matches among the candidate companies reviewed:**\n\n- **Adobe (ADBE): ROE 62.39% and FCF yield 9.35%, as of September 4, 2026.** Profitability is supported by quarterly net income of $1.71 billion for the period ended May 29, 2026.\n- **Intuit (INTU): ROE 23.42% and FCF yield 9.13%, as of September 9, 2026.** Profitability is supported by quarterly net income of $363 million for the period ended July 31, 2026.\n- **Salesforce (CRM): ROE 20.15% and FCF yield 7.17%, as of September 4, 2026.** Profitability is supported by quarterly net income of $3.53 billion for the period ended July 31, 2026.\n\nAll three satisfy the requested profitability, ROE, and free-cash-flow-yield conditions."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "**Screen matches among the candidate companies reviewed:**\n\n- **Adobe (ADBE): ROE 62.39% and FCF yield 9.35%, as of September 4, 2026.** Profitability is supported by quarterly net income of $1.71 billion for the period ended May 29, 2026.\n- **Intuit (INTU): ROE 23.42% and FCF yield 9.13%, as of September 9, 2026.** Profitability is supported by quarterly net income of $363 million for the period ended July 31, 2026.\n- **Salesforce (CRM): ROE 20.15% and FCF yield 7.17%, as of September 4, 2026.** Profitability is supported by quarterly net income of $3.53 billion for the period ended July 31, 2026.\n\nAll three satisfy the requested profitability, ROE, and free-cash-flow-yield conditions.",
+        "next_experiments": {
+          "version": "argus_next_experiments/v1",
+          "rows": [
+            {
+              "kind": "research_test_single",
+              "label": "Test Adobe (ADBE) over the last 3 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Adobe"
+                },
+                {
+                  "type": "ticker",
+                  "value": "ADBE"
+                },
+                {
+                  "type": "text",
+                  "value": " over the last 3 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding ADBE over the last three years"
+            },
+            {
+              "kind": "research_test_versus",
+              "label": "Test Adobe (ADBE) vs Salesforce (CRM) over the last 3 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Adobe"
+                },
+                {
+                  "type": "ticker",
+                  "value": "ADBE"
+                },
+                {
+                  "type": "text",
+                  "value": " vs "
+                },
+                {
+                  "type": "text",
+                  "value": "Salesforce"
+                },
+                {
+                  "type": "ticker",
+                  "value": "CRM"
+                },
+                {
+                  "type": "text",
+                  "value": " over the last 3 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding ADBE, CRM over the last three years"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "screening",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Adobe Stock Q3 Earnings Preview: AI ARR in Focus | ADBE",
+              "domain": "www.indmoney.com",
+              "url": "https://www.indmoney.com/blog/us-stocks/adobe-stock-q3-earnings-preview",
+              "source_date": "2026-09-10"
+            }
+          ],
+          "rows": [
+            {
+              "subject": "Adobe Inc.",
+              "symbol": "ADBE",
+              "label": "return on equity",
+              "value": 62.39,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-04",
+              "source_url": "https://www.algovestiq.com/stock/adbe/financial-data"
+            },
+            {
+              "subject": "Adobe Inc.",
+              "symbol": "ADBE",
+              "label": "free cash flow yield",
+              "value": 9.35,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-04",
+              "source_url": "https://www.algovestiq.com/stock/adbe/financial-data"
+            },
+            {
+              "subject": "Adobe Inc.",
+              "symbol": "ADBE",
+              "label": "quarterly net income",
+              "value": 1710000000.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-05-29",
+              "source_url": "https://www.algovestiq.com/stock/adbe/financial-data"
+            },
+            {
+              "subject": "Intuit Inc.",
+              "symbol": "INTU",
+              "label": "return on equity",
+              "value": 23.42,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-09",
+              "source_url": "https://www.algovestiq.com/stock/intu/financial-data"
+            },
+            {
+              "subject": "Intuit Inc.",
+              "symbol": "INTU",
+              "label": "free cash flow yield",
+              "value": 9.13,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-09",
+              "source_url": "https://www.algovestiq.com/stock/intu/financial-data"
+            },
+            {
+              "subject": "Intuit Inc.",
+              "symbol": "INTU",
+              "label": "quarterly net income",
+              "value": 363000000.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-07-31",
+              "source_url": "https://www.algovestiq.com/stock/intu/financial-data"
+            },
+            {
+              "subject": "Salesforce, Inc.",
+              "symbol": "CRM",
+              "label": "return on equity",
+              "value": 20.15,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-04",
+              "source_url": "https://www.algovestiq.com/stock/crm/financial-data"
+            },
+            {
+              "subject": "Salesforce, Inc.",
+              "symbol": "CRM",
+              "label": "free cash flow yield",
+              "value": 7.17,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-04",
+              "source_url": "https://www.algovestiq.com/stock/crm/financial-data"
+            },
+            {
+              "subject": "Salesforce, Inc.",
+              "symbol": "CRM",
+              "label": "quarterly net income",
+              "value": 3530000000.0,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-07-31",
+              "source_url": "https://www.algovestiq.com/stock/crm/financial-data"
+            }
+          ],
+          "retrieved_at": "2026-09-10T20:36:44.579717+00:00",
+          "anchor_symbols": [
+            "ADBE"
+          ],
+          "peers": [
+            {
+              "symbol": "CRM",
+              "name": "Salesforce, Inc.",
+              "asset_class": "equity"
+            }
+          ],
+          "usage": {
+            "invocations": 9,
+            "latency_ms": 119819,
+            "cost_usd": 0.54952,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [
+              {
+                "symbol": "ADBE",
+                "name": "Adobe Inc. Common Stock",
+                "asset_class": "equity"
+              }
+            ],
+            "comparison_set": [],
+            "peer_suggestions": [
+              "CRM"
+            ],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            }
+          }
+        },
+        "message_id": "179d8557-346f-42ae-a305-9904717ec3f3",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "ebc8b7cb-22bc-4e2d-8482-8c7ee78a0f70",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "40b1f069-0dfc-485f-ab4d-6e41eef30bbc",
+        "conversation_id": "ebc8b7cb-22bc-4e2d-8482-8c7ee78a0f70",
+        "role": "user",
+        "content": "Screen profitable US software companies with ROE above 15% and a free cash flow yield above 3%.",
+        "created_at": "2026-09-10T20:34:29.049688Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "ebc8b7cb-22bc-4e2d-8482-8c7ee78a0f70",
+            "request_id": "742455b1-e24a-4fe8-8d8b-7e4f725079cf",
+            "started_at": "2026-09-10T20:34:29.049680+00:00"
+          }
+        }
+      },
+      {
+        "id": "179d8557-346f-42ae-a305-9904717ec3f3",
+        "conversation_id": "ebc8b7cb-22bc-4e2d-8482-8c7ee78a0f70",
+        "role": "assistant",
+        "content": "**Screen matches among the candidate companies reviewed:**\n\n- **Adobe (ADBE): ROE 62.39% and FCF yield 9.35%, as of September 4, 2026.** Profitability is supported by quarterly net income of $1.71 billion for the period ended May 29, 2026.\n- **Intuit (INTU): ROE 23.42% and FCF yield 9.13%, as of September 9, 2026.** Profitability is supported by quarterly net income of $363 million for the period ended July 31, 2026.\n- **Salesforce (CRM): ROE 20.15% and FCF yield 7.17%, as of September 4, 2026.** Profitability is supported by quarterly net income of $3.53 billion for the period ended July 31, 2026.\n\nAll three satisfy the requested profitability, ROE, and free-cash-flow-yield conditions.",
+        "created_at": "2026-09-10T20:36:45.676994Z",
+        "metadata": {
+          "conversation_mode": "guide",
+          "agent_runtime_stage_outcome": "ready_to_respond",
+          "next_experiments": {
+            "version": "argus_next_experiments/v1",
+            "rows": [
+              {
+                "kind": "research_test_single",
+                "label": "Test Adobe (ADBE) over the last 3 years",
+                "label_parts": [
+                  {
+                    "type": "text",
+                    "value": "Test "
+                  },
+                  {
+                    "type": "text",
+                    "value": "Adobe"
+                  },
+                  {
+                    "type": "ticker",
+                    "value": "ADBE"
+                  },
+                  {
+                    "type": "text",
+                    "value": " over the last 3 years"
+                  }
+                ],
+                "label_key": "chat.next_experiments.labels.research_dynamic",
+                "send_text": "Test buying and holding ADBE over the last three years"
+              },
+              {
+                "kind": "research_test_versus",
+                "label": "Test Adobe (ADBE) vs Salesforce (CRM) over the last 3 years",
+                "label_parts": [
+                  {
+                    "type": "text",
+                    "value": "Test "
+                  },
+                  {
+                    "type": "text",
+                    "value": "Adobe"
+                  },
+                  {
+                    "type": "ticker",
+                    "value": "ADBE"
+                  },
+                  {
+                    "type": "text",
+                    "value": " vs "
+                  },
+                  {
+                    "type": "text",
+                    "value": "Salesforce"
+                  },
+                  {
+                    "type": "ticker",
+                    "value": "CRM"
+                  },
+                  {
+                    "type": "text",
+                    "value": " over the last 3 years"
+                  }
+                ],
+                "label_key": "chat.next_experiments.labels.research_dynamic",
+                "send_text": "Test buying and holding ADBE, CRM over the last three years"
+              }
+            ]
+          },
+          "research": {
+            "schema_version": "argus_research/v1",
+            "capability_class": "screening",
+            "shape": "balanced",
+            "sources": [
+              {
+                "title": "Adobe Stock Q3 Earnings Preview: AI ARR in Focus | ADBE",
+                "domain": "www.indmoney.com",
+                "url": "https://www.indmoney.com/blog/us-stocks/adobe-stock-q3-earnings-preview",
+                "source_date": "2026-09-10"
+              }
+            ],
+            "rows": [
+              {
+                "subject": "Adobe Inc.",
+                "symbol": "ADBE",
+                "label": "return on equity",
+                "value": 62.39,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-04",
+                "source_url": "https://www.algovestiq.com/stock/adbe/financial-data"
+              },
+              {
+                "subject": "Adobe Inc.",
+                "symbol": "ADBE",
+                "label": "free cash flow yield",
+                "value": 9.35,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-04",
+                "source_url": "https://www.algovestiq.com/stock/adbe/financial-data"
+              },
+              {
+                "subject": "Adobe Inc.",
+                "symbol": "ADBE",
+                "label": "quarterly net income",
+                "value": 1710000000.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-05-29",
+                "source_url": "https://www.algovestiq.com/stock/adbe/financial-data"
+              },
+              {
+                "subject": "Intuit Inc.",
+                "symbol": "INTU",
+                "label": "return on equity",
+                "value": 23.42,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-09",
+                "source_url": "https://www.algovestiq.com/stock/intu/financial-data"
+              },
+              {
+                "subject": "Intuit Inc.",
+                "symbol": "INTU",
+                "label": "free cash flow yield",
+                "value": 9.13,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-09",
+                "source_url": "https://www.algovestiq.com/stock/intu/financial-data"
+              },
+              {
+                "subject": "Intuit Inc.",
+                "symbol": "INTU",
+                "label": "quarterly net income",
+                "value": 363000000.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-07-31",
+                "source_url": "https://www.algovestiq.com/stock/intu/financial-data"
+              },
+              {
+                "subject": "Salesforce, Inc.",
+                "symbol": "CRM",
+                "label": "return on equity",
+                "value": 20.15,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-04",
+                "source_url": "https://www.algovestiq.com/stock/crm/financial-data"
+              },
+              {
+                "subject": "Salesforce, Inc.",
+                "symbol": "CRM",
+                "label": "free cash flow yield",
+                "value": 7.17,
+                "kind": "percent",
+                "unit": "%",
+                "as_of": "2026-09-04",
+                "source_url": "https://www.algovestiq.com/stock/crm/financial-data"
+              },
+              {
+                "subject": "Salesforce, Inc.",
+                "symbol": "CRM",
+                "label": "quarterly net income",
+                "value": 3530000000.0,
+                "kind": "currency",
+                "unit": "USD",
+                "as_of": "2026-07-31",
+                "source_url": "https://www.algovestiq.com/stock/crm/financial-data"
+              }
+            ],
+            "retrieved_at": "2026-09-10T20:36:44.579717+00:00",
+            "anchor_symbols": [
+              "ADBE"
+            ],
+            "peers": [
+              {
+                "symbol": "CRM",
+                "name": "Salesforce, Inc.",
+                "asset_class": "equity"
+              }
+            ],
+            "usage": {
+              "invocations": 9,
+              "latency_ms": 119819,
+              "cost_usd": 0.54952,
+              "cache_status": "miss"
+            },
+            "follow_up": {
+              "schema_version": "argus_research_follow_up/v1",
+              "subjects": [
+                {
+                  "symbol": "ADBE",
+                  "name": "Adobe Inc. Common Stock",
+                  "asset_class": "equity"
+                }
+              ],
+              "comparison_set": [],
+              "peer_suggestions": [
+                "CRM"
+              ],
+              "open_thread": {
+                "shape": "balanced",
+                "period_of_interest": null
+              }
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "40b1f069-0dfc-485f-ab4d-6e41eef30bbc",
+            "request_id": "742455b1-e24a-4fe8-8d8b-7e4f725079cf",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 136.64,
+  "summary": {
+    "label": "software-screen",
+    "language": "en",
+    "elapsed_seconds": 136.64,
+    "stage_outcomes": [
+      "ready_to_respond"
+    ],
+    "answered": true,
+    "recovery_code": null,
+    "clarification_kind": null,
+    "clarification_reason_code": null,
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "**Screen matches among the candidate companies reviewed:**\n\n- **Adobe (ADBE): ROE 62.39% and FCF yield 9.35%, as of September 4, 2026.** Profitability is supported by quarterly net income of $1.71 billion for the period ended May 29, 2026.\n- **Intuit (INTU): ROE 23.42% and FCF yield 9.13%, as of September 9, 2026.** Profitability is supported by quarterly net income of $363 million for the period ended July 31, 2026.\n- **Salesforce (CRM): ROE 20.15% and FCF yield 7.17%, as of September 4, 2026.** Profitability is supported by quarterly net income of $3.53 billion for the period ended July 31, 2026.\n\nAll three satisfy the requested profitability, ROE, and free-cash-flow-yield conditions.",
+    "shape": "balanced",
+    "degraded": null,
+    "rows": 9,
+    "sources": [
+      "https://www.indmoney.com/blog/us-stocks/adobe-stock-q3-earnings-preview"
+    ],
+    "research_usage": {
+      "invocations": 9,
+      "latency_ms": 119819,
+      "cost_usd": 0.54952,
+      "cache_status": "miss"
+    },
+    "next_experiments": [
+      "Test Adobe (ADBE) over the last 3 years",
+      "Test Adobe (ADBE) vs Salesforce (CRM) over the last 3 years"
+    ]
+  }
+}

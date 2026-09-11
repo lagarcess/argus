@@ -1,0 +1,190 @@
+{
+  "question": "what will $10,000 in NVDA be worth in ten years?",
+  "asked_at": "2026-09-10T20:02:17.526977+00:00",
+  "ceiling_seconds": 180.0,
+  "spec": {
+    "shape": "balanced",
+    "models": [
+      "openai/gpt-5.6-sol",
+      "anthropic/claude-opus-4-7"
+    ],
+    "max_steps": 5,
+    "max_output_tokens": 2048,
+    "tools": [
+      "web_search",
+      "finance_search",
+      "fetch_url"
+    ],
+    "reasoning_effort": "low",
+    "background": false,
+    "timeout_seconds": 180.0,
+    "search_context_size": "medium",
+    "typed_output": true,
+    "language": "en",
+    "location": null,
+    "recency": null,
+    "source_domains": []
+  },
+  "outcome": "packet",
+  "elapsed_seconds": 122.21,
+  "answer_markdown": "**Ten-year scenario range:** your NVDA investment could be worth **$2,311.39, $5,502.05 in the bear case, $29,482.02, $37,868.02 in the base case, or $160,513.23, $201,347.80 in the bull case.**\n\nNVDA’s current price is **$218.40 as of September 10, 2026**. A published five-year analysis estimates share-price ranges of **$105, $162 bear, $375, $425 base, and $875, $980 bull**. Because comparable ten-year analyst forecasts are unavailable, this calculation mechanically assumes that each scenario’s first-five-year return repeats during the following five years:\n\n**Future investment value = $10,000 × (five-year target ÷ $218.40)²**\n\n| Scenario | Arithmetic | Ten-year value |\n|---|---:|---:|\n| Bear | $10,000 × ($105 ÷ $218.40)² to $10,000 × ($162 ÷ $218.40)² | **$2,311.39, $5,502.05** |\n| Base | $10,000 × ($375 ÷ $218.40)² to $10,000 × ($425 ÷ $218.40)² | **$29,482.02, $37,868.02** |\n| Bull | $10,000 × ($875 ÷ $218.40)² to $10,000 × ($980 ÷ $218.40)² | **$160,513.23, $201,347.80** |\n\nThe wide range reflects uncertainty over AI-infrastructure demand, competition from custom chips, margins and the valuation multiple investors may eventually pay. NVIDIA’s filing identifies its broad software ecosystem and full-stack platform as strengths, while also warning of intensifying competition and rapid technological change. These are illustrative scenarios, not a prediction or investment advice; they exclude taxes, trading costs and dividends.",
+  "rows": [
+    {
+      "subject": "NVIDIA Corporation",
+      "symbol": "NVDA",
+      "label": "current share price",
+      "value": 218.4,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2026-09-10",
+      "source_url": null
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "five-year bear target lower bound",
+      "value": 105.0,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2026-04-05",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "five-year bear target upper bound",
+      "value": 162.0,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2026-04-05",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "five-year base target lower bound",
+      "value": 375.0,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2026-04-05",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "five-year base target upper bound",
+      "value": 425.0,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2026-04-05",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "five-year bull target lower bound",
+      "value": 875.0,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2026-04-05",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "five-year bull target upper bound",
+      "value": 980.0,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2026-04-05",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "ten-year bear investment value lower bound",
+      "value": 2311.39,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2036-09-10",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "ten-year bear investment value upper bound",
+      "value": 5502.05,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2036-09-10",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "ten-year base investment value lower bound",
+      "value": 29482.02,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2036-09-10",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "ten-year base investment value upper bound",
+      "value": 37868.02,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2036-09-10",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "ten-year bull investment value lower bound",
+      "value": 160513.23,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2036-09-10",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    },
+    {
+      "subject": "Nvidia",
+      "symbol": "NVDA",
+      "label": "ten-year bull investment value upper bound",
+      "value": 201347.8,
+      "kind": "currency",
+      "unit": "USD",
+      "as_of": "2036-09-10",
+      "source_url": "https://www.money365.market/articles/nvidia-stock-forecast-5-years"
+    }
+  ],
+  "sources": [
+    "url='https://public.com/stocks/nvda/forecast-price-target' title='NVIDIA (NVDA) Stock Forecast: Analyst Ratings, Predictions ...' source_date='2026-09-09'",
+    "url='https://www.ainvest.com/aime/share/-projected-earnings-growth-rate-years-30b7ac/' title='What is the projected earnings growth rate for the next five years' source_date='2025-09-14'",
+    "url='https://finance.yahoo.com/quote/NVDA/analysis/' title='NVIDIA Corporation (NVDA) Analyst Ratings, Estimates & ...' source_date='2026-09-09'",
+    "url='https://finance.yahoo.com/news/jpmorgan-revamps-nvidia-stock-price-153700952.html' title='JPMorgan revamps Nvidia stock price target for rest of 2026' source_date='2026-03-03'",
+    "url='https://eciks.org/6034-59432-nvidia-stock-price-forecast-reaches-303-96-by-year-end-2026-analysts-project-43' title='NVIDIA stock price forecast reaches $303.96 by year-end 2026, analysts project 43% upside - ECIKS.org' source_date='2026-05-27'",
+    "url='https://capital.com/en-int/market-updates/nvidia-stock-forecast-08-04-2026' title='NVIDIA Stock Forecast | Record Q4 Revenue, H200 Exports | Capital.com' source_date='2026-04-08'",
+    "url='https://brimindinvest.com/blog/nvidia-stock-analysis-2026' title='Bear Case: Risks That Could...' source_date='2026-06-14'",
+    "url='https://www.marketbeat.com/stocks/NASDAQ/NVDA/forecast/' title='NVIDIA (NVDA) Stock Forecast and Price Target 2026' source_date='2026-09-09'",
+    "url='https://finance.yahoo.com/news/nvidia-stock-ripe-gains-2026-143002055.html' title='Nvidia Stock Is ‘Ripe’ for Gains in 2026, According to This Top Analyst' source_date='2025-12-27'",
+    "url='https://www.bybit.com/en/learn/rwa/nvidia-stock-outlook' title='How To Trade Nvda On Bybit' source_date='2026-08-11'",
+    "url='https://www.ainvest.com/aime/share/projected-growth-rate-nvdas-earnings-share-5-years-1f814a/' title=\"What is the projected growth rate of NVDA's earnings per share over ...\" source_date='2026-03-28'",
+    "url='https://capital.com/en-int/market-updates/nvidia-nvda-stock-forecast-19-02-2026' title='NVIDIA Stock Forecast 2026–2030 | Future Outlook | Capital.com' source_date='2026-02-19'"
+  ],
+  "usage": {
+    "invocations": 1,
+    "finance_search_invocations": 1,
+    "web_search_invocations": 3,
+    "fetch_url_invocations": 3,
+    "model": "openai/gpt-5.6-sol",
+    "latency_ms": 122208,
+    "cost_usd": 0.68717,
+    "input_tokens": 242380,
+    "output_tokens": 5989,
+    "cache_creation_input_tokens": 99038,
+    "cache_read_input_tokens": 143102
+  }
+}

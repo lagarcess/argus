@@ -248,7 +248,7 @@ def test_prose_judge_receives_the_surface_rendered_beside_the_reply(
     assert result["prose_judge"]["judged_rendered_context"]["text"] == json.dumps(
         surface, sort_keys=True
     )
-    assert result["prose_judge"]["rubric_version"] == "argus-prose-quality-v2"
+    assert result["prose_judge"]["rubric_version"] == "argus-prose-quality-v3"
     assert result["prose_judge"]["pass"] is verdict["pass"]
     assert result["failed_checks"] == expected_failures
     assert result["status"] == ("failed" if expected_failures else "passed")

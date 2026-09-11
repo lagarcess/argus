@@ -17,7 +17,6 @@ from argus.agent_runtime.artifacts.strategy_edits import (
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _clear_incompatible_strategy_rule_state,
     _indicator_key_from_strategy,
-    _provenance_field,
     _strategy_looks_like_pending_artifact_edit,
     _strategy_supplies_contextual_rule_edit,
 )
@@ -25,11 +24,19 @@ from argus.agent_runtime.stages.interpret_internal.date_contract import (
     _date_range_endpoints,
     _strategy_date_evidence_candidates,
 )
-from argus.agent_runtime.stages.interpret_internal.shared import (
+from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
+    _compact_asset_evidence_token,
+    _current_turn_has_strong_asset_override,
     _field_base,
+    _incoming_asset_is_misplaced_benchmark,
+    _message_has_cashtag_for_asset,
+    _message_has_uppercase_asset_token,
     _should_preserve_prior_asset_context,
+    _strategy_has_explicit_asset_evidence,
+    _strategy_has_strong_asset_evidence,
     _strategy_supplies_executable_rule_edit,
     _strategy_supplies_explicit_turn_money,
+    _turn_continues_pending_setup,
 )
 from argus.agent_runtime.state.models import (
     StrategySummary,
@@ -82,9 +89,19 @@ def _strategy_with_contextual_merge(
         return strategy
     if "pending_response_option_selected" in set(reason_codes or []):
         return strategy
+    continues_pending_setup = _turn_continues_pending_setup(
+        prior=prior,
+        strategy=strategy,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=semantic_turn_act,
+        task_relation=task_relation,
+        current_user_message=current_user_message,
+        reason_codes=reason_codes,
+    )
     should_merge = (
         semantic_turn_act in CONTEXTUAL_EDIT_TURN_ACTS
         or task_relation == "refine"
+        or continues_pending_setup
         or _strategy_supplies_contextual_rule_edit(prior=prior, strategy=strategy)
         or _strategy_fills_pending_execution_context(
             prior=prior,
@@ -115,6 +132,10 @@ def _strategy_with_contextual_merge(
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
     )
+    asset_field_requested = (
+        _field_base(str(selected_thread_metadata.get("requested_field") or ""))
+        == "asset_universe"
+    )
     preserve_prior_asset_context = _should_preserve_prior_asset_context(
         prior=prior,
         selected_thread_metadata=selected_thread_metadata,
@@ -128,6 +149,16 @@ def _strategy_with_contextual_merge(
         task_relation=task_relation,
         current_user_message=current_user_message,
     ):
+        preserve_prior_asset_context = True
+    if (
+        continues_pending_setup
+        and not asset_field_requested
+        and _incoming_asset_is_misplaced_benchmark(
+            prior=prior, strategy=strategy, reason_codes=reason_codes
+        )
+    ):
+        # The benchmark repair's artifact is not an edit; the setup keeps
+        # what it is testing.
         preserve_prior_asset_context = True
     if (
         normalized_asset_universe_operation(
@@ -153,10 +184,6 @@ def _strategy_with_contextual_merge(
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
         current_user_message=current_user_message,
-    )
-    asset_field_requested = (
-        _field_base(str(selected_thread_metadata.get("requested_field") or ""))
-        == "asset_universe"
     )
     preserve_prior_asset_for_field_owned_indicator = bool(
         prior.asset_universe
@@ -367,53 +394,6 @@ def _should_preserve_prior_asset_for_pending_rule_answer(
         strategy=strategy,
         current_user_message=current_user_message,
     )
-
-
-def _current_turn_has_strong_asset_override(
-    *,
-    strategy: StrategySummary,
-    current_user_message: str | None,
-) -> bool:
-    for symbol in strategy.asset_universe:
-        target = _compact_asset_evidence_token(symbol)
-        if not target:
-            continue
-        if _message_has_cashtag_for_asset(current_user_message, target=target):
-            return True
-        if _message_has_uppercase_asset_token(current_user_message, target=target):
-            return True
-        if _strategy_has_strong_asset_evidence(strategy=strategy, target=target):
-            return True
-    return False
-
-
-def _strategy_has_strong_asset_evidence(
-    *,
-    strategy: StrategySummary,
-    target: str,
-) -> bool:
-    evidence_spans = strategy.extra_parameters.get("evidence_spans")
-    if isinstance(evidence_spans, dict):
-        for field_name, evidence in evidence_spans.items():
-            if _field_base(str(field_name)) != "asset_universe":
-                continue
-            evidence_text = str(evidence or "")
-            if _message_has_cashtag_for_asset(evidence_text, target=target):
-                return True
-            if _message_has_uppercase_asset_token(evidence_text, target=target):
-                return True
-    for item in strategy.resolution_provenance:
-        if _field_base(_provenance_field(item)) != "asset_universe":
-            continue
-        source = getattr(item, "source", None)
-        raw_text = getattr(item, "raw_text", "")
-        canonical_symbol = getattr(item, "canonical_symbol", "")
-        if str(source or "") == "user_mention" and target in {
-            _compact_asset_evidence_token(raw_text),
-            _compact_asset_evidence_token(canonical_symbol),
-        }:
-            return True
-    return False
 
 
 def _extra_parameters_without_unrequested_money_context(
@@ -697,94 +677,6 @@ def _strategy_uses_rule_or_indicator_context(strategy: StrategySummary) -> bool:
         or strategy.entry_rule
         or strategy.exit_rule
         or strategy.rule_spec
-    )
-
-
-def _strategy_has_explicit_asset_evidence(
-    strategy: StrategySummary,
-    *,
-    symbol: str,
-    current_user_message: str | None,
-) -> bool:
-    target = _compact_asset_evidence_token(symbol)
-    if not target:
-        return False
-    if _message_has_cashtag_for_asset(current_user_message, target=target):
-        return True
-
-    field_provenance = strategy.extra_parameters.get("field_provenance")
-    if isinstance(field_provenance, dict):
-        for field_name, source in field_provenance.items():
-            if _field_base(str(field_name)) != "asset_universe":
-                continue
-            if str(source or "").strip() in {
-                "asset_field",
-                "asset_mention",
-                "cashtag",
-                "composer_mention",
-                "explicit_user",
-                "user",
-                "user_mention",
-            }:
-                return True
-
-    evidence_spans = strategy.extra_parameters.get("evidence_spans")
-    if isinstance(evidence_spans, dict):
-        for field_name, evidence in evidence_spans.items():
-            if _field_base(str(field_name)) != "asset_universe":
-                continue
-            evidence_text = str(evidence or "")
-            if _message_has_cashtag_for_asset(evidence_text, target=target):
-                return True
-
-    for item in strategy.resolution_provenance:
-        if _field_base(_provenance_field(item)) != "asset_universe":
-            continue
-        source = getattr(item, "source", None)
-        raw_text = getattr(item, "raw_text", "")
-        canonical_symbol = getattr(item, "canonical_symbol", "")
-        if str(source or "") == "user_mention" and target in {
-            _compact_asset_evidence_token(raw_text),
-            _compact_asset_evidence_token(canonical_symbol),
-        }:
-            return True
-    return False
-
-
-def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
-    for token in str(message or "").split():
-        cleaned = "".join(
-            character
-            for character in token.strip()
-            if character.isalnum() or character == "$"
-        )
-        if (
-            cleaned.startswith("$")
-            and _compact_asset_evidence_token(cleaned[1:]) == target
-        ):
-            return True
-    return False
-
-
-def _message_has_uppercase_asset_token(message: str | None, *, target: str) -> bool:
-    for token in str(message or "").split():
-        cleaned = "".join(
-            character
-            for character in token.strip()
-            if character.isalnum() or character in {"/", "-"}
-        )
-        if not cleaned or cleaned != cleaned.upper():
-            continue
-        if not any(character.isalpha() and character.isupper() for character in cleaned):
-            continue
-        if _compact_asset_evidence_token(cleaned) == target:
-            return True
-    return False
-
-
-def _compact_asset_evidence_token(value: Any) -> str:
-    return "".join(
-        character.casefold() for character in str(value or "") if character.isalnum()
     )
 
 

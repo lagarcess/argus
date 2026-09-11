@@ -34,7 +34,7 @@ from argus.domain.research.billing import (
     record_unpriced_spend,
     unpriced_spend,
 )
-from argus.domain.research.config import RETRIEVAL_INSTRUCTIONS, ResearchConfigSpec
+from argus.domain.research.config import ResearchConfigSpec
 from argus.domain.research.contracts import (
     MAX_ANSWER_CHARS,
     MAX_PACKET_ROWS,
@@ -299,7 +299,7 @@ class PerplexityAgentClient:
         if spec.language:
             body["language_preference"] = spec.language
         if spec.typed_output:
-            body["instructions"] = RETRIEVAL_INSTRUCTIONS
+            body["instructions"] = spec.instructions
             body["response_format"] = typed_response_format()
         return body
 

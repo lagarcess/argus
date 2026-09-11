@@ -22,7 +22,10 @@ import {
 import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
-import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
+import {
+  nextExperimentRowsFromMetadata,
+  nextExperimentsSourceRunIdFromMetadata,
+} from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
   backtestJobCardAwaitsPolling,
@@ -499,7 +502,13 @@ export function hydrateMessagesFromApi(
             ...(!discovery && researchSources.length > 0
               ? { researchSources, researchDegradedCode }
               : {}),
-            ...(nextExperiments ? { nextExperiments } : {}),
+            ...(nextExperiments
+              ? {
+                  nextExperiments,
+                  nextExperimentsSourceRunId:
+                    nextExperimentsSourceRunIdFromMetadata(metadata),
+                }
+              : {}),
             ...(memoryRecalls ? { memoryRecalls } : {}),
           };
         }

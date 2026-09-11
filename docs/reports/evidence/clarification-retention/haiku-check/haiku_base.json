@@ -1,0 +1,45 @@
+[
+  {
+    "attempt": 1,
+    "status": "passed",
+    "failed_checks": [],
+    "capability_verdict": "unsupported",
+    "starting_capital": null,
+    "clarification": "unsupported_dca_contribution_ceiling",
+    "interpretation_models": [
+      "anthropic/claude-haiku-4.5"
+    ],
+    "cost_usd": 0.033295
+  },
+  {
+    "attempt": 2,
+    "status": "failed",
+    "failed_checks": [
+      "capability_verdict: expected 'unsupported', got 'executable'",
+      "stage_outcomes: expected ['needs_clarification', 'await_user_reply'], got ['ready_for_confirmation', 'await_approval']",
+      "clarification: expected mapping subset {'kind': 'unsupported_recovery', 'reason_code': 'unsupported_dca_contribution_ceiling'}, got None",
+      "offered.response: no assistant answer reached the turn",
+      "offered.clarification: no clarification reached the turn",
+      "offered.min_recovery_options: expected at least 1, got []"
+    ],
+    "capability_verdict": "executable",
+    "starting_capital": 0.0,
+    "clarification": null,
+    "interpretation_models": [
+      "anthropic/claude-haiku-4.5"
+    ],
+    "cost_usd": 0.014383
+  },
+  {
+    "attempt": 3,
+    "status": "passed",
+    "failed_checks": [],
+    "capability_verdict": "unsupported",
+    "starting_capital": null,
+    "clarification": "unsupported_dca_contribution_ceiling",
+    "interpretation_models": [
+      "anthropic/claude-haiku-4.5"
+    ],
+    "cost_usd": 0.028359
+  }
+]

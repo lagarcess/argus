@@ -1,0 +1,99 @@
+{
+  "label": "nflx-vs-dis-wbd",
+  "language": "en",
+  "question": "Compare margins and revenue growth for NFLX against DIS and WBD.",
+  "asked_at": "2026-09-10T20:04:30.957545+00:00",
+  "tree": "base",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "I couldn't finish that thorough research run. I won't quote figures I didn't verify; you can ask again, or test the idea against historical data right now."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "I couldn't finish that thorough research run. I won't quote figures I didn't verify; you can ask again, or test the idea against historical data right now.",
+        "message_id": "a0acca6c-b6aa-4a91-97e8-3ba29982937d",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "a2f50220-d907-4356-855e-f7575166e80e",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "be963fe7-6a20-41d1-ab1d-d1752bcfc9d2",
+        "conversation_id": "a2f50220-d907-4356-855e-f7575166e80e",
+        "role": "user",
+        "content": "Compare margins and revenue growth for NFLX against DIS and WBD.",
+        "created_at": "2026-09-10T20:04:30.987558Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "a2f50220-d907-4356-855e-f7575166e80e",
+            "request_id": "5d5d8fe1-9b2b-4792-be04-4974c18382e4",
+            "started_at": "2026-09-10T20:04:30.987551+00:00"
+          }
+        }
+      },
+      {
+        "id": "a0acca6c-b6aa-4a91-97e8-3ba29982937d",
+        "conversation_id": "a2f50220-d907-4356-855e-f7575166e80e",
+        "role": "assistant",
+        "content": "I couldn't finish that thorough research run. I won't quote figures I didn't verify; you can ask again, or test the idea against historical data right now.",
+        "created_at": "2026-09-10T20:05:47.766778Z",
+        "metadata": {
+          "conversation_mode": "guide",
+          "agent_runtime_stage_outcome": "ready_to_respond",
+          "agent_runtime_turn": {
+            "turn_id": "be963fe7-6a20-41d1-ab1d-d1752bcfc9d2",
+            "request_id": "5d5d8fe1-9b2b-4792-be04-4974c18382e4",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 76.81,
+  "summary": {
+    "label": "nflx-vs-dis-wbd",
+    "language": "en",
+    "elapsed_seconds": 76.81,
+    "stage_outcomes": [
+      "ready_to_respond"
+    ],
+    "answered": true,
+    "recovery_code": null,
+    "clarification_kind": null,
+    "clarification_reason_code": null,
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "I couldn't finish that thorough research run. I won't quote figures I didn't verify; you can ask again, or test the idea against historical data right now.",
+    "shape": null,
+    "degraded": null,
+    "rows": 0,
+    "sources": [],
+    "research_usage": null,
+    "next_experiments": []
+  }
+}

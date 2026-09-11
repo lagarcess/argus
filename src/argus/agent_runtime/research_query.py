@@ -31,8 +31,11 @@ class ResearchQueryExtraction(BaseModel):
             "figure. A request also asking why, what changed, or growth drivers is "
             "not live_quote in any language. company_lookup: one company's history, "
             "fundamentals, financial statements, earnings, business model, peers or "
-            "explanation. cross_company: comparison or multi-year trend analysis of "
-            "named companies, sectors or funds, with every subject already named. "
+            "explanation, including forward-looking and valuation questions about "
+            "it: what an investment in it will be worth, what price it must grow "
+            "into, fair value, analyst targets. cross_company: comparison or "
+            "multi-year trend analysis of named companies, sectors or funds, with "
+            "every subject already named. "
             "etf_constituents: fund holdings or weights. market_pulse: current market "
             "or index moves, gainers, losers or most-active assets. screening: assets "
             "that must satisfy any stated condition or threshold, regardless of "
@@ -42,7 +45,8 @@ class ResearchQueryExtraction(BaseModel):
             "asset statistics or price behavior over a period. current_external: "
             "news, events or macro facts outside those shapes. concept: a general "
             "term or mechanism, no specific company. none: everything else, including "
-            "requests to build or run a test. Counterfactual investment simulations "
+            "requests to build or run a test, and arithmetic on the user's own stated "
+            "numbers with no market subject. Counterfactual investment simulations "
             "are build requests, not market_stats."
         )
     )
@@ -64,6 +68,15 @@ class ResearchQueryExtraction(BaseModel):
     period_start_date: date | None = Field(
         default=None,
         description="Earliest ISO date implied by the requested period, including relative periods, using the current runtime date; null without a period.",
+    )
+    scenario_question: bool = Field(
+        default=False,
+        description=(
+            "True when the question asks what an investment or asset will be "
+            "worth, what price it must grow into, its fair value or a price "
+            "target, in any language: the answer is scenarios computed from "
+            "published inputs. False for a figure or a story that exists on a page."
+        ),
     )
     requires_publisher_sources: bool = Field(
         default=False,

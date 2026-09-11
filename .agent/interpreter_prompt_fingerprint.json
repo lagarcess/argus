@@ -1,10 +1,10 @@
 {
   "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
   "last_measured": {
-    "commit": "9fec4bf70c95383f4afa536674ceac4f38104787",
-    "scorecard": "docs/reports/evidence/411/live-measurement.json",
-    "passed": 61,
-    "failed": 1
+    "commit": "60e7c0ec25c7a7e84ceb402fa14db3a710cee2ae",
+    "scorecard": "docs/reports/evidence/decision-10/live-measurement.json",
+    "passed": 63,
+    "failed": 6
   },
   "surface": {
     "src/argus/agent_runtime/discovery/prompt_guidance.py": {
@@ -44,8 +44,8 @@
     },
     "src/argus/agent_runtime/interpreter/unsupported_admission.py": {
       "entries": 2,
-      "chars": 2370,
-      "sha256": "b873f42ff8e2d008e67107062139de4c7df3094d5f60e481def990dde264e9a4"
+      "chars": 2864,
+      "sha256": "837e28c3d3191b2f5ccd928d65c4d40caf717e9f466a999aaa506fad7743e33f"
     },
     "src/argus/agent_runtime/llm_clarifier.py": {
       "entries": 6,
@@ -54,8 +54,8 @@
     },
     "src/argus/agent_runtime/llm_interpreter.py": {
       "entries": 3,
-      "chars": 20900,
-      "sha256": "b6ccc08100f01e427b5d91e482be47efb17cbea1f68f57feccf55b7bf3cfd58c"
+      "chars": 20915,
+      "sha256": "96903616badab292303beac5172af9778652df45ac32a9bacde1088627434056"
     },
     "src/argus/agent_runtime/llm_interpreter_types.py": {
       "entries": 40,
@@ -64,13 +64,13 @@
     },
     "src/argus/agent_runtime/research_grounded.py": {
       "entries": 3,
-      "chars": 1868,
-      "sha256": "af6520a67ca45ae10f5b746508cd4dedf0e0d292e5b0b997f05a95b899c10e3b"
+      "chars": 2100,
+      "sha256": "cbd90276feb448c8fcb884e017362d344a2eeaece7321d7a01919b8f1a05789d"
     },
     "src/argus/agent_runtime/research_query.py": {
-      "entries": 10,
-      "chars": 2017,
-      "sha256": "c69ebf65f56c13c68d250929a0fc46b29d71251ab0de5d6b60ee5160cafb9300"
+      "entries": 11,
+      "chars": 2508,
+      "sha256": "6272ae2d2caa136cf141ff1092e1569ee2f97bd98b9bfc72496c89ba72758851"
     },
     "src/argus/agent_runtime/result_followups.py": {
       "entries": 11,

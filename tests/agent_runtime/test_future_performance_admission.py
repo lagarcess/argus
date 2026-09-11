@@ -1,11 +1,18 @@
-"""Issue #241 future-performance executable boundary.
+"""The future test-window boundary (issue #241, narrowed by decision 10).
 
 Invariant under test: a typed future-anchored horizon
-(``date_range_intent.kind == "future_window"``) on a strategy-shaped turn can
+(``date_range_intent.kind == "future_window"``) on a strategy-route turn can
 never become an executable confirmation, a resolved historical date range, or
-inherited dates after an explicit supported-alternative selection. The future
-horizon survives only as original-intent evidence; compatible asset, capital,
-and strategy facts are preserved.
+inherited dates after an explicit supported-alternative selection, because
+that market data does not exist. The horizon survives only as original-intent
+evidence; compatible asset, capital, and strategy facts are preserved.
+
+What changed (decision 10, 2026-09-10): a question read that carries a
+research query is answered by research before this stage runs
+(``test_forward_question_routing.py``). A typed horizon that still reaches
+this stage belongs to a turn research did not claim, and it keeps the
+deterministic recovery, which now offers the historical test and analyst
+research; the model's own forecast prose never reaches the user.
 """
 
 from __future__ import annotations
@@ -690,12 +697,15 @@ FORECAST_PROSE = (
 )
 
 
-def test_educational_label_with_future_window_fails_closed(
+def test_educational_label_with_future_window_keeps_its_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A typed future horizon is capability truth: an educational_question
-    label may not suppress the strategy route, wipe the draft, and ship the
-    model's forecast as a plain answer."""
+    """A future horizon research did not claim never ships the model's own
+    forecast as prose. Research claims a question read before this stage
+    (test_forward_question_routing.py); here the read carries no research
+    query, so the typed horizon keeps the strategy route and the future
+    test-window recovery owns the turn, offering the historical test and the
+    analyst research instead of a number."""
 
     _stub_equity_asset_resolution(monkeypatch)
     result = _run_interpret(
@@ -711,11 +721,10 @@ def test_educational_label_with_future_window_fails_closed(
     assert result.patch.get("assistant_response") is None
 
 
-def test_followup_label_with_future_window_fails_closed(
+def test_followup_label_with_future_window_keeps_its_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A conversation-followup label (result_followup act) may not keep the
-    strategy route unset and return the forecast unchanged."""
+    """A follow-up forecast with no research query is recovered, not voiced."""
 
     _stub_equity_asset_resolution(monkeypatch)
     result = _run_interpret(
@@ -862,7 +871,7 @@ def _future_recovery_clarify_state() -> RunState:
             {
                 "category": FUTURE_PERFORMANCE_CATEGORY,
                 "raw_value": "in ten years",
-                "explanation": "Argus cannot predict future performance.",
+                "explanation": "There is no market data for a future period.",
                 "simplification_options": [
                     {
                         "label": "Test this idea over a historical period",
@@ -922,8 +931,9 @@ def test_future_recovery_prose_is_llm_clarification_owned() -> None:
             return self.question
 
     honest = (
-        "I can't predict future performance, but I can test how the same "
-        "golden-cross idea performed historically. Which period should I use?"
+        "There is no data for the next ten years yet, so I can't test them. I "
+        "can test how the same golden-cross idea performed historically. Which "
+        "period should I use?"
     )
     clarifier = RecordingClarifier(honest)
     result = clarify_stage(
@@ -944,7 +954,7 @@ def test_future_recovery_prose_is_llm_clarification_owned() -> None:
 
 def test_future_recovery_generation_failure_uses_honest_fallback() -> None:
     """A clarification-generation failure falls back to the deterministic
-    future-performance copy, never to interpreter prose."""
+    future test-window copy, never to interpreter prose."""
 
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
@@ -960,7 +970,7 @@ def test_future_recovery_generation_failure_uses_honest_fallback() -> None:
     )
     assert result.outcome == "await_user_reply"
     prompt = result.patch["assistant_prompt"]
-    assert "cannot predict future performance" in prompt
+    assert "no market data for a period that has not happened yet" in prompt
     assert "historical period" in prompt
     assert "$150,000" not in prompt
     clarification = result.patch["clarification"]
@@ -971,9 +981,9 @@ def test_future_recovery_generation_failure_uses_honest_fallback() -> None:
 def test_forecast_prose_full_route_reaches_honest_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """End to end: future_window plus forecast prose becomes future_performance
-    recovery whose visible prose carries no forecast, with facts conserved and
-    no executable artifact."""
+    """End to end on the strategy route: a backtest asked over a future window
+    becomes future_performance recovery whose visible prose carries no
+    forecast, with facts conserved and no executable artifact."""
 
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
@@ -1016,7 +1026,7 @@ def test_forecast_prose_full_route_reaches_honest_recovery(
     )
     prompt = clarify_result.patch["assistant_prompt"]
     assert "$150,000" not in prompt
-    assert "cannot predict future performance" in prompt
+    assert "no market data for a period that has not happened yet" in prompt
     assert clarify_result.patch.get("confirmation_payload") is None
     clarification = clarify_result.patch["clarification"]
     assert clarification["reason_code"] == FUTURE_PERFORMANCE_CATEGORY

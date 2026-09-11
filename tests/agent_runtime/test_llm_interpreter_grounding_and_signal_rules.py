@@ -835,9 +835,13 @@ def test_llm_interpreter_prompt_preserves_valuation_as_valid_context() -> None:
 
     assert "valuation and fundamental language is valid investing intent" in prompt
     assert "p/e" in prompt
-    assert "concept is financially real" in prompt
-    assert "executable historical price/indicator rule" in prompt
+    # Decision 10: valuation language is answered by research; the engine
+    # boundary and its proxy apply only to a rule the user wants to test.
+    assert "is a research question" in prompt
+    assert "do not steer it toward a backtest" in prompt
+    assert "only when the user wants to test a rule" in prompt
     assert "supported proxy" in prompt
+    assert "cannot predict future performance" not in prompt
 
 def test_llm_interpreter_prompt_understands_crossover_shorthand() -> None:
     interpreter = OpenRouterStructuredInterpreter(

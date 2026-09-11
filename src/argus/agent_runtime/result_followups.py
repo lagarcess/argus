@@ -51,6 +51,15 @@ INTERNAL_ONLY_FACT_IDS = frozenset({"benchmark_comparison_claim"})
 BENCHMARK_COMPARISON_CLAIMS = frozenset(
     {"beat_benchmark", "lagged_benchmark", "matched_benchmark"}
 )
+# Engine metric paths every follow-up surface reads, so the Try next rows and
+# the fact bank compare against the same figures.
+BENCHMARK_DELTA_METRIC_PATHS = (
+    ("metrics", "aggregate", "performance", "delta_vs_benchmark_pct"),
+)
+MAX_DRAWDOWN_METRIC_PATHS = (
+    ("metrics", "aggregate", "risk", "max_drawdown_pct"),
+    ("metrics", "aggregate", "max_drawdown_pct"),
+)
 
 
 class ResultFollowupDraft(BaseModel):
@@ -831,10 +840,7 @@ def result_followup_fact_bank(
     if benchmark_return is not None:
         fact_bank["benchmark_return"] = format_percent(benchmark_return)
     enriched_facts = enriched_result_fact_entries(metadata)
-    benchmark_delta = metric_number(
-        metadata,
-        paths=(("metrics", "aggregate", "performance", "delta_vs_benchmark_pct"),),
-    )
+    benchmark_delta = metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS)
     comparison = (
         benchmark_comparison_from_delta(benchmark_delta)
         if benchmark_delta is not None
@@ -870,13 +876,7 @@ def result_followup_fact_bank(
             )
             if relative:
                 fact_bank["relative_performance"] = relative
-    drawdown = metric_number(
-        metadata,
-        paths=(
-            ("metrics", "aggregate", "risk", "max_drawdown_pct"),
-            ("metrics", "aggregate", "max_drawdown_pct"),
-        ),
-    )
+    drawdown = metric_number(metadata, paths=MAX_DRAWDOWN_METRIC_PATHS)
     if drawdown is not None:
         fact_bank["max_drawdown"] = format_percent(drawdown, signed=False)
     trade_count = metric_number(

@@ -424,8 +424,8 @@
         "daily": "Usar barras diarias",
         "hour_1": "Usar barras de 1 hora"
       },
-      "future_performance": "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico. ¿Qué período histórico quieres examinar?",
-      "future_performance_with_options": "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico: {{options}}?"
+      "future_performance": "No hay datos de mercado para un período que todavía no ocurre, así que no puedo correr una prueba sobre él. Puedo probar cómo se comportó la misma idea en un período histórico, o investigar qué esperan los analistas. ¿Qué período histórico quieres examinar?",
+      "future_performance_with_options": "No hay datos de mercado para un período que todavía no ocurre, así que no puedo correr una prueba sobre él. Puedo probar cómo se comportó la misma idea en un período histórico, o investigar qué esperan los analistas: {{options}}?"
     },
     "coverage_recovery": {
       "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",

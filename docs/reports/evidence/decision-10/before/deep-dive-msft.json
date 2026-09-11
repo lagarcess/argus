@@ -1,0 +1,245 @@
+{
+  "label": "deep-dive-msft",
+  "language": "en",
+  "question": "Give me a deep dive on Microsoft: its growth drivers and the biggest risks to the business.",
+  "asked_at": "2026-09-10T20:00:42.166148+00:00",
+  "tree": "base",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.",
+        "next_experiments": {
+          "version": "argus_next_experiments/v1",
+          "rows": [
+            {
+              "kind": "research_test_single",
+              "label": "Test Microsoft (MSFT) over the last 3 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Microsoft"
+                },
+                {
+                  "type": "ticker",
+                  "value": "MSFT"
+                },
+                {
+                  "type": "text",
+                  "value": " over the last 3 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding MSFT over the last three years"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [],
+          "rows": [],
+          "retrieved_at": "2026-09-10T20:02:07.773641+00:00",
+          "anchor_symbols": [
+            "MSFT"
+          ],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 0,
+            "cost_usd": null,
+            "cache_status": "bypass"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [
+              {
+                "symbol": "MSFT",
+                "name": "Microsoft Corporation Common Stock",
+                "asset_class": "equity"
+              }
+            ],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            }
+          },
+          "degraded": {
+            "code": "research_unavailable_http_error"
+          }
+        },
+        "message_id": "dbd692ef-4c8d-44d5-90d9-54363dc8b8ad",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "d3cc9557-de16-443f-ba2e-fb5052f613cb",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "080e2974-2226-4108-b2dc-7cfcd2e2ca9b",
+        "conversation_id": "d3cc9557-de16-443f-ba2e-fb5052f613cb",
+        "role": "user",
+        "content": "Give me a deep dive on Microsoft: its growth drivers and the biggest risks to the business.",
+        "created_at": "2026-09-10T20:00:42.196704Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "d3cc9557-de16-443f-ba2e-fb5052f613cb",
+            "request_id": "f11b7886-900c-468d-9d82-0b61f92f30f2",
+            "started_at": "2026-09-10T20:00:42.196694+00:00"
+          }
+        }
+      },
+      {
+        "id": "dbd692ef-4c8d-44d5-90d9-54363dc8b8ad",
+        "conversation_id": "d3cc9557-de16-443f-ba2e-fb5052f613cb",
+        "role": "assistant",
+        "content": "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.",
+        "created_at": "2026-09-10T20:02:07.775886Z",
+        "metadata": {
+          "conversation_mode": "guide",
+          "agent_runtime_stage_outcome": "ready_to_respond",
+          "next_experiments": {
+            "version": "argus_next_experiments/v1",
+            "rows": [
+              {
+                "kind": "research_test_single",
+                "label": "Test Microsoft (MSFT) over the last 3 years",
+                "label_parts": [
+                  {
+                    "type": "text",
+                    "value": "Test "
+                  },
+                  {
+                    "type": "text",
+                    "value": "Microsoft"
+                  },
+                  {
+                    "type": "ticker",
+                    "value": "MSFT"
+                  },
+                  {
+                    "type": "text",
+                    "value": " over the last 3 years"
+                  }
+                ],
+                "label_key": "chat.next_experiments.labels.research_dynamic",
+                "send_text": "Test buying and holding MSFT over the last three years"
+              }
+            ]
+          },
+          "research": {
+            "schema_version": "argus_research/v1",
+            "capability_class": "balanced_lookup",
+            "shape": "balanced",
+            "sources": [],
+            "rows": [],
+            "retrieved_at": "2026-09-10T20:02:07.773641+00:00",
+            "anchor_symbols": [
+              "MSFT"
+            ],
+            "peers": [],
+            "usage": {
+              "invocations": 0,
+              "latency_ms": 0,
+              "cost_usd": null,
+              "cache_status": "bypass"
+            },
+            "follow_up": {
+              "schema_version": "argus_research_follow_up/v1",
+              "subjects": [
+                {
+                  "symbol": "MSFT",
+                  "name": "Microsoft Corporation Common Stock",
+                  "asset_class": "equity"
+                }
+              ],
+              "comparison_set": [],
+              "peer_suggestions": [],
+              "open_thread": {
+                "shape": "balanced",
+                "period_of_interest": null
+              }
+            },
+            "degraded": {
+              "code": "research_unavailable_http_error"
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "080e2974-2226-4108-b2dc-7cfcd2e2ca9b",
+            "request_id": "f11b7886-900c-468d-9d82-0b61f92f30f2",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 85.61,
+  "summary": {
+    "label": "deep-dive-msft",
+    "language": "en",
+    "elapsed_seconds": 85.61,
+    "stage_outcomes": [
+      "ready_to_respond"
+    ],
+    "answered": true,
+    "recovery_code": null,
+    "clarification_kind": null,
+    "clarification_reason_code": null,
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.",
+    "shape": "balanced",
+    "degraded": {
+      "code": "research_unavailable_http_error"
+    },
+    "rows": 0,
+    "sources": [],
+    "research_usage": {
+      "invocations": 0,
+      "latency_ms": 0,
+      "cost_usd": null,
+      "cache_status": "bypass"
+    },
+    "next_experiments": [
+      "Test Microsoft (MSFT) over the last 3 years"
+    ]
+  }
+}

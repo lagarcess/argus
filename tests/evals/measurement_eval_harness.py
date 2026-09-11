@@ -582,7 +582,8 @@ def _run_followup_turn_if_needed(
     followup_interpret = interpret_stage(
         state=state,
         user=user,
-        latest_task_snapshot=case.snapshot,
+        latest_task_snapshot=case.snapshot
+        or _followup_snapshot(case, final_clarify_patch, clarify_result.outcome),
         selected_thread_metadata=_followup_thread_metadata(
             final_clarify_patch,
             last_stage_outcome=str(clarify_result.outcome),
@@ -632,6 +633,21 @@ def _run_followup_turn_if_needed(
         "confirm_result": followup_confirm,
         "clarify_result": followup_clarify,
     }
+
+
+def _followup_snapshot(case: EvalCase, patch: dict[str, Any], outcome: Any):
+    """The setup the first turn left pending, built by the workflow's own owner."""
+    from argus.agent_runtime.graph.workflow import _build_task_snapshot
+
+    state = _state_from_interpret_patch(case=case, interpret_patch=patch)
+    state.intent = patch.get("intent")
+    state.user_goal_summary = patch.get("user_goal_summary")
+    return _build_task_snapshot(
+        run_state=state,
+        stage_outcome=outcome,
+        prior_task_snapshot=None,
+        artifact_references=[],
+    )
 
 
 def _followup_thread_metadata(
