@@ -96,8 +96,10 @@ the merge ignores it. That replay is a committed test.
 - `interpreter/dca_audits.py`: an audit may add a money role only for a
   distinct amount, and the role it names decides the field. A seed the user
   typed is never re-typed as a cap (`dca_budget_audit_outranked_by_typed_seed`);
-  the same money read again as the seed adds no role
-  (`dca_budget_audit_same_amount_already_typed`);
+  the same money read again as the seed adds no role when the draft typed it
+  as a cap (`dca_budget_audit_same_amount_already_typed`) and supplies the
+  provenance the primary left out when two reads agree on the seed
+  (`dca_budget_audit_seed_corroborated`);
   a budget the audit calls starting capital lands in `initial_capital` only
   while that role is empty (`dca_budget_audit_typed_as_seed`); beside an
   occupied seed it can only bound the plan, so it becomes the ceiling
@@ -115,8 +117,9 @@ the merge ignores it. That replay is a committed test.
   (`semantic_dca_seed_role_read_over_ceiling_key`); a distinct amount stays a
   ceiling. A seed key whose provenance names a ceiling role is read as the
   ceiling (`semantic_dca_ceiling_role_read_over_seed_key`). When both slots
-  are crossed, each amount moves to the slot its role names and both codes
-  are recorded.
+  are crossed with distinct money, each amount moves to the slot its role
+  names and both codes are recorded; the same money in both crossed slots is
+  one fact and reads as the cap, never as a day-one seed.
 - `src/argus/api/chat/visible_reply.py`: the one owner of the em dash rule at
   the point a reply becomes visible. Token frames, the final payload text and
   the persisted message pass through it; the turn records `reply_rewrites`
@@ -132,11 +135,11 @@ the merge ignores it. That replay is a committed test.
 | Suite | Result |
 | --- | ---: |
 | `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task, the recorded two turns through the real workflow) | 98 passed |
-| `tests/agent_runtime/test_dca_money_role_audits.py` | 33 passed |
+| `tests/agent_runtime/test_dca_money_role_audits.py` | 35 passed |
 | `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 21 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
-| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `cda7a1a3` | 2637 passed, 2 skipped |
-| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `cda7a1a3` | 822 passed |
+| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `ef6b38a1` | 2639 passed, 2 skipped |
+| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `ef6b38a1` | 822 passed |
 | `scripts/check_modularity_budget.py` | no violations |
 
 ## Measurement cases, run live on the fix (`live_cases_after.json`)
@@ -321,6 +324,22 @@ cases). All nine passed with the judge on, $0.25.
 
 The same nine cases. All nine passed with the judge on, $0.28.
 
+## Codex round 7 (two P1s on `e90f52af`, fixed in `ef6b38a1`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| The primary typed the $1,000 seed with no provenance and the contract audit read the same $1,000 as starting capital; the round-6 no-role branch recorded nothing, `_grounded_initial_capital` dropped the untyped seed and the run started from zero | The no-role reading is kept only for money the draft typed as a cap. Otherwise two reads that agree on the seed corroborate it: the audit supplies the provenance the primary left out (`dca_budget_audit_seed_corroborated`), as the fidelity audit already did (`stated_run_field_seed_corroborated`) | `test_a_contract_audit_that_reads_the_untyped_seed_supplies_its_provenance` |
+| The primary put the same $5,000 in both crossed slots (`initial_capital` under a ceiling role, `total_capital` under a seed role); the round-4 swap moved both and the report carried a $5,000 ceiling beside an invented $5,000 seed | The swap needs distinct money. Equal money is one fact and falls through to the rule for a cap in the seed slot (a ceiling, never money on day one); a cap already moved out of the seed slot is never read back as a seed | `test_semantic_reader_reads_an_equal_amount_in_both_crossed_slots_as_one_cap` |
+
+### Measurement cases the round-7 fix touches, live at `ef6b38a1` (`live-touched-cases-ef6b38a1.json`, `live-rerun-only-have-ef6b38a1.json`)
+
+The same nine cases, $0.29. Eight passed with the judge on. In
+`dca_capital_semantics_only_have_amount_is_ceiling_issue_455` grok timed out
+on the primary read and haiku's fallback read "through 2024" as an end date
+only, so the runtime asked for the period before it could refuse the cap
+(`missing_period`); the money fields never held the shape this round
+changed. Rerun alone with grok on the primary it passed ($0.03).
+
 ## Billed cost
 
 | Item | Cost |
@@ -337,7 +356,8 @@ The same nine cases. All nine passed with the judge on, $0.28.
 | Nine touched measurement cases live at `506b38a7` | $0.321 |
 | Nine touched measurement cases live at `8241f56d` | $0.255 |
 | Nine touched measurement cases live at `cda7a1a3` | $0.281 |
-| **Total** | **$3.44** |
+| Nine touched measurement cases live at `ef6b38a1`, plus one solo rerun | $0.325 |
+| **Total** | **$3.76** |
 
 ## Observed, not changed here
 

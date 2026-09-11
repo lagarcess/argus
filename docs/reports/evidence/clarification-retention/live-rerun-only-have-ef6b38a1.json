@@ -1,0 +1,492 @@
+[
+  {
+    "id": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+    "category": "dca_capital_semantics",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "strategy_drafting",
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply"
+      ],
+      "assets": [
+        "VOO"
+      ],
+      "asset_class": "equity",
+      "requested_strategy_template": "dca_accumulation",
+      "strategy_type": "dca_accumulation",
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": {
+        "start": "2024-01-01",
+        "end": "2024-12-31"
+      },
+      "requested_date_range": {
+        "start": "2024-01-01",
+        "end": "2024-12-31"
+      },
+      "effective_date_range": {
+        "start": "2024-01-01",
+        "end": "2024-12-31"
+      },
+      "adjustment_reason": null,
+      "benchmark_symbol": "SPY",
+      "capital_amount": null,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": "monthly",
+      "launch_validation_code": null,
+      "missing_required_fields": [
+        "capital_amount"
+      ],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "unsupported",
+      "requested_field": null,
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "reason_code": "unsupported_dca_contribution_ceiling",
+        "prompt_source": "llm_generated",
+        "requested_field": "unsupported_constraints",
+        "requested_fields": [
+          "unsupported_constraints"
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "payload": {
+          "strategy": {
+            "raw_user_phrasing": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+            "requested_strategy_template": "dca_accumulation",
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+            "asset_universe": [
+              "VOO"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": "monthly",
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2024-01-01",
+              "end": "2024-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": null,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": "SPY",
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "raw_text": "VOO",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "resolved",
+                "canonical_symbol": "VOO",
+                "asset_class": "equity",
+                "validated_by": "provider_catalog",
+                "confidence": "medium"
+              }
+            ],
+            "extra_parameters": {
+              "provider_resolved_assets": [
+                {
+                  "raw_text": "VOO",
+                  "symbol": "VOO",
+                  "asset_class": "equity",
+                  "name": "Vanguard S&P 500 ETF",
+                  "raw_symbol": "VOO",
+                  "provider": "alpaca",
+                  "exchange": "AssetExchange.ARCA"
+                }
+              ],
+              "total_capital": 5000.0,
+              "language": "en",
+              "date_range_raw_text": "through 2024",
+              "date_range_intent": {
+                "kind": "calendar_year",
+                "start": null,
+                "end": null,
+                "day_offset": null,
+                "count": null,
+                "unit": null,
+                "anchor": "today",
+                "year": 2024,
+                "endpoint": null,
+                "confidence": 0.95,
+                "evidence": "through 2024"
+              },
+              "evidence_spans": {
+                "total_capital": "I only have $5,000 to invest",
+                "cadence": "every month",
+                "asset_universe": "VOO",
+                "date_range_raw_text": "through 2024",
+                "date_range": "through 2024"
+              },
+              "recurring_cadence": "monthly",
+              "field_provenance": {
+                "total_capital": "explicit_user",
+                "cadence": "explicit_user",
+                "asset_universe": "explicit_user",
+                "date_range_raw_text": "explicit_user",
+                "capital_amount": "starting_capital"
+              },
+              "raw_strategy_type": "dca_accumulation"
+            }
+          },
+          "raw_value": "$5,000 total budget"
+        },
+        "options": [
+          {
+            "id": "recurring_only",
+            "replacement_values": {
+              "ignore_initial_capital": true
+            },
+            "compatibility_label": "Run recurring buys only"
+          },
+          {
+            "id": "option_1",
+            "replacement_values": {
+              "initial_capital": 5000.0
+            },
+            "compatibility_label": "Use it as starting capital"
+          },
+          {
+            "id": "option_2",
+            "replacement_values": {
+              "strategy_type": "buy_and_hold",
+              "initial_capital": 5000.0
+            },
+            "compatibility_label": "Use buy and hold with starting capital"
+          }
+        ]
+      },
+      "semantic_turn_act": "new_idea",
+      "asset_discovery": null,
+      "research": null,
+      "offered": {
+        "response": true,
+        "launch_payload": {},
+        "clarification": {
+          "kind": "unsupported_recovery",
+          "reason_code": "unsupported_dca_contribution_ceiling",
+          "prompt_source": "llm_generated",
+          "requested_field": "unsupported_constraints",
+          "requested_fields": [
+            "unsupported_constraints"
+          ],
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "payload": {
+            "strategy": {
+              "raw_user_phrasing": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+              "requested_strategy_template": "dca_accumulation",
+              "strategy_type": "dca_accumulation",
+              "strategy_thesis": "I only have $5,000 to invest. Can you test putting money into VOO every month through 2024?",
+              "asset_universe": [
+                "VOO"
+              ],
+              "asset_class": "equity",
+              "timeframe": null,
+              "cadence": "monthly",
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": {
+                "start": "2024-01-01",
+                "end": "2024-12-31"
+              },
+              "sizing_mode": null,
+              "capital_amount": null,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": "SPY",
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "VOO",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "VOO",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "confidence": "medium"
+                }
+              ],
+              "extra_parameters": {
+                "provider_resolved_assets": [
+                  {
+                    "raw_text": "VOO",
+                    "symbol": "VOO",
+                    "asset_class": "equity",
+                    "name": "Vanguard S&P 500 ETF",
+                    "raw_symbol": "VOO",
+                    "provider": "alpaca",
+                    "exchange": "AssetExchange.ARCA"
+                  }
+                ],
+                "total_capital": 5000.0,
+                "language": "en",
+                "date_range_raw_text": "through 2024",
+                "date_range_intent": {
+                  "kind": "calendar_year",
+                  "start": null,
+                  "end": null,
+                  "day_offset": null,
+                  "count": null,
+                  "unit": null,
+                  "anchor": "today",
+                  "year": 2024,
+                  "endpoint": null,
+                  "confidence": 0.95,
+                  "evidence": "through 2024"
+                },
+                "evidence_spans": {
+                  "total_capital": "I only have $5,000 to invest",
+                  "cadence": "every month",
+                  "asset_universe": "VOO",
+                  "date_range_raw_text": "through 2024",
+                  "date_range": "through 2024"
+                },
+                "recurring_cadence": "monthly",
+                "field_provenance": {
+                  "total_capital": "explicit_user",
+                  "cadence": "explicit_user",
+                  "asset_universe": "explicit_user",
+                  "date_range_raw_text": "explicit_user",
+                  "capital_amount": "starting_capital"
+                },
+                "raw_strategy_type": "dca_accumulation"
+              }
+            },
+            "raw_value": "$5,000 total budget"
+          },
+          "options": [
+            {
+              "id": "recurring_only",
+              "replacement_values": {
+                "ignore_initial_capital": true
+              },
+              "compatibility_label": "Run recurring buys only"
+            },
+            {
+              "id": "option_1",
+              "replacement_values": {
+                "initial_capital": 5000.0
+              },
+              "compatibility_label": "Use it as starting capital"
+            },
+            {
+              "id": "option_2",
+              "replacement_values": {
+                "strategy_type": "buy_and_hold",
+                "initial_capital": 5000.0
+              },
+              "compatibility_label": "Use buy and hold with starting capital"
+            }
+          ]
+        },
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [
+          "recurring_only",
+          "option_1",
+          "option_2"
+        ],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": null,
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1004,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 800,
+          "completion_tokens": 46,
+          "total_tokens": 846,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0009806,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T11:48:13.161261+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 14249,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10739,
+          "completion_tokens": 1702,
+          "total_tokens": 12441,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.01747715,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T11:48:27.845804+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 16299,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1120,
+          "completion_tokens": 1822,
+          "total_tokens": 2942,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0057534,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T11:48:46.458220+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 5668,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 1239,
+          "completion_tokens": 515,
+          "total_tokens": 1754,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.003814,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T11:48:52.127433+00:00"
+      },
+      {
+        "task": "interpretation_repair",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "FocusedDateWindowExtraction",
+        "latency_ms": 1183,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2064,
+          "completion_tokens": 58,
+          "total_tokens": 2122,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0025906,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T11:48:53.311875+00:00",
+        "repair_effect": {
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "date_window_intent_uncertain",
+          "repair_applied": true,
+          "changed_fields": [
+            "candidate_strategy_draft.date_range",
+            "candidate_strategy_draft.date_range_intent"
+          ],
+          "before_fingerprint": "67f9b90fe8772d380278f5f34328c9bffb901b8a8b098545a76bd10cdadfa1d3",
+          "after_fingerprint": "aae62324657a9c780377f7701b31748f99ef2c24eb05927980798908273f8791",
+          "no_op_reason": null
+        }
+      },
+      {
+        "task": "field_fidelity",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "latency_ms": 1090,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2237,
+          "completion_tokens": 71,
+          "total_tokens": 2308,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00283935,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T11:48:55.363128+00:00"
+      },
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 1234,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1940,
+          "completion_tokens": 81,
+          "total_tokens": 2021,
+          "cached_tokens": 1024,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.000115452,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T11:48:56.797178+00:00"
+      }
+    ],
+    "cost_usd": 0.033571
+  }
+]
