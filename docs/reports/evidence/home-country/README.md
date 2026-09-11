@@ -20,7 +20,8 @@ with integration `afdd8a86` as `523b17d5`.
 
 ## Browser proof (`browser/`)
 
-Captured at `523b17d5` by `drivers/settings_proof.mjs` against the real local
+Re-captured at `eb28dfbc` (after Codex round 1 made the search boxes 16px) by
+`drivers/settings_proof.mjs` against the real local
 API (dev memory persistence, mock auth, provider keys blank) and the web dev
 server, at 1280 px. `report.json` records what `GET /me` held after every
 step, the status of the refused save and the alert the panel showed. Neither
@@ -36,3 +37,17 @@ language raised a page error.
 
 The mocked-API spec `web/e2e/profile-home-country-save.spec.ts` covers the
 same save, override, reload and refusal in both languages for CI-style runs.
+
+## Review evidence (`review/`)
+
+`drivers/row_heights.mjs` measures the Preferences rows with a mocked account.
+At 390 px with touch, where the menu is a drawer, Appearance, Language and
+Country and currency all render 44 px tall. At 1280 px, the rail popover for a
+pointer, all three render 38 px. The drawer and sheet containers give every
+submenu button a 44 px minimum, and the new row inherits it like its siblings.
+
+## Live measurement
+
+Not yet recorded. The first full run, on `9af12545`, finished its cases but
+`write_scorecard` refused to write: its provenance check re-reads the head at
+write time, and a commit landed in this worktree during the run.
