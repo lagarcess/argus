@@ -545,3 +545,62 @@ def test_an_audit_that_repeats_a_mis_slotted_cap_as_the_seed_adds_no_role() -> N
     assert report.evidence.contribution_ceiling == 5000.0
     assert report.evidence.total_capital is None
     assert report.optional_parameter_values.get("initial_capital") is None
+
+
+def test_a_contract_audit_that_reads_the_untyped_seed_supplies_its_provenance() -> None:
+    # The primary typed the $1,000 seed with no provenance and the contract
+    # audit reads the same $1,000 as starting capital: two reads agree, so
+    # the audit supplies the provenance the primary left out and the seed
+    # survives grounding.
+    response = _dca_response(initial_capital=1000.0, seed_provenance=None)
+
+    repaired = _response_from_dca_contract_audit(
+        request=_request(),
+        response=response,
+        audit=_contract_audit(
+            total_budget_amount=1000.0, total_budget_source="starting_capital"
+        ),
+    )
+
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.initial_capital == 1000.0
+    assert draft.total_capital is None
+    assert draft.field_provenance["initial_capital"] == "starting_capital"
+    assert "dca_budget_audit_seed_corroborated" in repaired.reason_codes
+    projected = _strategy_from_llm(draft, "Start with $1,000 then $100 a month.")
+    assert projected.extra_parameters["initial_capital"] == 1000.0
+    report = conserve_semantic_constraints(
+        strategy=projected, selected_thread_metadata={}
+    )
+    assert report.unsupported_constraints == []
+    assert report.evidence.total_capital == 1000.0
+    assert report.evidence.contribution_ceiling is None
+
+
+def test_semantic_reader_reads_an_equal_amount_in_both_crossed_slots_as_one_cap() -> None:
+    # The primary put the same $5,000 in both slots with crossed roles. The
+    # same money is one fact, and a cap in the seed slot is never money on
+    # day one: the plan has a $5,000 ceiling and no seed.
+    strategy = _pending_dca(
+        {
+            "recurring_contribution": 200.0,
+            "initial_capital": 5000.0,
+            "total_capital": 5000.0,
+            "field_provenance": {
+                "recurring_contribution": "explicit_user",
+                "initial_capital": "total_budget",
+                "total_capital": "starting_capital",
+            },
+        }
+    )
+
+    report = conserve_semantic_constraints(strategy=strategy, selected_thread_metadata={})
+
+    assert [c.category for c in report.unsupported_constraints] == [
+        UNSUPPORTED_DCA_CONTRIBUTION_CEILING
+    ]
+    assert report.evidence.contribution_ceiling == 5000.0
+    assert report.evidence.total_capital is None
+    assert report.optional_parameter_values.get("initial_capital") is None
+    assert "semantic_dca_ceiling_role_read_over_seed_key" in report.reason_codes

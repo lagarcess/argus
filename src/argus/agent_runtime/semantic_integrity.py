@@ -287,8 +287,9 @@ def _structured_money_role_evidence(
     ceiling_slot_holds_seed = ceiling is not None and _dca_ceiling_provenance_names_seed(
         field_provenance
     )
-    if seed_slot_holds_ceiling and ceiling_slot_holds_seed:
-        # Both slots crossed: each amount moves to the slot its role names.
+    if seed_slot_holds_ceiling and ceiling_slot_holds_seed and ceiling != total:
+        # Both slots crossed with distinct money: each amount moves to the
+        # slot its role names. Equal money is one fact and falls through.
         total, total_key, ceiling, ceiling_key = (
             ceiling,
             "initial_capital",
@@ -308,10 +309,15 @@ def _structured_money_role_evidence(
         # The provenance named a cap even though no ceiling key carried a
         # number, so the amount on capital_amount is the cap.
         ceiling, ceiling_key = total, resolved_source
-    if ceiling_slot_holds_seed and not ceiling_key_read_as_seed:
+    if (
+        ceiling_slot_holds_seed
+        and not ceiling_key_read_as_seed
+        and not seed_key_read_as_ceiling
+    ):
         # The key says ceiling, the provenance says seed. The role wins only
         # for the seed's own money: a lone number is the seed, an equal number
-        # is the seed read twice, and a distinct number is still a limit.
+        # is the seed read twice, and a distinct number is still a limit. A
+        # cap already moved out of the seed slot is never read back as a seed.
         if total is None or total_key == ceiling_key:
             total, total_key = ceiling, "initial_capital"
             ceiling, ceiling_key = None, None

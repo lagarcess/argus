@@ -110,9 +110,17 @@ def _response_from_dca_contract_audit(
         if _draft_types_amount_as_seed(draft, field_provenance, budget):
             audit_reason_codes.append("dca_budget_audit_outranked_by_typed_seed")
         elif budget == draft.initial_capital and budget_source in _DCA_SEED_ROLE_SOURCES:
-            # The same money read again as the seed adds no role; the draft's
-            # own typing stands and the reader places it.
-            audit_reason_codes.append("dca_budget_audit_same_amount_already_typed")
+            if _capital_source(field_provenance, "initial_capital") in (
+                _DCA_CEILING_ROLE_SOURCES
+            ):
+                # The draft typed this money as a cap; a second reading of the
+                # same money adds no role, and the reader places the cap.
+                audit_reason_codes.append("dca_budget_audit_same_amount_already_typed")
+            else:
+                # Two reads agree on the seed; the audit supplies the
+                # provenance the primary left out.
+                field_provenance["initial_capital"] = budget_source
+                audit_reason_codes.append("dca_budget_audit_seed_corroborated")
         elif budget_source in _DCA_SEED_ROLE_SOURCES and draft.initial_capital is None:
             draft.initial_capital = budget
             field_provenance["initial_capital"] = budget_source
