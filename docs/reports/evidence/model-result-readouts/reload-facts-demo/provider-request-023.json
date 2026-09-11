@@ -1,0 +1,96 @@
+{
+  "model": "x-ai/grok-4.3",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Asset mention extraction tool for Argus interpretation. Read only the current user message and identify exact spans that name possible public-market assets: company names, ticker symbols, crypto assets, currency pairs, benchmarks, or comparison assets. Preserve each separate same-class company-name mention when the user lists a basket. Do not infer assets from ordinary grammar, months, amounts, or strategy words. Do not canonicalize yourself; return only the short raw text span and whether the user framed it as a traded asset, a benchmark/comparison, or unknown. Also classify whether the span is a company_name, ticker, crypto asset, currency_pair, or unknown. Return at most six distinct mentions. If more than six are visible, preserve traded-asset and unknown spans before benchmark spans. If the six-item limit omits any traded-asset or unknown span, set all_traded_asset_mentions_included to false; otherwise set it to true. If none are visible, return an empty list and true."
+    },
+    {
+      "role": "user",
+      "content": "Haz un backtest de SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con $1,000. Usa RSI de 14 d\u00edas: compra cuando caiga a 30 o menos y vende cuando suba a 70 o m\u00e1s. Sin comisiones ni deslizamiento."
+    }
+  ],
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "LLMAssetMentionExtraction",
+      "strict": true,
+      "schema": {
+        "$defs": {
+          "LLMAssetMentionCandidate": {
+            "properties": {
+              "raw_text": {
+                "default": "",
+                "description": "Exact short user-message span that names a possible traded asset, company, ticker, crypto asset, currency pair, benchmark, or comparison asset.",
+                "title": "Raw Text",
+                "type": "string"
+              },
+              "role": {
+                "default": "unknown",
+                "description": "Use traded_asset when the user wants to buy, hold, test, or include the asset in the strategy. Use benchmark when it is only a comparison or reference baseline.",
+                "enum": [
+                  "traded_asset",
+                  "benchmark",
+                  "unknown"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "mention_kind": {
+                "default": "unknown",
+                "description": "Classify the raw span itself. Use company_name for public company names like Target or Costco, ticker for stock symbols like TGT or AAPL, crypto for assets like Bitcoin, and currency_pair for FX pairs.",
+                "enum": [
+                  "company_name",
+                  "ticker",
+                  "crypto",
+                  "currency_pair",
+                  "unknown"
+                ],
+                "title": "Mention Kind",
+                "type": "string"
+              },
+              "confidence": {
+                "default": 0.8,
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "title": "Confidence",
+                "type": "number"
+              }
+            },
+            "title": "LLMAssetMentionCandidate",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "asset_mentions": {
+            "description": "Provider-resolution candidates identified by the LLM from the current message. Keep at most six distinct asset-like mentions.",
+            "items": {
+              "$ref": "#/$defs/LLMAssetMentionCandidate"
+            },
+            "maxItems": 6,
+            "title": "Asset Mentions",
+            "type": "array"
+          },
+          "all_traded_asset_mentions_included": {
+            "description": "True only when every traded-asset or unknown asset-like mention in the current message is present in asset_mentions. Set false when the six-item limit omits any such mention.",
+            "title": "All Traded Asset Mentions Included",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "all_traded_asset_mentions_included"
+        ],
+        "title": "LLMAssetMentionExtraction",
+        "type": "object"
+      }
+    }
+  },
+  "provider": {
+    "require_parameters": true
+  },
+  "temperature": 0,
+  "max_tokens": 2200,
+  "reasoning": {
+    "effort": "none"
+  }
+}

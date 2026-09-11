@@ -1,0 +1,34 @@
+[
+  {
+    "case": "rsi-en-reload",
+    "provider_attempt": 7,
+    "all_current_headline_lines_match_sent_request": true,
+    "chart_series_or_internal_fact_paths_in_input": false,
+    "input_characters": 961,
+    "instructions_characters": 1958
+  },
+  {
+    "case": "docn-en-reload",
+    "provider_attempt": 15,
+    "all_current_headline_lines_match_sent_request": true,
+    "chart_series_or_internal_fact_paths_in_input": false,
+    "input_characters": 970,
+    "instructions_characters": 1958
+  },
+  {
+    "case": "docn-es",
+    "provider_attempt": 22,
+    "all_current_headline_lines_match_sent_request": true,
+    "chart_series_or_internal_fact_paths_in_input": false,
+    "input_characters": 1003,
+    "instructions_characters": 1974
+  },
+  {
+    "case": "rsi-es",
+    "provider_attempt": 29,
+    "all_current_headline_lines_match_sent_request": true,
+    "chart_series_or_internal_fact_paths_in_input": false,
+    "input_characters": 986,
+    "instructions_characters": 1974
+  }
+]

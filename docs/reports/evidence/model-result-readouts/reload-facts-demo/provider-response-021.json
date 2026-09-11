@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789112671-GjA2DSOe9uvfZFuNaygb",
+  "object": "chat.completion",
+  "created": 1789112671,
+  "model": "openai/gpt-5.6-luna",
+  "provider": "OpenAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\"language\":\"es-419\",\"text\":\"Comprar DOCN una vez y mantener la posici\u00f3n termin\u00f3 muy por encima de SPY en esta experiencia hist\u00f3rica: el resultado fue 396.3%, frente a 69.0% para el referente. La ganancia registrada fue de $3,963 sobre $1,000 invertidos, pero el recorrido fue \u00e1spero: en el peor tramo, la cuenta cay\u00f3 44.9% desde un m\u00e1ximo anterior antes de recuperarse. El intercambio fue claro: m\u00e1s crecimiento en este periodo, a cambio de soportar ca\u00eddas mucho m\u00e1s fuertes.\",\"figures\":[{\"fact_key\":\"portfolio.total_return\",\"value\":396.3},{\"fact_key\":\"portfolio.benchmark_return\",\"value\":69},{\"fact_key\":\"portfolio.profit\",\"value\":3963},{\"fact_key\":\"portfolio.max_drawdown\",\"value\":44.9}]}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 25744,
+    "completion_tokens": 183,
+    "total_tokens": 25927,
+    "cost": 0.00665545,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 25741,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.00665545,
+      "upstream_inference_prompt_cost": 0.00643585,
+      "upstream_inference_completions_cost": 0.0002196
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

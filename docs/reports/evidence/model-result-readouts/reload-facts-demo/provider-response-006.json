@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789111782-3RThIgs5Q9Dyjx13x3uB",
+  "object": "chat.completion",
+  "created": 1789111782,
+  "model": "openai/gpt-5.6-luna",
+  "provider": "OpenAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\"language\":\"en\",\"text\":\"This was a buy-and-sell experience with four recorded fills, ending with $86 of profit on $1,000 invested. The account dipped to $988 during the run before recovering to finish at $1,086, so the strategy involved a modest setback along the way.\\n\\nThe tradeoff was clear: it gained 8.6% but lagged simply holding SPY, which returned 16.9% over the same window. That is an 8.3 percentage-point gap in exchange for the strategy\u2019s measured 4.8% largest investment decline.\",\"figures\":[{\"fact_key\":\"portfolio.profit\",\"value\":86},{\"fact_key\":\"portfolio.invested_capital\",\"value\":1000},{\"fact_key\":\"portfolio.lowest_equity\",\"value\":988},{\"fact_key\":\"portfolio.ending_equity\",\"value\":1086},{\"fact_key\":\"portfolio.total_return\",\"value\":8.6},{\"fact_key\":\"portfolio.benchmark_return\",\"value\":16.9},{\"fact_key\":\"portfolio.benchmark_gap\",\"value\":8.3},{\"fact_key\":\"portfolio.max_drawdown\",\"value\":4.8}]}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 13443,
+    "completion_tokens": 246,
+    "total_tokens": 13689,
+    "cost": 0.0036558,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 13440,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0036558,
+      "upstream_inference_prompt_cost": 0.0033606,
+      "upstream_inference_completions_cost": 0.0002952
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

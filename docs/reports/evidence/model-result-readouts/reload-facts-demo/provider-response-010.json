@@ -1,0 +1,55 @@
+{
+  "id": "gen-1789112402-ulDH86YccwaQmGbtDruZ",
+  "object": "chat.completion",
+  "created": 1789112402,
+  "model": "anthropic/claude-haiku-4.5",
+  "provider": "Amazon Bedrock",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "end_turn",
+      "message": {
+        "role": "assistant",
+        "content": "```json\n{\n  \"intent\": \"strategy_drafting\",\n  \"task_relation\": \"new_task\",\n  \"requires_clarification\": false,\n  \"user_goal_summary\": \"Run a buy-and-hold backtest of DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital, compared to SPY, with zero fees and slippage.\",\n  \"detected_user_language\": \"en\",\n  \"candidate_strategy_draft\": {\n    \"raw_user_phrasing\": \"Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital. Compare with SPY, with no fees or slippage.\",\n    \"language\": \"en\",\n    \"requested_strategy_template\": \"buy_and_hold\",\n    \"strategy_type\": \"buy_and_hold\",\n    \"strategy_thesis\": \"Hold DOCN for the full period and compare against SPY benchmark.\",\n    \"asset_universe\": [\n      \"DOCN\"\n    ],\n    \"asset_class\": \"equity\",\n    \"date_range\": {\n      \"start\": \"2023-09-01\",\n      \"end\": \"2026-09-09\"\n    },\n    \"date_range_raw_text\": \"September 1, 2023 through September 9, 2026\",\n    \"capital_amount\": 1000,\n    \"comparison_baseline\": \"SPY\",\n    \"field_provenance\": {\n      \"strategy_type\": \"explicit_user\",\n      \"asset_universe\": \"explicit_user\",\n      \"date_range\": \"explicit_user\",\n      \"capital_amount\": \"explicit_user\",\n      \"comparison_baseline\": \"explicit_user\"\n    },\n    \"evidence_spans\": {\n      \"strategy_type\": \"Buy and hold\",\n      \"asset_universe\": \"DOCN\",\n      \"date_range\": \"from September 1, 2023 through September 9, 2026\",\n      \"capital_amount\": \"$1,000 starting capital\",\n      \"comparison_baseline\": \"Compare with SPY\"\n    },\n    \"extra_parameters\": {\n      \"fee_rate\": 0,\n      \"slippage\": 0\n    }\n  },\n  \"research_query\": null,\n  \"missing_required_fields\": [],\n  \"assistant_response\": \"I'm ready to backtest DOCN as a buy-and-hold from September 1, 2023 through September 9, 2026 with $1,000 starting capital, compared to SPY, with zero fees and slippage. All the details are set. Approve to run the test.\",\n  \"uses_latest_result_context\": false,\n  \"confidence\": 0.95,\n  \"reason_codes\": [\n    \"complete_strategy_specification\"\n  ],\n  \"ambiguous_fields\": [],\n  \"unsupported_constraints\": [],\n  \"semantic_turn_act\": \"new_idea\",\n  \"artifact_target\": \"active_confirmation\"\n}\n```",
+        "refusal": null,
+        "reasoning": "The user is asking for a buy and hold backtest with:\n- Asset: DOCN (resolved as traded asset)\n- Date range: September 1, 2023 through September 9, 2026\n- Starting capital: $1,000\n- Benchmark/comparison: SPY\n- Fees/slippage: zero (explicitly stated)\n\nThis is a clear buy_and_hold strategy request, so:\n- intent: \"strategy_drafting\" (they want to set up a test)\n- task_relation: \"new_task\" \n- requires_clarification: false (all required fields are provided)\n- strategy_type: \"buy_and_hold\"\n- asset_universe: [\"DOCN\"]\n- comparison_baseline: \"SPY\"\n- capital_amount: 1000\n- date_range: explicit ISO dates {\"start\":\"2023-09-01\",\"end\":\"2026-09-09\"}\n- field_provenance: mark each as explicit_user where they came from the user message\n- evidence_spans: provide short bounded phrases\n\nThe user explicitly states \"no fees or slippage\", so I should note that in extra_parameters and evidence_spans.\n\nsemantic_turn_act: \"new_idea\" - they're proposing a new investment idea/backtest\n\nuses_latest_result_context: false - this is a fresh request\n\nLet me fill in the full response JSON.",
+        "reasoning_details": [
+          {
+            "type": "reasoning.text",
+            "text": "The user is asking for a buy and hold backtest with:\n- Asset: DOCN (resolved as traded asset)\n- Date range: September 1, 2023 through September 9, 2026\n- Starting capital: $1,000\n- Benchmark/comparison: SPY\n- Fees/slippage: zero (explicitly stated)\n\nThis is a clear buy_and_hold strategy request, so:\n- intent: \"strategy_drafting\" (they want to set up a test)\n- task_relation: \"new_task\" \n- requires_clarification: false (all required fields are provided)\n- strategy_type: \"buy_and_hold\"\n- asset_universe: [\"DOCN\"]\n- comparison_baseline: \"SPY\"\n- capital_amount: 1000\n- date_range: explicit ISO dates {\"start\":\"2023-09-01\",\"end\":\"2026-09-09\"}\n- field_provenance: mark each as explicit_user where they came from the user message\n- evidence_spans: provide short bounded phrases\n\nThe user explicitly states \"no fees or slippage\", so I should note that in extra_parameters and evidence_spans.\n\nsemantic_turn_act: \"new_idea\" - they're proposing a new investment idea/backtest\n\nuses_latest_result_context: false - this is a fresh request\n\nLet me fill in the full response JSON.",
+            "format": "anthropic-claude-v1",
+            "index": 0,
+            "signature": "Eq4KCpwBCBEQARgCKkAcVRW3qP4N6uui+4YPHAlhz/gOpZCq46uKVP/2cNclMmTf21z8ihU3jAPnqF+EisWcYMBFGgYA/A+s8Xh52GF5MhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOABCCHRoaW5raW5nWgw1MzY2OTcyNDk3MjhyEJBz9hvUXq/aJhZs8jjzTnCIAQGoAdbgjtUGsAECEgwC30kOxu1mUDVQ3d4aDA12JhorRtn8GZpMKyIwNOdcXkalKtD+Ph7QYUq6WS20C4a8B/y5d47M7qp5S9nzmcRmV5T23aoOWA0Q+z1nKr4Iid9bvc1YODhxrLVafqToSphTnkh0rwTUfDTr2PoPAnPggDrVdpJuVCr4NKtKoPgJkogwT65QQLJESCO7hGhYSXrXlX2mkvnt0W2P4xhVSXcutZv1ce1nVKZcsi4oC2Nj8VQYK4azDDGHqmBS4xBWIm4oo6ZMUfbIBaTCmFIF/Cpg+DHIk5qdkUEKrk0gojHr9ZU4hfDzVS+LJvO09jdwBm27ieZr55h93EWp33FRqZIx8jk2iMUakS1NNpoNT+c0D4acN3z3egeoYztIuPAPDavDUVQ2skCHzi2jNWdhSceQgiSSiMC1hP0hzCWxd4wtW/qFzLwXUxl1iGru1tvlvz+mBzbhO35G4gEW39q9nb/Rhdp0KpeInjJjAA46f4gjSoelqPrGHKJoBQ7Q2UlHrDkjWqJ55qMhvL8NTCg5hWgU7G5SYDx+4RJkEoOXCR+E7JDCPjNtCi65Yp+IGlH0Zzod3kM98zMAo7msWvBRN3Ais8PlNwq1aFuXYlZbY1OI3dDpM0/zRjoXQfzXGcsFk5kG8MaFxeEFP6HemHPhu1RTALnPhNNOOjH0BxK7eqR6coFsZP840/faWcZT5WYL5D9EHbVgmxJ0u97rwU9+HHfuva1TjbvOqsW4WGUR5gT5NI4vacIVCPS7i1jxIUyTNPP2p8dYVEcn+wM27zvxu8VOGN2hLHZTCgWyHFoIDy7EM+iCoxLqJ8X+yh7QrcEDZnWjf2Y0wcnVnFisTU7GnqZH2uExUh/YQ8q1TddwKxQnaC4QoARhMQG/g6I4uVTtw9EKoTr578rG62JH8vJz5Eu3YDgHUR6lJZCRtKHBNWkVBfJoZA5sGJ+no5/hfLw9QQuUh5m0XyvWZUMcJUGXeNzjprYH6VsyWC1vCG1KpS8nXtxPR4MF0XnhNSqHgaIb0cxpp8R0KOASHICIWw+paUqnzoBGGZeXCzkwPtye9MGoOA5Fua9iZOC6qt41TYe+nv2XQom2IM9gT6M7PCQ7kvUaogCfTLGdwsL65WFuLWaJIZMOtuGTAqYsll92/BGTXu9sPzdvbmdBrogG3GENn75Ix3vrOsTcbUNWAh6PMbNvNdn6wwuz2VV7SzIQRXmC5QNvwFhIgqzELPY8/exnsZ2mYe1ql9bX3LCYHnR6DYHW5RkNWU4m7mRvL2btLRd4d9EDiC07+CB4RhYJ6gtVmKX2jTlHK3NW9X7v1N1Zxjr6gjv9wS7wGPP4hYJ6Ihs20NvNaflC3V3T6ZO9IbajxvOwyEOJtYytSB3P6chjVhQM6Y1XLC96lmDD/0KkqzeiWdn9/yRg3ZLUiJJorIXG9ZKRz3f9midpY/8m3tgLfl1PnFqUv68mCdEmGvLSkTtDKrXrGVaUfQSvvVOnaOpkbXk7+DRc7mAiQSBvL82R5qiYrzkmrk8eEUskA17keTOeavKutxR4G8UCzKbXCZ8bGAE="
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 13254,
+    "completion_tokens": 1068,
+    "total_tokens": 14322,
+    "cost": 0.0202465,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 6610,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0202465,
+      "upstream_inference_prompt_cost": 0.0149065,
+      "upstream_inference_completions_cost": 0.00534
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 323,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

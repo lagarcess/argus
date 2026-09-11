@@ -1,0 +1,185 @@
+{
+  "model": "x-ai/grok-4.3",
+  "messages": [
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "You are Argus's run-field fidelity audit. Compare the current user message with the structured draft and return only run fields the user explicitly stated but the draft may have dropped or reshaped. Do not infer defaults, symbols, or rules. If a field is absent from the current user message, return null for that field. Normalize starting capital exactly from the current message: 10k -> 10000, 100K -> 100000, $10,000 -> 10000, 100k -> 100000, and a plain number such as 100000 -> 100000 when the message uses it as the amount to test, invest, allocate, put on, or use as capital. This is language-agnostic: preserve bare numeric amounts and numeric magnitude shorthand that appear in the user's investing idea. A standalone numeric magnitude at the end of an otherwise complete strategy, asset, and date-window request is a starting-capital candidate when it is not serving as a date, lookback window, percentage, indicator parameter, share count, or asset identifier. Do not require currency symbols. Do not treat dates, calendar years, indicator windows, lookback windows, percentages, share counts, or asset names as capital. For DCA or recurring buys, return the per-purchase recurring contribution as recurring_contribution_amount, not capital_amount; return cadence only when the current message states one. If a money amount is total budget, starting principal, or cap, leave recurring_contribution_amount null. Normalize one-hour/hourly bars to 1h, four-hour bars to 4h, and daily bars to 1D. Preserve today/current as today or the runtime date 2026-09-11 only when the user stated today/current. If the user stated only a start or only an end date, return only that endpoint; do not infer the missing endpoint or rewrite the unstated endpoint. For pending date answers such as 'end of 2023' or 'through December 2024', return only the end endpoint. Date phrases such as 'at the start of 2024', 'from the beginning of 2024', or 'since 2024' state only a start endpoint unless the message also states an end. Return explicit comparison assets as comparison_baseline, not asset_universe. Treat benchmark/reference/baseline/comparison relationships semantically in any language; if a user names an asset as a reference, benchmark, against/versus target, or comparison target, that asset belongs in comparison_baseline. If the draft has a default benchmark but the current message states a different comparison asset, return the user-stated comparison asset, even a company name with no known symbol \u2014 'compare AAPL with Samsung' or 'comparar AAPL con Samsung' states comparison_baseline='Samsung' \u2014 return it verbatim, never dropped; validation owns support decisions. For a fee or slippage stated in the current message, return the matching typed fee or slippage object with its canonical decimal rate and an exact bounded evidence_span copied from that message. One basis point is 0.0001, so 10 bps is 0.001 and 5 bps is 0.0005. Preserve 0.0 for an explicit clear. Leave the object null when that cost is absent, and never copy a draft-only default or cost. Return only JSON matching the schema.",
+          "cache_control": {
+            "type": "ephemeral"
+          }
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "content": "Structured draft JSON: {'raw_user_phrasing': 'Haz un backtest de SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con $1,000. Usa RSI de 14 d\u00edas: compra cuando caiga a 30 o menos y vende cuando suba a 70 o m\u00e1s. Sin comisiones ni deslizamiento.', 'language': 'es', 'requested_strategy_template': 'rsi_mean_reversion', 'strategy_type': 'indicator_threshold', 'strategy_thesis': 'Backtest SPY from 2025-09-10 to 2026-09-09 with $1,000 using RSI(14) threshold strategy: buy when RSI <= 30, sell when RSI >= 70, no fees or slippage.', 'asset_universe': ['SPY'], 'asset_inclusions': [], 'asset_exclusions': [], 'asset_universe_operation': None, 'asset_class': 'equity', 'timeframe': '1D', 'cadence': None, 'entry_logic': 'compra cuando caiga a 30 o menos', 'exit_logic': 'vende cuando suba a 70 o m\u00e1s', 'entry_rule': None, 'exit_rule': None, 'rule_spec': None, 'indicator': 'rsi', 'indicator_period': 14, 'entry_threshold': 30.0, 'exit_threshold': 70.0, 'date_range': {'start': '2025-09-10', 'end': '2026-09-09'}, 'date_range_raw_text': 'del 10 de septiembre de 2025 al 9 de septiembre de 2026', 'date_range_intent': {'kind': 'explicit_range', 'start': '2025-09-10', 'end': '2026-09-09', 'day_offset': None, 'count': None, 'unit': None, 'anchor': None, 'year': None, 'endpoint': None, 'confidence': 1.0, 'evidence': 'del 10 de septiembre de 2025 al 9 de septiembre de 2026'}, 'sizing_mode': None, 'capital_amount': 1000.0, 'recurring_contribution': None, 'initial_capital': None, 'total_capital': None, 'position_size': None, 'risk_rules': [], 'assumptions': [], 'comparison_baseline': None, 'refinement_of': None, 'field_provenance': {'strategy_type': 'explicit_user', 'asset_universe': 'explicit_user', 'date_range': 'explicit_user', 'capital_amount': 'starting_capital', 'indicator': 'explicit_user', 'indicator_period': 'explicit_user', 'entry_threshold': 'explicit_user', 'exit_threshold': 'explicit_user', 'fee_rate': 'explicit_user', 'slippage': 'explicit_user'}, 'evidence_spans': {'strategy_type': 'Usa RSI de 14 d\u00edas', 'asset_universe': 'SPY', 'date_range': 'del 10 de septiembre de 2025 al 9 de septiembre de 2026', 'capital_amount': '$1,000', 'fee_rate': 'Sin comisiones ni deslizamiento', 'slippage': 'Sin comisiones ni deslizamiento', 'date_range_raw_text': 'del 10 de septiembre de 2025 al 9 de septiembre de 2026', 'indicator': 'RSI de 14 d\u00edas', 'entry_threshold': 'caiga a 30 o menos', 'exit_threshold': 'suba a 70 o m\u00e1s'}, 'extra_parameters': {'fee_rate': 0, 'slippage': 0, 'provider_resolved_assets': [{'raw_text': 'SPY', 'symbol': 'SPY', 'asset_class': 'equity', 'name': 'State Street SPDR S&P 500 ETF Trust', 'raw_symbol': 'SPY', 'provider': 'alpaca', 'exchange': 'AssetExchange.ARCA'}]}}"
+    },
+    {
+      "role": "user",
+      "content": "Haz un backtest de SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con $1,000. Usa RSI de 14 d\u00edas: compra cuando caiga a 30 o menos y vende cuando suba a 70 o m\u00e1s. Sin comisiones ni deslizamiento."
+    }
+  ],
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "StatedRunFieldFidelityAudit",
+      "strict": true,
+      "schema": {
+        "$defs": {
+          "StatedExecutionCost": {
+            "properties": {
+              "rate": {
+                "description": "Canonical decimal rate explicitly stated by the current user message. For example, 10 basis points is 0.001. Preserve 0.0 when the user explicitly clears the cost.",
+                "title": "Rate",
+                "type": "number"
+              },
+              "evidence_span": {
+                "description": "Exact bounded phrase copied from the current user message that states this execution cost.",
+                "maxLength": 240,
+                "minLength": 1,
+                "title": "Evidence Span",
+                "type": "string"
+              }
+            },
+            "required": [
+              "rate",
+              "evidence_span"
+            ],
+            "title": "StatedExecutionCost",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "capital_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Starting capital explicitly stated by the current user message, normalized as a number. Examples: 10k -> 10000, $500 -> 500, 100k -> 100000, 100000 -> 100000 when the message uses that plain number or shorthand as the amount to test or invest. Leave null when the user did not state starting capital. Do not treat dates, indicator windows, percentages, or asset names as capital. For DCA or recurring buys, do not put the per-purchase contribution here; use recurring_contribution_amount.",
+            "title": "Capital Amount"
+          },
+          "recurring_contribution_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For DCA or recurring-buy requests only: the amount explicitly stated as each recurring purchase contribution, normalized as a number. Leave null when the current user message gives only a total budget, starting principal, cap, or no per-purchase contribution.",
+            "title": "Recurring Contribution Amount"
+          },
+          "cadence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For DCA or recurring-buy requests only: user-stated cadence normalized to daily, weekly, biweekly, monthly, or quarterly. Leave null when the current user message did not state cadence.",
+            "title": "Cadence"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User-stated bar interval, normalized to 1h, 4h, or 1D when present. Leave null when the user did not state a timeframe.",
+            "title": "Timeframe"
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User-stated date range. Preserve today/current as today or the runtime date only when the user stated it. If the user stated only one endpoint, return only that endpoint. Leave null when the user did not state a date range.",
+            "title": "Date Range"
+          },
+          "comparison_baseline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Benchmark or comparison asset explicitly stated by the current user message. This is language-agnostic: if the current message states an asset as a benchmark, reference, baseline, against/versus target, or comparison target, return that asset here. Leave null when the user did not state one.",
+            "title": "Comparison Baseline"
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/StatedExecutionCost"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Per-trade fee explicitly stated by the current user message, with its canonical decimal rate and exact bounded evidence span. Leave null when the user did not state a fee. Preserve an explicit 0.0 clear."
+          },
+          "slippage": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/StatedExecutionCost"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Execution slippage explicitly stated by the current user message, with its canonical decimal rate and exact bounded evidence span. Leave null when the user did not state slippage. Preserve an explicit 0.0 clear."
+          },
+          "confidence": {
+            "default": 0.8,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          }
+        },
+        "title": "StatedRunFieldFidelityAudit",
+        "type": "object"
+      }
+    }
+  },
+  "provider": {
+    "require_parameters": true
+  },
+  "temperature": 0,
+  "max_tokens": 900,
+  "reasoning": {
+    "effort": "none"
+  }
+}

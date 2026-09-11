@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789112873-M8nMALwI4MKvoYSOV7kj",
+  "object": "chat.completion",
+  "created": 1789112873,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\"capital_amount\":1000,\"recurring_contribution_amount\":null,\"cadence\":null,\"timeframe\":\"1D\",\"date_range\":{\"start\":\"2025-09-10\",\"end\":\"2026-09-09\"},\"comparison_baseline\":null,\"fee\":{\"rate\":0,\"evidence_span\":\"Sin comisiones ni deslizamiento\"},\"slippage\":{\"rate\":0,\"evidence_span\":\"Sin comisiones ni deslizamiento\"},\"confidence\":0.8}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2584,
+    "completion_tokens": 93,
+    "total_tokens": 2677,
+    "cost": 0.0033281,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0033281,
+      "upstream_inference_prompt_cost": 0.0030956,
+      "upstream_inference_completions_cost": 0.0002325
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

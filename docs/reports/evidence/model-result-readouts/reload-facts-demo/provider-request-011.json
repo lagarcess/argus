@@ -1,0 +1,284 @@
+{
+  "model": "x-ai/grok-4.3",
+  "messages": [
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "You extract only the temporal constraint for an Argus backtest. The current user message may be in any language, shorthand, or messy prose. Return canonical machine fields, not user-facing copy. Do not decide strategy, asset, capital, support status, or whether to run. Do not infer a default window when the current message does not state one. Do not copy endpoint dates from the structured draft unless they are directly supported by the current user message. If the structured draft has a partial date_range whose start or end contains natural-language prose instead of an ISO date or today/current_date sentinel, treat that value only as non-executable evidence and re-extract the temporal intent from the current user message.\n\nFor relative or semantic windows, do not calculate endpoint dates. A relative lookback anchored to the present is already a complete temporal constraint, even when the user does not provide calendar endpoint dates. If the current message states a lookback duration with a count and time unit in any language, set has_date_window=true and return date_range_intent kind=rolling_window with anchor=today. Do not ask for start/end dates just because the current message uses natural language. If the stated period points forward from today ('in ten years', 'over the next 3 years', 'by 2031', any language), set has_date_window=true and return kind=future_window with count/unit or year and the exact phrase as evidence; a forward-looking period is never a rolling_window or a calendar range. For a historical relative lookback, return date_range_intent with kind=rolling_window, count, unit, anchor=today, confidence, and evidence. For year-to-date, return kind=year_to_date. For a calendar year, return kind=calendar_year and year. For since-style windows, return kind=since and start. When the current message reuses the previous or latest test's window ('same time period', 'mismo periodo', 'the same period as the test we just ran', any language), set has_date_window=true and return kind=same_as_latest_result with the reference phrase as evidence and no start/end; the runtime binds the dates from the canonical result. For explicit calendar start/end endpoints, return date_range with ISO dates or the canonical sentinel today/current_date. Never put prose or shorthand relative windows inside date_range start/end. If no temporal window is present, has_date_window=false.",
+          "cache_control": {
+            "type": "ephemeral"
+          }
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "content": "Structured draft JSON that may contain drifted dates: {'raw_user_phrasing': 'Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital. Compare with SPY, with no fees or slippage.', 'language': 'en', 'requested_strategy_template': 'buy_and_hold', 'strategy_type': 'buy_and_hold', 'strategy_thesis': 'Hold DOCN for the full period and compare against SPY benchmark.', 'asset_universe': ['DOCN'], 'asset_inclusions': [], 'asset_exclusions': [], 'asset_universe_operation': None, 'asset_class': 'equity', 'timeframe': None, 'cadence': None, 'entry_logic': None, 'exit_logic': None, 'entry_rule': None, 'exit_rule': None, 'rule_spec': None, 'indicator': None, 'indicator_period': None, 'entry_threshold': None, 'exit_threshold': None, 'date_range': {'start': '2023-09-01', 'end': '2026-09-09'}, 'date_range_raw_text': 'September 1, 2023 through September 9, 2026', 'date_range_intent': None, 'sizing_mode': None, 'capital_amount': 1000.0, 'recurring_contribution': None, 'initial_capital': None, 'total_capital': None, 'position_size': None, 'risk_rules': [], 'assumptions': [], 'comparison_baseline': 'SPY', 'refinement_of': None, 'field_provenance': {'strategy_type': 'explicit_user', 'asset_universe': 'explicit_user', 'date_range': 'explicit_user', 'capital_amount': 'explicit_user', 'comparison_baseline': 'explicit_user'}, 'evidence_spans': {'strategy_type': 'Buy and hold', 'asset_universe': 'DOCN', 'date_range': 'from September 1, 2023 through September 9, 2026', 'capital_amount': '$1,000 starting capital', 'comparison_baseline': 'Compare with SPY'}, 'extra_parameters': {'fee_rate': 0, 'slippage': 0, 'provider_resolved_assets': [{'raw_text': 'DOCN', 'symbol': 'DOCN', 'asset_class': 'equity', 'name': 'DigitalOcean Holdings, Inc.', 'raw_symbol': 'DOCN', 'provider': 'alpaca', 'exchange': 'AssetExchange.NYSE'}]}}"
+    },
+    {
+      "role": "user",
+      "content": "Buy and hold DOCN from September 1, 2023 through September 9, 2026 with $1,000 starting capital. Compare with SPY, with no fees or slippage."
+    }
+  ],
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "FocusedDateWindowExtraction",
+      "strict": true,
+      "schema": {
+        "$defs": {
+          "LLMDateRangeIntent": {
+            "properties": {
+              "kind": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "explicit_range",
+                      "rolling_window",
+                      "year_to_date",
+                      "calendar_year",
+                      "since",
+                      "endpoint_patch",
+                      "same_as_latest_result",
+                      "future_window"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Canonical, language-neutral temporal intent. Use this for relative or semantic windows such as last 12 months or year to date instead of asking deterministic code to parse localized prose. Use same_as_latest_result when the user references the latest completed test's window; the runtime binds the dates from the canonical run. Use future_window whenever the user's period points forward from today \u2014 in ten years, over the next 3 years, by 2031, dentro de diez a\u00f1os \u2014 with count/unit or year filled and the exact phrase as evidence. A future_window is never a historical test window: do not emit rolling_window or calendar dates for a forward-looking period.",
+                "title": "Kind"
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+                "title": "Start"
+              },
+              "end": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+                "title": "End"
+              },
+              "day_offset": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Optional day offset from anchor for endpoint patches, e.g. -1 for the previous day. This is canonical machine data, not localized text.",
+                "title": "Day Offset"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Quantity of unit for rolling windows; may be fractional. The last 8.5 months is count=8.5 unit=month, and hace 2,5 meses is count=2.5 unit=month. Never round or truncate a stated fractional duration; deterministic date math computes from it.",
+                "title": "Count"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "quarter",
+                      "year"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              },
+              "anchor": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "today",
+                      "current_date"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "today",
+                "title": "Anchor"
+              },
+              "year": {
+                "anyOf": [
+                  {
+                    "maximum": 2100,
+                    "minimum": 1900,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Year"
+              },
+              "endpoint": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "start",
+                      "end"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Endpoint"
+              },
+              "confidence": {
+                "default": 0.8,
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "title": "Confidence",
+                "type": "number"
+              },
+              "evidence": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Short user-message span supporting this intent.",
+                "title": "Evidence"
+              }
+            },
+            "title": "LLMDateRangeIntent",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "has_date_window": {
+            "description": "True when the current user message states a backtest date window, lookback window, start/end date, or other temporal constraint.",
+            "title": "Has Date Window",
+            "type": "boolean"
+          },
+          "date_range_raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Shortest exact user-message span that expresses the temporal window. Keep the user's language; this is provenance, not executable input.",
+            "title": "Date Range Raw Text"
+          },
+          "date_range_intent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LLMDateRangeIntent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Canonical language-neutral temporal intent. Required for relative or semantic windows. A present-anchored lookback duration is complete without explicit calendar endpoints. Do not calculate endpoint dates for relative windows."
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Use only when the user explicitly states calendar endpoints. Values must be ISO dates or the canonical sentinel today/current_date. Never put relative, shorthand, or prose windows in start/end; use date_range_intent for those.",
+            "title": "Date Range"
+          },
+          "confidence": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Short user-message span supporting the temporal extraction.",
+            "title": "Evidence"
+          }
+        },
+        "required": [
+          "has_date_window"
+        ],
+        "title": "FocusedDateWindowExtraction",
+        "type": "object"
+      }
+    }
+  },
+  "provider": {
+    "require_parameters": true
+  },
+  "temperature": 0,
+  "max_tokens": 2200,
+  "reasoning": {
+    "effort": "none"
+  }
+}

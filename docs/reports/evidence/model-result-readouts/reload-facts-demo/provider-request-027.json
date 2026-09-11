@@ -1,0 +1,41 @@
+{
+  "model": "google/gemini-2.5-flash-lite",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Generate a concise user-facing name for Argus Alpha. Max 6 words. No punctuation-only output. Entity type: conversation. Language: es-419."
+    },
+    {
+      "role": "user",
+      "content": "Name this Argus conversation from the meaningful chat context.\nuser: Haz un backtest de SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con $1,000. Usa RSI de 14 d\u00edas: compra cuando caiga a 30 o menos y vende cuando suba a 70 o m\u00e1s. Sin comisiones ni deslizamiento.\nassistant: Ready to test SPY with an RSI threshold over 10 de septiembre de 2025 al 9 de septiembre de 2026.\nlatest_user: Haz un backtest de SPY del 10 de septiembre de 2025 al 9 de septiembre de 2026 con $1,000. Usa RSI de 14 d\u00edas: compra cuando caiga a 30 o menos y vende cuando suba a 70 o m\u00e1s. Sin comisiones ni deslizamiento.\nlatest_assistant: Ready to test SPY with an RSI threshold over 10 de septiembre de 2025 al 9 de septiembre de 2026.\nAvoid generic titles like New idea."
+    }
+  ],
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "name_suggestion",
+      "strict": true,
+      "schema": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "NameSuggestion",
+        "type": "object"
+      }
+    }
+  },
+  "provider": {
+    "require_parameters": true
+  },
+  "temperature": 0,
+  "max_tokens": 400,
+  "reasoning": {
+    "effort": "none"
+  }
+}

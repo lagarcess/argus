@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789112431-O7WIYmCS6jO9jelpg9hW",
+  "object": "chat.completion",
+  "created": 1789112431,
+  "model": "openai/gpt-5.6-luna",
+  "provider": "OpenAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\"language\":\"en\",\"text\":\"Buying DOCN once and holding it through this historical run turned $1,000 invested into $4,963, beating SPY\u2019s comparable result of 69.0% with a 396.3% return. The tradeoff was a rough ride: the account later fell $784 from its drawdown peak before recovering, so the strong outcome came with substantial declines along the way.\",\"figures\":[{\"fact_key\":\"portfolio.total_return\",\"value\":396.3},{\"fact_key\":\"portfolio.benchmark_return\",\"value\":69},{\"fact_key\":\"portfolio.ending_equity\",\"value\":4963},{\"fact_key\":\"portfolio.drawdown.dollar_loss\",\"value\":784}]}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 25189,
+    "completion_tokens": 152,
+    "total_tokens": 25341,
+    "cost": 0.0064795,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 25186,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0064795,
+      "upstream_inference_prompt_cost": 0.0062971,
+      "upstream_inference_completions_cost": 0.0001824
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}
