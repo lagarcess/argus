@@ -72,6 +72,10 @@ def rewrite_visible_reply(
 
 
 def _without_em_dashes(text: str, *, trailing: str, left_tail: str = "") -> str:
+    # Adjacent dashes are one dash: the empty text between them is not the
+    # end of anything, so the stream and the final reply read it the same.
+    while EM_DASH * 2 in text:
+        text = text.replace(EM_DASH * 2, EM_DASH)
     pieces = text.split(EM_DASH)
     result = pieces[0]
     for piece in pieces[1:]:
