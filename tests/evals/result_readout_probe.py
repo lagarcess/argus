@@ -6,10 +6,8 @@ import asyncio
 import copy
 import json
 import math
-import os
 import platform
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -18,18 +16,14 @@ from unittest.mock import patch
 try:
     from .result_readout_eval import (
         MAX_INPUT_BYTES,
-        TASK_OUTPUT_LIMITS,
         CostGuard,
-        attempt_limit,
         encoded,
         sha256,
     )
 except ImportError:  # Direct script entry in the other checkout's subprocess.
     from result_readout_eval import (
         MAX_INPUT_BYTES,
-        TASK_OUTPUT_LIMITS,
         CostGuard,
-        attempt_limit,
         encoded,
         sha256,
     )
@@ -38,44 +32,50 @@ PRIOR_QUICK_TAKE_ALLOWANCE_BYTES = 8192  # Free sizing stress, not a prose limit
 
 
 def install_http_guards(
-    stack: Any,
-    *,
-    guard: CostGuard,
-    observations: dict[str, Any],
-    live: bool,
+    stack: Any, *, guard: CostGuard, observations: dict[str, Any], live: bool
 ) -> None:
-    """Intercept every real HTTP attempt, including provider fallback/retries."""
+    """One HTTP boundary for OpenRouter and the Perplexity Agent client."""
     import httpx
 
-    original_async = httpx.AsyncClient.post
-    original_sync = httpx.Client.post
+    original_async = httpx.AsyncClient.request
+    original_sync = httpx.Client.request
 
-    def before(url: Any, kwargs: dict[str, Any]) -> tuple[dict[str, Any], float]:
+    def before(
+        method: str, url: Any, kwargs: dict[str, Any]
+    ) -> tuple[dict[str, Any], float]:
         payload = kwargs.get("json", {})
-        schema = payload.get("response_format", {}).get("json_schema", {}).get("name")
-        task = {
-            "QuickTakeDraft": "result_summary",
-            "ResultBreakdownDraft": "result_breakdown",
-        }.get(schema)
-        # This round deliberately measures the first response only. A blocked
-        # retry is an expected policy outcome, not a reason to skip other tasks.
-        if guard.max_attempts == 1 and guard.by_task.get(task, 0) >= 1:
-            observations.setdefault("blocked_dispatches", []).append(
-                {
-                    "task": task,
-                    "model": payload.get("model"),
-                    "reason": "single_attempt_policy",
-                }
+        endpoints = {
+            "https://openrouter.ai/api/v1/chat/completions": (
+                "result_summary",
+                "openrouter",
+                "QuickTakeDraft",
+            ),
+            "https://api.perplexity.ai/v1/agent": (
+                "result_breakdown",
+                "perplexity_agent",
+                "ResultBreakdownDraft",
+            ),
+        }
+        destination = endpoints.get(str(url))
+        task, provider, schema = destination or (None, None, None)
+        if (
+            not observations["guard_failures"]
+            and task
+            and guard.by_task.get(task, 0) >= 1
+        ):
+            observations["blocked_dispatches"].append(
+                {"task": task, "provider": provider, "reason": "single_attempt_policy"}
             )
             raise ValueError("single_attempt_policy")
         try:
             if observations["guard_failures"]:
                 raise ValueError("prior_guard_failure")
-            if observations.get("http_closed"):
-                raise ValueError("probe_finalized")
-            if not live or str(url) != "https://openrouter.ai/api/v1/chat/completions":
+            if not live or method.upper() != "POST" or destination is None:
                 raise ValueError("network_not_authorized")
-            if task is None:
+            if (
+                payload.get("response_format", {}).get("json_schema", {}).get("name")
+                != schema
+            ):
                 raise ValueError("unexpected_provider_task")
             reservation = guard.reserve(payload, task=task)
         except ValueError as exc:
@@ -84,36 +84,56 @@ def install_http_guards(
         receipt = {
             "attempt_id": guard.attempts,
             "task": task,
-            "model": payload["model"],
+            "provider": provider,
+            "model": guard.tasks[task]["model"],
             "reserved_usd": reservation,
             "outcome": "pending",
             "http_status": None,
             "payload_sha256": sha256(encoded(payload)),
             "payload_bytes": len(encoded(payload)),
-            "max_output_tokens": payload["max_tokens"],
+            "max_output_tokens": guard.tasks[task]["max_output_tokens"],
         }
         observations["requests"].append(receipt)
         return receipt, time.monotonic()
 
     def after(response: Any, receipt: dict[str, Any], started: float) -> Any:
         try:
-            data = response.json()
+            document = response.json()
         except ValueError:
-            data = {}
-        if not isinstance(data, dict):
-            data = {}
-        drafts = [
-            choice.get("message", {}).get("content") for choice in data.get("choices", [])
-        ]
-        usage = data.get("usage", {})
-        if not isinstance(usage, dict):
-            usage = {}
+            document = None
+        data = document if isinstance(document, dict) else {}
+        raw_usage = data.get("usage")
+        usage = raw_usage if isinstance(raw_usage, dict) else {}
+
+        def items(value: Any) -> list[Any]:
+            return value if isinstance(value, list) else []
+
+        if receipt["provider"] == "openrouter":
+            drafts = [
+                choice["message"].get("content")
+                for choice in items(data.get("choices"))
+                if isinstance(choice, dict) and isinstance(choice.get("message"), dict)
+            ]
+            reported_cost = usage.get("cost")
+        else:
+            drafts = [
+                chunk.get("text")
+                for item in items(data.get("output"))
+                if isinstance(item, dict) and item.get("type") == "message"
+                for chunk in items(item.get("content"))
+                if isinstance(chunk, dict) and chunk.get("type") == "output_text"
+            ]
+            cost = usage.get("cost")
+            reported_cost = (
+                cost.get("total_cost")
+                if isinstance(cost, dict) and cost.get("currency") == "USD"
+                else None
+            )
+        latency = round((time.monotonic() - started) * 1000)
         receipt.update(
-            {
-                "http_status": response.status_code,
-                "outcome": "succeeded" if response.is_success else "failed",
-                "latency_ms": round((time.monotonic() - started) * 1000),
-            }
+            http_status=response.status_code,
+            outcome="succeeded" if response.is_success else "failed",
+            latency_ms=latency,
         )
         if not response.is_success:
             receipt["error"] = {
@@ -124,64 +144,48 @@ def install_http_guards(
             {
                 "attempt_id": receipt["attempt_id"],
                 "task": receipt["task"],
+                "provider": receipt["provider"],
                 "http_status": response.status_code,
                 "model": data.get("model"),
+                "provider_response_id": data.get("id"),
                 "raw_drafts": drafts,
-                "usage": {
-                    key: usage[key]
-                    for key in (
-                        "prompt_tokens",
-                        "completion_tokens",
-                        "total_tokens",
-                        "cost",
-                    )
-                    if key in usage
-                },
-                "latency_ms": round((time.monotonic() - started) * 1000),
+                "raw_response": document,
+                "raw_response_text": response.text,
+                "raw_usage": raw_usage,
+                "usage": {"cost": reported_cost},
+                "latency_ms": latency,
             }
         )
-        # Stop subsequent retries immediately if returned billing evidence
-        # contradicts the amount reserved before this request.
         cost_accounting(guard=guard, observations=observations)
         return response
 
     def failed(exc: BaseException, receipt: dict[str, Any], started: float) -> None:
-        canceled = isinstance(exc, asyncio.CancelledError)
         receipt.update(
-            {
-                "outcome": "canceled" if canceled else "failed",
-                "latency_ms": round((time.monotonic() - started) * 1000),
-                "error": safe_provider_error(exc),
-            }
+            outcome="canceled" if isinstance(exc, asyncio.CancelledError) else "failed",
+            latency_ms=round((time.monotonic() - started) * 1000),
+            error=safe_provider_error(exc),
         )
 
-    async def async_post(self: Any, url: Any, **kwargs: Any) -> Any:
-        receipt, started = before(url, kwargs)
+    async def async_request(self: Any, method: str, url: Any, **kwargs: Any) -> Any:
+        receipt, started = before(method, url, kwargs)
         try:
-            response = await original_async(self, url, **kwargs)
+            response = await original_async(self, method, url, **kwargs)
         except BaseException as exc:
             failed(exc, receipt, started)
             raise
         return after(response, receipt, started)
 
-    def sync_post(self: Any, url: Any, **kwargs: Any) -> Any:
-        receipt, started = before(url, kwargs)
+    def sync_request(self: Any, method: str, url: Any, **kwargs: Any) -> Any:
+        receipt, started = before(method, url, kwargs)
         try:
-            response = original_sync(self, url, **kwargs)
+            response = original_sync(self, method, url, **kwargs)
         except BaseException as exc:
             failed(exc, receipt, started)
             raise
         return after(response, receipt, started)
 
-    def other_network(*args: Any, **kwargs: Any) -> Any:
-        observations["guard_failures"].append("unexpected_network_method")
-        raise ValueError("unexpected_network_method")
-
-    stack.enter_context(patch.object(httpx.AsyncClient, "post", async_post))
-    stack.enter_context(patch.object(httpx.Client, "post", sync_post))
-    for method in ("get", "put", "patch", "delete"):
-        stack.enter_context(patch.object(httpx.AsyncClient, method, other_network))
-        stack.enter_context(patch.object(httpx.Client, method, other_network))
+    stack.enter_context(patch.object(httpx.AsyncClient, "request", async_request))
+    stack.enter_context(patch.object(httpx.Client, "request", sync_request))
 
 
 def safe_provider_error(exc: BaseException) -> dict[str, str]:
@@ -318,7 +322,7 @@ def production_quick_take_payload(
     typed_request = LaunchBacktestRequest.model_validate(request)
     card = copy.deepcopy(run.conversation_result_card)
     # Stored prose is not the newly measured composition. In particular an
-    # accepted candidate readout may not leak into baseline Quick take input.
+    # saved readout may not leak into the fresh Quick take input.
     card.pop("result_readout_content", None)
     envelope = LaunchExecutionEnvelope(
         execution_status="succeeded",
@@ -348,25 +352,6 @@ def production_quick_take_payload(
     }
 
 
-class CompletionTracker:
-    """Observe a production worker's lifetime without changing its deadline."""
-
-    def __init__(self, invoke: Any) -> None:
-        self.invoke = invoke
-        self.started = threading.Event()
-        self.finished = threading.Event()
-
-    def __call__(self, **kwargs: Any) -> Any:
-        self.started.set()
-        try:
-            return self.invoke(**kwargs)
-        finally:
-            self.finished.set()
-
-    def settle(self, timeout: float) -> bool:
-        return not self.started.is_set() or self.finished.wait(timeout=max(0.0, timeout))
-
-
 def run_probe(request: dict[str, Any]) -> dict[str, Any]:
     from contextlib import ExitStack
 
@@ -374,103 +359,136 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
     from argus.agent_runtime.stages import explain
     from argus.api.chat import breakdown
     from argus.api.schemas import BacktestRun
+    from argus.domain.research import billing
+    from argus.domain.research.contracts import ResearchUnavailableError
+    from argus.domain.research.credentials import perplexity_api_key
+    from argus.domain.research.perplexity_agent import PerplexityAgentClient
     from argus.llm import openrouter
     from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
 
-    language = request["language"]
-    live = request["live"]
-    run_data = copy.deepcopy(request["case"]["run"])
-    run = BacktestRun.model_validate(run_data)
+    language, live = request["language"], request["live"]
+    run = BacktestRun.model_validate(copy.deepcopy(request["case"]["run"]))
+    profile = openrouter.openrouter_profile_for_task("result_summary")
+    models = openrouter.openrouter_model_candidates(task="result_summary")
+    if openrouter.openrouter_model_tier_for_task("result_summary") != "readout":
+        raise ValueError("readout_tier_required")
+    if models and models != [breakdown.RESULT_BREAKDOWN_MODEL]:
+        raise ValueError("luna_only_readout_required")
+    spec = breakdown.result_breakdown_spec(language)
     configuration = {
         "python_version": platform.python_version(),
         "llm_mode": "live_provider" if live else "preflight_no_calls",
         "market_data_provider_mode": "recorded_run_fixture_no_fetch",
         "asset_provider_mode": "recorded_run_fixture_no_fetch",
-        "credential_present": bool(resolve_openrouter_api_key()),
+        "credentials_present": {
+            "openrouter": bool(resolve_openrouter_api_key()),
+            "perplexity_agent": bool(perplexity_api_key()),
+        },
+        "credential_present": bool(
+            resolve_openrouter_api_key() and perplexity_api_key() and models
+        ),
         "max_input_bytes": request.get("max_input_bytes", MAX_INPUT_BYTES),
-        "single_attempt": request.get("single_attempt") is True,
         "tasks": {
-            task: {
-                "tier": openrouter.openrouter_model_tier_for_task(task),
-                "models": openrouter.openrouter_model_candidates(task=task),
-                "max_output_tokens": openrouter.openrouter_profile_for_task(
-                    task
-                ).max_tokens,
-                "timeout_seconds": openrouter.openrouter_profile_for_task(
-                    task
-                ).timeout_seconds,
-                "temperature": openrouter.openrouter_profile_for_task(task).temperature,
-                "reasoning_effort": openrouter.openrouter_profile_for_task(
-                    task
-                ).reasoning_effort,
-                "max_retries": openrouter.openrouter_profile_for_task(task).max_retries,
-            }
-            for task in TASK_OUTPUT_LIMITS
+            "result_summary": {
+                "provider": "openrouter",
+                "tier": "readout",
+                "model": models[0] if models else "",
+                "max_output_tokens": profile.max_tokens,
+                "timeout_seconds": profile.timeout_seconds,
+                "temperature": profile.temperature,
+                "reasoning_effort": profile.reasoning_effort,
+            },
+            "result_breakdown": {
+                "provider": "perplexity_agent",
+                "model": spec.model,
+                "max_output_tokens": spec.max_output_tokens,
+                "timeout_seconds": spec.timeout_seconds,
+            },
         },
     }
-    if configuration["single_attempt"] and any(
-        task["tier"] != "structured" for task in configuration["tasks"].values()
-    ):
-        raise ValueError("writing_round_requires_structured_tiers")
-    if live and not configuration["credential_present"]:
-        raise ValueError("missing_provider_credential")
-    observations: dict[str, Any] = {
+    if live:
+        if not configuration["credential_present"]:
+            raise ValueError("missing_provider_credential")
+        previous = request["preflight_configuration"]
+        for task, current in configuration["tasks"].items():
+            if any(
+                previous["tasks"][task].get(key) != value
+                for key, value in current.items()
+            ):
+                raise ValueError("provider_configuration_changed_after_preflight")
+        configuration["tasks"]["result_breakdown"]["request_limits"] = previous["tasks"][
+            "result_breakdown"
+        ]["request_limits"]
+    observations = {
         "configuration": configuration,
         "requests": [],
         "provider_responses": [],
         "guard_failures": [],
         "blocked_dispatches": [],
         "preflight_payloads": [],
-        "composition_mode": "fresh composition from a stored run fixture; no persistence",
+        "unpriced_spend": [],
+        "composition_mode": "Fresh composition from saved run, no persistence; one HTTP request per frame.",
     }
     guard = CostGuard(
         budget_usd=request["budget_usd"],
         rates=request["rates"],
+        tasks=configuration["tasks"],
         max_input_bytes=configuration["max_input_bytes"],
-        max_attempts=attempt_limit(configuration),
-        primary_models={
-            task: profile["models"][0]
-            for task, profile in configuration["tasks"].items()
-            if profile["models"]
-        }
-        if configuration["single_attempt"]
-        else None,
     )
 
-    def dry_completion(**kwargs: Any) -> None:
-        task = kwargs["task"]
-        models = configuration["tasks"][task]["models"] or ["UNCONFIGURED"]
-        if configuration["single_attempt"]:
-            models = models[:1]
-        for model in models:
-            payload = openrouter._json_schema_payload(
-                model=model,
-                messages=kwargs["messages"],
-                schema_model=kwargs["schema_model"],
-                schema_name=kwargs["schema_name"],
-                profile=openrouter.openrouter_profile_for_task(task),
-            )
-            observations["preflight_payloads"].append(
-                {
-                    "task": task,
-                    "model": model,
-                    "bytes": len(encoded(payload)),
-                    "payload_sha256": sha256(encoded(payload)),
-                    "prior_quick_take_allowance_bytes": PRIOR_QUICK_TAKE_ALLOWANCE_BYTES
-                    if task == "result_breakdown"
-                    else 0,
-                    "bytes_with_prior_quick_take_allowance": len(encoded(payload))
-                    + (
-                        PRIOR_QUICK_TAKE_ALLOWANCE_BYTES
-                        if task == "result_breakdown"
-                        else 0
-                    ),
-                }
-            )
+    def capture_payload(task: str, payload: dict[str, Any]) -> None:
+        allowance = PRIOR_QUICK_TAKE_ALLOWANCE_BYTES if task == "result_breakdown" else 0
+        observations["preflight_payloads"].append(
+            {
+                "task": task,
+                "provider": configuration["tasks"][task]["provider"],
+                "model": configuration["tasks"][task]["model"],
+                "bytes": len(encoded(payload)),
+                "payload_sha256": sha256(encoded(payload)),
+                "prior_quick_take_allowance_bytes": allowance,
+                "bytes_with_prior_quick_take_allowance": len(encoded(payload))
+                + allowance,
+            }
+        )
+
+    async def dry_quick(**kwargs: Any) -> None:
+        payload = openrouter._json_schema_payload(
+            model=models[0] if models else "UNCONFIGURED",
+            messages=kwargs["messages"],
+            schema_model=kwargs["schema_model"],
+            schema_name=kwargs["schema_name"],
+            profile=profile,
+        )
+        capture_payload("result_summary", payload)
         return None
 
-    async def dry_async_completion(**kwargs: Any) -> None:
-        return dry_completion(**kwargs)
+    def dry_agent_post(
+        self: Any, payload: dict[str, Any], *, timeout_seconds: float
+    ) -> Any:
+        configuration["tasks"]["result_breakdown"]["request_limits"] = {
+            key: payload[key]
+            for key in (
+                "models",
+                "max_steps",
+                "max_output_tokens",
+                "max_tool_calls",
+                "parallel_tool_calls",
+                "tools",
+            )
+            if key in payload
+        }
+        capture_payload("result_breakdown", payload)
+        raise ResearchUnavailableError("preflight_no_calls")
+
+    def outcome(result: Any, started: float) -> dict[str, Any]:
+        return {
+            "complete_text": result.text,
+            "accepted_text": None if result.fallback_used else result.text,
+            "source": result.source,
+            "fallback_used": result.fallback_used,
+            "failure_mode": result.failure_mode,
+            "latency_ms": round((time.monotonic() - started) * 1000),
+        }
 
     quick_payload = production_quick_take_payload(
         run=run,
@@ -484,91 +502,60 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
         "resolved_launch_metadata_recorded": request["case"]["source"]["kind"]
         != "synthetic_test_only",
     }
-    tracker = CompletionTracker(
-        openrouter.invoke_openrouter_json_schema_sync if live else dry_completion
-    )
     openrouter.clear_openrouter_route_receipts()
     with ExitStack() as stack:
         install_http_guards(stack, guard=guard, observations=observations, live=live)
+        stack.enter_context(
+            patch.object(
+                billing,
+                "_recorder",
+                lambda spend: observations["unpriced_spend"].append(
+                    spend.model_dump(mode="json")
+                ),
+            )
+        )
         if not live:
             stack.enter_context(
-                patch.object(
-                    explain, "invoke_openrouter_json_schema", dry_async_completion
-                )
+                patch.object(explain, "invoke_openrouter_json_schema", dry_quick)
+            )
+            stack.enter_context(
+                patch.object(PerplexityAgentClient, "_post", dry_agent_post)
             )
         try:
-            quick_started = time.monotonic()
+            started = time.monotonic()
             quick = asyncio.run(
                 result_readout.result_readout_with_metadata_from_backtest_payload_async(
                     **quick_payload
                 )
             )
-            observations["quick_take"] = {
-                "complete_text": quick.text,
-                "accepted_text": None if quick.fallback_used else quick.text,
-                "source": quick.source,
-                "fallback_used": quick.fallback_used,
-                "failure_mode": quick.failure_mode,
-                "latency_ms": round((time.monotonic() - quick_started) * 1000),
-            }
-            # This is a new composition against the fixture, not an edit to history.
-            # Candidate Breakdown receives exactly its paired accepted Quick take.
+            observations["quick_take"] = outcome(quick, started)
             run.conversation_result_card["result_readout_content"] = {
                 "schema_version": "result_readout/v1",
                 "surface": "quick_take",
                 "language": language,
                 "text": None if quick.fallback_used else quick.text,
             }
-            context = breakdown.result_breakdown_context(run)
-            deeper_started = time.monotonic()
-            detailed = getattr(breakdown, "_llm_result_breakdown_with_metadata", None)
-            if detailed is not None:
-                deeper, failure = detailed(
-                    context, language=language, invoke_json_schema_func=tracker
-                )
-            else:
-                deeper = breakdown.llm_result_breakdown_message(
-                    context, language=language, invoke_json_schema_func=tracker
-                )
-                failure = None if deeper else "llm_unavailable_or_contract_rejected"
-            fallback_text = breakdown.fallback_result_breakdown_message(
-                context, language=language
+            started = time.monotonic()
+            deeper = breakdown.result_breakdown_message_with_metadata(
+                run, language=language, client=PerplexityAgentClient(perplexity_api_key())
             )
             observations["breakdown"] = {
-                "complete_text": deeper if deeper else fallback_text,
-                "accepted_text": deeper,
-                "source": "llm_breakdown_stage" if deeper else "deterministic_fallback",
-                "fallback_used": not bool(deeper),
-                "failure_mode": failure,
-                "latency_ms": round((time.monotonic() - deeper_started) * 1000),
+                **outcome(deeper, started),
+                "sources": [source.model_dump(mode="json") for source in deeper.sources],
+                "usage": deeper.usage.model_dump(mode="json")
+                if deeper.usage is not None
+                else None,
             }
         except BaseException as exc:
-            # Cancellation can escape a composer's ordinary fallback handler.
-            # Preserve receipts without inventing a user-visible frame response.
             observations["interruption"] = safe_provider_error(exc)
             observations["stop_requested"] = True
-        finally:
-            settlement_started = time.monotonic()
-            timeout = configuration["tasks"]["result_breakdown"]["timeout_seconds"]
-            settled = tracker.settle(attempt_limit(configuration) * timeout + 5)
-            observations["provider_worker_settled"] = settled
-            observations["receipt_settlement_ms"] = round(
-                (time.monotonic() - settlement_started) * 1000
-            )
-            observations["http_closed"] = True
-            if not settled:
-                observations["guard_failures"].append("provider_worker_unsettled")
-                observations["stop_requested"] = True
-                observations["requires_process_exit"] = True
-                # Keep late calls blocked until the isolated probe process exits.
-                # Restoring HTTP methods while its worker lives would bypass the cap.
-                stack.pop_all()
-    observations = copy.deepcopy(observations)
     observations["route_receipts"] = [
         receipt.as_dict() for receipt in openrouter.get_openrouter_route_receipts()
     ]
     observations.update(cost_accounting(guard=guard, observations=observations))
-    observations["attempt_receipts_complete"] = observations["provider_worker_settled"]
+    observations["attempt_receipts_complete"] = all(
+        row["outcome"] != "pending" for row in observations["requests"]
+    )
     return observations
 
 
@@ -581,9 +568,6 @@ def main() -> None:
         result = {"error": type(exc).__name__}
     sys.stdout.write(json.dumps(result, ensure_ascii=False, default=str) + "\n")
     sys.stdout.flush()
-    if result.get("requires_process_exit"):
-        # Only the standalone, owned subprocess uses this termination path.
-        os._exit(0)
 
 
 if __name__ == "__main__":

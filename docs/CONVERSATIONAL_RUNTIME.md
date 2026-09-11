@@ -322,16 +322,42 @@ Result presentation is a single product moment:
    original user wording.
 3. Offer result actions.
 
-The main card shows only high-signal metrics: total return, final value, max drawdown, and benchmark delta. Win rate appears only when closed trades make it meaningful. Secondary metrics and caveats belong in the breakdown.
+The card owns numerical reporting. Quick take tells the first-glance story;
+Breakdown explores the holding experience and historical tradeoffs without
+repeating the card or Quick take. The frames, labels, ordering and result card
+stay unchanged. Both composers receive the same labeled stored-run fact sheet,
+with units, meaning, money roles and available dated path relationships. A figure
+appears only when a sentence needs it, with its checked fact reference.
 
-`Show breakdown` is an educational follow-up, not a second source of result
-truth. The preferred path is an LLM-authored markdown explanation that can vary
-its headings and framing so the conversation does not feel templated. The
-backend derives an internal fact bank from the stored run/result context, asks
-the LLM to structure sections with fact references, then renders those facts
-deterministically. If the generated breakdown is malformed or references facts
-outside that bank, Argus should fall back to the deterministic grounded
-breakdown.
+`result_summary` uses the OpenRouter `readout` tier with
+`openai/gpt-5.6-luna`. Both readout model keys select Luna; a failure uses the
+existing template, with no weaker-model fallback and no search.
+
+The `Show breakdown` action uses that same model through the existing
+`PerplexityAgentClient.run_structured` interface. Its model, deadline and bounded
+tool configuration are owned by `api/chat/breakdown.py`, not an environment key.
+Only `web_search` and `fetch_url` are allowed. There is no Breakdown OpenRouter
+task/profile/tier mapping. The `result_breakdown` message kind remains unchanged.
+
+Run facts alone own simulation numbers. Web evidence may add dated, cited
+historical context, including documented events around a decline. External
+figures carry separate source references and cannot become run facts. Code
+validates complete drafts, run references, cited external numeric occurrences,
+benchmark claims, internal-field leaks and the reported written language before
+publishing any prose. Unsupported drafts use the complete template. This boundary
+does not prove that a cited page entails arbitrary prose; live quality review
+still checks every accepted claim. No forecasts or investing advice belong here.
+
+Accepted prose is saved once in the closed language-tagged
+`result_readout_content` envelope described in `docs/API_CONTRACT.md`. Readers
+show it only when their workspace language matches. Older readouts and language
+mismatches use today's template; a new Breakdown request composes a new message
+in the current language without rewriting the saved Quick take.
+
+Quick take spend retains OpenRouter receipt accounting. Every received Breakdown
+invoice, including a rejected draft, reaches the shared research ledger writer
+with task `result_breakdown` and feature area `result_readout`. The Agent client
+retains existing unpriced-spend recording. There is no second Perplexity client.
 
 Breakdown suggestions must respect capability truth. The assistant may suggest
 tests that are runnable now, ideas it can help draft, or future engine
@@ -357,12 +383,14 @@ Required model and data variables:
 - `OPENROUTER_API_KEY`
 - `ARGUS_UTILITY_MODEL` / `ARGUS_UTILITY_FALLBACK_MODEL`: cheap background
   utility tasks such as titles and labels.
-- `ARGUS_CHAT_MODEL` / `ARGUS_CHAT_FALLBACK_MODEL`: normal chat,
-  clarification, education, and flexible prose.
+- `ARGUS_CHAT_MODEL` / `ARGUS_CHAT_FALLBACK_MODEL`: clarification,
+  `chat_composer`, `discovery_voicing` and `knowledge_voicing`.
+- `ARGUS_READOUT_MODEL` / `ARGUS_READOUT_FALLBACK_MODEL`: Quick take
+  (`result_summary`), both set to `openai/gpt-5.6-luna`.
 - `ARGUS_STRUCTURED_MODEL` / `ARGUS_STRUCTURED_FALLBACK_MODEL`: durable
   JSON-schema artifact interpretation, repair, and draft edits.
-- `ARGUS_CONTEXT_MODEL` / `ARGUS_CONTEXT_FALLBACK_MODEL`: grounded context
-  synthesis from run facts plus structured context packets.
+- `ARGUS_CONTEXT_MODEL` / `ARGUS_CONTEXT_FALLBACK_MODEL`: `capability_conflict`.
+- `PERPLEXITY_API_KEY`: existing Agent credentials, also used by Breakdown.
 - `ARGUS_FRED_CONTEXT_SERIES`: curated comma-separated macro series for context
   packets. Default: `FEDFUNDS,DGS10,DGS2,T10Y2Y,CPIAUCSL,CPILFESL,UNRATE,PAYEMS,INDPRO,USREC`.
 - `ARGUS_CONTEXT_PACKETS_ENABLED`: enables best-effort context packet collection

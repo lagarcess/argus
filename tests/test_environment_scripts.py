@@ -86,6 +86,8 @@ def _workflow_env_payload(
         "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
         "ARGUS_CONTEXT_MODEL": "openai/gpt-oss-120b",
         "ARGUS_CONTEXT_FALLBACK_MODEL": "deepseek/deepseek-v4-flash",
+        "ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna",
+        "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna",
     }
     rows: list[dict[str, dict[str, str]]] = []
 
@@ -427,10 +429,7 @@ def test_render_web_declares_exact_server_only_https_app_origin() -> None:
     )
     assert "ARGUS_APP_ORIGIN" in _contract_array("ARGUS_RENDER_WEB_ENV")
     assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_contract
-    assert (
-        'ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"'
-        in env_contract
-    )
+    assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"' in env_contract
     assert f'ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS="{transition_origins}"' in env_contract
     assert "NEXT_PUBLIC_ARGUS_APP_ORIGIN" not in env_contract
 
@@ -462,6 +461,8 @@ def test_render_blueprint_syncs_non_secret_model_routing() -> None:
         "ARGUS_STRUCTURED_FALLBACK_MODEL",
         "ARGUS_CONTEXT_MODEL",
         "ARGUS_CONTEXT_FALLBACK_MODEL",
+        "ARGUS_READOUT_MODEL",
+        "ARGUS_READOUT_FALLBACK_MODEL",
     ):
         assert "value" in api_env[key]
         assert api_env[key].get("sync") is not False
@@ -525,6 +526,8 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ARGUS_STRUCTURED_FALLBACK_MODEL" in env_contract
     assert "ARGUS_CONTEXT_MODEL" in env_contract
     assert "ARGUS_CONTEXT_FALLBACK_MODEL" in env_contract
+    assert "ARGUS_READOUT_MODEL" in env_contract
+    assert "ARGUS_READOUT_FALLBACK_MODEL" in env_contract
     workflow_env_section = env_contract.split(
         "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(",
         maxsplit=1,
@@ -581,6 +584,8 @@ def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
         "ARGUS_STRUCTURED_FALLBACK_MODEL",
         "ARGUS_CONTEXT_MODEL",
         "ARGUS_CONTEXT_FALLBACK_MODEL",
+        "ARGUS_READOUT_MODEL",
+        "ARGUS_READOUT_FALLBACK_MODEL",
     ):
         assert f"require_local_env {key}" in workflow_block
         assert 'release_profile_env_value workflow "$key"' in source
@@ -1186,8 +1191,7 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert ".github/canary-render.sh" in before_sessions
     assert (
         "API deploy-status, app deploy-status, workflow version status, local smoke, warmup, both "
-        "canary surfaces, and the release manifest"
-        in normalized_before_sessions
+        "canary surfaces, and the release manifest" in normalized_before_sessions
     )
     assert "both scripts pass" not in before_sessions
     assert ".github/stale-backtest-jobs.sh" in runbook
@@ -1195,7 +1199,9 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook
 
 
-def test_private_launch_runbook_smoke_matches_three_action_card_and_dark_drawers() -> None:
+def test_private_launch_runbook_smoke_matches_three_action_card_and_dark_drawers() -> (
+    None
+):
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     smoke_test = runbook.split("## Smoke Test", maxsplit=1)[1].split(
         "## Supabase Persistence Check",
@@ -1226,6 +1232,4 @@ def test_private_launch_runbook_smoke_matches_three_action_card_and_dark_drawers
         "`Change dates` updates the confirmation/result period"
         not in normalized_smoke_test
     )
-    assert (
-        "`Change asset` preserves the explicit period" not in normalized_smoke_test
-    )
+    assert "`Change asset` preserves the explicit period" not in normalized_smoke_test

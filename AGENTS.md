@@ -852,6 +852,10 @@ Pattern:
   A supported next historical test may appear in the story without a "Try next"
   heading or experiment checklist. Quick take stays first-glance; Explain
   result adds depth without repeating it or reusing frame headings.
+- Run facts alone own backtest figures. Quick take uses no search. Breakdown may
+  add separately cited and dated historical web context; it must not substitute
+  web figures for run facts or imply unsupported causality. Forecasts and
+  investing advice remain outside both readouts.
 
 Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
 

@@ -79,11 +79,14 @@ const locales = Object.fromEntries(['en', 'es-419'].map(lang => [lang, require(p
       for (const [index, surface] of ['quick_take', 'breakdown'].entries()) {
         const outcome = pair.outcomes[surface];
         const visible = await body(surface).innerText();
+        const renderedLinks = await body(surface).locator('a').evaluateAll(nodes => nodes.map(node => ({ text: node.textContent, href: node.getAttribute('href') })));
         before[surface] = visible;
         assert(visible.trim(), 'Empty frame');
         if (outcome.accepted) {
           const expected = await page.evaluate(html => new DOMParser().parseFromString(html, 'text/html').body.textContent, markdownHtml(outcome.accepted_text));
           assert(normalize(await body(surface).textContent()) === normalize(expected), `${pair.key}/${surface}: accepted text differs`);
+          const expectedLinks = await page.evaluate(html => Array.from(new DOMParser().parseFromString(html, 'text/html').body.querySelectorAll('a')).map(node => ({ text: node.textContent, href: node.getAttribute('href') })), markdownHtml(outcome.accepted_text));
+          assert(JSON.stringify(renderedLinks) === JSON.stringify(expectedLinks), 'Accepted citation labels or links changed');
         }
         else for (const draft of outcome.raw_drafts.filter(item => typeof item === 'string' && item.trim())) {
           assert(!visible.includes(draft), 'Rejected raw draft appeared as accepted text');
@@ -110,10 +113,14 @@ const locales = Object.fromEntries(['en', 'es-419'].map(lang => [lang, require(p
           accepted: outcome.accepted, fallback_used: !outcome.accepted,
           failure_mode: outcome.failure_mode || null,
           readout_source: outcome.source || null,
+          model_provider: outcome.provider,
           reader_sha: seed.reader_sha, measurement_checkouts: seed.measurement_checkouts,
           report_sha256: seed.report_sha256, source: pair.source,
           requests: outcome.requests, provider_responses: outcome.provider_responses,
           blocked_dispatches: outcome.blocked_dispatches,
+          web_sources: outcome.sources || [],
+          outcome_usage: outcome.usage || null,
+          rendered_links: renderedLinks,
           stored_transport: pair.transport[surface],
           complete_server_outcome: outcome.complete_text || null,
           visible_text: visible, clipboard_text: copied,
@@ -122,16 +129,17 @@ const locales = Object.fromEntries(['en', 'es-419'].map(lang => [lang, require(p
         fs.writeFileSync(path.join(output, `${name}.json`), JSON.stringify(provenance, null, 2) + '\n');
         const rejected = !outcome.accepted;
         const raw = outcome.raw_drafts.length ? outcome.raw_drafts.map(draft => `<pre>${escape(typeof draft === 'string' ? draft : JSON.stringify(draft))}</pre>`).join('') : '<p>No complete raw draft was returned.</p>';
+        const webSources = (outcome.sources || []).length ? `<div class="diagnostic"><h2>WEB SOURCE PROVENANCE</h2><p>External context only. These records do not alter or supply the backtest figures in the canonical source table.</p><pre>${escape(JSON.stringify(outcome.sources, null, 2))}</pre></div>` : '';
         const html = `<!doctype html><html lang="${language}"><meta charset="utf-8"><title>${escape(name)}</title><style>
           *{box-sizing:border-box}body{margin:0;padding:32px;background:#f1f3f6;color:#18202c;font:17px/1.45 system-ui}h1{font-size:28px;margin:0 0 10px}h2{font-size:20px}header,section{background:white;border:1px solid #ccd3df;border-radius:12px;padding:22px}header{margin-bottom:20px}main{display:grid;grid-template-columns:1.25fr 1fr;gap:20px;align-items:start}img{display:block;width:100%;height:auto;border:1px solid #ccd3df}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.4 ui-monospace;margin:0}table{border-collapse:collapse;width:100%;font:13px/1.35 ui-monospace}td{padding:5px;border-bottom:1px solid #e6e9ee;overflow-wrap:anywhere}td:first-child{width:72%}.diagnostic{margin-top:22px;border:2px solid #c78621;padding:18px}.note{font-size:14px;color:#45526a}.stamp{font-weight:700;color:${rejected ? '#944b00' : '#176b42'}}
-          </style><header><h1>${escape(pair.case_id)} · ${escape(language)} · ${escape(surface)}</h1><div class="stamp">${seed.synthetic_browser_preflight ? 'SYNTHETIC HARNESS PREFLIGHT · ' : ''}${rejected ? 'REJECTED / UNAVAILABLE: COMPLETE PRODUCT FALLBACK' : 'ACCEPTED MODEL TEXT'}</div><p class="note">Provider-free browser replay of existing measurement. No new model call or backtest. Frame below is a screenshot of the actual Argus UI. Diagnostic/source panels are evidence, not product UI.</p><pre>Reader: ${escape(seed.reader_sha)}\nMeasurement: ${escape(JSON.stringify(seed.measurement_checkouts))}\nSource: ${escape(pair.source_path)}\nSource SHA256: ${escape(pair.source.sha256)}\nFailure: ${escape(outcome.failure_mode || 'none')}</pre></header><main><section><h2>${escape(surface === 'quick_take' ? locales[language].chat.result_readout.quick_take : locales[language].chat.result_breakdown.aria_label)}</h2><img alt="Actual Argus ${escape(surface)} frame" src="data:image/png;base64,${fs.readFileSync(framePath).toString('base64')}">${rejected ? `<div class="diagnostic"><h2>DIAGNOSTIC ONLY: rejected/unavailable raw draft</h2><p>Never accepted or displayed inside the product frame. Complete provider content follows without edits.</p>${raw}</div>` : ''}</section><section><h2>CANONICAL SOURCE NUMBERS</h2><p class="note">Exact stored values and paths. No recomputation or rounding. Full chart points and trades remain in the unchanged source JSON cited above. DCA source came from direct engine execution, not a successful DCA chat journey.</p><table>${pair.source_numbers.map(row => `<tr><td>${escape(row.path)}</td><td>${escape(JSON.stringify(row.value))}</td></tr>`).join('')}</table></section></main></html>`;
+          </style><header><h1>${escape(pair.case_id)} · ${escape(language)} · ${escape(surface)}</h1><div class="stamp">${seed.synthetic_browser_preflight ? 'SYNTHETIC HARNESS PREFLIGHT · ' : ''}${rejected ? 'REJECTED / UNAVAILABLE: COMPLETE PRODUCT FALLBACK' : 'ACCEPTED MODEL TEXT'}</div><p class="note">Provider-free browser replay of existing measurement. No new model call or backtest. Frame below is a screenshot of the actual Argus UI. Diagnostic/source panels are evidence, not product UI.</p><pre>Reader: ${escape(seed.reader_sha)}\nMeasurement: ${escape(JSON.stringify(seed.measurement_checkouts))}\nSource: ${escape(pair.source_path)}\nSource SHA256: ${escape(pair.source.sha256)}\nFrame provider: ${escape(outcome.provider)}\nFailure: ${escape(outcome.failure_mode || 'none')}</pre></header><main><section><h2>${escape(surface === 'quick_take' ? locales[language].chat.result_readout.quick_take : locales[language].chat.result_breakdown.aria_label)}</h2><img alt="Actual Argus ${escape(surface)} frame" src="data:image/png;base64,${fs.readFileSync(framePath).toString('base64')}">${rejected ? `<div class="diagnostic"><h2>DIAGNOSTIC ONLY: rejected/unavailable raw draft</h2><p>Never accepted or displayed inside the product frame. Complete provider content follows without edits.</p>${raw}</div>` : ''}${webSources}</section><section><h2>CANONICAL SOURCE NUMBERS</h2><p class="note">Exact stored values and paths. No recomputation or rounding. Full chart points and trades remain in the unchanged source JSON cited above. DCA source came from direct engine execution, not a successful DCA chat journey.</p><table>${pair.source_numbers.map(row => `<tr><td>${escape(row.path)}</td><td>${escape(JSON.stringify(row.value))}</td></tr>`).join('')}</table></section></main></html>`;
         fs.writeFileSync(path.join(output, `${name}.html`), html);
         const sheet = await context.newPage();
         await sheet.setViewportSize({ width: 1900, height: 1200 });
         await sheet.setContent(html);
         await sheet.screenshot({ path: path.join(output, `${name}.png`), fullPage: true });
         await sheet.close();
-        outcomes.push({ name, language, surface, accepted: outcome.accepted, visible_text: visible, screenshot: `${name}.png`, frame_screenshot: `${name}-frame.png`, clipboard_parity: true });
+        outcomes.push({ name, language, surface, provider: outcome.provider, accepted: outcome.accepted, visible_text: visible, rendered_links: renderedLinks, screenshot: `${name}.png`, frame_screenshot: `${name}-frame.png`, clipboard_parity: true });
       }
       await page.reload();
       await frame('breakdown').waitFor();

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from loguru import logger
+
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
+from argus.api.chat.research_evidence import record_result_breakdown_spend
 from argus.api.schemas import BacktestRun
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
@@ -19,27 +20,58 @@ from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
 )
+from argus.domain.research.config import ResearchConfigSpec
+from argus.domain.research.contracts import (
+    ResearchSource,
+    ResearchUnavailableError,
+    ResearchUsage,
+)
+from argus.domain.research.credentials import perplexity_api_key
+from argus.domain.research.perplexity_agent import (
+    PerplexityAgentClient,
+    StructuredAgentLimits,
+)
 from argus.domain.result_readout_content import (
     normalize_readout_language,
     validated_readout,
 )
 from argus.domain.result_readout_grounding import (
-    READOUT_GROUNDING_INSTRUCTIONS,
-    ResultReadoutDraft,
-    accepted_readout_text,
+    READOUT_RUN_GROUNDING_INSTRUCTIONS,
     stored_readout_facts,
 )
-from argus.llm.openrouter import (
-    invoke_openrouter_json_schema_sync,
-    log_openrouter_failure,
+from argus.domain.result_readout_sources import (
+    BREAKDOWN_SOURCE_INSTRUCTIONS,
+    ResultBreakdownDraft,
+    accepted_breakdown_text,
+)
+
+RESULT_BREAKDOWN_MODEL = "openai/gpt-5.6-luna"
+RESULT_BREAKDOWN_LIMITS = StructuredAgentLimits(
+    max_tool_calls=4,
+    parallel_tool_calls=False,
+    web_search_max_tokens=8000,
+    web_search_max_tokens_per_page=2000,
+    web_search_max_results=4,
+    fetch_url_max_urls=2,
+    fetch_url_total_budget_tokens=8000,
 )
 
 
-class ResultBreakdownDraft(ResultReadoutDraft):
-    """Complete deeper model prose; the UI owns its frame."""
+def result_breakdown_spec(language: str) -> ResearchConfigSpec:
+    return ResearchConfigSpec(
+        shape="balanced",
+        models=(RESULT_BREAKDOWN_MODEL,),
+        max_steps=3,
+        max_output_tokens=2200,
+        tools=("web_search", "fetch_url"),
+        timeout_seconds=75.0,
+        language=language,
+    )
 
 
-RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS = 28.0
+def _client() -> PerplexityAgentClient | None:
+    api_key = perplexity_api_key()
+    return PerplexityAgentClient(api_key) if api_key else None
 
 
 @dataclass(frozen=True)
@@ -52,6 +84,8 @@ class ResultBreakdownMessage:
     ]
     fallback_used: bool
     failure_mode: str | None = None
+    usage: ResearchUsage | None = None
+    sources: tuple[ResearchSource, ...] = ()
 
 
 def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
@@ -96,16 +130,12 @@ def llm_result_breakdown_message(
     context: dict[str, Any],
     *,
     language: str = "en",
-    invoke_json_schema_func=invoke_openrouter_json_schema_sync,
-    log_openrouter_failure_func=log_openrouter_failure,
-    timeout_seconds: float = RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS,
+    client: PerplexityAgentClient | None = None,
 ) -> str | None:
-    text, _ = _llm_result_breakdown_with_metadata(
+    text, _, _, _ = _llm_result_breakdown_with_metadata(
         context,
         language=language,
-        invoke_json_schema_func=invoke_json_schema_func,
-        log_openrouter_failure_func=log_openrouter_failure_func,
-        timeout_seconds=timeout_seconds,
+        client=client,
     )
     return text
 
@@ -114,13 +144,11 @@ def _llm_result_breakdown_with_metadata(
     context: dict[str, Any],
     *,
     language: str = "en",
-    invoke_json_schema_func=invoke_openrouter_json_schema_sync,
-    log_openrouter_failure_func=log_openrouter_failure,
-    timeout_seconds: float = RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS,
-) -> tuple[str | None, str | None]:
+    client: PerplexityAgentClient | None = None,
+) -> tuple[str | None, str | None, ResearchUsage | None, tuple[ResearchSource, ...]]:
     resolved_language = normalize_readout_language(language)
     if resolved_language is None:
-        return None, "language_mismatch"
+        return None, "language_mismatch", None, ()
     facts = stored_readout_facts(
         metrics=context.get("raw_metrics", context.get("metrics")),
         config_snapshot=context.get("config_snapshot"),
@@ -129,66 +157,36 @@ def _llm_result_breakdown_with_metadata(
         date_range=context.get("date_range"),
         chart=context.get("chart"),
     )
-    context_packet_ids = _context_packet_ids_from_context(context)
+    messages = _result_breakdown_llm_messages(
+        facts=facts,
+        prior_quick_take=context.get("prior_quick_take"),
+        language=resolved_language,
+    )
     try:
-        response = _invoke_breakdown_llm_with_budget(
-            invoke_json_schema_func=invoke_json_schema_func,
-            facts=facts,
-            prior_quick_take=context.get("prior_quick_take"),
-            context_packet_ids=context_packet_ids,
-            language=resolved_language,
-            timeout_seconds=timeout_seconds,
-        )
-    except FutureTimeoutError:
-        log_openrouter_failure_func(
-            task="result_breakdown",
-            model_name=None,
-            exc=TimeoutError("Result breakdown LLM exceeded action budget"),
-            message="LLM result breakdown timed out; using deterministic fallback",
-        )
-        return None, "llm_unavailable_or_contract_rejected"
-    except Exception as exc:
-        log_openrouter_failure_func(
-            task="result_breakdown",
-            model_name=None,
-            exc=exc,
-            message="LLM result breakdown failed; using deterministic fallback",
-        )
-        return None, "llm_unavailable_or_contract_rejected"
-    return accepted_readout_text(response, facts=facts, language=resolved_language)
-
-
-def _invoke_breakdown_llm_with_budget(
-    *,
-    invoke_json_schema_func: Any,
-    facts: dict[str, Any],
-    prior_quick_take: str | None,
-    context_packet_ids: list[str],
-    language: str,
-    timeout_seconds: float,
-) -> object:
-    def _invoke() -> object:
-        return invoke_json_schema_func(
-            task="result_breakdown",
-            messages=_result_breakdown_llm_messages(
-                facts=facts,
-                prior_quick_take=prior_quick_take,
-                language=language,
-            ),
+        active_client = client if client is not None else _client()
+        if active_client is None:
+            return None, "llm_unavailable_or_contract_rejected", None, ()
+        response = active_client.run_structured(
+            messages[1]["content"],
+            result_breakdown_spec(resolved_language),
             schema_model=ResultBreakdownDraft,
             schema_name="ResultBreakdownDraft",
-            context_packet_ids=context_packet_ids,
+            instructions=messages[0]["content"],
+            limits=RESULT_BREAKDOWN_LIMITS,
         )
-
-    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="argus-breakdown")
-    future = executor.submit(_invoke)
-    try:
-        return future.result(timeout=max(0.1, timeout_seconds))
-    except FutureTimeoutError:
-        future.cancel()
-        raise
-    finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+    except ResearchUnavailableError as exc:
+        logger.warning("Result breakdown unavailable; using template", reason=exc.reason)
+        return None, "llm_unavailable_or_contract_rejected", exc.usage, ()
+    except Exception:  # noqa: BLE001
+        logger.warning("Result breakdown failed; using template")
+        return None, "llm_unavailable_or_contract_rejected", None, ()
+    text, failure = accepted_breakdown_text(
+        response.draft,
+        facts=facts,
+        language=resolved_language,
+        sources=response.sources,
+    )
+    return text, failure, response.usage, response.sources
 
 
 def _result_breakdown_llm_messages(
@@ -214,7 +212,7 @@ def _result_breakdown_llm_messages(
                 "fixed outline, repeat card figures or add a frame heading or "
                 "experiment checklist; the UI owns the frame and actions. "
                 f"{response_language_instruction(language)} "
-                f"{READOUT_GROUNDING_INSTRUCTIONS}"
+                f"{READOUT_RUN_GROUNDING_INSTRUCTIONS} {BREAKDOWN_SOURCE_INSTRUCTIONS}"
             ),
         },
         {
@@ -229,22 +227,6 @@ def _result_breakdown_llm_messages(
             ),
         },
     ]
-
-
-def _context_packets_from_context(context: dict[str, Any]) -> list[dict[str, Any]]:
-    packets = context.get("context_packets")
-    if not isinstance(packets, list):
-        return []
-    return [packet for packet in packets if isinstance(packet, dict)]
-
-
-def _context_packet_ids_from_context(context: dict[str, Any]) -> list[str]:
-    packet_ids: list[str] = []
-    for packet in _context_packets_from_context(context):
-        packet_id = str(packet.get("id") or "").strip()
-        if packet_id and packet_id not in packet_ids:
-            packet_ids.append(packet_id)
-    return packet_ids
 
 
 def _response_language(language: object) -> str:
@@ -447,6 +429,7 @@ def result_breakdown_message_with_metadata(
     run: BacktestRun | None,
     *,
     language: str = "en",
+    client: PerplexityAgentClient | None = None,
 ) -> ResultBreakdownMessage:
     if run is None:
         return ResultBreakdownMessage(
@@ -460,18 +443,44 @@ def result_breakdown_message_with_metadata(
         )
     context = result_breakdown_context(run)
     context_language = _response_language(language or context.get("language"))
-    llm_text, failure_mode = _llm_result_breakdown_with_metadata(
-        context, language=language
+    llm_text, failure_mode, usage, sources = _llm_result_breakdown_with_metadata(
+        context,
+        language=language,
+        client=client,
     )
     if llm_text:
         return ResultBreakdownMessage(
             text=llm_text,
             source="llm_breakdown_stage",
             fallback_used=False,
+            usage=usage,
+            sources=sources,
         )
     return ResultBreakdownMessage(
         text=fallback_result_breakdown_message(context, language=context_language),
         source="deterministic_fallback",
         fallback_used=True,
         failure_mode=failure_mode or "llm_unavailable_or_contract_rejected",
+        usage=usage,
+        sources=sources,
     )
+
+
+def result_breakdown_action(
+    run: BacktestRun | None,
+    *,
+    language: str,
+    user_id: str,
+    conversation_id: str,
+    request_id: str,
+) -> ResultBreakdownMessage:
+    """Keep received spend attached to the provider work, even after disconnect."""
+    result = result_breakdown_message_with_metadata(run, language=language)
+    record_result_breakdown_spend(
+        usage=result.usage,
+        failure_mode=result.failure_mode,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id=request_id,
+    )
+    return result

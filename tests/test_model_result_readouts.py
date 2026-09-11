@@ -7,6 +7,8 @@ import pytest
 from argus.agent_runtime.stages import explain
 from argus.agent_runtime.state.models import RunState
 from argus.api.chat import breakdown
+from argus.domain.research.contracts import ResearchUsage
+from argus.domain.research.perplexity_agent import StructuredAgentResult
 
 from tests.result_readout_fixtures import (
     readout_draft,
@@ -44,13 +46,30 @@ async def compose(surface, text, result, monkeypatch, language="en", figures=())
 
     def draft(**kwargs):
         captured.update(kwargs)
+        captured["prompt"] = kwargs["messages"][1]["content"]
         return readout_draft(text, figures, language=language)
 
     if surface == "breakdown":
+
+        class Client:
+            def run_structured(self, prompt, spec, **kwargs):
+                captured.update(prompt=prompt, spec=spec, **kwargs)
+                return StructuredAgentResult(
+                    draft={
+                        **readout_draft(text, figures, language=language),
+                        "source_figures": [],
+                        "citations": [],
+                    },
+                    sources=(),
+                    usage=ResearchUsage(model=spec.model),
+                    tool_results=(),
+                    provider_response_id=None,
+                )
+
         rendered = breakdown.llm_result_breakdown_message(
             {**result, "raw_metrics": result["metrics"]},
             language=language,
-            invoke_json_schema_func=draft,
+            client=Client(),
         )
         return rendered, captured
 
@@ -113,7 +132,7 @@ async def test_readout_accepts_richer_rounded_metrics_without_forced_mentions(
         surface, text, stored_result, monkeypatch, language, figures=figures
     )
     assert rendered == text
-    context = json.loads(captured["messages"][1]["content"])
+    context = json.loads(captured["prompt"])
     assert {
         path: value
         for path, value in stored_scalar_values(context["run_facts"]).items()
@@ -163,7 +182,7 @@ async def test_readout_model_inputs_omit_provenance_and_preserve_run_evidence(
     )
 
     assert rendered == "The ride was uneven."
-    facts = json.loads(captured["messages"][1]["content"])["run_facts"]
+    facts = json.loads(captured["prompt"])["run_facts"]
     scalars = stored_scalar_values(facts)
     assert {
         path: value

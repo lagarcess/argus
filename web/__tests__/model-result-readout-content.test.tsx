@@ -87,6 +87,7 @@ for (const surface of ["quick_take", "breakdown"] as const) {
     test.each([
       { schema_version: "result_readout/v0" }, { surface: "other" }, { language: "fr" }, { language: "en-US" },
       { text: null }, { text: " " }, { text: 42 }, { private_extra: privateText },
+      { source_figures: [] }, { citations: [] }, { usage: {} },
     ])("rejects malformed or failed envelopes: %j", async (patch) => {
       const i18n = await translations("en");
       expect(template(resultReadoutFacts(bank), i18n.t, "en", { ...envelope(surface, "en"), ...patch })).toBe(template(resultReadoutFacts(bank), i18n.t, "en"));
@@ -106,6 +107,18 @@ for (const surface of ["quick_take", "breakdown"] as const) {
 }
 
 describe("model readout transport", () => {
+  test.each(["en", "es-419"] as const)("renders dated %s citations inside the saved Breakdown text", async (language) => {
+    const i18n = await translations(language);
+    const date = language === "en" ? "Aug 1, 2025" : "1 ago 2025";
+    const text = `${texts[language].breakdown} [${date}](https://example.com/earnings)`;
+    const saved = { ...envelope("breakdown", language), text };
+    const [message] = hydrateMessagesFromApi([savedMessage("breakdown", saved)]).messages;
+    const html = renderToStaticMarkup(<I18nextProvider i18n={i18n}><ChatMessage message={message} /></I18nextProvider>);
+    expect(html).toContain('href="https://example.com/earnings"');
+    expect(html).toContain(date);
+    expect(chatMessageCopyText(message, i18n.t, language)).toBe(text);
+    expect(html).not.toContain(privateText);
+  });
   test.each(["en", "es-419"] as const)("result card read and copy preserve accepted %s text", async (language) => {
     const i18n = await translations(language);
     const result = resultCardFromRun(run(envelope("quick_take", language)));

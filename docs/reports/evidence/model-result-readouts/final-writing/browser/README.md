@@ -1,6 +1,7 @@
-# Final writing round: offline browser harness
+# Luna readout round: offline browser harness
 
-Prepared under spec section 8. No measured final-writing draft or screenshot is
+Prepared under spec section 9, which supersedes the unpaid section 8 experiment.
+No measured Luna draft or screenshot is
 claimed by this preparation. The parent must obtain the new cost approval and
 complete the twelve single-attempt tasks before this harness consumes their
 report. Browser replay itself makes no provider, market-data or backtest calls.
@@ -12,16 +13,24 @@ each frame, and reload without changing its saved text or stored source facts.
 ## Inputs and provenance
 
 `replay_data.py` consumes the existing measurement report's six paired rows:
-three `recorded-fixtures.json` cases, `en` and `es-419`, structured tier, one
-repetition. Each frame consumes `accepted_text`, full composer outcome,
+three `recorded-fixtures.json` cases, `en` and `es-419`, candidate variant, one
+repetition. Quick take uses OpenRouter's `readout` tier; Breakdown uses
+Perplexity Agent. Each frame consumes `accepted_text`, full composer outcome,
 source/fallback/failure metadata and exact per-task request/response receipts.
 Missing outcomes become complete frontend fallback. A raw draft is never
 promoted to accepted text. More than one provider request per frame is rejected.
-Actual proof must declare `live_targeted`, writing comparison mode, twelve
+Actual proof must declare `live_targeted`, `luna` comparison mode, twelve
 scheduled tasks and one attempt per task. Free preflight reports are refused.
+The superseded structured-tier writing report is also refused. Configured and
+observed providers must match each frame; mixed-provider receipts and raw
+responses remain separated by task and attempt ID.
 An absent frame requires a recorded interruption; it cannot silently turn an
 unfinished or preflight report into a completed fallback outcome. Rejected
 content checks inspect both the raw response and parsed Markdown text.
+Accepted Breakdown Markdown, including code-attached dated citation labels and
+URLs, passes unchanged through the existing envelope. Capture compares every
+rendered link label and href with that accepted Markdown and retains clipboard
+parity. Links are inspected, never opened. No external page is fetched.
 
 The original fixture manifest and its three canonical source JSONs must still
 match their recorded hashes and contents. Local run/conversation IDs and
@@ -64,6 +73,7 @@ Use the reader SHA actually being vouched for, not an example SHA.
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python docs/reports/evidence/model-result-readouts/final-writing/browser/check_harness.py
+node docs/reports/evidence/model-result-readouts/final-writing/browser/check_markup.cjs
 node --check docs/reports/evidence/model-result-readouts/final-writing/browser/capture.cjs
 ```
 
@@ -104,6 +114,10 @@ Each of the twelve tasks produces:
    inserted into the product frame. If absent, the sheet explicitly says so.
 4. Frame DOM snapshot, exact text/copy/source/receipt JSON and the HTML evidence
    sheet. The HTML contains the real frame image; it does not recreate Argus UI.
+   Every sheet identifies its frame's provider. Any returned web sources appear
+   in a separate external-context provenance panel, never merged into the
+   canonical backtest source-number table. Rejected source/raw evidence remains
+   diagnostic even if some of its citations are valid.
 
 `proof.json` records all twelve outcomes, locale switches, reload/copy parity,
 browser health, source hashes and the zero-call guard results. Actual PNGs must
@@ -114,4 +128,4 @@ backtests, a new model-quality measurement, or a deployed preview.
 Existing bilingual mismatch/legacy regressions remain in `../../browser/` and
 `../../live-browser/`; this bounded round does not rewrite those histories or
 repeat a large matrix. New screenshots remain pending the twelve actual
-approved writing outcomes.
+approved Luna outcomes.

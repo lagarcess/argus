@@ -1,4 +1,4 @@
-"""Bounded, opt-in comparison of readout composers on immutable run fixtures.
+"""Bounded, opt-in Luna readout measurement on immutable run fixtures.
 
 This is a targeted generator measurement, not the full conversational eval.
 The subprocess probe imports each checkout's actual composers. No environment
@@ -20,9 +20,9 @@ from pathlib import Path
 from typing import Any
 
 LANGUAGES = ("en", "es-419")
-TASK_OUTPUT_LIMITS = {"result_summary": 700, "result_breakdown": 2400}
+TASKS = ("result_summary", "result_breakdown")
 MAX_INPUT_BYTES = 60_000  # Original default; larger measured ceilings are explicit.
-MAX_ATTEMPTS = 4  # Two configured models, each with one reasoning retry.
+MAX_ATTEMPTS = 1  # One provider HTTP request per frame, with retries blocked.
 
 
 def sha256(value: bytes) -> str:
@@ -70,60 +70,80 @@ def load_fixture_set(path: Path, *, live: bool) -> dict[str, Any]:
     return fixtures
 
 
-def build_schedule(
-    case_ids: list[str],
-    *,
-    replicates: int = 2,
-    variants: tuple[str, str] = ("baseline", "candidate"),
-) -> list[dict[str, Any]]:
-    if replicates < 2 or replicates % 2 or len(set(variants)) != 2:
-        raise ValueError("paired_replicates_and_two_distinct_variants_required")
+def build_schedule(case_ids: list[str]) -> list[dict[str, Any]]:
+    """The same three saved runs, both languages, one paired composition each."""
     return [
-        {
-            "case_id": case_id,
-            "language": language,
-            "variant": variant,
-            "replicate": replicate,
-        }
-        for case_id in case_ids
-        for language in LANGUAGES
-        for first in range(1, replicates, 2)
-        for variant, replicate in (
-            (variants[0], first),
-            (variants[1], first),
-            (variants[1], first + 1),
-            (variants[0], first + 1),
-        )
-    ]
-
-
-def build_writing_schedule(case_ids: list[str]) -> list[dict[str, Any]]:
-    """One paired composition per saved run and language; no measured control arm."""
-    return [
-        {
-            "case_id": case_id,
-            "language": language,
-            "variant": "structured",
-            "replicate": 1,
-        }
+        {"case_id": case_id, "language": language, "variant": "candidate", "replicate": 1}
         for case_id in case_ids
         for language in LANGUAGES
     ]
 
 
-def attempt_limit(configuration: dict[str, Any]) -> int:
-    return 1 if configuration.get("single_attempt") is True else MAX_ATTEMPTS
+def _positive_integer(value: Any) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError("positive_integer_bound_required")
+    return value
+
+
+def _rate(value: Any) -> float:
+    if (
+        not isinstance(value, (float, int))
+        or isinstance(value, bool)
+        or not math.isfinite(value)
+        or value < 0
+    ):
+        raise ValueError("invalid_price")
+    return float(value)
+
+
+def task_reservation(
+    configuration: dict[str, Any], rates: dict[str, Any], input_limit: int
+) -> float:
+    """Conservative estimate, conditional on the provider honoring its limits.
+
+    Agent retrieval can fill the model context repeatedly. Reserve a full
+    context for each loop step plus a final generation, not just initial bytes.
+    The raw invoice remains authoritative, including an unpriced first model.
+    """
+    provider = configuration["provider"]
+    rate = rates.get(provider, {})
+    if rate.get("model") != configuration["model"]:
+        raise ValueError("unpriced_model")
+    input_rate = _rate(rate.get("input_per_million"))
+    output_rate = _rate(rate.get("output_per_million"))
+    output = _positive_integer(configuration["max_output_tokens"])
+    if provider == "openrouter":
+        return (input_limit * input_rate + output * output_rate) / 1_000_000
+    if provider != "perplexity_agent":
+        raise ValueError("unexpected_provider")
+    limits = configuration["request_limits"]
+    steps = _positive_integer(limits.get("max_steps")) + 1
+    calls = _positive_integer(limits.get("max_tool_calls"))
+    context = _positive_integer(rate.get("context_window_tokens"))
+    tools = {tool["type"]: tool for tool in limits["tools"]}
+    if set(tools) != {"web_search", "fetch_url"}:
+        raise ValueError("unexpected_agent_tools")
+    for tool, fields in (
+        ("web_search", ("max_tokens", "max_tokens_per_page", "max_results")),
+        ("fetch_url", ("max_urls", "total_budget_tokens")),
+    ):
+        for name in fields:
+            _positive_integer(tools[tool].get(name))
+    tool_price = max(_rate(rate["tool_per_call"].get(tool)) for tool in tools)
+    return (
+        steps * (context * input_rate + output * output_rate) / 1_000_000
+        + calls * tool_price
+    )
 
 
 @dataclass
 class CostGuard:
-    """Reserve a worst-case cost before each actual HTTP request, including retries."""
+    """Reserve before dispatch; never treat unknown billed usage as zero."""
 
     budget_usd: float
-    rates: dict[str, dict[str, float]]
+    rates: dict[str, Any]
+    tasks: dict[str, dict[str, Any]]
     max_input_bytes: int = MAX_INPUT_BYTES
-    max_attempts: int = MAX_ATTEMPTS
-    primary_models: dict[str, str] | None = None
     reserved_usd: float = 0
     attempts: int = 0
     by_task: dict[str, int] = field(default_factory=dict)
@@ -132,35 +152,36 @@ class CostGuard:
         checked_input_limit(self.max_input_bytes)
 
     def reserve(self, payload: dict[str, Any], *, task: str) -> float:
+        if task not in TASKS or task not in self.tasks:
+            raise ValueError("unexpected_provider_task")
+        if self.by_task.get(task, 0) >= MAX_ATTEMPTS:
+            raise ValueError("attempt_limit")
         if not math.isfinite(self.budget_usd) or self.budget_usd <= 0:
             raise ValueError("positive_finite_budget_required")
-        if self.by_task.get(task, 0) >= self.max_attempts:
-            raise ValueError("attempt_limit")
-        model = payload.get("model")
-        if self.primary_models is not None and model != self.primary_models.get(task):
-            raise ValueError("unexpected_primary_model")
-        rate = self.rates.get(model)
-        if rate is None:
-            raise ValueError("unpriced_model")
-        if any(
-            not math.isfinite(rate[k]) or rate[k] < 0
-            for k in ("input_per_million", "output_per_million")
-        ):
-            raise ValueError("invalid_price")
-        input_bytes = len(encoded(payload))
-        if input_bytes > self.max_input_bytes:
+        configuration = self.tasks[task]
+        if len(encoded(payload)) > self.max_input_bytes:
             raise ValueError("payload_too_large")
-        output_tokens = payload.get("max_tokens")
-        if (
-            task not in TASK_OUTPUT_LIMITS
-            or not isinstance(output_tokens, int)
-            or not 0 < output_tokens <= TASK_OUTPUT_LIMITS[task]
-        ):
-            raise ValueError("output_limit")
-        reservation = (
-            self.max_input_bytes * rate["input_per_million"]
-            + output_tokens * rate["output_per_million"]
-        ) / 1_000_000
+        if configuration["provider"] == "openrouter":
+            if payload.get("model") != configuration["model"]:
+                raise ValueError("unexpected_primary_model")
+            if payload.get("max_tokens") != configuration["max_output_tokens"]:
+                raise ValueError("output_limit")
+            if payload.get("tools") or payload.get("plugins"):
+                raise ValueError("quick_take_search_forbidden")
+        else:
+            if payload.get("models") != [configuration["model"]]:
+                raise ValueError("unexpected_primary_model")
+            if any(
+                payload.get(key) != value
+                for key, value in configuration["request_limits"].items()
+            ):
+                raise ValueError("agent_request_limits_changed")
+            if any(
+                key in payload
+                for key in ("preset", "background", "previous_response_id", "skills")
+            ):
+                raise ValueError("unexpected_agent_work")
+        reservation = task_reservation(configuration, self.rates, self.max_input_bytes)
         if self.reserved_usd + reservation > self.budget_usd + 1e-12:
             raise ValueError("budget_exceeded")
         self.reserved_usd += reservation
@@ -189,38 +210,6 @@ def checkout_provenance(checkout: Path, *, require_clean: bool) -> dict[str, Any
     }
 
 
-def retained_case_evidence(path: Path) -> dict[str, Any]:
-    contents = path.read_bytes()
-    scorecard = json.loads(contents)
-    rows = scorecard.get("results", scorecard.get("cases", []))
-    dispositions = []
-    for row in rows:
-        readout_reached = any(
-            receipt.get("task") in TASK_OUTPUT_LIMITS
-            for receipt in row.get("route_receipts", [])
-        )
-        dispositions.append(
-            {
-                "case_id": row.get("id", row.get("case_id")),
-                "prior_status": row.get("status", row.get("passed")),
-                "disposition": (
-                    "Readout reached: prior full-turn result retained, not remeasured by this generator-only probe."
-                    if readout_reached
-                    else "No observed readout call: prior case retained without a new pass claim."
-                ),
-            }
-        )
-    return {
-        "path": str(path),
-        "evidence_role": "historical_reference_only",
-        "sha256": sha256(contents),
-        "remeasured": False,
-        "disposition": "Prior full-suite evidence retained; no new pass claimed.",
-        "totals": scorecard["totals"],
-        "case_dispositions": dispositions,
-    }
-
-
 def measurement_can_continue(probe: dict[str, Any]) -> bool:
     """Unknown actual cost is allowed only when every attempt was fully reserved."""
     return (
@@ -241,13 +230,8 @@ def invoke_probe(
     rates: dict[str, Any],
     preflight: dict[str, Any] | None = None,
     max_input_bytes: int | None = None,
-    single_attempt: bool | None = None,
 ) -> dict[str, Any]:
     preflight_configuration = (preflight or {}).get("configuration", {})
-    preflight_single = preflight_configuration.get("single_attempt", False)
-    single = preflight_single if single_attempt is None else single_attempt
-    if live and single != preflight_single:
-        raise ValueError("attempt_policy_changed_after_preflight")
     preflight_limit = preflight_configuration.get("max_input_bytes", MAX_INPUT_BYTES)
     input_limit = checked_input_limit(
         preflight_limit if max_input_bytes is None else max_input_bytes
@@ -270,7 +254,7 @@ def invoke_probe(
         ]
         if any(not math.isfinite(value) or value <= 0 for value in timeouts):
             raise ValueError("invalid_task_timeout")
-        timeout_seconds = attempt_limit(preflight_configuration) * sum(timeouts) + 60
+        timeout_seconds = sum(timeouts) + 60
 
     def lost_receipts(reason: str) -> dict[str, Any]:
         if not live:
@@ -309,7 +293,7 @@ def invoke_probe(
         "budget_usd": budget_usd,
         "rates": rates,
         "max_input_bytes": input_limit,
-        "single_attempt": single,
+        "preflight_configuration": preflight_configuration,
     }
     try:
         child = subprocess.run(
@@ -336,45 +320,58 @@ def invoke_probe(
 
 
 def estimate_ceiling(probes: list[dict[str, Any]], rates: dict[str, Any]) -> float:
+    return sum(
+        task_reservation(
+            task,
+            rates,
+            checked_input_limit(
+                probe["configuration"].get("max_input_bytes", MAX_INPUT_BYTES)
+            ),
+        )
+        for probe in probes
+        for task in probe["configuration"]["tasks"].values()
+    )
+
+
+def estimate_payload_and_tools(
+    probes: list[dict[str, Any]], rates: dict[str, Any]
+) -> float:
+    """Planning estimate only; remote internal context can exceed these inputs."""
     total = 0.0
     for probe in probes:
-        input_limit = checked_input_limit(
-            probe["configuration"].get("max_input_bytes", MAX_INPUT_BYTES)
-        )
-        for task, configuration in probe["configuration"]["tasks"].items():
-            models = configuration["models"]
-            attempts = attempt_limit(probe["configuration"])
-            if attempts == 1:
-                models = models[:1]
-            if not models or any(model not in rates for model in models):
-                raise ValueError("configured_models_need_verified_prices")
-            if any(
-                not math.isfinite(rates[model][key]) or rates[model][key] < 0
-                for model in models
-                for key in ("input_per_million", "output_per_million")
-            ):
-                raise ValueError("invalid_price")
-            total += attempts * max(
-                (
-                    input_limit * rates[model]["input_per_million"]
-                    + TASK_OUTPUT_LIMITS[task] * rates[model]["output_per_million"]
-                )
-                / 1_000_000
-                for model in models
+        for payload in probe["preflight_payloads"]:
+            task = probe["configuration"]["tasks"][payload["task"]]
+            rate = rates[task["provider"]]
+            initial = payload["bytes_with_prior_quick_take_allowance"]
+            output = task["max_output_tokens"]
+            if task["provider"] == "openrouter":
+                total += (
+                    initial * rate["input_per_million"]
+                    + output * rate["output_per_million"]
+                ) / 1_000_000
+                continue
+            limits = task["request_limits"]
+            steps = limits["max_steps"] + 1
+            calls = limits["max_tool_calls"]
+            tool_budget = max(
+                tool["max_tokens"]
+                if tool["type"] == "web_search"
+                else tool["total_budget_tokens"]
+                for tool in limits["tools"]
             )
+            # Charge all allowed retrieved text and previous generated output
+            # as input on every step, including a separate final generation.
+            input_per_step = initial + calls * tool_budget + (steps - 1) * output
+            total += steps * (
+                input_per_step * rate["input_per_million"]
+                + output * rate["output_per_million"]
+            ) / 1_000_000 + calls * max(rate["tool_per_call"].values())
     return total
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
-    parser.add_argument(
-        "--comparison-mode",
-        choices=("legacy", "tiers", "writing"),
-        default="legacy",
-        help="tiers/writing: --baseline is a current-code reference; --candidate has only the two structured-tier mappings. writing probes only --candidate once.",
-    )
     parser.add_argument(
         "--fixtures",
         type=Path,
@@ -384,152 +381,109 @@ def main() -> None:
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--pricing", type=Path)
     parser.add_argument("--budget-usd", type=float, default=0)
+    parser.add_argument("--max-input-bytes", type=int, default=MAX_INPUT_BYTES)
     parser.add_argument(
-        "--max-input-bytes",
-        type=int,
-        default=MAX_INPUT_BYTES,
-        help="Explicit measured full-request ceiling; re-estimate and obtain approval before increasing for live work",
-    )
-    parser.add_argument(
-        "--live", action="store_true", help="Paid; founder approval required"
+        "--live", action="store_true", help="Paid; fresh founder approval required"
     )
     args = parser.parse_args()
     checked_input_limit(args.max_input_bytes)
-    tier_mode = args.comparison_mode == "tiers"
-    writing_mode = args.comparison_mode == "writing"
-    verify_tiers = tier_mode or writing_mode
+    root = args.candidate.resolve()
     fixtures = load_fixture_set(args.fixtures.resolve(), live=args.live)
-    variants = ("current", "structured") if verify_tiers else ("baseline", "candidate")
-    roots = dict(
-        zip(variants, (args.baseline.resolve(), args.candidate.resolve()), strict=False)
-    )
-    if args.live and any(
-        args.output.resolve().is_relative_to(root) for root in roots.values()
-    ):
-        raise ValueError("live_output_must_be_outside_checkouts")
-    provenance = {
-        key: checkout_provenance(path, require_clean=args.live or verify_tiers)
-        for key, path in roots.items()
-    }
-    tier_proof = None
-    if verify_tiers:
-        from tests.evals.result_readout_eval_tiers import validate_tier_checkouts
-
-        tier_proof = validate_tier_checkouts(roots["current"], roots["structured"])
+    provenance = checkout_provenance(root, require_clean=True)
+    if args.output.resolve().is_relative_to(root):
+        raise ValueError("output_must_be_outside_checkout")
+    if args.output.exists():
+        raise ValueError("output_already_exists")
     rates = {}
+    pricing = None
     if args.pricing:
         pricing = json.loads(args.pricing.read_text())
         if not pricing.get("verified_at") or not pricing.get("source"):
             raise ValueError("pricing_source_and_date_required")
-        rates = pricing["models"]
-    case_ids = [case["id"] for case in fixtures["cases"]]
-    replicates = 1 if writing_mode else 4 if tier_mode else 2
-    schedule = (
-        build_writing_schedule(case_ids)
-        if writing_mode
-        else build_schedule(case_ids, replicates=replicates, variants=variants)
-    )
-    task_count = len(schedule) * len(TASK_OUTPUT_LIMITS)
+        rates = pricing["providers"]
+    schedule = build_schedule([case["id"] for case in fixtures["cases"]])
     cases = {case["id"]: case for case in fixtures["cases"]}
-    preflight = {}
-    for row in schedule:
-        key = (row["variant"], row["case_id"], row["language"])
-        if key not in preflight:
-            preflight[key] = invoke_probe(
-                python=args.python,
-                checkout=roots[row["variant"]],
-                case=cases[row["case_id"]],
-                language=row["language"],
-                live=False,
-                budget_usd=0,
-                rates=rates,
-                max_input_bytes=args.max_input_bytes,
-                single_attempt=writing_mode,
-            )
-    probes = [preflight[(r["variant"], r["case_id"], r["language"])] for r in schedule]
+    probes = [
+        invoke_probe(
+            python=args.python,
+            checkout=root,
+            case=cases[row["case_id"]],
+            language=row["language"],
+            live=False,
+            budget_usd=0,
+            rates=rates,
+            max_input_bytes=args.max_input_bytes,
+        )
+        for row in schedule
+    ]
     ceiling = estimate_ceiling(probes, rates) if rates else None
     prerequisites = []
     if any(case["source"].get("kind") != "recorded_run" for case in fixtures["cases"]):
         prerequisites.append("Three genuine source-verified saved runs required.")
     if not rates:
-        prerequisites.append(
-            "Verified prices for configured primary/fallback models required."
-        )
-    if any(not item["worktree_clean"] for item in provenance.values()):
-        prerequisites.append("Both checkouts must be clean at their recorded commits.")
+        prerequisites.append("Verified estimate-only prices for both providers required.")
     if any(not probe["configuration"]["credential_present"] for probe in probes):
-        prerequisites.append("Provider credential required in subprocess environment.")
-    oversized = any(
-        row.get("bytes_with_prior_quick_take_allowance", row["bytes"])
-        > args.max_input_bytes
+        prerequisites.append(
+            "Both provider credentials required in subprocess environment."
+        )
+    if any(
+        row["bytes_with_prior_quick_take_allowance"] > args.max_input_bytes
         for probe in probes
         for row in probe["preflight_payloads"]
-    )
-    if oversized:
-        prerequisites.append(
-            "Request exceeds approved input bound; revise estimate before live."
-        )
-    if args.live and oversized:
-        raise ValueError("preflight_payload_too_large")
-    if args.live and (ceiling is None or ceiling > args.budget_usd):
-        raise ValueError("approved_budget_below_worst_case_estimate")
-    prior = None
-    if not writing_mode:
-        prior_manifest = json.loads(
-            (
-                roots[variants[0]] / ".agent/interpreter_prompt_fingerprint.json"
-            ).read_text()
-        )
-        prior = roots[variants[0]] / prior_manifest["last_measured"]["scorecard"]
+    ):
+        prerequisites.append("Full request plus prior Quick take exceeds input ceiling.")
+    if args.live and (prerequisites or ceiling is None or ceiling > args.budget_usd):
+        raise ValueError("live_prerequisites_or_approved_budget_unsatisfied")
     report = {
         "schema_version": "targeted_readout_scorecard/v1",
-        "scope": "result_summary + result_breakdown only; not a full eval suite",
-        "comparison_mode": args.comparison_mode,
-        "replicates_per_variant": replicates,
-        "scheduled_task_completions": task_count,
-        "tier_source_proof": tier_proof,
+        "scope": "Luna Quick take via OpenRouter and Breakdown via Perplexity Agent; generator-only proof",
+        "comparison_mode": "luna",
+        "replicates_per_variant": 1,
+        "scheduled_task_completions": len(schedule) * len(TASKS),
         "fingerprint_authority": {
             "eligible": False,
-            "reason": "Targeted readout evidence cannot authorize a fingerprint update.",
-            "required_gate": "Finish this lane's approved targeted proof, then stop and report. No full live eval or fingerprint regeneration without an explicit founder go.",
+            "reason": "No full live eval or fingerprint update authorized.",
         },
         "evaluation_mode": "live_targeted" if args.live else "preflight_no_calls",
         "remaining_prerequisites": prerequisites,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "fixture_sha256": fixtures["fixture_sha256"],
         "fixture_sources": {case["id"]: case["source"] for case in fixtures["cases"]},
-        "checkouts": provenance,
+        "checkouts": {"candidate": provenance},
         "runner_sha256": sha256(Path(__file__).read_bytes()),
         "probe_sha256": sha256(
             Path(__file__).with_name("result_readout_probe.py").read_bytes()
         ),
-        "prior_full_scorecard": retained_case_evidence(prior)
-        if prior is not None
-        else None,
+        "pricing": pricing,
         "budget": {
             "approved_usd": args.budget_usd,
             "worst_case_usd": ceiling,
+            "payload_and_tools_estimate_usd": estimate_payload_and_tools(probes, rates)
+            if rates
+            else None,
             "max_input_bytes": args.max_input_bytes,
-            "max_attempts_per_task": 1 if writing_mode else MAX_ATTEMPTS,
+            "max_attempts_per_task": MAX_ATTEMPTS,
+            "estimate_assumptions": "Agent envelope reserves a full model context per max_steps plus one final generation, output cap each, and max_tool_calls at the highest enabled tool rate. Conditional on provider enforcement; not billed-rate evidence. Unknown invoices retain the reservation; an invoice exceeding it stops later requests.",
+            "payload_and_tools_assumptions": "Planning estimate uses measured full request bytes as input tokens, including prior Quick take headroom, plus every allowed tool result and prior output on each Agent step and final generation. Uses the same conservative price envelope. Provider internal context is unknown, so this estimate is not a spending cap.",
         },
-        "totals": {"passed": 0, "failed": 0, "pending_review": task_count},
-        "quality_review": "Required: language, helpful interpretation beyond card, short/deep distinction, no repetition, false figures/claims, causal claims, forecasts, advice, em dashes.",
+        "totals": {
+            "passed": 0,
+            "failed": 0,
+            "pending_review": len(schedule) * len(TASKS),
+        },
+        "quality_review": "Review every outcome for language, supported historical story, source citations/dates, numeric and relationship truth, complementary frames, no forecast/advice/em dashes.",
         "results": [],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if args.output.exists():
-        raise ValueError("output_already_exists")
     reserved = 0.0
     for row, dry_probe in zip(schedule, probes, strict=False):
         probe = dry_probe
         if args.live:
-            # Recheck both immutable inputs before every paid pair, not only at startup.
-            for key, root in roots.items():
-                if checkout_provenance(root, require_clean=True) != provenance[key]:
-                    raise ValueError("checkout_changed_during_measurement")
+            if checkout_provenance(root, require_clean=True) != provenance:
+                raise ValueError("checkout_changed_during_measurement")
             probe = invoke_probe(
                 python=args.python,
-                checkout=roots[row["variant"]],
+                checkout=root,
                 case=cases[row["case_id"]],
                 language=row["language"],
                 live=True,
@@ -542,13 +496,7 @@ def main() -> None:
             {
                 **row,
                 **probe,
-                "display_evidence_role": (
-                    "Fixed-code composer output for this tier setting; generation evidence, not browser transport proof."
-                    if verify_tiers
-                    else "Private baseline composer output; baseline reader showed the web template."
-                    if row["variant"] == "baseline"
-                    else "Candidate composer output; reader and template fallback require separate browser evidence."
-                ),
+                "display_evidence_role": "Actual composer outcome; browser rendering is separate provider-free proof. Raw rejected drafts are diagnostics, not accepted text.",
             }
         )
         report["budget"]["reserved_usd"] = reserved
@@ -560,7 +508,7 @@ def main() -> None:
             report["budget"][key] = sum(item[key] for item in report["results"])
         counts = [item["unknown_cost_attempts"] for item in report["results"]]
         report["budget"]["unknown_cost_attempts"] = (
-            None if any(count is None for count in counts) else sum(counts)
+            None if None in counts else sum(counts)
         )
         report["budget"]["cost_complete"] = all(
             item["cost_complete"] for item in report["results"]
@@ -568,17 +516,16 @@ def main() -> None:
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
         if args.live and not measurement_can_continue(probe):
             raise ValueError("measurement_stopped_preserved_partial_evidence")
-    sys.stdout.write(
+    print(
         json.dumps(
             {
                 "output": str(args.output),
                 "live": args.live,
                 "worst_case_usd": ceiling,
-                "scheduled_task_completions": task_count,
+                "scheduled_task_completions": len(schedule) * len(TASKS),
                 "remaining_prerequisites": prerequisites,
             }
         )
-        + "\n"
     )
 
 

@@ -5,7 +5,14 @@ import json
 import tempfile
 from pathlib import Path
 
-from replay_data import digest, draft_prose, load_inputs, source_numbers, synthetic_report
+from replay_data import (
+    FRAME_PROVIDERS,
+    digest,
+    draft_prose,
+    load_inputs,
+    source_numbers,
+    synthetic_report,
+)
 
 root = Path.cwd()
 report = synthetic_report(root)
@@ -33,11 +40,23 @@ with tempfile.TemporaryDirectory(prefix="final-writing-schema-") as temporary:
     for pair in inputs["pairs"]:
         assert source_numbers(pair["run"])
         assert digest(root / pair["source_path"]) == pair["source"]["sha256"]
+        for surface, provider in FRAME_PROVIDERS.items():
+            outcome = pair["outcomes"][surface]
+            assert outcome["provider"] == provider
+            assert outcome["provider_responses"][0]["provider"] == provider
+        assert pair["outcomes"]["breakdown"]["sources"][0]["url"].startswith(
+            "https://example.invalid/"
+        )
+        if pair["outcomes"]["breakdown"]["accepted"]:
+            assert (
+                "](https://example.invalid/"
+                in pair["outcomes"]["breakdown"]["accepted_text"]
+            )
 
     mutations = {
         "fixture_hash": lambda value: value.update(fixture_sha256="incorrect"),
         "row_missing": lambda value: value["results"].pop(),
-        "wrong_tier": lambda value: value["results"][0].update(variant="current"),
+        "wrong_variant": lambda value: value["results"][0].update(variant="structured"),
         "accepted_fallback_conflict": lambda value: value["results"][0][
             "quick_take"
         ].update(fallback_used=True),
@@ -45,8 +64,14 @@ with tempfile.TemporaryDirectory(prefix="final-writing-schema-") as temporary:
             complete_text="partial"
         ),
         "extra_attempt": lambda value: value["results"][0].update(
-            requests=[{"task": "result_summary"}, {"task": "result_summary"}]
+            requests=[
+                {"task": "result_summary", "provider": "openrouter"},
+                {"task": "result_summary", "provider": "openrouter"},
+            ]
         ),
+        "swapped_provider": lambda value: value["results"][0]["provider_responses"][
+            0
+        ].update(provider="perplexity_agent"),
     }
     for name, mutate in mutations.items():
         bad = copy.deepcopy(report)
@@ -69,12 +94,10 @@ with tempfile.TemporaryDirectory(prefix="final-writing-schema-") as temporary:
     actual_like.pop("synthetic_browser_preflight")
     actual_like.update(
         evaluation_mode="live_targeted",
-        comparison_mode="writing",
+        comparison_mode="luna",
         scheduled_task_completions=12,
         budget={"max_attempts_per_task": 1},
     )
-    for row in actual_like["results"]:
-        row["configuration"] = {"single_attempt": True}
     path.write_text(json.dumps(actual_like))
     assert len(load_inputs(root, path)["pairs"]) == 6
     actual_mutations = {
@@ -82,11 +105,15 @@ with tempfile.TemporaryDirectory(prefix="final-writing-schema-") as temporary:
             evaluation_mode="preflight_no_calls"
         ),
         "wrong_comparison": lambda value: value.update(comparison_mode="tiers"),
+        "superseded_writing_round": lambda value: value.update(comparison_mode="writing"),
         "wrong_task_count": lambda value: value.update(scheduled_task_completions=96),
         "retry_configuration": lambda value: value["budget"].update(
             max_attempts_per_task=2
         ),
         "missing_frame": lambda value: value["results"][0].pop("quick_take"),
+        "wrong_provider_configuration": lambda value: value["results"][0][
+            "configuration"
+        ]["tasks"]["result_breakdown"].update(provider="openrouter"),
     }
     for name, mutate in actual_mutations.items():
         bad = copy.deepcopy(actual_like)

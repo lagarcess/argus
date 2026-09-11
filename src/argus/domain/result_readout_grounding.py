@@ -21,8 +21,8 @@ from argus.domain.result_readout_facts import (
 )
 from argus.domain.result_readout_quotes import validate_figure_references
 
-READOUT_GROUNDING_INSTRUCTIONS = (
-    "Use only run_facts for every figure and historical claim. The card owns "
+READOUT_RUN_GROUNDING_INSTRUCTIONS = (
+    "Use only run_facts for every backtest figure and simulation claim. The card owns "
     "the numbers; do not restate its figures or turn the readout into a metric "
     "inventory. Tell the historical story those facts support: the shape of the "
     "ride, what holding through it involved, and the tradeoff against the "
@@ -39,19 +39,25 @@ READOUT_GROUNDING_INSTRUCTIONS = (
     "feelings or decisions. Trade counts are executed fills, "
     "not necessarily completed round trips; sampled markers are not a full ledger. "
     "Annualized return is historical, not a forecast. Costs may be in percentage "
-    "points or basis points; do not invent dollar fees. Explain without a causal "
-    "claim about why a price moved. No forecasts, forward scenarios, advice to "
+    "points or basis points; do not invent dollar fees. No forecasts, forward scenarios, advice to "
     "buy or sell, or claims that a next test will improve results. No em dashes. "
     "Write all prose in product_language, "
     "translating source labels naturally; never copy internal fields or schema keys. "
     "Return the entire finished prose in text and report the language actually "
-    "written. For every visible numeric occurrence, include a figures reference "
+    "written. For every visible numeric occurrence from the run, include a figures reference "
     "with its exact fact_key and canonical value from run_facts, its exact visible "
     "quote, and the one-based occurrence of that quote in text. Include the unit "
     "in quote when written, and quote the whole visible date, not just its year. "
     "Repeated figures need separate occurrences. The 500 "
     "inside the name S&P 500 is part of the name, not a numerical fact. Use an "
     "empty figures list when no figures are written."
+)
+
+
+READOUT_GROUNDING_INSTRUCTIONS = (
+    READOUT_RUN_GROUNDING_INSTRUCTIONS
+    + " Use only run_facts for every figure and historical claim. Explain without "
+    "a causal claim about why a price moved. Do not search or add external context."
 )
 
 
@@ -174,7 +180,11 @@ def stored_readout_facts(
 
 
 def accepted_readout_text(
-    draft: object, *, facts: dict[str, Any], language: str
+    draft: object,
+    *,
+    facts: dict[str, Any],
+    language: str,
+    source_references: tuple[tuple[dict[str, Any], dict[str, Any]], ...] = (),
 ) -> tuple[str | None, str | None]:
     """Accept all of the draft or none; punctuation normalization is lossless."""
     try:
@@ -196,6 +206,7 @@ def accepted_readout_text(
             [ref.model_dump() for ref in response.figures],
             facts=facts,
             language=response.language,
+            source_references=source_references,
         )
     except (ValueError, OverflowError):
         # Malformed numbers/dates are rejected identically by both composers.

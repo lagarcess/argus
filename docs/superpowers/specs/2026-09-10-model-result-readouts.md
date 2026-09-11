@@ -3,6 +3,11 @@
 Founder-directed 2026-09-10. Integration base:
 `d0884c3de81f8c53d454ac4f68f461d3b5dd77e3`.
 
+Current authority: section 9 supersedes earlier provider/tier restrictions,
+release-file exclusions and paid-check plans below. Earlier sections retain
+the lane's decision history; their past approvals do not authorize the new
+twelve-draft Luna check. Its fresh estimate must be approved first.
+
 ## 1. Why
 
 The product promises explanations of computed results. The current Quick take

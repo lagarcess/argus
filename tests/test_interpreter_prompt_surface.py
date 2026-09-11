@@ -64,6 +64,31 @@ def test_shared_readout_instruction_constant_is_fingerprinted(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize(
+    "owner,name",
+    [
+        (
+            "src/argus/domain/result_readout_grounding.py",
+            "READOUT_RUN_GROUNDING_INSTRUCTIONS",
+        ),
+        (
+            "src/argus/domain/result_readout_grounding.py",
+            "READOUT_GROUNDING_INSTRUCTIONS",
+        ),
+        ("src/argus/domain/result_readout_sources.py", "BREAKDOWN_SOURCE_INSTRUCTIONS"),
+    ],
+)
+def test_each_readout_instruction_fragment_remains_measured(
+    tmp_path: Path, owner: str, name: str
+) -> None:
+    source = f'{name} = SHARED_TEXT + "Keep run and source figures separate."'
+    _write(tmp_path, owner, source)
+    first = model_facing_surface(tmp_path)
+    assert owner in first
+    _write(tmp_path, owner, source.replace("separate", "distinct"))
+    assert model_facing_surface(tmp_path)[owner] != first[owner]
+
+
+@pytest.mark.parametrize(
     "owner",
     [
         "src/argus/domain/result_readout_fact_sheet.py",

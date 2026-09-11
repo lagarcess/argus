@@ -29,7 +29,12 @@ READOUT_MESSAGE_OWNERS = frozenset(
         "src/argus/api/chat/breakdown.py",
     }
 )
-READOUT_INSTRUCTION_OWNER = "src/argus/domain/result_readout_grounding.py"
+READOUT_INSTRUCTION_OWNERS = frozenset(
+    {
+        "src/argus/domain/result_readout_grounding.py",
+        "src/argus/domain/result_readout_sources.py",
+    }
+)
 READOUT_FACT_SHEET_OWNERS = frozenset(
     {
         "src/argus/domain/result_readout_fact_sheet.py",
@@ -129,14 +134,19 @@ def _model_facing_strings(
                 target.id for target in node.targets if isinstance(target, ast.Name)
             ]
             if (
+                include_readout_instructions
+                and len(target_names) == 1
+                and target_names[0].endswith("_INSTRUCTIONS")
+            ):
+                # Shared and surface-specific fragments are each measured at
+                # their definition, including literals concatenated to a name.
+                text = _joined_constants(node.value)
+                if text:
+                    found.append((target_names[0], text))
+                continue
+            if (
                 len(target_names) == 1
-                and (
-                    target_names[0].endswith(_GUIDANCE_CONSTANT_SUFFIX)
-                    or (
-                        include_readout_instructions
-                        and target_names[0] == "READOUT_GROUNDING_INSTRUCTIONS"
-                    )
-                )
+                and target_names[0].endswith(_GUIDANCE_CONSTANT_SUFFIX)
                 and isinstance(node.value, ast.Constant)
                 and isinstance(node.value.value, str)
                 and node.value.value
@@ -185,7 +195,7 @@ def model_facing_surface(repository_root: Path) -> dict[str, dict[str, object]]:
         strings = _model_facing_strings(
             tree,
             include_dictionary_messages=relative in READOUT_MESSAGE_OWNERS,
-            include_readout_instructions=relative == READOUT_INSTRUCTION_OWNER,
+            include_readout_instructions=relative in READOUT_INSTRUCTION_OWNERS,
             include_fact_sheet_text=relative in READOUT_FACT_SHEET_OWNERS,
         )
         if not strings:

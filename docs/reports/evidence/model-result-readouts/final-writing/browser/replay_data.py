@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 SURFACES = {"quick_take": "result_summary", "breakdown": "result_breakdown"}
+FRAME_PROVIDERS = {"quick_take": "openrouter", "breakdown": "perplexity_agent"}
 EVIDENCE = Path("docs/reports/evidence/model-result-readouts")
 
 
@@ -38,11 +39,11 @@ def load_inputs(root: Path, report_path: Path, synthetic: bool = False) -> dict[
         raise ValueError("synthetic_mode_must_be_explicit")
     if not synthetic and (
         report.get("evaluation_mode") != "live_targeted"
-        or report.get("comparison_mode") != "writing"
+        or report.get("comparison_mode") != "luna"
         or report.get("scheduled_task_completions") != 12
         or report.get("budget", {}).get("max_attempts_per_task") != 1
     ):
-        raise ValueError("completed_single_attempt_writing_measurement_required")
+        raise ValueError("completed_single_attempt_luna_measurement_required")
     cases = {case["id"]: case for case in fixtures["cases"]}
     expected = {(key, lang) for key in cases for lang in ("en", "es-419")}
     rows = report["results"]
@@ -50,13 +51,8 @@ def load_inputs(root: Path, report_path: Path, synthetic: bool = False) -> dict[
         raise ValueError("exactly_three_runs_times_two_languages_required")
     pairs = []
     for row in rows:
-        if row["variant"] != "structured" or row["replicate"] != 1:
-            raise ValueError("structured_one_repetition_required")
-        if (
-            not synthetic
-            and row.get("configuration", {}).get("single_attempt") is not True
-        ):
-            raise ValueError("single_attempt_configuration_required")
+        if row["variant"] != "candidate" or row["replicate"] != 1:
+            raise ValueError("candidate_one_repetition_required")
         case = cases[row["case_id"]]
         source_path = root / EVIDENCE / case["source"]["artifact"]
         if digest(source_path) != case["source"]["sha256"]:
@@ -84,12 +80,25 @@ def load_inputs(root: Path, report_path: Path, synthetic: bool = False) -> dict[
             responses = [
                 item for item in row.get("provider_responses", []) if item["task"] == task
             ]
+            provider = FRAME_PROVIDERS[surface]
+            if any(item.get("provider") != provider for item in requests + responses):
+                raise ValueError("frame_provider_receipt_mismatch")
+            if (
+                not synthetic
+                and row.get("configuration", {})
+                .get("tasks", {})
+                .get(task, {})
+                .get("provider")
+                != provider
+            ):
+                raise ValueError("frame_provider_configuration_mismatch")
             if len(requests) > 1:
                 raise ValueError("more_than_one_provider_attempt_per_frame")
             outcome.update(
                 {
                     "surface": surface,
                     "task": task,
+                    "provider": provider,
                     "accepted": accepted is not None,
                     "requests": requests,
                     "provider_responses": responses,
@@ -174,10 +183,16 @@ def synthetic_report(root: Path) -> dict[str, Any]:
             row: dict[str, Any] = {
                 "case_id": case["id"],
                 "language": language,
-                "variant": "structured",
+                "variant": "candidate",
                 "replicate": 1,
                 "requests": [],
                 "provider_responses": [],
+                "configuration": {
+                    "tasks": {
+                        task: {"provider": FRAME_PROVIDERS[surface]}
+                        for surface, task in SURFACES.items()
+                    },
+                },
             }
             for index, (surface, task) in enumerate(SURFACES.items()):
                 text = (
@@ -186,6 +201,19 @@ def synthetic_report(root: Path) -> dict[str, Any]:
                     else f"Prueba sintética del formato {surface}. Ningún modelo escribió este texto."
                 )
                 accepted = (language == "en") == (surface == "quick_take")
+                sources = []
+                if surface == "breakdown":
+                    # An intentionally non-fetchable citation tests markup only.
+                    url = "https://example.invalid/synthetic-source?year=2023&kind=test"
+                    date_label = "Sep 1, 2023" if language == "en" else "1 sep 2023"
+                    text += f" [{date_label}]({url})"
+                    sources = [
+                        {
+                            "url": url,
+                            "title": "SYNTHETIC citation fixture",
+                            "source_date": "2023-09-01",
+                        }
+                    ]
                 row[surface] = {
                     "complete_text": text
                     if accepted
@@ -194,10 +222,20 @@ def synthetic_report(root: Path) -> dict[str, Any]:
                     "source": "synthetic_browser_preflight",
                     "fallback_used": not accepted,
                     "failure_mode": None if accepted else "synthetic_rejection",
+                    "sources": sources,
                 }
+                row["requests"].append(
+                    {
+                        "task": task,
+                        "provider": FRAME_PROVIDERS[surface],
+                        "attempt_id": index + 1,
+                        "synthetic_browser_preflight": True,
+                    }
+                )
                 row["provider_responses"].append(
                     {
                         "task": task,
+                        "provider": FRAME_PROVIDERS[surface],
                         "attempt_id": index + 1,
                         "http_status": 200,
                         "raw_drafts": [

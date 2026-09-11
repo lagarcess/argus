@@ -1178,6 +1178,36 @@ and uses complete fallback. This is a structured self-report, not an independent
 language classifier, and references do not establish arbitrary prose entailment.
 Model quality therefore still requires case-by-case factual review.
 
+Quick take is composed on the OpenRouter `readout` tier, with both model keys
+set to `openai/gpt-5.6-luna` and no search. Breakdown uses a readout-owned Luna
+constant through the existing Perplexity Agent client with only `web_search`
+and `fetch_url`. Its public message kind stays `result_breakdown`; it is no
+longer an OpenRouter task. The chat and context environment keys retain their
+other task owners.
+
+Breakdown's internal structured draft additionally contains `source_figures`
+and `citations`. Each external figure records its value, unit, optional currency,
+visible quote, occurrence and zero-based `citation_index`. Each citation records
+the exact external claim quote and occurrence, a URL present in the provider's
+returned sources, and an ISO `as_of` date established by that source. This date
+describes the cited event or measurement, not automatically the page's publication
+date. External claims without supported dates should be omitted. Code requires
+the numeric occurrence to lie inside its cited claim, verifies the visible
+value/unit, and enforces non-overlapping coverage across run and source figures.
+Unknown sources, missing dates and uncited figures reject the entire draft.
+Source figures never enter the run fact sheet or resolve a run fact key.
+
+Code attaches dated Markdown citation links only after complete validation;
+model-written links are rejected. These links travel inside the accepted `text`,
+with dates formatted for its stored language. No additional public envelope
+fields, source packets, quote references or provider usage are exposed. Cited
+historical context may explain the holding experience, with inference distinguished
+from documented events. Forecasts and investing advice remain outside readouts.
+The source/date check proves reference structure, not source entailment; factual
+review remains required. Received Breakdown usage is recorded through the shared
+research cost ledger even when the draft is rejected; unpriced usage retains the
+existing invoice-reconciliation path.
+
 Fact sheets and quote references are internal generation inputs/output, not
 additional public readout fields. The closed public envelope above is unchanged.
 Only accepted complete prose crosses it; language/figure rejection details use

@@ -672,7 +672,8 @@ here.
 
 ### Let the model write the readout  ·  ships in **its own promotion, after the registry**
 
-**The Quick take and Breakdown a user reads are not written by a model.** Since
+**Original defect, recorded before this lane:** the Quick take and Breakdown a
+user reads are not written by a model. Since
 PR #551 on 2026-09-05 the web renders both from typed facts through fixed
 templates, `web/lib/result-readout-display.ts` and the `chat.result_readout`
 strings in the locale files: four sentences for the Quick take, and for the
@@ -682,6 +683,14 @@ still writes both on every result, `result_summary` on the chat tier and
 that text on read as private prose. **Argus pays for an answer nobody sees.**
 Founder, 2026-09-10, on a DOCN buy-and-hold result beside Perplexity: the
 readout is shallow.
+
+**Current founder-locked target:** Quick take uses Luna through the new
+OpenRouter `readout` tier; Breakdown uses Luna through the existing Perplexity
+Agent client, with web search and URL retrieval only. Chat and context retain
+their other owners. Separate dated source references supplement the immutable
+run references. The additive client exception, exact environment propagation,
+held fingerprint and twelve-draft approval gate are specified in
+`docs/superpowers/specs/2026-09-10-model-result-readouts.md`, section 9.
 
 **Why #551 did it.** Saved English results rendered under Spanish chrome (#531,
 #530, #528). Hiding model prose fixed the language, and it also removed the only

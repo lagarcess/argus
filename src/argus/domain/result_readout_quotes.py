@@ -345,15 +345,21 @@ def _matches_row(
 
 
 def validate_figure_references(
-    text: str, references: list[dict[str, Any]], *, facts: dict[str, Any], language: str
+    text: str,
+    references: list[dict[str, Any]],
+    *,
+    facts: dict[str, Any],
+    language: str,
+    source_references: tuple[tuple[dict[str, Any], dict[str, Any]], ...] = (),
 ) -> str | None:
     """Check canonical keys/values and complete coverage before text normalization."""
     locale = "es" if language == "es-419" else "en"
     visible = _visible_figures(text, locale, facts)
     covered: set[int] = set()
     occupied: list[tuple[int, int]] = []
-    for reference in references:
-        row = resolve_readout_fact(facts, reference["fact_key"])
+    # A web citation may authorize its own figure, never a lookup in run facts.
+    resolved = [(ref, resolve_readout_fact(facts, ref["fact_key"])) for ref in references]
+    for reference, row in [*resolved, *source_references]:
         if not row or row.get("unit") in {"unknown", "text", "boolean"}:
             return "invalid_figure_reference"
         value = row.get("value")

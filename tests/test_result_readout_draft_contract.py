@@ -409,6 +409,8 @@ async def test_composer_one_call_and_complete_fallback_with_precise_reason(
     from argus.agent_runtime.stages import explain
     from argus.agent_runtime.state.models import RunState
     from argus.api.chat import breakdown
+    from argus.domain.research.contracts import ResearchUsage
+    from argus.domain.research.perplexity_agent import StructuredAgentResult
 
     calls = []
     text = "El recorrido histórico fue irregular."
@@ -468,14 +470,28 @@ async def test_composer_one_call_and_complete_fallback_with_precise_reason(
         reason = patch.get("assistant_response_failure_mode")
         source = patch["assistant_response_source"]
     else:
-        monkeypatch.setattr(breakdown, "_invoke_breakdown_llm_with_budget", invoke)
+
+        class Client:
+            def run_structured(self, prompt, spec, **kwargs):
+                return StructuredAgentResult(
+                    draft={
+                        **invoke(prompt=prompt, spec=spec, **kwargs),
+                        "source_figures": [],
+                        "citations": [],
+                    },
+                    sources=(),
+                    usage=ResearchUsage(model=spec.model),
+                    tool_results=(),
+                    provider_response_id=None,
+                )
+
         monkeypatch.setattr(
             breakdown,
             "result_breakdown_context",
             lambda run: {**result, "raw_metrics": result["metrics"]},
         )
         message = breakdown.result_breakdown_message_with_metadata(
-            object(), language="es-419"
+            object(), language="es-419", client=Client()
         )
         rendered, used_fallback, reason, source = (
             message.text,
@@ -509,13 +525,14 @@ def test_breakdown_unsupported_requested_language_never_uses_context_locale(lang
 
     calls = []
 
-    def invoke(**kwargs):
-        calls.append(kwargs)
-        return draft("A historical result.")
+    class Client:
+        def run_structured(self, *args, **kwargs):
+            calls.append((args, kwargs))
+            raise AssertionError("Unsupported language must not call the provider")
 
     assert _llm_result_breakdown_with_metadata(
-        {"language": "en"}, language=language, invoke_json_schema_func=invoke
-    ) == (None, "language_mismatch")
+        {"language": "en"}, language=language, client=Client()
+    ) == (None, "language_mismatch", None, ())
     assert calls == []
 
 

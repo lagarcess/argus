@@ -54,7 +54,7 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.breakdown import result_breakdown_message_with_metadata
+from argus.api.chat.breakdown import result_breakdown_action
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -1000,9 +1000,13 @@ async def chat_stream(
                         )
                     if result_action_type == "show_breakdown":
                         yield sse_data({"type": "stage_start", "stage": "explain"})
-                        breakdown_message = result_breakdown_message_with_metadata(
+                        breakdown_message = await asyncio.to_thread(
+                            result_breakdown_action,
                             result_action_run,
                             language=runtime_user.language_preference,
+                            user_id=user.id,
+                            conversation_id=conversation.id,
+                            request_id=request.state.request_id,
                         )
                         assistant_text = breakdown_message.text
                         breakdown_metadata = result_breakdown_metadata(
