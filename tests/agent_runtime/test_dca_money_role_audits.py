@@ -604,3 +604,48 @@ def test_semantic_reader_reads_an_equal_amount_in_both_crossed_slots_as_one_cap(
     assert report.evidence.total_capital is None
     assert report.optional_parameter_values.get("initial_capital") is None
     assert "semantic_dca_ceiling_role_read_over_seed_key" in report.reason_codes
+
+
+def test_fidelity_audit_corroborates_an_untyped_seed_equal_to_the_contribution() -> None:
+    # "Start with $100 and add $100 monthly": the primary typed the seed with
+    # no provenance and the fidelity audit reads both a $100 capital and a
+    # $100 contribution. Two roles read separately are two facts; the seed is
+    # corroborated even though the amounts are equal.
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Start with $100 and add $100 monthly.",
+        semantic_turn_act="new_idea",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            cadence="monthly",
+            date_range={"start": "2024-01-02", "end": "2024-12-31"},
+            capital_amount=100.0,
+            recurring_contribution=100.0,
+            initial_capital=100.0,
+            field_provenance={
+                "asset_universe": "explicit_user",
+                "date_range": "explicit_user",
+                "recurring_contribution": "explicit_user",
+                "cadence": "explicit_user",
+            },
+        ),
+    )
+
+    repaired = _response_from_stated_run_field_fidelity_audit(
+        response=response,
+        audit=StatedRunFieldFidelityAudit(
+            capital_amount=100.0, recurring_contribution_amount=100.0, confidence=0.9
+        ),
+    )
+
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.initial_capital == 100.0
+    assert draft.field_provenance["initial_capital"] == "starting_capital"
+    assert "stated_run_field_seed_corroborated" in repaired.reason_codes
+    projected = _strategy_from_llm(draft, "Start with $100 and add $100 monthly.")
+    assert projected.extra_parameters["initial_capital"] == 100.0
+    assert projected.capital_amount == 100.0

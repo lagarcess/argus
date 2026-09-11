@@ -212,16 +212,15 @@ def _seed_corroborated_by_fidelity_audit(
     repaired: LLMInterpretationResponse,
 ) -> bool:
     """A seed the primary typed without provenance keeps its value once the
-    fidelity audit reads the same distinct starting capital beside the
-    contribution. The audit corroborates; it never invents a seed.
+    fidelity audit reads the same starting capital beside the contribution.
+    The audit's schema keeps the two roles apart, so an equal pair is two
+    facts, not one restated. The audit corroborates; it never invents a seed.
     """
     if canonical_strategy_type(draft.strategy_type) != "dca_accumulation":
         return False
     if audit.capital_amount is None or audit.recurring_contribution_amount is None:
         return False
     seed = float(audit.capital_amount)
-    if seed == float(audit.recurring_contribution_amount):
-        return False
     if draft.initial_capital is None or float(draft.initial_capital) != seed:
         return False
     if (
