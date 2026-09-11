@@ -144,7 +144,7 @@ the merge ignores it. That replay is a committed test.
 | --- | ---: |
 | `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task and of a continuing new idea, the recorded two turns through the real workflow) | 101 passed |
 | `tests/agent_runtime/test_dca_money_role_audits.py` | 35 passed |
-| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 37 passed |
+| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 42 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
 | Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `f7fc6d74` | 2642 passed, 2 skipped |
 | `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `f7fc6d74` | 822 passed |
@@ -391,6 +391,14 @@ This owner touches no measurement case; no live run and no spend.
 | Finding | Fix | Test |
 | --- | --- | --- |
 | A currency sign placed after the amount ("1.000€—2.000€") was not accepted as a figure ending, so the range was rendered as two figures | One predicate says what a figure character is (a digit, any Unicode currency sign, or a percent-like sign) and both sides of the dash use it | trailing-sign ranges in Spanish and English, whole-reply and chunked, and a letter code that keeps the comma, in `tests/test_visible_reply.py` (three failed on the head owner) |
+
+This owner touches no measurement case; no live run and no spend.
+
+## Codex round 13 (one P2 on `73d8bdde`, fixed in `971fdbc6`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| Adjacent dashes ("Wait——actually") streamed as "Wait, actually" and persisted as "Wait. actually", because the empty text between them was read as the end of a streamed token | A run of adjacent dashes is one dash, collapsed before the split, so both doors read the same text; every dash is still counted | adjacent dashes whole-reply in English and Spanish and split across chunks on either side, in `tests/test_visible_reply.py` (five failed on the head owner) |
 
 This owner touches no measurement case; no live run and no spend.
 
