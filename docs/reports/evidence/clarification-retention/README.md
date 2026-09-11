@@ -2,7 +2,8 @@
 
 Lane branch `claude/dca-clarification-retention-1578cd`, base integration
 `46d43c1d` (`origin/codex/private-alpha-next` on 2026-09-11). Fix commits
-`368fe918`, `ee15a349` (Codex round 1) and `a658c7ad` (Codex round 2). This folder holds the reproduction on the base, the deterministic
+`368fe918`, `ee15a349` (Codex round 1), `a658c7ad` (Codex round 2) and
+`1d41d9f4` (Codex round 3). This folder holds the reproduction on the base, the deterministic
 replay of the recorded provider reads before and after, the live browser demo
 in English and Spanish before and after, the two new measurement cases run
 live, the engine check of the start-day contribution, and every billed cost.
@@ -250,6 +251,23 @@ the fresh idea stated during a pending clarification. All five passed with the
 judge on, $0.19. The em dash change touches no measurement case; it lives in
 the SSE and persistence boundary that `tests/test_visible_reply.py` covers.
 
+## Codex round 3 (a P1 and a P2 on `51695446`, fixed in `1d41d9f4`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| Occupied-seed detection read the aggregate total-capital vocabulary, so a cap the primary read slotted under `initial_capital` with the role `total_budget` counted as a typed seed and the audit's matching cap was outranked | A seed is the user's own only under a user or seed role (`_USER_SEED_SOURCES`); a ceiling role under the seed key is a cap in the wrong slot. The semantic reader gained the mirror rule: a seed key whose provenance names a ceiling role is read as the ceiling (`semantic_dca_ceiling_role_read_over_seed_key`) | `test_a_cap_slotted_as_the_seed_with_a_ceiling_role_is_not_a_typed_seed`, `test_semantic_reader_treats_a_seed_key_with_a_ceiling_role_as_the_ceiling`, `test_a_seed_typed_under_a_seed_or_user_role_still_outranks_the_audit` |
+| A reply that ends on an em dash left the held boundary in the token carry with nothing flushing it, so the live stream read "Hello" while the persisted reply read "Hello." | `ReplyRewrites.flush()` shows what a chunk held for a next chunk that never came; the stream flushes it as a last token frame when the final event arrives | `test_a_reply_that_ends_on_a_held_boundary_is_flushed_when_the_stream_closes` (en, es-419), `test_chat_stream_flushes_a_trailing_em_dash_before_the_final_frame` |
+
+### Measurement cases the round-3 fix touches, live at `1d41d9f4` (`live-touched-cases-1d41d9f4.json`)
+
+The money-role change reaches every DCA case that states a seed or a cap:
+`dca_capital_semantics_only_have_amount_is_ceiling_issue_455`,
+`dca_capital_semantics_explicit_cap_refused_by_name_issue_455`,
+`dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455`,
+`dca_capital_semantics_spanish_seed_and_contribution_issue_455` and the two
+recorded-repro cases (en, es-419). All six passed with the judge on, $0.13.
+The stream flush touches no measurement case; the SSE contract test covers it.
+
 ## Billed cost
 
 | Item | Cost |
@@ -262,7 +280,8 @@ the SSE and persistence boundary that `tests/test_visible_reply.py` covers.
 | Six regressed cases rerun with the judge | $0.081 |
 | Haiku check of the cap case, three runs on the base and three on this head | $0.165 |
 | Five touched measurement cases live at `a658c7ad` | $0.187 |
-| **Total** | **$2.45** |
+| Six touched measurement cases live at `1d41d9f4` | $0.130 |
+| **Total** | **$2.58** |
 
 ## Observed, not changed here
 
