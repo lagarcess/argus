@@ -357,6 +357,9 @@ class UserState(BaseModel):
     user_id: str
     display_name: str | None = None
     language_preference: str = "en"
+    # The profile's declared ISO 3166-1 alpha-2 country; research sends it as
+    # the reader's location, and None sends no location.
+    country: str | None = None
     preferred_tone: ToneName = "friendly"
     expertise_level: ExpertiseMode = "beginner"
     response_verbosity: VerbosityName = "medium"

@@ -96,21 +96,14 @@ def _record(
 
 
 def run_probe(name: str, *, sha: str) -> dict[str, Any]:
-    """One probe, with the home market set only for the local-source call so
-    every other recording shows the request a deployment without a declared
-    market sends."""
-    previous = os.environ.pop("ARGUS_RESEARCH_HOME_COUNTRY", None)
-    if name.startswith("domain_filtered_"):
-        os.environ["ARGUS_RESEARCH_HOME_COUNTRY"] = "DO"
-    try:
-        return _run_probe(name, sha=sha)
-    finally:
-        os.environ.pop("ARGUS_RESEARCH_HOME_COUNTRY", None)
-        if previous is not None:
-            os.environ["ARGUS_RESEARCH_HOME_COUNTRY"] = previous
+    """One probe. The domain-filtered probes ask as a reader whose declared
+    country is DO; every other probe asks as a user with no country, which
+    sends no location."""
+    country = "DO" if name.startswith("domain_filtered_") else None
+    return _run_probe(name, sha=sha, country=country)
 
 
-def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
+def _run_probe(name: str, *, sha: str, country: str | None) -> dict[str, Any]:
     from argus.agent_runtime import research_grounded as grounded
     from argus.domain.research.config import PRIMARY_MODEL, retrieval_spec
     from argus.domain.research.contracts import ResearchUnavailableError
@@ -126,7 +119,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
     nvda = [{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}]
 
     if name == "fast_quote_typed":
-        spec = retrieval_spec("fast", question_kind="live_quote", language_tag="en")
+        spec = retrieval_spec("fast", question_kind="live_quote", language_tag="en", country=country)
         prompt = grounded._research_prompt(
             message="What is Apple trading at right now?",
             subjects=[{"symbol": "AAPL", "name": "Apple", "asset_class": "equity"}],
@@ -137,7 +130,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
         purpose = "fast shape under the strict schema and the fallback chain"
     elif name == "typed_rows_current_external":
         spec = retrieval_spec(
-            "balanced", question_kind="current_external", language_tag="en"
+            "balanced", question_kind="current_external", language_tag="en", country=country
         )
         prompt = grounded._research_prompt(
             message="Why is NVIDIA stock moving this week?",
@@ -149,12 +142,14 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
         )
         purpose = "#545: typed rows and dated publisher sources, one-week recency"
     elif name == "domain_filtered_local_source":
+        # No shape sends a domain filter now; the probe keeps the recorded
+        # request, the seed publisher, so the provider behavior can be re-recorded.
         spec = retrieval_spec(
             "balanced",
             question_kind="current_external",
             language_tag="es-419",
-            local_sources=True,
-        )
+            country=country,
+        ).model_copy(update={"source_domains": ("popularenlinea.com",)})
         prompt = grounded._research_prompt(
             message=(
                 "¿Qué tasa de interés paga hoy el Banco Popular Dominicano por "
@@ -175,7 +170,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             "balanced",
             question_kind="current_external",
             language_tag="es-419",
-            local_sources=True,
+            country=country,
         ).model_copy(
             update={
                 "source_domains": (
@@ -210,7 +205,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             "balanced",
             question_kind="current_external",
             language_tag="es-419",
-            local_sources=True,
+            country=country,
         ).model_copy(
             update={
                 "source_domains": ("popularenlinea.com", "sb.gob.do", "bancentral.gov.do")
@@ -232,7 +227,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
             "list: does a local rate arrive as a cited row"
         )
     elif name == "market_pulse_vaguest_rail":
-        spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en")
+        spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en", country=country)
         prompt = ""
         purpose = (
             "#404 end to end: the rail's grounded path on the vaguest phrasing, "
@@ -240,7 +235,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
         )
     elif name in RETRY_VARIANTS:
         spec = retrieval_spec(
-            "balanced", question_kind="market_pulse", language_tag="en"
+            "balanced", question_kind="market_pulse", language_tag="en", country=country
         ).model_copy(
             update={
                 "tools": ("finance_search",),
@@ -258,7 +253,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
         # concrete retry asked with only the finance tool available, so the
         # model cannot spend its steps reconstructing the table from web prose.
         spec = retrieval_spec(
-            "balanced", question_kind="market_pulse", language_tag="en"
+            "balanced", question_kind="market_pulse", language_tag="en", country=country
         ).model_copy(update={"tools": ("finance_search",)})
         prompt = grounded._survey_retry_prompt(
             question_kind="market_pulse",
@@ -267,7 +262,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
         )
         purpose = "#404: the concrete survey retry with the finance tool alone"
     elif name in ("market_pulse_vaguest", "tool_choice_required"):
-        spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en")
+        spec = retrieval_spec("balanced", question_kind="market_pulse", language_tag="en", country=country)
         prompt = grounded._research_prompt(
             message="anything interesting moving today",
             subjects=[],
@@ -282,7 +277,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
         )
     elif name == "models_fallback_forced":
         spec = retrieval_spec(
-            "fast", question_kind="live_quote", language_tag="en"
+            "fast", question_kind="live_quote", language_tag="en", country=country
         ).model_copy(update={"models": ("openai/does-not-exist-model", PRIMARY_MODEL)})
         prompt = grounded._research_prompt(
             message="What is Apple trading at right now?",
@@ -294,7 +289,7 @@ def _run_probe(name: str, *, sha: str) -> dict[str, Any]:
         purpose = "the fallback chain: an unavailable first model is passed over"
     elif name == "thorough_typed_background":
         spec = retrieval_spec(
-            "thorough", question_kind="cross_company", language_tag="en"
+            "thorough", question_kind="cross_company", language_tag="en", country=country
         )
         prompt = grounded._research_prompt(
             message=(

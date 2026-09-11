@@ -11,9 +11,9 @@ one invocation. Probe evidence: docs/reports/evidence/377/probes/.
 The retrieval parameters (grounded-finance board, "Retrieval parameters") ride
 the same spec: a model fallback chain, the strict typed-output schema, the
 response language, the web search context size, a recency filter derived from
-the question's data class, the deployment's home market as the user location,
-and a curated local publisher list for local questions. They are configuration
-per question shape, derived by :func:`retrieval_spec`; nothing here routes.
+the question's data class, and the asking user's declared country as the user
+location. They are configuration per question shape, derived by
+:func:`retrieval_spec`; nothing here routes.
 """
 
 from __future__ import annotations
@@ -21,8 +21,7 @@ from __future__ import annotations
 import os
 from typing import Literal
 
-from loguru import logger
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from argus.domain.research.cache import DataClass, data_class_for
 from argus.domain.research.contracts import CapabilityClass, QuestionShape
@@ -214,41 +213,6 @@ RECENCY_BY_DATA_CLASS: dict[DataClass, RecencyFilter | None] = {
     "filings_transcripts": None,
 }
 
-# Curated local publishers per market, keyed by ISO 3166-1 alpha-2. The
-# provider caps a domain filter at twenty entries, so this is the real
-# constraint on a market's source list. Seeded with the bank users actually
-# named on 2026-08-12 (spec section 6, smoke test question 4); the founder
-# supplies the Dominican list.
-LOCAL_SOURCE_DOMAINS: dict[str, tuple[str, ...]] = {
-    "DO": ("popularenlinea.com",),
-}
-
-
-def home_location() -> RetrievalLocation | None:
-    """The deployment's market, sent as the reader's location.
-
-    Argus holds no per-user country yet. Until it does, the market the
-    deployment serves is the one location fact, declared in the release
-    contract; unset means no location is sent."""
-    country = os.getenv("ARGUS_RESEARCH_HOME_COUNTRY", "").strip()
-    if not country:
-        return None
-    try:
-        return RetrievalLocation(country=country)
-    except ValidationError:
-        logger.warning(
-            "ARGUS_RESEARCH_HOME_COUNTRY is not an ISO 3166-1 alpha-2 code"
-            f" value={country!r}; no location sent"
-        )
-        return None
-
-
-def local_source_domains(location: RetrievalLocation | None) -> tuple[str, ...]:
-    if location is None:
-        return ()
-    return LOCAL_SOURCE_DOMAINS.get(location.country, ())
-
-
 def iso_language(language_tag: str | None) -> str:
     """ISO 639-1 code from a BCP 47 tag: es-419 to es, en to en."""
     return str(language_tag or "en").split("-", 1)[0].strip().lower() or "en"
@@ -258,21 +222,22 @@ def retrieval_spec(
     shape: QuestionShape,
     *,
     question_kind: str | None,
+    country: str | None,
     closed_period: bool = False,
     language_tag: str | None = "en",
-    local_sources: bool = False,
     scenario: bool = False,
 ) -> ResearchConfigSpec:
     """The documented configuration for a shape, with this question's
-    retrieval parameters: response language, home-market location, recency
-    by data class, the local publisher list when the question is local and
-    the market has one, and the scenario contract when the answer is
-    computed from published inputs."""
-    location = home_location()
+    retrieval parameters: response language, the asking user's declared
+    country as the location, recency by data class, and the scenario contract
+    when the answer is computed from published inputs.
+
+    ``country`` has no default: every caller says whose question it builds,
+    and a user without a country sends no location."""
     return RESEARCH_CONFIG_SPECS[shape].model_copy(
         update={
             "language": iso_language(language_tag),
-            "location": location,
+            "location": RetrievalLocation(country=country) if country else None,
             "recency": RECENCY_BY_DATA_CLASS[
                 data_class_for(
                     question_kind=question_kind,
@@ -280,7 +245,6 @@ def retrieval_spec(
                     scenario=scenario,
                 )
             ],
-            "source_domains": (local_source_domains(location) if local_sources else ()),
             "instructions": (
                 SCENARIO_RETRIEVAL_INSTRUCTIONS if scenario else RETRIEVAL_INSTRUCTIONS
             ),

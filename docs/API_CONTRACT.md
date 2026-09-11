@@ -929,6 +929,9 @@ Application-facing user object.
   "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
+  "country": "MX",
+  "currency_override": null,
+  "currency": "MXN",
   "is_admin": false,
   "onboarding": {
     "completed": false,
@@ -955,6 +958,14 @@ Application-facing user object.
     opts out after opting in.
   - A registered-account preference. Guest responses omit it entirely, and the
     database policies keep it off the guest surface.
+- `country` is where the user lives, an ISO 3166-1 alpha-2 code chosen in
+  Settings. It is stated, never inferred from conversation, IP or behavior
+  (decision 8). Research sends it as the reader's location; null sends none.
+- `currency` is read-only: `currency_override` when the user chose one,
+  otherwise the currency the country implies (the first tender currency CLDR
+  records there with no end date), and null when neither is known. Only the
+  override is stored.
+  - All three are registered-account preferences. Guest responses omit them.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
@@ -2644,6 +2655,9 @@ Retrieve the current authenticated user profile and preferences.
     "language": "en",
     "locale": "en-US",
     "avatar_theme": "ocean",
+    "country": "MX",
+    "currency_override": null,
+    "currency": "MXN",
     "is_admin": false,
     "onboarding": {
       "completed": false,
@@ -2872,7 +2886,9 @@ Update profile preferences. Partial update semantics are supported.
   "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
-  "avatar_theme": "plum"
+  "avatar_theme": "plum",
+  "country": "DO",
+  "currency_override": "USD"
 }
 ```
 
@@ -2895,6 +2911,21 @@ Update profile preferences. Partial update semantics are supported.
 - Avatar themes are registered-account preferences. Guests cannot update a
   profile, and guest-facing `/me` and `/auth/session` responses omit
   `avatar_theme`.
+- `country` accepts an officially assigned ISO 3166-1 alpha-2 code in any
+  case. A grouping or user-assigned region such as `EU` or `XK`, or a country
+  name, returns 422. `null` or an empty value clears it, and a user with no
+  country sends no research location.
+- `currency_override` accepts an ISO 4217 code CLDR records in tender in some
+  country with no end date; other codes return 422. The accepted codes change
+  only with the installed CLDR data, never with the date, so the Settings
+  picker's generated list and the API always agree within one build. `null`
+  clears it, and `currency` returns to the one the country implies. A stored
+  code the standards later retire still reads back; only an edit is held to
+  the current codes.
+- `currency` is derived and cannot be written; a patch that sends it is
+  ignored.
+- Country and currency are registered-account preferences. Guests cannot
+  update a profile, and guest-facing responses omit all three fields.
 - A legacy `onboarding` object or `theme` from an old client is ignored; the
   API cannot write either. The chosen theme stays in the browser, so the
   account holds no theme.
@@ -4204,13 +4235,13 @@ Contract rules:
   language), the shape's web search context size, a recency filter derived
   from the question's section 7 data class (current classes a week, analyst
   estimates a month, quarterly and closed classes none, so a closed window is
-  never filtered to the past week), the deployment's home market as the
-  reader's location (`ARGUS_RESEARCH_HOME_COUNTRY`, ISO 3166-1 alpha-2;
-  unset sends none, and Argus holds no per-user country yet), and, for a
-  local question, that market's curated publisher list as the domain filter
-  (at most twenty domains, the provider's ceiling). No rail shape today is
-  local; the list is seeded from the bank users actually named and is
-  consumed by the first local calculation.
+  never filtered to the past week), and the asking user's declared country
+  as the reader's location on the web search tool (the profile's `country`,
+  ISO 3166-1 alpha-2). A user without a country sends no location, and no
+  deployment-wide country stands in for one. A thorough job's typed request
+  carries the country, so the job sends the location of the user who asked.
+  The research cache key includes that country, so a search made for one
+  country's readers never answers another's. No domain filter is sent.
 - Current external facts ("why is NVDA moving this week") are claim-shaped:
   they ground through the balanced shape with publisher sources required and
   a one-week recency filter, and persist the ordinary `research` sidecar with

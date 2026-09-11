@@ -153,6 +153,8 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
   chosen theme stays in the browser, and a later migration drops the column)
 - `avatar_theme`: `avatar_theme` enum (Default: `'ocean'`; one of `ocean`,
   `plum`, `teal`, `ember`, `gold`, `indigo`, or `slate`)
+- `country`: `text` (Nullable; an ISO 3166-1 alpha-2 code when present)
+- `currency_override`: `text` (Nullable; an ISO 4217 code when present)
 - `is_admin`: `boolean` (Default: `false`)
 - `onboarding`: `jsonb` (legacy/inert; the applied migration defaults new rows
   to the historical shape below)
@@ -189,6 +191,18 @@ product behavior reads it, and no API path writes it.
   runtime path writes it. A registered-account preference: restrictive
   policies read the trusted `is_anonymous` JWT claim to keep it off the guest
   surface, because anonymous Auth users share the `authenticated` role.
+- `country` is where the user lives. It is chosen in Settings and never
+  inferred from conversation, IP or behavior (decision 8). Research sends it
+  as the reader's location, and a user with no country sends no location.
+- `currency_override` is a currency the user chose over the one their country
+  implies. The resolved currency is not stored: the API derives it from the
+  override when there is one, otherwise from the country (the first tender
+  currency CLDR records there with no end date, so it changes only with the
+  installed CLDR data, never with the date).
+- Both constraints check only a code's shape. Which codes are assigned is
+  checked when an edit is accepted, so a code the standards later retire still
+  loads. Both columns are registered-account preferences under the same
+  restrictive policies as `preferred_name`, and guest responses omit them.
 - `profiles.email` is null only for a verified anonymous Auth user. Permanent
   profiles require the verified provider email. Fake or placeholder guest
   addresses are forbidden.

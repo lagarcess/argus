@@ -144,6 +144,7 @@ def _cache_key_for(
     capability_class: CapabilityClass,
     message: str,
     language: str,
+    country: str | None,
     scenario: bool = False,
 ) -> str:
     """One key recipe for every shape, so a packet stored by the thorough job
@@ -156,6 +157,7 @@ def _cache_key_for(
         question_fingerprint=" ".join(message.lower().split()),
         language=language,
         contract="scenario" if scenario else "retrieval",
+        country=country,
     )
 
 
@@ -225,6 +227,7 @@ async def grounded_result(
         question_kind=query.question_kind,
         closed_period=query.period_is_closed_window,
         language_tag=language,
+        country=user.country,
         scenario=scenario,
     )
     if not provider_finance:
@@ -253,6 +256,7 @@ async def grounded_result(
         capability_class=capability_class,
         message=state.current_user_message,
         language=language,
+        country=user.country,
         scenario=scenario,
     )
     cache_status = "miss"
@@ -577,6 +581,7 @@ def thorough_job_result(
         capability_class=capability_class,
         message=message,
         language=language,
+        country=user.country,
         scenario=scenario,
     )
     cached = cache_get(key)
@@ -625,6 +630,9 @@ def thorough_job_result(
                 "capability_class": capability_class,
                 "shape": "thorough",
                 "language": language,
+                # The asking user's declared country, sent as the location
+                # when the job's request is rebuilt; None sends none.
+                "country": user.country,
                 "question": message,
                 "subjects": subjects,
                 "period_of_interest": query.period_of_interest,
@@ -1417,6 +1425,7 @@ def retrieval_spec_for_job(job_request: dict[str, Any]) -> ResearchConfigSpec:
         question_kind=str(job_request.get("question_kind") or "cross_company"),
         closed_period=bool(job_request.get("period_is_closed_window")),
         language_tag=str(job_request.get("language") or "en"),
+        country=job_request.get("country") or None,
         scenario=bool(job_request.get("scenario_question")),
     )
 
