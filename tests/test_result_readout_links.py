@@ -1,11 +1,17 @@
 """Inline Breakdown citations are bounded by this response's returned sources."""
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from argus.domain.research.contracts import ResearchSource
 from argus.domain.result_readout_sources import accepted_breakdown_text
 from markdown_it import MarkdownIt
+
+ENCODINGS = json.loads(
+    (Path(__file__).parent / "fixtures/result_readouts/link_encodings.json").read_text()
+)
 
 
 @pytest.fixture(
@@ -43,6 +49,24 @@ def test_keep_descriptive_link_to_returned_source(language_case):
     source = ResearchSource(url="https://example.com/results", title=title)
     text = f"{sentence} [{title}]({source.url})"
     assert accept(text, language, [source]) == text
+
+
+@pytest.mark.parametrize("case", ENCODINGS, ids=lambda case: case["raw"])
+def test_decoded_gfm_autolinks_follow_the_same_source_boundary(language_case, case):
+    language, title, sentence = language_case
+    source = ResearchSource(url=case["decoded"], title=title)
+    sources = [source] if case.get("returned") else []
+    expected = f"[{title}](<{source.url}>)" if sources else f"`{case['decoded']}`"
+    assert (
+        accept(sentence + " " + case["raw"], language, sources)
+        == sentence + " " + expected
+    )
+
+
+def test_decoding_does_not_activate_unrelated_markdown_or_change_code(language_case):
+    language, _, _ = language_case
+    text = "&ast;words&ast; and `https&#58;//invented.example`"
+    assert accept(text, language, []) == text
 
 
 @pytest.mark.parametrize("shape", ["{}", "<{}>", "[{0}]({0})"])

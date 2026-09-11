@@ -45,6 +45,10 @@ The app used explicit live market/asset providers, process-only Luna overrides, 
 | Per-occurrence run-quote bookkeeping | Remove: an unreferenced number does not discard the answer; declared references still get value/key validation. |
 | Web claim quote, occurrence and date bookkeeping | Remove: the provider's sources travel in the existing panel, with dates when returned. Link membership does not prove every claim true. |
 
+## Final review follow-up
+
+Codex found that GFM autolinks entity-decoded and backslash-escaped URLs. The fix matches the decoded text while preserving original spans outside URLs, so it does not activate unrelated literal Markdown. Shared fixtures in `tests/fixtures/result_readouts/link_encodings.json` prove the accepted backend strings and actual `ChatMessage` rendering in English and Spanish. The focused backend run passes 305 tests and the full web suite passes 1,799 tests. The saved live Spanish draft was revalidated byte-for-byte unchanged; its screenshot remains valid. Model-facing text and the measured fingerprint are unchanged, and no additional paid calls ran.
+
 ## Measurement
 
 [Full scorecard](live-measurement.json): **67 passed, 3 failed, 1 infrastructure error**, across 71 cases. [One retry per non-passing case](measurement-retries.json): **4 passed**. [Case-by-case comparison](measurement-comparison.json) retains every first-run failure and its receipt analysis. None reproduced in its single retry; this is not a claim that the first run passed 71/71. Five baseline failures passed in the full run, and both added integration cases passed. Known merge-prep spend: **$3.169720877376**, below the $3.50 billed-spend cap; 12 timed-out requests returned no invoice and remain explicitly unpriced. This is the known billed total, not an assumption that those attempts cost zero. No further paid calls ran.

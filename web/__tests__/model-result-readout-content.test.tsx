@@ -19,6 +19,7 @@ import { localizeArtifactFinalPayload } from "../lib/artifact-response-transport
 import { researchDegradedCodeFromMetadata, researchSourcesForFinalPayload } from "../lib/chat-discovery-sidecar";
 import en from "../public/locales/en/common.json";
 import es from "../public/locales/es-419/common.json";
+import linkEncodings from "../../tests/fixtures/result_readouts/link_encodings.json";
 
 const bank = {
   symbols: ["DOCN"], benchmark_symbol: "SPY", asset_class: "equity",
@@ -53,6 +54,30 @@ function run(value?: ReturnType<typeof envelope>): BacktestRun {
     metrics: { aggregate: {}, by_symbol: {} }, figures: bank.figures, created_at: new Date().toISOString(),
     conversation_result_card: { title: "DOCN", status_label: "Simulation Complete", rows: [], actions: [], assumptions: [],
       date_range: { start: "2023-09-01", end: "2026-09-09", display: "" }, result_readout_content: value } };
+}
+
+for (const language of ["en", "es-419"] as const) {
+  test.each(linkEncodings)(`decoded URLs respect the saved link boundary in ${language}: $raw`, async (entry) => {
+    const i18n = await translations(language);
+    const title = language === "en" ? "Quarterly results" : "Resultados trimestrales";
+    const returned = "returned" in entry && entry.returned;
+    const expected = returned ? `[${title}](<${entry.decoded}>)` : `\`${entry.decoded}\``;
+    const render = (text: string) => {
+      const message = hydrateMessagesFromApi([savedMessage("breakdown", { ...envelope("breakdown", language), text })]).messages[0];
+      return renderToStaticMarkup(<I18nextProvider i18n={i18n}><ChatMessage message={message} /></I18nextProvider>);
+    };
+    // GFM really does turn entity/escape-decoded text into a link. The backend
+    // asserts these same fixture outputs before they reach this renderer.
+    expect(render(entry.raw)).toContain("href=");
+    const html = render(expected);
+    if (returned) {
+      expect(html).toContain(`href="${entry.decoded.replaceAll("&", "&amp;")}"`);
+      expect(html).toContain(title);
+    } else {
+      expect(html).not.toContain("href=");
+      expect(html).toContain(`<code>${entry.decoded}</code>`);
+    }
+  });
 }
 
 for (const surface of ["quick_take", "breakdown"] as const) {

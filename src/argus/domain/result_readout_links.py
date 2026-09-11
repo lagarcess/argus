@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from urllib.parse import urlsplit
 
 from markdown_it import MarkdownIt
+from markdown_it.common.utils import UNESCAPE_ALL_RE, unescapeAll
 from markdown_it.rules_inline import autolink, link
 from markdown_it.rules_inline.backticks import backtick
 from markdown_it.rules_inline.state_inline import StateInline
@@ -40,6 +41,23 @@ def _unlinked_label(label: str) -> str:
     return "".join(pieces)
 
 
+def _visible_text_offsets(value: str) -> tuple[str, list[tuple[int, int]]]:
+    """Decode CommonMark text while retaining each character's original span."""
+    characters: list[str] = []
+    offsets: list[tuple[int, int]] = []
+    cursor = 0
+    for match in UNESCAPE_ALL_RE.finditer(value):
+        characters.extend(value[cursor : match.start()])
+        offsets.extend((index, index + 1) for index in range(cursor, match.start()))
+        decoded = unescapeAll(match.group())
+        characters.extend(decoded)
+        offsets.extend((match.start(), match.end()) for _ in decoded)
+        cursor = match.end()
+    characters.extend(value[cursor:])
+    offsets.extend((index, index + 1) for index in range(cursor, len(value)))
+    return "".join(characters), offsets
+
+
 def returned_source_links(text: str, sources: Sequence[ResearchSource]) -> str:
     """Preserve named citations, title returned bare URLs, and unlink other URLs."""
     parser = MarkdownIt("commonmark", {"html": False})
@@ -50,9 +68,14 @@ def returned_source_links(text: str, sources: Sequence[ResearchSource]) -> str:
         return f"[{_words(title)}](<{url}>)"
 
     def plain_urls(value: str) -> str:
-        def replace(match: re.Match[str]) -> str:
+        # GFM autolinks decoded text, including entities and escaped punctuation.
+        # Map replacements back to source spans so unrelated literal markup does
+        # not become active Markdown merely because its entities were decoded.
+        visible, offsets = _visible_text_offsets(value)
+        pieces: list[str] = []
+        cursor = 0
+        for match in _BARE_LINK.finditer(visible):
             url = match.group()
-            suffix = ""
             while url and (
                 url[-1] in ".,;:!?"
                 or (
@@ -60,15 +83,20 @@ def returned_source_links(text: str, sources: Sequence[ResearchSource]) -> str:
                     and url.count(url[-1]) > url.count({")": "(", "]": "["}[url[-1]])
                 )
             ):
-                suffix = url[-1] + suffix
                 url = url[:-1]
             normalized = parser.normalizeLink(url)
             source = allowed.get(normalized)
-            return (
-                named_link(normalized, source) if source else _literal_url(url)
-            ) + suffix
-
-        return _BARE_LINK.sub(replace, value)
+            start = offsets[match.start()][0]
+            end = offsets[match.start() + len(url) - 1][1]
+            pieces.extend(
+                (
+                    value[cursor:start],
+                    named_link(normalized, source) if source else _literal_url(url),
+                )
+            )
+            cursor = end
+        pieces.append(value[cursor:])
+        return "".join(pieces)
 
     # The block parser owns reference definitions and code blocks. Keep those
     # spans intact while using the inline parser's grammar for link destinations.
