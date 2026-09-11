@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789106786-xh2VETqFGPX45EU0GBBN",
+  "object": "chat.completion",
+  "created": 1789106786,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"capital_amount\": 1000,\n  \"recurring_contribution_amount\": 100,\n  \"cadence\": \"monthly\",\n  \"timeframe\": null,\n  \"date_range\": {\n    \"start\": \"2025-09-10\",\n    \"end\": \"2026-09-09\"\n  },\n  \"comparison_baseline\": \"SPY\",\n  \"fee\": {\n    \"rate\": 0.001,\n    \"evidence_span\": \"comisiones de 10 puntos b\u00e1sicos\"\n  },\n  \"slippage\": {\n    \"rate\": 0.0005,\n    \"evidence_span\": \"deslizamiento de 5 puntos b\u00e1sicos\"\n  },\n  \"confidence\": 0.8\n}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2457,
+    "completion_tokens": 151,
+    "total_tokens": 2608,
+    "cost": 0.00331435,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.00331435,
+      "upstream_inference_prompt_cost": 0.00293685,
+      "upstream_inference_completions_cost": 0.0003775
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

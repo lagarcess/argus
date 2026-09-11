@@ -1,0 +1,61 @@
+{
+  "id": "gen-1789107344-WFwRJmZ1rfCoT33KMY7d",
+  "object": "chat.completion",
+  "created": 1789107344,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"targets_latest_result\": true,\n  \"save_requested\": false,\n  \"focus\": \"general\",\n  \"fact_key\": null,\n  \"confidence\": 0.9\n}",
+        "refusal": null,
+        "reasoning": "The task is to decide whether the current user message should be answered from the latest completed result artifact or as a general product/capability question.\n",
+        "reasoning_details": [
+          {
+            "type": "reasoning.summary",
+            "summary": "The task is to decide whether the current user message should be answered from the latest completed result artifact or as a general product/capability question.\n",
+            "format": "xai-responses-v1",
+            "index": 0
+          },
+          {
+            "type": "reasoning.encrypted",
+            "data": "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.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+            "format": "xai-responses-v1",
+            "id": "rs_c5085c01-611c-9cd5-9c3a-5c7c2929b6be",
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1534,
+    "completion_tokens": 431,
+    "total_tokens": 1965,
+    "cost": 0.0027934,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 192,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0027934,
+      "upstream_inference_prompt_cost": 0.0017159,
+      "upstream_inference_completions_cost": 0.0010775
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 391,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

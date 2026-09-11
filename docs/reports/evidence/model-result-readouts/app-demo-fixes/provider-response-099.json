@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789106781-8OaazaNhSjjuWVtEpi7y",
+  "object": "chat.completion",
+  "created": 1789106781,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"is_testable_strategy\": true,\n  \"user_goal_summary\": \"Backtest of monthly $100 purchases of DOCN from 2025-09-10 to 2026-09-09 with $1,000 initial capital, compared to SPY\",\n  \"requires_clarification\": false,\n  \"language\": \"es\",\n  \"strategy_type\": \"dca_accumulation\",\n  \"strategy_thesis\": null,\n  \"asset_universe\": [\"DOCN\"],\n  \"asset_class\": null,\n  \"timeframe\": null,\n  \"date_range\": null,\n  \"date_range_raw_text\": \"del 10 de septiembre de 2025 al 9 de septiembre de 2026\",\n  \"date_range_intent\": {\n    \"kind\": \"explicit_range\",\n    \"start\": \"2025-09-10\",\n    \"end\": \"2026-09-09\",\n    \"day_offset\": null,\n    \"count\": null,\n    \"unit\": null,\n    \"anchor\": null,\n    \"year\": null,\n    \"endpoint\": null,\n    \"confidence\": 0.95,\n    \"evidence\": \"del 10 de septiembre de 2025 al 9 de septiembre de 2026\"\n  },\n  \"comparison_baseline\": \"SPY\",\n  \"capital_amount\": 1000,\n  \"recurring_contribution\": 100,\n  \"cadence\": \"monthly\",\n  \"entry_logic\": null,\n  \"exit_logic\": null,\n  \"entry_rule\": null,\n  \"exit_rule\": null,\n  \"rule_spec\": null,\n  \"indicator\": null,\n  \"indicator_period\": null,\n  \"entry_threshold\": null,\n  \"exit_threshold\": null,\n  \"missing_required_fields\": [],\n  \"assistant_response\": null,\n  \"confidence\": 0.9,\n  \"evidence_spans\": {\n    \"strategy_type\": \"compras mensuales\",\n    \"asset_universe\": \"DOCN\",\n    \"date_range_raw_text\": \"del 10 de septiembre de 2025 al 9 de septiembre de 2026\",\n    \"comparison_baseline\": \"SPY\",\n    \"capital_amount\": \"$1,000 de capital inicial\",\n    \"recurring_contribution\": \"compras mensuales de $100\",\n    \"cadence\": \"mensuales\"\n  }\n}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 3528,
+    "completion_tokens": 486,
+    "total_tokens": 4014,
+    "cost": 0.0019962,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 3456,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0019962,
+      "upstream_inference_prompt_cost": 0.0007812,
+      "upstream_inference_completions_cost": 0.001215
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}

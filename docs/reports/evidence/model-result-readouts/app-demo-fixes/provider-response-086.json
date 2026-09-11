@@ -1,0 +1,46 @@
+{
+  "id": "gen-1789106368-T4AzQvz4IyIC9Xwdumn9",
+  "object": "chat.completion",
+  "created": 1789106368,
+  "model": "x-ai/grok-4.3",
+  "provider": "xAI",
+  "system_fingerprint": null,
+  "service_tier": "default",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"is_testable_strategy\": true,\n  \"user_goal_summary\": \"Backtest SPY from September 10, 2025 through September 9, 2026 with $1,000 using RSI 14-day period: buy when RSI crosses below 30, sell when RSI crosses above 70\",\n  \"requires_clarification\": false,\n  \"language\": null,\n  \"strategy_type\": \"indicator_threshold\",\n  \"strategy_thesis\": null,\n  \"asset_universe\": [\"SPY\"],\n  \"asset_class\": null,\n  \"timeframe\": null,\n  \"date_range\": null,\n  \"date_range_raw_text\": \"September 10, 2025 through September 9, 2026\",\n  \"date_range_intent\": {\n    \"kind\": \"explicit_range\",\n    \"start\": \"2025-09-10\",\n    \"end\": \"2026-09-09\",\n    \"day_offset\": null,\n    \"count\": null,\n    \"unit\": null,\n    \"anchor\": null,\n    \"year\": null,\n    \"endpoint\": null,\n    \"confidence\": 1.0,\n    \"evidence\": \"September 10, 2025 through September 9, 2026\"\n  },\n  \"comparison_baseline\": null,\n  \"capital_amount\": 1000,\n  \"recurring_contribution\": null,\n  \"cadence\": null,\n  \"entry_logic\": null,\n  \"exit_logic\": null,\n  \"entry_rule\": null,\n  \"exit_rule\": null,\n  \"rule_spec\": null,\n  \"indicator\": \"rsi\",\n  \"indicator_period\": 14,\n  \"entry_threshold\": 30,\n  \"exit_threshold\": 70,\n  \"missing_required_fields\": [],\n  \"assistant_response\": null,\n  \"confidence\": 0.95,\n  \"evidence_spans\": {\n    \"asset_universe\": \"SPY\",\n    \"date_range_raw_text\": \"September 10, 2025 through September 9, 2026\",\n    \"capital_amount\": \"$1,000\",\n    \"indicator\": \"RSI\",\n    \"indicator_period\": \"14-day period\",\n    \"entry_threshold\": \"crosses below 30\",\n    \"exit_threshold\": \"crosses above 70\"\n  }\n}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 3514,
+    "completion_tokens": 478,
+    "total_tokens": 3992,
+    "cost": 0.0054531,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0054531,
+      "upstream_inference_prompt_cost": 0.0042581,
+      "upstream_inference_completions_cost": 0.001195
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  }
+}
