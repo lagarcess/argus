@@ -14,6 +14,7 @@ def test_percent_reuses_canonical_card_rounding(language, value):
     assert readout_display_value(
         {"value": value, "unit": "percent"}, language=language
     ) == {
+        "unit": "percent",
         "value": expected,
         "text": f"{expected:.1f}%",
     }
@@ -29,6 +30,7 @@ def test_drawdown_display_uses_magnitude_without_mutating_fact(language):
     }
     before = deepcopy(row)
     assert readout_display_value(row, language=language) == {
+        "unit": "percent",
         "value": 42.1,
         "text": "42.1%",
     }
@@ -51,6 +53,7 @@ def test_money_matches_card_zero_decimals_and_half_expand(language, value, round
     row = {"value": value, "unit": "currency", "currency": "USD"}
     before = deepcopy(row)
     assert readout_display_value(row, language=language) == {
+        "unit": "currency",
         "value": rounded,
         "text": text,
     }
@@ -76,7 +79,11 @@ def test_money_matches_card_zero_decimals_and_half_expand(language, value, round
     ],
 )
 def test_existing_numeric_fact_units_have_plain_display_values(language, row, expected):
-    assert readout_display_value(row, language=language) == expected
+    result = readout_display_value(row, language=language)
+    assert {key: result[key] for key in expected} == expected
+    assert result["unit"] == (
+        "percent" if "fraction_as_percent" in row.get("presentation", []) else row["unit"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -86,7 +93,7 @@ def test_existing_numeric_fact_units_have_plain_display_values(language, row, ex
 def test_date_localizes_display_and_keeps_iso_reference(language, text):
     assert readout_display_value(
         {"value": "2023-09-01", "unit": "date"}, language=language
-    ) == {"value": "2023-09-01", "text": text}
+    ) == {"value": "2023-09-01", "text": text, "unit": "date"}
 
 
 @pytest.mark.parametrize("value", [None, True, "unknown", float("nan"), float("inf")])

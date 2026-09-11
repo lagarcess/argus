@@ -16,7 +16,7 @@ def _prompt_row(row: dict[str, Any], language: str) -> dict[str, Any]:
     }
     display = readout_display_value(row, language=language)
     if display is not None:
-        result.update(value=display["value"], display=display["text"])
+        result.update(value=display["value"], display=display["text"], unit=display["unit"])
     return result
 
 

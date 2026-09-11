@@ -50,3 +50,28 @@ def test_model_facts_use_card_precision_without_changing_stored_values(language)
     assert "provenance" not in prompt["facts"]["portfolio.ending_equity"]
     assert prompt["series"]["portfolio_equity"]["points"][0]["value"] == 6644
     assert facts == before
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+def test_percent_projection_keeps_value_and_unit_consistent(language):
+    from argus.domain.result_readout_grounding import accepted_readout_text
+    from argus.domain.result_readout_prompt_facts import readout_prompt_facts
+
+    row = {"value": 1.0, "unit": "ratio", "presentation": ["fraction_as_percent"]}
+    stored = {"facts": {"portfolio.win_rate": row}}
+    projected = readout_prompt_facts(stored, language=language)["facts"][
+        "portfolio.win_rate"
+    ]
+    assert projected["value"] == 100.0
+    assert projected["unit"] == "percent"
+    assert projected["display"] == "100.0%"
+    assert row["value"] == 1.0 and row["unit"] == "ratio"
+    draft = {
+        "language": language,
+        "text": "100.0%.",
+        "figures": [{"fact_key": "portfolio.win_rate", "value": projected["value"]}],
+    }
+    assert accepted_readout_text(draft, facts=stored, language=language) == (
+        draft["text"],
+        None,
+    )

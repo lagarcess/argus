@@ -28,6 +28,7 @@ _CURRENCY_ROUNDING = {"halfExpand": ROUND_HALF_UP}[
 class ReadoutDisplayValue(TypedDict):
     value: float | str
     text: str
+    unit: str
 
 
 def readout_display_value(
@@ -50,7 +51,11 @@ def readout_display_value(
             date = datetime.fromisoformat(value.replace("Z", "+00:00")).date()
         except ValueError:
             return None
-        return {"value": value, "text": format_date(date, format="long", locale=locale)}
+        return {
+            "value": value,
+            "text": format_date(date, format="long", locale=locale),
+            "unit": unit,
+        }
     if (
         isinstance(value, bool)
         or not isinstance(value, (int, float))
@@ -77,6 +82,7 @@ def readout_display_value(
         number = format_decimal(abs(amount), format=pattern, locale=locale)
         return {
             "value": float(amount),
+            "unit": unit,
             "text": f"{'-' if amount.is_signed() else ''}${number}",
         }
     if unit in {"percent", "percentage_points"}:
@@ -85,12 +91,17 @@ def readout_display_value(
         number = format_decimal(
             rounded, format="#,##0." + "0" * DISPLAY_DECIMALS, locale=locale
         )
-        return {"value": rounded, "text": number + ("%" if unit == "percent" else " pp")}
+        return {
+            "value": rounded,
+            "text": number + ("%" if unit == "percent" else " pp"),
+            "unit": unit,
+        }
     if unit in {"count", "ratio", "basis_points", "indicator_points"}:
         rounded = value if unit == "count" else round(value, 2)
         number = format_decimal(rounded, format="#,##0.##", locale=locale)
         return {
             "value": rounded,
+            "unit": unit,
             "text": number + (" bps" if unit == "basis_points" else ""),
         }
     return None

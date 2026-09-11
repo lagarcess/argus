@@ -69,7 +69,7 @@ METRIC_DEFINITIONS = {
     "win_rate": (
         "win_rate",
         "ratio",
-        "Fraction of completed trades with positive net profit; unavailable with no completed trades",
+        "Share of completed buy-and-sell pairs that ended with a gain",
         "closed_trade_net_pnl",
     ),
     "profit_factor": (
