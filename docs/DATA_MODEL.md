@@ -196,8 +196,9 @@ product behavior reads it, and no API path writes it.
   as the reader's location, and a user with no country sends no location.
 - `currency_override` is a currency the user chose over the one their country
   implies. The resolved currency is not stored: the API derives it from the
-  override when there is one, otherwise from the country (the first currency
-  CLDR lists in tender there).
+  override when there is one, otherwise from the country (the first tender
+  currency CLDR records there with no end date, so it changes only with the
+  installed CLDR data, never with the date).
 - Both constraints check only a code's shape. Which codes are assigned is
   checked when an edit is accepted, so a code the standards later retire still
   loads. Both columns are registered-account preferences under the same

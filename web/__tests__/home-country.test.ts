@@ -37,6 +37,42 @@ describe("the home country picker's codes", () => {
     expect(CURRENCY_CODES).toContain("DOP");
   });
 
+  test("every text field in a Preferences panel is at least 16px, so iOS never zooms", () => {
+    // Derived from the registry: whatever the Preferences submenu can open.
+    const panels = readFileSync(
+      join(import.meta.dir, "../components/sidebar/ProfileSettingsPanels.tsx"),
+      "utf-8",
+    );
+    const imports = new Map(
+      [...panels.matchAll(/import (\w+) from "@\/components\/settings\/(\w+)"/g)].map(
+        (match) => [match[1], match[2]],
+      ),
+    );
+    const preferences = [
+      ...panels.matchAll(/\w+: \{\s*parent: "settings",\s*render: [^<]*<(\w+)/g),
+    ].map((match) => imports.get(match[1]));
+    expect(preferences).toContain("HomeCountryModal");
+    expect(preferences).toContain("LanguageModal");
+    const sizes: number[] = [];
+    for (const file of preferences) {
+      const source = readFileSync(
+        join(import.meta.dir, `../components/settings/${file}.tsx`),
+        "utf-8",
+      );
+      // A whole element, so an arrow function inside a handler cannot end it early.
+      for (const field of source.matchAll(
+        /<(input|textarea|select)\b[\s\S]*?(?:\/>|<\/\1>)/g,
+      )) {
+        const className = field[0].match(/className="([^"]*)"/)?.[1] ?? "";
+        sizes.push(
+          ...[...className.matchAll(/text-\[(\d+)px\]/g)].map((size) => Number(size[1])),
+        );
+      }
+    }
+    expect(sizes.length).toBeGreaterThanOrEqual(2);
+    expect(sizes.filter((size) => size < 16)).toEqual([]);
+  });
+
   test("only a registered account is offered the setting", () => {
     // A guest has no account to keep a country in, and the API omits it for guests.
     const menu = readFileSync(

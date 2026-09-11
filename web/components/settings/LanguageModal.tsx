@@ -106,7 +106,7 @@ export default function LanguageModal({
             placeholder={t("settings.search_language")}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full bg-transparent border-none outline-none text-[15px] text-black dark:text-white placeholder:text-black/35 dark:placeholder:text-white/35"
+            className="w-full bg-transparent border-none outline-none text-[16px] text-black dark:text-white placeholder:text-black/35 dark:placeholder:text-white/35"
           />
         </div>
         {saveError ? (

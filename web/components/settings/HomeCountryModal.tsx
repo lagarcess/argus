@@ -221,7 +221,7 @@ export default function HomeCountryModal({
           }
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          className="w-full border-none bg-transparent text-[15px] text-black outline-none placeholder:text-black/35 dark:text-white dark:placeholder:text-white/35"
+          className="w-full border-none bg-transparent text-[16px] text-black outline-none placeholder:text-black/35 dark:text-white dark:placeholder:text-white/35"
         />
       </div>
       {saveError ? (

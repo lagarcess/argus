@@ -15,7 +15,7 @@ import pytest
 import yaml
 from argus.api.main import app
 from argus.api.schemas import ProfilePatch, User, guest_safe_user
-from argus.domain.home_country import country_codes, currency_codes
+from argus.domain.home_country import country_codes, country_currency, currency_codes
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -107,6 +107,36 @@ def test_an_edit_needs_a_currency_in_tender_but_a_stored_one_still_loads() -> No
     with pytest.raises(ValidationError):
         ProfilePatch(currency_override=retired)
     assert _user(currency_override=retired).currency == retired
+
+
+def test_the_offered_currencies_follow_the_record_never_the_calendar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The picker ships these codes as a file, so the API's list must not move
+    on a date the deployed picker cannot see."""
+    import babel.numbers
+
+    real = babel.numbers.get_global
+
+    def announced_changeover(key: str) -> Any:
+        data = real(key)
+        if key != "territory_currencies":
+            return data
+        # By the calendar MXN is in use for centuries and XTS has not begun;
+        # the record says MXN ends and XTS has no end.
+        return {
+            **data,
+            "MX": [
+                ("MXN", (1993, 1, 1), (2999, 1, 1), True),
+                ("XTS", (2999, 1, 1), None, True),
+            ],
+        }
+
+    monkeypatch.setattr(babel.numbers, "get_global", announced_changeover)
+
+    assert country_currency("MX") == "XTS"
+    assert "XTS" in currency_codes()
+    assert "MXN" not in currency_codes()
 
 
 # --- the API ----------------------------------------------------------------

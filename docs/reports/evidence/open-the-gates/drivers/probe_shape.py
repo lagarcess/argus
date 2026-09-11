@@ -26,7 +26,7 @@ from argus.domain.research.perplexity_agent import (  # noqa: E402
 )
 
 label, shape, kind, language, symbols, tools, max_steps, question, out = sys.argv[1:10]
-spec = retrieval_spec(shape, question_kind=kind, closed_period=False, language_tag=language)
+spec = retrieval_spec(shape, question_kind=kind, closed_period=False, language_tag=language, country=None)
 spec = spec.model_copy(update={"tools": tuple(tools.split(",")), "max_steps": int(max_steps)})
 subjects = [] if symbols == "-" else [{"symbol": s, "name": s, "asset_class": "equity"} for s in symbols.split(",")]
 prompt = grounded._research_prompt(message=question, subjects=subjects, period=None, language=language, question_kind=kind)

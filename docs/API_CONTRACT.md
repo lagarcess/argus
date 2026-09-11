@@ -962,8 +962,9 @@ Application-facing user object.
   Settings. It is stated, never inferred from conversation, IP or behavior
   (decision 8). Research sends it as the reader's location; null sends none.
 - `currency` is read-only: `currency_override` when the user chose one,
-  otherwise the currency the country implies (the first CLDR lists in tender
-  there), and null when neither is known. Only the override is stored.
+  otherwise the currency the country implies (the first tender currency CLDR
+  records there with no end date), and null when neither is known. Only the
+  override is stored.
   - All three are registered-account preferences. Guest responses omit them.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
@@ -2762,10 +2763,13 @@ Update profile preferences. Partial update semantics are supported.
   case. A grouping or user-assigned region such as `EU` or `XK`, or a country
   name, returns 422. `null` or an empty value clears it, and a user with no
   country sends no research location.
-- `currency_override` accepts an ISO 4217 code in tender in some country
-  today; other codes return 422. `null` clears it, and `currency` returns to
-  the one the country implies. A stored code the standards later retire still
-  reads back; only an edit is held to today's codes.
+- `currency_override` accepts an ISO 4217 code CLDR records in tender in some
+  country with no end date; other codes return 422. The accepted codes change
+  only with the installed CLDR data, never with the date, so the Settings
+  picker's generated list and the API always agree within one build. `null`
+  clears it, and `currency` returns to the one the country implies. A stored
+  code the standards later retire still reads back; only an edit is held to
+  the current codes.
 - `currency` is derived and cannot be written; a patch that sends it is
   ignored.
 - Country and currency are registered-account preferences. Guests cannot
