@@ -18,7 +18,11 @@ from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
 )
-from argus.agent_runtime.response_style import result_followup_response_intent
+from argus.agent_runtime.result_followup_answers import (
+    composed_result_followup_patch,
+    next_experiment_followup_patch,
+    unavailable_result_followup_patch,
+)
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     context_packet_ids_from_fact_bank,
@@ -1074,38 +1078,26 @@ async def artifact_followup_stage_result_if_applicable(
     if reference is None:
         return None
     metadata = dict(reference.metadata)
-    response = await _compose_result_followup_with_timeout(
-        metadata=metadata,
-        focus=focus,
-        user_message=current_user_message,
-        language=language,
-    )
-    used_recovery = response is None
-    if response is None:
-        response = recovery_message(
-            "latest_result_followup_unavailable",
-            language=language,
+    if focus == "next_experiment":
+        answer = next_experiment_followup_patch(metadata, language=language)
+    else:
+        answer = composed_result_followup_patch(
+            await _compose_result_followup_with_timeout(
+                metadata=metadata,
+                focus=focus,
+                user_message=current_user_message,
+                language=language,
+            ),
+            focus=focus,
         )
     return StageResult(
         outcome="ready_to_respond",
         decision=_result_followup_decision(decision, focus=focus),
-        stage_patch={
-            "assistant_response": response,
-            **(
-                {}
-                if used_recovery
-                else {"response_intent": result_followup_response_intent(focus)}
-            ),
-            **(
-                recovery_state_stage_patch(
-                    "latest_result_followup_unavailable",
-                    language=language,
-                    retryable=True,
-                )
-                if used_recovery
-                else {}
-            ),
-        },
+        stage_patch=(
+            answer
+            if answer is not None
+            else unavailable_result_followup_patch(language=language)
+        ),
     )
 
 

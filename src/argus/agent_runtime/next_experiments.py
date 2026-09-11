@@ -25,6 +25,7 @@ from argus.agent_runtime.next_experiments_contract import (
     next_experiment_short_label_key,
     offered_kinds_from_thread_metadata,
 )
+from argus.agent_runtime.presentation_i18n import runtime_locale
 from argus.domain.benchmark_comparison import (
     BenchmarkComparison,
     benchmark_comparison_from_delta,
@@ -46,6 +47,7 @@ __all__ = [
     "detect_next_experiment_acceptance",
     "next_experiment_label_key",
     "next_experiment_short_label_key",
+    "next_experiments_lead_in",
     "next_experiments_sidecar",
     "offered_kinds_from_thread_metadata",
 ]
@@ -108,6 +110,17 @@ _SEND_TEMPLATES: dict[str, dict[str, str]] = {
         ),
     },
 }
+
+# The one sentence above the rows when the user asks what to try next (#590).
+# It carries no figures; the first row's `why` does.
+NEXT_EXPERIMENTS_LEAD_IN: dict[str, str] = {
+    "en": "Here is what you can try next from this result.",
+    "es-419": "Esto es lo que puedes probar después a partir de este resultado.",
+}
+
+
+def next_experiments_lead_in(language: str | None) -> str:
+    return NEXT_EXPERIMENTS_LEAD_IN[runtime_locale(language)]
 
 
 def next_experiments_sidecar(
@@ -313,10 +326,7 @@ def _prebaked_row_fields(
     questions. Prebaking only happens when the grounding chain agrees."""
     if params is None or kind not in {"same_setup_peer_asset", "recurring_monthly_buys"}:
         return None
-    templates = _SEND_TEMPLATES.get(
-        "es-419" if (language or "en").lower().startswith("es") else "en",
-        _SEND_TEMPLATES["en"],
-    )
+    templates = _SEND_TEMPLATES[runtime_locale(language)]
     template = templates.get(kind)
     if template is None:
         return None
