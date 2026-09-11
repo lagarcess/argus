@@ -9,6 +9,8 @@ from argus.agent_runtime.response_style import (
 from argus.agent_runtime.result_followups import result_followup_llm_messages
 from argus.agent_runtime.state.models import ResponseIntent
 from argus.api.chat.breakdown import _result_breakdown_llm_messages
+from argus.domain.result_readout_grounding import READOUT_RUN_GROUNDING_INSTRUCTIONS
+from argus.domain.result_readout_sources import BREAKDOWN_SOURCE_INSTRUCTIONS
 
 
 def test_argus_response_style_contract_names_human_readability_requirements() -> None:
@@ -61,8 +63,9 @@ def test_result_followup_headings_are_typed_chrome_keys() -> None:
     ).kind == "result_followup_chrome"
 
 
-def test_result_breakdown_prompt_includes_argus_response_style_contract() -> None:
+def test_result_breakdown_prompt_uses_shared_run_and_search_instructions() -> None:
     messages = _result_breakdown_llm_messages(facts={})
 
-    assert ARGUS_RESPONSE_STYLE_CONTRACT in messages[0]["content"]
-    assert "Go deeper than the prior Quick take" in messages[0]["content"]
+    assert READOUT_RUN_GROUNDING_INSTRUCTIONS in messages[0]["content"]
+    assert BREAKDOWN_SOURCE_INSTRUCTIONS in messages[0]["content"]
+    assert ARGUS_RESPONSE_STYLE_CONTRACT not in messages[0]["content"]

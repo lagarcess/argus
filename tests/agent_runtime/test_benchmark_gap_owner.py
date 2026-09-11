@@ -15,6 +15,7 @@ from argus.agent_runtime.stages import explain as explain_module
 from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.state.models import ResponseProfile, RunState
 from argus.domain.backtesting.cards import build_result_card
+from argus.domain.display_figure import display_figure
 
 from tests.result_readout_fixtures import readout_draft
 
@@ -110,12 +111,12 @@ async def test_quick_take_facts_quote_the_card_gap_not_a_subtraction(monkeypatch
             "portfolio.benchmark_return",
         )
     } == {
-        "portfolio.benchmark_gap": ENGINE_DELTA_PCT,
-        "portfolio.total_return": TOTAL_RETURN_PCT,
-        "portfolio.benchmark_return": BENCHMARK_RETURN_PCT,
+        "portfolio.benchmark_gap": display_figure(ENGINE_DELTA_PCT),
+        "portfolio.total_return": display_figure(TOTAL_RETURN_PCT),
+        "portfolio.benchmark_return": display_figure(BENCHMARK_RETURN_PCT),
     }
     assert facts["facts"]["portfolio.benchmark_gap"]["value"] != pytest.approx(
-        TOTAL_RETURN_PCT - BENCHMARK_RETURN_PCT
+        display_figure(TOTAL_RETURN_PCT - BENCHMARK_RETURN_PCT)
     )
 
 
@@ -157,7 +158,9 @@ async def test_an_engine_block_without_its_gap_makes_no_comparison_claim(
     result = explain_stage(state=_completed_state(context))
 
     assert facts["facts"]["portfolio.benchmark_gap"]["value"] is None
-    assert facts["facts"]["portfolio.total_return"]["value"] == TOTAL_RETURN_PCT
+    assert facts["facts"]["portfolio.total_return"]["value"] == display_figure(
+        TOTAL_RETURN_PCT
+    )
     assert facts["benchmark_comparison_claim"] == "unknown"
     readout = result.patch["assistant_response"]
     assert readout.startswith(

@@ -77,3 +77,18 @@ and `app-demo-fixes`, with each provider attempt carrying its source SHA. The
 known billed total before this follow-up demo is $0.32597547. Two provider error
 responses supplied no billing data. Earlier screenshots are historical findings,
 not acceptance evidence for this new source change.
+
+
+The first Sources-panel demo at `d9152dc0` produced a Luna Quick take and a
+searched Breakdown that fell back because numeric references were formatted
+strings. The shared instruction/schema description now asks for JSON numbers
+and reserves strings for ISO dates; validation is unchanged. That rejected draft
+and its $0.01272 bill remain in the evidence. Cumulative known spend is $0.35819697.
+
+CI exposed a web build-context issue with importing the canonical formatting
+policy from `src`. The single JSON owner now lives in the small
+`web/argus_display_contract` package, included in the Python wheel and imported
+locally by the web build. A production Turbopack build using only the web context
+passes. The wheel contains the policy and can read it from an isolated installed
+layout. Deployment configuration is unchanged. Updated runtime assertions pass
+68 focused tests; the packaging/readout regression check passes 102 tests.

@@ -5,7 +5,10 @@ description = "Argus - Pattern Analysis & Backtesting Engine"
 authors = ["Admin <admin@example.com>"]
 # Active Argus package source lives under src/argus.
 package-mode = true
-packages = [{include = "argus", from = "src"}]
+packages = [
+    {include = "argus", from = "src"},
+    {include = "argus_display_contract", from = "web"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"

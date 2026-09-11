@@ -2549,7 +2549,8 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
     assert facts["benchmark_symbol"] == "SPY"
     assert facts["symbols"] == ["TSLA"]
     assert facts["benchmark_comparison_claim"] == "lagged_benchmark"
-    assert facts["facts"]["portfolio.benchmark_gap"]["value"] == pytest.approx(-87.8)
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] == pytest.approx(87.8)
+    assert facts["facts"]["portfolio.benchmark_gap"]["display"] == "87.8 pp"
     assert captured["context_packet_ids"] == ["packet-1"]
 
 
@@ -2820,10 +2821,8 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
     assert set(context) == {"run_facts", "product_language"}
     facts = context["run_facts"]
     assert facts["facts"]["metrics.sharpe_ratio"]["value"] == 1.45
-    assert (
-        facts["facts"]["metrics.sharpe_ratio"]["provenance"]["path"]
-        == "metrics.sharpe_ratio"
-    )
+    assert facts["facts"]["metrics.sharpe_ratio"]["meaning"]
+    assert all("provenance" not in row for row in facts["facts"].values())
     assert facts["facts"]["portfolio.benchmark_gap"]["value"] == pytest.approx(8.1)
     assert "result_card" not in facts
     assert "raw_user_phrasing" not in json.dumps(facts)

@@ -7,7 +7,7 @@ import math
 from collections.abc import Mapping
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
-from pathlib import Path
+from importlib.resources import files
 from typing import Any, TypedDict
 
 from babel.dates import format_date
@@ -17,7 +17,7 @@ from argus.domain.display_figure import DISPLAY_DECIMALS, display_figure
 from argus.domain.result_readout_content import normalize_readout_language
 
 _CURRENCY_POLICY = json.loads(
-    Path(__file__).with_name("result_display_policy.json").read_text()
+    files("argus_display_contract").joinpath("result_display_policy.json").read_text()
 )
 _CURRENCY_DIGITS = _CURRENCY_POLICY["currency_fraction_digits"]
 _CURRENCY_ROUNDING = {"halfExpand": ROUND_HALF_UP}[

@@ -1,4 +1,4 @@
-import displayPolicy from "../../src/argus/domain/result_display_policy.json";
+import displayPolicy from "../argus_display_contract/result_display_policy.json";
 import type { StrategyResultPayload } from "@/components/chat/types";
 import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
