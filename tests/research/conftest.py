@@ -233,12 +233,6 @@ PROVIDER_PAGE = "https://www.perplexity.ai/finance/NVDA"
 RESEARCH_USER_ID = "retrieval"
 
 
-@pytest.fixture(autouse=True)
-def no_home_market(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The deployment's market is a per-test decision, never inherited."""
-    monkeypatch.delenv("ARGUS_RESEARCH_HOME_COUNTRY", raising=False)
-
-
 def educational_interpretation():
     from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
     from argus.agent_runtime.state.models import StrategySummary

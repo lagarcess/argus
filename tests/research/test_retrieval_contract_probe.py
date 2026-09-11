@@ -17,7 +17,6 @@ from urllib.parse import urlparse
 
 import pytest
 from argus.domain.research.config import (
-    LOCAL_SOURCE_DOMAINS,
     RESEARCH_CONFIG_SPECS,
     RETRIEVAL_INSTRUCTIONS,
     SCENARIO_RETRIEVAL_INSTRUCTIONS,
@@ -105,23 +104,21 @@ def test_current_facts_arrive_with_dated_sources_inside_the_recency_window() -> 
         assert source.source_date >= "2026-08-25", source.url
 
 
-def test_the_domain_filtered_call_cites_only_the_local_list() -> None:
-    """The proof the board asked for: a domain-filtered call citing a local
-    source. Every retrieved page is on the seeded list."""
+def test_a_domain_filtered_call_cites_only_the_filtered_domains() -> None:
+    """What the provider does with a domain filter, as recorded: every page a
+    filtered call retrieves is on the filter. No shape sends one today."""
     request = _request("domain_filtered_local_source")
     web_search = request["tools"][0]
-    assert web_search["filters"]["search_domain_filter"] == list(
-        LOCAL_SOURCE_DOMAINS["DO"]
-    )
+    domains = web_search["filters"]["search_domain_filter"]
+    assert domains
     assert web_search["user_location"] == {"country": "DO"}
     assert request["language_preference"] == "es"
     packet = _packet("domain_filtered_local_source")
-    assert packet.sources, "the filtered search still found local pages"
+    assert packet.sources, "the filtered search still found pages"
     for source in packet.sources:
         host = urlparse(source.url).netloc.lower()
         assert any(
-            host == domain or host.endswith(f".{domain}")
-            for domain in LOCAL_SOURCE_DOMAINS["DO"]
+            host == domain or host.endswith(f".{domain}") for domain in domains
         ), source.url
 
 

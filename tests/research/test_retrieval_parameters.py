@@ -13,13 +13,12 @@ from typing import Any
 import pytest
 from argus.agent_runtime import research_grounded as grounded
 from argus.domain.research.config import (
-    LOCAL_SOURCE_DOMAINS,
     MAX_FALLBACK_MODELS,
     MAX_SOURCE_DOMAINS,
     RESEARCH_CONFIG_SPECS,
     RETRIEVAL_INSTRUCTIONS,
     ResearchConfigSpec,
-    home_location,
+    RetrievalLocation,
     iso_language,
     normalized_source_domains,
     retrieval_spec,
@@ -92,13 +91,6 @@ def test_the_domain_filter_is_normalized_and_bounded() -> None:
         )
 
 
-def test_every_local_list_fits_the_provider_ceiling() -> None:
-    for country, domains in LOCAL_SOURCE_DOMAINS.items():
-        assert len(country) == 2 and country.isupper()
-        assert domains, country
-        assert normalized_source_domains(domains) == domains
-
-
 @pytest.mark.parametrize(
     ("question_kind", "closed_period", "recency"),
     [
@@ -126,28 +118,13 @@ def test_recency_follows_the_section_7_data_class(
     assert spec.recency == recency
 
 
-def test_home_market_comes_from_the_release_contract(monkeypatch) -> None:
-    assert home_location() is None
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", " do ")
-    location = home_location()
-    assert location is not None and location.country == "DO"
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "Dominican Republic")
-    assert home_location() is None, "a malformed market sends no location"
+def test_the_location_is_the_asking_users_country_and_nothing_else() -> None:
+    def spec(country: str | None) -> ResearchConfigSpec:
+        return retrieval_spec("balanced", question_kind="current_external", country=country)
 
-
-def test_local_sources_need_a_country_with_a_list() -> None:
-    def domains(country: str | None, *, local_sources: bool = True) -> tuple[str, ...]:
-        return retrieval_spec(
-            "balanced",
-            question_kind="current_external",
-            country=country,
-            local_sources=local_sources,
-        ).source_domains
-
-    assert domains(None) == ()
-    assert domains("US") == ()
-    assert domains("DO") == LOCAL_SOURCE_DOMAINS["DO"]
-    assert domains("DO", local_sources=False) == (), "a country never restricts the web"
+    assert spec("MX").location == RetrievalLocation(country="MX")
+    assert spec(None).location is None, "a user without a country sends no location"
+    assert spec("DO").source_domains == (), "a country never restricts the web"
 
 
 @pytest.mark.parametrize(
@@ -182,13 +159,12 @@ def test_the_thorough_job_rebuilds_its_parameters_from_the_typed_request() -> No
 # --- the request -----------------------------------------------------------
 
 
-def test_the_request_carries_every_retrieval_parameter(monkeypatch) -> None:
+def test_the_request_carries_every_retrieval_parameter() -> None:
     spec = retrieval_spec(
         "balanced",
         question_kind="current_external",
         language_tag="es-419",
         country="DO",
-        local_sources=True,
     )
     client = PerplexityAgentClient("k", transport=RecordingTransport([agent_response()]))
 
@@ -206,10 +182,7 @@ def test_the_request_carries_every_retrieval_parameter(monkeypatch) -> None:
         {
             "type": "web_search",
             "search_context_size": "medium",
-            "filters": {
-                "search_recency_filter": "week",
-                "search_domain_filter": ["popularenlinea.com"],
-            },
+            "filters": {"search_recency_filter": "week"},
             "user_location": {"country": "DO"},
         },
         {"type": "finance_search"},

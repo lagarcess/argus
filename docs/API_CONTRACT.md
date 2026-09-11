@@ -4040,13 +4040,13 @@ Contract rules:
   language), the shape's web search context size, a recency filter derived
   from the question's section 7 data class (current classes a week, analyst
   estimates a month, quarterly and closed classes none, so a closed window is
-  never filtered to the past week), the deployment's home market as the
-  reader's location (`ARGUS_RESEARCH_HOME_COUNTRY`, ISO 3166-1 alpha-2;
-  unset sends none, and Argus holds no per-user country yet), and, for a
-  local question, that market's curated publisher list as the domain filter
-  (at most twenty domains, the provider's ceiling). No rail shape today is
-  local; the list is seeded from the bank users actually named and is
-  consumed by the first local calculation.
+  never filtered to the past week), and the asking user's declared country
+  as the reader's location on the web search tool (the profile's `country`,
+  ISO 3166-1 alpha-2). A user without a country sends no location, and no
+  deployment-wide country stands in for one. A thorough job's typed request
+  carries the country, so the job sends the location of the user who asked.
+  The research cache key includes that country, so a search made for one
+  country's readers never answers another's. No domain filter is sent.
 - Current external facts ("why is NVDA moving this week") are claim-shaped:
   they ground through the balanced shape with publisher sources required and
   a one-week recency filter, and persist the ordinary `research` sidecar with
