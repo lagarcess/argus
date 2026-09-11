@@ -144,7 +144,7 @@ the merge ignores it. That replay is a committed test.
 | --- | ---: |
 | `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task and of a continuing new idea, the recorded two turns through the real workflow) | 101 passed |
 | `tests/agent_runtime/test_dca_money_role_audits.py` | 35 passed |
-| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 42 passed |
+| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 46 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
 | Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `f7fc6d74` | 2642 passed, 2 skipped |
 | `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `f7fc6d74` | 822 passed |
@@ -399,6 +399,14 @@ This owner touches no measurement case; no live run and no spend.
 | Finding | Fix | Test |
 | --- | --- | --- |
 | Adjacent dashes ("Wait——actually") streamed as "Wait, actually" and persisted as "Wait. actually", because the empty text between them was read as the end of a streamed token | A run of adjacent dashes is one dash, collapsed before the split, so both doors read the same text; every dash is still counted | adjacent dashes whole-reply in English and Spanish and split across chunks on either side, in `tests/test_visible_reply.py` (five failed on the head owner) |
+
+This owner touches no measurement case; no live run and no spend.
+
+## Codex round 14 (one P2 on `ca85091d`, fixed in `b14a0c1e`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| Dashes separated only by spaces ("Wait— —actually") still split into a blank interior piece that the stream read as a token end and the final reply as a sentence end | After the split, blank interior pieces are dropped, so any run of dashes with nothing but spaces between them is one dash on both doors; every dash is still counted | spaced dash runs whole-reply in English and Spanish and chunked, in `tests/test_visible_reply.py` (four failed on the head owner) |
 
 This owner touches no measurement case; no live run and no spend.
 
