@@ -1,6 +1,6 @@
 {
-  "candidate": "82e37ddf1fc3f449c48177b5f09b412016f66a95",
-  "review": "Bounded code review clean after malformed URL and cancellation-accounting fixes; 25 tests passed. Harness review clean with 43 tests passed. Dollar arithmetic checked separately against d730 and unchanged final-head payloads. GitHub final review not yet claimed.",
+  "candidate": "4dc1afeebd9b7a3dda7ef0a9bafbaafff64c4d1e",
+  "review": "Bounded code review clean after malformed URL and cancellation-accounting fixes; 25 tests passed. Harness review clean with 43 tests passed. Dollar arithmetic checked separately against d730 and unchanged final-head payloads. GitHub final review not yet claimed. Final nested-schema guard delta reviewed clean; both new class-name regression cases pass.",
   "tests": {
     "focused_backend": 640,
     "mocked_eval": 257,
@@ -9,7 +9,8 @@
     "existing_retrieval_parameters": 59,
     "readout_probe": 43,
     "prompt_surface_coverage": 9,
-    "readout_policy_after_format_cleanup": 122
+    "readout_policy_after_format_cleanup": 122,
+    "nested_schema_guard_followup": 374
   },
   "fingerprint": "Held unchanged; model-facing fingerprint comparison fails as expected. No full live eval authorized.",
   "paid_provider_calls": 0,
@@ -18,7 +19,7 @@
     "src/argus/api/chat/research_evidence.py": "b3be9b27f1955bdae74410e6d0d5907de67f39758d566c1e64b8065dcc8b2aba",
     "src/argus/api/routers/agent.py": "78e00b52c6753d078a383f1619e95724d8407e7b27a795c4f464e615ab69afb8",
     "src/argus/domain/research/perplexity_agent.py": "8e805299941e6d741b1909c668d2a54f8cb9c0b5aeac9ea8dfac5cbf8bfe38ba",
-    "src/argus/domain/result_readout_grounding.py": "f4582524485f1d47ecad9899ce2c838c13eaacddc34d4251142926daab1e041a",
+    "src/argus/domain/result_readout_grounding.py": "2974cd5232ff056320d98c5031dd770cca893e5db1684ae4799d667d3a05f9ae",
     "src/argus/domain/result_readout_quotes.py": "8b1f4915fbf1831dd417e539728a89347b29159fb77a0ad0ba330baa24da3c0b",
     "src/argus/domain/result_readout_sources.py": "4563b42714fc79b275afc20e4469d0c485130487b9bc4dfac02a3639d19f6f81",
     "src/argus/llm/openrouter.py": "4d38d2d5d1472e7dd0df252d8163e3fb9d3c9f801ddfe204f8b4b8f59c23ac43",
@@ -57,5 +58,11 @@
       "result_summary receipt checks in .github/canary-render.sh remain valid; task name is unchanged",
       "Historical docs/archive, docs/reports and earlier spec sections retain measured former wiring and cancelled commands; section9 and luna/README own current instructions"
     ]
+  },
+  "payload_revalidation": "Final clean-head free preflight has identical twelve payload hashes, limits and estimate to the reviewed preflight. Zero requests or provider responses.",
+  "github_review_threads_before_push": {
+    "unresolved": 0,
+    "total": 3,
+    "new_head_review": "pending"
   }
 }

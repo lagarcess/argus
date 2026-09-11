@@ -4,7 +4,7 @@ Status: implemented and verified without paid calls. This is not a readiness
 or quality approval. The fingerprint is held, no merge has occurred, and the
 new twelve-draft check still needs the founder's explicit approval.
 
-The measured source candidate is `82e37ddf1fc3f449c48177b5f09b412016f66a95`.
+The measured source candidate is `4dc1afeebd9b7a3dda7ef0a9bafbaafff64c4d1e`.
 `preflight.json` records six saved-run/language pairs, twelve frames and zero
 HTTP attempts. Later evidence-only commits can be checked against the source
 hashes in `preapproval-audit.json`. The former structured-tier check and its
@@ -87,7 +87,7 @@ the lane ready if accepted prose contains a factual error.
 The main combined backend set passed 640 tests, the mocked eval harness 257,
 and the frontend readout/privacy guard 76. The new measurement harness passed
 43 tests. New additive-client behavior and existing client/retrieval/ledger
-paths passed their focused tests. Nine prompt-surface coverage tests pass; the
+paths passed their focused tests. The final nested-schema guard delta passed 374 focused tests. Nine prompt-surface coverage tests pass; the
 frozen fingerprint comparison intentionally remains failed and unchanged.
 
 `merged-modularity.json` and `.txt` record a passing check across 1,430 source

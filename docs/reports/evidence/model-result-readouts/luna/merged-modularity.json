@@ -11,5 +11,7 @@
     "docs/specs/argus-grounded-finance-roadmap.md",
     "src/argus/domain/research/perplexity_agent.py"
   ],
-  "readiness": "Pending founder-authorized measurement and fingerprint release; no reconciliation merge authorized."
+  "readiness": "Pending founder-authorized measurement and fingerprint release; no reconciliation merge authorized.",
+  "revalidated_candidate": "4dc1afeebd9b7a3dda7ef0a9bafbaafff64c4d1e",
+  "revalidation": "Since the computed tree, only result_readout_grounding.py (not watched), its small focused source test, and evidence docs changed. Watched file contents and shared budget configuration are byte-identical to the checked tree."
 }
