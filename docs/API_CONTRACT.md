@@ -929,6 +929,9 @@ Application-facing user object.
   "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
+  "country": "MX",
+  "currency_override": null,
+  "currency": "MXN",
   "is_admin": false,
   "onboarding": {
     "completed": false,
@@ -955,6 +958,14 @@ Application-facing user object.
     opts out after opting in.
   - A registered-account preference. Guest responses omit it entirely, and the
     database policies keep it off the guest surface.
+- `country` is where the user lives, an ISO 3166-1 alpha-2 code chosen in
+  Settings. It is stated, never inferred from conversation, IP or behavior
+  (decision 8). Research sends it as the reader's location; null sends none.
+- `currency` is read-only: `currency_override` when the user chose one,
+  otherwise the currency the country implies (the first tender currency CLDR
+  records there with no end date), and null when neither is known. Only the
+  override is stored.
+  - All three are registered-account preferences. Guest responses omit them.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
@@ -2644,6 +2655,9 @@ Retrieve the current authenticated user profile and preferences.
     "language": "en",
     "locale": "en-US",
     "avatar_theme": "ocean",
+    "country": "MX",
+    "currency_override": null,
+    "currency": "MXN",
     "is_admin": false,
     "onboarding": {
       "completed": false,
@@ -2872,7 +2886,9 @@ Update profile preferences. Partial update semantics are supported.
   "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
-  "avatar_theme": "plum"
+  "avatar_theme": "plum",
+  "country": "DO",
+  "currency_override": "USD"
 }
 ```
 
@@ -2895,6 +2911,21 @@ Update profile preferences. Partial update semantics are supported.
 - Avatar themes are registered-account preferences. Guests cannot update a
   profile, and guest-facing `/me` and `/auth/session` responses omit
   `avatar_theme`.
+- `country` accepts an officially assigned ISO 3166-1 alpha-2 code in any
+  case. A grouping or user-assigned region such as `EU` or `XK`, or a country
+  name, returns 422. `null` or an empty value clears it, and a user with no
+  country sends no research location.
+- `currency_override` accepts an ISO 4217 code CLDR records in tender in some
+  country with no end date; other codes return 422. The accepted codes change
+  only with the installed CLDR data, never with the date, so the Settings
+  picker's generated list and the API always agree within one build. `null`
+  clears it, and `currency` returns to the one the country implies. A stored
+  code the standards later retire still reads back; only an edit is held to
+  the current codes.
+- `currency` is derived and cannot be written; a patch that sends it is
+  ignored.
+- Country and currency are registered-account preferences. Guests cannot
+  update a profile, and guest-facing responses omit all three fields.
 - A legacy `onboarding` object or `theme` from an old client is ignored; the
   API cannot write either. The chosen theme stays in the browser, so the
   account holds no theme.
@@ -4204,13 +4235,13 @@ Contract rules:
   language), the shape's web search context size, a recency filter derived
   from the question's section 7 data class (current classes a week, analyst
   estimates a month, quarterly and closed classes none, so a closed window is
-  never filtered to the past week), the deployment's home market as the
-  reader's location (`ARGUS_RESEARCH_HOME_COUNTRY`, ISO 3166-1 alpha-2;
-  unset sends none, and Argus holds no per-user country yet), and, for a
-  local question, that market's curated publisher list as the domain filter
-  (at most twenty domains, the provider's ceiling). No rail shape today is
-  local; the list is seeded from the bank users actually named and is
-  consumed by the first local calculation.
+  never filtered to the past week), and the asking user's declared country
+  as the reader's location on the web search tool (the profile's `country`,
+  ISO 3166-1 alpha-2). A user without a country sends no location, and no
+  deployment-wide country stands in for one. A thorough job's typed request
+  carries the country, so the job sends the location of the user who asked.
+  The research cache key includes that country, so a search made for one
+  country's readers never answers another's. No domain filter is sent.
 - Current external facts ("why is NVDA moving this week") are claim-shaped:
   they ground through the balanced shape with publisher sources required and
   a one-week recency filter, and persist the ordinary `research` sidecar with
@@ -5695,16 +5726,34 @@ limit returns `429` with `code: "too_many_requests"` and `Retry-After`.
 
 Feedback context is privacy-sanitized by the backend before persistence. The
 backend keeps only known scalar artifact/app keys such as `source`, `surface`,
-`message_id`, `conversation_id`, `artifact_id`, `artifact_type`, result,
-confirmation, backtest-job, rating, tag, timestamp, and attachment-count
+`message_id`, `conversation_id`, `artifact_id`, `artifact_type`,
+`evidence_artifact_id`, result, confirmation, backtest-job, rating, tag, timestamp,
+and attachment-count
 metadata. Raw browser URLs are not persisted; when a URL or legacy
 `metadata.path` is provided, the backend stores only a queryless `page_path`
 with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,
 tokens, and arbitrary browser metadata are dropped.
 
 Guest feedback does not require an email and does not consume chat or simulation
-allowance. Conversation and artifact identifiers are attached only after the
-user explicitly opts in; raw transcript content is never attached by default.
+allowance. A one-tap rating, from message thumbs or the chat's feedback ask,
+carries the identifiers of the message it rates. Written feedback from the
+feedback dialog attaches conversation and artifact identifiers only after the
+user opts in. Raw transcript content is never attached.
+
+The chat's feedback ask sends `context.source: "feedback_ask"` with a one-tap
+`context.rating` of `positive`, `neutral`, or `negative`, plus the identifiers
+message thumbs send for the result it follows, such as `conversation_id` and
+`message_id`. Its optional detail goes through the feedback dialog under the
+opt-in above. The detail keeps the ask's `source` but carries no rating, so only
+the tap's row holds the rating. Message thumbs send `positive` or `negative`.
+
+Every accepted submission, guest or registered and of any type, is emailed to
+`support@get-argus.com` after the response is sent, through the Resend SMTP
+credential the access welcome email already uses
+(`ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`). The email carries the type, account kind,
+profile language, message, and the sanitized context above, and adds no contact
+details the submission did not already carry. A missing credential or a failed
+delivery is logged and never changes the response or the saved feedback.
 
 For `account_deletion_request`, clients send a one-click support request from
 the account surface. The backend enriches `context` with authenticated account

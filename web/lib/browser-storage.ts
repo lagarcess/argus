@@ -36,6 +36,7 @@ export const STORAGE_REGISTRY = {
   "argus:command_palette_layout": "layout",
   "argus:guest-hint:confirmation:v1": "tips",
   "argus:guest-hint:result:v1": "tips",
+  "argus:feedback-ask:v1": "tips",
   "argus.memoryOptOutConversations.v1": "temporary",
 } as const satisfies Record<string, StorageConcept>;
 

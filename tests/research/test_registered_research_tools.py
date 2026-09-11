@@ -148,7 +148,10 @@ def test_balanced_call_preserves_the_existing_service_period_policy(
     assert result.sources
     assert client.calls[0][1].shape == "balanced"
     expected = retrieval_spec(
-        "balanced", question_kind="current_external", closed_period=closed_window
+        "balanced",
+        question_kind="current_external",
+        closed_period=closed_window,
+        country=None,
     )
     assert client.calls[0][1].recency == expected.recency
     assert "question_kind" not in args.model_dump()
@@ -217,7 +220,10 @@ def test_thorough_call_retains_job_lifecycle_without_inline_provider_work(
     from argus.domain.research.config import retrieval_spec
 
     assert grounded.retrieval_spec_for_job(job) == retrieval_spec(
-        "thorough", question_kind=job["question_kind"], language_tag=job["language"]
+        "thorough",
+        question_kind=job["question_kind"],
+        language_tag=job["language"],
+        country=job["country"],
     )
 
 

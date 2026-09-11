@@ -7,6 +7,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 RETIRED_ENV_KEYS = {
+    "ARGUS_RESEARCH_HOME_COUNTRY",
     "ARGUS_STRATEGIES_ENABLED",
     "NEXT_PUBLIC_STRATEGIES_ENABLED",
     "NEXT_PUBLIC_COLLECTIONS_ENABLED",
@@ -77,3 +78,14 @@ def test_live_asset_provider_override_remains_untouched() -> None:
 
     assert "ARGUS_ASSET_PROVIDER_MODE" in assets
     assert "ARGUS_MARKET_DATA_PROVIDER_MODE" in assets
+
+
+def test_no_deployment_wide_country_stands_in_for_the_users() -> None:
+    # Research sends each user's declared country. A server-wide value would
+    # answer for every user who has not chosen one.
+    readers = [
+        path.relative_to(ROOT).as_posix()
+        for path in (ROOT / "src").rglob("*.py")
+        if "ARGUS_RESEARCH_HOME_COUNTRY" in path.read_text(encoding="utf-8")
+    ]
+    assert readers == []

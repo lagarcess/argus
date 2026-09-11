@@ -64,7 +64,7 @@ prompt = _research_prompt(
     publisher_sources_required=True,
     scenario=True,
 )
-spec = retrieval_spec("balanced", question_kind="company_lookup", language_tag="en", scenario=True)
+spec = retrieval_spec("balanced", question_kind="company_lookup", language_tag="en", country=None, scenario=True)
 transport = RecordingHTTPTransport()
 client = PerplexityAgentClient(os.environ["PERPLEXITY_API_KEY"], transport=transport)
 started = time.monotonic()

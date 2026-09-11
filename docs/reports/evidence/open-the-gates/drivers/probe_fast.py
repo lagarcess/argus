@@ -26,7 +26,7 @@ from argus.domain.research.perplexity_agent import (  # noqa: E402
 )
 
 label, tools, out = sys.argv[1:4]
-spec = retrieval_spec("fast", question_kind="live_quote", closed_period=False, language_tag="en")
+spec = retrieval_spec("fast", question_kind="live_quote", closed_period=False, language_tag="en", country=None)
 if tools == "finance+web":
     spec = spec.model_copy(update={"tools": ("finance_search", "web_search"), "max_steps": 3})
 prompt = grounded._research_prompt(
