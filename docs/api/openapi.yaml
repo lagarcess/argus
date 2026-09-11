@@ -4425,6 +4425,16 @@ components:
           - indigo
           - slate
           default: ocean
+        country:
+          anyOf:
+          - type: string
+            pattern: ^[A-Z]{2}$
+          - type: 'null'
+        currency_override:
+          anyOf:
+          - type: string
+            pattern: ^[A-Z]{3}$
+          - type: 'null'
       type: object
     ProviderReconciliationStatus:
       type: string
@@ -6128,6 +6138,16 @@ components:
           - indigo
           - slate
           default: ocean
+        country:
+          anyOf:
+          - type: string
+            pattern: ^[A-Z]{2}$
+          - type: 'null'
+        currency_override:
+          anyOf:
+          - type: string
+            pattern: ^[A-Z]{3}$
+          - type: 'null'
         is_admin:
           type: boolean
           default: false
@@ -6139,12 +6159,19 @@ components:
         updated_at:
           type: string
           format: date-time
+        currency:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'ISO 4217: the override when set, otherwise the country''s currency.'
+          readOnly: true
       type: object
       required:
       - id
       - email
       - created_at
       - updated_at
+      - currency
     UserResponse:
       properties:
         user:

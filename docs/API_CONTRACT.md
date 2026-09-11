@@ -929,6 +929,9 @@ Application-facing user object.
   "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
+  "country": "MX",
+  "currency_override": null,
+  "currency": "MXN",
   "is_admin": false,
   "onboarding": {
     "completed": false,
@@ -955,6 +958,13 @@ Application-facing user object.
     opts out after opting in.
   - A registered-account preference. Guest responses omit it entirely, and the
     database policies keep it off the guest surface.
+- `country` is where the user lives, an ISO 3166-1 alpha-2 code chosen in
+  Settings. It is stated, never inferred from conversation, IP or behavior
+  (decision 8). Research sends it as the reader's location; null sends none.
+- `currency` is read-only: `currency_override` when the user chose one,
+  otherwise the currency the country implies (the first CLDR lists in tender
+  there), and null when neither is known. Only the override is stored.
+  - All three are registered-account preferences. Guest responses omit them.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
@@ -2492,6 +2502,9 @@ Retrieve the current authenticated user profile and preferences.
     "language": "en",
     "locale": "en-US",
     "avatar_theme": "ocean",
+    "country": "MX",
+    "currency_override": null,
+    "currency": "MXN",
     "is_admin": false,
     "onboarding": {
       "completed": false,
@@ -2720,7 +2733,9 @@ Update profile preferences. Partial update semantics are supported.
   "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
-  "avatar_theme": "plum"
+  "avatar_theme": "plum",
+  "country": "DO",
+  "currency_override": "USD"
 }
 ```
 
@@ -2743,6 +2758,18 @@ Update profile preferences. Partial update semantics are supported.
 - Avatar themes are registered-account preferences. Guests cannot update a
   profile, and guest-facing `/me` and `/auth/session` responses omit
   `avatar_theme`.
+- `country` accepts an officially assigned ISO 3166-1 alpha-2 code in any
+  case. A grouping or user-assigned region such as `EU` or `XK`, or a country
+  name, returns 422. `null` or an empty value clears it, and a user with no
+  country sends no research location.
+- `currency_override` accepts an ISO 4217 code in tender in some country
+  today; other codes return 422. `null` clears it, and `currency` returns to
+  the one the country implies. A stored code the standards later retire still
+  reads back; only an edit is held to today's codes.
+- `currency` is derived and cannot be written; a patch that sends it is
+  ignored.
+- Country and currency are registered-account preferences. Guests cannot
+  update a profile, and guest-facing responses omit all three fields.
 - A legacy `onboarding` object or `theme` from an old client is ignored; the
   API cannot write either. The chosen theme stays in the browser, so the
   account holds no theme.

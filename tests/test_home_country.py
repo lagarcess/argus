@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from argus.api.main import app
 from argus.api.schemas import ProfilePatch, User, guest_safe_user
 from argus.domain.home_country import country_codes, currency_codes
@@ -246,6 +247,19 @@ def test_the_migration_adds_nullable_codes_off_the_guest_surface() -> None:
     assert "add column if not exists currency text" not in migration
     assert migration.count("as restrictive") == 2
     assert "'is_anonymous') is distinct from 'true'" in migration
+
+
+def test_the_contract_declares_the_settings_on_user_and_the_patch_only() -> None:
+    openapi = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+    schemas = openapi["components"]["schemas"]
+
+    assert set(SETTINGS) <= schemas["User"]["properties"].keys()
+    assert schemas["User"]["properties"]["currency"]["readOnly"] is True
+    assert not set(SETTINGS) & schemas["GuestUser"]["properties"].keys()
+    assert {"country", "currency_override"} <= schemas["ProfilePatch"]["properties"].keys()
+    assert "currency" not in schemas["ProfilePatch"]["properties"]
 
 
 def test_the_settings_picker_offers_exactly_what_an_edit_may_name() -> None:
