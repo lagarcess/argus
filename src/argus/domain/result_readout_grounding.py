@@ -20,6 +20,14 @@ from argus.domain.result_readout_facts import (
 from argus.domain.result_readout_quotes import validate_figure_references
 from argus.domain.visible_reply import rewrite_visible_reply
 
+# Every model-written text about a run declares its figures the same way.
+READOUT_FIGURE_REFERENCE_INSTRUCTIONS = (
+    "Put complete prose in text; keep fact names private in figures. For each run "
+    "figure used, give its exact fact_key. In figures.value use a JSON number "
+    "without currency symbols, percent signs or separators; only dates use an ISO "
+    "string. One reference per fact is enough; no figures used means an empty list."
+)
+
 READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "Tell the story of this historical experience in plain language: what staying "
     "invested involved and the meaningful tradeoff against the benchmark. The card "
@@ -36,11 +44,8 @@ READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "without inventing a holder's feelings or decisions. Any next step is a "
     "question for another supported historical test, never a prediction or "
     "recommendation to trade. No forecasts, investment advice or em dashes. "
-    "Write in product_language and report the language actually written. Put "
-    "complete prose in text; keep fact names private in figures. For each run "
-    "figure used, give its exact fact_key. In figures.value use a JSON number "
-    "without currency symbols, percent signs or separators; only dates use an ISO "
-    "string. One reference per fact is enough; no figures used means an empty list."
+    "Write in product_language and report the language actually written. "
+    + READOUT_FIGURE_REFERENCE_INSTRUCTIONS
 )
 
 

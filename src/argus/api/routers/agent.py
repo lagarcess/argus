@@ -1070,6 +1070,7 @@ async def chat_stream(
                     "clarification",
                     "discovery",
                     "next_experiments",
+                    "suggested_questions",
                     "research",
                 ):
                     value = runtime_result.get(key)

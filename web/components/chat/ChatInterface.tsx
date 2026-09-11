@@ -121,6 +121,7 @@ import {
   nextExperimentRowsFromMetadata,
   nextExperimentsSourceRunIdFromMetadata,
 } from "@/lib/chat-next-experiments";
+import { suggestedQuestionsFromMetadata } from "@/lib/chat-suggested-questions";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
   loadAllConversationMessagePages,
@@ -1348,6 +1349,7 @@ export default function ChatInterface() {
           nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
         const finalNextExperimentsSourceRunId =
           nextExperimentsSourceRunIdFromMetadata(finalPayload);
+        const finalSuggestedQuestions = suggestedQuestionsFromMetadata(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1476,6 +1478,7 @@ export default function ChatInterface() {
                   resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
                   resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                   nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
+                  suggestedQuestions: finalSuggestedQuestions,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
                 }),
@@ -1500,6 +1503,7 @@ export default function ChatInterface() {
                 resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
                 resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                 nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
+                suggestedQuestions: finalSuggestedQuestions,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
               },

@@ -10,6 +10,7 @@ from argus.api.schemas import BacktestRun
 from argus.domain.engine import SymbolAsset
 from argus.domain.indicators import IndicatorInfo
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.result_readout_research import RESULT_RESEARCH_MODEL
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 
@@ -1263,7 +1264,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
     breakdown_languages: list[str] = []
     ledger_calls: list[dict[str, Any]] = []
-    usage = ResearchUsage(model=breakdown_service.RESULT_BREAKDOWN_MODEL, cost_usd=0.01)
+    usage = ResearchUsage(model=RESULT_RESEARCH_MODEL, cost_usd=0.01)
     source = ResearchSource(
         title="Historical context",
         url="https://example.com/context",

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from collections.abc import Sequence
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -68,6 +69,7 @@ from argus.domain.research.contracts import (
     QuestionShape,
     ResearchNamePair,
     ResearchPacket,
+    ResearchSource,
     ResearchUnavailableError,
     ResearchUsage,
     combined_research_usage,
@@ -1845,6 +1847,32 @@ def build_research_sidecar(
         sidecar["degraded"] = {"code": degraded_code}
     assert set(sidecar) <= RESEARCH_SIDECAR_KEYS, "undocumented research sidecar key"
     return sidecar
+
+
+def returned_sources_research_sidecar(
+    *,
+    sources: Sequence[ResearchSource],
+    usage: ResearchUsage | None,
+    degraded_code: str | None = None,
+) -> dict[str, Any]:
+    """The sidecar for a structured Agent answer: its returned sources and invoice."""
+    packet = ResearchPacket(answer_markdown="", sources=tuple(sources))
+    return build_research_sidecar(
+        capability_class="balanced_lookup",
+        shape="balanced",
+        sources=typed_sources(packet),
+        retrieved_at=packet.retrieved_at.isoformat(),
+        subjects=[],
+        peers=[],
+        usage={
+            "invocations": usage.invocations if usage else None,
+            "latency_ms": usage.latency_ms if usage else None,
+            "cost_usd": usage.cost_usd if usage else None,
+            "cache_status": "miss",
+        },
+        period_of_interest=None,
+        degraded_code=degraded_code,
+    )
 
 
 def research_stage_result(

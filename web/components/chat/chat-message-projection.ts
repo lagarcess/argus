@@ -26,6 +26,7 @@ import {
   nextExperimentRowsFromMetadata,
   nextExperimentsSourceRunIdFromMetadata,
 } from "@/lib/chat-next-experiments";
+import { suggestedQuestionsFromMetadata } from "@/lib/chat-suggested-questions";
 import {
   applyHydratedBacktestJobTruth,
   backtestJobCardAwaitsPolling,
@@ -476,6 +477,9 @@ export function hydrateMessagesFromApi(
         const nextExperiments = discovery
           ? null
           : nextExperimentRowsFromMetadata(metadata);
+        const suggestedQuestions = discovery
+          ? null
+          : suggestedQuestionsFromMetadata(metadata);
         const memoryRecalls = memoryRecallsFromMetadata(metadata);
         // A computed answer declares its computation; the backend stamps
         // the current decision beside it. Both are rendered, never inferred.
@@ -483,6 +487,7 @@ export function hydrateMessagesFromApi(
         if (
           discovery ||
           nextExperiments ||
+          suggestedQuestions ||
           memoryRecalls ||
           computation ||
           researchSources.length > 0
@@ -509,6 +514,7 @@ export function hydrateMessagesFromApi(
                     nextExperimentsSourceRunIdFromMetadata(metadata),
                 }
               : {}),
+            ...(suggestedQuestions ? { suggestedQuestions } : {}),
             ...(memoryRecalls ? { memoryRecalls } : {}),
           };
         }

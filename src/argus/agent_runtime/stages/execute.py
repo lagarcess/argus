@@ -533,9 +533,8 @@ def _fallback_prompt(
         )
     if _is_provider_history_start_error(error_message):
         return (
-            "That start date is earlier than the equity history Argus can use "
-            "right now. Choose a 2016-or-later start date and I can keep the "
-            "same idea."
+            "That start date is earlier than the price history Argus has for "
+            "this asset. Choose a later start date and I can keep the same idea."
         )
     if _is_lookback_limit_error(error_message):
         return (

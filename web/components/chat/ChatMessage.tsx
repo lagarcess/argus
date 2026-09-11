@@ -26,6 +26,7 @@ import {
   nextExperimentAction,
   nextExperimentReasonText,
 } from "@/lib/chat-next-experiments";
+import { suggestedQuestionAction } from "@/lib/chat-suggested-questions";
 import {
   type ChatActionOption,
   type ChatMention,
@@ -763,6 +764,33 @@ export default function ChatMessage({
                       </NextMoveRow>
                     );
                   })}
+                </div>
+              </section>
+            )}
+
+          {/* Questions the model wrote for this conversation; a tap asks one. */}
+          {shouldShowAssistantFooter &&
+            Boolean(isLatest) &&
+            !turnInFlight &&
+            (message.suggestedQuestions?.length ?? 0) > 0 && (
+              <section
+                aria-label={t("chat.suggested_questions.section", "Related questions")}
+                className="mt-5 flex w-full max-w-[min(100%,660px)] flex-col"
+              >
+                <div className="argus-result-section-label">
+                  {t("chat.suggested_questions.section", "Related questions")}
+                </div>
+                <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
+                  {(message.suggestedQuestions ?? []).map((question) => (
+                    <NextMoveRow
+                      key={question}
+                      ariaLabel={question}
+                      disabled={turnInFlight}
+                      onClick={() => onAction?.(suggestedQuestionAction(question))}
+                    >
+                      <NextMoveTitle>{question}</NextMoveTitle>
+                    </NextMoveRow>
+                  ))}
                 </div>
               </section>
             )}

@@ -57,6 +57,68 @@ class TradableHistory:
 def clear_tradable_history_cache() -> None:
     with _CACHE_LOCK:
         _CACHE.clear()
+        _HISTORY_START_CACHE.clear()
+
+
+# How far back an equity's history can begin is the provider's floor; an asset
+# listed later begins on its own first bar, which only the feed knows.
+ASSET_HISTORY_START_BUDGET_SECONDS = 3.0
+_HISTORY_START_CACHE: dict[tuple[str, date], date] = {}
+
+
+def asset_history_start(symbol: str, asset_class: str) -> date | None:
+    """The first day the price feed has a daily bar for this asset.
+
+    None when that cannot be established inside the budget, and for crypto and
+    currency pairs, whose feeds can fall back to a recent rolling window; a
+    caller holding None states no start date. A decided answer is cached for
+    the New York day.
+    """
+    key_symbol = str(symbol or "").strip().upper()
+    if not key_symbol or str(asset_class or "").strip().lower() != "equity":
+        return None
+    key = (key_symbol, new_york_today())
+    with _CACHE_LOCK:
+        cached = _HISTORY_START_CACHE.get(key)
+    if cached is not None:
+        return cached
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        start = executor.submit(_first_equity_bar_date, *key).result(
+            timeout=ASSET_HISTORY_START_BUDGET_SECONDS
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(
+            "Asset history start could not be established",
+            symbol=key_symbol,
+            error=str(exc),
+        )
+        return None
+    finally:
+        executor.shutdown(wait=False, cancel_futures=False)
+    if start is not None:
+        with _CACHE_LOCK:
+            _HISTORY_START_CACHE[key] = start
+    return start
+
+
+def shared_history_start(symbols: list[str], asset_class: str) -> date | None:
+    """The first day every asset of a run has history, or None if any is unknown."""
+    starts = [asset_history_start(symbol, asset_class) for symbol in symbols]
+    if not starts or any(start is None for start in starts):
+        return None
+    return max(start for start in starts if start is not None)
+
+
+def _first_equity_bar_date(symbol: str, today: date) -> date | None:
+    from argus.domain.market_data.capabilities import ALPACA_EQUITY_HISTORY_START
+    from argus.domain.market_data.provider import fetch_price_series
+
+    series = fetch_price_series(symbol, "equity", ALPACA_EQUITY_HISTORY_START, today, "1d")
+    index = getattr(series, "index", None)
+    if index is None or len(index) == 0:
+        return None
+    return date.fromisoformat(str(index[0])[:10])
 
 
 def tradable_history(symbol: str, asset_class: str) -> TradableHistory:

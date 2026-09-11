@@ -396,6 +396,50 @@ async def _generate_clarifying_question(
     return result.prompt
 
 
+def _asks_about_dates(
+    *,
+    response_intent: dict[str, object],
+    missing_required_fields: list[str],
+    unsupported_constraints: list[dict[str, object]],
+) -> bool:
+    requested = response_intent.get("requested_fields")
+    return (
+        "date_range" in missing_required_fields
+        or (isinstance(requested, list) and "date_range" in requested)
+        or response_intent.get("kind") == "coverage_recovery"
+        or any(
+            constraint.get("category") == "data_window_unavailable"
+            for constraint in unsupported_constraints
+        )
+    )
+
+
+async def _asset_history_starts(
+    strategy: StrategySummary | None, *, dates_in_question: bool
+) -> dict[str, str]:
+    """Each asset's first daily bar, for a clarification that concerns dates."""
+    if not dates_in_question or strategy is None:
+        return {}
+    from argus.domain.market_data import asset_history_start
+
+    symbols = list(
+        dict.fromkeys(
+            str(symbol).strip().upper()
+            for symbol in strategy.asset_universe
+            if str(symbol).strip()
+        )
+    )
+    asset_class = str(strategy.asset_class or "")
+    starts = await asyncio.gather(
+        *(asyncio.to_thread(asset_history_start, symbol, asset_class) for symbol in symbols)
+    )
+    return {
+        symbol: start.isoformat()
+        for symbol, start in zip(symbols, starts, strict=False)
+        if start is not None
+    }
+
+
 async def _generate_clarifying_question_result(
     *,
     state: RunState,
@@ -428,6 +472,14 @@ async def _generate_clarifying_question_result(
         optional_parameter_choices=optional_parameter_choices,
         response_intent=response_intent,
         language=language,
+        asset_history_starts=await _asset_history_starts(
+            state.candidate_strategy_draft,
+            dates_in_question=_asks_about_dates(
+                response_intent=response_intent,
+                missing_required_fields=missing_required_fields,
+                unsupported_constraints=unsupported_constraints,
+            ),
+        ),
     )
     async_invoke = getattr(clarification_generator, "ainvoke", None)
     if async_invoke is not None:

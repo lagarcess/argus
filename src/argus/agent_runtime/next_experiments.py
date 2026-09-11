@@ -47,7 +47,6 @@ __all__ = [
     "detect_next_experiment_acceptance",
     "next_experiment_label_key",
     "next_experiment_short_label_key",
-    "next_experiments_lead_in",
     "next_experiments_sidecar",
     "offered_kinds_from_thread_metadata",
 ]
@@ -110,18 +109,6 @@ _SEND_TEMPLATES: dict[str, dict[str, str]] = {
         ),
     },
 }
-
-# The one sentence above the rows when the user asks what to try next (#590).
-# It carries no figures; the first row's `why` does.
-NEXT_EXPERIMENTS_LEAD_IN: dict[str, str] = {
-    "en": "Here is what you can try next from this result.",
-    "es-419": "Esto es lo que puedes probar después a partir de este resultado.",
-}
-
-
-def next_experiments_lead_in(language: str | None) -> str:
-    return NEXT_EXPERIMENTS_LEAD_IN[runtime_locale(language)]
-
 
 def next_experiments_sidecar(
     result_facts: dict[str, Any],

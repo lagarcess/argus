@@ -28,6 +28,7 @@ type MergeFinalTextOptions = {
   memoryRecalls?: MemoryRecallItem[] | null;
   nextExperiments?: NextExperimentRow[] | null;
   nextExperimentsSourceRunId?: string | null;
+  suggestedQuestions?: string[] | null;
 };
 
 export function mergeFinalTextMessage(
@@ -50,6 +51,7 @@ export function mergeFinalTextMessage(
     memoryRecalls,
     nextExperiments,
     nextExperimentsSourceRunId,
+    suggestedQuestions,
   }: MergeFinalTextOptions,
 ): Message {
   if (message.id !== assistantId) {
@@ -76,5 +78,6 @@ export function mergeFinalTextMessage(
     nextExperiments: nextExperiments ?? message.nextExperiments,
     nextExperimentsSourceRunId:
       nextExperimentsSourceRunId ?? message.nextExperimentsSourceRunId,
+    suggestedQuestions: suggestedQuestions ?? message.suggestedQuestions,
   };
 }
