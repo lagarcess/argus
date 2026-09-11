@@ -194,3 +194,70 @@ to preserve on a local reference branch. No slot changes are authorized.
 
 This final instruction supersedes the unpaid two-tier comparison plan, not its
 preserved historical evidence. All runtime checks remain at `ab1fbda9` behavior.
+
+## 9. Founder-locked Luna design and additive client boundary
+
+This section supersedes section 8's unpaid structured-tier experiment and its
+writing-only implementation boundary. No prior paid approval carries forward.
+The existing frames, result card, saved-language behavior and complete template
+fallback remain the reader contract.
+
+1. Quick take uses `openai/gpt-5.6-luna` through OpenRouter, without search, on
+   a new `readout` tier. `ARGUS_READOUT_MODEL` and
+   `ARGUS_READOUT_FALLBACK_MODEL` both name that model. A Luna failure uses the
+   template; no weaker model fallback. Chat retains its other tasks and keys.
+2. Breakdown uses a readout-owned Luna model constant through the existing
+   Perplexity Agent client, with `web_search` and `fetch_url` only. No
+   `finance_search`. Its own Agent request deadline replaces the OpenRouter
+   timeout wrapper. The context tier retains `capability_conflict` and its keys.
+3. Add exactly one public structured-output method to `PerplexityAgentClient`.
+   It accepts the caller's output schema and instructions and returns the
+   complete validated draft, sources and usage. Reuse existing request, auth,
+   timeout, usage, pricing and unpriced-spend handling. Add imports/supporting
+   declarations if needed, but do not modify or delete any existing line in
+   `src/argus/domain/research/perplexity_agent.py`. The existing research entry
+   points and request builder are unchanged. `research/config.py` and
+   `agent_runtime/research_grounded.py` remain byte-identical.
+4. Keep the labeled run fact sheet and exact run references as the only source
+   for backtest figures. Web context has separate source citations and dates;
+   it never changes, replaces or joins the stored run facts. A web figure must
+   reference its source and date; uncited figures reject the whole draft.
+   Historical explanatory context must cite its source and distinguish
+   reported events from an inferred contribution to a price move. No forecast
+   or investment advice is introduced. Model-reported language still gates
+   complete acceptance. Quick take remains search-free.
+5. The card owns numerical reporting. Readouts tell the historical story,
+   holding experience, tradeoffs and useful next historical test. A figure
+   appears only when the sentence needs it, with its proper run or web reference.
+   Quick take is first-glance; Breakdown develops rather than repeats it.
+6. Remove the Breakdown OpenRouter task literal, profile, tier mapping, call,
+   dependency injection and old timeout constant, including tests that pin
+   that provider wiring. Preserve the `result_breakdown` message/presentation
+   kind. OpenRouter Quick take receipts keep their existing accounting path.
+   Every Perplexity Breakdown invoice reaches the shared research cost-ledger
+   path, including rejected drafts; unpriced spend uses the existing recorder.
+7. Propagate both readout keys through model environment owners, task registry,
+   `.env.example`, local-QA and GitHub environment scripts, Render sync lists
+   and requirements, release profile, `render.yaml`, runtime docs and tests.
+   These release/environment edits are explicitly founder-authorized. Never
+   write `.env` or `web/.env.local`; local values are process-only. Report the
+   exact two lines the founder must add. Other tier keys retain their meaning.
+8. Add Luna's research pricing row from the first approved response's billed
+   input/output usage, retaining raw response evidence. Published prices may
+   support the preflight estimate but are not billed-rate evidence. Unknown
+   or mismatched pricing must remain visible through unpriced spend.
+9. Prepare the same three genuine saved runs in English and Spanish, both
+   frames, exactly twelve drafts, one attempt per frame. No new backtests.
+   Bound input/output/tool work, post a fresh estimate, and wait for explicit
+   approval before any paid call. Retain every outcome, raw response, receipt,
+   accepted/fallback status and factual/quality review. Render all twelve
+   outcomes in the browser beside their source numbers and commit screenshots.
+10. Search `src`, `tests`, `docs`, `scripts` and `.github` for obsolete readout
+    provider/tier wiring and report the disposition of every category found,
+    distinguishing immutable historical evidence from active runtime contracts.
+    Keep the fingerprint held; no full live eval, merge, deploy or stash.
+
+Before approval, complete implementation, deterministic verification and the
+bounded measurement setup. After approved proof, report its results and the
+remaining held release gates. Stop if any required change exceeds the precise
+additive client boundary or touches either other forbidden research file.
