@@ -22,6 +22,7 @@ from argus.agent_runtime.interpreter.shared import (
     _field_path_base,
     _llm_strategy_draft_has_extractable_fields,
     _llm_strategy_draft_has_rule_or_indicator_fields,
+    _request_has_active_strategy_context,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
 )
@@ -451,17 +452,6 @@ def _normalized_material_date_range_payload(value: Any) -> Any:
 def _request_has_latest_result(request: InterpretationRequest) -> bool:
     snapshot = request.latest_task_snapshot
     return bool(snapshot and snapshot.latest_backtest_result_reference is not None)
-
-
-def _request_has_active_strategy_context(request: InterpretationRequest) -> bool:
-    snapshot = request.latest_task_snapshot
-    if snapshot is None:
-        return False
-    return bool(
-        snapshot.pending_strategy_summary
-        or snapshot.confirmed_strategy_summary
-        or snapshot.active_confirmation_reference
-    )
 
 
 _EXECUTION_EVIDENCE_FIELDS = (

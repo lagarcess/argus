@@ -1,0 +1,652 @@
+{
+  "baseline_scorecard": "docs/reports/evidence/decision-10/live-measurement.json",
+  "baseline_commit": "60e7c0ec25c7a7e84ceb402fa14db3a710cee2ae",
+  "candidate_sha": "ee15a3491e8e77ec857caeb22441389bdbe17869",
+  "baseline_totals": {
+    "expected_failed": 0,
+    "failed": 6,
+    "infrastructure_error": 0,
+    "passed": 63,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "candidate_totals": {
+    "expected_failed": 0,
+    "failed": 7,
+    "infrastructure_error": 0,
+    "passed": 64,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "verdicts": {
+    "unchanged": 58,
+    "fixed": 5,
+    "regressed": 6,
+    "added": 2,
+    "removed": 0
+  },
+  "regressed": [
+    "action_chip_add_asset_preserves_modeled_costs_issue_271",
+    "action_chip_change_asset_compound_replace_issue_188",
+    "asset_discovery_peer_anchor_english_issue_244",
+    "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+    "dca_capital_semantics_truncated_window_measures_served_issue_455",
+    "ordinary_conversation_price_question_en"
+  ],
+  "rows": [
+    {
+      "id": "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [
+        "capability_verdict: expected 'executable', got 'needs_clarification'",
+        "launch_execution_realism: expected mapping subset {'enabled': True, 'fee_bps': 10.0, 'slippage_bps': 5.0}, got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "verdict": "regressed"
+    },
+    {
+      "id": "action_chip_change_asset_bare_ticker_append_issue_190",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_change_asset_changed_mind_capital_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_change_asset_compound_replace_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [
+        "intent: expected 'backtest_execution', got 'conversation_followup'",
+        "capability_verdict: expected 'executable', got 'answer_only'",
+        "assets: expected ['MSFT', 'NVDA', 'TSLA', 'GOOGL'], got ['AAPL', 'MSFT', 'NVDA']",
+        "effective_date_range: expected {'start': '2024-01-02', 'end': '2024-12-31'}, got {'start': '2024-01-01', 'end': '2024-12-31'}",
+        "adjustment_reason: expected 'calendar_alignment', got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'ready_to_respond']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "verdict": "regressed"
+    },
+    {
+      "id": "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_change_asset_remove_aapl_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "action_chip_run_visible_confirmation_aapl",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_category_english_issue_244",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_category_spanish_issue_244",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "semantic_turn_act: expected 'asset_discovery', got None"
+      ],
+      "candidate_failed_checks": [],
+      "verdict": "fixed"
+    },
+    {
+      "id": "asset_discovery_comparison_anchor_english_issue_244",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_not_capability_question_issue_244",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_not_direct_backtest_issue_244",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "baseline_status": "failed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [
+        "offered.min_next_experiment_rows: expected at least 1, got []"
+      ],
+      "candidate_failed_checks": [
+        "offered.min_next_experiment_rows: expected at least 1, got []"
+      ],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'discovery_search_failed', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})"
+      ],
+      "candidate_failed_checks": [],
+      "verdict": "fixed"
+    },
+    {
+      "id": "asset_discovery_peer_anchor_english_issue_244",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [
+        "prose_judge:honesty"
+      ],
+      "verdict": "regressed"
+    },
+    {
+      "id": "asset_discovery_recent_ipo_exact_issue_344",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "capability_honesty_future_performance_btc_regression",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "capability_honesty_future_performance_nvda_golden_cross",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "capability_honesty_golden_cross_control_aapl",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "capability_honesty_momentum_breakout_aapl",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "capability_honesty_news_sentiment_rule_aapl",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "capability_honesty_options_straddle_tsla",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+      "baseline_status": "absent",
+      "candidate_status": "passed",
+      "baseline_failed_checks": null,
+      "candidate_failed_checks": [],
+      "verdict": "added"
+    },
+    {
+      "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+      "baseline_status": "absent",
+      "candidate_status": "passed",
+      "baseline_failed_checks": null,
+      "candidate_failed_checks": [],
+      "verdict": "added"
+    },
+    {
+      "id": "dca_capital_semantics_crypto_weekly_btc_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [
+        "capability_verdict: expected 'unsupported', got 'executable'",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply'], got ['ready_for_confirmation', 'await_approval']",
+        "clarification: expected mapping subset {'kind': 'unsupported_recovery', 'reason_code': 'unsupported_dca_contribution_ceiling'}, got None",
+        "offered.response: no assistant answer reached the turn",
+        "offered.clarification: no clarification reached the turn",
+        "offered.min_recovery_options: expected at least 1, got []"
+      ],
+      "verdict": "regressed"
+    },
+    {
+      "id": "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "capability_verdict: expected 'executable', got 'unsupported'",
+        "capital_amount: expected 13000, got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "candidate_failed_checks": [],
+      "verdict": "fixed"
+    },
+    {
+      "id": "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_truncated_window_measures_served_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [
+        "capability_verdict: expected 'unsupported', got 'needs_clarification'",
+        "requested_field: expected 'cadence', got None",
+        "offered.clarification.kind: expected 'unsupported_recovery', got 'coverage_recovery'",
+        "offered.clarification.requested_field: expected 'cadence', got None"
+      ],
+      "verdict": "regressed"
+    },
+    {
+      "id": "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "graceful_recovery_spanish_weekly_options_aapl",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "prose_judge:honesty"
+      ],
+      "candidate_failed_checks": [],
+      "verdict": "fixed"
+    },
+    {
+      "id": "graceful_recovery_weekly_options_aapl",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_english_aapl_simple_hold_2024",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_english_company_name_multi_asset_issue_142",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_english_complete_sma_crossover_benchmark_issue_270",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_english_opening_apple_capital_missing_period_issue_336",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_spanish_btc_hold_q1_2024",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "metric_correctness_eth_default_crypto_benchmark",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "natural_language_establishes_modeled_costs_issue_271",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "ordinary_conversation_capability_indicator_question_en",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "ordinary_conversation_capability_indicator_question_es",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "ordinary_conversation_concept_compound_interest_en",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "prose_judge:honesty"
+      ],
+      "candidate_failed_checks": [],
+      "verdict": "fixed"
+    },
+    {
+      "id": "ordinary_conversation_concept_etf_es",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "ordinary_conversation_concept_inflation_es",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "ordinary_conversation_macro_curiosity_en",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "ordinary_conversation_price_question_en",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [
+        "prose_judge:honesty"
+      ],
+      "verdict": "regressed"
+    },
+    {
+      "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    },
+    {
+      "id": "spanish_ui_english_user_msft_hold_h1_2024",
+      "baseline_status": "passed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "verdict": "unchanged"
+    }
+  ]
+}

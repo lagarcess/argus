@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, NamedTuple
 
 from argus.agent_runtime.llm_interpreter_types import (
     LLMDateRangeIntent,
@@ -17,6 +17,7 @@ from argus.agent_runtime.llm_interpreter_types import (
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import TaskSnapshot
+from argus.domain.dca_capital import DCA_CEILING_ROLES, DCA_SEED_ROLES
 from argus.domain.slot_normalizer import normalize_parameter_value
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import (
@@ -50,25 +51,71 @@ _COMPARISON_BASELINE_EVIDENCE_KEYS = (
 
 _EXECUTABLE_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
 
+# Acts the model uses for a turn that continues what is pending, and every act
+# a repaired read may keep as its own.
+CONTINUATION_TURN_ACTS = frozenset(
+    {"answer_pending_need", "approval", "refine_current_idea"}
+)
+KNOWN_TURN_ACTS = frozenset({"new_idea", *CONTINUATION_TURN_ACTS})
+_AWAITING_REPLY_OUTCOMES = frozenset({"await_user_reply", "await_approval"})
+PENDING_REPLY_ASSUMED_REASON = "pending_setup_reply_assumed_without_model_read"
+
+
+def is_explicit_fresh_task(act: str | None, relation: str | None) -> bool:
+    """Only new_idea with new_task starts a fresh task; a new idea that
+    continues answers what is pending."""
+    return act == "new_idea" and relation == "new_task"
+
+
+class RepairedTurnAct(NamedTuple):
+    task_relation: str
+    semantic_turn_act: str
+    answers_pending: bool
+    reason_codes: tuple[str, ...]
+
+
+def _request_has_active_strategy_context(request: InterpretationRequest) -> bool:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return False
+    return bool(
+        snapshot.pending_strategy_summary
+        or snapshot.confirmed_strategy_summary
+        or snapshot.active_confirmation_reference
+    )
+
+
+def repaired_turn_act(
+    *, base_act: str | None, base_relation: str | None, request: InterpretationRequest
+) -> RepairedTurnAct:
+    """A known act is the model's read and stays. An act a repair replaces (none,
+    unsupported) is decided by whether the runtime is waiting on its own question,
+    and that assumption is recorded as a reason code."""
+    has_pending_setup = _request_has_active_strategy_context(request)
+    if base_act in KNOWN_TURN_ACTS:
+        return RepairedTurnAct(
+            base_relation or "new_task",
+            base_act,
+            has_pending_setup and not is_explicit_fresh_task(base_act, base_relation),
+            (),
+        )
+    metadata = request.selected_thread_metadata
+    if has_pending_setup and (
+        str(metadata.get("requested_field") or "").strip()
+        or metadata.get("last_stage_outcome") in _AWAITING_REPLY_OUTCOMES
+    ):
+        return RepairedTurnAct(
+            "continue", "answer_pending_need", True, (PENDING_REPLY_ASSUMED_REASON,)
+        )
+    return RepairedTurnAct("new_task", "new_idea", False, ())
+
 
 _TOTAL_CAPITAL_SOURCES = {
     "user",
     "explicit_user",
     "prior",
-    "initial_capital",
-    "starting_capital",
-    "starting_principal",
-    "initial_lump_sum",
-    "initial_lump",
-    "lump_sum",
-    "total_capital",
-    "total_budget",
-    "max_budget",
-    "investment_budget",
-    "cap",
-    "contribution_cap",
-    "capital_cap",
-    "investment_cap",
+    *DCA_SEED_ROLES,
+    *DCA_CEILING_ROLES,
 }
 
 

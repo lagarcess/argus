@@ -11,6 +11,7 @@ from typing import Any
 from argus.agent_runtime.interpreter.audits import StatedRunFieldFidelityAudit
 from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
+    _seed_corroborated_by_fidelity_audit,
 )
 from argus.agent_runtime.interpreter.draft_shape import (
     _llm_strategy_draft_has_executable_shape,
@@ -309,7 +310,8 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
             "intent": "backtest_execution",
             "requires_clarification": False,
             "assistant_response": None,
-            "semantic_turn_act": "new_idea",
+            # The executable fields win over prose; the act stays the read's.
+            "semantic_turn_act": response.semantic_turn_act or "new_idea",
             "reason_codes": list(
                 dict.fromkeys(
                     [
@@ -1068,6 +1070,9 @@ def _response_from_stated_run_field_fidelity_audit(
         changed = True
     if audit.recurring_contribution_amount is not None:
         recurring_amount = float(audit.recurring_contribution_amount)
+        changed |= _seed_corroborated_by_fidelity_audit(
+            draft, audit=audit, repaired=repaired
+        )
         if draft.capital_amount != recurring_amount:
             draft.capital_amount = recurring_amount
             changed = True
@@ -1121,12 +1126,7 @@ def _response_from_stated_run_field_fidelity_audit(
     if not changed:
         return None
     repaired.reason_codes = list(
-        dict.fromkeys(
-            [
-                *repaired.reason_codes,
-                "stated_run_field_fidelity_audit",
-            ]
-        )
+        dict.fromkeys([*repaired.reason_codes, "stated_run_field_fidelity_audit"])
     )
     return repaired
 

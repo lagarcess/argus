@@ -23,6 +23,30 @@ from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 
 DCA_CAPITAL_SCHEMA_VERSION = "dca_capital_v1"
 
+# The names each money role travels under between the interpreter's drafts,
+# the audits that re-type them and the semantic reader that decides what the
+# plan may do. A seed role is money put to work on day one; a ceiling role
+# bounds the whole plan. One tuple each, so a writer and a reader can never
+# disagree on which is which.
+DCA_SEED_ROLES: tuple[str, ...] = (
+    "initial_capital",
+    "starting_capital",
+    "starting_principal",
+    "initial_lump_sum",
+    "initial_lump",
+    "lump_sum",
+)
+DCA_CEILING_ROLES: tuple[str, ...] = (
+    "total_capital",
+    "total_budget",
+    "max_budget",
+    "investment_budget",
+    "cap",
+    "contribution_cap",
+    "capital_cap",
+    "investment_cap",
+)
+
 DCA_CAPITAL_CONFIG_KEY = "dca_capital"
 
 # Legacy engine configs stored the recurring contribution in the shared

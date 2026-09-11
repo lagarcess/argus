@@ -22,7 +22,7 @@ from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
 )
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
-from argus.agent_runtime.interpreter.shared import _llm_value_is_empty
+from argus.agent_runtime.interpreter.shared import _llm_value_is_empty, repaired_turn_act
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
     LLMInterpretationResponse,
@@ -475,16 +475,12 @@ def response_from_focused_strategy_extraction(
     base_response: LLMInterpretationResponse | None = None,
     resolve_asset_candidate: ResolveAssetCandidate,
 ) -> LLMInterpretationResponse:
-    snapshot = request.latest_task_snapshot
-    is_pending_strategy_answer = bool(
-        snapshot
-        and (
-            snapshot.pending_strategy_summary
-            or snapshot.confirmed_strategy_summary
-            or snapshot.active_confirmation_reference
-        )
-        and str(request.selected_thread_metadata.get("requested_field") or "").strip()
+    turn = repaired_turn_act(
+        base_act=base_response.semantic_turn_act if base_response is not None else None,
+        base_relation=base_response.task_relation if base_response is not None else None,
+        request=request,
     )
+    is_pending_strategy_answer = turn.answers_pending
     strategy_type = executable_strategy_type_from_extracted_fields(
         extraction.model_dump(mode="python")
     )
@@ -582,7 +578,7 @@ def response_from_focused_strategy_extraction(
         intent="strategy_drafting"
         if extraction.requires_clarification
         else "backtest_execution",
-        task_relation="continue" if is_pending_strategy_answer else "new_task",
+        task_relation=turn.task_relation,
         requires_clarification=extraction.requires_clarification,
         user_goal_summary=extraction.user_goal_summary,
         candidate_strategy_draft=LLMStrategyDraft(
@@ -619,10 +615,8 @@ def response_from_focused_strategy_extraction(
         missing_required_fields=list(extraction.missing_required_fields),
         assistant_response=extraction.assistant_response,
         confidence=extraction.confidence,
-        reason_codes=["focused_strategy_extraction_repair"],
-        semantic_turn_act=(
-            "answer_pending_need" if is_pending_strategy_answer else "new_idea"
-        ),
+        reason_codes=["focused_strategy_extraction_repair", *turn.reason_codes],
+        semantic_turn_act=turn.semantic_turn_act,
     )
     response = _merge_focused_repair_with_base(
         response=response,

@@ -269,6 +269,7 @@ from argus.agent_runtime.interpreter.shared import (  # noqa: F401
     _latest_result_date_window,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
+    repaired_turn_act,
 )
 from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _asset_recovery_query_is_explicit_ticker,
@@ -2033,7 +2034,9 @@ async def _dca_contract_audited_response(
                 message="DCA contract audit failed; trying next candidate model",
             )
             continue
-        repaired = _response_from_dca_contract_audit(response=response, audit=audit)
+        repaired = _response_from_dca_contract_audit(
+            response=response, audit=audit, request=request
+        )
         if repaired is not None:
             return repaired
     return response
@@ -3286,9 +3289,14 @@ async def _repair_incomplete_strategy_extraction(
                 return None
             continue
         base_response = failed_response
-        if _request_has_active_strategy_context(
-            request
-        ) and _selected_requested_field_base(request):
+        # The pending setup fills the re-read only for a turn that answers
+        # the runtime's question; a fresh task is filled from itself alone.
+        turn = repaired_turn_act(
+            base_act=failed_response.semantic_turn_act,
+            base_relation=failed_response.task_relation,
+            request=request,
+        )
+        if turn.answers_pending and _selected_requested_field_base(request):
             pending_draft = _pending_strategy_draft_from_request_or_response(
                 response=failed_response,
                 request=request,
@@ -4877,17 +4885,19 @@ async def _focused_strategy_repair_after_candidate_failures(
         request
     ) and not _request_current_turn_has_material_execution_evidence(request):
         return None
+    # No model read the act; the owner decides it from the pending state.
+    turn = repaired_turn_act(base_act=None, base_relation=None, request=request)
     seed_response = LLMInterpretationResponse(
         intent="strategy_drafting",
-        task_relation="new_task",
+        task_relation=turn.task_relation,
         requires_clarification=True,
         user_goal_summary=request.current_user_message,
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing=request.current_user_message,
             strategy_thesis=request.current_user_message,
         ),
-        reason_codes=["structured_interpretation_candidates_failed"],
-        semantic_turn_act="new_idea",
+        reason_codes=["structured_interpretation_candidates_failed", *turn.reason_codes],
+        semantic_turn_act=turn.semantic_turn_act,
     )
     logger.bind(
         llm_task=_INTERPRETATION_REPAIR_TASK,

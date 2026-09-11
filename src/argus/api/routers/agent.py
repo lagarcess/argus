@@ -118,6 +118,7 @@ from argus.api.chat.tool_results import (
     runtime_tool_result_cards,
 )
 from argus.api.chat.turn_metering import settle_metered_turn
+from argus.api.chat.visible_reply import ReplyRewrites, rewrite_visible_reply
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.guest_access import account_context, client_identity
 from argus.api.message_store import (
@@ -707,7 +708,9 @@ async def chat_stream(
                 )
 
         if runtime_fallback.recovery_message:
-            assistant_text = runtime_fallback.recovery_message
+            assistant_text = rewrite_visible_reply(
+                runtime_fallback.recovery_message, surface="chat_stream"
+            ).text
             recovery = runtime_fallback.recovery
             recovery_code = recovery.get("code") if isinstance(recovery, dict) else None
             stale_card_redirect = recovery_code == "confirmation_action_stale_card"
@@ -809,6 +812,7 @@ async def chat_stream(
             return
 
         streamed_text_parts: list[str] = []
+        reply_rewrites = ReplyRewrites(surface="chat_stream")
         shadow_context_token = set_backtest_job_shadow_context(
             BacktestJobShadowContext(
                 user_id=user.id,
@@ -878,11 +882,13 @@ async def chat_stream(
                     continue
                 event_type = runtime_event.get("type")
                 if event_type == "token":
-                    content = str(runtime_event.get("content") or "")
+                    content = reply_rewrites.token(
+                        str(runtime_event.get("content") or "")
+                    )
                     if content:
                         streamed_text_parts.append(content)
                     if not private_result_stream:
-                        yield sse_data(runtime_event)
+                        yield sse_data({**runtime_event, "content": content})
                     continue
                 if event_type in {"stage_start", "stage_outcome"}:
                     if runtime_event.get("stage") == "explain":
@@ -893,6 +899,9 @@ async def chat_stream(
                     continue
 
                 final_seen = True
+                if (flushed := reply_rewrites.flush()) and not private_result_stream:
+                    streamed_text_parts.append(flushed)
+                    yield sse_data({"type": "token", "content": flushed})
                 apply_turn_progress_evidence(runtime_event.get("_turn_progress"))
                 discovery_usage_evidence = runtime_event.get("_discovery_usage")
                 runtime_result = dict(runtime_event.get("payload") or {})
@@ -1160,6 +1169,12 @@ async def chat_stream(
 
                 persisted_text = (
                     confirmation_anchor_text or assistant_text or streamed_text
+                )
+                assistant_text, persisted_text = reply_rewrites.finalize(
+                    runtime_result=runtime_result,
+                    metadata=metadata,
+                    assistant_text=assistant_text,
+                    persisted_text=persisted_text,
                 )
                 typed_artifact_answer = artifact_presentation_kind(metadata) in {
                     "assumptions",
