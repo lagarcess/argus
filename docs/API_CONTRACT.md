@@ -5539,6 +5539,20 @@ Guest feedback does not require an email and does not consume chat or simulation
 allowance. Conversation and artifact identifiers are attached only after the
 user explicitly opts in; raw transcript content is never attached by default.
 
+The chat's feedback ask sends `context.source: "feedback_ask"` with a one-tap
+`context.rating` of `positive`, `neutral`, or `negative` and no conversation or
+artifact identifiers. Its optional detail goes through the feedback dialog, which
+attaches those identifiers only if the user opts in. Message thumbs send
+`positive` or `negative`.
+
+Every accepted submission, guest or registered and of any type, is emailed to
+`support@get-argus.com` after the response is sent, through the Resend SMTP
+credential the access welcome email already uses
+(`ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`). The email carries the type, account kind,
+profile language, message, and the sanitized context above, and adds no contact
+details the submission did not already carry. A missing credential or a failed
+delivery is logged and never changes the response or the saved feedback.
+
 For `account_deletion_request`, clients send a one-click support request from
 the account surface. The backend enriches `context` with authenticated account
 metadata such as account email, profile language, request user id, and request
