@@ -1,0 +1,69 @@
+{
+  "label": "head-3cc37cfd-rerun",
+  "tree": "/Users/garces/Documents/projects/repos/argus/.claude/worktrees/scout-loop-extraction-cost-a90464",
+  "candidate_sha": "3cc37cfd81416dd87b63142212d679b2fe660331",
+  "market_data_provider_mode": "live_provider",
+  "asset_provider_mode": "live_provider",
+  "captured_at": "2026-09-11T07:49:46.444959+00:00",
+  "records": [
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "status": "passed",
+      "failed_checks": [],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "result_followup",
+      "intent": "conversation_followup",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "next_experiment_kinds": [
+        "change_date_range",
+        "same_setup_peer_asset",
+        "recurring_monthly_buys"
+      ],
+      "recovery_code": null,
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0002136
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError",
+          "usage_cost_usd": null
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0112291
+        },
+        {
+          "task": "interpretation",
+          "schema": "LatestResultRoutingAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0033
+        },
+        {
+          "task": "interpretation",
+          "schema": "LatestResultSaveAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00146
+        }
+      ],
+      "billed_cost_usd": 0.016203
+    }
+  ],
+  "billed_cost_usd": 0.016203
+}
