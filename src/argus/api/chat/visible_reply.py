@@ -24,16 +24,15 @@ _CLOSING_PUNCTUATION = ".,;:!?"
 # the fact, so the range keeps a hyphen in every language.
 
 
-def _ends_a_figure(char: str) -> bool:
-    """A digit or a percent-like sign closes a figure."""
-    return char.isdigit() or unicodedata.name(char, "").endswith(
-        ("PERCENT SIGN", "PER MILLE SIGN")
+def _is_figure_char(char: str) -> bool:
+    """A digit, any currency sign (Unicode category Sc) or a percent-like
+    sign; a figure may open or close on any of them ("$1,000", "1.000€",
+    "5%")."""
+    return (
+        char.isdigit()
+        or unicodedata.category(char) == "Sc"
+        or unicodedata.name(char, "").endswith(("PERCENT SIGN", "PER MILLE SIGN"))
     )
-
-
-def _opens_a_figure(char: str) -> bool:
-    """A digit or any currency sign (Unicode category Sc) opens a figure."""
-    return char.isdigit() or unicodedata.category(char) == "Sc"
 
 
 @dataclass(frozen=True)
@@ -80,8 +79,8 @@ def _without_em_dashes(text: str, *, trailing: str, left_tail: str = "") -> str:
         if (
             raw_left
             and piece
-            and _ends_a_figure(raw_left[-1])
-            and _opens_a_figure(piece[0])
+            and _is_figure_char(raw_left[-1])
+            and _is_figure_char(piece[0])
         ):
             result = f"{result}-{piece}"
             continue

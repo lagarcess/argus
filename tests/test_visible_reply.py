@@ -47,6 +47,10 @@ from fastapi.testclient import TestClient
         ("Between ¥1,000—¥2,000 a month.", "Between ¥1,000-¥2,000 a month.", 1),
         ("Entre ₹1,000—₹2,000 al mes.", "Entre ₹1,000-₹2,000 al mes.", 1),
         ("Expect 5‰—10‰ a year.", "Expect 5‰-10‰ a year.", 1),
+        # A currency sign placed after the amount closes the figure too.
+        ("Entre 1.000€—2.000€ al mes.", "Entre 1.000€-2.000€ al mes.", 1),
+        ("Between 1,000kr—2,000kr a month.", "Between 1,000kr, 2,000kr a month.", 1),
+        ("Between 1.000€—2.000€ a month.", "Between 1.000€-2.000€ a month.", 1),
         # A spaced dash between figures is an aside, not a range.
         ("It returned 12% — 3% above SPY.", "It returned 12%, 3% above SPY.", 1),
         (
@@ -208,6 +212,7 @@ def test_chat_stream_records_nothing_when_no_em_dash_was_shown(
         (["Expect 5%—", "10% a year."], "Expect 5%-10% a year."),
         (["Entre $1,000", "—", "$2,000 al mes."], "Entre $1,000-$2,000 al mes."),
         (["Between ₹1,000—", "₹2,000."], "Between ₹1,000-₹2,000."),
+        (["Entre 1.000€", "—2.000€ al mes."], "Entre 1.000€-2.000€ al mes."),
     ],
 )
 def test_streamed_chunks_render_exactly_what_the_final_reply_persists(
