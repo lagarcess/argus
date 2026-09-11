@@ -1156,8 +1156,8 @@ references. A supported next historical test may follow naturally from that
 story; it is not investment advice and does not replace the typed action
 controls. Frames, labels and their order are unchanged.
 
-Before creating that public envelope, both composers use the same internal
-labeled fact sheet. Each fact identifies its canonical value, unit, meaning,
+Before creating that public envelope, both composers derive facts from the same
+internal labeled fact sheet. Each fact identifies its canonical value, unit, meaning,
 scope, return basis and stored or derived source. Executed fills are distinct
 from completed trades; annualized volatility is distinct from daily returns;
 ending nominal equity is distinct from whole-period extrema; starting capital
@@ -1166,20 +1166,35 @@ dated series meaning. Historical drawdown endpoints are unavailable unless
 retained evidence supports their chronological reconstruction; a nominal DCA
 chart cannot establish a flow-adjusted drawdown event.
 
+Quick take receives the full labeled sheet. Breakdown receives only labeled
+headline scalar facts a sentence could need: tested dates, return and benchmark
+comparison, risk, capital and contributions, costs, ending and peak value, and
+executed fills versus completed round trips. Available drawdown endpoints remain
+explicitly labeled. Chart series, markers, internal field paths and full row
+metadata never enter its provider request. The full sheet remains an internal
+source for this projection; search cannot add to or replace stored run facts.
+
 The internal structured model draft contains `language`, complete `text`, and
-`figures`. Each quoted figure carries `fact_key`, canonical `value`, its exact
-visible `quote`, and a one-based `occurrence`. Code checks that specific fact's
-key and value, the visible quote's units/rounding, and complete, non-overlapping
-coverage of recognized numeric, cardinal and date occurrences. Names such as S&P 500 are identity
-text, not permission to quote an unsupported numerical 500. Missing or invalid
-references reject the complete draft. The model-reported written language must
+`figures`. Each declared run figure carries its supplied `fact_key` and the
+`value` as written, without a quote or occurrence index. Breakdown uses the
+supplied plain-language fact label as the key. One reference per distinct fact
+is sufficient even when the prose repeats the number. Code checks each declared
+key and value against that run fact within display rounding, with exact counts
+and calendar dates. It does not require numeric occurrence coverage: a number
+without a reference, including a number in an asset name such as S&P 500, does
+not reject the readout. Invalid declared references reject the complete draft.
+The model-reported written language must
 match the normalized workspace request; a mismatch records `language_mismatch`
 and uses complete fallback. This is a structured self-report, not an independent
 language classifier, and references do not establish arbitrary prose entailment.
-Model quality therefore still requires case-by-case factual review.
+Model quality therefore still requires case-by-case factual review. Invalid
+schema, empty drafts and provider failure also select complete fallback. There
+are no benchmark-claim or internal-field prose regex gates, required mentions,
+figure limits, or per-occurrence bookkeeping.
 
 Quick take is composed on the OpenRouter `readout` tier, with both model keys
-set to `openai/gpt-5.6-luna` and no search. Breakdown uses a readout-owned Luna
+set to `openai/gpt-5.6-luna` and no search. Only readout-tier requests omit
+`temperature`; every other tier keeps its existing parameters. Breakdown uses a readout-owned Luna
 constant through the existing Perplexity Agent client with only `web_search`
 and `fetch_url`. Its public message kind stays `result_breakdown`; it is no
 longer an OpenRouter task. The chat and context environment keys retain their
@@ -1188,36 +1203,36 @@ request-scoped research admission owner as research answers. Guest allowance or
 global capacity refusal makes no provider call and selects the complete template
 with `result_readout_failure_mode = research_capacity_exhausted`.
 
-Breakdown's internal structured draft additionally contains `source_figures`
-and `citations`. Each external figure records its value, unit, optional currency,
-visible quote, occurrence and zero-based `citation_index`. Each citation records
-the exact external claim quote and occurrence, a URL present in the provider's
-returned sources, and an ISO `as_of` date established by that source. This date
-describes the cited event or measurement, not automatically the page's publication
-date. External claims without supported dates should be omitted. Code requires
-the numeric occurrence to lie inside its cited claim, verifies the visible
-value/unit, and enforces non-overlapping coverage across run and source figures.
-An external citation cannot overlap a run-owned numeric occurrence, including a
-date or spelled-out count; only source-owned figures may sit inside that citation.
-Unknown sources, missing dates and uncited figures reject the entire draft.
-Source figures never enter the run fact sheet or resolve a run fact key.
+Breakdown uses the same three-field internal draft contract. Its short request
+asks what happened to the assets during the tested window and why, what holding
+through it was like, and how the test compared with the benchmark, explained for
+a normal person with sources. `source_figures` and `citations` are not model
+output fields. Code does not request or validate per-claim quotes, occurrences
+or dates. The run remains the sole owner of simulation figures; web search adds
+historical context and never modifies or resolves a run fact.
 
-Code attaches dated Markdown citation links only after complete validation;
-model-written links are rejected. These links travel inside the accepted `text`,
-with dates formatted for its stored language. No additional public envelope
-fields, source packets, quote references or provider usage are exposed. Cited
-historical context may explain the holding experience, with inference distinguished
-from documented events. Forecasts and investing advice remain outside readouts.
-The source/date check proves reference structure, not source entailment; factual
-review remains required. Received Breakdown usage is recorded through the shared
+After draft acceptance, code appends the sources returned by Perplexity as
+Markdown links, using their titles and dates when the provider supplies them.
+Available dates are formatted for the stored readout language. An absent source
+date does not discard the prose. The links travel inside accepted `text`; no
+additional public envelope fields, source packets, figure references or provider
+usage are exposed. The writing brief asks the model to distinguish documented
+events from inference and excludes forecasts and investing advice. Returned
+sources do not prove the truth of every claim; factual review remains required.
+Received Breakdown usage is recorded through the shared
 research cost ledger even when the draft is rejected; unpriced usage retains the
 existing invoice-reconciliation path.
 
-Fact sheets and quote references are internal generation inputs/output, not
+Fact sheets and figure references are internal generation inputs/output, not
 additional public readout fields. The closed public envelope above is unchanged.
 Only accepted complete prose crosses it; language/figure rejection details use
 the existing source/fallback/failure metadata. No read-time composition or
 historical rewrite is introduced.
+
+While a Breakdown stream is active, its existing frame shows localized working
+text. The completed response then selects accepted prose or the template. Empty
+pending content is not evidence that saved run facts are insufficient, and empty
+legacy message content does not leave a completed envelope permanently working.
 
 Template readouts and dossier outcomes render from the same typed run facts
 in the current workspace language. The figures those
@@ -3270,12 +3285,14 @@ returns `422 tool_inputs_not_editable`.
 - `show_breakdown` requires canonical result run context. A stale
   `save_strategy` request also requires that context, but is non-mutating and
   returns the historical-run continuity response.
-- `show_breakdown` composes complete model text from all stored run metrics and
-  configuration facts, with the prior Quick take available for context. New
+- `show_breakdown` composes complete model text from labeled headline run facts
+  and searched historical context, without sending chart series or internal paths. New
   run readouts use the versioned `result_readout_content` transport described
-  under Message. Numeric grounding, benchmark contradictions and visible
-  internal keys reject the whole draft; there are no required-mention or
-  figure-count checks. Generation failure selects the typed template and
+  under Message. Declared run figures must match their fact keys within display
+  rounding; missing references do not reject prose. Language, schema or declared
+  figure failure selects the whole template; there are no quote/occurrence,
+  required-mention, figure-count, benchmark-claim or internal-field regex checks.
+  Generation failure selects the typed template and
   records `result_readout_source`, `result_readout_fallback_used`, and
   `result_readout_failure_mode`. Existing `result_breakdown_*` provenance is
   retained for compatibility. An older run can receive a newly requested,

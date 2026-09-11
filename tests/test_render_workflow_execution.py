@@ -1499,7 +1499,7 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return readout_draft(
             "\n\n".join([model_takeaway, model_tested_bullet, model_meaning_bullet]),
-            [("portfolio.benchmark_gap", 4.2, "4.2 percentage points")],
+            [("portfolio.benchmark_gap", 4.2)],
         )
 
     monkeypatch.setattr(

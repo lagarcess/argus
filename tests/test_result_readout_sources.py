@@ -1,4 +1,4 @@
-"""Web evidence stays separate from immutable backtest facts."""
+"""Provider sources accompany Breakdown without claim-level bookkeeping."""
 
 from copy import deepcopy
 
@@ -13,202 +13,90 @@ def source_draft():
         "language": "en",
         "text": "Reported revenue grew 18%. Holding through the decline required patience.",
         "figures": [],
-        "source_figures": [
-            {
-                "value": 18.0,
-                "unit": "percent",
-                "currency": None,
-                "quote": "18%",
-                "occurrence": 1,
-                "citation_index": 0,
-            }
-        ],
-        "citations": [
-            {
-                "quote": "Reported revenue grew 18%.",
-                "occurrence": 1,
-                "source_url": "https://example.com/earnings",
-                "as_of": "2025-08-01",
-            }
-        ],
     }
 
 
-def accept(draft, facts=None):
-    return accepted_breakdown_text(
-        draft,
-        facts=facts or {},
-        language=draft["language"],
-        sources=(ResearchSource(url="https://example.com/earnings"),),
-    )
-
-
 @pytest.mark.parametrize(
-    "language,text,claim",
+    "language,text",
     [
-        ("en", "Reported revenue grew 18%.", "Reported revenue grew 18%."),
-        (
-            "es-419",
-            "Los ingresos reportados crecieron 18%.",
-            "Los ingresos reportados crecieron 18%.",
-        ),
+        ("en", "Reported revenue grew 18%."),
+        ("es-419", "Los ingresos reportados crecieron 18%."),
     ],
 )
-def test_cited_dated_web_figure_renders_without_mutating_run_facts(
-    source_draft, language, text, claim
+def test_provider_sources_render_with_optional_dates_without_mutating_run_facts(
+    source_draft, language, text
 ):
     source_draft.update(language=language, text=text)
-    source_draft["citations"][0]["quote"] = claim
+    sources = (
+        ResearchSource(
+            url="https://example.com/earnings",
+            title="Quarterly report",
+            source_date="2025-08-01",
+        ),
+        ResearchSource(url="https://example.com/filing", title="Filing"),
+    )
     facts = {"facts": {"portfolio.ending_value": {"value": 1000.0, "unit": "currency"}}}
     before = deepcopy(facts)
-    rendered, failure = accept(source_draft, facts)
+    rendered, failure = accepted_breakdown_text(
+        source_draft, facts=facts, language=language, sources=sources
+    )
     assert failure is None
-    assert text in rendered
-    assert "](https://example.com/earnings)" in rendered
+    assert rendered.startswith(text)
+    for source in sources:
+        assert f"]({source.url})" in rendered
+        assert source.title in rendered
     assert "2025" in rendered
     assert facts == before
 
 
-@pytest.mark.parametrize(
-    "mutation,expected",
-    [
-        (lambda d: d.update(source_figures=[]), "unreferenced_figure"),
-        (lambda d: d.update(citations=[]), "invalid_source_reference"),
-        (
-            lambda d: d["citations"][0].update(source_url="https://["),
-            "invalid_source_reference",
-        ),
-        (
-            lambda d: d["citations"][0].update(
-                source_url="https://invented.example/news"
-            ),
-            "invalid_source_reference",
-        ),
-        (lambda d: d["citations"][0].update(as_of=""), "invalid_source_reference"),
-        (
-            lambda d: d["citations"][0].update(as_of="2025-02-31"),
-            "invalid_source_reference",
-        ),
-        (
-            lambda d: d["citations"][0].update(
-                quote="Holding through the decline required patience."
-            ),
-            "invalid_source_reference",
-        ),
-        (lambda d: d["source_figures"][0].update(value=19.0), "invalid_figure_reference"),
-        (
-            lambda d: d["source_figures"][0].update(unit="currency"),
-            "invalid_figure_reference",
-        ),
-        (
-            lambda d: d["source_figures"][0].update(citation_index=4),
-            "invalid_source_reference",
-        ),
-    ],
-)
-def test_bad_web_evidence_falls_back_as_a_whole(source_draft, mutation, expected):
-    mutation(source_draft)
-    assert accept(source_draft) == (None, expected)
+def test_no_returned_sources_preserves_complete_text(source_draft):
+    assert accepted_breakdown_text(
+        source_draft, facts={}, language="en", sources=()
+    ) == (source_draft["text"], None)
 
 
-def test_source_cannot_supply_a_missing_run_fact(source_draft):
-    source_draft["figures"] = [
-        {"fact_key": "invented_return", "value": 18.0, "quote": "18%", "occurrence": 1}
-    ]
-    source_draft["source_figures"] = []
-    assert accept(source_draft) == (None, "invalid_figure_reference")
-
-
-def test_source_and_run_cannot_cover_same_figure(source_draft):
-    source_draft["figures"] = [
-        {
-            "fact_key": "portfolio.total_return",
-            "value": 18.0,
-            "quote": "18%",
-            "occurrence": 1,
-        }
-    ]
-    facts = {"facts": {"portfolio.total_return": {"value": 18.0, "unit": "percent"}}}
-    assert accept(source_draft, facts) == (None, "invalid_figure_reference")
-
-
-@pytest.mark.parametrize(
-    "language,value,unit,quote",
-    [
-        ("en", 18.0, "percent", "18%"),
-        ("es-419", 18.0, "percent", "18%"),
-        ("en", 18.0, "count", "eighteen fills"),
-        ("es-419", 18.0, "count", "dieciocho operaciones"),
-        ("en", "2025-08-01", "date", "August 1, 2025"),
-        ("es-419", "2025-08-01", "date", "1 de agosto de 2025"),
-    ],
-)
-def test_external_citation_cannot_enclose_a_run_figure(
-    source_draft, language, value, unit, quote
-):
-    source_draft.update(
-        language=language,
-        text=f"{quote}.",
-        figures=[
-            {"fact_key": "run.fact", "value": value, "quote": quote, "occurrence": 1}
-        ],
-        source_figures=[],
+def test_external_figure_does_not_require_quote_occurrence_or_date(source_draft):
+    rendered, failure = accepted_breakdown_text(
+        source_draft,
+        facts={},
+        language="en",
+        sources=(ResearchSource(url="https://example.com/earnings"),),
     )
-    source_draft["citations"][0]["quote"] = source_draft["text"]
-    facts = {"facts": {"run.fact": {"value": value, "unit": unit}}}
-    assert accept(source_draft, facts) == (None, "invalid_source_reference")
+    assert failure is None
+    assert source_draft["text"] in rendered
+    assert "](https://example.com/earnings)" in rendered
 
 
-def test_separate_run_and_source_claims_keep_their_owners(source_draft):
-    source_draft["text"] = "The run returned 9%. " + source_draft["text"]
-    source_draft["figures"] = [
-        {
-            "fact_key": "portfolio.total_return",
-            "value": 9.0,
-            "quote": "9%",
-            "occurrence": 1,
-        }
-    ]
+@pytest.mark.parametrize(
+    "reference",
+    [
+        {"fact_key": "invented_return", "value": 18.0},
+        {"fact_key": "portfolio.total_return", "value": 18.0},
+    ],
+)
+def test_source_cannot_override_invalid_run_reference(source_draft, reference):
+    source_draft["figures"] = [reference]
     facts = {"facts": {"portfolio.total_return": {"value": 9.0, "unit": "percent"}}}
-    text, failure = accept(source_draft, facts)
-    assert failure is None
-    assert text.startswith("The run returned 9%. Reported revenue grew 18%. [")
+    assert accepted_breakdown_text(
+        source_draft,
+        facts=facts,
+        language="en",
+        sources=(ResearchSource(url="https://example.com/earnings"),),
+    ) == (None, "invalid_figure_reference")
 
 
-def test_instrument_name_inside_citation_is_not_a_run_figure(source_draft):
-    source_draft.update(
-        text="The S&P 500 also faced pressure.", figures=[], source_figures=[]
+def test_run_reference_and_web_figures_keep_separate_owners(source_draft):
+    source_draft["text"] = "The run returned 9%. " + source_draft["text"]
+    source_draft["figures"] = [{"fact_key": "portfolio.total_return", "value": 9.0}]
+    facts = {"facts": {"portfolio.total_return": {"value": 9.0, "unit": "percent"}}}
+    rendered, failure = accepted_breakdown_text(
+        source_draft,
+        facts=facts,
+        language="en",
+        sources=(ResearchSource(url="https://example.com/earnings"),),
     )
-    source_draft["citations"][0]["quote"] = source_draft["text"]
-    text, failure = accept(source_draft, {"benchmark_symbol": "SPY"})
     assert failure is None
-    assert text.startswith("The S&P 500 also faced pressure. [")
-
-
-@pytest.mark.parametrize(
-    "text,failure",
-    [
-        ("DOCN lagged SPY.", "contradicting_benchmark_claim"),
-        ("The ending_value matters.", "internal_field_name"),
-        ("ReadoutCitation supplies the context.", "internal_field_name"),
-        ("ReadoutSourceFigure supplies the context.", "internal_field_name"),
-        ("Read [here](https://invented.example/news).", "invalid_source_reference"),
-    ],
-)
-def test_kept_checks_apply_to_web_enabled_breakdown(text, failure):
-    draft = {
-        "language": "en",
-        "text": text,
-        "figures": [],
-        "source_figures": [],
-        "citations": [],
-    }
-    facts = {
-        "benchmark_comparison_claim": "beat_benchmark",
-        "symbols": ["DOCN"],
-        "benchmark_symbol": "SPY",
-    }
-    assert accept(draft, facts) == (None, failure)
+    assert rendered.startswith(source_draft["text"])
 
 
 def test_reported_language_mismatch_still_falls_back(source_draft):

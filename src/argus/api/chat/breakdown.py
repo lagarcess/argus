@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from loguru import logger
 
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.api.chat.research_evidence import record_result_breakdown_spend
 from argus.api.schemas import BacktestRun
 from argus.domain.benchmark_comparison import (
@@ -34,11 +32,13 @@ from argus.domain.research.perplexity_agent import (
 )
 from argus.domain.result_readout_content import (
     normalize_readout_language,
-    validated_readout,
 )
 from argus.domain.result_readout_grounding import (
-    READOUT_RUN_GROUNDING_INSTRUCTIONS,
     stored_readout_facts,
+)
+from argus.domain.result_readout_headlines import (
+    headline_readout_facts,
+    headline_request_lines,
 )
 from argus.domain.result_readout_sources import (
     BREAKDOWN_SOURCE_INSTRUCTIONS,
@@ -97,17 +97,9 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "trades": run.trades or [],
     }
     config_snapshot = run.config_snapshot if isinstance(run.config_snapshot, dict) else {}
-    prior = (
-        validated_readout(card.get("result_readout_content"))
-        if isinstance(card, dict)
-        else None
-    )
     return {
         "run_id": run.id,
         "chart": run.chart,
-        "prior_quick_take": prior["text"]
-        if prior and prior["surface"] == "quick_take"
-        else None,
         "title": card.get("title") if isinstance(card, dict) else None,
         "asset_class": run.asset_class,
         "symbols": run.symbols,
@@ -160,7 +152,7 @@ def _llm_result_breakdown_with_metadata(
     )
     messages = _result_breakdown_llm_messages(
         facts=facts,
-        prior_quick_take=context.get("prior_quick_take"),
+        title=context.get("title"),
         language=resolved_language,
     )
     try:
@@ -185,7 +177,7 @@ def _llm_result_breakdown_with_metadata(
         return None, "llm_unavailable_or_contract_rejected", None, ()
     text, failure = accepted_breakdown_text(
         response.draft,
-        facts=facts,
+        facts=headline_readout_facts(facts),
         language=resolved_language,
         sources=response.sources,
     )
@@ -195,38 +187,30 @@ def _llm_result_breakdown_with_metadata(
 def _result_breakdown_llm_messages(
     *,
     facts: dict[str, Any],
-    prior_quick_take: str | None = None,
+    title: str | None = None,
     language: str = "en",
 ) -> list[dict[str, str]]:
     return [
         {
             "role": "system",
             "content": (
-                f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
-                "Write what belongs inside the Breakdown frame of a completed "
-                "historical backtest. Go deeper than the prior Quick take without "
-                "repeating it. Develop the story the card cannot tell on its "
-                "own: how the ride unfolded when the stored path supports it, "
-                "what holding through the rough parts involved, and what the "
-                "return, risk, costs and trading activity meant together. Choose "
-                "the relationships that illuminate this run, not a tour of its "
-                "metrics. A useful next historical test can follow naturally "
-                "from an unanswered question in these results. Do not fill a "
-                "fixed outline, repeat card figures or add a frame heading or "
-                "experiment checklist; the UI owns the frame and actions. "
+                "Explain this historical backtest for a normal person. "
                 f"{response_language_instruction(language)} "
-                f"{READOUT_RUN_GROUNDING_INSTRUCTIONS} {BREAKDOWN_SOURCE_INSTRUCTIONS}"
+                "The card already shows the numbers; tell the story instead. "
+                "Use a run figure only when it helps, with its label as fact_key "
+                "and the number as written in figures. One reference per fact is enough. "
+                "Report the language actually written. No jargon, forecasts, investing advice or em dashes. "
+                f"{BREAKDOWN_SOURCE_INSTRUCTIONS}"
             ),
         },
         {
             "role": "user",
-            "content": json.dumps(
-                {
-                    "run_facts": facts,
-                    "prior_quick_take": prior_quick_take,
-                    "product_language": language,
-                },
-                default=str,
+            "content": (
+                "What happened to these assets over the tested window and why? "
+                "Search for sources. Explain what holding through it was like and "
+                "how this test compared with the benchmark.\n\n"
+                + (f"Strategy: {title}\n" if title else "")
+                + "\n".join(headline_request_lines(headline_readout_facts(facts)))
             ),
         },
     ]

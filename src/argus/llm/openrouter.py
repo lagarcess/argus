@@ -837,6 +837,10 @@ def _json_schema_payload(
     schema_name: str,
     profile: OpenRouterProfile,
 ) -> dict[str, object]:
+    sampling_parameters = (
+        {} if openrouter_model_tier_for_task(profile.task) == "readout"
+        else {"temperature": profile.temperature}
+    )
     if model.startswith("anthropic/"):
         # Anthropic strict structured outputs reject core shapes of our
         # schemas (numeric bounds, any-typed values, open objects such as
@@ -853,7 +857,7 @@ def _json_schema_payload(
         payload: dict[str, object] = {
             "model": model,
             "messages": _messages_with_stable_prefix_prompt_cache([schema_message, *messages], model=model, task=profile.task),
-            "temperature": profile.temperature,
+            **sampling_parameters,
             "max_tokens": profile.max_tokens,
         }
         _apply_reasoning_for_structured_artifact(payload, profile)
@@ -870,7 +874,7 @@ def _json_schema_payload(
             },
         },
         "provider": {"require_parameters": True},
-        "temperature": profile.temperature,
+        **sampling_parameters,
         "max_tokens": profile.max_tokens,
     }
     _apply_reasoning_for_structured_artifact(payload, profile)

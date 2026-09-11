@@ -210,7 +210,7 @@ def test_free_probe_uses_both_production_builders_without_http(probe_request):
 
 def draft(*, deeper=False):
     value = {"language": "en", "text": "The historical ride was uneven.", "figures": []}
-    return {**value, "source_figures": [], "citations": []} if deeper else value
+    return value
 
 
 @pytest.mark.parametrize(
@@ -248,6 +248,7 @@ def test_real_composer_paths_dispatch_once_each_and_preserve_raw_invoice(
         deeper["language"] = "es-419"
     if failure == "deep_false_figure":
         deeper["text"] = "The return was 9999%."
+        deeper["figures"] = [{"fact_key": "Total return on starting capital", "value": 9999}]
     raw_text = "{bad json" if failure == "deep_json" else json.dumps(deeper)
     response = agent_response(
         text=raw_text,
@@ -316,7 +317,7 @@ def test_real_composer_paths_dispatch_once_each_and_preserve_raw_invoice(
     if failure == "deep_language":
         assert result["breakdown"]["failure_mode"] == "language_mismatch"
     if failure == "deep_false_figure":
-        assert result["breakdown"]["failure_mode"] == "unreferenced_figure"
+        assert result["breakdown"]["failure_mode"] == "invalid_figure_reference"
     if failure in {
         "none",
         "quick_http",

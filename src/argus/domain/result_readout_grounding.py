@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Iterator
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -43,14 +42,11 @@ READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "buy or sell, or claims that a next test will improve results. No em dashes. "
     "Write all prose in product_language, "
     "translating source labels naturally; never copy internal fields or schema keys. "
-    "Return the entire finished prose in text and report the language actually "
-    "written. For every visible numeric occurrence from the run, include a figures reference "
-    "with its exact fact_key and canonical value from run_facts, its exact visible "
-    "quote, and the one-based occurrence of that quote in text. Include the unit "
-    "in quote when written, and quote the whole visible date, not just its year. "
-    "Repeated figures need separate occurrences. The 500 "
-    "inside the name S&P 500 is part of the name, not a numerical fact. Use an "
-    "empty figures list when no figures are written."
+    "Return the complete prose in text and report the language actually written. "
+    "For a run figure you cite, include its fact_key and the value as written "
+    "in figures, using the supplied unit and an ISO date for dates. "
+    "One reference per distinct fact is enough, even if mentioned again. "
+    "Use an empty figures list when no run figures are cited."
 )
 
 
@@ -66,14 +62,7 @@ class ResultReadoutFigure(BaseModel):
 
     fact_key: str = Field(description="The exact key of the supplied fact being quoted.")
     value: float | str = Field(
-        description="Copy that fact's canonical value exactly, including ISO dates."
-    )
-    quote: str = Field(
-        min_length=1,
-        description="The exact visible numeric quote, including its unit when written.",
-    )
-    occurrence: int = Field(
-        ge=1, description="The one-based occurrence of this exact quote in text."
+        description="The number used in the prose, without its unit; ISO date for a date. Rounding is allowed."
     )
 
 
@@ -87,7 +76,7 @@ class ResultReadoutDraft(BaseModel):
         description="The complete user-visible readout in product_language."
     )
     figures: list[ResultReadoutFigure] = Field(
-        description="A fact reference for every visible numeric occurrence; empty when none are written."
+        description="References for cited run figures; one per distinct fact, without occurrence bookkeeping."
     )
 
 
@@ -184,8 +173,6 @@ def accepted_readout_text(
     *,
     facts: dict[str, Any],
     language: str,
-    source_references: tuple[tuple[dict[str, Any], dict[str, Any]], ...] = (),
-    source_citation_spans: tuple[tuple[int, int], ...] = (),
 ) -> tuple[str | None, str | None]:
     """Accept all of the draft or none; punctuation normalization is lossless."""
     try:
@@ -199,24 +186,18 @@ def accepted_readout_text(
     text = response.text
     if not text.strip():
         return None, "empty_draft"
-    if _internal_field_name(text, facts):
-        return None, "internal_field_name"
     try:
         figure_failure = validate_figure_references(
             text,
             [ref.model_dump() for ref in response.figures],
             facts=facts,
             language=response.language,
-            source_references=source_references,
-            source_citation_spans=source_citation_spans,
         )
     except (ValueError, OverflowError):
         # Malformed numbers/dates are rejected identically by both composers.
         return None, "invalid_figure_reference"
     if figure_failure:
         return None, figure_failure
-    if _contradicting_comparison(text, facts):
-        return None, "contradicting_benchmark_claim"
     return re.sub(r"[ \t]*—[ \t]*", ", ", text.strip()), None
 
 
@@ -230,107 +211,3 @@ def _finite_number(value: object) -> bool:
         and not isinstance(value, bool)
         and math.isfinite(value)
     )
-
-
-def _leaves(value: object, path: str = "") -> Iterator[tuple[str, object]]:
-    if isinstance(value, dict):
-        for key, child in value.items():
-            yield from _leaves(child, f"{path}.{key}")
-    elif isinstance(value, list):
-        for child in value:
-            yield from _leaves(child, path)
-    else:
-        yield path, value
-
-
-def _internal_field_name(text: str, facts: dict[str, Any]) -> bool:
-    if re.search(r"\b[a-zA-Z][a-zA-Z0-9]*_[a-zA-Z0-9_]+\b", text):
-        return True
-    if re.search(
-        r"\b(?:fact ids?|context packets?|route receipts?|schema keys?)\b", text, re.I
-    ):
-        return True
-    schemas: set[str] = set()
-    for model in (ResultReadoutDraft, *ResultReadoutDraft.__subclasses__()):
-        schemas.add(model.__name__)
-        schemas.update(model.model_json_schema().get("$defs", {}))
-    if any(re.search(rf"\b{re.escape(name)}\b", text) for name in schemas):
-        return True
-    keys = {part for path, _ in _leaves(facts) for part in path.split(".") if part}
-    keys.update(ResultReadoutDraft.model_fields)
-    keys.update(ResultReadoutFigure.model_fields)
-    return any(
-        re.search(rf'`{re.escape(key)}`|"{re.escape(key)}"\s*:', text)
-        or (
-            key[:1].islower()
-            and any(c.isupper() for c in key)
-            and re.search(rf"\b{re.escape(key)}\b", text)
-        )
-        for key in keys
-    )
-
-
-_COMPARISON = re.compile(
-    r"\b(?P<beat>beat|outperform\w*|ahead of|above|super[óoa]\w*|por encima|rindi[óo] más)\b|"
-    r"\b(?P<lag>lag\w*|trail\w*|underperform\w*|behind|below|por debajo|detrás|detras|rindi[óo] menos)\b|"
-    r"\b(?P<match>match\w*|in line with|igual[óoa]\w*|a la par)\b",
-    re.I,
-)
-
-
-def _contradicting_comparison(text: str, facts: dict[str, Any]) -> bool:
-    truth = facts.get("benchmark_comparison_claim")
-    expected = {"beat_benchmark": 1, "lagged_benchmark": -1, "matched_benchmark": 0}.get(
-        truth
-    )
-    benchmark = str(facts.get("benchmark_symbol") or "").casefold()
-    if expected is None or not benchmark:
-        return False
-    strategy_symbols = {str(s).casefold() for s in facts.get("symbols") or []}
-    roles = {
-        **{symbol: "strategy" for symbol in strategy_symbols},
-        "strategy": "strategy",
-        "estrategia": "strategy",
-        **{
-            alias: "benchmark"
-            for alias in (benchmark, "benchmark", "referencia", "índice", "indice")
-        },
-    }
-    if benchmark in strategy_symbols:
-        roles[benchmark] = "shared"
-    role_pattern = re.compile(
-        r"(?<!\w)(?:" + "|".join(re.escape(alias) for alias in roles) + r")(?!\w)"
-    )
-    for clause in re.split(r"(?<!\d)[.!?;\n](?!\d)", text.casefold()):
-        mentions = list(role_pattern.finditer(clause))
-        if not any(roles[mention.group()] != "strategy" for mention in mentions):
-            continue
-        explicit = [mention for mention in mentions if roles[mention.group()] != "shared"]
-        for match in _COMPARISON.finditer(clause):
-            claim = (
-                1 if match.lastgroup == "beat" else -1 if match.lastgroup == "lag" else 0
-            )
-            prefix = clause[: match.start()]
-            # Resolve which side is the subject, including inverted sentences
-            # such as 'SPY beat DOCN' and ordinary strategy-first statements.
-            subjects = [mention for mention in explicit if mention.end() <= match.start()]
-            subject = roles[subjects[-1].group()] if subjects else None
-            if subject is None and benchmark in strategy_symbols:
-                # A shared ticker cannot own a side. An explicit object can
-                # disambiguate it, as in 'SPY beat the RSI strategy'.
-                objects = [
-                    mention for mention in explicit if mention.start() >= match.end()
-                ]
-                if not objects:
-                    continue
-                subject = (
-                    "strategy"
-                    if roles[objects[0].group()] == "benchmark"
-                    else "benchmark"
-                )
-            if subject == "benchmark":
-                claim *= -1
-            negated = bool(re.search(r"(?:\bnot|\bno|n['’]t)\s+(?:\w+\s+){0,2}$", prefix))
-            if (negated and claim == expected) or (not negated and claim != expected):
-                return True
-    return False

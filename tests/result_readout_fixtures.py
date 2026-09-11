@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-FigureFixture = tuple[str, float | str, str] | tuple[str, float | str, str, int]
+FigureFixture = tuple[str, float | str]
 
 
 def readout_draft(
@@ -14,7 +14,7 @@ def readout_draft(
     *,
     language: str = "en",
 ) -> dict[str, Any]:
-    """Keep references explicit so a wrong quote cannot borrow another fact."""
+    """Keep only the fact key and the value declared by the draft."""
     return {
         "language": language,
         "text": text,
@@ -22,8 +22,6 @@ def readout_draft(
             {
                 "fact_key": row[0],
                 "value": row[1],
-                "quote": row[2],
-                "occurrence": row[3] if len(row) == 4 else 1,
             }
             for row in figures
         ],

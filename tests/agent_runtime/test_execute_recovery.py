@@ -2405,12 +2405,8 @@ async def test_explain_stage_async_composes_spanish_quick_take_without_heading(
         return readout_draft(
             "ETH rindió +55.1%, pero quedó 6.3 puntos porcentuales detrás de BTC.\n\nSe probó comprar y mantener ETH en la ventana solicitada.\n\nLa comparación sirve como evidencia histórica, no como predicción.\n\nSimulación histórica solamente.",
             [
-                ("portfolio.total_return", 55.1, "+55.1%"),
-                (
-                    "portfolio.benchmark_gap",
-                    -6.299999999999997,
-                    "6.3 puntos porcentuales",
-                ),
+                ("portfolio.total_return", 55.1),
+                ("portfolio.benchmark_gap", -6.299999999999997),
             ],
             language="es-419",
         )
@@ -2466,13 +2462,9 @@ async def test_explain_stage_async_accepts_spanish_decimal_comma_benchmark_gap(
         return readout_draft(
             "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; quedaron por debajo por 3,1 puntos porcentuales.\n\nSe probó comprar y mantener AAPL y MSFT en la ventana confirmada.\n\nLa comparación nombra SPY y la brecha frente a la referencia.\n\nSimulación histórica solamente.",
             [
-                ("portfolio.total_return", 13.56, "13,6%"),
-                ("portfolio.benchmark_return", 16.63, "16,6%"),
-                (
-                    "portfolio.benchmark_gap",
-                    -3.0699999999999985,
-                    "3,1 puntos porcentuales",
-                ),
+                ("portfolio.total_return", 13.56),
+                ("portfolio.benchmark_return", 16.63),
+                ("portfolio.benchmark_gap", -3.0699999999999985),
             ],
             language="es-419",
         )
@@ -2571,10 +2563,10 @@ async def test_explain_stage_async_renders_quick_take_from_canonical_facts(
         return readout_draft(
             "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only.",
             [
-                ("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points"),
-                ("window.start", "2024-01-01", "2024"),
-                ("portfolio.total_return", 35.0, "35.0%"),
-                ("portfolio.benchmark_return", 26.9, "26.9%"),
+                ("portfolio.benchmark_gap", 8.099999999999998),
+                ("window.start", "2024-01-01"),
+                ("portfolio.total_return", 35.0),
+                ("portfolio.benchmark_return", 26.9),
             ],
             language="en",
         )
@@ -2630,10 +2622,10 @@ async def test_explain_stage_async_rejects_mismatched_quick_take_return_values(
         return readout_draft(
             "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned +46.7%, while QQQ returned +38.6%.\n\nHistorical simulation only.",
             [
-                ("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points"),
-                ("window.start", "2024-01-01", "2024"),
-                ("portfolio.total_return", 35.0, "+46.7%"),
-                ("portfolio.benchmark_return", 26.9, "+38.6%"),
+                ("portfolio.benchmark_gap", 8.099999999999998),
+                ("window.start", "2024-01-01"),
+                ("portfolio.total_return", 46.7),
+                ("portfolio.benchmark_return", 38.6),
             ],
             language="en",
         )
@@ -2677,7 +2669,7 @@ async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return readout_draft(
             "AAPL trailed QQQ by 5.3 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe benchmark comparison is still visible without template wording.\n\nHistorical simulation only.",
-            [("portfolio.benchmark_gap", -5.299999999999999, "5.3 percentage points")],
+            [("portfolio.benchmark_gap", -5.299999999999999)],
             language="en",
         )
 
@@ -2738,7 +2730,7 @@ async def test_result_readout_preserves_route_receipt_capture_inside_running_loo
         )
         return readout_draft(
             "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed window.\n\nThe result is grounded in the completed backtest run.\n\nHistorical simulation only.",
-            [("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points")],
+            [("portfolio.benchmark_gap", 8.099999999999998)],
             language="en",
         )
 
@@ -2784,10 +2776,10 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
         return readout_draft(
             "AAPL beat QQQ by 8.1 percentage points in this historical test.\n\nTested AAPL buy and hold over the confirmed 2024 window.\n\nAAPL returned 35.0%, while QQQ returned 26.9%.\n\nHistorical simulation only.",
             [
-                ("portfolio.benchmark_gap", 8.099999999999998, "8.1 percentage points"),
-                ("window.start", "2024-01-01", "2024"),
-                ("portfolio.total_return", 35.0, "35.0%"),
-                ("portfolio.benchmark_return", 26.9, "26.9%"),
+                ("portfolio.benchmark_gap", 8.099999999999998),
+                ("window.start", "2024-01-01"),
+                ("portfolio.total_return", 35.0),
+                ("portfolio.benchmark_return", 26.9),
             ],
             language="en",
         )

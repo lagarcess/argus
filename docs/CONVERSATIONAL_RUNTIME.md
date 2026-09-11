@@ -325,13 +325,19 @@ Result presentation is a single product moment:
 The card owns numerical reporting. Quick take tells the first-glance story;
 Breakdown explores the holding experience and historical tradeoffs without
 repeating the card or Quick take. The frames, labels, ordering and result card
-stay unchanged. Both composers receive the same labeled stored-run fact sheet,
-with units, meaning, money roles and available dated path relationships. A figure
-appears only when a sentence needs it, with its checked fact reference.
+stay unchanged. Both composers derive their facts from one labeled stored-run
+fact sheet with units, meaning, money roles and available dated path relationships.
+Quick take receives that sheet. Breakdown receives only
+its labeled headline scalar facts, such as the tested dates, returns, worst drop,
+capital, contributions, costs and fills versus completed round trips. The full
+chart series, markers and internal field paths never enter the Breakdown request.
+A figure appears only when a sentence needs it, with its checked fact reference.
 
 `result_summary` uses the OpenRouter `readout` tier with
 `openai/gpt-5.6-luna`. Both readout model keys select Luna; a failure uses the
 existing template, with no weaker-model fallback and no search.
+Readout-tier requests omit `temperature` because Luna's available OpenRouter
+endpoints do not support it. Other tiers keep their existing request parameters.
 
 The `Show breakdown` action uses that same model through the existing
 `PerplexityAgentClient.run_structured` interface. Its model, deadline and bounded
@@ -342,15 +348,23 @@ Before provider dispatch, Breakdown uses the request's shared research capacity
 claim. An exhausted guest allowance or global ceiling selects the complete
 template without a provider call.
 
-Run facts alone own simulation numbers. Web evidence may add dated, cited
-historical context, including documented events around a decline. External
-figures carry separate source references and cannot become run facts. Code
-rejects web citation spans that overlap run-owned figures. It
-validates complete drafts, run references, cited external numeric occurrences,
-benchmark claims, internal-field leaks and the reported written language before
-publishing any prose. Unsupported drafts use the complete template. This boundary
-does not prove that a cited page entails arbitrary prose; live quality review
-still checks every accepted claim. No forecasts or investing advice belong here.
+The Breakdown request asks plainly what happened to the asset over the tested
+window and why, what holding through it was like, and how the test compared with
+the benchmark, with a web search for sources. Run facts alone own simulation
+numbers; web context must not replace or merge with those facts. Returned
+Perplexity sources are appended as links, with dates when the provider supplies
+them. The model does not recreate a source list or per-claim citation records.
+
+Both structured drafts contain `language`, complete `text` and `figures`; each
+run reference carries `fact_key` and the displayed `value`. One reference per
+distinct fact is sufficient. The light numerical guard checks only declared
+references against their run facts within display rounding. Missing references
+or repeated numbers do not reject prose. Quote/occurrence coverage, per-claim web
+dates, benchmark-claim regexes and internal-field regexes are not acceptance
+checks. Invalid schema, empty text, language mismatch, invalid declared references
+or provider failure selects the complete template. This boundary does not prove
+that every sentence is true; live review still checks accepted claims. Plain
+language, no forecasts and no investing advice remain writing requirements.
 
 Accepted prose is saved once in the closed language-tagged
 `result_readout_content` envelope described in `docs/API_CONTRACT.md`. Readers
@@ -368,7 +382,9 @@ tests that are runnable now, ideas it can help draft, or future engine
 capabilities, but it must not imply unsupported strategies are executable today.
 Structured breakdown actions should emit an `explain` stage before final text so
 the UI can show a clear working state while preserving canonical SSE frame
-types.
+types. The existing Breakdown frame displays localized working text while its
+stream is active. Only a completed response selects model prose or the template;
+the pending frame does not claim saved facts are insufficient.
 
 The chart is a TradingView Lightweight Charts baseline chart using the aggregate portfolio equity curve. Multi-symbol runs must show the portfolio curve, not a cluttered symbol comparison. Entry and exit markers may be capped for readability. TradingView attribution must remain visible.
 

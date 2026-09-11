@@ -229,11 +229,12 @@ export function messageStreamPresentation(
       message.kind === "text" &&
       !message.toolResultCards?.length && !message.toolJobs?.length && !message.hasUnavailableToolResults &&
       message.contentPresentation !== "result_readout" &&
-      message.contentPresentation !== "result_breakdown" &&
       message.recoveryDisplay?.kind !== "artifact_assumptions" &&
       (isStreamingResponse ||
         hasVisibleStreamStatus ||
-        (message.content ?? "") === ""),
+        // A finished Breakdown may have empty content: its readout envelope
+        // or typed facts own the display, so only live status means working.
+        (message.contentPresentation !== "result_breakdown" && (message.content ?? "") === "")),
   };
 }
 

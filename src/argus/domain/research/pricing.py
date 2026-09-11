@@ -40,6 +40,17 @@ class ModelTokenRate:
 # long-context tier has never been observed and keeps the published values.
 # See tests/research/fixtures/README.md.
 MODEL_RATE_TABLE_USD_PER_MILLION: dict[str, tuple[ModelTokenRate, ...]] = {
+    # Compatible with both captured Luna invoices in model-result-readouts/
+    # luna-billed-usage.json. Their tiny uncached input counts and rounded bills
+    # do not uniquely establish the input rate; the evidence records that limit.
+    "openai/gpt-5.6-luna": (
+        ModelTokenRate(
+            input_usd_per_million=Decimal("0.20"),
+            output_usd_per_million=Decimal("1.20"),
+            cache_creation_input_usd_per_million=Decimal("0.25"),
+            cache_read_input_usd_per_million=Decimal("0.02"),
+        ),
+    ),
     "openai/gpt-5.6-sol": (
         ModelTokenRate(
             input_usd_per_million=Decimal("4"),

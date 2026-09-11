@@ -315,7 +315,7 @@ class FakeBreakdownAgentClient:
             )
         )
         return StructuredAgentResult(
-            draft={**draft, "source_figures": [], "citations": []},
+            draft=draft,
             sources=(),
             usage=self.usage,
             tool_results=(),
@@ -424,6 +424,31 @@ def test_reasoning_effort_override_is_sent_in_json_schema_payload(
     )
 
     assert payload["reasoning"] == {"effort": effort}
+
+
+@pytest.mark.parametrize("task", openrouter.OPENROUTER_TASK_MODEL_TIERS)
+@pytest.mark.parametrize("model", ["openai/gpt-5.6-luna", "anthropic/test-model"])
+def test_json_schema_payload_omits_temperature_only_for_readout_tier(
+    task: openrouter.OpenRouterTask,
+    model: str,
+) -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    profile = openrouter_profile_for_task(task)
+    payload = openrouter._json_schema_payload(
+        model=model,
+        messages=[{"role": "user", "content": "hello"}],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=profile,
+    )
+
+    if openrouter.openrouter_model_tier_for_task(task) == "readout":
+        assert "temperature" not in payload
+    else:
+        assert payload["temperature"] == profile.temperature
+    if not model.startswith("anthropic/"):
+        assert payload["provider"] == {"require_parameters": True}
 
 
 def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:
@@ -636,6 +661,7 @@ def test_result_breakdown_uses_structured_agent_with_only_web_tools(monkeypatch)
     text = chat_service.llm_result_breakdown_message(
         {
             "title": "AAPL test",
+            "symbols": ["AAPL"],
             "context_packets": [{"id": "packet-1", "provider": "fred"}],
         },
         client=fake_schema,
@@ -650,8 +676,8 @@ def test_result_breakdown_uses_structured_agent_with_only_web_tools(monkeypatch)
     assert set(spec.tools) == {"web_search", "fetch_url"}
     assert spec.timeout_seconds > 0
     assert fake_schema.calls[0]["limits"] == chat_service.RESULT_BREAKDOWN_LIMITS
-    assert "run_facts" in fake_schema.calls[0]["prompt"]
-    assert "product_language" in fake_schema.calls[0]["instructions"]
+    assert "AAPL" in fake_schema.calls[0]["prompt"]
+    assert "sources" in fake_schema.calls[0]["instructions"].lower()
 
 
 def test_result_breakdown_prompt_carries_product_language_contract() -> None:
@@ -659,18 +685,15 @@ def test_result_breakdown_prompt_carries_product_language_contract() -> None:
 
     messages = _result_breakdown_llm_messages(
         facts={
-            "symbols": "AAPL",
-            "total_return": "+46.7%",
+            "symbols": ["AAPL"],
             "benchmark_symbol": "SPY",
-            "caveat": "Evidencia historica, no asesoría.",
+            "facts": {},
         },
         language="es-419",
     )
 
-    assert "product_language" in messages[0]["content"]
-    assert "schema keys" in messages[0]["content"]
     assert "Answer in Spanish" in messages[0]["content"]
-    assert "es-419" in messages[1]["content"]
+    assert "Search for sources" in messages[1]["content"]
 
 
 def test_result_breakdown_schema_requires_complete_text_language_and_figures() -> None:
@@ -683,15 +706,11 @@ def test_result_breakdown_schema_requires_complete_text_language_and_figures() -
         "language",
         "text",
         "figures",
-        "source_figures",
-        "citations",
     }
     assert set(schema["properties"]) == {
         "language",
         "text",
         "figures",
-        "source_figures",
-        "citations",
     }
     with pytest.raises(ValidationError):
         ResultBreakdownDraft.model_validate({})
@@ -2546,15 +2565,15 @@ def test_result_breakdown_prompt_uses_run_facts_and_surface_ownership(
 
     system_prompt = fake_schema.calls[0]["instructions"]
     user_payload = fake_schema.calls[0]["prompt"]
-    assert "Go deeper than the prior Quick take" in system_prompt
-    assert "No forecasts, forward scenarios, advice" in system_prompt
-    assert "Distinguish a documented event" in system_prompt
-    assert "Every external claim needs a citations entry" in system_prompt
-    assert "No em dashes" in system_prompt
-    assert "plain language" in system_prompt
-    assert "run_facts" in user_payload
-    assert "required_fact_ids" not in user_payload
-    assert "answer_blocks" not in system_prompt
+    assert "sources" in system_prompt.lower()
+    assert "holding" in user_payload.lower()
+    assert "benchmark" in user_payload.lower()
+    assert "AAPL" in user_payload and "SPY" in user_payload
+    assert "Total return on starting capital" in user_payload
+    for internal in ("portfolio.total_return", "total_return_pct", "series", "markers"):
+        assert internal not in user_payload
+    for removed in ("citations entry", "occurrence", "answer_blocks"):
+        assert removed not in system_prompt
 
 
 def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
@@ -2567,10 +2586,10 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
         readout_draft(
             "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +39.5% while SPY returned +25.6%, a 13.9 percentage point lead.\n\nThe largest drawdown was -13.8%. Assumptions: Universe: AAPL. Benchmark: SPY. This is historical simulation evidence, not a prediction.",
             [
-                ("portfolio.total_return", 39.5, "+39.5%"),
-                ("portfolio.benchmark_return", 25.6, "+25.6%"),
-                ("portfolio.benchmark_gap", 13.9, "13.9 percentage point"),
-                ("portfolio.max_drawdown", -13.8, "-13.8%"),
+                ("Total return on starting capital", 39.5),
+                ("Benchmark return", 25.6),
+                ("Return difference versus benchmark", 13.9),
+                ("Worst drop from a prior high", -13.8),
             ],
             language="en",
         )
@@ -2633,10 +2652,10 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
         readout_draft(
             "BABA Buy and Hold tested BABA over last month and returned +1.7%.\n\nSPY returned +26.6%, so BABA lagged by 24.9 percentage points versus that benchmark.\n\nThe max drawdown was -36.8%. Assumptions: Universe: BABA. Benchmark: SPY. A useful next check is one of the supported same-asset-class variations. This is historical simulation evidence, not a prediction.",
             [
-                ("portfolio.total_return", 1.7, "+1.7%"),
-                ("portfolio.benchmark_return", 26.6, "+26.6%"),
-                ("portfolio.benchmark_gap", -24.9, "24.9 percentage points"),
-                ("portfolio.max_drawdown", -36.8, "-36.8%"),
+                ("Total return on starting capital", 1.7),
+                ("Benchmark return", 26.6),
+                ("Return difference versus benchmark", -24.9),
+                ("Worst drop from a prior high", -36.8),
             ],
             language="en",
         )
@@ -2722,48 +2741,10 @@ def test_result_breakdown_rejects_mismatched_visible_fact_values(monkeypatch) ->
         readout_draft(
             "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +46.7% while SPY returned +20.0%, a 13.9 percentage point lead.\n\nBenchmark: SPY. This is historical simulation evidence, not a prediction.",
             [
-                ("portfolio.total_return", 39.5, "+46.7%"),
-                ("portfolio.benchmark_return", 25.6, "+20.0%"),
-                ("portfolio.benchmark_gap", 13.9, "13.9 percentage point"),
+                ("Total return on starting capital", 46.7),
+                ("Benchmark return", 20.0),
+                ("Return difference versus benchmark", 13.9),
             ],
-            language="en",
-        )
-    )
-
-    text = chat_service.llm_result_breakdown_message(
-        {
-            "title": "AAPL Buy and Hold",
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "SPY",
-            "date_range": "past year",
-            "raw_metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 39.5,
-                        "benchmark_return_pct": 25.6,
-                        "delta_vs_benchmark_pct": 13.9,
-                        "max_drawdown_pct": -13.8,
-                    }
-                }
-            },
-            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
-        },
-        client=fake_schema,
-    )
-
-    assert text is None
-
-
-def test_result_breakdown_rejects_user_visible_internal_context_terms(
-    monkeypatch,
-) -> None:
-    from argus.api.chat import breakdown as chat_service
-
-    del monkeypatch
-    fake_schema = FakeBreakdownAgentClient(
-        readout_draft(
-            "The context_packet field provides background market conditions.",
-            [],
             language="en",
         )
     )

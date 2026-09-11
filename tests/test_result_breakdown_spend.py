@@ -38,8 +38,6 @@ async def test_breakdown_claims_shared_capacity_before_provider_work(
                     "text": "The uneven path mattered to the holder.",
                     "language": "en",
                     "figures": [],
-                    "source_figures": [],
-                    "citations": [],
                 },
                 usage=ResearchUsage(model=breakdown.RESULT_BREAKDOWN_MODEL),
                 sources=(),
@@ -104,8 +102,6 @@ def test_every_received_breakdown_invoice_reaches_shared_ledger(
                 "text": "The uneven path mattered to the holder.",
                 "language": "es-419" if outcome == "language_mismatch" else "en",
                 "figures": [],
-                "source_figures": [],
-                "citations": [],
             }
             return StructuredAgentResult(
                 draft=draft,

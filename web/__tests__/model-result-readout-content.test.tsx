@@ -3,7 +3,8 @@ import { createInstance } from "i18next";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import ChatMessage from "../components/chat/ChatMessage";
-import { hydrateMessagesFromApi } from "../components/chat/chat-message-projection";
+import { hydrateMessagesFromApi, messageStreamPresentation } from "../components/chat/chat-message-projection";
+import type { Message } from "../components/chat/types";
 import { resultCardFromRun, type ApiMessage, type BacktestRun } from "../lib/argus-api";
 import { applyBacktestJobUpdate } from "../lib/chat-backtest-jobs";
 import { resultCardViewModel } from "../lib/result-card-view-model";
@@ -152,6 +153,34 @@ describe("model readout transport", () => {
 
 
 describe("transport authority and live state", () => {
+  test.each(["en", "es-419"] as const)("a pending %s Breakdown shows working status until the final readout arrives", async (language) => {
+    const i18n = await translations(language);
+    const pending: Message = {
+      id: crypto.randomUUID(), role: "ai", kind: "text",
+      content: "", contentPresentation: "result_breakdown",
+    };
+    const render = (message: Message, streamActive: boolean) => renderToStaticMarkup(
+      <I18nextProvider i18n={i18n}><ChatMessage message={message}
+        isStreaming={messageStreamPresentation([message], message, 0, streamActive, false).isWorkingMessage}
+      /></I18nextProvider>,
+    );
+    const working = render(pending, true);
+    expect(working).toContain(i18n.t("chat.result_breakdown.label"));
+    expect(working).toContain(i18n.t("chat.status.working"));
+    expect(working).toContain('aria-busy="true"');
+    expect(working).not.toContain(i18n.t("chat.result_readout.unavailable"));
+    const partialDraft = "Unvalidated partial draft";
+    expect(render({ ...pending, content: partialDraft }, true)).not.toContain(partialDraft);
+    const completed = mergeFinalTextMessage(pending, {
+      assistantId: pending.id, finalText: "", finalActions: [], contentPresentation: "result_breakdown",
+      resultReadoutContent: envelope("breakdown", language),
+    });
+    const finished = render(completed, false);
+    expect(finished).toContain(texts[language].breakdown);
+    expect(finished).not.toContain(i18n.t("chat.status.working"));
+    expect(finished).not.toContain('aria-busy="true"');
+    expect(render(pending, false)).toContain(i18n.t("chat.result_readout.unavailable"));
+  });
   test.each(["missing", "accepted", "null", "malformed"])("a %s message envelope respects root ownership over the card", async (state) => {
     const card = run(envelope("quick_take", "en")).conversation_result_card;
     const root = state === "missing" ? {} : { result_readout_content: state === "accepted"

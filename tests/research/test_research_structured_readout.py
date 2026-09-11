@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from typing import Literal
 
 import pytest
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
@@ -13,7 +12,7 @@ from argus.domain.research.perplexity_agent import (
     PerplexityAgentClient,
     StructuredAgentLimits,
 )
-from pydantic import BaseModel, ConfigDict
+from argus.domain.result_readout_grounding import ResultReadoutDraft as Draft
 
 from tests.research.conftest import (
     RecordingTransport,
@@ -22,20 +21,6 @@ from tests.research.conftest import (
     request_body,
     search_results_item,
 )
-
-
-class Figure(BaseModel):
-    fact_key: str
-    value: float
-    quote: str
-    occurrence: int
-
-
-class Draft(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    language: Literal["en", "es-419"]
-    text: str
-    figures: list[Figure]
 
 
 @pytest.fixture
@@ -47,8 +32,6 @@ def draft():
             {
                 "fact_key": "portfolio.total_return",
                 "value": 15.126,
-                "quote": "15.1%",
-                "occurrence": 1,
             }
         ],
     }
@@ -199,7 +182,7 @@ def test_malformed_structured_output_fails_whole_with_usage(draft, defect):
         elif defect == "nested_extra":
             draft["figures"][0]["unexpected"] = "not in strict schema"
         else:
-            draft["figures"][0]["occurrence"] = "1"
+            draft["figures"][0]["value"] = True
         message["content"][0]["text"] = json.dumps(draft)
     elif defect == "empty_output":
         response["output"] = []

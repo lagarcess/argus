@@ -853,9 +853,17 @@ Pattern:
   heading or experiment checklist. Quick take stays first-glance; Explain
   result adds depth without repeating it or reusing frame headings.
 - Run facts alone own backtest figures. Quick take uses no search. Breakdown may
-  add separately cited and dated historical web context; it must not substitute
-  web figures for run facts or imply unsupported causality. Forecasts and
+  add searched historical context with the sources Perplexity returns, including
+  their dates when provided; it must not substitute web figures for run facts or
+  imply unsupported causality. Its short, plain request receives labeled headline
+  facts, never chart series, markers or internal field paths. Forecasts and
   investing advice remain outside both readouts.
+- Readout acceptance keeps one light factual guard: declared run figure keys and
+  values must match stored facts within display rounding. Missing references,
+  repeated figures and optional source dates do not reject prose. Language,
+  schema, empty-draft and provider failures still select the complete template;
+  writing requirements are not enforced through per-occurrence or prose regex
+  bookkeeping. The pending Breakdown frame shows localized working text.
 
 Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
 

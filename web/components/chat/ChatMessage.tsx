@@ -198,6 +198,9 @@ export default function ChatMessage({
   };
 
   const getDisplayContent = () => {
+    if (!isUser && isStreaming && message.contentPresentation === "result_breakdown") {
+      return t("chat.status.working");
+    }
     const readout = resultMessageReadoutText(message, t, locale);
     if (readout !== null) return readout;
     const content = message.content ?? "";
@@ -405,6 +408,7 @@ export default function ChatMessage({
               ariaLabel={t("chat.result_breakdown.aria_label", "Result breakdown")}
               content={displayContent}
               label={t("chat.result_breakdown.label", "Breakdown")}
+              isWorking={Boolean(isStreaming)}
             />
           ) : !isUser && message.assistantRecoveryCode ? (
             // Infrastructure failure is visibly a failure: no result chrome,
@@ -927,13 +931,15 @@ function ResultBreakdown({
   ariaLabel,
   content,
   label,
+  isWorking,
 }: {
   ariaLabel: string;
   content: string;
   label: string;
+  isWorking: boolean;
 }) {
   return (
-    <section aria-label={ariaLabel}>
+    <section aria-label={ariaLabel} aria-busy={isWorking || undefined}>
       <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-breakdown prose dark:prose-invert max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
