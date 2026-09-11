@@ -804,6 +804,69 @@ fingerprint unchanged. The founder merges and applies the migration.
 
 ---
 
+### The conversation after a result  ·  ships in **its own promotion, after the readout**
+
+**Founder, 2026-09-11, side by side with Perplexity in the live app.** Asked
+"what should I try next?", Perplexity answered with a plan grounded in the
+conversation: a comparison of candidates, an order to work through, a useful
+next prompt and related questions. Argus answered with one fixed sentence and
+three generic rows. The founder's bar holds here: the AI writes; Argus supplies
+the run's facts, the tested math, what the data can support, and the actions.
+One lane owns this whole surface, not one defect at a time.
+
+**Today.**
+
+- "What should I try next?" gets a fixed sentence, "Here is what you can try
+  next from this result." or "Esto es lo que puedes probar después a partir de
+  este resultado.", from `src/argus/agent_runtime/next_experiments.py`, then the
+  rows from `next_experiments_sidecar` (PR #592). The rows are right: they go
+  away once used and a tap sends a typed refine action.
+- Every equity date question says history starts in 2016. That is the provider
+  floor, `ALPACA_EQUITY_HISTORY_START` in `src/argus/domain/market_data/capabilities.py`,
+  repeated in `llm_clarifier.py`, `llm_interpreter.py`, `stages/confirm.py`,
+  `stages/execute.py` and `src/argus/api/backtest_service.py`. For an asset listed
+  later it is false: DOCN began trading in March 2021.
+- Questions about a result go through `src/argus/agent_runtime/result_followups.py`
+  and `result_followup_answers.py`.
+
+**Done means.** On the same result, side by side with Perplexity, in English and
+Spanish, the founder prefers or matches Argus:
+
+- "What should I try next?" is answered by the model from the result, the
+  conversation and, when it helps, cited research: what to test and why, in an
+  order, with the Try next rows kept as the actions.
+- A question about the result, such as why it fell or whether it was good, is
+  answered by the model from the run's facts, with cited context when the answer
+  needs the world.
+- A few next questions built from this conversation are offered to tap, never a
+  fixed catalogue.
+- Any date or availability statement uses the asset's own first available date,
+  never the provider floor.
+- No fixed prose answers on these surfaces; fixed text is only the recovery when
+  the model is unavailable.
+
+**Surface.** `next_experiments.py`, `result_followup_answers.py`,
+`result_followups.py`, the result follow-up paths in `stages/interpret.py` and
+`stages/interpret_actions.py`, every history-start statement listed above and
+the capability that owns the floor, the web rows and suggested questions, both
+locales.
+
+**Do not touch.** The Quick take and Breakdown frames, owned by "Let the model
+write the readout". Money math stays in tested code and is never computed in
+prose (operating rule 6). No advice and no forecast stated as fact. No template
+answer and no question catalogue.
+
+**Proof.** Side-by-side screenshots against Perplexity on DOCN buy and hold, DOCN
+DCA and SPY RSI, in English and Spanish. Focused tests. This lane changes
+model-facing text, and the fingerprint covers every model-facing string under
+`src/argus/agent_runtime`, `src/argus/domain`, `src/argus/llm`, `src/argus/context`
+and `src/argus/nlp`, not only the files it last recorded, so the lane owns the
+fingerprint: one full live measurement at the end, compared case by case, then
+the refreeze. It starts when the readout lane lands, because one lane changes
+model-facing text at a time.
+
+---
+
 ### Share the answer  ·  ships with **The calculations**
 
 **Promoted from a note under the registry to its own item, founder 2026-09-09.**
@@ -1282,6 +1345,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | A clarification reply keeps what the user said | outside the releases | **LANDED** `05196b33`, PR #591. After Argus asks a question, the reply keeps every fact the user already gave (asset, dates, money, costs), an explicit new idea starts clean, money the user typed outranks an audit's guess, and one owner removes em dashes from visible replies. Its full live run on the merged tree was 65 passed and 6 failed; four passed a rerun, and the other two failed outside its code (research publishing on a Spanish forward question, and a discovery answer whose voicing model timed out). On the Haiku fallback it refused a named cap three times out of three where integration lost it once. The founder kept the rule that money the user typed outranks an audit's cap of the same amount. |
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
 | Home country per user | its own promotion | **Scoped 2026-09-11 in its item section; lane not started; founder priority 2026-09-10.** `ARGUS_RESEARCH_HOME_COUNTRY` sends one country for every user, which the founder called a huge issue and not state of the art. Country, with currency inferred from it and overridable, becomes a declared profile setting chosen in Settings like language, and research sends each user's own country. **The server-wide `ARGUS_RESEARCH_HOME_COUNTRY` is removed, not kept as a fallback** (founder, 2026-09-10): a user who has not chosen a country sends no location. Additive columns only. Decision 8 still holds: never inferred from conversation. |
+| The conversation after a result | its own promotion | **Scoped 2026-09-11 in its item section; starts when #588 lands.** "What should I try next?" and questions about a result are answered by the model, with the Try next rows kept as actions and a few next questions offered; availability dates use the asset's own first date instead of the 2016 provider floor. Judged side by side with Perplexity. |
 | Any grounded math | The calculations | **Not started.** Reframed 2026-09-10 from "the five calculations": any finance math, grounded, never a list. The AI answers first; polished cards later. Portfolio monitor, quant calculator and insider tracking deferred. |
 | Teach the method | Grounding | **Not started.** |
 
