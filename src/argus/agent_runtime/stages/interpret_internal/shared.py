@@ -4,11 +4,9 @@ Behavior-preserving relocation from stages/interpret.py (issue #131)."""
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from argus.agent_runtime.capabilities.answers import EXECUTABLE_STRATEGY_FAMILIES
-from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
@@ -16,9 +14,6 @@ from argus.agent_runtime.rule_specs import (
     strategy_rule,
 )
 from argus.agent_runtime.state.models import StrategySummary
-from argus.agent_runtime.strategy_requirements import (
-    missing_required_fields_for_strategy,
-)
 from argus.agent_runtime.strategy_requirements import (
     valid_rule_spec_from_strategy as _valid_rule_spec_from_strategy,
 )
@@ -125,34 +120,10 @@ def _turn_continues_pending_setup(
     ):
         return False
     if semantic_turn_act == "new_idea" and task_relation == "new_task":
-        # An explicit fresh-task read wins over asset equality: a new idea
-        # that names another traded asset, or that states a complete task on
-        # its own, starts clean. Only a partial new-idea read while the
-        # runtime awaits a reply is that reply.
-        if _strategy_names_another_traded_asset(
-            prior=prior,
-            strategy=strategy,
-            current_user_message=current_user_message,
-            reason_codes=reason_codes,
-        ):
-            return False
-        if _strategy_states_a_complete_task(strategy):
-            return False
-    return True
-
-
-@lru_cache(maxsize=1)
-def _default_capability_contract() -> Any:
-    return build_default_capability_contract()
-
-
-def _strategy_states_a_complete_task(strategy: StrategySummary) -> bool:
-    """The draft alone names everything its family needs to run."""
-    if not strategy.asset_universe or strategy.date_range in (None, "", [], {}):
+        # The interpreter's fresh-task read wins, whatever the draft holds:
+        # a new task inherits nothing, and what it lacks is asked for.
         return False
-    return not missing_required_fields_for_strategy(
-        strategy, contract=_default_capability_contract()
-    )
+    return True
 
 
 def _pending_setup_continuation_reason_codes(
@@ -341,40 +312,6 @@ def _incoming_asset_is_misplaced_benchmark(
         _compact_asset_evidence_token(symbol) in benchmarks
         for symbol in strategy.asset_universe
     )
-
-
-def _strategy_names_another_traded_asset(
-    *,
-    prior: StrategySummary,
-    strategy: StrategySummary,
-    current_user_message: str | None,
-    reason_codes: list[str] | None = None,
-) -> bool:
-    """The reply itself names a traded asset the pending setup does not hold.
-
-    An asset the benchmark repair inserted is not something the reply named;
-    any other symbol counts on its own evidence, the benchmark's included.
-    """
-    if _incoming_asset_is_misplaced_benchmark(
-        prior=prior, strategy=strategy, reason_codes=reason_codes
-    ):
-        return False
-    held = {_compact_asset_evidence_token(symbol) for symbol in prior.asset_universe}
-    for symbol in strategy.asset_universe:
-        target = _compact_asset_evidence_token(symbol)
-        if not target or target in held:
-            continue
-        if _message_has_cashtag_for_asset(current_user_message, target=target):
-            return True
-        if _message_has_uppercase_asset_token(current_user_message, target=target):
-            return True
-        if _strategy_has_strong_asset_evidence(strategy=strategy, target=target):
-            return True
-        if _strategy_has_explicit_asset_evidence(
-            strategy, symbol=symbol, current_user_message=current_user_message
-        ):
-            return True
-    return False
 
 
 def _strategy_supplies_explicit_turn_money(strategy: StrategySummary) -> bool:

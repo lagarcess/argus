@@ -14,6 +14,7 @@ from argus.agent_runtime.interpreter.shared import (
     _field_path_base,
     _llm_value_is_empty,
     _supported_dca_cadence_value,
+    repaired_turn_act,
 )
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
@@ -71,6 +72,7 @@ def _response_from_dca_contract_audit(
     *,
     response: LLMInterpretationResponse,
     audit: Any,
+    request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
     if (
         not isinstance(audit, DcaContractAudit)
@@ -130,23 +132,33 @@ def _response_from_dca_contract_audit(
         response.missing_required_fields,
         draft=draft,
     )
+    turn = repaired_turn_act(
+        base_act=response.semantic_turn_act,
+        base_relation=response.task_relation,
+        request=request,
+    )
     return response.model_copy(
         update={
             "intent": "strategy_drafting"
             if missing_required_fields
             else "backtest_execution",
-            "task_relation": "new_task",
+            "task_relation": turn.task_relation,
             "requires_clarification": bool(missing_required_fields),
             "candidate_strategy_draft": draft,
             "missing_required_fields": missing_required_fields,
             "assistant_response": None,
-            "semantic_turn_act": "new_idea",
+            "semantic_turn_act": turn.semantic_turn_act,
             "capability_question_focus": None,
             "artifact_target": "none",
             "unsupported_constraints": [],
             "reason_codes": list(
                 dict.fromkeys(
-                    [*response.reason_codes, "dca_contract_audit", *audit_reason_codes]
+                    [
+                        *response.reason_codes,
+                        "dca_contract_audit",
+                        *audit_reason_codes,
+                        *turn.reason_codes,
+                    ]
                 )
             ),
         }

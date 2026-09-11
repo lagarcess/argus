@@ -31,7 +31,17 @@ from argus.agent_runtime.semantic_integrity import (
     UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
     conserve_semantic_constraints,
 )
-from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.state.models import StrategySummary, UserState
+
+
+def _request() -> InterpretationRequest:
+    return InterpretationRequest(
+        current_user_message="",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
 
 
 def _dca_response(
@@ -84,6 +94,7 @@ def test_budget_audit_cannot_re_role_money_the_user_typed_as_the_seed(
     response = _dca_response(initial_capital=1000.0, seed_provenance="explicit_user")
 
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(
             total_budget_amount=1000.0, total_budget_source=budget_source
@@ -110,6 +121,7 @@ def test_budget_audit_with_a_seed_role_types_the_seed_not_a_ceiling(
     response = _dca_response(initial_capital=None, seed_provenance=None)
 
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(
             total_budget_amount=1000.0, total_budget_source=budget_source
@@ -129,6 +141,7 @@ def test_a_distinct_cap_beside_a_typed_seed_is_still_a_ceiling() -> None:
     response = _dca_response(initial_capital=1000.0, seed_provenance="explicit_user")
 
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(total_budget_amount=5000.0, total_budget_source="cap"),
     )
@@ -253,6 +266,7 @@ def test_budget_audit_never_replaces_an_occupied_seed_with_a_different_amount() 
     response = _dca_response(initial_capital=1000.0, seed_provenance="explicit_user")
 
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(
             total_budget_amount=5000.0, total_budget_source="starting_capital"
@@ -273,6 +287,7 @@ def test_budget_audit_never_replaces_a_seed_typed_without_provenance() -> None:
     response = _dca_response(initial_capital=1000.0, seed_provenance=None)
 
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(
             total_budget_amount=5000.0, total_budget_source="initial_capital"
@@ -355,6 +370,7 @@ def test_every_seed_role_is_written_and_read_as_the_seed(role: str) -> None:
 
     response = _dca_response(initial_capital=None, seed_provenance=None)
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(total_budget_amount=1000.0, total_budget_source=role),
     )
@@ -379,6 +395,7 @@ def test_a_cap_slotted_as_the_seed_with_a_ceiling_role_is_not_a_typed_seed() -> 
     response = _dca_response(initial_capital=5000.0, seed_provenance="total_budget")
 
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(total_budget_amount=5000.0, total_budget_source="cap"),
     )
@@ -430,6 +447,7 @@ def test_a_seed_typed_under_a_seed_or_user_role_still_outranks_the_audit(
     response = _dca_response(initial_capital=1000.0, seed_provenance=seed_source)
 
     repaired = _response_from_dca_contract_audit(
+        request=_request(),
         response=response,
         audit=_contract_audit(total_budget_amount=1000.0, total_budget_source="cap"),
     )
@@ -437,3 +455,34 @@ def test_a_seed_typed_under_a_seed_or_user_role_still_outranks_the_audit(
     assert repaired is not None
     assert repaired.candidate_strategy_draft.total_capital is None
     assert "dca_budget_audit_outranked_by_typed_seed" in repaired.reason_codes
+
+
+# --- Codex round 4 on PR #591 -------------------------------------------------
+
+
+def test_semantic_reader_swaps_crossed_money_roles_and_keeps_both_amounts() -> None:
+    # initial_capital carries the ceiling role and total_capital the seed
+    # role: each amount moves to the slot its role names; nothing is dropped.
+    strategy = _pending_dca(
+        {
+            "recurring_contribution": 200.0,
+            "initial_capital": 5000.0,
+            "total_capital": 1000.0,
+            "field_provenance": {
+                "recurring_contribution": "explicit_user",
+                "initial_capital": "total_budget",
+                "total_capital": "starting_capital",
+            },
+        }
+    )
+
+    report = conserve_semantic_constraints(strategy=strategy, selected_thread_metadata={})
+
+    assert [c.category for c in report.unsupported_constraints] == [
+        UNSUPPORTED_DCA_CONTRIBUTION_CEILING
+    ]
+    assert report.evidence.contribution_ceiling == 5000.0
+    assert report.evidence.total_capital == 1000.0
+    assert report.optional_parameter_values["initial_capital"] == 1000.0
+    assert "semantic_dca_ceiling_role_read_over_seed_key" in report.reason_codes
+    assert "semantic_dca_seed_role_read_over_ceiling_key" in report.reason_codes

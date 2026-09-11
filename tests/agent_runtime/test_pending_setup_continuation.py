@@ -13,10 +13,15 @@ from typing import Any
 
 import httpx
 import pytest
+from argus.agent_runtime.interpreter.shared import (
+    PENDING_REPLY_ASSUMED_REASON,
+    repaired_turn_act,
+)
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
 )
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import (
     RunState,
     StrategySummary,
@@ -160,22 +165,6 @@ def _reply_draft(pending: StrategySummary, dropped: str) -> StrategySummary:
     return draft
 
 
-def _states_a_complete_task(strategy: StrategySummary) -> bool:
-    # The same owner the runtime reads: the contract's required fields.
-    from argus.agent_runtime.capabilities.contract import (
-        build_default_capability_contract,
-    )
-    from argus.agent_runtime.strategy_requirements import (
-        missing_required_fields_for_strategy,
-    )
-
-    return bool(strategy.asset_universe and strategy.date_range) and not (
-        missing_required_fields_for_strategy(
-            strategy, contract=build_default_capability_contract()
-        )
-    )
-
-
 class _Interpreter:
     def __init__(self, response: StructuredInterpretation) -> None:
         self.response = response
@@ -250,7 +239,7 @@ DROPPED_BY_FAMILY = {
 @pytest.mark.parametrize("language", sorted(REPLIES))
 @pytest.mark.parametrize(
     ("semantic_turn_act", "task_relation"),
-    [("new_idea", "new_task"), ("answer_pending_need", "continue")],
+    [("answer_pending_need", "continue"), ("new_idea", "continue")],
 )
 @pytest.mark.parametrize(
     ("family", "dropped"),
@@ -269,10 +258,6 @@ def test_reply_to_runtime_question_keeps_every_earlier_fact(
 ) -> None:
     pending = _pending(family)
     reply = _reply_draft(pending, dropped)
-    if semantic_turn_act == "new_idea" and _states_a_complete_task(reply):
-        # A new-idea read that states a complete task on its own is a fresh
-        # task (Codex round 2); the continuation applies to partial replies.
-        pytest.skip("complete fresh-task read starts clean")
     response = StructuredInterpretation(
         intent="strategy_drafting",
         task_relation=task_relation,
@@ -300,7 +285,7 @@ def test_reply_to_runtime_question_keeps_every_earlier_fact(
     assert result.decision.missing_required_fields == []
     _assert_pending_facts_survived(result.decision.candidate_strategy_draft, pending)
     if semantic_turn_act == "new_idea":
-        # The runtime overrode the model's label; that must be visible.
+        # The runtime kept the setup a mixed read called new; that is recorded.
         assert "pending_setup_continuation_merged" in result.decision.reason_codes
 
 
@@ -308,12 +293,12 @@ def test_reply_while_a_card_awaits_approval_keeps_the_card_facts() -> None:
     pending = _pending("dca_accumulation")
     response = StructuredInterpretation(
         intent="strategy_drafting",
-        task_relation="new_task",
+        task_relation="continue",
         requires_clarification=True,
         user_goal_summary="Restate the money only.",
         candidate_strategy_draft=_reply_draft(pending, "asset_and_dates"),
         missing_required_fields=["asset_universe", "date_range"],
-        semantic_turn_act="new_idea",
+        semantic_turn_act="answer_pending_need",
     )
 
     result = _run(
@@ -709,12 +694,12 @@ def test_a_benchmark_the_repair_misread_as_the_asset_does_not_replace_the_pendin
     draft.comparison_baseline = None
     response = StructuredInterpretation(
         intent="strategy_drafting",
-        task_relation="new_task",
+        task_relation="continue",
         requires_clarification=True,
         user_goal_summary="Restate the money.",
         candidate_strategy_draft=draft,
         missing_required_fields=["date_range"],
-        semantic_turn_act="new_idea",
+        semantic_turn_act="answer_pending_need",
         reason_codes=["misplaced_benchmark_asset_recovered"],
     )
 
@@ -728,7 +713,6 @@ def test_a_benchmark_the_repair_misread_as_the_asset_does_not_replace_the_pendin
 
     assert result.outcome == "ready_for_confirmation", result.decision.reason_codes
     _assert_pending_facts_survived(result.decision.candidate_strategy_draft, pending)
-    assert "pending_setup_continuation_merged" in result.decision.reason_codes
 
 
 # --- Codex round 2 on PR #591 -------------------------------------------------
@@ -791,3 +775,137 @@ def test_an_explicit_fresh_task_on_the_same_asset_does_not_inherit_the_pending_s
     assert "fee_rate" not in strategy.extra_parameters
     assert "slippage" not in strategy.extra_parameters
     assert "pending_setup_continuation_merged" not in result.decision.reason_codes
+
+
+# --- Codex round 4 on PR #591 -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("language", "message"),
+    [
+        ("en", "New idea: DCA $200 monthly into AAPL"),
+        ("es-419", "Nueva idea: DCA de $200 mensuales en AAPL"),
+    ],
+)
+def test_a_partial_fresh_task_read_stays_fresh_and_asks_for_what_it_lacks(
+    language: str, message: str
+) -> None:
+    # The interpreter read a new idea and a new task without dates. It stays
+    # a new idea: nothing is copied from the pending setup, and the missing
+    # dates are asked for rather than inherited.
+    pending = _pending("dca_accumulation")
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="DCA $200 monthly into AAPL.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="DCA $200 monthly into AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=200.0,
+            extra_parameters={
+                "recurring_contribution": 200.0,
+                "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "recurring_contribution",
+                    "recurring_contribution": "explicit_user",
+                    "cadence": "explicit_user",
+                },
+            },
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+    )
+
+    result = _run(
+        message=message,
+        language=language,
+        pending=pending,
+        response=response,
+        thread_metadata=dict(AWAITING_REPLY_WITHOUT_FIELD),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert result.outcome == "needs_clarification", result.decision.reason_codes
+    assert "date_range" in result.decision.missing_required_fields
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range in (None, "", {})
+    assert strategy.capital_amount == 200.0
+    assert strategy.extra_parameters.get("initial_capital") is None
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert "pending_setup_continuation_merged" not in result.decision.reason_codes
+
+
+@pytest.mark.parametrize(
+    ("base_act", "base_relation", "metadata", "pending", "expected"),
+    [
+        # A known act is the model's read and stays, whatever is pending.
+        (
+            "new_idea",
+            "new_task",
+            {"last_stage_outcome": "await_user_reply"},
+            True,
+            ("new_task", "new_idea", False, ()),
+        ),
+        (
+            "answer_pending_need",
+            "continue",
+            {"last_stage_outcome": "await_user_reply"},
+            True,
+            ("continue", "answer_pending_need", True, ()),
+        ),
+        # An act the repair replaces is decided by the runtime's own question,
+        # and the assumption is recorded.
+        (
+            "unsupported_request",
+            "new_task",
+            {"last_stage_outcome": "await_user_reply"},
+            True,
+            ("continue", "answer_pending_need", True, (PENDING_REPLY_ASSUMED_REASON,)),
+        ),
+        (
+            None,
+            None,
+            {"requested_field": "capital_amount"},
+            True,
+            ("continue", "answer_pending_need", True, (PENDING_REPLY_ASSUMED_REASON,)),
+        ),
+        # Nothing pending, or nothing asked: a replaced act is a fresh idea.
+        (
+            "unsupported_request",
+            "new_task",
+            {"last_stage_outcome": "await_user_reply"},
+            False,
+            ("new_task", "new_idea", False, ()),
+        ),
+        (None, None, {}, True, ("new_task", "new_idea", False, ())),
+    ],
+)
+def test_a_repair_keeps_a_known_act_and_decides_a_replaced_one_from_the_pending_state(
+    base_act: str | None,
+    base_relation: str | None,
+    metadata: dict[str, Any],
+    pending: bool,
+    expected: tuple[str, str, bool, tuple[str, ...]],
+) -> None:
+    request = InterpretationRequest(
+        current_user_message="$500",
+        recent_thread_history=[],
+        latest_task_snapshot=(
+            TaskSnapshot(pending_strategy_summary=_pending("dca_accumulation"))
+            if pending
+            else None
+        ),
+        selected_thread_metadata=metadata,
+        user=UserState(user_id="u1"),
+    )
+
+    turn = repaired_turn_act(
+        base_act=base_act, base_relation=base_relation, request=request
+    )
+
+    assert tuple(turn) == expected

@@ -277,12 +277,26 @@ def _structured_money_role_evidence(
         recurring = _coerce_number(strategy.capital_amount)
 
     seed_key_read_as_ceiling = False
+    ceiling_key_read_as_seed = False
     seed_source = str(field_provenance.get(total_key) or "").strip().lower()
-    if (
+    seed_slot_holds_ceiling = (
         total is not None
         and total_key in _DCA_SEED_KEYS
         and seed_source in _DCA_CONTRIBUTION_CEILING_SOURCES
-    ):
+    )
+    ceiling_slot_holds_seed = ceiling is not None and _dca_ceiling_provenance_names_seed(
+        field_provenance
+    )
+    if seed_slot_holds_ceiling and ceiling_slot_holds_seed:
+        # Both slots crossed: each amount moves to the slot its role names.
+        total, total_key, ceiling, ceiling_key = (
+            ceiling,
+            "initial_capital",
+            total,
+            seed_source,
+        )
+        seed_key_read_as_ceiling = ceiling_key_read_as_seed = True
+    elif seed_slot_holds_ceiling:
         # The key says seed, the provenance says ceiling: a cap in the wrong
         # slot bounds the plan, it is never money on day one.
         if ceiling is None or ceiling == total:
@@ -294,8 +308,7 @@ def _structured_money_role_evidence(
         # The provenance named a cap even though no ceiling key carried a
         # number, so the amount on capital_amount is the cap.
         ceiling, ceiling_key = total, resolved_source
-    ceiling_key_read_as_seed = False
-    if ceiling is not None and _dca_ceiling_provenance_names_seed(field_provenance):
+    if ceiling_slot_holds_seed and not ceiling_key_read_as_seed:
         # The key says ceiling, the provenance says seed. The role wins only
         # for the seed's own money: a lone number is the seed, an equal number
         # is the seed read twice, and a distinct number is still a limit.

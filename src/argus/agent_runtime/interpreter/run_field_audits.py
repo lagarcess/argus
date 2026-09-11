@@ -310,7 +310,8 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
             "intent": "backtest_execution",
             "requires_clarification": False,
             "assistant_response": None,
-            "semantic_turn_act": "new_idea",
+            # The executable fields win over prose; the act stays the read's.
+            "semantic_turn_act": response.semantic_turn_act or "new_idea",
             "reason_codes": list(
                 dict.fromkeys(
                     [
