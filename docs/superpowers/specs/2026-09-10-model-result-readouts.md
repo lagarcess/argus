@@ -3,10 +3,10 @@
 Founder-directed 2026-09-10. Integration base:
 `d0884c3de81f8c53d454ac4f68f461d3b5dd77e3`.
 
-Current authority: section 9 supersedes earlier provider/tier restrictions,
-release-file exclusions and paid-check plans below. Earlier sections retain
-the lane's decision history; their past approvals do not authorize the new
-twelve-draft Luna check. Its fresh estimate must be approved first.
+Historical decision log: later founder instructions superseded the earlier
+provider restrictions and paid-check plans below. Current contracts live in
+`docs/API_CONTRACT.md` and `docs/CONVERSATIONAL_RUNTIME.md`; completed merge
+proof and measurement live in `docs/reports/evidence/model-result-readouts/README.md`.
 
 ## 1. Why
 
