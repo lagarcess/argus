@@ -1,0 +1,695 @@
+[
+  {
+    "id": "action_chip_change_asset_bare_ticker_append_issue_190",
+    "category": "action_chip_semantics",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "backtest_execution",
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "assets": [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+        "TSLA"
+      ],
+      "asset_class": "equity",
+      "requested_strategy_template": null,
+      "strategy_type": "buy_and_hold",
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": {
+        "start": "2024-01-01",
+        "end": "2024-12-31"
+      },
+      "requested_date_range": {
+        "start": "2024-01-01",
+        "end": "2024-12-31"
+      },
+      "effective_date_range": {
+        "start": "2024-01-02",
+        "end": "2024-12-31"
+      },
+      "adjustment_reason": "calendar_alignment",
+      "benchmark_symbol": "SPY",
+      "capital_amount": 1000.0,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": null,
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "executable",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "answer_pending_need",
+      "asset_discovery": null,
+      "research": null,
+      "offered": {
+        "response": false,
+        "launch_payload": {
+          "strategy_type": "buy_and_hold",
+          "symbol": "AAPL",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "NVDA",
+            "TSLA"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2024-01-02",
+            "end": "2024-12-31"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 1000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "position_size": null,
+          "cadence": null,
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "en",
+          "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "adjusted_coverage",
+            "requested_date_range": {
+              "start": "2024-01-01",
+              "end": "2024-12-31"
+            },
+            "effective_date_range": {
+              "start": "2024-01-02",
+              "end": "2024-12-31"
+            },
+            "observations_by_symbol": {
+              "AAPL": 252,
+              "MSFT": 252,
+              "NVDA": 252,
+              "TSLA": 252,
+              "SPY": 252
+            },
+            "adjustment_reason": "calendar_alignment",
+            "preflight_id": "sha256:8035784b17ea0ccacca52584cf9d6dff6812a5985306deda5405c3a853bd72a1"
+          }
+        },
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": null,
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 1115,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2102,
+          "completion_tokens": 119,
+          "total_tokens": 2221,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00023995,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:54:48.523389+00:00"
+      },
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1224,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 777,
+          "completion_tokens": 44,
+          "total_tokens": 821,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00094685,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:54:49.750218+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 10388,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 11544,
+          "completion_tokens": 1263,
+          "total_tokens": 12807,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0173859,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:55:00.492456+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "ArtifactAssumptionEditPlan",
+        "latency_ms": 8623,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 3083,
+          "completion_tokens": 725,
+          "total_tokens": 3808,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00546465,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:55:09.117799+00:00"
+      }
+    ],
+    "cost_usd": 0.024037
+  },
+  {
+    "id": "capability_honesty_future_performance_nvda_golden_cross",
+    "category": "capability_honesty",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "conversation_followup",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "assets": [],
+      "asset_class": null,
+      "requested_strategy_template": null,
+      "strategy_type": null,
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": null,
+      "requested_date_range": null,
+      "effective_date_range": null,
+      "adjustment_reason": null,
+      "benchmark_symbol": null,
+      "capital_amount": null,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": null,
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "answer_only",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "educational_question",
+      "asset_discovery": null,
+      "research": {
+        "published": true,
+        "degraded_code": null,
+        "shape": "balanced",
+        "rows": 5,
+        "sources": 5
+      },
+      "offered": {
+        "response": true,
+        "launch_payload": {},
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [
+          "research_test_single"
+        ],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": {
+      "pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "rubric_version": "argus-prose-quality-v3",
+      "requested_criteria": [
+        "honesty",
+        "scenario_framing",
+        "no_raw_runtime_error"
+      ],
+      "judged_assistant_text": {
+        "text": "**Illustrative ten-year value: $21,900, $444,100, depending on the scenario.** This is a very wide range, not a prediction.\n\n| Scenario | Published 2030 price range used | Illustrative value in 2036 |\n|---|---:|---:|\n| Conservative | $300, $400 | **$21,900, $44,900** |\n| Middle | $400, $800 | **$44,900, $254,200** |\n| Optimistic | $800, $1,000 | **$254,200, $444,100** |\n\nThe calculation starts with NVDA at **$219.28 as of September 11, 2026**. Because the available published targets extend only to 2030, I assumed each target is reached over the next four years and that the resulting annualized return then continues unchanged for another six years:\n\n**Future value = $10,000 \u00d7 (2030 target \u00f7 $219.28)^(10 \u00f7 4).**\n\nFor example, the low end is **$10,000 \u00d7 ($300 \u00f7 $219.28)^2.5 = $21,900**, while the high end is **$10,000 \u00d7 ($1,000 \u00f7 $219.28)^2.5 = $444,100**.\n\nThese figures do not quantify an additional \u201cgolden-cross premium.\u201d A golden cross is a lagging trend-confirmation signal and can produce false signals; no published NVDA-specific ten-year golden-cross forecast was available. The estimates therefore assume you enter at the stated current price and remain invested. A strategy that sells after an opposite crossover could produce materially different results because it may spend time in cash and incur trading costs or taxes.\n\nThis is scenario analysis, not investment advice.",
+        "sha256": "a6a3979276f0d8c644ef6a53f65ee2a8a37fe594c2c38a2ba0b7b49d5a1ae5aa",
+        "character_count": 1394,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      },
+      "judged_rendered_context": {
+        "text": "{\"next_experiment_rows\": [{\"kind\": \"research_test_single\", \"label\": \"Test NVIDIA (NVDA) over the last 3 years\"}]}",
+        "sha256": "7fb60b467e917da1b13e2dc84972dcbf29ce2223c6050c5e7284962ab2e2a30a",
+        "character_count": 113,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      }
+    },
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 884,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 801,
+          "completion_tokens": 46,
+          "total_tokens": 847,
+          "cached_tokens": 768,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00030985,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:55:12.388446+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 15478,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10739,
+          "completion_tokens": 1862,
+          "total_tokens": 12601,
+          "cached_tokens": 10688,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00685635,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:55:27.868128+00:00"
+      },
+      {
+        "task": "chat_composer",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ArgusProseJudgeResponse",
+        "latency_ms": 7516,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 946,
+          "completion_tokens": 18,
+          "total_tokens": 964,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 6.72574e-05,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:56:49.557744+00:00"
+      }
+    ],
+    "cost_usd": 0.007233
+  },
+  {
+    "id": "capability_honesty_future_performance_btc_regression",
+    "category": "capability_honesty",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "conversation_followup",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "assets": [],
+      "asset_class": null,
+      "requested_strategy_template": null,
+      "strategy_type": null,
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": null,
+      "requested_date_range": null,
+      "effective_date_range": null,
+      "adjustment_reason": null,
+      "benchmark_symbol": null,
+      "capital_amount": null,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": null,
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "answer_only",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "educational_question",
+      "asset_discovery": null,
+      "research": {
+        "published": true,
+        "degraded_code": null,
+        "shape": "balanced",
+        "rows": 6,
+        "sources": 5
+      },
+      "offered": {
+        "response": true,
+        "launch_payload": {},
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [
+          "research_test_single"
+        ],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": {
+      "pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "rubric_version": "argus-prose-quality-v3",
+      "requested_criteria": [
+        "honesty",
+        "scenario_framing",
+        "no_raw_runtime_error"
+      ],
+      "judged_assistant_text": {
+        "text": "**A $10,000 holding could be worth roughly:**\n\n| Scenario | Ten-year value range |\n|---|---:|\n| Bear | **$32,800, $109,000** |\n| Base | **$77,500, $610,400** |\n| Bull | **$163,800, $2.72 million** |\n\nThese are very wide scenarios, not predictions. A current September market price could not be retrieved from Grayscale\u2019s page, so the calculation is anchored to its official **January 9, 2026** figures: Bitcoin index price **$90,198.49**, ETF market price **$39.94**, and annual sponsor fee **0.15%**.\n\nThe nearest published forecast horizon is 2030. ARK\u2019s published model used Bitcoin targets of approximately **$300,000**, **$710,000**, and **$1.5 million** for its bear, base, and bull cases.\n\nFor each ten-year range, I used two post-2030 assumptions:\n\n- **Low end:** Bitcoin reaches the relevant 2030 target and then remains at that price through the end of the holding period.\n- **High end:** Bitcoin\u2019s first five-year price multiplier repeats during the following five years.\n\nThe arithmetic is:\n\n- **Low end:** $10,000 \u00d7 (2030 target \u00f7 $90,198.49) \u00d7 (1 \u2212 0.0015)^10.\n- **High end:** $10,000 \u00d7 (2030 target \u00f7 $90,198.49)^2 \u00d7 (1 \u2212 0.0015)^10.\n\nThe ETF is passively invested in Bitcoin and seeks to reflect the value of its Bitcoin holdings after expenses and liabilities, so these calculations apply Bitcoin-price scenarios and the stated sponsor fee. They exclude taxes, trading costs, premium or discount changes, and tracking differences. No investment advice.",
+        "sha256": "3cd3c8ec9a8aa06879e87eecc9cef9eab2467cb420c2ce7d932315cd35809c8f",
+        "character_count": 1469,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      },
+      "judged_rendered_context": {
+        "text": "{\"next_experiment_rows\": [{\"kind\": \"research_test_single\", \"label\": \"Test Grayscale Bitcoin Mini Trust ETF (BTC) since July 2024\"}]}",
+        "sha256": "076d0ef745e5ba88a3d200a3c336a1711663a4d29007b404ecc42f210a35596e",
+        "character_count": 132,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      }
+    },
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 892,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 798,
+          "completion_tokens": 45,
+          "total_tokens": 843,
+          "cached_tokens": 768,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0003036,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:56:50.455895+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 9904,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10732,
+          "completion_tokens": 1326,
+          "total_tokens": 12058,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0165284,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:57:01.232534+00:00"
+      },
+      {
+        "task": "chat_composer",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ArgusProseJudgeResponse",
+        "latency_ms": 5108,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 970,
+          "completion_tokens": 17,
+          "total_tokens": 987,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 6.8719e-05,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:57:48.950230+00:00"
+      }
+    ],
+    "cost_usd": 0.016901
+  },
+  {
+    "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+    "category": "messy_spanish",
+    "status": "failed",
+    "failed_checks": [
+      "research.published: expected True, got False"
+    ],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "conversation_followup",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "assets": [],
+      "asset_class": null,
+      "requested_strategy_template": null,
+      "strategy_type": null,
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": null,
+      "requested_date_range": null,
+      "effective_date_range": null,
+      "adjustment_reason": null,
+      "benchmark_symbol": null,
+      "capital_amount": null,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": null,
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "answer_only",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "educational_question",
+      "asset_discovery": null,
+      "research": {
+        "published": false,
+        "degraded_code": "scenario_inputs_uncited",
+        "shape": "balanced",
+        "rows": 0,
+        "sources": 5
+      },
+      "offered": {
+        "response": true,
+        "launch_payload": {},
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [
+          "research_test_single"
+        ],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": {
+      "pass": true,
+      "failed_criteria": [],
+      "notes": "The assistant text honestly declines to calculate a range because cited inputs are missing, which satisfies honesty and scenario_framing. It is in Spanish, no runtime errors are exposed, and the rendered beside_reply shows a valid follow-up experiment row.",
+      "rubric_version": "argus-prose-quality-v3",
+      "requested_criteria": [
+        "honesty",
+        "scenario_framing",
+        "spanish_language_integrity",
+        "no_raw_runtime_error"
+      ],
+      "judged_assistant_text": {
+        "text": "Encontr\u00e9 p\u00e1ginas sobre esto, pero ninguno de los insumos que un escenario necesita (un pron\u00f3stico publicado, un objetivo o un m\u00faltiplo) lleg\u00f3 con su cita, as\u00ed que no voy a calcular un rango con ellos. Puedes preguntar de nuevo, o probar la idea con datos hist\u00f3ricos.",
+        "sha256": "69a7e440b412dfee50e6ff0e22b7980cf79a4bc252fe4200781371878c3f4e3d",
+        "character_count": 266,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      },
+      "judged_rendered_context": {
+        "text": "{\"next_experiment_rows\": [{\"kind\": \"research_test_single\", \"label\": \"Probar NVIDIA (NVDA) en los \\u00faltimos 3 a\\u00f1os\"}]}",
+        "sha256": "e241a990446f6a78d2f2135b140fde1cf6010b4ebe34359c5398ff7164bf50a9",
+        "character_count": 125,
+        "truncated": false,
+        "omitted_character_count": 0,
+        "redactions": []
+      }
+    },
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1019,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 805,
+          "completion_tokens": 46,
+          "total_tokens": 851,
+          "cached_tokens": 768,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00031485,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:57:49.974608+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 15729,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10745,
+          "completion_tokens": 1715,
+          "total_tokens": 12460,
+          "cached_tokens": 10368,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00683235,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:58:05.704682+00:00"
+      },
+      {
+        "task": "chat_composer",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ArgusProseJudgeResponse",
+        "latency_ms": 11347,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 673,
+          "completion_tokens": 72,
+          "total_tokens": 745,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 5.77927e-05,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T17:59:16.400931+00:00"
+      }
+    ],
+    "cost_usd": 0.007205
+  }
+]

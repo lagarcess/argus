@@ -146,8 +146,8 @@ the merge ignores it. That replay is a committed test.
 | `tests/agent_runtime/test_dca_money_role_audits.py` | 35 passed |
 | `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 46 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
-| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `f7fc6d74` | 2642 passed, 2 skipped |
-| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `f7fc6d74` | 822 passed |
+| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at the merge head `6ed5d458` | 2698 passed, 2 skipped |
+| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at the merge head `6ed5d458` | 822 passed |
 | `scripts/check_modularity_budget.py` | no violations |
 
 ## Measurement cases, run live on the fix (`live_cases_after.json`)
@@ -410,6 +410,53 @@ This owner touches no measurement case; no live run and no spend.
 
 This owner touches no measurement case; no live run and no spend.
 
+## Full live measurement at `6ed5d458` (`live-measurement-6ed5d458.json`, `baseline-comparison-6ed5d458.json`)
+
+The pre-merge gate rerun on the merge head: `origin/codex/private-alpha-next`
+at `2623e33a` (#592 landed) merged into the lane with no conflicts, the
+focused suites and the hermetic sweeps green (agent_runtime + evals + spine
+2698 passed, contract 822 passed), a clean worktree, both provider modes
+assigned to `live_provider` in the process environment, the live asset
+catalog and the calendar probe passing (a first attempt stopped at the door
+on an Alpaca 504 before any model call; nothing spent). 71 cases, 65 passed,
+6 failed, no infrastructure errors, $1.50 billed, 49 minutes; 12
+structured-tier timeouts landed in the run (11 grok primary or audit reads
+and one asset-mention read). Compared case by case against the fingerprint's
+baseline, `docs/reports/evidence/decision-10/live-measurement.json` (63
+passed, 6 failed at `60e7c0ec`):
+
+| Verdict | Count | Cases |
+| --- | ---: | --- |
+| unchanged | 61 | 59 passing both times, plus `asset_discovery_old_pharma_escalation_exact_issue_344` (`discovery_search_failed`, the baseline's known failure) and `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run` (see below) |
+| fixed | 4 | `asset_discovery_category_spanish_issue_244`, `asset_discovery_not_result_followup_issue_244` (#590, landed in #592), `graceful_recovery_spanish_weekly_options_aapl`, `ordinary_conversation_concept_compound_interest_en` |
+| added | 2 | the two recorded-repro cases, both passed |
+| regressed | 4 | see below |
+
+Each flip, with the structured-tier timeouts recorded in its own route
+receipts, and the one allowed rerun alone with the judge on
+(`live-rerun-regressed-6ed5d458.json`, $0.06):
+
+| Case | First run | Structured-tier timeouts | Rerun alone |
+| --- | --- | --- | --- |
+| `action_chip_change_asset_bare_ticker_append_issue_190` | `conversation_followup`, TSLA not appended; the act was `answer_pending_need` (this lane's fresh-task rule never fired) and the artifact edit plan needed the haiku fallback after grok | none | passed |
+| `capability_honesty_future_performance_btc_regression` | `research.published` false | none | passed |
+| `capability_honesty_future_performance_nvda_golden_cross` | `research.published` false | none | passed |
+| `messy_spanish_future_performance_nvda_cruce_dorado` | `research.published` false with `research_unavailable_timeout` (the research provider timed out) and two prose-judge verdicts on the unresearched reply | `LLMInterpretationResponse@x-ai/grok-4.3` (haiku answered) | failed again: five sources returned, the publisher withheld the answer as `scenario_inputs_uncited`, prose judge passed |
+
+The persistent Spanish failure is the research publisher's own gate on an
+answer whose scenario inputs were not cited, a path this lane does not touch;
+the base's #592 scorecard at `b7bdca4e` also failed this case, in a different
+mode. `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`
+failed in the full run because turn 1's clarifier was unavailable (deepseek
+timeout, two qwen validation errors, offline fallback) and turn 2's bare
+"13,000 pesos" then came back as an ambiguous plan-wide amount with the two
+role options; it passed in all five touched-case runs of rounds 4 to 8 and
+passed alone here (`live-rerun-pesos-6ed5d458.json`, $0.06). No case failed on
+a typed check this lane's code owns.
+
+The prompt fingerprint is untouched; `tests/test_interpreter_prompt_freeze.py`
+passes at this head, so the fingerprint's own `last_measured` is not moved.
+
 ## Billed cost
 
 | Item | Cost |
@@ -428,7 +475,9 @@ This owner touches no measurement case; no live run and no spend.
 | Nine touched measurement cases live at `cda7a1a3` | $0.281 |
 | Nine touched measurement cases live at `ef6b38a1`, plus one solo rerun | $0.325 |
 | Five continuation cases live at `f7fc6d74` | $0.175 |
-| **Total** | **$3.94** |
+| Full live measurement at the merge head `6ed5d458` (approved separately, up to $2) | $1.502 |
+| Four regressed cases and the pesos case rerun alone with the judge | $0.114 |
+| **Total** | **$5.56** |
 
 ## Observed, not changed here
 
