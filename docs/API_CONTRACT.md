@@ -1240,13 +1240,31 @@ the existing source/fallback/failure metadata. No read-time composition or
 historical rewrite is introduced.
 
 While a Breakdown is pending, its existing frame owns exactly one localized
-working state; the generic stream status row does not repeat it. On reload, the
-web derives the pending frame from the saved `show_breakdown` user action and
-its `agent_runtime_turn` accepted/running lifecycle. The existing turn-recovery
-reader settles it from the saved answer or terminal recovery state without
-calling a model. The completed response selects accepted prose or the template. Empty
+working state; the generic stream status row does not repeat it. With durable
+persistence, the action first reserves a `chat.research` job and saves its
+acknowledgement, then starts completion work outside the browser stream. The
+acknowledgement carries `artifact_presentation_kind = breakdown` and the existing
+`backtest_job` envelope. Job polling serves the saved complete answer as
+`result_message`; its `backtest_job_id` replaces that job's pending frame, live
+and after reload. The shared research finalizer persists the answer before
+linking `execution_metadata.research_result_message_id` and settling the job.
+The job stores the source run id and requested language, never another run or
+chart series. A disconnect neither cancels composition nor starts another call.
+
+Development memory persistence has no job endpoint. Its retained completion task
+uses the existing ordinary-turn finalizer even when the stream is canceled.
+Reload derives its pending frame from the saved `show_breakdown` user action and
+accepted/running lifecycle, then the existing turn-recovery reader obtains the
+saved terminal answer without calling a model. The completed response selects
+accepted prose or the template. Empty
 pending content is not evidence that saved run facts are insufficient, and empty
 legacy message content does not leave a completed envelope permanently working.
+
+The internal headline facts include the worst drawdown's high and low balances,
+dates and dollar decline computed from unrounded balances, plus the whole-test
+peak date. Dated headline groups are ordered before composition. Display rounding
+is applied after arithmetic; chart series and markers stay out of the Breakdown
+request. Missing dated evidence remains unavailable.
 
 Template readouts and dossier outcomes render from the same typed run facts
 in the current workspace language. The figures those

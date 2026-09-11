@@ -356,7 +356,8 @@ export default function ChatMessage({
                 />
               )}
             </div>
-          ) : message.kind === "backtest_job" && message.backtestJob ? (
+          ) : message.kind === "backtest_job" && message.backtestJob &&
+            (message.contentPresentation !== "result_breakdown" || !isStreaming) ? (
             <div className="w-full max-w-[min(100%,660px)]">
               <BacktestJobCard
                 job={message.backtestJob}

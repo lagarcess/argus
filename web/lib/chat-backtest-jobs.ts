@@ -64,6 +64,7 @@ export function backtestJobMessage({
     id,
     role: "ai",
     kind: "backtest_job",
+    contentPresentation: metadata.artifact_presentation_kind === "breakdown" ? "result_breakdown" : undefined,
     content,
     backtestJob: job,
     artifactId: job.id,

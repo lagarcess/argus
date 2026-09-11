@@ -333,6 +333,7 @@ export type Message = {
   // The message a terminal research job produced, once it is in the view;
   // until then the card keeps polling for it.
   researchResultMessageId?: string;
+  resultBreakdownJobId?: string;
   isLoadingResult?: boolean;
   actions?: ChatActionOption[];
   artifactId?: string;

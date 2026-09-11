@@ -26,7 +26,7 @@ from argus.agent_runtime.turn_execution import (
     turn_execution_summary,
 )
 from argus.api import state as api_state
-from argus.api.artifact_presentation import reader_chat_result, result_breakdown_metadata
+from argus.api.artifact_presentation import reader_chat_result
 from argus.api.chat import confirmation as chat_confirmation
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
@@ -54,7 +54,7 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.breakdown import result_breakdown_action
+from argus.api.chat.breakdown_jobs import dispatch_result_breakdown
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -941,6 +941,7 @@ async def chat_stream(
                 envelope = runtime_result_envelope(runtime_result)
                 backtest_job = tool_publication.backtest_job
                 run = None
+                completed_breakdown_message = None
                 result_action_run = validated_result_action_run
                 result_action_type = result_action_request_type(runtime_result)
                 if (
@@ -1000,22 +1001,21 @@ async def chat_stream(
                         )
                     if result_action_type == "show_breakdown":
                         yield sse_data({"type": "stage_start", "stage": "explain"})
-                        breakdown_message = await asyncio.to_thread(
-                            result_breakdown_action,
+                        dispatched = await dispatch_result_breakdown(
                             result_action_run,
                             language=runtime_user.language_preference,
-                            user_id=user.id,
-                            conversation_id=conversation.id,
-                            request_id=request.state.request_id,
+                            lifecycle=lifecycle_hooks,
+                            settle_usage=guest_compute_settlement(
+                                turn_account,
+                                is_run_backtest_turn=is_run_backtest_turn,
+                                visitor_key=turn_visitor_key,
+                            ),
                         )
-                        assistant_text = breakdown_message.text
-                        breakdown_metadata = result_breakdown_metadata(
-                            breakdown_message,
-                            result_action_run,
-                            language=runtime_user.language_preference,
-                        )
-                        metadata.update(breakdown_metadata)
-                        runtime_result.update(breakdown_metadata)
+                        backtest_job = dispatched.job
+                        completed_breakdown_message = dispatched.message
+                        assistant_text = dispatched.text
+                        metadata.update(dispatched.metadata)
+                        runtime_result.update(dispatched.metadata)
                     elif result_action_type == "save_strategy":
                         yield sse_data({"type": "stage_start", "stage": "next_step"})
                         if result_action_run is None:
@@ -1191,8 +1191,8 @@ async def chat_stream(
                         final_payload_keys=sorted(runtime_result.keys()),
                     )
                     raise RuntimeError("agent_runtime_empty_final")
-                assistant_message = None
-                if (
+                assistant_message = completed_breakdown_message
+                if assistant_message is None and (
                     persisted_text
                     or typed_artifact_answer
                     or lifecycle_hooks.turn_id is not None
@@ -1256,6 +1256,8 @@ async def chat_stream(
                         and retryable_recovery_code is None
                     ):
                         runtime_result.pop("retry_last_turn", None)
+                    receipt_message_id = assistant_message.id
+                elif assistant_message is not None:
                     receipt_message_id = assistant_message.id
                 settle_metered_turn(
                     runtime_result,

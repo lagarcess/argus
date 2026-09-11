@@ -3,10 +3,11 @@ import { createInstance } from "i18next";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import ChatMessage from "../components/chat/ChatMessage";
-import { hydrateMessagesFromApi, messageStreamPresentation, standaloneStreamStatusVisible } from "../components/chat/chat-message-projection";
+import { applyResearchJobAnswer, hydrateMessagesFromApi, messageStreamPresentation, standaloneStreamStatusVisible } from "../components/chat/chat-message-projection";
+import { backtestJobMessage, pendingBacktestJobIds } from "../lib/chat-backtest-jobs";
 import { recoverPendingBreakdown } from "../components/chat/usePendingBreakdownRecovery";
 import type { Message } from "../components/chat/types";
-import type { ApiMessage } from "../lib/argus-api";
+import type { ApiMessage, BacktestJob } from "../lib/argus-api";
 import { retirePendingBreakdown } from "../lib/pending-result-breakdown";
 import en from "../public/locales/en/common.json";
 import es from "../public/locales/es-419/common.json";
@@ -29,6 +30,39 @@ const apply = (view: Awaited<ReturnType<typeof recoverPendingBreakdown>>, messag
   typeof view.messages === "function" ? view.messages(messages) : view.messages;
 
 describe("a reloaded Breakdown follows its durable request", () => {
+  for (const language of ["en", "es-419"] as const) {
+    test(`research job shows one ${language} Breakdown frame and replaces it with the saved answer`, async () => {
+      const job = { id: crypto.randomUUID(), conversation_id: request.conversation_id, status: "running", operation_scope: "chat.research", retryable: false } as BacktestJob;
+      const ack: ApiMessage = { ...request, id: crypto.randomUUID(), role: "assistant", content: "", metadata: {
+        artifact_presentation_kind: "breakdown", backtest_job: job,
+        agent_runtime_turn: { ...turn, terminal: true, status: "completed" },
+      } };
+      const i18n = createInstance();
+      await i18n.init({ lng: language, resources: { en: { translation: en }, "es-419": { translation: es } } });
+      const live = [backtestJobMessage({ id: ack.id, job, metadata: ack.metadata! })];
+      const reloaded = hydrateMessagesFromApi([request, ack]).messages;
+      for (const messages of [live, reloaded]) {
+        expect(pendingBacktestJobIds(messages)).toEqual([job.id]);
+        const html = renderToStaticMarkup(<I18nextProvider i18n={i18n}>{messages.map((message, index) => <ChatMessage key={message.id} message={message}
+          isStreaming={messageStreamPresentation(messages, message, index, false, false).isWorkingMessage} />)}
+          {standaloneStreamStatusVisible(messages, false) && <span>{i18n.t("chat.status.working")}</span>}
+        </I18nextProvider>);
+        expect(html.split(i18n.t("chat.status.working"))).toHaveLength(2);
+        expect(html.split('class="argus-result-section-label"')).toHaveLength(2);
+        expect(html).not.toContain(i18n.t("chat.result_readout.unavailable"));
+      }
+      const answer = completed(language)[1];
+      answer.metadata = { ...answer.metadata, backtest_job_id: job.id, research: { sources: [{ title: "Results", domain: "example.com", url: "https://example.com/results" }] } };
+      const updated = applyResearchJobAnswer(live, { job: { ...job, status: "succeeded" }, run: null, result_message: answer });
+      const saved = hydrateMessagesFromApi([request, ack, answer]).messages;
+      for (const messages of [updated, saved]) {
+        expect(pendingBacktestJobIds(messages)).toEqual([]);
+        expect(messages.filter((message) => message.contentPresentation === "result_breakdown")).toHaveLength(1);
+        expect(messages.find((message) => message.id === answer.id)?.resultReadoutContent?.language).toBe(language);
+        expect(messages.find((message) => message.id === answer.id)?.researchSources?.[0]?.url).toBe("https://example.com/results");
+      }
+    });
+  }
   for (const language of ["en", "es-419"] as const) {
     test(`saved accepted and running requests show one ${language} working frame without local stream state`, async () => {
       const i18n = createInstance();

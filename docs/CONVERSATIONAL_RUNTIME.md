@@ -333,6 +333,10 @@ Breakdown receives only
 its labeled headline scalar facts, such as the tested dates, returns, worst drop,
 capital, contributions, costs and purchases/sales versus completed buy-and-sell pairs. The full
 chart series, markers and internal field paths never enter the Breakdown request.
+The worst drop includes its high, low, dates and dollar decline computed from
+unrounded balances. The whole-period peak includes its date. Dated groups enter
+the request in chronological order, with arithmetic done before display rounding;
+missing endpoint or date evidence remains unavailable.
 A figure appears only when a sentence needs it, with its checked fact reference.
 Both composers receive the card's precision: one decimal for percentages, whole
 dollars for account values, and localized dates. Accuracy instructions guide the
@@ -390,9 +394,14 @@ capabilities, but it must not imply unsupported strategies are executable today.
 Structured breakdown actions should emit an `explain` stage before final text so
 the UI can show a clear working state while preserving canonical SSE frame
 types. The existing Breakdown frame owns one localized working state, without
-a second generic status line. Reload restores it from the durable typed request
-lifecycle and uses the existing turn-recovery reader to obtain the saved answer
-or terminal recovery state. Only a completed response selects model prose or the
+a second generic status line. Durable persistence reserves a `chat.research` job
+and saves its acknowledgement before provider work starts. The existing research
+task owner and message-first finalizer complete it outside the browser stream;
+job polling replaces the pending frame with its saved answer, including after
+reload. The Perplexity call still uses its existing structured client interface.
+Development memory mode retains completion independently and uses its existing
+ordinary-turn finalizer and recovery reader because it has no job endpoint.
+Only a completed response selects model prose or the
 template; the pending frame does not claim saved facts are insufficient.
 
 The chart is a TradingView Lightweight Charts baseline chart using the aggregate portfolio equity curve. Multi-symbol runs must show the portfolio curve, not a cluttered symbol comparison. Entry and exit markers may be capped for readability. TradingView attribution must remain visible.

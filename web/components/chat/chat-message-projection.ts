@@ -25,6 +25,7 @@ import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
+  backtestJobCardAwaitsPolling,
   backtestJobMessageFromApi,
   RESEARCH_JOB_SCOPE,
   toolJobsFromMetadata,
@@ -233,6 +234,9 @@ export function messageStreamPresentation(
 ): MessageStreamPresentation {
   const latestAiIndex = messages.findLastIndex((m) => m.role === "ai");
   const isLatestAi = message.role === "ai" && latestAiIndex === index;
+  if (message.contentPresentation === "result_breakdown" && message.backtestJob) {
+    return { isLatestAi, isWorkingMessage: backtestJobCardAwaitsPolling(message) };
+  }
   return {
     isLatestAi,
     isWorkingMessage:
@@ -450,6 +454,7 @@ export function hydrateMessagesFromApi(
         return {
           ...hydratedText,
           content: undefined,
+          resultBreakdownJobId: stringOrNull(metadata.backtest_job_id) ?? undefined,
           researchSources: researchSourcesFromMetadata(metadata),
           researchDegradedCode: researchDegradedCodeFromMetadata(metadata),
           recoveryDisplay: hydratedText.recoveryDisplay?.kind === "result_breakdown" ? hydratedText.recoveryDisplay : {
@@ -517,7 +522,9 @@ export function hydrateMessagesFromApi(
       ),
     ),
   );
-  const reconciled = projectPendingBreakdowns(items, reconcileToolJobMessages(normalized));
+  const completedBreakdownJobs = new Set(normalized.flatMap((message) => message.resultBreakdownJobId ? [message.resultBreakdownJobId] : []));
+  const retained = normalized.filter((message) => !message.backtestJob || !completedBreakdownJobs.has(message.backtestJob.id));
+  const reconciled = projectPendingBreakdowns(items, reconcileToolJobMessages(retained));
   return { messages: reconciled, inputActions: latestInputActions(reconciled) };
 }
 
@@ -568,6 +575,12 @@ export function applyResearchJobAnswer(
       message.kind === "backtest_job" &&
       message.backtestJob?.id === response.job.id,
   );
+  if (cardIndex !== -1 && messages[cardIndex].contentPresentation === "result_breakdown") {
+    const projected = hydrateMessagesFromApi([answer]).messages[0];
+    if (!projected) return messages;
+    return messages.flatMap((message, index) => index === cardIndex
+      ? [projected] : message.id === answer.id ? [] : [message]);
+  }
   const present = messages.some((message) => message.id === answer.id);
   const cardSettled =
     cardIndex === -1 ||
