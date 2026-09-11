@@ -128,8 +128,10 @@ the merge ignores it. That replay is a committed test.
   the persisted message pass through it; the turn records `reply_rewrites`
   (`docs/API_CONTRACT.md`). A dash set directly between two figures
   ("5%—10%", "$1,000—$2,000") is the model's range notation and keeps a
-  hyphen in every language; every other dash takes the comma, colon or
-  period the copy rule asks for.
+  hyphen in every language; a figure opens with a digit or any Unicode
+  currency sign and closes with a digit or a percent-like sign, nothing
+  enumerated. Every other dash takes the comma, colon or period the copy
+  rule asks for.
 - `tests/evals/measurement_eval_harness.py`: a followup turn runs against the
   setup the first turn built (the workflow's own snapshot builder), not
   against an absent snapshot.
@@ -142,7 +144,7 @@ the merge ignores it. That replay is a committed test.
 | --- | ---: |
 | `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task and of a continuing new idea, the recorded two turns through the real workflow) | 101 passed |
 | `tests/agent_runtime/test_dca_money_role_audits.py` | 35 passed |
-| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 29 passed |
+| `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 33 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
 | Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `f7fc6d74` | 2642 passed, 2 skipped |
 | `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `f7fc6d74` | 822 passed |
@@ -373,6 +375,14 @@ continuation test file (`416e7348`), which the budget test in CI requires.
 | Finding | Fix | Test |
 | --- | --- | --- |
 | The em dash owner replaced every dash with a comma, so a model's range notation ("5%—10%", "$1,000—$2,000") read as two separate figures, live and persisted | A dash set directly between two figures, no space on either side, keeps a hyphen in every language; a spaced dash between figures is still an aside and takes the comma. The stream path already holds a chunk's trailing dash and reads the shown tail as its left side, so a range split across chunks renders exactly what is persisted | whole-reply and chunked ranges in English and Spanish, and a spaced dash keeping the comma, in `tests/test_visible_reply.py` (seven failed on the head owner) |
+
+This owner touches no measurement case; no live run and no spend.
+
+## Codex round 11 (one P1 on `ab0fac18`, fixed in `5b881d13`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| The range rule named three currency signs, so a yen or rupee range was still rendered as two figures | A figure opens with a digit or any character of Unicode category Sc and closes with a digit or a sign Unicode names as a percent or per-mille sign; nothing is enumerated | yen, rupee and per-mille ranges, whole-reply in English and Spanish and chunked, in `tests/test_visible_reply.py` (four failed on the head owner) |
 
 This owner touches no measurement case; no live run and no spend.
 
