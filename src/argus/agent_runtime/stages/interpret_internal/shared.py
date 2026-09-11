@@ -4,9 +4,11 @@ Behavior-preserving relocation from stages/interpret.py (issue #131)."""
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from argus.agent_runtime.capabilities.answers import EXECUTABLE_STRATEGY_FAMILIES
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
@@ -14,6 +16,9 @@ from argus.agent_runtime.rule_specs import (
     strategy_rule,
 )
 from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.strategy_requirements import (
+    missing_required_fields_for_strategy,
+)
 from argus.agent_runtime.strategy_requirements import (
     valid_rule_spec_from_strategy as _valid_rule_spec_from_strategy,
 )
@@ -119,18 +124,35 @@ def _turn_continues_pending_setup(
         and semantic_turn_act is not None
     ):
         return False
-    if (
-        semantic_turn_act == "new_idea"
-        and task_relation == "new_task"
-        and _strategy_names_another_traded_asset(
+    if semantic_turn_act == "new_idea" and task_relation == "new_task":
+        # An explicit fresh-task read wins over asset equality: a new idea
+        # that names another traded asset, or that states a complete task on
+        # its own, starts clean. Only a partial new-idea read while the
+        # runtime awaits a reply is that reply.
+        if _strategy_names_another_traded_asset(
             prior=prior,
             strategy=strategy,
             current_user_message=current_user_message,
             reason_codes=reason_codes,
-        )
-    ):
-        return False
+        ):
+            return False
+        if _strategy_states_a_complete_task(strategy):
+            return False
     return True
+
+
+@lru_cache(maxsize=1)
+def _default_capability_contract() -> Any:
+    return build_default_capability_contract()
+
+
+def _strategy_states_a_complete_task(strategy: StrategySummary) -> bool:
+    """The draft alone names everything its family needs to run."""
+    if not strategy.asset_universe or strategy.date_range in (None, "", [], {}):
+        return False
+    return not missing_required_fields_for_strategy(
+        strategy, contract=_default_capability_contract()
+    )
 
 
 def _pending_setup_continuation_reason_codes(

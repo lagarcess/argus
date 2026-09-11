@@ -175,3 +175,43 @@ def test_chat_stream_records_nothing_when_no_em_dash_was_shown(
     ]
     assistant = next(message for message in messages if message["role"] == "assistant")
     assert REPLY_REWRITES_METADATA_KEY not in assistant["metadata"]
+
+
+# --- Codex round 2 on PR #591 -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("chunks", "expected"),
+    [
+        (["Hello", " —", " world"], "Hello, world"),
+        (["Hello ", "—", " world"], "Hello, world"),
+        (["Hello —", " world"], "Hello, world"),
+        (
+            ["Hola", " —", " mundo, ", "listo —", " capital inicial de $1,000."],
+            "Hola, mundo, listo, capital inicial de $1,000.",
+        ),
+        (["Comma already,", " — twice"], "Comma already, twice"),
+        (["First line\n", "— second"], "First line\nsecond"),
+    ],
+)
+def test_streamed_chunks_render_exactly_what_the_final_reply_persists(
+    chunks: list[str], expected: str
+) -> None:
+    from argus.api.chat.visible_reply import ReplyRewrites
+
+    rewrites = ReplyRewrites(surface="test")
+    live = "".join(rewrites.token(chunk) for chunk in chunks)
+    full = "".join(chunks)
+    runtime_result = {"assistant_response": full}
+    metadata: dict[str, object] = {}
+    final_text, _ = rewrites.finalize(
+        runtime_result=runtime_result,
+        metadata=metadata,
+        assistant_text=full,
+        persisted_text=full,
+    )
+
+    assert live == expected
+    assert final_text == expected
+    assert runtime_result["assistant_response"] == expected
+    assert metadata[REPLY_REWRITES_METADATA_KEY] == {"em_dash": full.count(EM_DASH)}

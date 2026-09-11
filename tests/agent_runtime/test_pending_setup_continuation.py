@@ -160,6 +160,22 @@ def _reply_draft(pending: StrategySummary, dropped: str) -> StrategySummary:
     return draft
 
 
+def _states_a_complete_task(strategy: StrategySummary) -> bool:
+    # The same owner the runtime reads: the contract's required fields.
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.strategy_requirements import (
+        missing_required_fields_for_strategy,
+    )
+
+    return bool(strategy.asset_universe and strategy.date_range) and not (
+        missing_required_fields_for_strategy(
+            strategy, contract=build_default_capability_contract()
+        )
+    )
+
+
 class _Interpreter:
     def __init__(self, response: StructuredInterpretation) -> None:
         self.response = response
@@ -252,12 +268,17 @@ def test_reply_to_runtime_question_keeps_every_earlier_fact(
     language: str,
 ) -> None:
     pending = _pending(family)
+    reply = _reply_draft(pending, dropped)
+    if semantic_turn_act == "new_idea" and _states_a_complete_task(reply):
+        # A new-idea read that states a complete task on its own is a fresh
+        # task (Codex round 2); the continuation applies to partial replies.
+        pytest.skip("complete fresh-task read starts clean")
     response = StructuredInterpretation(
         intent="strategy_drafting",
         task_relation=task_relation,
         requires_clarification=dropped in {"asset", "dates", "asset_and_dates"},
         user_goal_summary="Continue the pending setup.",
-        candidate_strategy_draft=_reply_draft(pending, dropped),
+        candidate_strategy_draft=reply,
         missing_required_fields=(
             {"asset": ["asset_universe"], "dates": ["date_range"]}.get(
                 dropped,
@@ -708,3 +729,65 @@ def test_a_benchmark_the_repair_misread_as_the_asset_does_not_replace_the_pendin
     assert result.outcome == "ready_for_confirmation", result.decision.reason_codes
     _assert_pending_facts_survived(result.decision.candidate_strategy_draft, pending)
     assert "pending_setup_continuation_merged" in result.decision.reason_codes
+
+
+# --- Codex round 2 on PR #591 -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("language", "message"),
+    [
+        ("en", "New idea: DCA $200 monthly into AAPL during 2025"),
+        ("es-419", "Nueva idea: DCA de $200 mensuales en AAPL durante 2025"),
+    ],
+)
+def test_an_explicit_fresh_task_on_the_same_asset_does_not_inherit_the_pending_setup(
+    language: str, message: str
+) -> None:
+    # The interpreter read a complete new task; asset equality must not turn
+    # it into a continuation that inherits the pending seed, fees and slippage.
+    pending = _pending("dca_accumulation")
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="DCA $200 monthly into AAPL during 2025.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="DCA $200 monthly into AAPL during 2025.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            cadence="monthly",
+            date_range={"start": "2025-01-02", "end": "2025-12-31"},
+            capital_amount=200.0,
+            extra_parameters={
+                "recurring_contribution": 200.0,
+                "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "date_range": "explicit_user",
+                    "capital_amount": "recurring_contribution",
+                    "recurring_contribution": "explicit_user",
+                    "cadence": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = _run(
+        message=message,
+        language=language,
+        pending=pending,
+        response=response,
+        thread_metadata=dict(AWAITING_REPLY_WITHOUT_FIELD),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert result.outcome == "ready_for_confirmation", result.decision.reason_codes
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range == {"start": "2025-01-02", "end": "2025-12-31"}
+    assert strategy.capital_amount == 200.0
+    assert strategy.extra_parameters.get("initial_capital") is None
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+    assert "pending_setup_continuation_merged" not in result.decision.reason_codes
