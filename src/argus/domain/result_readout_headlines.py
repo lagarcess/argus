@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from argus.domain.result_readout_display_values import readout_display_value
@@ -24,6 +25,7 @@ _HEADLINES = {
     "portfolio.invested_capital": "Total money contributed",
     "portfolio.ending_equity": "Ending portfolio value",
     "portfolio.peak_equity": "Highest portfolio value",
+    "portfolio.peak_date": "Highest portfolio value reached",
     "portfolio.executed_fills": "Purchases and sales",
     "portfolio.completed_trades": "Completed buy-and-sell pairs",
     "configuration.fee_bps": "Fee per trade",
@@ -32,6 +34,17 @@ _HEADLINES = {
     "portfolio.drawdown.trough_date": "Worst drop ended",
     "portfolio.drawdown.peak_equity": "Portfolio value before the worst drop",
     "portfolio.drawdown.trough_equity": "Portfolio value at the bottom of the worst drop",
+    "portfolio.drawdown.dollar_loss": "Dollar decline during the worst drop",
+}
+
+# Event membership derives labels from the same map used by figure references.
+_EVENTS = {
+    "portfolio.drawdown.peak_date": ("portfolio.drawdown.peak_equity",),
+    "portfolio.drawdown.trough_date": (
+        "portfolio.drawdown.trough_equity",
+        "portfolio.drawdown.dollar_loss",
+    ),
+    "portfolio.peak_date": ("portfolio.peak_equity",),
 }
 
 
@@ -74,10 +87,36 @@ def headline_request_lines(sheet: dict[str, Any], *, language: str = "en") -> li
         f"Assets: {', '.join(sheet.get('symbols') or [])}",
         f"Benchmark: {sheet.get('benchmark_symbol') or 'not available'}",
     ]
-    for label, row in sheet["facts"].items():
-        value = row.get("value")
-        if value is None:
-            continue
+    facts = sheet["facts"]
+
+    def line(label: str) -> str:
+        row = facts[label]
         display = readout_display_value(row, language=language)
-        lines.append(f"{label}: {display['text'] if display else value}")
+        return f"{label}: {display['text'] if display else row['value']}"
+
+    events = []
+    grouped = set()
+    for date_key, value_keys in _EVENTS.items():
+        date_label = _HEADLINES[date_key]
+        value = facts.get(date_label, {}).get("value")
+        if not isinstance(value, str):
+            continue
+        try:
+            date = datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+        except ValueError:
+            continue
+        labels = [date_label, *(_HEADLINES[key] for key in value_keys)]
+        labels = [
+            label for label in labels if facts.get(label, {}).get("value") is not None
+        ]
+        events.append((date, "; ".join(line(label) for label in labels)))
+        grouped.update(labels)
+    for label, row in facts.items():
+        value = row.get("value")
+        if value is None or label in grouped:
+            continue
+        lines.append(line(label))
+    if events:
+        lines.append("Recorded events in chronological order (earliest to latest):")
+        lines.extend(text for _, text in sorted(events, key=lambda event: event[0]))
     return lines

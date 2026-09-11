@@ -332,7 +332,31 @@ def build_labeled_fact_sheet(raw_facts: dict[str, Any]) -> dict[str, Any]:
             "owner": "stored_readout_facts",
         }
     _drawdown_facts(sheet, raw, chart, currency)
+    _peak_date_fact(rows, chart)
     return sheet
+
+
+def _peak_date_fact(rows: dict[str, Any], chart: dict[str, Any]) -> None:
+    row = _unavailable(
+        "timestamp",
+        "First recorded close at the highest portfolio value over the whole test",
+        "nominal_equity_close",
+        "An ordered recorded point matching the stored whole-period peak is required.",
+    )
+    rows["portfolio.peak_date"] = row
+    points = _ordered_points(chart.get("series"))
+    value = _mapping(rows.get("portfolio.peak_equity")).get("value")
+    if not points or not _finite(value):
+        return
+    peak = max(points, key=lambda point: point["value"])
+    if abs(peak["value"] - value) > 0.005:
+        return
+    row["value"] = peak["time"]
+    row["provenance"] = {
+        "kind": "derived",
+        "owner": "recorded_whole_period_peak_date",
+        "inputs": ["portfolio.peak_equity", "chart.portfolio_equity"],
+    }
 
 
 def _capital_roles(
