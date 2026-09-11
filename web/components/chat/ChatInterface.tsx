@@ -104,6 +104,8 @@ import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
 import { toolResultRecomputeHandler } from "@/lib/tool-result-recompute";
 import { toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
+import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import {
   discoveryCandidateMention,
   discoverySidecarFromMetadata,
@@ -193,10 +195,13 @@ import {
   messageStreamPresentation,
   messagesWithSavedDecisionState,
   settleOpenConfirmationsFromFinalPayload,
+  standaloneStreamStatusVisible,
 } from "./chat-message-projection";
 import { openFeedbackDialogState, type ChatFeedbackDialogState } from "./feedback-dialog-state";
 import FeedbackAsk from "../feedback/FeedbackAsk";
 import { messageElementRegistrar } from "./transcript-element-refs";
+import { usePendingBreakdownRecovery } from "./usePendingBreakdownRecovery";
+import { retirePendingBreakdown } from "@/lib/pending-result-breakdown";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
 import SidebarShell from "@/components/sidebar/SidebarShell";
 import ChatShellMenuTrigger from "@/components/chat/ChatShellMenuTrigger";
@@ -388,6 +393,12 @@ export default function ChatInterface() {
       promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
     }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
   useBacktestJobPolling(messages, canApplyConversationOwnedUpdate, setMessages, handleDurableJobCompletion);
+  const handlePendingBreakdownSettled = useCallback((targetConversationId: string) => {
+    invalidateTranscriptForMutation(targetConversationId, "durable_result_action");
+    promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+    void refreshHistory();
+  }, [activityTranscriptReadiness, invalidateTranscriptForMutation, refreshHistory]);
+  usePendingBreakdownRecovery(messages, conversationId, setMessages, t("chat.error_load"), handlePendingBreakdownSettled);
 
   const retireActiveTranscriptPresentationForNavigation = useCallback(() => {
     setStreamStatus(null);
@@ -1316,7 +1327,7 @@ export default function ChatInterface() {
             : undefined;
         const finalAssistantId = finalMessageId ?? assistantId;
         setMessages((prev) =>
-          applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
+          applyRetestReceipt(retirePendingBreakdown(prev, requestSession.identity.requestId), userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
         );
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
         const finalStrategyPathContext =
@@ -1390,6 +1401,7 @@ export default function ChatInterface() {
           );
           const card = {
             ...baseCard,
+            readoutContent: resultReadoutContentFromMetadata(finalPayload, baseCard.readoutContent),
             savedStrategyId: run.strategy_id ?? null,
             actions: resultActions,
           };
@@ -1439,7 +1451,8 @@ export default function ChatInterface() {
           const finalResearchDegradedCode =
             researchDegradedCodeFromMetadata(finalPayload);
           const finalTextPresentation =
-            action?.type === "show_breakdown" ? "result_breakdown" : undefined;
+            finalPayload.artifact_presentation_kind === "result" ? "result_readout"
+              : finalRecoveryDisplay?.kind === "result_breakdown" || action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
             const nextMessages = replaceOrAppendFinalAssistantMessage(
               prev.map((m) =>
@@ -1456,6 +1469,8 @@ export default function ChatInterface() {
                   researchSources: finalResearchSources,
                   researchDegradedCode: finalResearchDegradedCode,
                   nextExperiments: finalNextExperiments,
+                  resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
+                  resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                   nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
@@ -1478,6 +1493,8 @@ export default function ChatInterface() {
                 researchSources: finalResearchSources,
                 researchDegradedCode: finalResearchDegradedCode,
                 nextExperiments: finalNextExperiments,
+                resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
+                resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                 nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
@@ -2087,14 +2104,7 @@ export default function ChatInterface() {
   // the conversation's actions.
   const nextMovesEnabled =
     !turnInFlight && !hasActiveArtifactActionSet(messages);
-  const latestAssistantContent =
-    [...messages]
-      .reverse()
-      .find((message) => message.role === "ai")
-      ?.content?.trim() ?? "";
-  const showStreamStatus = Boolean(
-    visibleStreamStatus && latestAssistantContent.length === 0,
-  );
+  const showStreamStatus = standaloneStreamStatusVisible(messages, Boolean(visibleStreamStatus));
   const showConversationDisclaimer = shouldShowConversationDisclaimer(
     messages,
     isStreamingResponse,

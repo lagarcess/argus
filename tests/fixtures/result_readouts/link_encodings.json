@@ -1,0 +1,12 @@
+[
+  {"raw": "https&#x3A;//invented.example/a", "decoded": "https://invented.example/a"},
+  {"raw": "https&#58;//invented.example/a", "decoded": "https://invented.example/a"},
+  {"raw": "https&colon;//invented.example/a", "decoded": "https://invented.example/a"},
+  {"raw": "www&#x2E;invented.example", "decoded": "www.invented.example"},
+  {"raw": "fake&#64;invented.example", "decoded": "fake@invented.example"},
+  {"raw": "https\\://invented.example/a", "decoded": "https://invented.example/a"},
+  {"raw": "www\\.invented.example", "decoded": "www.invented.example"},
+  {"raw": "fake\\@invented.example", "decoded": "fake@invented.example"},
+  {"raw": "https&#x3A;//example.com/a?x=1&amp;y=2", "decoded": "https://example.com/a?x=1&y=2", "returned": true},
+  {"raw": "https\\://example.com/a?x=1&y=2", "decoded": "https://example.com/a?x=1&y=2", "returned": true}
+]

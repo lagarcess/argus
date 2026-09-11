@@ -1,0 +1,181 @@
+{
+  "provenance": "Saved live demo request; pending snapshots serialized through project_chat_turn_lifecycle_messages.",
+  "source_sha": "7141b0dc54ae8c4a5d38f16b23601f5a616f7b1d",
+  "started": {
+    "id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+    "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+    "role": "user",
+    "content": "Explain result",
+    "created_at": "2026-09-11T04:46:45.728288Z",
+    "metadata": {
+      "agent_runtime_turn": {
+        "status": "started",
+        "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+        "request_id": "3016f618-6670-4c61-aa0f-ba519b280a61",
+        "started_at": "2026-09-11T04:46:45.728248+00:00"
+      },
+      "chat_action": {
+        "type": "show_breakdown",
+        "label": "Explain result",
+        "labelKey": "chat.result_card.explain_result",
+        "payload": {
+          "run_id": "f927acd6-ca78-591d-ace2-6d32b43827a9",
+          "strategy_id": null,
+          "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+          "idea_id": "c7a103b2-d85f-4106-a083-d43d53902897",
+          "idea_version_id": "b5c0e086-6747-4bd9-9095-b1289780e41f",
+          "evidence_artifact_id": "a2ad460d-f5f8-494b-9b7d-1467a5d9778b",
+          "strategy_name": "DOCN Buy and Hold",
+          "symbols": [
+            "DOCN"
+          ],
+          "template": "buy_and_hold",
+          "asset_class": "equity"
+        },
+        "presentation": "result"
+      }
+    }
+  },
+  "accepted": {
+    "id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+    "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+    "role": "user",
+    "content": "Explain result",
+    "created_at": "2026-09-11T04:46:45.728288Z",
+    "metadata": {
+      "agent_runtime_turn": {
+        "turn_id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+        "request_id": "3016f618-6670-4c61-aa0f-ba519b280a61",
+        "status": "accepted",
+        "terminal": false,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "chat_action": {
+        "type": "show_breakdown",
+        "label": "Explain result",
+        "labelKey": "chat.result_card.explain_result",
+        "payload": {
+          "run_id": "f927acd6-ca78-591d-ace2-6d32b43827a9",
+          "strategy_id": null,
+          "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+          "idea_id": "c7a103b2-d85f-4106-a083-d43d53902897",
+          "idea_version_id": "b5c0e086-6747-4bd9-9095-b1289780e41f",
+          "evidence_artifact_id": "a2ad460d-f5f8-494b-9b7d-1467a5d9778b",
+          "strategy_name": "DOCN Buy and Hold",
+          "symbols": [
+            "DOCN"
+          ],
+          "template": "buy_and_hold",
+          "asset_class": "equity"
+        },
+        "presentation": "result"
+      }
+    }
+  },
+  "running": {
+    "id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+    "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+    "role": "user",
+    "content": "Explain result",
+    "created_at": "2026-09-11T04:46:45.728288Z",
+    "metadata": {
+      "agent_runtime_turn": {
+        "turn_id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+        "request_id": "3016f618-6670-4c61-aa0f-ba519b280a61",
+        "status": "running",
+        "terminal": false,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "chat_action": {
+        "type": "show_breakdown",
+        "label": "Explain result",
+        "labelKey": "chat.result_card.explain_result",
+        "payload": {
+          "run_id": "f927acd6-ca78-591d-ace2-6d32b43827a9",
+          "strategy_id": null,
+          "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+          "idea_id": "c7a103b2-d85f-4106-a083-d43d53902897",
+          "idea_version_id": "b5c0e086-6747-4bd9-9095-b1289780e41f",
+          "evidence_artifact_id": "a2ad460d-f5f8-494b-9b7d-1467a5d9778b",
+          "strategy_name": "DOCN Buy and Hold",
+          "symbols": [
+            "DOCN"
+          ],
+          "template": "buy_and_hold",
+          "asset_class": "equity"
+        },
+        "presentation": "result"
+      }
+    }
+  },
+  "abandoned": {
+    "id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+    "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+    "role": "user",
+    "content": "Explain result",
+    "created_at": "2026-09-11T04:46:45.728288Z",
+    "metadata": {
+      "agent_runtime_turn": {
+        "turn_id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+        "request_id": "3016f618-6670-4c61-aa0f-ba519b280a61",
+        "status": "abandoned",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": "turn_abandoned",
+        "retryable": true
+      },
+      "chat_action": {
+        "type": "show_breakdown",
+        "label": "Explain result",
+        "labelKey": "chat.result_card.explain_result",
+        "payload": {
+          "run_id": "f927acd6-ca78-591d-ace2-6d32b43827a9",
+          "strategy_id": null,
+          "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+          "idea_id": "c7a103b2-d85f-4106-a083-d43d53902897",
+          "idea_version_id": "b5c0e086-6747-4bd9-9095-b1289780e41f",
+          "evidence_artifact_id": "a2ad460d-f5f8-494b-9b7d-1467a5d9778b",
+          "strategy_name": "DOCN Buy and Hold",
+          "symbols": [
+            "DOCN"
+          ],
+          "template": "buy_and_hold",
+          "asset_class": "equity"
+        },
+        "presentation": "result"
+      },
+      "recovery": {
+        "code": "turn_abandoned",
+        "retryable": true
+      },
+      "retry_last_turn": {
+        "request_message_id": "dd99c5a3-cf80-427b-b84c-027ccfc6169c",
+        "message": "Explain result",
+        "action": {
+          "type": "show_breakdown",
+          "label": "Explain result",
+          "labelKey": "chat.result_card.explain_result",
+          "payload": {
+            "run_id": "f927acd6-ca78-591d-ace2-6d32b43827a9",
+            "strategy_id": null,
+            "conversation_id": "5de1cd1f-9097-4607-a221-3877f2ebdac7",
+            "idea_id": "c7a103b2-d85f-4106-a083-d43d53902897",
+            "idea_version_id": "b5c0e086-6747-4bd9-9095-b1289780e41f",
+            "evidence_artifact_id": "a2ad460d-f5f8-494b-9b7d-1467a5d9778b",
+            "strategy_name": "DOCN Buy and Hold",
+            "symbols": [
+              "DOCN"
+            ],
+            "template": "buy_and_hold",
+            "asset_class": "equity"
+          },
+          "presentation": "result"
+        }
+      }
+    }
+  }
+}

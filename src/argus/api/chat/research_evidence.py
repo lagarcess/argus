@@ -29,6 +29,7 @@ from argus.api import state as api_state
 from argus.api.chat.discovery_evidence import discovery_meter
 from argus.domain.research.admission import ResearchAttemptAdmission
 from argus.domain.research.config import research_rail_enabled
+from argus.domain.research.contracts import ResearchUsage
 from argus.domain.usage_limits import (
     GLOBAL_RESEARCH_CEILING_SUBJECT,
     GUEST_RESEARCH_VISITOR_LIMITS,
@@ -251,6 +252,36 @@ def record_research_turn_evidence(
     )
 
 
+def record_result_breakdown_spend(
+    *,
+    usage: ResearchUsage | None,
+    failure_mode: str | None,
+    user_id: str,
+    conversation_id: str | None,
+    request_id: str | None,
+) -> None:
+    """The received invoice counts even when the readout falls back entirely.
+
+    The shared Agent client separately sends unpriceable invoices to the existing
+    unpriced-spend recorder. This row owns the action's spend, never its prose.
+    """
+    if usage is None:
+        return
+    _append_ledger_row(
+        research={
+            "capability_class": "result_breakdown",
+            "shape": "balanced",
+            "degraded": {"code": failure_mode} if failure_mode else None,
+        },
+        usage=usage.model_dump(mode="json"),
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=None,
+        request_id=request_id,
+        feature_area="result_readout",
+    )
+
+
 def _append_ledger_row(
     *,
     research: dict[str, Any],
@@ -260,6 +291,7 @@ def _append_ledger_row(
     message_id: str | None,
     request_id: str | None,
     tool_call_id: str | None = None,
+    feature_area: str = "research_rail",
 ) -> None:
     gateway = api_state.supabase_gateway
     if gateway is None:
@@ -274,7 +306,10 @@ def _append_ledger_row(
         "source": "research",
         "service": "perplexity_agent",
         "provider": "perplexity_agent",
-        "feature_area": "research_rail",
+        "feature_area": feature_area,
+        "model": usage.get("model"),
+        "input_tokens": usage.get("input_tokens") if paid else None,
+        "output_tokens": usage.get("output_tokens") if paid else None,
         "task": capability_class,
         "user_id": user_id,
         "conversation_id": conversation_id,
@@ -286,6 +321,17 @@ def _append_ledger_row(
             "shape": research.get("shape"),
             "cache_status": cache_status_of(usage),
             "invocations": usage.get("invocations"),
+            **{
+                key: usage[key]
+                for key in (
+                    "web_search_invocations",
+                    "fetch_url_invocations",
+                    "finance_search_invocations",
+                    "cache_creation_input_tokens",
+                    "cache_read_input_tokens",
+                )
+                if key in usage
+            },
             **({"tool_call_id": tool_call_id} if tool_call_id is not None else {}),
             **(
                 {"degraded_code": degraded.get("code")}

@@ -238,7 +238,9 @@ def test_run_action_identity_is_rejected_before_route_side_effects(
     assert response.status_code == expected_status
     assert response.json()["code"] == expected_code
     assert gateway.profile_reads == 0
-    assert sum(len(items) for items in api_state.store.messages.values()) == before_messages
+    assert (
+        sum(len(items) for items in api_state.store.messages.values()) == before_messages
+    )
     assert len(api_state.store.backtest_jobs) == before_jobs
     assert len(api_state.store.backtest_job_reservations) == before_allowance
 
@@ -795,9 +797,7 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     assert validation.launch_payload is not None
     canonical_hash = payload_hash(validation.launch_payload)
     assert (
-        raw_assistant.metadata["confirmation_card"][
-            "canonical_launch_payload_hash"
-        ]
+        raw_assistant.metadata["confirmation_card"]["canonical_launch_payload_hash"]
         == canonical_hash
     )
     assert (
@@ -1068,9 +1068,7 @@ def test_confirmation_edit_actions_reenter_runtime_with_structured_context(
     # keep routing with structured context. Rebuild it exactly as an old card
     # carried it: same payload identity, retired type.
     base_action = next(
-        item
-        for item in confirmation["actions"]
-        if item["type"] == "adjust_assumptions"
+        item for item in confirmation["actions"] if item["type"] == "adjust_assumptions"
     )
     action = {
         **base_action,
@@ -1095,8 +1093,8 @@ def test_confirmation_edit_actions_reenter_runtime_with_structured_context(
     action_context = seen_turns[1]["action_context"]
     assert action_context["type"] == action_type
     assert action_context["presentation"] == "confirmation"
-    assert action_context["payload"]["confirmation_id"] == (
-        confirmation["confirmation_id"]
+    assert (
+        action_context["payload"]["confirmation_id"] == (confirmation["confirmation_id"])
     )
     final = _stream_payloads(response.text, "final")[0]["payload"]
     assert final["pending_strategy"]["requested_field"] == "asset_universe"
@@ -1235,9 +1233,7 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
     ).json()["items"][0]
     assert user_message["metadata"]["mentions"][0]["asset_class"] == "equity"
     assert user_message["metadata"]["mentions"][0]["provider"] == "alpaca"
-    assert (
-        user_message["metadata"]["resolution_provenance"][0]["asset_class"] == "equity"
-    )
+    assert user_message["metadata"]["resolution_provenance"][0]["asset_class"] == "equity"
     assert (
         user_message["metadata"]["resolution_provenance"][0]["validated_by"]
         == "client_mention"
@@ -1247,12 +1243,14 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
 def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.api.chat import breakdown as breakdown_service
     from argus.api.chat.breakdown import (
         ResultBreakdownMessage,
         fallback_result_breakdown_message,
         result_breakdown_context,
     )
     from argus.api.routers import agent as agent_router
+    from argus.domain.research.contracts import ResearchSource, ResearchUsage
 
     runtime_calls = 0
 
@@ -1264,6 +1262,13 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         return _result_runtime_result()
 
     breakdown_languages: list[str] = []
+    ledger_calls: list[dict[str, Any]] = []
+    usage = ResearchUsage(model=breakdown_service.RESULT_BREAKDOWN_MODEL, cost_usd=0.01)
+    source = ResearchSource(
+        title="Historical context",
+        url="https://example.com/context",
+        source_date="2025-08-01",
+    )
 
     def _forced_breakdown(run: Any, *, language: str = "en") -> ResultBreakdownMessage:
         breakdown_languages.append(language)
@@ -1275,6 +1280,8 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
             source="deterministic_fallback",
             fallback_used=True,
             failure_mode="test_forced_fallback",
+            usage=usage,
+            sources=(source,),
         )
 
     monkeypatch.setattr(
@@ -1283,9 +1290,14 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         _stream_events_from_runtime(_runtime),
     )
     monkeypatch.setattr(
-        agent_router,
+        breakdown_service,
         "result_breakdown_message_with_metadata",
         _forced_breakdown,
+    )
+    monkeypatch.setattr(
+        breakdown_service,
+        "record_result_breakdown_spend",
+        lambda **kwargs: ledger_calls.append(kwargs),
     )
     client = _client()
     conversation = _conversation(client)
@@ -1339,6 +1351,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     final = _stream_payloads(second.text, "final")[0]["payload"]
     assert final["assistant_response"] == ""
     assert final["response_intent"]["kind"] == "result_breakdown"
+    assert final["research"]["sources"] == [
+        {**source.model_dump(), "domain": "example.com"}
+    ]
     bank = final["response_intent"]["facts"]["result_fact_bank"]
     assert bank["run_id"] == run_id
     assert bank["symbols"] == ["AAPL"]
@@ -1365,25 +1380,36 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert assistant["content"] == ""
     assert breakdown not in messages.text
     assert assistant["metadata"]["response_intent"] == final["response_intent"]
+    assert assistant["metadata"]["research"] == final["research"]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
     assert assistant["metadata"]["result_breakdown_source"] == "deterministic_fallback"
     assert assistant["metadata"]["result_breakdown_fallback_used"] is True
-    assert assistant["metadata"]["result_breakdown_failure_mode"] == "test_forced_fallback"
+    assert (
+        assistant["metadata"]["result_breakdown_failure_mode"] == "test_forced_fallback"
+    )
     assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
     assert assistant["metadata"]["result_fact_bank"]["symbols"] == ["AAPL"]
     assert "result_card" not in assistant["metadata"]
     assert breakdown_languages == ["en"]
+    assert len(ledger_calls) == 1
+    assert ledger_calls[0]["conversation_id"] == conversation["id"]
+    assert ledger_calls[0]["usage"] is usage
+    assert ledger_calls[0]["failure_mode"] == "test_forced_fallback"
+    assert ledger_calls[0]["user_id"]
+    assert ledger_calls[0]["request_id"]
 
 
-def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
+def test_breakdown_retains_work_before_progress_and_waits_after_progress() -> None:
     from pathlib import Path
 
     source = Path("src/argus/api/routers/agent.py").read_text()
 
-    assert source.index(
-        'yield sse_data({"type": "stage_start", "stage": "explain"})'
-    ) < source.index("breakdown_message = result_breakdown_message_with_metadata")
+    assert (
+        source.index("completion = start_result_breakdown(")
+        < source.index('yield sse_data({"type": "stage_start", "stage": "explain"})')
+        < source.index("dispatched = await asyncio.shield(completion)")
+    )
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:
@@ -1649,9 +1675,9 @@ def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
     assert api_state.store.strategies == {}
     final = _stream_payloads(response.text, "final")[0]["payload"]
     assert final["assistant_response"] == retirement_text
-    messages = client.get(
-        f"/api/v1/conversations/{conversation['id']}/messages"
-    ).json()["items"]
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
     assert messages[-1]["content"] == retirement_text
 
 

@@ -7,6 +7,7 @@ import type {
 import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
 import type { MemoryRecallItem } from "@/lib/memory-recalls";
+import type { ResultReadoutContent } from "@/lib/result-readout-content";
 import type { ResultReadoutFacts } from "@/lib/result-readout-facts";
 
 export type StrategyResultMetric = {
@@ -122,6 +123,7 @@ export type ChatMention = {
 
 export type StrategyResultPayload = {
   readoutFacts?: ResultReadoutFacts | null;
+  readoutContent?: ResultReadoutContent | null;
   strategyName: string;
   strategyLabel?: string;
   symbols?: string[];
@@ -316,6 +318,8 @@ export type Message = {
     | "conversation_load_failure"
     | "superseded_runtime_failure";
   content?: string;
+  /** Read-time projection of a durable, unfinished show_breakdown request. */
+  pendingBreakdown?: { turnId: string; requestId: string; conversationId: string };
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
@@ -323,11 +327,13 @@ export type Message = {
   hasUnavailableToolResults?: boolean;
   toolJobs?: ToolJob[];
   resultReadoutFacts?: ResultReadoutFacts | null;
+  resultReadoutContent?: ResultReadoutContent | null;
   confirmation?: StrategyConfirmationPayload;
   backtestJob?: BacktestJob;
   // The message a terminal research job produced, once it is in the view;
   // until then the card keeps polling for it.
   researchResultMessageId?: string;
+  resultBreakdownJobId?: string;
   isLoadingResult?: boolean;
   actions?: ChatActionOption[];
   artifactId?: string;

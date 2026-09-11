@@ -14,6 +14,10 @@ from pydantic import BaseModel, field_serializer
 
 from argus.domain.artifact_presentation_kind import artifact_presentation_kind
 from argus.domain.result_figures import result_display_figures
+from argus.domain.result_readout_content import (
+    readout_metadata,
+    validated_readout,
+)
 from argus.domain.result_readout_facts import (
     result_readout_config,
     with_result_readout_facts,
@@ -34,7 +38,9 @@ ARTIFACT_ROOT_PROSE_FIELDS = frozenset(
 def without_private_prose(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {
-            key: without_private_prose(item)
+            key: validated_readout(item)
+            if key == "result_readout_content"
+            else without_private_prose(item)
             for key, item in value.items()
             if key not in PRIVATE_ARTIFACT_PROSE_FIELDS
         }
@@ -106,9 +112,16 @@ class ReaderJobResponse(BaseModel):
         return None
 
 
-def result_breakdown_metadata(message: Any, run: Any) -> dict[str, Any]:
+def result_breakdown_metadata(
+    message: Any, run: Any, *, language: str = "en"
+) -> dict[str, Any]:
     """Keep composition provenance beside the typed, reloadable reply facts."""
+    from argus.agent_runtime.research_grounded import (
+        build_research_sidecar,
+        typed_sources,
+    )
     from argus.domain.backtest_message_projection import result_fact_bank
+    from argus.domain.research.contracts import ResearchPacket
 
     metadata = {
         "response_intent": {
@@ -122,4 +135,33 @@ def result_breakdown_metadata(message: Any, run: Any) -> dict[str, Any]:
     }
     if message.failure_mode is not None:
         metadata["result_breakdown_failure_mode"] = message.failure_mode
+    metadata.update(
+        readout_metadata(
+            surface="breakdown",
+            text=message.text,
+            language=language,
+            source=message.source,
+            fallback_used=message.fallback_used,
+            failure_mode=message.failure_mode,
+        )
+    )
+    if message.sources:
+        packet = ResearchPacket(answer_markdown="", sources=message.sources)
+        usage = message.usage
+        metadata["research"] = build_research_sidecar(
+            capability_class="balanced_lookup",
+            shape="balanced",
+            sources=typed_sources(packet),
+            retrieved_at=packet.retrieved_at.isoformat(),
+            subjects=[],
+            peers=[],
+            usage={
+                "invocations": usage.invocations if usage else None,
+                "latency_ms": usage.latency_ms if usage else None,
+                "cost_usd": usage.cost_usd if usage else None,
+                "cache_status": "miss",
+            },
+            period_of_interest=None,
+            degraded_code=message.failure_mode if message.fallback_used else None,
+        )
     return metadata

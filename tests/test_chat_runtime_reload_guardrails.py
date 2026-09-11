@@ -5140,25 +5140,27 @@ def test_show_breakdown_action_without_canonical_run_id_does_not_use_latest(
     monkeypatch,
 ) -> None:
     from argus.api import state as api_state
-    from argus.api.routers import agent as agent_router
+    from argus.api.chat import breakdown
 
     captured: dict[str, Any] = {}
 
-    def _breakdown(run: BacktestRun | None, *, language: str) -> SimpleNamespace:
+    def _breakdown(
+        run: BacktestRun | None, *, language: str
+    ) -> breakdown.ResultBreakdownMessage:
         captured["run"] = run
-        return SimpleNamespace(
+        return breakdown.ResultBreakdownMessage(
             text=(
                 "I could not find the completed backtest to explain."
                 if run is None
                 else "Unexpected latest-run breakdown."
             ),
-            source="missing_result" if run is None else "latest_result",
+            source="missing_result" if run is None else "llm_breakdown_stage",
             fallback_used=True,
             failure_mode="missing_result" if run is None else None,
         )
 
     monkeypatch.setattr(
-        agent_router,
+        breakdown,
         "result_breakdown_message_with_metadata",
         _breakdown,
     )

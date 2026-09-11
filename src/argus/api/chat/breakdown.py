@@ -1,62 +1,79 @@
 from __future__ import annotations
 
-import json
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from loguru import logger
 
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
+from argus.api.chat.research_evidence import record_result_breakdown_spend
 from argus.api.schemas import BacktestRun
-from argus.context.rendering import context_packet_fact_summary
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
 from argus.domain.engine_launch.display import (
     format_benchmark_comparison_phrase,
-    format_benchmark_magnitude_points,
 )
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
 )
-from argus.llm.openrouter import (
-    invoke_openrouter_json_schema_sync,
-    log_openrouter_failure,
+from argus.domain.research.admission import claim_current_research_attempt
+from argus.domain.research.config import ResearchConfigSpec
+from argus.domain.research.contracts import (
+    ResearchSource,
+    ResearchUnavailableError,
+    ResearchUsage,
+)
+from argus.domain.research.credentials import perplexity_api_key
+from argus.domain.research.perplexity_agent import (
+    PerplexityAgentClient,
+    StructuredAgentLimits,
+)
+from argus.domain.result_readout_content import (
+    normalize_readout_language,
+)
+from argus.domain.result_readout_grounding import (
+    READOUT_RUN_GROUNDING_INSTRUCTIONS,
+    stored_readout_facts,
+)
+from argus.domain.result_readout_headlines import (
+    headline_readout_facts,
+    headline_request_lines,
+)
+from argus.domain.result_readout_sources import (
+    BREAKDOWN_SOURCE_INSTRUCTIONS,
+    accepted_breakdown_text,
+    result_breakdown_schema,
+)
+
+RESULT_BREAKDOWN_MODEL = "openai/gpt-5.6-luna"
+RESULT_BREAKDOWN_LIMITS = StructuredAgentLimits(
+    max_tool_calls=4,
+    parallel_tool_calls=False,
+    web_search_max_tokens=8000,
+    web_search_max_tokens_per_page=2000,
+    web_search_max_results=4,
+    fetch_url_max_urls=2,
+    fetch_url_total_budget_tokens=8000,
 )
 
 
-class ResultBreakdownDraft(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    answer: str = Field(
-        default="",
-        description=(
-            "Fallback visible answer in product_language. Prefer answer_blocks for "
-            "readability when possible."
-        ),
-    )
-    answer_blocks: list[str] = Field(
-        min_length=1,
-        max_length=3,
-        description=(
-            "One to three short visible markdown blocks in product_language using "
-            "only supplied fact_bank facts."
-        ),
-    )
-    fact_ids: list[str] = Field(
-        min_length=1,
-        description=(
-            "Fact IDs from fact_bank grounding the answer. Include every required "
-            "fact ID and do not invent IDs."
-        ),
+def result_breakdown_spec(language: str) -> ResearchConfigSpec:
+    return ResearchConfigSpec(
+        shape="balanced",
+        models=(RESULT_BREAKDOWN_MODEL,),
+        max_steps=3,
+        max_output_tokens=2200,
+        tools=("web_search", "fetch_url"),
+        timeout_seconds=75.0,
+        language=language.split("-", 1)[0],
     )
 
 
-RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS = 28.0
+def _client() -> PerplexityAgentClient | None:
+    api_key = perplexity_api_key()
+    return PerplexityAgentClient(api_key) if api_key else None
 
 
 @dataclass(frozen=True)
@@ -69,6 +86,8 @@ class ResultBreakdownMessage:
     ]
     fallback_used: bool
     failure_mode: str | None = None
+    usage: ResearchUsage | None = None
+    sources: tuple[ResearchSource, ...] = ()
 
 
 def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
@@ -81,6 +100,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
     config_snapshot = run.config_snapshot if isinstance(run.config_snapshot, dict) else {}
     return {
         "run_id": run.id,
+        "chart": run.chart,
         "title": card.get("title") if isinstance(card, dict) else None,
         "asset_class": run.asset_class,
         "symbols": run.symbols,
@@ -104,307 +124,104 @@ def llm_result_breakdown_message(
     context: dict[str, Any],
     *,
     language: str = "en",
-    invoke_json_schema_func=invoke_openrouter_json_schema_sync,
-    log_openrouter_failure_func=log_openrouter_failure,
-    timeout_seconds: float = RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS,
+    client: PerplexityAgentClient | None = None,
 ) -> str | None:
-    resolved_language = _response_language(language or context.get("language"))
-    fact_bank = result_breakdown_fact_bank(context, language=resolved_language)
-    required_fact_ids = _required_result_breakdown_fact_ids(fact_bank)
-    context_packet_ids = _context_packet_ids_from_context(context)
-    try:
-        response = _invoke_breakdown_llm_with_budget(
-            invoke_json_schema_func=invoke_json_schema_func,
-            fact_bank=fact_bank,
-            required_fact_ids=required_fact_ids,
-            context_packet_ids=context_packet_ids,
-            language=resolved_language,
-            timeout_seconds=timeout_seconds,
-        )
-    except FutureTimeoutError:
-        log_openrouter_failure_func(
-            task="result_breakdown",
-            model_name=None,
-            exc=TimeoutError("Result breakdown LLM exceeded action budget"),
-            message="LLM result breakdown timed out; using deterministic fallback",
-        )
-        return None
-    except Exception as exc:
-        log_openrouter_failure_func(
-            task="result_breakdown",
-            model_name=None,
-            exc=exc,
-            message="LLM result breakdown failed; using deterministic fallback",
-        )
-        return None
-    draft = _coerce_result_breakdown_draft(response)
-    if draft is None:
-        return None
-    return _render_result_breakdown_draft(
-        draft=draft,
-        fact_bank=fact_bank,
-        required_fact_ids=required_fact_ids,
+    text, _, _, _ = _llm_result_breakdown_with_metadata(
+        context,
+        language=language,
+        client=client,
     )
+    return text
 
 
-def _invoke_breakdown_llm_with_budget(
+def _llm_result_breakdown_with_metadata(
+    context: dict[str, Any],
     *,
-    invoke_json_schema_func: Any,
-    fact_bank: dict[str, str],
-    required_fact_ids: set[str],
-    context_packet_ids: list[str],
-    language: str,
-    timeout_seconds: float,
-) -> object:
-    def _invoke() -> object:
-        return invoke_json_schema_func(
-            task="result_breakdown",
-            messages=_result_breakdown_llm_messages(
-                fact_bank=fact_bank,
-                required_fact_ids=required_fact_ids,
-                language=language,
-            ),
-            schema_model=ResultBreakdownDraft,
-            schema_name="ResultBreakdownDraft",
-            context_packet_ids=context_packet_ids,
-        )
-
-    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="argus-breakdown")
-    future = executor.submit(_invoke)
+    language: str = "en",
+    client: PerplexityAgentClient | None = None,
+) -> tuple[str | None, str | None, ResearchUsage | None, tuple[ResearchSource, ...]]:
+    resolved_language = normalize_readout_language(language)
+    if resolved_language is None:
+        return None, "language_mismatch", None, ()
+    facts = stored_readout_facts(
+        metrics=context.get("raw_metrics", context.get("metrics")),
+        config_snapshot=context.get("config_snapshot"),
+        symbols=context.get("symbols"),
+        benchmark_symbol=context.get("benchmark_symbol"),
+        date_range=context.get("date_range"),
+        chart=context.get("chart"),
+    )
+    messages = _result_breakdown_llm_messages(
+        facts=facts,
+        title=context.get("title"),
+        language=resolved_language,
+    )
+    headline_facts = headline_readout_facts(facts)
     try:
-        return future.result(timeout=max(0.1, timeout_seconds))
-    except FutureTimeoutError:
-        future.cancel()
-        raise
-    finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+        active_client = client if client is not None else _client()
+        if active_client is None:
+            return None, "llm_unavailable_or_contract_rejected", None, ()
+        if not claim_current_research_attempt().available:
+            return None, "research_capacity_exhausted", None, ()
+        response = active_client.run_structured(
+            messages[1]["content"],
+            result_breakdown_spec(resolved_language),
+            schema_model=result_breakdown_schema(headline_facts),
+            schema_name="ResultBreakdownDraft",
+            instructions=messages[0]["content"],
+            limits=RESULT_BREAKDOWN_LIMITS,
+        )
+    except ResearchUnavailableError as exc:
+        logger.warning("Result breakdown unavailable; using template", reason=exc.reason)
+        return None, "llm_unavailable_or_contract_rejected", exc.usage, ()
+    except Exception:  # noqa: BLE001
+        logger.warning("Result breakdown failed; using template")
+        return None, "llm_unavailable_or_contract_rejected", None, ()
+    text, failure = accepted_breakdown_text(
+        response.draft,
+        facts=headline_facts,
+        language=resolved_language,
+        sources=response.sources,
+    )
+    return text, failure, response.usage, response.sources
 
 
 def _result_breakdown_llm_messages(
     *,
-    fact_bank: dict[str, str],
-    required_fact_ids: set[str],
+    facts: dict[str, Any],
+    title: str | None = None,
     language: str = "en",
 ) -> list[dict[str, str]]:
-    resolved_language = _response_language(language)
     return [
         {
             "role": "system",
             "content": (
-                f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
-                "You are Argus, an investing backtest copilot. Explain the stored "
-                "backtest result using only the supplied fact_bank. Write for a "
-                "normal person who is trying to keep exploring, not as a financial report. "
-                f"{response_language_instruction(resolved_language)} "
-                "Do not leave untranslated English words in user-facing prose except "
-                "tickers, symbols, currency codes, numbers, and standard abbreviations. "
-                "When product_language is not English, translate finance terms instead "
-                "of borrowing English terms like benchmark. "
-                "For non-English product_language, literal English words such as "
-                "benchmark, drawdown, back-test, backtest, setup, total return, risk, "
-                "and assumptions are language-quality failures. "
-                "Some source fact values may be stored in English; translate their "
-                "meaning into product_language in your visible section bodies. Do "
-                "not judge source fact values, fact IDs, or schema keys as user-facing "
-                "language. "
-                "Do not return empty sections just because source fact values are "
-                "stored in English; translate those source facts and return the "
-                "completed breakdown. "
-                "Write every user-facing answer block in product_language. "
-                "Symbols, tickers, currency codes, numbers, and percentages can stay "
-                "unchanged, but internal fact IDs and schema field names are never "
-                "user-facing copy. "
-                "Start with one warm takeaway before details. Return one to three "
-                "concise, non-template answer_blocks and vary the phrasing. Keep the "
-                "full breakdown under 220 words. Do not fill a fixed outline. Put all "
-                "visible prose in answer_blocks and use the top-level fact_ids only as "
-                "grounding metadata. fact_ids are not user-visible and do not render "
-                "words. fact_ids must include every fact_id listed in required_fact_ids. "
-                "Do not omit required fact IDs even when the visible answer already "
-                "mentions the value. Do not leave fact_ids empty. Do not invent fact IDs. "
-                "Do not put fact IDs, HTML comments, or metadata markers inside "
-                "answer_blocks. "
-                "Keep the writing polished, conversational, and "
-                "cohesive rather than fragmented. Do not expose fact_bank field names, "
-                "context packet language, provider names, source plumbing, app internals, "
-                "or implementation terms in user-facing prose. If context facts are "
-                "available, describe them naturally as market or macro backdrop. Keep "
-                "source/provider details internal. Do not recommend, list, or hint "
-                "at next tests, next experiments, or what to try next; the "
-                "conversation's Try next surface owns those and Explain must stay "
-                "pure grounded comprehension. Do not "
-                "label any section Quick Take or Quick Breakdown; this action is the "
-                "deeper Explain result surface, not the first-glance readout. "
-                "invent causes, trades, prices, support, missing metrics, unsupported "
-                "strategy mechanics, predictions, investment advice, advisory language, "
-                "profitable-trade claims, or custom benchmark support. Avoid phrases like "
-                "'investment decision-making', 'profitable trades', 'should buy', "
-                "'should sell', and 'alternative benchmarks'. For no-trade runs, say "
-                "the strategy stayed in cash because the entry condition did not trigger; "
-                "do not imply the market stood still or that trades were missed. If "
-                "context_packet_facts are present, treat them as possible backdrop only "
-                "and include context_packet_limitations; do not claim causality unless "
-                "the supplied fact directly supports it. Cover "
-                "what was tested, what drove the observed result, benchmark comparison, "
-                "risk or drawdown, assumptions, and caveats. "
-                "Keep the breakdown clearly deeper than the Quick Take: setup, drivers, "
-                "and risk/assumptions should each have their own job."
+                "Explain this historical backtest for a normal person. "
+                f"{response_language_instruction(language)} "
+                f"{READOUT_RUN_GROUNDING_INSTRUCTIONS} "
+                "Use the supplied headline label as fact_key. "
+                f"{BREAKDOWN_SOURCE_INSTRUCTIONS}"
             ),
         },
         {
             "role": "user",
-            "content": json.dumps(
-                {
-                    "fact_bank": fact_bank,
-                    "required_fact_ids": sorted(required_fact_ids),
-                    "product_language": resolved_language,
-                },
-                default=str,
+            "content": (
+                "What happened to these assets over the tested window and why? "
+                "Search for sources. Explain what holding through it was like and "
+                "how this test compared with the benchmark.\n\n"
+                + (f"Strategy: {title}\n" if title else "")
+                + "\n".join(
+                    headline_request_lines(
+                        headline_readout_facts(facts), language=language
+                    )
+                )
             ),
         },
     ]
 
 
-def result_breakdown_fact_bank(
-    context: dict[str, Any],
-    *,
-    language: str = "en",
-) -> dict[str, str]:
-    resolved_language = _response_language(language or context.get("language"))
-    fact_bank: dict[str, str] = {}
-    title = str(context.get("title") or "").strip()
-    if title:
-        fact_bank["title"] = title
-
-    symbols = context.get("symbols")
-    symbols_text = (
-        ", ".join(str(symbol).strip() for symbol in symbols if str(symbol).strip())
-        if isinstance(symbols, list)
-        else ""
-    )
-    if symbols_text:
-        fact_bank["symbols"] = symbols_text
-
-    date_range = _format_result_breakdown_date_range(context.get("date_range"))
-    if date_range:
-        fact_bank["date_range"] = date_range
-
-    rule_summary = _stored_rule_summary(context)
-    if rule_summary:
-        fact_bank["rule_summary"] = rule_summary
-
-    run_note = _stored_execution_note(context)
-    if run_note:
-        fact_bank["execution_note"] = run_note
-
-    benchmark = str(context.get("benchmark_symbol") or "").strip()
-    if benchmark:
-        fact_bank["benchmark_symbol"] = benchmark
-
-    total_return = _result_breakdown_metric(
-        context,
-        "total_return_pct",
-        row_keys=("total_return_pct", "total_return"),
-    )
-    if total_return is not None:
-        fact_bank["total_return"] = _format_result_breakdown_percent(total_return)
-
-    benchmark_return = _result_breakdown_metric(
-        context,
-        "benchmark_return_pct",
-        row_keys=("benchmark_return_pct", "benchmark_return"),
-    )
-    if benchmark_return is not None:
-        fact_bank["benchmark_return"] = _format_result_breakdown_percent(benchmark_return)
-
-    delta_vs_benchmark = _result_breakdown_metric(
-        context,
-        "delta_vs_benchmark_pct",
-        row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
-    )
-    if delta_vs_benchmark is not None:
-        comparison = benchmark_comparison_from_delta(delta_vs_benchmark)
-        fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
-            comparison.magnitude_points,
-            language=resolved_language,
-        )
-        fact_bank["benchmark_comparison"] = _benchmark_comparison_phrase(
-            delta_vs_benchmark,
-            language=resolved_language,
-        )
-
-    max_drawdown = _result_breakdown_metric(
-        context,
-        "max_drawdown_pct",
-        row_keys=("max_drawdown_pct", "max_drawdown"),
-    )
-    if max_drawdown is not None:
-        fact_bank["max_drawdown"] = _format_result_breakdown_percent(max_drawdown)
-
-    starting_capital = _result_breakdown_starting_capital(context)
-    if starting_capital:
-        fact_bank["starting_capital"] = starting_capital
-
-    assumptions = context.get("assumptions")
-    assumption_text = (
-        " ".join(str(item).strip() for item in assumptions if str(item).strip())
-        if isinstance(assumptions, list)
-        else ""
-    )
-    if assumption_text:
-        fact_bank["assumptions"] = assumption_text
-
-    fact_bank.update(
-        context_packet_fact_summary(
-            _context_packets_from_context(context),
-            symbols=_context_symbols(context),
-        )
-    )
-    fact_bank["caveat"] = _breakdown_caveat()
-    return fact_bank
-
-
-def _context_packets_from_context(context: dict[str, Any]) -> list[dict[str, Any]]:
-    packets = context.get("context_packets")
-    if not isinstance(packets, list):
-        return []
-    return [packet for packet in packets if isinstance(packet, dict)]
-
-
-def _context_symbols(context: dict[str, Any]) -> list[str]:
-    symbols = context.get("symbols")
-    if isinstance(symbols, list):
-        return [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
-    config = context.get("config_snapshot")
-    if isinstance(config, dict):
-        config_symbols = config.get("symbols")
-        if isinstance(config_symbols, list):
-            return [
-                str(symbol).strip().upper()
-                for symbol in config_symbols
-                if str(symbol).strip()
-            ]
-    return []
-
-
-def _context_packet_ids_from_context(context: dict[str, Any]) -> list[str]:
-    packet_ids: list[str] = []
-    for packet in _context_packets_from_context(context):
-        packet_id = str(packet.get("id") or "").strip()
-        if packet_id and packet_id not in packet_ids:
-            packet_ids.append(packet_id)
-    return packet_ids
-
-
 def _response_language(language: object) -> str:
     return str(language or "en").strip() or "en"
-
-
-def _breakdown_caveat() -> str:
-    return (
-        "This is historical simulation evidence, not a prediction or trading "
-        "recommendation."
-    )
 
 
 def _benchmark_comparison_phrase(
@@ -418,371 +235,6 @@ def _benchmark_comparison_phrase(
         comparison.magnitude_points,
         language=language,
     )
-
-
-def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:
-    if isinstance(value, ResultBreakdownDraft):
-        return value
-    try:
-        return ResultBreakdownDraft.model_validate(value)
-    except (TypeError, ValidationError):
-        return None
-
-
-def _render_result_breakdown_draft(
-    *,
-    draft: ResultBreakdownDraft,
-    fact_bank: dict[str, str],
-    required_fact_ids: set[str],
-) -> str | None:
-    rendered_text = _render_result_breakdown_answer_body(draft)
-    if not rendered_text:
-        return None
-
-    used_fact_ids: set[str] = set()
-    for fact_id_value in draft.fact_ids:
-        fact_id = str(fact_id_value or "").strip()
-        if fact_id not in fact_bank:
-            return None
-        used_fact_ids.add(fact_id)
-
-    if not required_fact_ids.issubset(used_fact_ids):
-        return None
-
-    if not _rendered_breakdown_mentions_required_facts(
-        rendered_text=rendered_text,
-        fact_bank=fact_bank,
-        required_fact_ids=required_fact_ids,
-    ):
-        return None
-
-    if len(rendered_text.split()) > 520:
-        return None
-    if _contains_disallowed_breakdown_heading(rendered_text):
-        return None
-    if _contains_user_visible_internal_breakdown_term(rendered_text):
-        return None
-    return rendered_text
-
-
-def _render_result_breakdown_answer_body(draft: ResultBreakdownDraft) -> str | None:
-    raw_blocks = draft.answer_blocks or ([draft.answer] if draft.answer else [])
-    blocks: list[str] = []
-    comment_fact_ids: set[str] = set()
-    for raw_block in raw_blocks:
-        block, block_comment_fact_ids = _strip_result_breakdown_fact_id_comments(
-            raw_block,
-        )
-        comment_fact_ids.update(block_comment_fact_ids)
-        cleaned = _normalize_result_breakdown_body(block)
-        if cleaned:
-            blocks.append(cleaned)
-    if comment_fact_ids and not draft.fact_ids:
-        draft.fact_ids.extend(sorted(comment_fact_ids))
-    if not blocks:
-        return None
-    return "\n\n".join(blocks).strip()
-
-
-def _rendered_breakdown_mentions_required_facts(
-    *,
-    rendered_text: str,
-    fact_bank: dict[str, str],
-    required_fact_ids: set[str],
-) -> bool:
-    if "symbols" in required_fact_ids and not _mentions_all_breakdown_symbols(
-        rendered_text,
-        fact_bank.get("symbols"),
-    ):
-        return False
-    if "benchmark_symbol" in required_fact_ids and not _contains_breakdown_text(
-        rendered_text,
-        fact_bank.get("benchmark_symbol"),
-    ):
-        return False
-    if "date_range" in required_fact_ids and not _contains_breakdown_fact_value(
-        rendered_text,
-        fact_bank.get("date_range"),
-    ):
-        return False
-    return not _contains_unknown_breakdown_metric_number(
-        rendered_text=rendered_text,
-        fact_bank=fact_bank,
-    )
-
-
-def _mentions_all_breakdown_symbols(text: str, value: str | None) -> bool:
-    symbols = [
-        symbol.strip()
-        for symbol in str(value or "").replace(" and ", ",").split(",")
-        if symbol.strip()
-    ]
-    return all(_contains_breakdown_text(text, symbol) for symbol in symbols)
-
-
-def _contains_breakdown_fact_value(text: str, value: str | None) -> bool:
-    cleaned = str(value or "").strip()
-    if not cleaned:
-        return True
-    if _contains_breakdown_text(text, cleaned):
-        return True
-    numeric_tokens = _breakdown_numeric_tokens(cleaned)
-    if not numeric_tokens:
-        return False
-    text_tokens = set(_breakdown_numeric_tokens(text))
-    return all(token in text_tokens for token in numeric_tokens)
-
-
-def _contains_breakdown_text(text: str, value: str | None) -> bool:
-    cleaned = str(value or "").strip()
-    return not cleaned or cleaned.casefold() in str(text or "").casefold()
-
-
-def _contains_unknown_breakdown_metric_number(
-    *,
-    rendered_text: str,
-    fact_bank: dict[str, str],
-) -> bool:
-    allowed: set[str] = set()
-    for fact_id in (
-        "total_return",
-        "benchmark_return",
-        "benchmark_delta_magnitude",
-        "benchmark_comparison",
-        "max_drawdown",
-    ):
-        allowed.update(_breakdown_metric_numeric_tokens(fact_bank.get(fact_id)))
-    if not allowed:
-        return False
-    return any(
-        token not in allowed for token in _breakdown_metric_numeric_tokens(rendered_text)
-    )
-
-
-INTERNAL_BREAKDOWN_TERMS = (
-    "alpaca",
-    "context packet",
-    "context_packet",
-    "data packet",
-    "fact_bank",
-    "fact id",
-    "fact_id",
-    "fred",
-    "kraken",
-    "provider",
-    "route receipt",
-    "source ids",
-    "source_ids",
-)
-
-
-def _contains_user_visible_internal_breakdown_term(answer: str) -> bool:
-    normalized = str(answer or "").casefold()
-    return any(term in normalized for term in INTERNAL_BREAKDOWN_TERMS)
-
-
-def _normalize_result_breakdown_body(value: str) -> str:
-    return " ".join(str(value or "").split()).strip()
-
-
-def _breakdown_metric_numeric_tokens(value: str | None) -> list[str]:
-    text = str(value or "")
-    tokens: list[str] = []
-    for index, character in enumerate(text):
-        if not (character.isdigit() or character in "+-"):
-            continue
-        token = _breakdown_numeric_token_starting_at(text, index)
-        if token is None:
-            continue
-        raw_token, end = token
-        suffix = text[end : end + 24].casefold()
-        stripped_suffix = suffix.lstrip()
-        if not (
-            stripped_suffix.startswith("%")
-            or stripped_suffix.startswith("percentage point")
-            or stripped_suffix.startswith("pts")
-            or stripped_suffix.startswith("puntos porcentual")
-        ):
-            continue
-        normalized = _normalize_result_breakdown_number_token(raw_token)
-        if normalized is None:
-            continue
-        try:
-            metric_token = f"{abs(float(normalized)):.1f}"
-        except ValueError:
-            continue
-        if metric_token not in tokens:
-            tokens.append(metric_token)
-    return tokens
-
-
-def _breakdown_numeric_tokens(value: str | None) -> list[str]:
-    text = str(value or "")
-    tokens: list[str] = []
-    for index, character in enumerate(text):
-        if not (character.isdigit() or character in "+-"):
-            continue
-        token = _breakdown_numeric_token_starting_at(text, index)
-        if token is None:
-            continue
-        raw_token, _ = token
-        normalized = _normalize_result_breakdown_number_token(raw_token)
-        if normalized is None:
-            continue
-        try:
-            numeric_token = f"{float(normalized):.1f}"
-        except ValueError:
-            continue
-        if numeric_token not in tokens:
-            tokens.append(numeric_token)
-    return tokens
-
-
-def _breakdown_numeric_token_starting_at(
-    text: str,
-    index: int,
-) -> tuple[str, int] | None:
-    candidate = ""
-    cursor = index
-    if text[cursor] in "+-":
-        candidate += text[cursor]
-        cursor += 1
-    seen_digit = False
-    while cursor < len(text):
-        character = text[cursor]
-        if character.isdigit():
-            seen_digit = True
-            candidate += character
-            cursor += 1
-            continue
-        if character in ".,":
-            candidate += character
-            cursor += 1
-            continue
-        break
-    if not seen_digit:
-        return None
-    return candidate, cursor
-
-
-def _normalize_result_breakdown_number_token(value: str) -> str | None:
-    token = value.strip().strip(".,")
-    if not token or not any(character.isdigit() for character in token):
-        return None
-    if "." in token and "," in token:
-        decimal_separator = "." if token.rfind(".") > token.rfind(",") else ","
-        thousands_separator = "," if decimal_separator == "." else "."
-        token = token.replace(thousands_separator, "")
-        if decimal_separator == ",":
-            token = token.replace(",", ".")
-        return token
-    if "," in token:
-        return _normalize_single_result_breakdown_separator_number(
-            token,
-            separator=",",
-        )
-    if "." in token:
-        return _normalize_single_result_breakdown_separator_number(
-            token,
-            separator=".",
-        )
-    return token
-
-
-def _normalize_single_result_breakdown_separator_number(
-    value: str,
-    *,
-    separator: str,
-) -> str:
-    pieces = value.split(separator)
-    if len(pieces) > 1 and all(len(piece) == 3 for piece in pieces[1:]):
-        return "".join(pieces)
-    if separator == ",":
-        return value.replace(",", ".")
-    return value
-
-
-def _strip_result_breakdown_fact_id_comments(
-    value: str,
-) -> tuple[str, set[str]]:
-    text = str(value or "")
-    if "<!--" not in text:
-        return text, set()
-
-    fact_ids: set[str] = set()
-    pieces: list[str] = []
-    index = 0
-    while index < len(text):
-        start = text.find("<!--", index)
-        if start == -1:
-            pieces.append(text[index:])
-            break
-        end = text.find("-->", start + 4)
-        if end == -1:
-            pieces.append(text[index:])
-            break
-        pieces.append(text[index:start])
-        candidate = text[start + 4 : end].strip()
-        if candidate:
-            fact_ids.add(candidate)
-        index = end + 3
-    return "".join(pieces), fact_ids
-
-
-def _ensure_sentence(value: str) -> str:
-    cleaned = str(value or "").strip()
-    if not cleaned:
-        return ""
-    if cleaned[-1:] in {".", "!", "?"}:
-        return cleaned
-    return f"{cleaned}."
-
-
-def _required_result_breakdown_fact_ids(fact_bank: dict[str, str]) -> set[str]:
-    # Required IDs are acceptance anchors, not the full fact surface; the model
-    # still receives the complete fact bank for risk, assumptions, and next tests.
-    required: set[str] = {"caveat"}
-    for fact_id in (
-        "title",
-        "symbols",
-        "date_range",
-        "total_return",
-        "benchmark_symbol",
-    ):
-        if fact_id in fact_bank:
-            required.add(fact_id)
-    if "benchmark_return" in fact_bank:
-        required.add("benchmark_return")
-    if "benchmark_comparison" in fact_bank:
-        required.add("benchmark_comparison")
-    elif "benchmark_delta" in fact_bank:
-        required.add("benchmark_delta")
-    return required
-
-
-def _contains_disallowed_breakdown_heading(value: str) -> bool:
-    normalized = str(value or "").casefold()
-    return "quick take" in normalized or "quick breakdown" in normalized
-
-
-def _result_breakdown_starting_capital(context: dict[str, Any]) -> str:
-    config_snapshot = context.get("config_snapshot")
-    if isinstance(config_snapshot, dict):
-        raw_value = config_snapshot.get("initial_capital") or config_snapshot.get(
-            "starting_capital"
-        )
-        if isinstance(raw_value, (int, float)) and raw_value > 0:
-            return f"${raw_value:,.0f}"
-        if isinstance(raw_value, str) and raw_value.strip():
-            return raw_value.strip()
-
-    assumptions = context.get("assumptions")
-    if isinstance(assumptions, list):
-        for assumption in assumptions:
-            text = str(assumption).strip()
-            if text.lower().startswith("starting capital"):
-                return text.split(":", 1)[-1].strip().rstrip(".")
-    return ""
 
 
 def fallback_result_breakdown_message(
@@ -890,39 +342,6 @@ def _stored_execution_note(context: dict[str, Any]) -> str | None:
     return raw_note
 
 
-def _context_strategy_type(context: dict[str, Any]) -> str | None:
-    candidates: list[Any] = [context.get("strategy_type")]
-    config = context.get("config_snapshot")
-    if isinstance(config, dict):
-        candidates.extend(
-            [
-                config.get("strategy_type"),
-                config.get("template"),
-            ]
-        )
-        resolved_strategy = config.get("resolved_strategy")
-        if isinstance(resolved_strategy, dict):
-            candidates.append(resolved_strategy.get("strategy_type"))
-    for candidate in candidates:
-        if isinstance(candidate, str) and candidate.strip():
-            return candidate.strip()
-    return None
-
-
-def _context_cadence(context: dict[str, Any]) -> str | None:
-    candidates: list[Any] = []
-    config = context.get("config_snapshot")
-    if isinstance(config, dict):
-        candidates.append(config.get("cadence"))
-        resolved_parameters = config.get("resolved_parameters")
-        if isinstance(resolved_parameters, dict):
-            candidates.append(resolved_parameters.get("cadence"))
-    for candidate in candidates:
-        if isinstance(candidate, str) and candidate.strip():
-            return candidate.strip()
-    return None
-
-
 def _result_breakdown_metric(
     context: dict[str, Any],
     metric_key: str,
@@ -1001,6 +420,7 @@ def result_breakdown_message_with_metadata(
     run: BacktestRun | None,
     *,
     language: str = "en",
+    client: PerplexityAgentClient | None = None,
 ) -> ResultBreakdownMessage:
     if run is None:
         return ResultBreakdownMessage(
@@ -1014,16 +434,44 @@ def result_breakdown_message_with_metadata(
         )
     context = result_breakdown_context(run)
     context_language = _response_language(language or context.get("language"))
-    llm_text = llm_result_breakdown_message(context, language=context_language)
+    llm_text, failure_mode, usage, sources = _llm_result_breakdown_with_metadata(
+        context,
+        language=language,
+        client=client,
+    )
     if llm_text:
         return ResultBreakdownMessage(
             text=llm_text,
             source="llm_breakdown_stage",
             fallback_used=False,
+            usage=usage,
+            sources=sources,
         )
     return ResultBreakdownMessage(
         text=fallback_result_breakdown_message(context, language=context_language),
         source="deterministic_fallback",
         fallback_used=True,
-        failure_mode="llm_unavailable_or_contract_rejected",
+        failure_mode=failure_mode or "llm_unavailable_or_contract_rejected",
+        usage=usage,
+        sources=sources,
     )
+
+
+def result_breakdown_action(
+    run: BacktestRun | None,
+    *,
+    language: str,
+    user_id: str,
+    conversation_id: str,
+    request_id: str,
+) -> ResultBreakdownMessage:
+    """Keep received spend attached to the provider work, even after disconnect."""
+    result = result_breakdown_message_with_metadata(run, language=language)
+    record_result_breakdown_spend(
+        usage=result.usage,
+        failure_mode=result.failure_mode,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id=request_id,
+    )
+    return result

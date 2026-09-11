@@ -5,7 +5,10 @@ description = "Argus - Pattern Analysis & Backtesting Engine"
 authors = ["Admin <admin@example.com>"]
 # Active Argus package source lives under src/argus.
 package-mode = true
-packages = [{include = "argus", from = "src"}]
+packages = [
+    {include = "argus", from = "src"},
+    {include = "argus_display_contract", from = "web"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -44,6 +47,7 @@ langgraph-checkpoint-postgres = "^3.0.5"
 psycopg = {extras = ["binary", "pool"], version = "^3.3.4"}
 babel = "^2.17.0"
 mem0ai = "^2.0.17"
+number-parser = "0.3.2"
 
 [build-system]
 requires = ["poetry-core"]

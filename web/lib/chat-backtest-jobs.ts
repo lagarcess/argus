@@ -1,3 +1,4 @@
+import { resultReadoutContentFromMetadata } from "./result-readout-content";
 import {
   resultCardFromRun,
   type ApiMessage,
@@ -63,6 +64,7 @@ export function backtestJobMessage({
     id,
     role: "ai",
     kind: "backtest_job",
+    contentPresentation: metadata.artifact_presentation_kind === "breakdown" ? "result_breakdown" : undefined,
     content,
     backtestJob: job,
     artifactId: job.id,
@@ -199,7 +201,7 @@ export function applyBacktestJobUpdate(
         return resultMessageFromRun(
           message,
           response.run,
-          response.result_readout,
+          response,
           nextExperimentRowsFromMetadata({
             next_experiments: response.next_experiments,
           }),
@@ -232,7 +234,7 @@ export function applyHydratedBacktestJobTruth(messages: Message[]): Message[] {
 function resultMessageFromRun(
   message: Message,
   run: BacktestRun,
-  resultReadout: string | null | undefined,
+  response: BacktestJobResponse,
   nextExperiments?: NextExperimentRow[] | null,
 ): Message {
   const baseCard = resultCardFromRun(run);
@@ -240,10 +242,11 @@ function resultMessageFromRun(
   return {
     ...message,
     kind: "strategy_result",
-    content: normalizedReadout(resultReadout) ?? "",
+    content: "",
     backtestJob: undefined,
     result: {
       ...baseCard,
+      readoutContent: resultReadoutContentFromMetadata(response, baseCard.readoutContent),
       actions,
     },
     actions,
@@ -252,14 +255,6 @@ function resultMessageFromRun(
     artifactType: "backtest_run",
     artifactStatus: run.status,
   };
-}
-
-function normalizedReadout(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const normalized = value.trim();
-  return normalized || null;
 }
 
 function settleConfirmationLabelsForJob(

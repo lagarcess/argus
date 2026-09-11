@@ -348,6 +348,20 @@ def run_backtest_job(
             )
         timings.record_elapsed("result_readout_total", phase_started)
 
+        from argus.domain.result_readout_content import readout_metadata
+
+        result_card = {
+            **result_card,
+            **readout_metadata(
+                surface="quick_take",
+                text=result_readout.text,
+                language=str(request.get("language") or "en"),
+                source=result_readout.source,
+                fallback_used=result_readout.fallback_used,
+                failure_mode=result_readout.failure_mode,
+            ),
+        }
+
         from argus.domain.backtest_run_builder import build_backtest_run_from_result
 
         binding = _request_tool_binding(running)

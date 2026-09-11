@@ -3980,6 +3980,21 @@ llvmlite = "==0.46.*"
 numpy = ">=1.22,<2.4"
 
 [[package]]
+name = "number-parser"
+version = "0.3.2"
+description = "parse numbers written in natural language"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "number-parser-0.3.2.tar.gz", hash = "sha256:7650e91afd46dec2f40396f62c2babc84645679a1ca8ecdb5292bdd252685d6a"},
+    {file = "number_parser-0.3.2-py2.py3-none-any.whl", hash = "sha256:beb20ce4c66d8e8f34dde1512a21f7c2a2aa3b068c60e230c4388d548ef3e3ca"},
+]
+
+[package.dependencies]
+attrs = ">=17.3.0"
+
+[[package]]
 name = "numpy"
 version = "2.0.2"
 description = "Fundamental package for array computing in Python"
@@ -8408,4 +8423,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "7f7e8f70a47dffeef79f1d6252a36f3e552590b779f9eb4497fee34f84568a61"
+content-hash = "9430e5a2cc8606dd5b217799ce26b93d12007b3d0bafc01fafe931ca5741d3a3"

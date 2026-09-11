@@ -19,6 +19,7 @@ import {
   decisionComputationFromMetadata,
   decisionStateFromValue,
 } from "@/lib/decision-contract";
+import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import {
@@ -27,11 +28,13 @@ import {
 } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
+  backtestJobCardAwaitsPolling,
   backtestJobMessageFromApi,
   RESEARCH_JOB_SCOPE,
   toolJobsFromMetadata,
 } from "@/lib/chat-backtest-jobs";
 import { retestReceiptFromMetadata } from "@/lib/chat-retest";
+import { projectPendingBreakdowns } from "@/lib/pending-result-breakdown";
 import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
 import {
   hydrateTextMessageFromApi,
@@ -215,6 +218,16 @@ export type MessageStreamPresentation = {
   isWorkingMessage: boolean;
 };
 
+export function standaloneStreamStatusVisible(
+  messages: Message[],
+  hasVisibleStreamStatus: boolean,
+): boolean {
+  const latestAssistant = messages.findLast((message) => message.role === "ai");
+  // The Breakdown frame already owns its pending copy.
+  return hasVisibleStreamStatus && !latestAssistant?.content?.trim() &&
+    latestAssistant?.contentPresentation !== "result_breakdown";
+}
+
 export function messageStreamPresentation(
   messages: Message[],
   message: Message,
@@ -224,18 +237,23 @@ export function messageStreamPresentation(
 ): MessageStreamPresentation {
   const latestAiIndex = messages.findLastIndex((m) => m.role === "ai");
   const isLatestAi = message.role === "ai" && latestAiIndex === index;
+  if (message.contentPresentation === "result_breakdown" && message.backtestJob) {
+    return { isLatestAi, isWorkingMessage: backtestJobCardAwaitsPolling(message) };
+  }
   return {
     isLatestAi,
     isWorkingMessage:
-      isLatestAi &&
+      (isLatestAi || Boolean(message.pendingBreakdown)) &&
       message.kind === "text" &&
       !message.toolResultCards?.length && !message.toolJobs?.length && !message.hasUnavailableToolResults &&
       message.contentPresentation !== "result_readout" &&
-      message.contentPresentation !== "result_breakdown" &&
       message.recoveryDisplay?.kind !== "artifact_assumptions" &&
       (isStreamingResponse ||
         hasVisibleStreamStatus ||
-        (message.content ?? "") === ""),
+        Boolean(message.pendingBreakdown) ||
+        // A finished Breakdown may have empty content: its readout envelope
+        // or typed facts own the display, so only live status means working.
+        (message.contentPresentation !== "result_breakdown" && (message.content ?? "") === "")),
   };
 }
 
@@ -307,6 +325,7 @@ export function hydrateMessagesFromApi(
       const toolResultCards = message.role !== "user" ? toolCardsFromMetadata(metadata) : undefined;
       const hasUnavailableToolResults = message.role !== "user" && hasUnavailableToolCards(metadata);
       const toolJobs = message.role !== "user" ? toolJobsFromMetadata(metadata) : undefined;
+      const isBreakdown = message.role !== "user" && (metadata.artifact_presentation_kind === "breakdown" || isBreakdownActionMetadata(metadata));
       const chatAction = metadata.chat_action as ChatActionOption | undefined;
       const confirmation = pendingArtifactCardFromPayload(metadata.confirmation_card);
       const projectedJob =
@@ -327,7 +346,7 @@ export function hydrateMessagesFromApi(
       }
       if (
         message.role !== "user" &&
-        !isBreakdownActionMetadata(metadata) &&
+        !isBreakdown &&
         isHydratableResultCard(metadata.result_card)
       ) {
         const runId = String(
@@ -369,6 +388,7 @@ export function hydrateMessagesFromApi(
           content: undefined,
           result: {
             ...card,
+            readoutContent: resultReadoutContentFromMetadata(metadata, card.readoutContent),
             symbols: context.symbols,
             template: context.template ?? undefined,
             assetClass: context.assetClass,
@@ -393,6 +413,7 @@ export function hydrateMessagesFromApi(
           contentPresentation: "result_readout",
           toolResultCards, hasUnavailableToolResults, toolJobs,
           resultReadoutFacts: resultReadoutFacts(metadata.result_fact_bank),
+          resultReadoutContent: resultReadoutContentFromMetadata(metadata),
         };
       }
       const jobMessage = backtestJobMessageFromApi(message);
@@ -428,15 +449,18 @@ export function hydrateMessagesFromApi(
           retryRequestMessageForAssistant(items, message) ??
           precedingUserMessageForRetryableRecovery(items, message),
         contentPresentation:
-          message.role !== "user" && isBreakdownActionMetadata(metadata)
+          isBreakdown
             ? "result_breakdown"
             : undefined,
       }), toolJobs };
-      if (message.role !== "user" && isBreakdownActionMetadata(metadata)) {
+      if (isBreakdown) {
         return {
           ...hydratedText,
           content: undefined,
-          recoveryDisplay: {
+          resultBreakdownJobId: stringOrNull(metadata.backtest_job_id) ?? undefined,
+          researchSources: researchSourcesFromMetadata(metadata),
+          researchDegradedCode: researchDegradedCodeFromMetadata(metadata),
+          recoveryDisplay: hydratedText.recoveryDisplay?.kind === "result_breakdown" ? hydratedText.recoveryDisplay : {
             kind: "result_breakdown" as const,
             facts: resultReadoutFacts(metadata.result_fact_bank),
           },
@@ -507,7 +531,9 @@ export function hydrateMessagesFromApi(
       ),
     ),
   );
-  const reconciled = reconcileToolJobMessages(normalized);
+  const completedBreakdownJobs = new Set(normalized.flatMap((message) => message.resultBreakdownJobId ? [message.resultBreakdownJobId] : []));
+  const retained = normalized.filter((message) => !message.backtestJob || !completedBreakdownJobs.has(message.backtestJob.id));
+  const reconciled = projectPendingBreakdowns(items, reconcileToolJobMessages(retained));
   return { messages: reconciled, inputActions: latestInputActions(reconciled) };
 }
 
@@ -558,6 +584,12 @@ export function applyResearchJobAnswer(
       message.kind === "backtest_job" &&
       message.backtestJob?.id === response.job.id,
   );
+  if (cardIndex !== -1 && messages[cardIndex].contentPresentation === "result_breakdown") {
+    const projected = hydrateMessagesFromApi([answer]).messages[0];
+    if (!projected) return messages;
+    return messages.flatMap((message, index) => index === cardIndex
+      ? [projected] : message.id === answer.id ? [] : [message]);
+  }
   const present = messages.some((message) => message.id === answer.id);
   const cardSettled =
     cardIndex === -1 ||
