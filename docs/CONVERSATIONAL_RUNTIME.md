@@ -338,10 +338,14 @@ The `Show breakdown` action uses that same model through the existing
 tool configuration are owned by `api/chat/breakdown.py`, not an environment key.
 Only `web_search` and `fetch_url` are allowed. There is no Breakdown OpenRouter
 task/profile/tier mapping. The `result_breakdown` message kind remains unchanged.
+Before provider dispatch, Breakdown uses the request's shared research capacity
+claim. An exhausted guest allowance or global ceiling selects the complete
+template without a provider call.
 
 Run facts alone own simulation numbers. Web evidence may add dated, cited
 historical context, including documented events around a decline. External
 figures carry separate source references and cannot become run facts. Code
+rejects web citation spans that overlap run-owned figures. It
 validates complete drafts, run references, cited external numeric occurrences,
 benchmark claims, internal-field leaks and the reported written language before
 publishing any prose. Unsupported drafts use the complete template. This boundary

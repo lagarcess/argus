@@ -133,6 +133,59 @@ def test_source_and_run_cannot_cover_same_figure(source_draft):
 
 
 @pytest.mark.parametrize(
+    "language,value,unit,quote",
+    [
+        ("en", 18.0, "percent", "18%"),
+        ("es-419", 18.0, "percent", "18%"),
+        ("en", 18.0, "count", "eighteen fills"),
+        ("es-419", 18.0, "count", "dieciocho operaciones"),
+        ("en", "2025-08-01", "date", "August 1, 2025"),
+        ("es-419", "2025-08-01", "date", "1 de agosto de 2025"),
+    ],
+)
+def test_external_citation_cannot_enclose_a_run_figure(
+    source_draft, language, value, unit, quote
+):
+    source_draft.update(
+        language=language,
+        text=f"{quote}.",
+        figures=[
+            {"fact_key": "run.fact", "value": value, "quote": quote, "occurrence": 1}
+        ],
+        source_figures=[],
+    )
+    source_draft["citations"][0]["quote"] = source_draft["text"]
+    facts = {"facts": {"run.fact": {"value": value, "unit": unit}}}
+    assert accept(source_draft, facts) == (None, "invalid_source_reference")
+
+
+def test_separate_run_and_source_claims_keep_their_owners(source_draft):
+    source_draft["text"] = "The run returned 9%. " + source_draft["text"]
+    source_draft["figures"] = [
+        {
+            "fact_key": "portfolio.total_return",
+            "value": 9.0,
+            "quote": "9%",
+            "occurrence": 1,
+        }
+    ]
+    facts = {"facts": {"portfolio.total_return": {"value": 9.0, "unit": "percent"}}}
+    text, failure = accept(source_draft, facts)
+    assert failure is None
+    assert text.startswith("The run returned 9%. Reported revenue grew 18%. [")
+
+
+def test_instrument_name_inside_citation_is_not_a_run_figure(source_draft):
+    source_draft.update(
+        text="The S&P 500 also faced pressure.", figures=[], source_figures=[]
+    )
+    source_draft["citations"][0]["quote"] = source_draft["text"]
+    text, failure = accept(source_draft, {"benchmark_symbol": "SPY"})
+    assert failure is None
+    assert text.startswith("The S&P 500 also faced pressure. [")
+
+
+@pytest.mark.parametrize(
     "text,failure",
     [
         ("DOCN lagged SPY.", "contradicting_benchmark_claim"),

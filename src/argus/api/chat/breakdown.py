@@ -20,6 +20,7 @@ from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
 )
+from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.config import ResearchConfigSpec
 from argus.domain.research.contracts import (
     ResearchSource,
@@ -166,6 +167,8 @@ def _llm_result_breakdown_with_metadata(
         active_client = client if client is not None else _client()
         if active_client is None:
             return None, "llm_unavailable_or_contract_rejected", None, ()
+        if not claim_current_research_attempt().available:
+            return None, "research_capacity_exhausted", None, ()
         response = active_client.run_structured(
             messages[1]["content"],
             result_breakdown_spec(resolved_language),

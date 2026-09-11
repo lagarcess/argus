@@ -157,6 +157,7 @@ def accepted_breakdown_text(
         facts=facts,
         language=language,
         source_references=tuple(source_references),
+        source_citation_spans=tuple(span for span, _, _ in citations),
     )
     if failure:
         return None, failure

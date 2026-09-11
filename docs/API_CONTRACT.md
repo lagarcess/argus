@@ -1183,7 +1183,10 @@ set to `openai/gpt-5.6-luna` and no search. Breakdown uses a readout-owned Luna
 constant through the existing Perplexity Agent client with only `web_search`
 and `fetch_url`. Its public message kind stays `result_breakdown`; it is no
 longer an OpenRouter task. The chat and context environment keys retain their
-other task owners.
+other task owners. Before dispatch, Breakdown claims capacity through the same
+request-scoped research admission owner as research answers. Guest allowance or
+global capacity refusal makes no provider call and selects the complete template
+with `result_readout_failure_mode = research_capacity_exhausted`.
 
 Breakdown's internal structured draft additionally contains `source_figures`
 and `citations`. Each external figure records its value, unit, optional currency,
@@ -1194,6 +1197,8 @@ describes the cited event or measurement, not automatically the page's publicati
 date. External claims without supported dates should be omitted. Code requires
 the numeric occurrence to lie inside its cited claim, verifies the visible
 value/unit, and enforces non-overlapping coverage across run and source figures.
+An external citation cannot overlap a run-owned numeric occurrence, including a
+date or spelled-out count; only source-owned figures may sit inside that citation.
 Unknown sources, missing dates and uncited figures reject the entire draft.
 Source figures never enter the run fact sheet or resolve a run fact key.
 

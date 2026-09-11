@@ -351,15 +351,17 @@ def validate_figure_references(
     facts: dict[str, Any],
     language: str,
     source_references: tuple[tuple[dict[str, Any], dict[str, Any]], ...] = (),
+    source_citation_spans: tuple[tuple[int, int], ...] = (),
 ) -> str | None:
     """Check canonical keys/values and complete coverage before text normalization."""
     locale = "es" if language == "es-419" else "en"
     visible = _visible_figures(text, locale, facts)
     covered: set[int] = set()
     occupied: list[tuple[int, int]] = []
+    cited_run_figure = False
     # A web citation may authorize its own figure, never a lookup in run facts.
     resolved = [(ref, resolve_readout_fact(facts, ref["fact_key"])) for ref in references]
-    for reference, row in [*resolved, *source_references]:
+    for reference_index, (reference, row) in enumerate([*resolved, *source_references]):
         if not row or row.get("unit") in {"unknown", "text", "boolean"}:
             return "invalid_figure_reference"
         value = row.get("value")
@@ -385,6 +387,13 @@ def validate_figure_references(
         index, span = attached[0]
         if index in covered or not _matches_row(text, span, row, locale):
             return "invalid_figure_reference"
+        if reference_index < len(resolved):
+            cited_run_figure |= any(
+                start < span.end and span.start < end
+                for start, end in source_citation_spans
+            )
         occupied.append(quote.span())
         covered.add(index)
-    return "unreferenced_figure" if len(covered) != len(visible) else None
+    if len(covered) != len(visible):
+        return "unreferenced_figure"
+    return "invalid_source_reference" if cited_run_figure else None

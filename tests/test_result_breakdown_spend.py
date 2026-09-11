@@ -5,8 +5,80 @@ from types import SimpleNamespace
 import pytest
 from argus.api import state as api_state
 from argus.api.chat import breakdown, research_evidence
+from argus.domain.research.admission import (
+    ResearchAttemptAdmission,
+    research_attempt_admission_context,
+)
 from argus.domain.research.contracts import ResearchUnavailableError, ResearchUsage
 from argus.domain.research.perplexity_agent import StructuredAgentResult
+
+from tests.test_backtest_message_projection import _completed_run
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("configured", [True, False])
+@pytest.mark.parametrize("capacity", ["available", "guest_exhausted", "global_exhausted"])
+async def test_breakdown_claims_shared_capacity_before_provider_work(
+    monkeypatch, configured, capacity
+):
+    events = []
+
+    def claim():
+        events.append("claim")
+        return ResearchAttemptAdmission(
+            available=capacity == "available",
+            guest_exhausted=capacity == "guest_exhausted",
+        )
+
+    class Client:
+        def run_structured(self, *args, **kwargs):
+            events.append("provider")
+            return StructuredAgentResult(
+                draft={
+                    "text": "The uneven path mattered to the holder.",
+                    "language": "en",
+                    "figures": [],
+                    "source_figures": [],
+                    "citations": [],
+                },
+                usage=ResearchUsage(model=breakdown.RESULT_BREAKDOWN_MODEL),
+                sources=(),
+                tool_results=(),
+                provider_response_id=None,
+            )
+
+    monkeypatch.setattr(breakdown, "_client", lambda: Client() if configured else None)
+    ledger = []
+    monkeypatch.setattr(
+        api_state,
+        "supabase_gateway",
+        SimpleNamespace(create_cost_ledger_entry=lambda *, entry: ledger.append(entry)),
+    )
+    run = _completed_run()
+    with research_attempt_admission_context(claim):
+        result = await asyncio.to_thread(
+            breakdown.result_breakdown_action,
+            run,
+            language="en",
+            user_id="owner",
+            conversation_id=run.conversation_id,
+            request_id="request",
+        )
+    admitted = configured and capacity == "available"
+    assert events == (
+        ["claim", "provider"] if admitted else ["claim"] if configured else []
+    )
+    assert len(ledger) == int(admitted)
+    assert result.fallback_used is not admitted
+    if not admitted:
+        assert result.text == breakdown.fallback_result_breakdown_message(
+            breakdown.result_breakdown_context(run), language="en"
+        )
+        assert result.failure_mode == (
+            "research_capacity_exhausted"
+            if configured
+            else "llm_unavailable_or_contract_rejected"
+        )
 
 
 @pytest.mark.parametrize("outcome", ["accepted", "language_mismatch", "invalid_response"])

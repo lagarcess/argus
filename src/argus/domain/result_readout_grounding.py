@@ -185,6 +185,7 @@ def accepted_readout_text(
     facts: dict[str, Any],
     language: str,
     source_references: tuple[tuple[dict[str, Any], dict[str, Any]], ...] = (),
+    source_citation_spans: tuple[tuple[int, int], ...] = (),
 ) -> tuple[str | None, str | None]:
     """Accept all of the draft or none; punctuation normalization is lossless."""
     try:
@@ -207,6 +208,7 @@ def accepted_readout_text(
             facts=facts,
             language=response.language,
             source_references=source_references,
+            source_citation_spans=source_citation_spans,
         )
     except (ValueError, OverflowError):
         # Malformed numbers/dates are rejected identically by both composers.
