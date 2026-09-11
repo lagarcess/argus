@@ -98,25 +98,6 @@ _ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = Contex
 _TIER_PRIMARY_ENV = TIER_PRIMARY_ENV
 _TIER_FALLBACK_ENV = TIER_FALLBACK_ENV
 
-_TIER_CANDIDATE_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
-    "utility": (
-        "ARGUS_UTILITY_MODEL",
-        "ARGUS_UTILITY_FALLBACK_MODEL",
-    ),
-    "chat": (
-        "ARGUS_CHAT_MODEL",
-        "ARGUS_CHAT_FALLBACK_MODEL",
-    ),
-    "structured": (
-        "ARGUS_STRUCTURED_MODEL",
-        "ARGUS_STRUCTURED_FALLBACK_MODEL",
-    ),
-    "context": (
-        "ARGUS_CONTEXT_MODEL",
-        "ARGUS_CONTEXT_FALLBACK_MODEL",
-    ),
-}
-
 _VALID_REASONING_EFFORTS = frozenset(("xhigh", "high", "medium", "low", "minimal", "none"))
 _REASONING_EFFORT_ENV_BY_TASK: dict[OpenRouterTask, str] = {
     "interpretation": "ARGUS_STRUCTURED_REASONING_EFFORT",
@@ -157,7 +138,10 @@ def openrouter_model_candidates(
         return [model_name]
     tier = openrouter_model_tier_for_task(task)
     return _unique_nonempty(
-        [_env_model_value(name) for name in _TIER_CANDIDATE_ENV[tier]]
+        [
+            _env_model_value(name)
+            for name in (*_TIER_PRIMARY_ENV[tier], *_TIER_FALLBACK_ENV[tier])
+        ]
     )
 
 
@@ -304,7 +288,9 @@ def record_openrouter_route_receipt(
         context_packet_ids=_normalized_context_packet_ids(context_packet_ids),
         repair_effect=current_tool_call_receipt_scope(),
         fallback_used=bool(
-            fallback_model and resolved_model == fallback_model and resolved_model != ""
+            fallback_model
+            and resolved_model == fallback_model
+            and resolved_model != resolve_openrouter_model(task=task)
         ),
         created_at=datetime.now(timezone.utc).isoformat(),
     )
@@ -851,6 +837,10 @@ def _json_schema_payload(
     schema_name: str,
     profile: OpenRouterProfile,
 ) -> dict[str, object]:
+    sampling_parameters = (
+        {} if openrouter_model_tier_for_task(profile.task) == "readout"
+        else {"temperature": profile.temperature}
+    )
     if model.startswith("anthropic/"):
         # Anthropic strict structured outputs reject core shapes of our
         # schemas (numeric bounds, any-typed values, open objects such as
@@ -867,7 +857,7 @@ def _json_schema_payload(
         payload: dict[str, object] = {
             "model": model,
             "messages": _messages_with_stable_prefix_prompt_cache([schema_message, *messages], model=model, task=profile.task),
-            "temperature": profile.temperature,
+            **sampling_parameters,
             "max_tokens": profile.max_tokens,
         }
         _apply_reasoning_for_structured_artifact(payload, profile)
@@ -884,7 +874,7 @@ def _json_schema_payload(
             },
         },
         "provider": {"require_parameters": True},
-        "temperature": profile.temperature,
+        **sampling_parameters,
         "max_tokens": profile.max_tokens,
     }
     _apply_reasoning_for_structured_artifact(payload, profile)

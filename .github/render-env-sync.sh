@@ -67,6 +67,8 @@ Additional local env for workflow-proof:
   ARGUS_STRUCTURED_FALLBACK_MODEL
   ARGUS_CONTEXT_MODEL
   ARGUS_CONTEXT_FALLBACK_MODEL
+  ARGUS_READOUT_MODEL
+  ARGUS_READOUT_FALLBACK_MODEL
 USAGE
 }
 
@@ -892,6 +894,8 @@ sync_workflow_proof() {
   require_local_env ARGUS_STRUCTURED_FALLBACK_MODEL
   require_local_env ARGUS_CONTEXT_MODEL
   require_local_env ARGUS_CONTEXT_FALLBACK_MODEL
+  require_local_env ARGUS_READOUT_MODEL
+  require_local_env ARGUS_READOUT_FALLBACK_MODEL
   local workflow_database_url="${ARGUS_WORKFLOW_DATABASE_URL:-${SUPABASE_POSTGRES_TRANSACTION_POOLER_URL:-}}"
   if [ -z "$workflow_database_url" ] || [[ "$workflow_database_url" == YOUR_* ]] || [[ "$workflow_database_url" == your_* ]]; then
     echo "ARGUS_WORKFLOW_DATABASE_URL or SUPABASE_POSTGRES_TRANSACTION_POOLER_URL is required."

@@ -136,6 +136,10 @@ services:
         value: openai/gpt-oss-120b
       - key: ARGUS_CONTEXT_FALLBACK_MODEL
         value: deepseek/deepseek-v4-flash
+      - key: ARGUS_READOUT_MODEL
+        value: openai/gpt-5.6-luna
+      - key: ARGUS_READOUT_FALLBACK_MODEL
+        value: openai/gpt-5.6-luna
       - key: ALPACA_API_KEY
         sync: false
       - key: ALPACA_SECRET_KEY

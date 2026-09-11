@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next";
+import type { Message } from "@/components/chat/types";
+import { resultReadoutText } from "./result-readout-content";
 import { contributionPhrase } from "./contribution-period-display";
 import { compactDateRangeDisplay } from "./date-range-display";
 import { formatCurrency } from "./result-card-display";
@@ -11,7 +13,9 @@ function figure(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
 }
 
-export function resultQuickTakeText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string {
+export function resultQuickTakeText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string, readoutContent?: unknown): string {
+  const modelText = resultReadoutText(readoutContent, "quick_take", locale);
+  if (modelText !== null) return modelText;
   if (!facts || facts.totalReturnPct === undefined) return t("chat.result_readout.unavailable");
   const strategy = strategyDisplayLabel(facts.strategyType, t) ?? t("chat.result_readout.strategy");
   const period = compactDateRangeDisplay(facts.dateRange, locale);
@@ -33,7 +37,9 @@ export function resultQuickTakeText(facts: ResultReadoutFacts | null | undefined
   return lines.join(" ");
 }
 
-export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string {
+export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string, readoutContent?: unknown): string {
+  const modelText = resultReadoutText(readoutContent, "breakdown", locale);
+  if (modelText !== null) return modelText;
   const readout = resultQuickTakeText(facts, t, locale);
   if (!facts) return readout;
   const details = resultReadoutPlanDetails(facts, t, locale);
@@ -69,4 +75,20 @@ export function resultReadoutRuleDetails(facts: ResultReadoutFacts | null | unde
   if (indicator?.entryThreshold !== undefined) rules.push({ label: t("chat.result_card.details.entry_rule"), value: t("chat.result_readout.rsi_entry", { threshold: figure(indicator.entryThreshold, locale), period: indicator.period ?? t("chat.result_readout.parameter_unavailable") }) });
   if (indicator?.exitThreshold !== undefined) rules.push({ label: t("chat.result_card.details.exit_rule"), value: t("chat.result_readout.rsi_exit", { threshold: figure(indicator.exitThreshold, locale), period: indicator.period ?? t("chat.result_readout.parameter_unavailable") }) });
   return rules;
+}
+
+/** Visible frame text is also the source for its clipboard representation. */
+export function resultMessageReadoutText(message: Message, t: TFunction, locale: string): string | null {
+  if (message.role === "user") return null;
+  if (message.kind === "strategy_result") {
+    return resultQuickTakeText(message.result?.readoutFacts, t, locale, message.result?.readoutContent);
+  }
+  if (message.contentPresentation === "result_readout") {
+    return resultQuickTakeText(message.resultReadoutFacts, t, locale, message.resultReadoutContent);
+  }
+  if (message.contentPresentation === "result_breakdown" || message.recoveryDisplay?.kind === "result_breakdown") {
+    const facts = message.recoveryDisplay?.kind === "result_breakdown" ? message.recoveryDisplay.facts : message.resultReadoutFacts;
+    return resultBreakdownText(facts, t, locale, message.resultReadoutContent);
+  }
+  return null;
 }

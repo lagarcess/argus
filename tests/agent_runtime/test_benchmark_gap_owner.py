@@ -8,14 +8,16 @@ deterministic readout, and the Try next reason said 46.3 on one screen.
 
 from __future__ import annotations
 
+import json
+
 import pytest
-from argus.agent_runtime.stages.explain import (
-    _quick_take_fact_bank,
-    _quick_take_relative_truth,
-    explain_stage,
-)
+from argus.agent_runtime.stages import explain as explain_module
+from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.state.models import ResponseProfile, RunState
 from argus.domain.backtesting.cards import build_result_card
+from argus.domain.display_figure import display_figure
+
+from tests.result_readout_fixtures import readout_draft
 
 # The issue's own shape: 53.44 - 7.1 = 46.34 prints 46.3, the engine gap
 # 46.35 prints 46.4.
@@ -81,19 +83,41 @@ def _completed_state(explanation_context: dict[str, object]) -> RunState:
     return state
 
 
-def test_quick_take_facts_quote_the_card_gap_not_a_subtraction() -> None:
-    facts = _quick_take_fact_bank(
-        context={},
-        result_payload={},
-        explanation_context=_explanation_context(),
-        language="en",
-    )
+async def _composer_facts(monkeypatch, state: RunState) -> dict[str, object]:
+    captured: dict[str, object] = {}
+    text = "The ride was uneven."
+
+    async def draft(**kwargs):
+        captured.update(json.loads(kwargs["messages"][1]["content"])["run_facts"])
+        return readout_draft(text)
+
+    monkeypatch.setattr(explain_module, "invoke_openrouter_json_schema", draft)
+    result = await explain_module.explain_stage_async(state=state)
+    assert result.patch["assistant_response"] == text
+    assert result.patch["assistant_response_fallback_used"] is False
+    return captured
+
+
+@pytest.mark.asyncio
+async def test_quick_take_facts_quote_the_card_gap_not_a_subtraction(monkeypatch) -> None:
+    facts = await _composer_facts(monkeypatch, _completed_state(_explanation_context()))
 
     assert _card_comparison() == "Beat by 46.4 percentage points"
-    assert facts["benchmark_comparison"] == _card_comparison()
-    assert facts["benchmark_delta_magnitude"] == "46.4 percentage points"
-    assert facts["total_return"] == "+53.4%"
-    assert facts["benchmark_return"] == "+7.1%"
+    assert {
+        key: facts["facts"][key]["value"]
+        for key in (
+            "portfolio.benchmark_gap",
+            "portfolio.total_return",
+            "portfolio.benchmark_return",
+        )
+    } == {
+        "portfolio.benchmark_gap": display_figure(ENGINE_DELTA_PCT),
+        "portfolio.total_return": display_figure(TOTAL_RETURN_PCT),
+        "portfolio.benchmark_return": display_figure(BENCHMARK_RETURN_PCT),
+    }
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] != pytest.approx(
+        display_figure(TOTAL_RETURN_PCT - BENCHMARK_RETURN_PCT)
+    )
 
 
 def test_deterministic_readout_and_try_next_reason_quote_the_engine_gap() -> None:
@@ -112,33 +136,32 @@ def test_deterministic_readout_and_try_next_reason_quote_the_engine_gap() -> Non
     ("delta", "claim"),
     [(0.06, "beat_benchmark"), (-0.06, "lagged_benchmark"), (0.02, "matched_benchmark")],
 )
-def test_relative_truth_follows_the_engine_gap_not_the_rounded_returns(
-    delta: float, claim: str
+@pytest.mark.asyncio
+async def test_relative_truth_follows_the_engine_gap_not_the_rounded_returns(
+    monkeypatch, delta: float, claim: str
 ) -> None:
     # 53.44 - 7.1 stays 46.34 whatever the engine gap says; the claim the LLM
     # draft is held to must come from the gap itself.
     context = _explanation_context(delta)
-    assert (
-        _quick_take_relative_truth(result_payload={}, explanation_context=context)
-        == claim
-    )
+    facts = await _composer_facts(monkeypatch, _completed_state(context))
+    assert facts["benchmark_comparison_claim"] == claim
 
 
-def test_an_engine_block_without_its_gap_makes_no_comparison_claim() -> None:
+@pytest.mark.asyncio
+async def test_an_engine_block_without_its_gap_makes_no_comparison_claim(
+    monkeypatch,
+) -> None:
     context = _explanation_context()
     del context["metrics"]["aggregate"]["performance"]["delta_vs_benchmark_pct"]
 
-    facts = _quick_take_fact_bank(
-        context={}, result_payload={}, explanation_context=context, language="en"
-    )
+    facts = await _composer_facts(monkeypatch, _completed_state(context))
     result = explain_stage(state=_completed_state(context))
 
-    assert "benchmark_comparison" not in facts
-    assert "benchmark_delta_magnitude" not in facts
-    assert facts["total_return"] == "+53.4%"
-    assert _quick_take_relative_truth(result_payload={}, explanation_context=context) == (
-        "unknown"
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] is None
+    assert facts["facts"]["portfolio.total_return"]["value"] == display_figure(
+        TOTAL_RETURN_PCT
     )
+    assert facts["benchmark_comparison_claim"] == "unknown"
     readout = result.patch["assistant_response"]
     assert readout.startswith(
         "The strategy returned 53.4% while SPY returned 7.1% for the comparison window."
@@ -147,14 +170,18 @@ def test_an_engine_block_without_its_gap_makes_no_comparison_claim() -> None:
     assert all("why" not in row for row in result.patch["next_experiments"]["rows"])
 
 
-def test_legacy_fraction_payloads_still_derive_their_only_comparison() -> None:
+@pytest.mark.asyncio
+async def test_legacy_fraction_payloads_still_derive_their_only_comparison(
+    monkeypatch,
+) -> None:
     # Offline tools publish two fractions and no engine block; their
     # difference is the only comparison that shape carries.
-    facts = _quick_take_fact_bank(
-        context={},
-        result_payload={"total_return": 0.14, "benchmark_return": 0.09},
-        explanation_context={},
-        language="en",
-    )
+    state = _completed_state(_explanation_context())
+    state.final_response_payload = {
+        "result": {"total_return": 0.14, "benchmark_return": 0.09},
+        "explanation_context": {"benchmark_symbol": "SPY"},
+    }
+    facts = await _composer_facts(monkeypatch, state)
 
-    assert facts["benchmark_comparison"] == "Beat by 5.0 percentage points"
+    assert facts["facts"]["portfolio.benchmark_gap"]["value"] == pytest.approx(5)
+    assert facts["benchmark_comparison_claim"] == "beat_benchmark"

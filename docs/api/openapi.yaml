@@ -2458,6 +2458,10 @@ components:
           - type: 'null'
         result_readout:
           type: 'null'
+        result_readout_content:
+          anyOf:
+          - $ref: '#/components/schemas/ResultReadoutContent'
+          - type: 'null'
         result_readout_source:
           anyOf:
           - type: string
@@ -5508,6 +5512,32 @@ components:
           - type: 'null'
       additionalProperties: false
       type: object
+    ResultReadoutContent:
+      properties:
+        schema_version:
+          type: string
+          const: result_readout/v1
+        surface:
+          type: string
+          enum:
+          - quick_take
+          - breakdown
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+        text:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - schema_version
+      - surface
+      - language
+      - text
     RetrievedMemoryOut:
       properties:
         record:

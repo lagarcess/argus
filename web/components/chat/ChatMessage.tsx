@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import ToolResultCard from "./ToolResultCard";
-import { toolCardCopyText, type ToolRecompute } from "@/lib/tool-result-card";
+import type { ToolRecompute } from "@/lib/tool-result-card";
 import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
@@ -34,19 +34,11 @@ import {
 } from "./types";
 import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
-import {
-  confirmationCardCopyText,
-  resultCardCopyText,
-} from "@/lib/chat-card-copy-text";
-import { confirmationCardViewModel } from "@/lib/confirmation-card-view-model";
-import { resultCardViewModel } from "@/lib/result-card-view-model";
-import { resultBreakdownText, resultQuickTakeText } from "@/lib/result-readout-display";
+import { chatMessageCopyText } from "@/lib/chat-message-copy-text";
+import { resultMessageReadoutText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
-import {
-  recoveryDisplayCopyText,
-  recoveryDisplayText,
-} from "@/lib/chat-recovery-display";
+import { recoveryDisplayText } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import FailureNotice from "./FailureNotice";
@@ -186,9 +178,6 @@ export default function ChatMessage({
     };
   }, [showOptions]);
 
-  const normalizeCopyText = (text: string) =>
-    isUser ? text : normalizeAssistantDisplayText(text);
-
   const handleRating = (newRating: "positive" | "negative") => {
     if (rating === newRating) {
       setRating(null);
@@ -198,40 +187,7 @@ export default function ChatMessage({
     }
   };
 
-  const getCopyText = () => {
-    if (!isUser && message.contentPresentation === "result_readout") {
-      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
-    }
-    if (!isUser) {
-      const localizedRecovery = recoveryDisplayCopyText(message.recoveryDisplay, t, locale);
-      if (localizedRecovery) {
-        return normalizeCopyText(localizedRecovery);
-      }
-    }
-    // Copy reads the card's own view model. Deriving it from the payload
-    // again is what put backend English on a Spanish workspace (#509).
-    if (message.kind === "strategy_result" && message.result) {
-      return normalizeCopyText(
-        resultCardCopyText(
-          resultCardViewModel(message.result, { t, locale }),
-          t,
-        ),
-      );
-    }
-    if (message.kind === "strategy_confirmation" && confirmation?.kind === "backtest") {
-      return normalizeCopyText(
-        confirmationCardCopyText(
-          confirmationCardViewModel(confirmation, t, locale),
-          t,
-          locale,
-        ),
-      );
-    }
-    if (message.contentPresentation === "result_breakdown") {
-      return resultBreakdownText(null, t, locale);
-    }
-    return normalizeCopyText([message.content ?? "", ...(message.toolResultCards ?? []).map((card) => toolCardCopyText(card, t, locale))].filter(Boolean).join("\n\n"));
-  };
+  const getCopyText = () => chatMessageCopyText(message, t, locale);
 
   const handleCopy = async (text = getCopyText()) => {
     const copied = await writeClipboardText(text);
@@ -242,21 +198,17 @@ export default function ChatMessage({
   };
 
   const getDisplayContent = () => {
-    if (!isUser && message.contentPresentation === "result_readout") {
-      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
+    if (!isUser && isStreaming && message.contentPresentation === "result_breakdown") {
+      return t("chat.status.working");
     }
-    if (!isUser && message.kind === "strategy_result") {
-      return resultQuickTakeText(message.result?.readoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
-    }
+    const readout = resultMessageReadoutText(message, t, locale);
+    if (readout !== null) return readout;
     const content = message.content ?? "";
     if (!isUser && message.recoveryDisplay) {
       const recovered = recoveryDisplayText(message.recoveryDisplay, t, locale);
       if (recovered.trim()) {
         return recovered;
       }
-    }
-    if (!isUser && message.contentPresentation === "result_breakdown") {
-      return resultBreakdownText(null, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
     }
     return isUser ? content : normalizeAssistantDisplayText(content);
   };
@@ -404,7 +356,8 @@ export default function ChatMessage({
                 />
               )}
             </div>
-          ) : message.kind === "backtest_job" && message.backtestJob ? (
+          ) : message.kind === "backtest_job" && message.backtestJob &&
+            (message.contentPresentation !== "result_breakdown" || !isStreaming) ? (
             <div className="w-full max-w-[min(100%,660px)]">
               <BacktestJobCard
                 job={message.backtestJob}
@@ -456,6 +409,7 @@ export default function ChatMessage({
               ariaLabel={t("chat.result_breakdown.aria_label", "Result breakdown")}
               content={displayContent}
               label={t("chat.result_breakdown.label", "Breakdown")}
+              isWorking={Boolean(isStreaming)}
             />
           ) : !isUser && message.assistantRecoveryCode ? (
             // Infrastructure failure is visibly a failure: no result chrome,
@@ -980,13 +934,15 @@ function ResultBreakdown({
   ariaLabel,
   content,
   label,
+  isWorking,
 }: {
   ariaLabel: string;
   content: string;
   label: string;
+  isWorking: boolean;
 }) {
   return (
-    <section aria-label={ariaLabel}>
+    <section aria-label={ariaLabel} aria-busy={isWorking || undefined}>
       <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-breakdown prose dark:prose-invert max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>

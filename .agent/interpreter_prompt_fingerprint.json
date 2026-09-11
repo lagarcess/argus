@@ -1,10 +1,11 @@
 {
   "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
   "last_measured": {
-    "commit": "60e7c0ec25c7a7e84ceb402fa14db3a710cee2ae",
-    "scorecard": "docs/reports/evidence/decision-10/live-measurement.json",
-    "passed": 63,
-    "failed": 6
+    "commit": "7d7ea88bbe0b2b66119c249069fb647bd7170fa7",
+    "scorecard": "docs/reports/evidence/model-result-readouts/live-measurement.json",
+    "passed": 67,
+    "failed": 3,
+    "infrastructure_error": 1
   },
   "surface": {
     "src/argus/agent_runtime/discovery/prompt_guidance.py": {
@@ -83,14 +84,39 @@
       "sha256": "46c86259f37db7b674728bd358277bd369e96a4f399df32235e0ecd33511d92d"
     },
     "src/argus/agent_runtime/stages/explain.py": {
-      "entries": 10,
-      "chars": 1295,
-      "sha256": "7f817d3989813e4061a9e45099839fc8bc14bff4c87eeb4ee7bca774bc846260"
+      "entries": 2,
+      "chars": 517,
+      "sha256": "4f1b992ced040464f520ab178c7c2e30d4519cc8047df17b67cfb09997040393"
     },
     "src/argus/agent_runtime/stages/interpret_types.py": {
       "entries": 2,
       "chars": 713,
       "sha256": "15f28666f1e0a1b154a8706ca90ebef8e4799ae3198187b052ff8db741d18347"
+    },
+    "src/argus/api/chat/breakdown.py": {
+      "entries": 2,
+      "chars": 284,
+      "sha256": "5e0374f13476e43242d497971640227a4ccd99888fe641ef094c42fef873dea6"
+    },
+    "src/argus/domain/result_readout_fact_definitions.py": {
+      "entries": 245,
+      "chars": 4984,
+      "sha256": "81346aa05e7d62276efa5ebabb34fac6fd373f28142144b22c1274673ec0e80a"
+    },
+    "src/argus/domain/result_readout_fact_sheet.py": {
+      "entries": 462,
+      "chars": 6924,
+      "sha256": "ca5adfc0bef4b8c035da53a48b0a874f22c3b6b28ba11c14220ec7923589b6d7"
+    },
+    "src/argus/domain/result_readout_grounding.py": {
+      "entries": 7,
+      "chars": 1980,
+      "sha256": "56299ad3362770e6b0ca872a68d8132aadb09d8733588a54a3223f504d6e181a"
+    },
+    "src/argus/domain/result_readout_sources.py": {
+      "entries": 1,
+      "chars": 409,
+      "sha256": "5e0bb9699040b6a9ce3c13bfc9885a2a84235535d35b7affb3c0e361adf8e15b"
     }
   }
 }
