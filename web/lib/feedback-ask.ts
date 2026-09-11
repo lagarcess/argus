@@ -1,5 +1,6 @@
 import type { Message } from "@/components/chat/types";
 import { readStored, writeStored } from "./browser-storage";
+import { feedbackContextForMessage } from "./chat-message-feedback-context";
 import { isSettledStrategyResult } from "./chat-result-message";
 import {
   feedbackContextForSubmission,
@@ -61,16 +62,26 @@ function isLandedResult(message: Message): boolean {
   );
 }
 
-/** A result card or a succeeded calculation arrived after the latest user message. */
-export function resultLandedThisTurn(messages: readonly Message[]): boolean {
+/** The result the ask follows: the latest one after the latest user message. */
+export function landedResultThisTurn(
+  messages: readonly Message[],
+): Message | undefined {
   const latestUser = messages.findLastIndex((message) => message.role === "user");
-  return messages.slice(latestUser + 1).some(isLandedResult);
+  return messages.slice(latestUser + 1).findLast(isLandedResult);
 }
 
-/** A tap carries no conversation identifiers; those travel only by choice. */
-export function feedbackAskContext(rating: FeedbackRating) {
-  return feedbackContextForSubmission(FEEDBACK_ASK_SOURCE, {
-    includeConversationContext: false,
+/** The result's pointers, built the way message thumbs build them; never its text. */
+export function feedbackAskPointers(result: Message, conversationId: string) {
+  return feedbackContextForMessage(result, conversationId, FEEDBACK_ASK_SOURCE);
+}
+
+/** A tap saves its rating with the result's pointers, as a thumbs rating is saved. */
+export function feedbackAskContext(
+  pointers: Record<string, unknown>,
+  rating: FeedbackRating,
+) {
+  return feedbackContextForSubmission(pointers, {
+    includeConversationContext: true,
     rating,
     tags: [],
     attachmentCount: 0,

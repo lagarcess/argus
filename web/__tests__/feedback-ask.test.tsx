@@ -10,10 +10,12 @@ import { STORAGE_REGISTRY } from "../lib/browser-storage";
 import {
   FEEDBACK_ASK_ANSWERS,
   feedbackAskContext,
+  feedbackAskPointers,
   hasAskedForFeedback,
+  landedResultThisTurn,
   markAskedForFeedback,
-  resultLandedThisTurn,
 } from "../lib/feedback-ask";
+import { feedbackContextForSubmission } from "../lib/feedback-context";
 import type { ToolResultCard } from "../lib/tool-result-card";
 import en from "../public/locales/en/common.json";
 import es419 from "../public/locales/es-419/common.json";
@@ -22,6 +24,8 @@ type AskProps = ComponentProps<typeof FeedbackAsk>;
 type Language = "en" | "es-419";
 
 const STORAGE_KEY = "argus:feedback-ask:v1";
+const STRATEGY_NAME = "AAPL buy and hold";
+const READOUT = "**Quick take** AAPL ended higher over the window.";
 
 function userTurn(id: string): Message {
   return { id, role: "user", kind: "text", content: "Test buy and hold on AAPL" };
@@ -34,9 +38,9 @@ function reply(id: string, overrides: Partial<Message> = {}): Message {
 function backtestResult(id: string, overrides: Partial<Message> = {}): Message {
   return reply(id, {
     kind: "strategy_result",
-    content: "**Quick take**",
+    content: READOUT,
     result: {
-      strategyName: "AAPL buy and hold",
+      strategyName: STRATEGY_NAME,
       period: "June 1, 2025 to June 1, 2026",
       metrics: [],
       runId: `${id}-run`,
@@ -78,19 +82,24 @@ async function renderAsk(language: Language, props: Partial<AskProps> = {}) {
   );
 }
 
-const TURNS: { label: string; messages: Message[]; landed: boolean }[] = [
-  { label: "a result card", messages: [userTurn("u1"), backtestResult("r1")], landed: true },
+const TURNS: { label: string; messages: Message[]; follows: string | undefined }[] = [
+  { label: "a result card", messages: [userTurn("u1"), backtestResult("r1")], follows: "r1" },
   {
     label: "a result after its job card",
     messages: [userTurn("u1"), reply("j1", { kind: "backtest_job", content: "" }), backtestResult("r1")],
-    landed: true,
+    follows: "r1",
   },
-  { label: "a succeeded calculation", messages: [userTurn("u1"), calculation("c1", "succeeded")], landed: true },
-  { label: "a result the user moved past", messages: [userTurn("u1"), backtestResult("r1"), userTurn("u2")], landed: false },
-  { label: "a result still loading", messages: [userTurn("u1"), backtestResult("r1", { isLoadingResult: true })], landed: false },
-  { label: "a calculation that did not succeed", messages: [userTurn("u1"), calculation("c1", "invalid")], landed: false },
-  { label: "a plain answer", messages: [userTurn("u1"), reply("a1")], landed: false },
-  { label: "an empty conversation", messages: [], landed: false },
+  {
+    label: "the later of two results in one turn",
+    messages: [userTurn("u1"), backtestResult("r1"), calculation("c1", "succeeded")],
+    follows: "c1",
+  },
+  { label: "a succeeded calculation", messages: [userTurn("u1"), calculation("c1", "succeeded")], follows: "c1" },
+  { label: "a result the user moved past", messages: [userTurn("u1"), backtestResult("r1"), userTurn("u2")], follows: undefined },
+  { label: "a result still loading", messages: [userTurn("u1"), backtestResult("r1", { isLoadingResult: true })], follows: undefined },
+  { label: "a calculation that did not succeed", messages: [userTurn("u1"), calculation("c1", "invalid")], follows: undefined },
+  { label: "a plain answer", messages: [userTurn("u1"), reply("a1")], follows: undefined },
+  { label: "an empty conversation", messages: [], follows: undefined },
 ];
 
 const LOCALES: { language: Language; question: string; answers: string[]; dismiss: string }[] = [
@@ -106,24 +115,59 @@ const HIDDEN: { label: string; props: Partial<AskProps> }[] = [
 ];
 
 describe("feedback ask", () => {
-  for (const { label, messages, landed } of TURNS) {
-    test(`${landed ? "asks" : "does not ask"} after ${label}`, () => {
-      expect(resultLandedThisTurn(messages)).toBe(landed);
+  for (const { label, messages, follows } of TURNS) {
+    test(`${follows ? "asks" : "does not ask"} after ${label}`, () => {
+      expect(landedResultThisTurn(messages)?.id).toBe(follows);
     });
   }
 
-  test("a tap saves its rating with no conversation identifiers", () => {
-    expect([...FEEDBACK_ASK_ANSWERS]).toEqual(["negative", "neutral", "positive"]);
+  test("a tap saves its rating with the result's pointers and none of the conversation's text", () => {
+    const result = backtestResult("result-1");
+    const pointers = feedbackAskPointers(result, "conversation-1");
+
     for (const rating of FEEDBACK_ASK_ANSWERS) {
-      expect(feedbackAskContext(rating)).toEqual({
+      const context = feedbackAskContext(pointers, rating);
+
+      expect(context).toEqual({
         source: "feedback_ask",
         surface: "chat",
+        conversation_id: "conversation-1",
+        message_id: "result-1",
+        message_kind: "strategy_result",
+        artifact_id: "result-1-run",
+        result_run_id: "result-1-run",
         rating,
         tags: [],
         hasAttachments: false,
         attachmentCount: 0,
       });
+      const serialized = JSON.stringify(context);
+      expect(serialized).not.toContain(READOUT);
+      expect(serialized).not.toContain(STRATEGY_NAME);
     }
+    expect([...FEEDBACK_ASK_ANSWERS]).toEqual(["negative", "neutral", "positive"]);
+  });
+
+  test("the dialog attaches the result's pointers only when its checkbox is ticked", () => {
+    // What "tell us more" hands the dialog, after the chat adds the conversation id.
+    const handed = {
+      ...feedbackAskPointers(backtestResult("result-2"), "conversation-2"),
+      conversation_id: "conversation-2",
+    };
+    const detail = { tags: [], attachmentCount: 0 };
+
+    expect(
+      feedbackContextForSubmission(handed, { ...detail, includeConversationContext: false }),
+    ).toEqual({
+      source: "feedback_ask",
+      surface: "chat",
+      tags: [],
+      hasAttachments: false,
+      attachmentCount: 0,
+    });
+    expect(
+      feedbackContextForSubmission(handed, { ...detail, includeConversationContext: true }),
+    ).toMatchObject({ conversation_id: "conversation-2", message_id: "result-2" });
   });
 
   test("a closed ask stays closed for its conversation when storage is blocked", () => {

@@ -38,12 +38,24 @@ ASK_PAYLOAD = {
     "context": {
         "source": "feedback_ask",
         "surface": "chat",
+        "conversation_id": "conversation-1",
+        "message_id": "result-message-1",
+        "message_kind": "strategy_result",
         "rating": "neutral",
         "tags": [],
         "email": "person@example.com",
+        "transcript": "Test buy and hold on AAPL",
     },
 }
-SANITIZED_ASK_CONTEXT = {"source": "feedback_ask", "surface": "chat", "rating": "neutral"}
+# The ask's pointers survive; contact details and conversation text never do.
+SANITIZED_ASK_CONTEXT = {
+    "source": "feedback_ask",
+    "surface": "chat",
+    "conversation_id": "conversation-1",
+    "message_id": "result-message-1",
+    "message_kind": "strategy_result",
+    "rating": "neutral",
+}
 
 
 def _profile(email: str | None) -> User:

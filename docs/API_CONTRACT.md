@@ -5536,15 +5536,17 @@ with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,
 tokens, and arbitrary browser metadata are dropped.
 
 Guest feedback does not require an email and does not consume chat or simulation
-allowance. Conversation and artifact identifiers are attached only after the
-user explicitly opts in; raw transcript content is never attached by default.
+allowance. A one-tap rating, from message thumbs or the chat's feedback ask,
+carries the identifiers of the message it rates. Written feedback from the
+feedback dialog attaches conversation and artifact identifiers only after the
+user opts in. Raw transcript content is never attached.
 
 The chat's feedback ask sends `context.source: "feedback_ask"` with a one-tap
-`context.rating` of `positive`, `neutral`, or `negative` and no conversation or
-artifact identifiers. Its optional detail goes through the feedback dialog, which
-attaches those identifiers only if the user opts in. The detail keeps the ask's
-`source` but carries no rating, so only the tap's row holds the rating. Message
-thumbs send `positive` or `negative`.
+`context.rating` of `positive`, `neutral`, or `negative`, plus the identifiers
+message thumbs send for the result it follows, such as `conversation_id` and
+`message_id`. Its optional detail goes through the feedback dialog under the
+opt-in above. The detail keeps the ask's `source` but carries no rating, so only
+the tap's row holds the rating. Message thumbs send `positive` or `negative`.
 
 Every accepted submission, guest or registered and of any type, is emailed to
 `support@get-argus.com` after the response is sent, through the Resend SMTP

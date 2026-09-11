@@ -8,11 +8,11 @@ import type { Message } from "@/components/chat/types";
 import { postFeedback } from "@/lib/argus-api";
 import {
   FEEDBACK_ASK_ANSWERS,
-  FEEDBACK_ASK_SOURCE,
   feedbackAskContext,
+  feedbackAskPointers,
   hasAskedForFeedback,
+  landedResultThisTurn,
   markAskedForFeedback,
-  resultLandedThisTurn,
 } from "@/lib/feedback-ask";
 import type { FeedbackRating } from "@/lib/feedback-context";
 
@@ -23,7 +23,10 @@ type FeedbackAskProps = {
   answerArriving: boolean;
   /** The account's feedback capability. */
   enabled: boolean;
-  /** Opens the feedback dialog. The tap's saved row alone carries the rating. */
+  /**
+   * Opens the feedback dialog with the result's pointers, which its checkbox
+   * attaches or not. The tap's saved row alone carries the rating.
+   */
   onTellUsMore: (context: Record<string, unknown>) => void;
   onToast: (message: string, variant?: ChatToastVariant) => void;
 };
@@ -47,15 +50,17 @@ export default function FeedbackAsk({
   const tellUsMore = useRef<HTMLButtonElement>(null);
   const focusTellUsMore = useRef(false);
 
+  const landedResult = landedResultThisTurn(messages);
   const thanked = conversationId !== null && thankedIn === conversationId;
   const asking =
+    landedResult !== undefined &&
     enabled &&
     conversationId !== null &&
     !answerArriving &&
     !thanked &&
-    resultLandedThisTurn(messages) &&
     !hasAskedForFeedback(conversationId);
-  const visible = asking || (thanked && !answerArriving);
+  const visible =
+    asking || (landedResult !== undefined && thanked && !answerArriving);
 
   // Sending the next turn closes an unanswered ask too, so it asks once.
   useEffect(() => {
@@ -79,8 +84,11 @@ export default function FeedbackAsk({
     tellUsMore.current?.focus();
   }, [thanked]);
 
-  if (!visible || conversationId === null) return null;
+  if (!visible || conversationId === null || landedResult === undefined) {
+    return null;
+  }
   const askedIn = conversationId;
+  const pointers = feedbackAskPointers(landedResult, askedIn);
 
   const close = () => {
     markAskedForFeedback(askedIn);
@@ -95,7 +103,7 @@ export default function FeedbackAsk({
       await postFeedback({
         type: "general",
         message: t("feedback.rating_message_fallback", { rating }),
-        context: feedbackAskContext(rating),
+        context: feedbackAskContext(pointers, rating),
       });
       markAskedForFeedback(askedIn);
       focusTellUsMore.current = true;
@@ -128,7 +136,7 @@ export default function FeedbackAsk({
           type="button"
           onClick={() => {
             close();
-            onTellUsMore({ ...FEEDBACK_ASK_SOURCE });
+            onTellUsMore(pointers);
           }}
           className={choiceClass}
         >

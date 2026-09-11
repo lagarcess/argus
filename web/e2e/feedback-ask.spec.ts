@@ -8,9 +8,9 @@ import es419 from "../public/locales/es-419/common.json";
 
 /**
  * The feedback ask in a real browser, in both workspace languages: it asks
- * after a result, a tap saves a rating that carries no conversation
- * identifiers, "tell us more" opens the existing dialog, and closing the ask
- * holds across a reload.
+ * after a result, a tap saves a rating with the result's pointers and none of
+ * the conversation's text, "tell us more" opens the existing dialog, and
+ * closing the ask holds across a reload.
  *
  * FEEDBACK_ASK_LIVE_API=1 sends feedback to the real backend instead of a stub,
  * so the saves are the real endpoint's. FEEDBACK_ASK_EVIDENCE_DIR keeps
@@ -21,6 +21,7 @@ type Language = "en" | "es-419";
 
 const COPY = { en: en.feedback, "es-419": es419.feedback } as const;
 const CONVERSATION_ID = "feedback-ask";
+const RESULT_MESSAGE_ID = `${CONVERSATION_ID}-2`;
 const NOW = "2026-09-11T12:00:00.000Z";
 const RESULT_REGION = "Hero + Delta Evidence Card";
 
@@ -68,7 +69,7 @@ function transcript(language: Language) {
       metadata: {},
     },
     {
-      id: `${CONVERSATION_ID}-2`,
+      id: RESULT_MESSAGE_ID,
       conversation_id: CONVERSATION_ID,
       role: "assistant",
       content: "AAPL ended higher over the window.",
@@ -187,6 +188,29 @@ function feedbackPosted(page: Page) {
   );
 }
 
+/** Pointers may travel; no message of the conversation, and no card text, ever does. */
+function expectNoConversationText(body: unknown, language: Language) {
+  const serialized = JSON.stringify(body);
+  for (const message of transcript(language)) {
+    expect(serialized).not.toContain(message.content);
+  }
+  expect(serialized).not.toContain(RESULT_CARD.title);
+}
+
+async function tapGoodAndOpenDialog(page: Page, language: Language) {
+  const copy = COPY[language];
+  const ask = page.getByTestId("feedback-ask");
+  const tapSaved = feedbackPosted(page);
+  await ask
+    .getByRole("button", { name: copy.ask.answers.positive, exact: true })
+    .click();
+  const tap = await tapSaved;
+  await ask.getByRole("button", { name: copy.ask.tell_more }).click();
+  const dialog = page.getByRole("dialog", { name: copy.title });
+  await expect(dialog).toBeVisible();
+  return { tap, dialog };
+}
+
 for (const language of ["en", "es-419"] as const) {
   const copy = COPY[language];
 
@@ -214,15 +238,17 @@ for (const language of ["en", "es-419"] as const) {
     expect(tap.status()).toBe(200);
     const rated = tap.request().postDataJSON();
     expect(rated.type).toBe("general");
-    expect(rated.context).toEqual({
+    expect(rated.context).toMatchObject({
       source: "feedback_ask",
       surface: "chat",
+      conversation_id: CONVERSATION_ID,
+      message_id: RESULT_MESSAGE_ID,
       rating: "positive",
       tags: [],
       hasAttachments: false,
       attachmentCount: 0,
     });
-    expect(JSON.stringify(rated)).not.toContain(CONVERSATION_ID);
+    expectNoConversationText(rated, language);
 
     await expect(ask).toContainText(copy.ask.thanks);
     const tellUsMore = ask.getByRole("button", { name: copy.ask.tell_more });
@@ -240,7 +266,7 @@ for (const language of ["en", "es-419"] as const) {
     await expect(ask).toHaveCount(0);
     await capture(page, `${language}-3-tell-us-more-dialog`);
 
-    // The detail row keeps the ask's source, but the rating stays on the tap's row.
+    // Unticked, the detail carries the ask's source and nothing that points at the conversation.
     await dialog.getByRole("textbox").fill(
       language === "es-419"
         ? "La tarjeta del resultado fue clara."
@@ -260,6 +286,33 @@ for (const language of ["en", "es-419"] as const) {
 
     await reloadConversation(page);
     await expect(page.getByTestId("feedback-ask")).toHaveCount(0);
+  });
+
+  test(`${language}: the dialog attaches the result's pointers only when ticked`, async ({
+    page,
+  }) => {
+    await installFixture(page, language);
+    await openConversation(page);
+
+    const { dialog } = await tapGoodAndOpenDialog(page, language);
+    await dialog
+      .getByRole("checkbox", { name: copy.include_conversation_context })
+      .check();
+    await dialog.getByRole("textbox").fill(
+      language === "es-419" ? "Quiero ver más fechas." : "I want to see more dates.",
+    );
+    const detailSaved = feedbackPosted(page);
+    await dialog.getByRole("button", { name: copy.submit }).click();
+    const detail = (await detailSaved).request().postDataJSON();
+
+    expect(detail.context).toMatchObject({
+      source: "feedback_ask",
+      surface: "chat",
+      conversation_id: CONVERSATION_ID,
+      message_id: RESULT_MESSAGE_ID,
+    });
+    expect(detail.context).not.toHaveProperty("rating");
+    expectNoConversationText(detail, language);
   });
 
   test(`${language}: a dismissal holds after a reload`, async ({ page }) => {
