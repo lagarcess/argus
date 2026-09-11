@@ -1,0 +1,61 @@
+{
+  "candidate": "82e37ddf1fc3f449c48177b5f09b412016f66a95",
+  "review": "Bounded code review clean after malformed URL and cancellation-accounting fixes; 25 tests passed. Harness review clean with 43 tests passed. Dollar arithmetic checked separately against d730 and unchanged final-head payloads. GitHub final review not yet claimed.",
+  "tests": {
+    "focused_backend": 640,
+    "mocked_eval": 257,
+    "frontend_readout_and_guard": 76,
+    "client_and_ledger": 37,
+    "existing_retrieval_parameters": 59,
+    "readout_probe": 43,
+    "prompt_surface_coverage": 9,
+    "readout_policy_after_format_cleanup": 122
+  },
+  "fingerprint": "Held unchanged; model-facing fingerprint comparison fails as expected. No full live eval authorized.",
+  "paid_provider_calls": 0,
+  "source_hashes": {
+    "src/argus/api/chat/breakdown.py": "75898364a2cf2dbe8f6048d622eaaa9bddad5a9c7ad619e2bf588eab63b61264",
+    "src/argus/api/chat/research_evidence.py": "b3be9b27f1955bdae74410e6d0d5907de67f39758d566c1e64b8065dcc8b2aba",
+    "src/argus/api/routers/agent.py": "78e00b52c6753d078a383f1619e95724d8407e7b27a795c4f464e615ab69afb8",
+    "src/argus/domain/research/perplexity_agent.py": "8e805299941e6d741b1909c668d2a54f8cb9c0b5aeac9ea8dfac5cbf8bfe38ba",
+    "src/argus/domain/result_readout_grounding.py": "f4582524485f1d47ecad9899ce2c838c13eaacddc34d4251142926daab1e041a",
+    "src/argus/domain/result_readout_quotes.py": "8b1f4915fbf1831dd417e539728a89347b29159fb77a0ad0ba330baa24da3c0b",
+    "src/argus/domain/result_readout_sources.py": "4563b42714fc79b275afc20e4469d0c485130487b9bc4dfac02a3639d19f6f81",
+    "src/argus/llm/openrouter.py": "4d38d2d5d1472e7dd0df252d8163e3fb9d3c9f801ddfe204f8b4b8f59c23ac43",
+    "src/argus/llm/openrouter_model_env.py": "b63b47580a59168db9768c60339816d7c9b590d78b148b28ba5d992544b2a154",
+    "src/argus/llm/openrouter_tasks.py": "e7ee3fde262f4c2b4900ee478e1f9c44c8b2e4d8fba3cd903f52e1fd3e49b90f",
+    "web/__tests__/model-result-readout-content.test.tsx": "d3310f09ce5b28be3c616f466272da640f696595e295404fc561a48c9be71dda"
+  },
+  "provider_client_line_delta_vs_e894817f": {
+    "added": 147,
+    "deleted": 0
+  },
+  "forbidden_files_unchanged": [
+    "src/argus/domain/research/config.py",
+    "src/argus/agent_runtime/research_grounded.py",
+    ".agent/interpreter_prompt_fingerprint.json"
+  ],
+  "environment_files_written": false,
+  "integration_overlap_disposition": "Shared API/roadmap docs and Perplexity request-builder owner. Integration changes the research instruction source to spec.instructions; the new method overwrites instructions and response_format after calling that builder. No textual conflict in computed tree; no actual integration merge is authorized or performed. Final reconciliation/acceptance remains pending.",
+  "old_wiring_audit": {
+    "searched": [
+      "src",
+      "tests",
+      "docs",
+      "scripts",
+      ".github"
+    ],
+    "changed": [
+      "result_summary task maps to readout; dedicated readout env owner feeds candidate resolution",
+      "result_breakdown removed from OpenRouterTask, profile, mapping and policy mocks",
+      "Breakdown OpenRouter injection, executor timeout constant and wrapper removed",
+      "Old tier-comparison runner removed; active probe calls the production Agent path",
+      "CONVERSATIONAL_RUNTIME and API_CONTRACT describe new provider ownership; active roadmap marks old diagnosis as history"
+    ],
+    "remaining": [
+      "result_breakdown presentation/message kinds, schema names and negative registry test are intentional",
+      "result_summary receipt checks in .github/canary-render.sh remain valid; task name is unchanged",
+      "Historical docs/archive, docs/reports and earlier spec sections retain measured former wiring and cancelled commands; section9 and luna/README own current instructions"
+    ]
+  }
+}

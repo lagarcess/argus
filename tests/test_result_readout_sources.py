@@ -137,6 +137,8 @@ def test_source_and_run_cannot_cover_same_figure(source_draft):
     [
         ("DOCN lagged SPY.", "contradicting_benchmark_claim"),
         ("The ending_value matters.", "internal_field_name"),
+        ("ReadoutCitation supplies the context.", "internal_field_name"),
+        ("ReadoutSourceFigure supplies the context.", "internal_field_name"),
         ("Read [here](https://invented.example/news).", "invalid_source_reference"),
     ],
 )

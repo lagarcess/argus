@@ -248,11 +248,10 @@ def _internal_field_name(text: str, facts: dict[str, Any]) -> bool:
         r"\b(?:fact ids?|context packets?|route receipts?|schema keys?)\b", text, re.I
     ):
         return True
-    schemas = {
-        ResultReadoutDraft.__name__,
-        ResultReadoutFigure.__name__,
-        *(model.__name__ for model in ResultReadoutDraft.__subclasses__()),
-    }
+    schemas: set[str] = set()
+    for model in (ResultReadoutDraft, *ResultReadoutDraft.__subclasses__()):
+        schemas.add(model.__name__)
+        schemas.update(model.model_json_schema().get("$defs", {}))
     if any(re.search(rf"\b{re.escape(name)}\b", text) for name in schemas):
         return True
     keys = {part for path, _ in _leaves(facts) for part in path.split(".") if part}
