@@ -1017,6 +1017,62 @@ collecting when signal arrives.
 
 ---
 
+### Ask for feedback  ·  ships in **Instrumentation, before the next distribution**
+
+**Founder, 2026-09-11.** People rarely use the feedback Argus already has.
+Borrow the pattern that works: ask once, at a good moment, with one tap, and
+make "tell us more" optional.
+
+**Today.** Every answer has a thumbs up and down that saves a rating to
+`public.feedback` through `POST /api/v1/feedback`
+(`src/argus/api/routers/feedback.py`), with conversation context sanitized by
+`src/argus/api/feedback_context.py`. `web/components/feedback/FeedbackDialog.tsx`
+takes written feedback, and guests can send it without an email. Nothing asks,
+and nothing shows the feedback to the founder. In production there are 17
+feedback rows between 2026-05-30 and 2026-07-16: 12 thumbs from internal or test
+accounts, 2 thumbs from registered users outside the team, 3 written notes with
+no account, and nothing since 2026-07-16. No guest feedback milestone has ever
+been recorded.
+
+**Done means.**
+
+- After a result lands, at most once per conversation, Argus asks how it is
+  doing with three one-tap answers, in English and Spanish. Never while an
+  answer is still arriving, and not again in that conversation after a dismissal,
+  including after a reload.
+- A tap saves the rating through the existing endpoint. "Tell us more" opens the
+  existing dialog.
+- The new ask attaches the conversation only when the user chooses to. Stated
+  personal financial figures follow decision 8.
+- Each submission emails the founder at support@get-argus.com through the existing
+  Resend sender (the `src/argus/domain/access_approval_email.py` pattern and
+  `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`), with no new release setting. A failed
+  email never fails the submission.
+- Guests and signed-in users both work, and the existing feedback quota still
+  applies.
+
+**Surface.** A new ask component beside `FeedbackDialog.tsx`, mounted with the
+smallest change to the chat screen. `web/lib/feedback-context.ts`.
+`FeedbackRequest` in `src/argus/api/schemas.py` and `routers/feedback.py` if a
+rating or consent field is needed. An additive migration only if the table's
+`type` check must widen. A notification sender following the access email. Both
+locales. `docs/API_CONTRACT.md` section 18, `docs/api/openapi.yaml`, and
+`docs/DATA_MODEL.md` if the table changes.
+
+**Do not touch.** Model-facing text: the prompt fingerprint scans every prompt
+string and `Field(description=...)` under `src/argus/agent_runtime`,
+`src/argus/domain`, `src/argus/llm`, `src/argus/context` and `src/argus/nlp`, so new
+code there carries none. The readout frames and the result rows. `render.yaml`
+and the release contract. No analytics vendor and no third-party widget.
+
+**Proof.** Focused backend and web tests, including a failed email that still
+saves the feedback. Bilingual browser proof: the ask appears after a result, a
+tap saves, "tell us more" opens the dialog, and a dismissal holds after a reload.
+One test email, marked as a test, received at support@get-argus.com from a local
+run. No live measurement, because no model-facing text or routing changes.
+
+---
+
 ### Retrieval parameters  ·  ships in **Grounding**
 
 **This item is configuration, not construction.** Argus calls
@@ -1328,6 +1384,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | --- | --- | --- |
 | Refusal log | Instrumentation | **Landed** `fa69466c`. #314 closed. |
 | #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
+| Ask for feedback | Instrumentation | **Scoped 2026-09-11 in its item section; can start now.** A one-tap ask after a result, optional detail through the existing dialog, the conversation attached only by choice, and each submission emailed to the founder. Production has 17 feedback rows ever, 2 from registered users outside the team, and none since 2026-07-16. |
 | Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
 | Decisions | Plumbing | **Landed** `67facaf5`. |
 | Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569, answered by PR #571: a turn now reports what it paid rather than what it published, so a discarded packet, a retry either kept or thrown away, and a response rejected after its invoice all reach the ledger. Eleven inline degraded turns between 2026-08-13 and 2026-09-02 recorded zero spend, under about $1.50 and not worth a backfill; the three thorough `missing_public_sources` turns on 2026-09-08 were already correct, and no research job has ever failed in production. |
@@ -1380,7 +1437,7 @@ interpreter promotes **without a $1.33 live eval run**.
 | Release | Ships | What a user sees | Live eval |
 | --- | --- | --- | --- |
 | **The fixes** | three bug fixes already on integration | drawer dates, benchmark gap, retrieval evidence | no |
-| **Instrumentation** | refusal log, plus #462 latency | nothing | no |
+| **Instrumentation** | refusal log, #462 latency, ask for feedback | a one-tap feedback ask after a result | no |
 
 Release names are cut boundaries, not a running order. The order is in the
 rules below.
