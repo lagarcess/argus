@@ -113,8 +113,9 @@ the merge ignores it. That replay is a committed test.
   still a ceiling. The role names come from `DCA_SEED_ROLES` and
   `DCA_CEILING_ROLES` in `argus/domain/dca_capital.py`.
   `_seed_corroborated_by_fidelity_audit`: a seed the primary typed without
-  provenance keeps its value when the fidelity audit reads the same distinct
-  starting capital beside the contribution (`stated_run_field_seed_corroborated`).
+  provenance keeps its value when the fidelity audit reads the same starting
+  capital beside the contribution, equal to it or not, since the audit's own
+  schema keeps the two roles apart (`stated_run_field_seed_corroborated`).
 - `semantic_integrity.py`: a ceiling key whose provenance names a seed role is
   read as the seed when it is the seed's own money, a lone or an equal amount
   (`semantic_dca_seed_role_read_over_ceiling_key`); a distinct amount stays a
@@ -143,11 +144,11 @@ the merge ignores it. That replay is a committed test.
 | Suite | Result |
 | --- | ---: |
 | `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task and of a continuing new idea, the recorded two turns through the real workflow) | 101 passed |
-| `tests/agent_runtime/test_dca_money_role_audits.py` | 35 passed |
+| `tests/agent_runtime/test_dca_money_role_audits.py` | 36 passed |
 | `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 46 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
-| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at the merge head `6ed5d458` | 2698 passed, 2 skipped |
-| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at the merge head `6ed5d458` | 822 passed |
+| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `d6bca32f` | 2699 passed, 2 skipped |
+| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `d6bca32f` | 822 passed |
 | `scripts/check_modularity_budget.py` | no violations |
 
 ## Measurement cases, run live on the fix (`live_cases_after.json`)
@@ -457,6 +458,17 @@ a typed check this lane's code owns.
 The prompt fingerprint is untouched; `tests/test_interpreter_prompt_freeze.py`
 passes at this head, so the fingerprint's own `last_measured` is not moved.
 
+## Codex round 15 (one P1 on `27f26da3`, fixed in `d6bca32f`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| "Start with $100 and add $100 monthly": the fidelity audit read a $100 capital and a $100 contribution, and the corroboration helper's equality guard refused the untyped seed, so grounding dropped it | The guard is gone. The audit's own schema keeps the two roles apart (the per-purchase contribution never goes in `capital_amount`), so an equal pair is two facts; the untyped seed must still match the audit's capital, and a seed the primary never typed is still never invented | `test_fidelity_audit_corroborates_an_untyped_seed_equal_to_the_contribution` |
+
+### Measurement cases the round-15 fix touches, live at `d6bca32f` (`live-touched-cases-d6bca32f.json`)
+
+The DCA seed and cap cases and the two recorded repros. All six passed with
+the judge on, $0.14.
+
 ## Billed cost
 
 | Item | Cost |
@@ -477,7 +489,8 @@ passes at this head, so the fingerprint's own `last_measured` is not moved.
 | Five continuation cases live at `f7fc6d74` | $0.175 |
 | Full live measurement at the merge head `6ed5d458` (approved separately, up to $2) | $1.502 |
 | Four regressed cases and the pesos case rerun alone with the judge | $0.114 |
-| **Total** | **$5.56** |
+| Six DCA seed and cap cases live at `d6bca32f` | $0.138 |
+| **Total** | **$5.70** |
 
 ## Observed, not changed here
 
