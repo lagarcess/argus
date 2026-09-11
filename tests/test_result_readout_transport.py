@@ -150,7 +150,6 @@ def test_new_breakdown_on_old_run_uses_current_language(
 
     from argus.api.artifact_presentation import result_breakdown_metadata
     from argus.api.chat import breakdown
-    from argus.api.routers.agent import result_breakdown_message_with_metadata
     from argus.api.schemas import BacktestRun
 
     run = BacktestRun(
@@ -168,21 +167,23 @@ def test_new_breakdown_on_old_run_uses_current_language(
     )
     calls = []
 
-    def compose(context, *, language):
+    def compose(context, *, language, client):
         calls.append(language)
         if fallback:
-            return None, "language_mismatch"
+            return None, "language_mismatch", None, ()
         return (
             {
                 "en": "A complete new explanation.",
                 "es-419": "Una explicación nueva y completa.",
             }[language],
             None,
+            None,
+            (),
         )
 
     monkeypatch.setattr(breakdown, "_llm_result_breakdown_with_metadata", compose)
     original = deepcopy(run.model_dump())
-    result = result_breakdown_message_with_metadata(run, language=language)
+    result = breakdown.result_breakdown_message_with_metadata(run, language=language)
     assert calls == [language]
     metadata = result_breakdown_metadata(result, run, language=language)
     envelope = metadata["result_readout_content"]

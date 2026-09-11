@@ -1372,7 +1372,7 @@ def test_run_backtest_job_persists_result_summary_route_receipts(
         "source": "render_workflow",
     }
     assert receipt["task"] == "result_summary"
-    assert receipt["tier"] == "chat"
+    assert receipt["tier"] == "readout"
     assert receipt["model"] == "unit-test-model"
     assert receipt["mode"] == "json_schema"
     assert receipt["schema_name"] == "QuickTakeDraft"

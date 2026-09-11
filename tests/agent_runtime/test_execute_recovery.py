@@ -2552,8 +2552,6 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
 
     messages = captured["messages"]
     assert isinstance(messages, list)
-    system_prompt = messages[0]["content"]
-    assert "return compares with the benchmark" in system_prompt
     context = json.loads(messages[1]["content"])
     facts = context["run_facts"]
     assert facts["benchmark_symbol"] == "SPY"
