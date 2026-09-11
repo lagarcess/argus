@@ -2,10 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { hydrateMessagesFromApi } from "@/components/chat/chat-message-projection";
+import type { ApiMessage } from "@/lib/argus-api";
 import {
   NEXT_EXPERIMENTS_VERSION,
   nextExperimentAction,
   nextExperimentRowsFromMetadata,
+  nextExperimentsSourceRunIdFromMetadata,
 } from "@/lib/chat-next-experiments";
 
 const root = join(import.meta.dir, "..");
@@ -213,5 +216,60 @@ describe("research citations reach the live turn", () => {
       "utf-8",
     );
     expect(merge).toContain("researchSources ?? message.researchSources");
+  });
+});
+
+describe("what-next follow-up rows (issue #590)", () => {
+  const anchored = {
+    version: NEXT_EXPERIMENTS_VERSION,
+    rows: [row],
+    source_run_id: "run-590",
+  };
+
+  test("the sidecar names its run only under the typed version", () => {
+    expect(
+      nextExperimentsSourceRunIdFromMetadata({ next_experiments: anchored }),
+    ).toBe("run-590");
+    expect(
+      nextExperimentsSourceRunIdFromMetadata({
+        next_experiments: { ...anchored, version: "unknown/v9" },
+      }),
+    ).toBeNull();
+    expect(
+      nextExperimentsSourceRunIdFromMetadata({
+        next_experiments: { version: NEXT_EXPERIMENTS_VERSION, rows: [row] },
+      }),
+    ).toBeNull();
+    expect(nextExperimentsSourceRunIdFromMetadata({})).toBeNull();
+  });
+
+  test("a follow-up message without a card keeps the typed action for a continuity row", () => {
+    const followup: ApiMessage = {
+      id: "followup-590",
+      conversation_id: "conversation-590",
+      role: "assistant",
+      content: "Here is what you can try next from this result.",
+      created_at: "2026-09-11T08:00:00Z",
+      metadata: { next_experiments: anchored },
+    };
+
+    const { messages } = hydrateMessagesFromApi([followup]);
+    const hydrated = messages[0];
+    expect(hydrated?.kind).toBe("text");
+    expect(hydrated?.result).toBeUndefined();
+    expect(hydrated?.nextExperiments?.[0]?.kind).toBe("change_date_range");
+    expect(hydrated?.nextExperimentsSourceRunId).toBe("run-590");
+
+    // ChatMessage falls back from the card's run to the rows' own run.
+    const action = nextExperimentAction(
+      hydrated!.nextExperiments![0]!,
+      "Test a different date range",
+      hydrated?.result?.runId ?? hydrated?.nextExperimentsSourceRunId ?? undefined,
+    );
+    expect(action.type).toBe("refine_strategy");
+    expect(action.payload).toEqual({
+      run_id: "run-590",
+      next_experiment_kind: "change_date_range",
+    });
   });
 });

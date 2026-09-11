@@ -4519,7 +4519,11 @@ this same sidecar on a plain assistant message: `assistant_response` is a
 one-sentence lead-in in the workspace language, `next_experiments` carries the
 latest result's rows (the same offer the result made when it was first
 explained), and no `response_intent` heading is attached because the Try next
-section is the heading. No composer call is spent on that turn. The retryable
+section is the heading. No composer call is spent on that turn. Because the
+message carries no result card, the sidecar names its run as `source_run_id`
+(the latest result's run id), and the client submits the same
+`refine_strategy` action for `change_date_range` and `compare_buy_and_hold`
+rows that it submits under a card, with that `run_id`. The retryable
 `recovery.code = "latest_result_followup_unavailable"` appears only when no
 row can be built for the latest result (#590).
 

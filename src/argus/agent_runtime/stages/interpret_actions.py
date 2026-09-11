@@ -1079,7 +1079,9 @@ async def artifact_followup_stage_result_if_applicable(
         return None
     metadata = dict(reference.metadata)
     if focus == "next_experiment":
-        answer = next_experiment_followup_patch(metadata, language=language)
+        answer = next_experiment_followup_patch(
+            metadata, language=language, source_run_id=reference.artifact_id
+        )
     else:
         answer = composed_result_followup_patch(
             await _compose_result_followup_with_timeout(

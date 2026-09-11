@@ -2847,7 +2847,9 @@ async def _latest_result_followup_recovery_if_applicable(
         stage_patch = {"assistant_response": response}
     elif focus == "next_experiment":
         stage_patch = next_experiment_followup_patch(
-            metadata, language=user.language_preference
+            metadata,
+            language=user.language_preference,
+            source_run_id=reference.artifact_id,
         )
     else:
         stage_patch = composed_result_followup_patch(

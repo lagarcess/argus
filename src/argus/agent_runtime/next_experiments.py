@@ -132,6 +132,7 @@ def next_experiments_sidecar(
     previously_offered_kinds: list[str] | None = None,
     language: str = "en",
     prebake_probe: Any | None = None,
+    source_run_id: str | None = None,
 ) -> dict[str, Any] | None:
     options = structured_next_experiments(result_facts)
     if not options:
@@ -186,7 +187,12 @@ def next_experiments_sidecar(
         rows.append(row)
     if not rows:
         return None
-    return {"version": NEXT_EXPERIMENTS_VERSION, "rows": rows}
+    sidecar: dict[str, Any] = {"version": NEXT_EXPERIMENTS_VERSION, "rows": rows}
+    if source_run_id:
+        # Rows on a message without a result card still name their run, so a
+        # continuity row's typed action anchors on the same result (#590).
+        sidecar["source_run_id"] = source_run_id
+    return sidecar
 
 
 def _kinds_already_asked(recent_user_messages: list[str] | None) -> set[str]:

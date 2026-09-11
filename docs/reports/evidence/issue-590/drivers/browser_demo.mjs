@@ -24,6 +24,7 @@ const SCRIPT = {
     quickTake: "Quick take",
     followup: "ok what should I try next?",
     tryNext: "Try next",
+    dateRow: "Test a different date range",
     recovery: /couldn.t answer that follow-up/i,
   },
   "es-419": {
@@ -32,6 +33,7 @@ const SCRIPT = {
     quickTake: "Lectura rápida",
     followup: "ok, ¿qué debería probar después?",
     tryNext: "Qué probar después",
+    dateRow: "Probar otro rango de fechas",
     recovery: /No pude responder ese seguimiento/i,
   },
 };
@@ -141,6 +143,24 @@ for (const [language, script] of Object.entries(SCRIPT)) {
   const rows = sectionCount
     ? await sections.last().locator("button").allInnerTexts()
     : [];
+
+  // Step 4: a continuity row tapped from the follow-up message must submit the
+  // typed refine action anchored on the run, not its label as prose.
+  const sent = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/chat/stream") && request.method() === "POST") {
+      try { sent.push(JSON.parse(request.postData() || "{}")); } catch { sent.push({ unparsed: true }); }
+    }
+  });
+  t = Date.now();
+  await sections.last().getByRole("button", { name: script.dateRow }).first().click();
+  await composerEnabled(page);
+  await settled(page);
+  timings.date_row_seconds = Math.round((Date.now() - t) / 100) / 10;
+  await page.evaluate(() => document.querySelectorAll("nextjs-portal").forEach((node) => node.remove()));
+  await page.screenshot({ path: `${OUT}/${language}-4-date-row-1280.png`, fullPage: true });
+  const dateRowRequest = sent[0] ? { message: sent[0].message, action: sent[0].action ?? sent[0].structured_action ?? null } : null;
+  const afterDateRow = (await page.locator('[data-testid="conversation-transcript-region"]').innerText().catch(() => "")).replace(/\s+/g, " ");
   const messages = await page.locator('[data-testid="conversation-transcript-region"]').innerText().catch(() => text);
   const followupIndex = messages.lastIndexOf(script.followup);
   const afterFollowup = followupIndex >= 0 ? messages.slice(followupIndex + script.followup.length) : messages;
@@ -162,8 +182,10 @@ for (const [language, script] of Object.entries(SCRIPT)) {
     rows,
     after_followup_text: afterFollowup.replace(/\s+/g, " ").trim().slice(0, 600),
     recovery_shown: script.recovery.test(text),
+    date_row_request: dateRowRequest,
+    after_date_row_text: afterDateRow.slice(afterDateRow.lastIndexOf(script.dateRow)).slice(0, 500),
     page_errors: errors,
-    screenshots: [1, 2, 3].map((n) => `${language}-${n}-*.png`),
+    screenshots: [1, 2, 3, 4].map((n) => `${language}-${n}-*.png`),
   });
   console.log(JSON.stringify(report[report.length - 1], null, 2));
   await context.close();

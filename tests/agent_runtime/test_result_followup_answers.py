@@ -141,9 +141,18 @@ def _forbid_composer(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _assert_rows_answer(patch: dict[str, Any], *, template: str, language: str) -> None:
+def _assert_rows_answer(
+    patch: dict[str, Any],
+    *,
+    template: str,
+    language: str,
+    source_run_id: str | None = None,
+) -> None:
     sidecar = patch["next_experiments"]
     assert sidecar["version"] == NEXT_EXPERIMENTS_VERSION
+    # No card on this message, so the rows name their run for the continuity
+    # rows' typed action; a helper call without a run names none.
+    assert sidecar.get("source_run_id") == source_run_id
     rows = sidecar["rows"]
     assert 1 <= len(rows) <= NEXT_EXPERIMENTS_ROW_CAP
     supported = {
@@ -215,6 +224,18 @@ def test_rows_read_the_engine_figures_the_fact_bank_quotes() -> None:
     }
 
 
+def test_rows_name_their_run_when_the_message_has_no_card() -> None:
+    anchored = next_experiment_followup_patch(
+        _result_metadata("dca_accumulation"), source_run_id="run-590-dca"
+    )
+    assert anchored is not None
+    assert anchored["next_experiments"]["source_run_id"] == "run-590-dca"
+
+    unanchored = next_experiment_followup_patch(_result_metadata("dca_accumulation"))
+    assert unanchored is not None
+    assert "source_run_id" not in unanchored["next_experiments"]
+
+
 def test_no_rows_means_no_answer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(answers_module, "next_experiments_sidecar", lambda *a, **k: None)
 
@@ -258,7 +279,12 @@ async def test_action_path_answers_what_next_with_rows(
 
     assert result is not None
     assert result.outcome == "ready_to_respond"
-    _assert_rows_answer(result.patch, template=template, language=language)
+    _assert_rows_answer(
+        result.patch,
+        template=template,
+        language=language,
+        source_run_id=f"run-590-{template}",
+    )
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "next_experiment"
 
@@ -282,7 +308,12 @@ async def test_recovery_path_answers_what_next_with_rows(
 
     assert result is not None
     assert result.outcome == "ready_to_respond"
-    _assert_rows_answer(result.patch, template=template, language=language)
+    _assert_rows_answer(
+        result.patch,
+        template=template,
+        language=language,
+        source_run_id=f"run-590-{template}",
+    )
     assert result.decision.result_followup_focus == "next_experiment"
     assert "latest_result_empty_turn_recovery" in result.decision.reason_codes
 
@@ -414,6 +445,7 @@ async def test_full_turn_carries_the_rows_for_the_production_repro(
 
     rows = result["next_experiments"]["rows"]
     assert len(rows) >= 1
+    assert result["next_experiments"]["source_run_id"] == "eval-run-244-next"
     assert result["assistant_response"] == next_experiments_lead_in(language)
     assert RECOVERY_CODE not in str(result)
     assert "result_followup_chrome" not in str(result)

@@ -29,20 +29,23 @@ def next_experiment_followup_patch(
     metadata: dict[str, Any],
     *,
     language: str = "en",
+    source_run_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Stage patch answering "what should I try next?" from the latest result.
 
     `next_experiments_sidecar` is the one owner of the rows (#590). An explicit
     ask gets the result's full offer: spec §4.3's non-repetition rule restrains
     unsolicited re-offers, not an answer to a question. The Try next section is
-    the heading, so the patch carries no result chrome. None when no row can
-    be built.
+    the heading, so the patch carries no result chrome. The message has no
+    card, so the sidecar names its run and a continuity row keeps its typed
+    action. None when no row can be built.
     """
     sidecar = next_experiments_sidecar(
         metadata,
         benchmark_delta=metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS),
         max_drawdown=metric_number(metadata, paths=MAX_DRAWDOWN_METRIC_PATHS),
         language=language,
+        source_run_id=source_run_id,
     )
     if sidecar is None:
         return None
