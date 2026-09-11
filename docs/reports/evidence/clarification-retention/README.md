@@ -96,6 +96,8 @@ the merge ignores it. That replay is a committed test.
 - `interpreter/dca_audits.py`: an audit may add a money role only for a
   distinct amount, and the role it names decides the field. A seed the user
   typed is never re-typed as a cap (`dca_budget_audit_outranked_by_typed_seed`);
+  the same money read again as the seed adds no role
+  (`dca_budget_audit_same_amount_already_typed`);
   a budget the audit calls starting capital lands in `initial_capital` only
   while that role is empty (`dca_budget_audit_typed_as_seed`); beside an
   occupied seed it can only bound the plan, so it becomes the ceiling
@@ -130,11 +132,11 @@ the merge ignores it. That replay is a committed test.
 | Suite | Result |
 | --- | ---: |
 | `tests/agent_runtime/test_pending_setup_continuation.py` (fields × families × labels × en/es-419, the fresh-task escape, the act owner's invariant table, the focused re-read of a fresh task, the recorded two turns through the real workflow) | 98 passed |
-| `tests/agent_runtime/test_dca_money_role_audits.py` | 32 passed |
+| `tests/agent_runtime/test_dca_money_role_audits.py` | 33 passed |
 | `tests/test_visible_reply.py` (owner + SSE and persistence contract) | 21 passed |
 | `tests/evals/test_measurement_eval_followup_snapshot.py` | 2 passed |
-| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `8241f56d` | 2636 passed, 2 skipped |
-| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `8241f56d` | 822 passed |
+| Hermetic `tests/agent_runtime`, `tests/evals`, `tests/test_spine_guardrails.py`, `test_interpreter_prompt_freeze.py`, `test_visible_reply.py` at `cda7a1a3` | 2637 passed, 2 skipped |
+| `tests/domain`, `tests/context`, `tests/test_alpha_api.py`, the chat stream and action contracts, OpenAPI compatibility, the DCA readout, the release docs at `cda7a1a3` | 822 passed |
 | `scripts/check_modularity_budget.py` | no violations |
 
 ## Measurement cases, run live on the fix (`live_cases_after.json`)
@@ -309,6 +311,16 @@ The same nine cases as round 4 (the focused re-read serves the recorded
 repros and the chip followups; the writer serves the four DCA seed-or-cap
 cases). All nine passed with the judge on, $0.25.
 
+## Codex round 6 (one P1 on `c540e926`, fixed in `cda7a1a3`)
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| The primary typed the $5,000 cap under `initial_capital` with a ceiling role and the audit repeated the same $5,000 as starting capital; the round-5 branch kept the audit's seed role and the crossed-slot reader invented a $5,000 day-one seed beside the $5,000 ceiling | The invariant the writer already states decides it: an audit adds a role only for a distinct amount. The same money read again as the seed adds no role (`dca_budget_audit_same_amount_already_typed`); the draft's own typing stands and the reader places the mis-slotted cap as the ceiling with no seed. The round-5 keep-role branch is reached only by a distinct amount; a repeated cap reading still lands as the ceiling (round 3) | `test_an_audit_that_repeats_a_mis_slotted_cap_as_the_seed_adds_no_role` |
+
+### Measurement cases the round-6 fix touches, live at `cda7a1a3` (`live-touched-cases-cda7a1a3.json`)
+
+The same nine cases. All nine passed with the judge on, $0.28.
+
 ## Billed cost
 
 | Item | Cost |
@@ -324,7 +336,8 @@ cases). All nine passed with the judge on, $0.25.
 | Six touched measurement cases live at `1d41d9f4` | $0.130 |
 | Nine touched measurement cases live at `506b38a7` | $0.321 |
 | Nine touched measurement cases live at `8241f56d` | $0.255 |
-| **Total** | **$3.16** |
+| Nine touched measurement cases live at `cda7a1a3` | $0.281 |
+| **Total** | **$3.44** |
 
 ## Observed, not changed here
 
