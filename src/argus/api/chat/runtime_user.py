@@ -14,4 +14,5 @@ def runtime_user_for(
         user_id=user_id,
         display_name=profile.display_name,
         language_preference=turn_language or profile.language or "en",
+        country=profile.country,
     )

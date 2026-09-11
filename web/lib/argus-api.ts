@@ -577,6 +577,10 @@ export type ProfilePatch = {
   /** Empty clears it, which is how a user opts out of being addressed by name. */
   preferred_name?: string | null;
   avatar_theme?: AvatarTheme;
+  /** ISO 3166-1 alpha-2; null clears it, and a user with none sends no location. */
+  country?: string | null;
+  /** ISO 4217; null goes back to the currency the country implies. */
+  currency_override?: string | null;
 };
 
 export async function getMe() {
