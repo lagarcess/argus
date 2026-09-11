@@ -35,6 +35,22 @@ class BreakdownDispatch:
         }
 
 
+def start_result_breakdown(
+    run: BacktestRun | None,
+    *,
+    language: str,
+    lifecycle: ChatTurnLifecycleHooks,
+    settle_usage: dict[str, Any] | None,
+) -> asyncio.Task[BreakdownDispatch]:
+    """Retain dispatch before the browser receives its first progress frame."""
+    return research_jobs.retain_research_work(
+        dispatch_result_breakdown(
+            run, language=language, lifecycle=lifecycle, settle_usage=settle_usage
+        ),
+        name=f"result-breakdown-dispatch-{lifecycle.turn_id}",
+    )
+
+
 async def dispatch_result_breakdown(
     run: BacktestRun | None,
     *,

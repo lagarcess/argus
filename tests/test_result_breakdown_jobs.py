@@ -27,6 +27,33 @@ def dispatch():
 
 
 @pytest.mark.asyncio
+async def test_closing_stream_at_first_progress_cannot_cancel_dispatch(monkeypatch):
+    from argus.api.chat import breakdown_jobs
+
+    finished = asyncio.Event()
+
+    async def complete(*args, **kwargs):
+        finished.set()
+
+    monkeypatch.setattr(breakdown_jobs, "dispatch_result_breakdown", complete)
+
+    async def stream():
+        completion = breakdown_jobs.start_result_breakdown(
+            None,
+            language="en",
+            lifecycle=SimpleNamespace(turn_id="turn"),
+            settle_usage=None,
+        )
+        yield "working"
+        await asyncio.shield(completion)
+
+    browser = stream()
+    assert await anext(browser) == "working"
+    await browser.aclose()
+    await asyncio.wait_for(finished.wait(), 1)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("language", ["en", "es-419"])
 @pytest.mark.parametrize("durable", [False, True])
 async def test_disconnect_preserves_one_complete_billed_answer(

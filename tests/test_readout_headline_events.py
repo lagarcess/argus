@@ -4,7 +4,10 @@ from copy import deepcopy
 
 import pytest
 from argus.api.chat.breakdown import _result_breakdown_llm_messages
-from argus.domain.result_readout_headlines import headline_readout_facts
+from argus.domain.result_readout_headlines import (
+    headline_readout_facts,
+    headline_request_lines,
+)
 
 from tests.test_result_readout_fact_sheet import CASES, projection, sheet
 
@@ -64,3 +67,20 @@ def test_peak_date_is_unavailable_without_matching_ordered_evidence(defect):
         raw["chart"]["series"].reverse()
     facts = sheet(raw)
     assert facts["facts"]["portfolio.peak_date"]["value"] is None
+
+
+def test_intraday_events_sort_by_instant_including_mixed_timezone_offsets():
+    facts = sheet(projection(CASES["docn_buyhold_recorded"]))
+    dates = {
+        "portfolio.peak_date": "2025-02-18T09:30:00-05:00",
+        "portfolio.drawdown.peak_date": "2025-02-18T15:00:00Z",
+        "portfolio.drawdown.trough_date": "2025-02-18T16:00:00",
+    }
+    for key, value in dates.items():
+        facts["facts"][key]["value"] = value
+    request = "\n".join(headline_request_lines(headline_readout_facts(facts)))
+    assert (
+        request.index("Highest portfolio value reached")
+        < request.index("Worst drop began")
+        < request.index("Worst drop ended")
+    )

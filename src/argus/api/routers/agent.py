@@ -54,7 +54,7 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.breakdown_jobs import dispatch_result_breakdown
+from argus.api.chat.breakdown_jobs import start_result_breakdown
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -1000,8 +1000,7 @@ async def chat_stream(
                             require_run_id=True,
                         )
                     if result_action_type == "show_breakdown":
-                        yield sse_data({"type": "stage_start", "stage": "explain"})
-                        dispatched = await dispatch_result_breakdown(
+                        completion = start_result_breakdown(
                             result_action_run,
                             language=runtime_user.language_preference,
                             lifecycle=lifecycle_hooks,
@@ -1011,6 +1010,8 @@ async def chat_stream(
                                 visitor_key=turn_visitor_key,
                             ),
                         )
+                        yield sse_data({"type": "stage_start", "stage": "explain"})
+                        dispatched = await asyncio.shield(completion)
                         backtest_job = dispatched.job
                         completed_breakdown_message = dispatched.message
                         assistant_text = dispatched.text

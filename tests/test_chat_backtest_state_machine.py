@@ -1290,13 +1290,6 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         _stream_events_from_runtime(_runtime),
     )
     monkeypatch.setattr(
-        agent_router,
-        "result_breakdown_action",
-        lambda run, **billing_context: breakdown_service.result_breakdown_action(
-            run, **billing_context
-        ),
-    )
-    monkeypatch.setattr(
         breakdown_service,
         "result_breakdown_message_with_metadata",
         _forced_breakdown,
@@ -1407,15 +1400,16 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert ledger_calls[0]["request_id"]
 
 
-def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
+def test_breakdown_retains_work_before_progress_and_waits_after_progress() -> None:
     from pathlib import Path
 
     source = Path("src/argus/api/routers/agent.py").read_text()
 
-    assert source.index(
-        'yield sse_data({"type": "stage_start", "stage": "explain"})'
-    ) < source.index("breakdown_message = await asyncio.to_thread(")
-    assert "result_breakdown_action," in source
+    assert (
+        source.index("completion = start_result_breakdown(")
+        < source.index('yield sse_data({"type": "stage_start", "stage": "explain"})')
+        < source.index("dispatched = await asyncio.shield(completion)")
+    )
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:

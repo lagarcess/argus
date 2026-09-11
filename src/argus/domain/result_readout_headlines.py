@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from argus.domain.result_readout_display_values import readout_display_value
@@ -102,9 +102,11 @@ def headline_request_lines(sheet: dict[str, Any], *, language: str = "en") -> li
         if not isinstance(value, str):
             continue
         try:
-            date = datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+            date = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             continue
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
         labels = [date_label, *(_HEADLINES[key] for key in value_keys)]
         labels = [
             label for label in labels if facts.get(label, {}).get("value") is not None
