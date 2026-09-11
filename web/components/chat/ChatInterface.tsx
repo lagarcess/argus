@@ -192,9 +192,12 @@ import {
   messageStreamPresentation,
   messagesWithSavedDecisionState,
   settleOpenConfirmationsFromFinalPayload,
+  standaloneStreamStatusVisible,
 } from "./chat-message-projection";
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
+import { usePendingBreakdownRecovery } from "./usePendingBreakdownRecovery";
+import { retirePendingBreakdown } from "@/lib/pending-result-breakdown";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
 import SidebarShell from "@/components/sidebar/SidebarShell";
 import ChatShellMenuTrigger from "@/components/chat/ChatShellMenuTrigger";
@@ -391,6 +394,12 @@ export default function ChatInterface() {
       promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
     }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
   useBacktestJobPolling(messages, canApplyConversationOwnedUpdate, setMessages, handleDurableJobCompletion);
+  const handlePendingBreakdownSettled = useCallback((targetConversationId: string) => {
+    invalidateTranscriptForMutation(targetConversationId, "durable_result_action");
+    promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+    void refreshHistory();
+  }, [activityTranscriptReadiness, invalidateTranscriptForMutation, refreshHistory]);
+  usePendingBreakdownRecovery(messages, conversationId, setMessages, t("chat.error_load"), handlePendingBreakdownSettled);
 
   const retireActiveTranscriptPresentationForNavigation = useCallback(() => {
     setStreamStatus(null);
@@ -1319,7 +1328,7 @@ export default function ChatInterface() {
             : undefined;
         const finalAssistantId = finalMessageId ?? assistantId;
         setMessages((prev) =>
-          applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
+          applyRetestReceipt(retirePendingBreakdown(prev, requestSession.identity.requestId), userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
         );
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
         const finalStrategyPathContext =
@@ -2092,14 +2101,7 @@ export default function ChatInterface() {
   // the conversation's actions.
   const nextMovesEnabled =
     !turnInFlight && !hasActiveArtifactActionSet(messages);
-  const latestAssistantContent =
-    [...messages]
-      .reverse()
-      .find((message) => message.role === "ai")
-      ?.content?.trim() ?? "";
-  const showStreamStatus = Boolean(
-    visibleStreamStatus && latestAssistantContent.length === 0,
-  );
+  const showStreamStatus = standaloneStreamStatusVisible(messages, Boolean(visibleStreamStatus));
   const showConversationDisclaimer = shouldShowConversationDisclaimer(
     messages,
     isStreamingResponse,

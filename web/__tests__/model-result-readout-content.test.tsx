@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import ChatMessage from "../components/chat/ChatMessage";
 import DiscoverySourcesPanel from "../components/chat/DiscoverySourcesPanel";
-import { hydrateMessagesFromApi, messageStreamPresentation } from "../components/chat/chat-message-projection";
+import { hydrateMessagesFromApi, messageStreamPresentation, standaloneStreamStatusVisible } from "../components/chat/chat-message-projection";
 import type { Message } from "../components/chat/types";
 import { resultCardFromRun, type ApiMessage, type BacktestRun } from "../lib/argus-api";
 import { applyBacktestJobUpdate } from "../lib/chat-backtest-jobs";
@@ -187,7 +187,7 @@ describe("model readout transport", () => {
 
 
 describe("transport authority and live state", () => {
-  test.each(["en", "es-419"] as const)("a pending %s Breakdown shows working status until the final readout arrives", async (language) => {
+  test.each(["en", "es-419"] as const)("a pending %s Breakdown has one working status until final text and reload", async (language) => {
     const i18n = await translations(language);
     const pending: Message = {
       id: crypto.randomUUID(), role: "ai", kind: "text",
@@ -195,12 +195,12 @@ describe("transport authority and live state", () => {
     };
     const render = (message: Message, streamActive: boolean) => renderToStaticMarkup(
       <I18nextProvider i18n={i18n}><ChatMessage message={message}
-        isStreaming={messageStreamPresentation([message], message, 0, streamActive, false).isWorkingMessage}
-      /></I18nextProvider>,
+        isStreaming={messageStreamPresentation([message], message, 0, streamActive, streamActive).isWorkingMessage}
+      />{standaloneStreamStatusVisible([message], streamActive) && <span>{i18n.t("chat.status.working")}</span>}</I18nextProvider>,
     );
     const working = render(pending, true);
     expect(working).toContain(i18n.t("chat.result_breakdown.label"));
-    expect(working).toContain(i18n.t("chat.status.working"));
+    expect(working.split(i18n.t("chat.status.working"))).toHaveLength(2);
     expect(working).toContain('aria-busy="true"');
     expect(working).not.toContain(i18n.t("chat.result_readout.unavailable"));
     const partialDraft = "Unvalidated partial draft";
@@ -209,11 +209,25 @@ describe("transport authority and live state", () => {
       assistantId: pending.id, finalText: "", finalActions: [], contentPresentation: "result_breakdown",
       resultReadoutContent: envelope("breakdown", language),
     });
-    const finished = render(completed, false);
-    expect(finished).toContain(texts[language].breakdown);
-    expect(finished).not.toContain(i18n.t("chat.status.working"));
-    expect(finished).not.toContain('aria-busy="true"');
+    const [reloaded] = hydrateMessagesFromApi([savedMessage("breakdown", envelope("breakdown", language))]).messages;
+    for (const message of [completed, reloaded]) {
+      const finished = render(message, false);
+      expect(finished).toContain(texts[language].breakdown);
+      expect(finished).not.toContain(i18n.t("chat.status.working"));
+      expect(finished).not.toContain('aria-busy="true"');
+    }
     expect(render(pending, false)).toContain(i18n.t("chat.result_readout.unavailable"));
+  });
+  test("standalone progress still belongs to ordinary messages and tool jobs", () => {
+    const olderBreakdown: Message = { id: crypto.randomUUID(), role: "ai", kind: "text", contentPresentation: "result_breakdown" };
+    const latest: Message = { id: crypto.randomUUID(), role: "ai", kind: "text", content: "" };
+    const toolJob: Message = { ...latest, toolJobs: [{ call_id: crypto.randomUUID(), tool_name: "backtest", artifact_id: crypto.randomUUID(),
+      job: { id: crypto.randomUUID(), conversation_id: crypto.randomUUID(), status: "running", retryable: false } }] };
+    for (const message of [latest, toolJob]) {
+      expect(standaloneStreamStatusVisible([olderBreakdown, message], true)).toBe(true);
+      expect(standaloneStreamStatusVisible([olderBreakdown, message], false)).toBe(false);
+      expect(standaloneStreamStatusVisible([{ ...message, content: "An answer has begun." }], true)).toBe(false);
+    }
   });
   test.each(["missing", "accepted", "null", "malformed"])("a %s message envelope respects root ownership over the card", async (state) => {
     const card = run(envelope("quick_take", "en")).conversation_result_card;

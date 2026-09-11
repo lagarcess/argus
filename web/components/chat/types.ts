@@ -318,6 +318,8 @@ export type Message = {
     | "conversation_load_failure"
     | "superseded_runtime_failure";
   content?: string;
+  /** Read-time projection of a durable, unfinished show_breakdown request. */
+  pendingBreakdown?: { turnId: string; requestId: string; conversationId: string };
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;

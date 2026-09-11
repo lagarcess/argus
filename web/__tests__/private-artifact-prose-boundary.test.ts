@@ -101,6 +101,8 @@ describe("private artifact prose AST boundary", () => {
       "components/chat/chat-message-projection.ts:applyEmptyFinalFallback:options.content": 1,
       "components/chat/chat-message-projection.ts:hydrateMessagesFromApi:message.content": 1,
       "components/chat/chat-message-projection.ts:messageStreamPresentation:message.content": 1,
+      // Presence-only status check moved out of ChatInterface; it never renders prose.
+      "components/chat/chat-message-projection.ts:standaloneStreamStatusVisible:latestAssistant?.content": 1,
       "lib/chat-message-hydration.ts:hydrateTextMessageFromApi:message.content": 1,
       "lib/chat-message-hydration.ts:hydrateTextMessageFromApi:options.retryRequestMessage.content": 1,
       "lib/chat-message-hydration.ts:precedingUserMessageForRetryableRecovery:candidate.content": 1,

@@ -1239,8 +1239,12 @@ Only accepted complete prose crosses it; language/figure rejection details use
 the existing source/fallback/failure metadata. No read-time composition or
 historical rewrite is introduced.
 
-While a Breakdown stream is active, its existing frame shows localized working
-text. The completed response then selects accepted prose or the template. Empty
+While a Breakdown is pending, its existing frame owns exactly one localized
+working state; the generic stream status row does not repeat it. On reload, the
+web derives the pending frame from the saved `show_breakdown` user action and
+its `agent_runtime_turn` accepted/running lifecycle. The existing turn-recovery
+reader settles it from the saved answer or terminal recovery state without
+calling a model. The completed response selects accepted prose or the template. Empty
 pending content is not evidence that saved run facts are insufficient, and empty
 legacy message content does not leave a completed envelope permanently working.
 

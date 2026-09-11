@@ -30,6 +30,7 @@ import {
   toolJobsFromMetadata,
 } from "@/lib/chat-backtest-jobs";
 import { retestReceiptFromMetadata } from "@/lib/chat-retest";
+import { projectPendingBreakdowns } from "@/lib/pending-result-breakdown";
 import { retireSupersededFailures } from "@/lib/chat-retry-action-history";
 import {
   hydrateTextMessageFromApi,
@@ -213,6 +214,16 @@ export type MessageStreamPresentation = {
   isWorkingMessage: boolean;
 };
 
+export function standaloneStreamStatusVisible(
+  messages: Message[],
+  hasVisibleStreamStatus: boolean,
+): boolean {
+  const latestAssistant = messages.findLast((message) => message.role === "ai");
+  // The Breakdown frame already owns its pending copy.
+  return hasVisibleStreamStatus && !latestAssistant?.content?.trim() &&
+    latestAssistant?.contentPresentation !== "result_breakdown";
+}
+
 export function messageStreamPresentation(
   messages: Message[],
   message: Message,
@@ -225,13 +236,14 @@ export function messageStreamPresentation(
   return {
     isLatestAi,
     isWorkingMessage:
-      isLatestAi &&
+      (isLatestAi || Boolean(message.pendingBreakdown)) &&
       message.kind === "text" &&
       !message.toolResultCards?.length && !message.toolJobs?.length && !message.hasUnavailableToolResults &&
       message.contentPresentation !== "result_readout" &&
       message.recoveryDisplay?.kind !== "artifact_assumptions" &&
       (isStreamingResponse ||
         hasVisibleStreamStatus ||
+        Boolean(message.pendingBreakdown) ||
         // A finished Breakdown may have empty content: its readout envelope
         // or typed facts own the display, so only live status means working.
         (message.contentPresentation !== "result_breakdown" && (message.content ?? "") === "")),
@@ -505,7 +517,7 @@ export function hydrateMessagesFromApi(
       ),
     ),
   );
-  const reconciled = reconcileToolJobMessages(normalized);
+  const reconciled = projectPendingBreakdowns(items, reconcileToolJobMessages(normalized));
   return { messages: reconciled, inputActions: latestInputActions(reconciled) };
 }
 

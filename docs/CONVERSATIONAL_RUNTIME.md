@@ -389,9 +389,11 @@ tests that are runnable now, ideas it can help draft, or future engine
 capabilities, but it must not imply unsupported strategies are executable today.
 Structured breakdown actions should emit an `explain` stage before final text so
 the UI can show a clear working state while preserving canonical SSE frame
-types. The existing Breakdown frame displays localized working text while its
-stream is active. Only a completed response selects model prose or the template;
-the pending frame does not claim saved facts are insufficient.
+types. The existing Breakdown frame owns one localized working state, without
+a second generic status line. Reload restores it from the durable typed request
+lifecycle and uses the existing turn-recovery reader to obtain the saved answer
+or terminal recovery state. Only a completed response selects model prose or the
+template; the pending frame does not claim saved facts are insufficient.
 
 The chart is a TradingView Lightweight Charts baseline chart using the aggregate portfolio equity curve. Multi-symbol runs must show the portfolio curve, not a cluttered symbol comparison. Entry and exit markers may be capped for readability. TradingView attribution must remain visible.
 
