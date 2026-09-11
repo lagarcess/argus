@@ -735,6 +735,75 @@ merged as `129ad084`. Prompt written 2026-09-10, not yet sent.
 
 ---
 
+### Home country per user  ·  ships in **its own promotion**
+
+**Founder, 2026-09-10:** one server-wide country for every user is a huge issue
+and not state of the art. Argus adapts to each user's own home country, and
+personalization means stable declared settings, country and currency (decision
+9's condition). Scoped 2026-09-11 from the lane brief held on 2026-09-10, whose
+wait on the decision 10 lane ended when #589 landed.
+
+**Today.** `home_location()` in `src/argus/domain/research/config.py` reads
+`ARGUS_RESEARCH_HOME_COUNTRY`, and `retrieval_spec()` puts it on every research
+request, which `src/argus/domain/research/perplexity_agent.py` sends as
+`user_location`. No country or currency exists on the profile, `/me` or
+Settings. Personalization memory (#386, #392) stores saved decisions and holds
+no country. The variable is not declared in `render.yaml`, so production most
+likely sends no location at all.
+
+**The rules.**
+
+- Country is a declared profile setting, ISO 3166-1 alpha-2, chosen by the user
+  in Settings like language. Nothing else writes it: never inferred from
+  conversation, IP or behavior (decision 8). The picker may pre-select from the
+  browser's region; nothing saves until the user picks.
+- Currency, ISO 4217, is derived from the country, with an optional user
+  override stored the same way. The profile exposes the resolved currency.
+- Research sends the asking user's country through the provider's location
+  parameter, never through prompt text. A user with no country sends no
+  location. A guest has no stored country; the lane reports what a session-only
+  pick would cost.
+- `ARGUS_RESEARCH_HOME_COUNTRY` and `home_location()` are removed, not kept as a
+  fallback.
+
+**Done means.** A registered user picks a country in Settings in English or
+Spanish, sees the currency it implies and can override it, and both survive a
+reload; a refused save rolls back with a visible error, as language does. A
+research question from that user, inline or as a thorough job, carries that
+country as the location; a question from a user with none carries no location.
+The server-wide setting no longer exists anywhere in the tree.
+
+**Surface.** An additive, nullable migration following
+`supabase/migrations/20260809140000_add_preferred_name.sql`. `User`,
+`ProfilePatch` and `PATCH /me` (`src/argus/api/schemas.py`,
+`src/argus/api/routers/profile.py`), not `GuestUser`, and the runtime's
+`UserState`. The Settings picker, saved through `saveProfile` in
+`web/lib/profile-writes.ts` beside `web/components/settings/LanguageModal.tsx`
+and `web/components/sidebar/ProfileSettingsPanels.tsx`, in both locales.
+`retrieval_spec()` and both research paths in
+`src/argus/agent_runtime/research_grounded.py`: `grounded_result` has the user,
+and `retrieval_spec_for_job` rebuilds from the typed job request, which must
+therefore carry the country. Removal of the server setting from `config.py`,
+`.env.example`, `docs/API_CONTRACT.md` and `tests/research/`, together with the
+unused `LOCAL_SOURCE_DOMAINS` and `local_sources` parameter. `docs/DATA_MODEL.md`,
+`docs/API_CONTRACT.md` and a regenerated `docs/api/openapi.yaml`.
+
+**Do not touch.** Currency in calculations, cards or any model-facing text; that
+use arrives with any grounded math. Prompt text anywhere, including in
+`research_grounded.py`, which is fingerprinted. `perplexity_agent.py`, which
+already sends the spec's location. `render.yaml` and the release contract, which
+never declared the variable.
+
+**Proof.** Focused backend and web tests. A research request built for a user
+with country MX carries MX, and one for a user with none carries no location, on
+both paths, with no provider calls. Bilingual browser proof in Settings,
+including a reload and a refused save. The sanctioned pre-merge live
+measurement, because research requests change, compared case by case against
+the scorecard named in `.agent/interpreter_prompt_fingerprint.json`, with the
+fingerprint unchanged. The founder merges and applies the migration.
+
+---
+
 ### Share the answer  ·  ships with **The calculations**
 
 **Promoted from a note under the registry to its own item, founder 2026-09-09.**
@@ -1212,7 +1281,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | What to try next after a result | outside the releases | **LANDED** `aadd70eb`, PR #592, closing #590. Asking what to try next after a result answers with that result's Try next rows and a one-sentence lead-in in the workspace language, on both follow-up paths and for every strategy family, through the one rows owner `next_experiments_sidecar`; the retry message appears only when no row can be built. No model-facing text changed. Its live run was 61 passed and 8 failed against the baseline's 63 and 6; six of the seven flips passed a rerun, and the one that failed twice got no read from the structured tier, so it never reached this code. |
 | A clarification reply keeps what the user said | outside the releases | **LANDED** `05196b33`, PR #591. After Argus asks a question, the reply keeps every fact the user already gave (asset, dates, money, costs), an explicit new idea starts clean, money the user typed outranks an audit's guess, and one owner removes em dashes from visible replies. Its full live run on the merged tree was 65 passed and 6 failed; four passed a rerun, and the other two failed outside its code (research publishing on a Spanish forward question, and a discovery answer whose voicing model timed out). On the Haiku fallback it refused a named cap three times out of three where integration lost it once. The founder kept the rule that money the user typed outranks an audit's cap of the same amount. |
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
-| Home country per user | its own promotion | **Not started; founder priority 2026-09-10.** `ARGUS_RESEARCH_HOME_COUNTRY` sends one country for every user, which the founder called a huge issue and not state of the art. Country, with currency inferred from it and overridable, becomes a declared profile setting chosen in Settings like language, and research sends each user's own country. **The server-wide `ARGUS_RESEARCH_HOME_COUNTRY` is removed, not kept as a fallback** (founder, 2026-09-10): a user who has not chosen a country sends no location. Additive columns only. Decision 8 still holds: never inferred from conversation. |
+| Home country per user | its own promotion | **Scoped 2026-09-11 in its item section; lane not started; founder priority 2026-09-10.** `ARGUS_RESEARCH_HOME_COUNTRY` sends one country for every user, which the founder called a huge issue and not state of the art. Country, with currency inferred from it and overridable, becomes a declared profile setting chosen in Settings like language, and research sends each user's own country. **The server-wide `ARGUS_RESEARCH_HOME_COUNTRY` is removed, not kept as a fallback** (founder, 2026-09-10): a user who has not chosen a country sends no location. Additive columns only. Decision 8 still holds: never inferred from conversation. |
 | Any grounded math | The calculations | **Not started.** Reframed 2026-09-10 from "the five calculations": any finance math, grounded, never a list. The AI answers first; polished cards later. Portfolio monitor, quant calculator and insider tracking deferred. |
 | Teach the method | Grounding | **Not started.** |
 
