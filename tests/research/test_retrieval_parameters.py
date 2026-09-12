@@ -13,13 +13,12 @@ from typing import Any
 import pytest
 from argus.agent_runtime import research_grounded as grounded
 from argus.domain.research.config import (
-    LOCAL_SOURCE_DOMAINS,
     MAX_FALLBACK_MODELS,
     MAX_SOURCE_DOMAINS,
     RESEARCH_CONFIG_SPECS,
     RETRIEVAL_INSTRUCTIONS,
     ResearchConfigSpec,
-    home_location,
+    RetrievalLocation,
     iso_language,
     normalized_source_domains,
     retrieval_spec,
@@ -92,13 +91,6 @@ def test_the_domain_filter_is_normalized_and_bounded() -> None:
         )
 
 
-def test_every_local_list_fits_the_provider_ceiling() -> None:
-    for country, domains in LOCAL_SOURCE_DOMAINS.items():
-        assert len(country) == 2 and country.isupper()
-        assert domains, country
-        assert normalized_source_domains(domains) == domains
-
-
 @pytest.mark.parametrize(
     ("question_kind", "closed_period", "recency"),
     [
@@ -118,44 +110,21 @@ def test_recency_follows_the_section_7_data_class(
     """Freshness has one owner: how fast the answer goes stale. A closed
     window is never filtered to the past week."""
     spec = retrieval_spec(
-        "balanced", question_kind=question_kind, closed_period=closed_period
+        "balanced",
+        question_kind=question_kind,
+        closed_period=closed_period,
+        country=None,
     )
     assert spec.recency == recency
 
 
-def test_home_market_comes_from_the_release_contract(monkeypatch) -> None:
-    assert home_location() is None
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", " do ")
-    location = home_location()
-    assert location is not None and location.country == "DO"
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "Dominican Republic")
-    assert home_location() is None, "a malformed market sends no location"
+def test_the_location_is_the_asking_users_country_and_nothing_else() -> None:
+    def spec(country: str | None) -> ResearchConfigSpec:
+        return retrieval_spec("balanced", question_kind="current_external", country=country)
 
-
-def test_local_sources_need_a_market_with_a_list(monkeypatch) -> None:
-    assert (
-        retrieval_spec(
-            "balanced", question_kind="current_external", local_sources=True
-        ).source_domains
-        == ()
-    )
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "US")
-    assert (
-        retrieval_spec(
-            "balanced", question_kind="current_external", local_sources=True
-        ).source_domains
-        == ()
-    )
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "DO")
-    assert (
-        retrieval_spec(
-            "balanced", question_kind="current_external", local_sources=True
-        ).source_domains
-        == LOCAL_SOURCE_DOMAINS["DO"]
-    )
-    assert (
-        retrieval_spec("balanced", question_kind="current_external").source_domains == ()
-    ), "a market alone never restricts the web"
+    assert spec("MX").location == RetrievalLocation(country="MX")
+    assert spec(None).location is None, "a user without a country sends no location"
+    assert spec("DO").source_domains == (), "a country never restricts the web"
 
 
 @pytest.mark.parametrize(
@@ -164,7 +133,9 @@ def test_local_sources_need_a_market_with_a_list(monkeypatch) -> None:
 def test_the_response_language_is_iso_639_1(tag: str | None, code: str) -> None:
     assert iso_language(tag) == code
     assert (
-        retrieval_spec("fast", question_kind="live_quote", language_tag=tag).language
+        retrieval_spec(
+            "fast", question_kind="live_quote", language_tag=tag, country=None
+        ).language
         == code
     )
 
@@ -188,13 +159,12 @@ def test_the_thorough_job_rebuilds_its_parameters_from_the_typed_request() -> No
 # --- the request -----------------------------------------------------------
 
 
-def test_the_request_carries_every_retrieval_parameter(monkeypatch) -> None:
-    monkeypatch.setenv("ARGUS_RESEARCH_HOME_COUNTRY", "DO")
+def test_the_request_carries_every_retrieval_parameter() -> None:
     spec = retrieval_spec(
         "balanced",
         question_kind="current_external",
         language_tag="es-419",
-        local_sources=True,
+        country="DO",
     )
     client = PerplexityAgentClient("k", transport=RecordingTransport([agent_response()]))
 
@@ -212,10 +182,7 @@ def test_the_request_carries_every_retrieval_parameter(monkeypatch) -> None:
         {
             "type": "web_search",
             "search_context_size": "medium",
-            "filters": {
-                "search_recency_filter": "week",
-                "search_domain_filter": ["popularenlinea.com"],
-            },
+            "filters": {"search_recency_filter": "week"},
             "user_location": {"country": "DO"},
         },
         {"type": "finance_search"},
@@ -224,7 +191,8 @@ def test_the_request_carries_every_retrieval_parameter(monkeypatch) -> None:
 
 
 def test_the_fast_shape_sends_no_web_options_and_no_location() -> None:
-    spec = retrieval_spec("fast", question_kind="live_quote")
+    # A quote searches no web, so even a user's country has nowhere to go.
+    spec = retrieval_spec("fast", question_kind="live_quote", country="MX")
     client = PerplexityAgentClient("k", transport=RecordingTransport([agent_response()]))
 
     client.run_research("What is Apple at?", spec)

@@ -6,6 +6,7 @@ import AppearanceModal from "@/components/settings/AppearanceModal";
 import LanguageModal from "@/components/settings/LanguageModal";
 import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
 import DeletedItemsView from "@/components/settings/DeletedItemsView";
+import HomeCountryModal from "@/components/settings/HomeCountryModal";
 import MemoryControlsModal from "@/components/settings/MemoryControlsModal";
 import SharedReceiptsView from "@/components/settings/SharedReceiptsView";
 import UsageModal from "@/components/settings/UsageModal";
@@ -29,6 +30,8 @@ type SettingsPanelContext = {
   onHistoryMutated?: () => void;
   /** The menu's hand-off, so a panel's save reaches the shell like the menu's own. */
   onProfileSaved: (user: ApiUser) => void;
+  /** The account as the menu last read it. */
+  profile: ApiUser | null;
 };
 
 type SettingsPanelEntry = {
@@ -52,6 +55,18 @@ const SETTINGS_PANELS = {
     parent: "settings",
     render: ({ onClose, onBack, backLabel, onProfileSaved }) => (
       <LanguageModal
+        onClose={onClose}
+        onBack={onBack}
+        backLabel={backLabel}
+        onProfileSaved={onProfileSaved}
+      />
+    ),
+  },
+  country: {
+    parent: "settings",
+    render: ({ onClose, onBack, backLabel, onProfileSaved, profile }) => (
+      <HomeCountryModal
+        profile={profile}
         onClose={onClose}
         onBack={onBack}
         backLabel={backLabel}
@@ -135,6 +150,7 @@ type ProfileSettingsPanelsProps = {
   onBack: (parent: SettingsPanelParent) => void;
   onHistoryMutated?: () => void;
   onProfileSaved: (user: ApiUser) => void;
+  profile: ApiUser | null;
 };
 
 export default function ProfileSettingsPanels({
@@ -146,6 +162,7 @@ export default function ProfileSettingsPanels({
   onBack,
   onHistoryMutated,
   onProfileSaved,
+  profile,
 }: ProfileSettingsPanelsProps) {
   const { t } = useTranslation();
   const { parent, render } = SETTINGS_PANELS[panel];
@@ -159,5 +176,6 @@ export default function ProfileSettingsPanels({
     backLabel: t(titleKey, titleFallback),
     onHistoryMutated,
     onProfileSaved,
+    profile,
   });
 }

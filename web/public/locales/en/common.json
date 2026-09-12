@@ -226,6 +226,17 @@
         "other": "Other"
       }
     },
+    "ask": {
+      "question": "How is Argus doing?",
+      "answers": {
+        "negative": "Bad",
+        "neutral": "Okay",
+        "positive": "Good"
+      },
+      "thanks": "Thanks for telling us.",
+      "tell_more": "Tell us more",
+      "dismiss": "Don't ask again in this chat"
+    },
     "close": "Close feedback"
   },
   "chat": {
@@ -1007,6 +1018,8 @@
       "preferred_name_save_error": "Could not save that name yet.",
       "preferred_name_too_long": "Keep this to {{count}} characters or fewer.",
       "language_save_error": "Could not update language yet.",
+      "country_save_error": "Could not update your country yet.",
+      "currency_save_error": "Could not update your currency yet.",
       "avatar_theme": {
         "label": "Avatar color",
         "change": "Edit avatar",
@@ -1054,7 +1067,20 @@
         "dark": "Dark",
         "system": "System"
       },
-      "close_appearance": "Close appearance"
+      "close_appearance": "Close appearance",
+      "home_country": "Country and currency",
+      "close_home_country": "Close country and currency",
+      "home_country_note": "When Argus looks things up, it uses your country as your location.",
+      "country": "Country",
+      "currency": "Currency",
+      "no_country": "No country",
+      "no_currency": "Not set",
+      "suggested_country": "Suggested",
+      "currency_from_country": "Match my country",
+      "search_country": "Search countries",
+      "search_currency": "Search currencies",
+      "no_countries": "No countries found.",
+      "no_currencies": "No currencies found."
     },
     "sidebar": {
       "title": "Sidebar preference",

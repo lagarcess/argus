@@ -10,6 +10,7 @@ from pydantic import (
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
+    computed_field,
     field_serializer,
     field_validator,
     model_serializer,
@@ -45,6 +46,13 @@ from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_KEYS,
     MAX_FEEDBACK_CONTEXT_SERIALIZED_LENGTH,
     MAX_FEEDBACK_MESSAGE_LENGTH,
+)
+from argus.domain.home_country import (
+    AssignedCountryCode,
+    CountryCode,
+    CurrencyCode,
+    TenderCurrencyCode,
+    resolved_currency,
 )
 from argus.domain.result_readout_content import ResultReadoutContent
 from argus.domain.strategy_template_contract import (
@@ -153,10 +161,21 @@ class User(BaseModel):
     language: Language = "en"
     locale: Locale = "en-US"
     avatar_theme: AvatarTheme = "ocean"
+    #: ISO 3166-1 alpha-2, declared in Settings and never inferred. Research
+    #: sends it as the reader's location; null sends none.
+    country: CountryCode = None
+    #: ISO 4217 the user chose over the currency their country implies.
+    currency_override: CurrencyCode = None
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def currency(self) -> str | None:
+        """ISO 4217: the override when set, otherwise the country's currency."""
+        return resolved_currency(self.country, self.currency_override)
 
 
 class GuestAccountSummary(BaseModel):
@@ -225,6 +244,8 @@ class ProfilePatch(BaseModel):
     language: Language | None = None
     locale: Locale | None = None
     avatar_theme: AvatarTheme = "ocean"
+    country: AssignedCountryCode = None
+    currency_override: TenderCurrencyCode = None
 
 
 class ConversationCreate(BaseModel):

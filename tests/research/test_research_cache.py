@@ -211,6 +211,9 @@ def test_a_scenario_lives_in_the_analyst_estimates_class() -> None:
         == (DATA_CLASS_TTL_SECONDS["analyst_estimates"])
     )
     assert retrieval_spec(
-        "balanced", question_kind="company_lookup", scenario=True
+        "balanced", question_kind="company_lookup", country=None, scenario=True
     ).recency == ("month")
-    assert retrieval_spec("balanced", question_kind="company_lookup").recency is None
+    assert (
+        retrieval_spec("balanced", question_kind="company_lookup", country=None).recency
+        is None
+    )

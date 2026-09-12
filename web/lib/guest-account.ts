@@ -27,6 +27,13 @@ export type ApiUser = {
   language: "en" | "es-419";
   locale: "en-US" | "es-419";
   avatar_theme?: AvatarTheme;
+  /**
+   * Registered-only settings, absent for guests. `currency` is what the account
+   * resolves to: the override when set, otherwise the country's currency.
+   */
+  country?: string | null;
+  currency_override?: string | null;
+  currency?: string | null;
   onboarding: {
     completed: boolean;
     stage: LegacyOnboardingStage;

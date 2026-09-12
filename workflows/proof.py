@@ -345,16 +345,14 @@ class PostgresProofJobGateway:
                       email,
                       display_name,
                       language,
-                      locale,
-                      theme
+                      locale
                     )
                     values (
                       %(user_id)s,
                       %(email)s,
                       'Render Workflow Proof',
                       'en',
-                      'en-US',
-                      'dark'
+                      'en-US'
                     )
                     on conflict (id) do nothing
                     """,

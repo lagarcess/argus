@@ -233,12 +233,6 @@ PROVIDER_PAGE = "https://www.perplexity.ai/finance/NVDA"
 RESEARCH_USER_ID = "retrieval"
 
 
-@pytest.fixture(autouse=True)
-def no_home_market(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The deployment's market is a per-test decision, never inherited."""
-    monkeypatch.delenv("ARGUS_RESEARCH_HOME_COUNTRY", raising=False)
-
-
 def educational_interpretation():
     from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
     from argus.agent_runtime.state.models import StrategySummary
@@ -267,9 +261,9 @@ def wire_grounded_client(
     return transport
 
 
-def run_research_turn(message: str, *, language: str = "en"):
+def run_research_turn(message: str, *, language: str = "en", country: str | None = None):
     """One research turn through the rail's own entry, as an English or
-    Spanish user."""
+    Spanish user with the country their profile declares, if any."""
     import asyncio
 
     from argus.agent_runtime import research_answer as ra
@@ -279,7 +273,9 @@ def run_research_turn(message: str, *, language: str = "en"):
         ra.research_answer_stage_result(
             interpretation=_interpretation(),
             state=RunState.new(current_user_message=message, recent_thread_history=[]),
-            user=UserState(user_id=RESEARCH_USER_ID, language_preference=language),
+            user=UserState(
+                user_id=RESEARCH_USER_ID, language_preference=language, country=country
+            ),
         )
     )
 

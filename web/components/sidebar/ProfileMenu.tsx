@@ -35,6 +35,7 @@ import {
   MessageSquareText,
   Palette,
   Globe,
+  MapPin,
   PanelLeft,
   Shield,
   Trash2,
@@ -174,6 +175,8 @@ export default function ProfileMenu({
   // retry that can never succeed.
   const receiptsAvailable =
     evidenceReceiptSharingEnabled && accountKind === "registered";
+  // A country is a registered-account setting; a guest has nowhere to keep one.
+  const homeCountryAvailable = accountKind === "registered";
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -725,6 +728,9 @@ export default function ProfileMenu({
       return [
         { id: "appearance", onSelect: () => openModal("appearance") },
         { id: "language", onSelect: () => openModal("language") },
+        ...(homeCountryAvailable
+          ? [{ id: "country", onSelect: () => openModal("country") }]
+          : []),
         ...(onOpenSidebarPreference
           ? [
               {
@@ -792,6 +798,7 @@ export default function ProfileMenu({
     handleOpenDeleteRequest,
     handleOpenKeyboardShortcuts,
     handleSubmenuToggle,
+    homeCountryAvailable,
     memoryControlsAvailable,
     receiptsAvailable,
     onClose,
@@ -885,6 +892,7 @@ export default function ProfileMenu({
         }}
         onHistoryMutated={onHistoryMutated}
         onProfileSaved={applyPatchedProfile}
+        profile={profile}
       />
     );
   }
@@ -1163,6 +1171,18 @@ export default function ProfileMenu({
               </span>
               <span className="ml-auto flex shrink-0">{quickJumpBadge("language")}</span>
             </button>
+            {homeCountryAvailable && (
+              <button
+                onClick={() => openModal("country")}
+                className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              >
+                <MapPin className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
+                <span className="whitespace-nowrap">
+                  {t("settings.app.home_country", "Country and currency")}
+                </span>
+                <span className="ml-auto flex shrink-0">{quickJumpBadge("country")}</span>
+              </button>
+            )}
             {onOpenSidebarPreference && (
               <button
                 onClick={() => {

@@ -182,12 +182,15 @@ def research_cache_key(
     question_fingerprint: str,
     language: str,
     contract: str = "retrieval",
+    country: str | None = None,
 ) -> str:
     """Public-market request identity only. No user identity may enter here.
 
     ``contract`` names the provider-facing instructions the packet was
     produced under (``retrieval`` or ``scenario``): a packet answered under
-    one contract never serves a question asked under the other."""
+    one contract never serves a question asked under the other. ``country``
+    is the location the request carried, so a search made for one country's
+    readers never answers another's."""
     material = "|".join(
         (
             capability_class,
@@ -197,6 +200,7 @@ def research_cache_key(
             question_fingerprint,
             language,
             contract,
+            country or "",
         )
     )
     return hashlib.sha256(material.encode()).hexdigest()

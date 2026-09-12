@@ -12,7 +12,6 @@ from loguru import logger
 from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import build_workflow_input, stream_agent_turn_events
-from argus.agent_runtime.state.models import UserState
 from argus.agent_runtime.turn_execution import (
     RuntimeEventTimeoutError as TurnRuntimeEventTimeoutError,
 )
@@ -100,6 +99,7 @@ from argus.api.chat.run_action_identity import (
     require_run_action_identity,
     validated_optional_idempotency_key,
 )
+from argus.api.chat.runtime_user import runtime_user_for
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
     threaded_runtime_event_source,
@@ -377,15 +377,10 @@ async def chat_stream(
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
     ]
-    runtime_user = UserState(
+    runtime_user = runtime_user_for(
         user_id=user.id,
-        display_name=current_user_profile.display_name,
-        language_preference=(
-            payload.language
-            or conversation.language
-            or current_user_profile.language
-            or "en"
-        ),
+        profile=current_user_profile,
+        turn_language=payload.language or conversation.language,
     )
     stale_confirmation_message = stale_confirmation_action_message(
         payload=payload,

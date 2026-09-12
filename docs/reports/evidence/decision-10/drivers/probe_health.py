@@ -28,7 +28,7 @@ prompt = _research_prompt(
     question_kind="company_lookup",
     publisher_sources_required=True,
 )
-spec = retrieval_spec("balanced", question_kind="company_lookup", language_tag="en").model_copy(
+spec = retrieval_spec("balanced", question_kind="company_lookup", language_tag="en", country=None).model_copy(
     update={"timeout_seconds": 75.0}
 )
 started = time.monotonic()

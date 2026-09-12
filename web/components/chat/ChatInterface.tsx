@@ -198,7 +198,8 @@ import {
   settleOpenConfirmationsFromFinalPayload,
   standaloneStreamStatusVisible,
 } from "./chat-message-projection";
-import { openFeedbackDialogState } from "./feedback-dialog-state";
+import { openFeedbackDialogState, type ChatFeedbackDialogState } from "./feedback-dialog-state";
+import FeedbackAsk from "../feedback/FeedbackAsk";
 import { messageElementRegistrar } from "./transcript-element-refs";
 import { usePendingBreakdownRecovery } from "./usePendingBreakdownRecovery";
 import { retirePendingBreakdown } from "@/lib/pending-result-breakdown";
@@ -302,12 +303,7 @@ export default function ChatInterface() {
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
-  const [feedbackState, setFeedbackState] = useState<{
-    isOpen: boolean;
-    type: "bug" | "feature" | "general" | "rating";
-    rating?: "positive" | "negative";
-    context?: Record<string, unknown>;
-  }>({ isOpen: false, type: "general" });
+  const [feedbackState, setFeedbackState] = useState<ChatFeedbackDialogState>({ isOpen: false, type: "general" });
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("collapsed");
   const [isSidebarPreferenceModalOpen, setIsSidebarPreferenceModalOpen] =
     useState(false);
@@ -2526,6 +2522,7 @@ export default function ChatInterface() {
                         </span>
                       </div>
                     )}
+                    <FeedbackAsk conversationId={conversationId} messages={messages} answerArriving={isStreamingResponse} enabled={canSubmitFeedback} onToast={showToast} onTellUsMore={(context) => setFeedbackState(openFeedbackDialogState("general", context, undefined, conversationId))} />
                     <div ref={latestActivitySentinelRef} data-testid="latest-activity-sentinel" className="h-px" aria-hidden="true" />
                     <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
