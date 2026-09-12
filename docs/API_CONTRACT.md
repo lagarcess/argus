@@ -4280,7 +4280,9 @@ Contract rules:
   or more subjects were compared, peer suggestions, and the open thread, in
   a consumable shape. It is not a memory record and carries none of the four
   memory categories. The rail only emits; nothing reads or writes memory
-  here, and consumption ships in the memory lane.
+  here, and consumption ships in the memory lane. The app does not render
+  `follow_up`; a research answer that later offers next steps adopts the
+  `next_steps` list instead of a new shape.
 - `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
   ground through the balanced shape; the provider's `etf_holdings` table is
   parsed deterministically, weight order preserved, and each named holding
@@ -4733,19 +4735,39 @@ number than the card above it. The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
 
-A result follow-up that asks what to try next (`semantic_turn_act:
-"result_followup"`, `result_followup_focus: "next_experiment"`) answers with
-this same sidecar on a plain assistant message: `assistant_response` is a
-one-sentence lead-in in the workspace language, `next_experiments` carries the
-latest result's rows (the same offer the result made when it was first
-explained), and no `response_intent` heading is attached because the Try next
-section is the heading. No composer call is spent on that turn. Because the
-message carries no result card, the sidecar names its run as `source_run_id`
-(the latest result's run id), and the client submits the same
-`refine_strategy` action for `change_date_range` and `compare_buy_and_hold`
-rows that it submits under a card, with that `run_id`. The retryable
-`recovery.code = "latest_result_followup_unavailable"` appears only when no
-row can be built for the latest result (#590).
+A result follow-up (`semantic_turn_act: "result_followup"`) is answered by the
+model on a plain assistant message: `assistant_response` is the answer in the
+workspace language, and no `response_intent` heading is attached. Under the
+answer, `next_steps` carries one ordered list of three to five steps
+(`version: "argus_next_steps/v1"`) in the order the answer recommends them. Each
+item is either `{type: "test", kind}`, a runnable test Argus attaches from the
+latest result's Try next offer, or `{type: "question", text}`, a question the
+reader could ask next. The same message's `next_experiments` carries exactly the
+listed tests' rows, in list order and without `why` (the answer gives the
+reasons), and names its run as `source_run_id`. A tapped test submits what its
+row submits under a card, including the `refine_strategy` action with that
+`run_id` for `change_date_range` and `compare_buy_and_hold`; a tapped question
+sends its text as an ordinary user turn. The frontend renders one Try next
+section from `next_steps`, resolving each test to its row and dropping items it
+cannot resolve. A message without `next_steps` shows its `next_experiments` rows
+alone, which is the shape under a result card before any follow-up answer. When
+the reader asked what to try next (`result_followup_focus: "next_experiment"`)
+and the answer lists no steps, or no model answered and the retryable
+`recovery.code = "latest_result_followup_unavailable"` is shown, the list holds
+the result's tests alone (#590). `next_steps` is not specific to results: a
+research answer can adopt it later without a new shape, and research answers
+carry only `next_experiments` today.
+
+```json
+"next_steps": {
+  "version": "argus_next_steps/v1",
+  "items": [
+    {"type": "test", "kind": "recurring_monthly_buys"},
+    {"type": "question", "text": "What drove DOCN's drop between February and August 2025?"},
+    {"type": "test", "kind": "change_date_range"}
+  ]
+}
+```
 
 When the user selects `change_date_range` or `compare_buy_and_hold`, the web
 client submits a result-presented `refine_strategy` action whose payload carries
