@@ -1,11 +1,11 @@
 {
   "probe": "scenario_inputs_balanced",
   "purpose": "any grounded math: the answer returns its calculation with every input source, balanced configuration",
-  "candidate_sha": "eb5d7daf3efbea17ed0d5414850650497a552111",
-  "captured_at": "2026-09-12T21:45:50.361076+00:00",
+  "candidate_sha": "cba2157672695375e2c20a7779e6206653c78984",
+  "captured_at": "2026-09-12T22:11:14.824130+00:00",
   "question": "what will $10,000 in NVDA be worth in ten years?",
   "packet": {
-    "answer_markdown": "**There is no single knowable value in ten years.** The calculation will show what your {{amount}} NVDA investment would be worth under low, base and high scenarios.\n\nIt starts with NVDA’s current price of {{price}} as of September eleventh, twenty twenty-six, and NVIDIA’s latest reported six-month GAAP diluted earnings of {{per_share}} per share for the period ended July twenty-six, twenty twenty-six.\n\nThe scenarios assume annual per-share earnings growth of {{growth_low_pct}}, {{growth_base_pct}} and {{growth_high_pct}}, paired with terminal valuation multiples of {{multiple_low}}, {{multiple_base}} and {{multiple_high}}. These growth rates and multiples are assumptions; NVIDIA does not publish a ten-year value for the shares. The results exclude dividends, taxes, fees and currency effects.",
+    "answer_markdown": "There is no single knowable future value. The calculation will show low, base and high outcomes for your {{amount}} investment over {{horizon_years}}, using NVDA’s {{price}} share price as of 2026-09-11 and trailing diluted earnings of {{per_share}} per share through 2026-07-26.\n\nThe scenarios assume annual earnings growth of {{growth_low_pct}}, {{growth_base_pct}} and {{growth_high_pct}}. These are assumptions, not company forecasts, and each scenario holds NVDA’s current earnings multiple constant because no future valuation multiple is stated by a public source.\n\nNVIDIA cautions that forward-looking statements are not guarantees of future performance and that actual results may differ materially. Accordingly, the calculated outcomes are scenarios rather than a prediction.",
     "categories": [
       "quote"
     ],
@@ -19,14 +19,14 @@
         "source_date": "2026-08-26"
       },
       {
-        "url": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-2nd-Quarter-FY27-Financial-Results/",
-        "title": "Event Details",
+        "url": "https://investor.nvidia.com/financial-info/financial-reports/",
+        "title": "Financial Reports - NVIDIA Investor Relations",
         "source_date": "2026-08-26"
       },
       {
-        "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762156",
-        "title": "NVIDIA Corporation - Financial Info - SEC Filings",
-        "source_date": "2026-09-02"
+        "url": "https://investor.nvidia.com/search-results/default.aspx?searchterm=dividends",
+        "title": "NVIDIA Corporation - Search Results - NVIDIA Investor Relations",
+        "source_date": "2026-08-26"
       },
       {
         "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762683",
@@ -39,9 +39,39 @@
         "source_date": "2026-08-14"
       },
       {
-        "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19727881",
+        "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19735893",
+        "title": "NVIDIA Corporation - Financial Info - SEC Filings",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762163",
+        "title": "NVIDIA Corporation - Financial Info - SEC Filings",
+        "source_date": "2026-09-02"
+      },
+      {
+        "url": "https://investor.nvidia.com/files/content_files/TRANSCRIPT_-NVIDIA-Corp-NVDA-US-Q2-2027-Earnings-Call-26-August-2026-5_00-PM-ET.pdf",
+        "title": "[PDF] NVIDIA Corp. (NVDA)",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19753209",
         "title": "SEC Filings",
-        "source_date": "2026-08-24"
+        "source_date": "2026-08-31"
+      },
+      {
+        "url": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/default.aspx",
+        "title": "Events & Presentations - NVIDIA Investor Relations",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-2nd-Quarter-FY27-Financial-Results/default.aspx",
+        "title": "NVIDIA 2nd Quarter FY27 Financial Results",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://investor.nvidia.com/files/doc_financials/2027/NVDA-2027-Q2-10Q-Final-including-exhibits.pdf",
+        "title": "[PDF] FORM 10-Q NVIDIA CORPORATION",
+        "source_date": "2026-08-26"
       },
       {
         "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000078/nvda-20260902.htm",
@@ -49,18 +79,8 @@
         "source_date": "2026-09-02"
       },
       {
-        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000069/nvda-20260817.htm",
-        "title": "nvda-20260817 - SEC.gov",
-        "source_date": "2026-08-17"
-      },
-      {
         "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000075/0001045810-26-000075-index.htm",
         "title": "EDGAR Filing Documents for 0001045810-26-000075 - SEC.gov",
-        "source_date": "2026-08-26"
-      },
-      {
-        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/nvda-20260826.htm",
-        "title": "nvda-20260826",
         "source_date": "2026-08-26"
       },
       {
@@ -69,37 +89,77 @@
         "source_date": "2026-08-27"
       },
       {
-        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000078/0001045810-26-000078-index.htm",
-        "title": "Filing Detail",
+        "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2026:DNVIDIA",
+        "title": "NVIDIA Announces Financial Results for Fourth Quarter ...",
         "source_date": "2026-09-03"
       },
       {
-        "url": "https://www.sec.gov/Archives/edgar/data/1577526/000157752626000119/",
-        "title": "Directory List of /Archives/edgar/data/1577526/000157752626000119",
+        "url": "https://www.stocktitan.net/financials/NVDA/eps/",
+        "title": "Nvidia Corporation (NVDA) EPS 2026: $4.90, up 66.7%",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://sec-api.io/insights/nvidia-financial-analysis",
+        "title": "Financial analysis of NVIDIA, August 2026",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://www.metatrader.com/en/symbols/nasdaq/nvda/documents/227647-annual-report-fy2026",
+        "title": "NVIDIA CORP annual report, FY2026 (NASDAQ:NVDA) | MetaTrader",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2026:K%3Cb%3ENVIDIA",
+        "title": "NVIDIA Announces Financial Results for Fourth Quarter ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.semiboard.com/ticker/NVDA/2026-02-25.html",
+        "title": "NVDA",
+        "source_date": "2026-08-30"
+      },
+      {
+        "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19753571",
+        "title": "Financial Info - SEC Filings",
+        "source_date": "2026-08-31"
+      },
+      {
+        "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762156",
+        "title": "NVIDIA Corporation - Financial Info - SEC Filings",
         "source_date": "2026-09-02"
       },
       {
-        "url": "https://www.sec.gov/Archives/edgar/data/1434740/000147793226005172/0001477932-26-005172-index.htm",
-        "title": "EDGAR Filing Documents for 0001477932-26-005172",
-        "source_date": "2026-08-19"
+        "url": "https://finance.yahoo.com/quote/JBSS/earnings/JBSS-Q4-2026-earnings_call-658109.html",
+        "title": "John B. Sanfilippo & Son, Inc. (JBSS) Q4 FY2026 earnings ...",
+        "source_date": "2026-08-20"
       },
       {
-        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/0001045810-26-000073-index.htm",
-        "title": "EDGAR Filing Documents for 0001045810-26-000073",
-        "source_date": "2026-08-26"
+        "url": "https://www.thebrief.news/en/detailed/article/14104/nvidias-816-billion-quarter-and-the-market-shrug-that-tells-the-real-story",
+        "title": "NVIDIA's Revenue Trajectory: From Q3 FY26 Through Q1 FY27, Markets Brace for Q2 Report",
+        "source_date": "2026-08-21"
       }
     ],
     "name_pairs": [],
     "rows": [
       {
-        "subject": "NVIDIA",
+        "subject": "NVIDIA Corporation",
         "symbol": "NVDA",
-        "label": "six-month GAAP diluted earnings per share",
-        "value": 4.85,
+        "label": "latest share price",
+        "value": 218.29,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-11",
+        "source_url": null
+      },
+      {
+        "subject": "Nvidia Corporation",
+        "symbol": "NVDA",
+        "label": "trailing twelve-month diluted earnings per share",
+        "value": 7.91,
         "kind": "currency",
         "unit": "USD",
         "as_of": "2026-07-26",
-        "source_url": "https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-Second-Quarter-Fiscal-2027/default.aspx"
+        "source_url": "https://www.stocktitan.net/financials/NVDA/eps/"
       }
     ],
     "typed_answer": true,
@@ -114,7 +174,7 @@
           "source": "user",
           "source_url": null,
           "as_of": null,
-          "currency": null
+          "currency": "USD"
         },
         {
           "name": "symbol",
@@ -134,22 +194,14 @@
         },
         {
           "name": "per_share",
-          "value": 4.85,
+          "value": 7.91,
           "source": "page",
-          "source_url": "https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-Second-Quarter-Fiscal-2027/default.aspx",
+          "source_url": "https://www.stocktitan.net/financials/NVDA/eps/",
           "as_of": "2026-07-26",
           "currency": "USD"
         },
         {
           "name": "growth_low_pct",
-          "value": 5.0,
-          "source": "assumption",
-          "source_url": null,
-          "as_of": null,
-          "currency": null
-        },
-        {
-          "name": "growth_base_pct",
           "value": 10.0,
           "source": "assumption",
           "source_url": null,
@@ -157,8 +209,16 @@
           "currency": null
         },
         {
+          "name": "growth_base_pct",
+          "value": 20.0,
+          "source": "assumption",
+          "source_url": null,
+          "as_of": null,
+          "currency": null
+        },
+        {
           "name": "growth_high_pct",
-          "value": 15.0,
+          "value": 30.0,
           "source": "assumption",
           "source_url": null,
           "as_of": null,
@@ -166,7 +226,7 @@
         },
         {
           "name": "multiple_low",
-          "value": 25.0,
+          "value": null,
           "source": "assumption",
           "source_url": null,
           "as_of": null,
@@ -174,7 +234,7 @@
         },
         {
           "name": "multiple_base",
-          "value": 35.0,
+          "value": null,
           "source": "assumption",
           "source_url": null,
           "as_of": null,
@@ -182,7 +242,7 @@
         },
         {
           "name": "multiple_high",
-          "value": 45.0,
+          "value": null,
           "source": "assumption",
           "source_url": null,
           "as_of": null,
@@ -209,26 +269,27 @@
     "tool_results": [
       "finance_results",
       "search_results",
+      "search_results",
       "fetch_url_results"
     ],
     "usage": {
       "invocations": 1,
       "finance_search_invocations": 1,
-      "web_search_invocations": 1,
+      "web_search_invocations": 2,
       "fetch_url_invocations": 1,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 33005,
-      "cost_usd": 0.18992,
-      "input_tokens": 54953,
-      "output_tokens": 1630,
-      "cache_creation_input_tokens": 27672,
-      "cache_read_input_tokens": 27269
+      "latency_ms": 56524,
+      "cost_usd": 0.22912,
+      "input_tokens": 70360,
+      "output_tokens": 2475,
+      "cache_creation_input_tokens": 30636,
+      "cache_read_input_tokens": 39709
     },
-    "retrieved_at": "2026-09-12T21:46:23.372047Z",
-    "background_id": "resp_c795826d-e8a5-4ed9-8da6-278d158b1412"
+    "retrieved_at": "2026-09-12T22:12:11.354718Z",
+    "background_id": "resp_d1f84183-e4c5-417a-8e73-562111f0062c"
   },
   "error": null,
-  "elapsed_s": 33.03,
+  "elapsed_s": 56.55,
   "exchanges": [
     {
       "method": "POST",
@@ -260,7 +321,7 @@
           "effort": "low"
         },
         "language_preference": "en",
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\nThis question is answered by a calculation: fill calculation, valuation_scenarios unless another listed kind fits the question better, with the current price from market_data and every other input from a page or a stated assumption. Never compute the answer, scenario values, ranges or future figures yourself, never present one number as the future, and never say what the reader should do.",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\nThis question is answered by a calculation: fill calculation, valuation_scenarios unless another listed kind fits the question better, with the current price from market_data and every other input from a page or a stated assumption. Never compute the answer, scenario values, ranges or future figures yourself, never present one number as the future, and never say what the reader should do. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the user; when the user named no exact product, retrieve a typical one and say which. State no figure the calculation does not use or produce, and write dates as dates, not in words.",
         "response_format": {
           "type": "json_schema",
           "json_schema": {
@@ -633,13 +694,13 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1789249550,
-        "created_at": 1789249550,
+        "completed_at": 1789251075,
+        "created_at": 1789251075,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_c795826d-e8a5-4ed9-8da6-278d158b1412",
+        "id": "resp_d1f84183-e4c5-417a-8e73-562111f0062c",
         "incomplete_details": null,
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\nThis question is answered by a calculation: fill calculation, valuation_scenarios unless another listed kind fits the question better, with the current price from market_data and every other input from a page or a stated assumption. Never compute the answer, scenario values, ranges or future figures yourself, never present one number as the future, and never say what the reader should do.",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\nThis question is answered by a calculation: fill calculation, valuation_scenarios unless another listed kind fits the question better, with the current price from market_data and every other input from a page or a stated assumption. Never compute the answer, scenario values, ranges or future figures yourself, never present one number as the future, and never say what the reader should do. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the user; when the user named no exact product, retrieve a typical one and say which. State no figure the calculation does not use or produce, and write dates as dates, not in words.",
         "max_output_tokens": 2048,
         "max_tool_calls": null,
         "metadata": {},
@@ -657,7 +718,7 @@
             "results": [
               {
                 "category": "quote",
-                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency |\n| --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-11 20:00:00 UTC | 2026-09-12 21:46:01 UTC | after_hours | 218.29 | USD |\n\nData available in: `NVDA_quotes_132e95.csv` (row key column: symbol)",
+                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency |\n| --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-11 20:00:00 UTC | 2026-09-12 22:11:25 UTC | after_hours | 218.29 | USD |\n\nData available in: `NVDA_quotes_132e95.csv` (row key column: symbol)",
                 "sources": [
                   "https://www.perplexity.ai/finance/NVDA"
                 ],
@@ -673,15 +734,15 @@
           },
           {
             "queries": [
-              "site:investor.nvidia.com latest NVIDIA financial results diluted earnings per share 2026",
-              "site:sec.gov NVIDIA 10-Q 2026 diluted earnings per share"
+              "site:investor.nvidia.com fiscal 2026 annual results diluted earnings per share",
+              "site:sec.gov NVIDIA 2026 10-K diluted earnings per share"
             ],
             "results": [
               {
                 "date": "2026-08-26",
                 "id": 1,
                 "last_updated": "2026-08-27",
-                "snippet": "SANTA CLARA, Calif., Aug. 26, 2026 (GLOBE NEWSWIRE) -- NVIDIA (NASDAQ: NVDA) today reported revenue for the second quarter ended July 26, 2026, of $96.2 billion, up 18% from the previous quarter and up 106% from a year ago.\nFor th\ne quarter, GAAP and non-GAAP gross margins were both 75.0%.\nGAAP and non-GAAP earnings per diluted share were $2.46 and $2.22, respectively.\n...\n|**GAAP**|**GAAP**|**GAAP**|**GAAP**|**GAAP**|**GAAP**|\n...\n|*($ in millions, except earnings per share)*|**Q2 FY27**|**Q1 FY27**|**Q2 FY26**|**Q/Q**|**Y/Y**|\n...\n|Diluted earnings per share|$2.46|$2.39|$1.08|3 %|128 %|\n...\n|Diluted earnings per share|$2.22|$1.87|$1.01|19 %|120 %|\n...\nA live webcast (listen-only mode) of the conference call will be accessible at NVIDIA’s investor relations website, https://investor.nvidia.com.\n...\nper share|Diluted net income per share|Diluted net income per share| | | | | | | | | | | | | | | | | | | |\n| |GAAP| |$|2.46| | |$|2.39| | |$|1.08| | |$|4.85| | |$|1.84| |",
+                "snippet": "For the quarter, GAAP and non-GAAP gross margins were both 75.0%. GAAP and non-GAAP earnings per diluted share were $2.46 and $2.22, respectively. “AI has ...",
                 "source": "web",
                 "title": "NVIDIA Announces Financial Results for Second Quarter Fiscal 2027",
                 "url": "https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-Second-Quarter-Fiscal-2027/default.aspx"
@@ -689,20 +750,20 @@
               {
                 "date": "2026-08-26",
                 "id": 2,
-                "last_updated": "2026-08-28",
-                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "last_updated": "2026-08-26",
+                "snippet": "2026―NVIDIA (NASDAQ: reported revenue for the second quarter ended July 26, 2026, of $96.2 billion, up 18% from the previous quarter and up 106% from a year ...",
                 "source": "web",
-                "title": "Event Details",
-                "url": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-2nd-Quarter-FY27-Financial-Results/"
+                "title": "Financial Reports - NVIDIA Investor Relations",
+                "url": "https://investor.nvidia.com/financial-info/financial-reports/"
               },
               {
-                "date": "2026-09-02",
+                "date": "2026-08-26",
                 "id": 3,
-                "last_updated": "2026-09-03",
-                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "last_updated": "2026-09-12",
+                "snippet": "Fiscal 2026 Revenue of $46.7 billion, up 6% from Q1 and up 56% from a year ago Data Center revenue. Fiscal 2026 Record revenue of $57.0 ...",
                 "source": "web",
-                "title": "NVIDIA Corporation - Financial Info - SEC Filings",
-                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762156"
+                "title": "NVIDIA Corporation - Search Results - NVIDIA Investor Relations",
+                "url": "https://investor.nvidia.com/search-results/default.aspx?searchterm=dividends"
               },
               {
                 "date": "2026-09-03",
@@ -723,17 +784,69 @@
                 "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19703341"
               },
               {
-                "date": "2026-08-24",
+                "date": "2026-08-26",
                 "id": 6,
-                "last_updated": "2026-08-26",
+                "last_updated": "2026-08-27",
                 "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
                 "source": "web",
-                "title": "SEC Filings",
-                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19727881"
+                "title": "NVIDIA Corporation - Financial Info - SEC Filings",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19735893"
               },
               {
                 "date": "2026-09-02",
                 "id": 7,
+                "last_updated": "2026-09-04",
+                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "source": "web",
+                "title": "NVIDIA Corporation - Financial Info - SEC Filings",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762163"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 8,
+                "snippet": "Total revenue of $96 billion, Hyperscale revenue of $49 billion grew 13% sequentially, In Q2, we returned a record $26 billion to shareholders, our quarterly ...",
+                "source": "web",
+                "title": "[PDF] NVIDIA Corp. (NVDA)",
+                "url": "https://investor.nvidia.com/files/content_files/TRANSCRIPT_-NVIDIA-Corp-NVDA-US-Q2-2027-Earnings-Call-26-August-2026-5_00-PM-ET.pdf"
+              },
+              {
+                "date": "2026-08-31",
+                "id": 9,
+                "last_updated": "2026-09-04",
+                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "source": "web",
+                "title": "SEC Filings",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19753209"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 10,
+                "last_updated": "2026-09-01",
+                "snippet": "Financial Results July 7, 2026 Download PDF file, NVIDIA 2026 Annual Meeting of Stockholders. SEC filings and public conference calls and webcasts.",
+                "source": "web",
+                "title": "Events & Presentations - NVIDIA Investor Relations",
+                "url": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/default.aspx"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 11,
+                "last_updated": "2026-08-14",
+                "snippet": "NVIDIA 2nd Quarter FY27 Financial Results. August 26, 2026 02:00 PM PT. Listen to Webcast. Add to Calendar. Add to Apple Calendar · Add to Google Calendar ...",
+                "source": "web",
+                "title": "NVIDIA 2nd Quarter FY27 Financial Results",
+                "url": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-2nd-Quarter-FY27-Financial-Results/default.aspx"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 12,
+                "snippet": "Diluted net income per share was computed using the weighted average number of common and potentially dilutive shares outstanding during the period,",
+                "source": "web",
+                "title": "[PDF] FORM 10-Q NVIDIA CORPORATION",
+                "url": "https://investor.nvidia.com/files/doc_financials/2027/NVDA-2027-Q2-10Q-Final-including-exhibits.pdf"
+              },
+              {
+                "date": "2026-09-02",
+                "id": 13,
                 "last_updated": "2026-09-03",
                 "snippet": "Date of Report (Date of earliest event reported): September 2, 2026",
                 "source": "web",
@@ -741,82 +854,176 @@
                 "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000078/nvda-20260902.htm"
               },
               {
-                "date": "2026-08-17",
-                "id": 8,
-                "last_updated": "2026-08-26",
-                "snippet": "2788 San Tomas Expressway, Santa Clara, CA 95051",
-                "source": "web",
-                "title": "nvda-20260817 - SEC.gov",
-                "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000069/nvda-20260817.htm"
-              },
-              {
                 "date": "2026-08-26",
-                "id": 9,
+                "id": 14,
                 "last_updated": "2026-08-27",
-                "snippet": "2026-08-26\n...\nPeriod of Report\n2026-07-26\n...\n2788 SAN TOMAS EXPRESSWAY SANTA CLARA CA 95051 408-486-2000",
+                "snippet": "Business Address\n2788 SAN TOMAS EXPRESSWAY SANTA CLARA CA 95051 408-486-2000",
                 "source": "web",
                 "title": "EDGAR Filing Documents for 0001045810-26-000075 - SEC.gov",
                 "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000075/0001045810-26-000075-index.htm"
               },
               {
-                "date": "2026-08-26",
-                "id": 10,
-                "last_updated": "2026-08-28",
-                "snippet": "Date of Report (Date of earliest event reported): August 26, 2026",
-                "source": "web",
-                "title": "nvda-20260826",
-                "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/nvda-20260826.htm"
-              },
-              {
                 "date": "2026-08-27",
-                "id": 11,
+                "id": 15,
                 "last_updated": "2026-09-12",
                 "snippet": "Interested parties can listen to the live audio webcast of NVIDIA financial presentations at investor.nvidia.com.",
                 "source": "web",
                 "title": "NVIDIA Announces Upcoming Event for Financial Community",
                 "url": "https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Upcoming-Event-for-Financial-Community/default.aspx"
-              },
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "NVIDIA Announces Financial Results Fourth Quarter Fiscal 2026 diluted earnings per share full year",
+              "site:investor.nvidia.com 2026 fiscal 2026 record revenue diluted EPS"
+            ],
+            "results": [
               {
                 "date": "2026-09-03",
-                "id": 12,
-                "last_updated": "2026-09-03",
-                "snippet": "2788 SAN TOMAS EXPRESSWAY SANTA CLARA CA 95051 408-486-2000",
+                "id": 16,
+                "last_updated": "2026-09-08",
+                "snippet": "NVIDIA (NASDAQ: NVDA) today reported revenue for the second quarter ended July 26, 2026, of $96.2 billion, up 18% from the previous quarter and up 106% from a year ago.",
                 "source": "web",
-                "title": "Filing Detail",
-                "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000078/0001045810-26-000078-index.htm"
-              },
-              {
-                "date": "2026-09-02",
-                "id": 13,
-                "last_updated": "2026-09-02",
-                "snippet": "Parent Directory|Name|Size|Last Modified|\n...\n|ex991-fy27xq1earnings.htm|243635|2026-09-02 16:10:42|",
-                "source": "web",
-                "title": "Directory List of /Archives/edgar/data/1577526/000157752626000119",
-                "url": "https://www.sec.gov/Archives/edgar/data/1577526/000157752626000119/"
-              },
-              {
-                "date": "2026-08-19",
-                "id": 14,
-                "last_updated": "2026-08-19",
-                "snippet": "SEC\nAccession\nNo. 0001477932-26-005172\nFiling Date\nAccepted\n2026-08-19 15:54:43\nDocuments\n...\nPeriod of Report\n2026-06-30\nInteractive Data",
-                "source": "web",
-                "title": "EDGAR Filing Documents for 0001477932-26-005172",
-                "url": "https://www.sec.gov/Archives/edgar/data/1434740/000147793226005172/0001477932-26-005172-index.htm"
+                "title": "NVIDIA Announces Financial Results for Fourth Quarter ...",
+                "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2026:DNVIDIA"
               },
               {
                 "date": "2026-08-26",
-                "id": 15,
-                "last_updated": "2026-08-27",
-                "snippet": "2026-08-26\nAccepted\n...\n2026-08-26\n...\n2788 SAN TOMAS EXPRESSWAY SANTA CLARA CA 95051 408-486-2000",
+                "id": 17,
+                "last_updated": "2026-09-05",
+                "snippet": "Nvidia Corporation earned $4.90 per diluted share in fiscal year 2026.\nThis represents an increase of 66.7% from the prior fiscal year.\n...\nFY2026 annual\nEPS (Diluted) $4.90\nYoY +66.7%\n...\n|Metric|Q2'2710-Q|Q1'2710-Q|Q4'2610-Q|Q3'2610-Q|Q2'2610-Q|Q1'2610-Q|Q4'2510-K|Q3'2510-Q|Q2'2510-Q|Q1'2510-Q|Q4'2410-K|Q3'2410-Q|\n|--|--|--|--|--|--|--|--|--|--|--|--|--|\n|EPS (Diluted)|$2.46+127.8%|$2.39+214.5%|$1.76+95.6%|$1.30+66.7%|$1.08+61.2%|$0.76|$0.90|$0.78|$0.67|$0.60|$4.92+763.2%|$0.37|",
                 "source": "web",
-                "title": "EDGAR Filing Documents for 0001045810-26-000073",
-                "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/0001045810-26-000073-index.htm"
+                "title": "Nvidia Corporation (NVDA) EPS 2026: $4.90, up 66.7%",
+                "url": "https://www.stocktitan.net/financials/NVDA/eps/"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 18,
+                "last_updated": "2026-08-27",
+                "snippet": "|Q4 FY2026|$65.0bn ±2%|$68.1bn|+4.8%|74.8%|75.0%|$6.7bn|$6.79bn|17.0%|14.8%|\n...\n|$bn unless noted|Q2 FY26|Q3 FY26|Q4 FY26|Q1 FY27|Q2 FY27|\n...\n|GAAP diluted EPS ($)|1.08|1.30|1.76|2.39|2.46|\n...\n|25 Feb 26|2.02, 9.01|Q4 and full year FY2026 results|",
+                "source": "web",
+                "title": "Financial analysis of NVIDIA, August 2026",
+                "url": "https://sec-api.io/insights/nvidia-financial-analysis"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 19,
+                "last_updated": "2026-09-03",
+                "snippet": "|Metric|Fiscal 2026|Fiscal 2025|Change|\n...\n|**Diluted EPS**|$4.90|$2.94|+67%|",
+                "source": "web",
+                "title": "NVIDIA CORP annual report, FY2026 (NASDAQ:NVDA) | MetaTrader",
+                "url": "https://www.metatrader.com/en/symbols/nasdaq/nvda/documents/227647-annual-report-fy2026"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 20,
+                "last_updated": "2026-09-08",
+                "snippet": "NVIDIA (NASDAQ: NVDA) today reported revenue for the second quarter ended July 26, 2026, of $96.2 billion, up 18% from the previous quarter and up 106% from a year ago.",
+                "source": "web",
+                "title": "NVIDIA Announces Financial Results for Fourth Quarter ...",
+                "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2026:K%3Cb%3ENVIDIA"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 21,
+                "last_updated": "2026-08-27",
+                "snippet": "Revenue of $96.2 billion, GAAP and non-GAAP earnings per diluted share were $2.46 and $2.22, respectively. used in diluted net income per share",
+                "source": "web",
+                "title": "NVIDIA Announces Financial Results for Second Quarter Fiscal 2027",
+                "url": "https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-Second-Quarter-Fiscal-2027/default.aspx"
+              },
+              {
+                "date": "2026-08-30",
+                "id": 22,
+                "last_updated": "2026-08-30",
+                "snippet": "- **FCF $35B (Q4) / $97B FY26** vs $49B record in Q1; FY26 returned $41.1B (43% of FCF)",
+                "source": "web",
+                "title": "NVDA",
+                "url": "https://www.semiboard.com/ticker/NVDA/2026-02-25.html"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 23,
+                "last_updated": "2026-08-27",
+                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "source": "web",
+                "title": "NVIDIA Corporation - Financial Info - SEC Filings",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19735893"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 24,
+                "last_updated": "2026-09-03",
+                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "source": "web",
+                "title": "NVIDIA Corporation - Financial Info - SEC Filings - SEC Filings Details",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762683"
+              },
+              {
+                "date": "2026-08-31",
+                "id": 25,
+                "last_updated": "2026-09-04",
+                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "source": "web",
+                "title": "Financial Info - SEC Filings",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19753571"
+              },
+              {
+                "date": "2026-09-02",
+                "id": 26,
+                "last_updated": "2026-09-03",
+                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "source": "web",
+                "title": "NVIDIA Corporation - Financial Info - SEC Filings",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762156"
+              },
+              {
+                "date": "2026-08-31",
+                "id": 27,
+                "last_updated": "2026-09-04",
+                "snippet": "2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                "source": "web",
+                "title": "SEC Filings",
+                "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19753209"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 28,
+                "snippet": "We delivered another outstanding quarter with record revenue, operating income, and EPS. Total revenue of $96 billion, more than doubled year-over-year as ...",
+                "source": "web",
+                "title": "[PDF] NVIDIA Corp. (NVDA)",
+                "url": "https://investor.nvidia.com/files/content_files/TRANSCRIPT_-NVIDIA-Corp-NVDA-US-Q2-2027-Earnings-Call-26-August-2026-5_00-PM-ET.pdf"
+              },
+              {
+                "date": "2026-08-20",
+                "id": 29,
+                "last_updated": "2026-09-02",
+                "snippet": "I am pleased to report on a strong fiscal 2026, with net sales reaching a record $1.2 billion and diluted earnings per share increasing 4.6% for the full year.",
+                "source": "web",
+                "title": "John B. Sanfilippo & Son, Inc. (JBSS) Q4 FY2026 earnings ...",
+                "url": "https://finance.yahoo.com/quote/JBSS/earnings/JBSS-Q4-2026-earnings_call-658109.html"
+              },
+              {
+                "date": "2026-08-21",
+                "id": 30,
+                "last_updated": "2026-09-10",
+                "snippet": "Fourth-quarter fiscal 2026 revenue reached $68.1 billion, up 20% from Q3, bringing full-year fiscal 2026 revenue to $215.9 billion, a 65% increase over the prior fiscal year (NVIDIA Investor Relations).",
+                "source": "web",
+                "title": "NVIDIA's Revenue Trajectory: From Q3 FY26 Through Q1 FY27, Markets Brace for Q2 Report",
+                "url": "https://www.thebrief.news/en/detailed/article/14104/nvidias-816-billion-quarter-and-the-market-shrug-that-tells-the-real-story"
               }
             ],
             "type": "search_results"
           },
           {
             "contents": [
+              {
+                "snippet": "1. Home\n2. Financials\n3. NVDA\n4.\n\n# Nvidia Corporation (NVDA) EPS by Year\n\nNVDA\n\nNvidia Corporation earned $4.90 per diluted share in fiscal year 2026. This represents an increase of 66.7% from the prior fiscal year. Over the trailing 12 months, Q3 FY2026 through Q2 FY2027, the same line adds up to $7.91 per diluted share. The table below carries 15 fiscal years, from 2012 to 2026, and the quarters Nvidia Corporation has filed alongside them.\n\nFY2026 annual\n\nEPS (Diluted) $4.90\n\nYoY +66.7%\n\nSource SEC Filings (10-K/10-Q) Latest period Q2 FY2027, ended Jul 26, 2026 Reported Currency USD\n\nAnnual figures, oldest first. Point at a bar to read its period.\n\n## NVDA EPS (Diluted) by Fiscal Year\n\nFigures are as reported in USD. Each change compares the year with the year before it, and each column links to the filing it was taken from.\n\n|Metric|TTM|FY2610-K|FY2510-K|FY2410-K|FY2310-K|FY2210-K|FY2110-K|FY2010-K|FY1910-K|FY1810-K|FY1710-K|FY1610-K|FY1510-K|FY1410-K|FY1310-K|FY1210-K|\n|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|\n|EPS (Diluted)|$7.91|$4.90+66.7%|$2.94|$1.19+600.0%|$0.17|$3.85|$1.73+53.1%|$1.13|$6.63+37.6%|$4.82+87.5%|$2.57+138.0%|$1.08-3.6%|$1.12+51.4%|$0.74-17.8%|$0.90-4.3%|$0.94|\n\nTTM is the trailing twelve months, Q3 FY2026 through Q2 FY2027, summed from the four most recent quarterly filings.\n\n## NVDA EPS (Diluted) by Quarter\n\nFigures are as reported in USD. Each change compares the quarter with the same quarter a year earlier.\n\n|Metric|Q2'2710-Q|Q1'2710-Q|Q4'2610-Q|Q3'2610-Q|Q2'2610-Q|Q1'2610-Q|Q4'2510-K|Q3'2510-Q|Q2'2510-Q|Q1'2510-Q|Q4'2410-K|Q3'2410-Q|\n|--|--|--|--|--|--|--|--|--|--|--|--|--|\n|EPS (Diluted)|$2.46+127.8%|$2.39+214.5%|$1.76+95.6%|$1.30+66.7%|$1.08+61.2%|$0.76|$0.90|$0.78|$0.67|$0.60|$4.92+763.2%|$0.37|\n\n## What diluted earnings per share means\n\nDiluted earnings per share divides net income by the share count the company would have if every option and convertible security were exercised, which is the more conservative of the two per-share figures a filer reports.\n\n## More Nvidia Corporation financials\n- Every NVDA statement on one page\n- NVDA Revenue\n- NVDA Net Income\n- NVDA Free Cash Flow\n- NVDA Debt & Cash\n- NVDA Balance Sheet\n\n## Frequently Asked Questions",
+                "title": "Nvidia Corporation (NVDA) EPS 2026: $4.90, up 66.7%",
+                "url": "https://www.stocktitan.net/financials/NVDA/eps/"
+              },
               {
                 "snippet": "View all news\n\n### NVIDIA Announces Financial Results for Second Quarter Fiscal 2027\n\nAugust 26, 2026\n\nDownload this Press Release PDF Format (opens in new window)\n\n- Revenue of $96.2 billion, up 106% from a year ago\n- Data Center revenue of $89.0 billion, up 117% from a year ago\n\nSANTA CLARA, Calif., Aug. 26, 2026 (GLOBE NEWSWIRE) -- NVIDIA (NASDAQ: NVDA) today reported revenue for the second quarter ended July 26, 2026, of $96.2 billion, up 18% from the previous quarter and up 106% from a year ago. For the quarter, GAAP and non-GAAP gross margins were both 75.0%. GAAP and non-GAAP earnings per diluted share were $2.46 and $2.22, respectively.\n\n“AI has reached its inflection point. It’s doing useful work. Its tokens are productive and profitable. Now, compute is revenue,” said Jensen Huang, founder and CEO of NVIDIA. “And demand is accelerating. This time last year, one lab alone was driving the buildout; today, we have a golden age of new AI labs and startups, multiple frontier labs scaling in parallel, a thriving open-model ecosystem and physical AI coming online — with strong momentum across the U.S. and around the world. The AI infrastructure buildout is at full steam. Vera Rubin, now in full production, was built to power exactly this moment.”\n\nDuring the second quarter of fiscal 2027, NVIDIA returned approximately $26.0 billion to shareholders in the form of shares repurchased and cash dividends. As of the end of the second quarter, the company had approximately $99.0 billion remaining under its share repurchase authorization.\n\nNVIDIA will pay its next quarterly cash dividend of $0.25 per share on October 1, 2026, to all shareholders of record on September 10, 2026.\n\n**Q2 Fiscal 2027 Summary**\n\n|**GAAP**|**GAAP**|**GAAP**|**GAAP**|**GAAP**|**GAAP**|\n|--|--|--|--|--|--|\n|*($ in millions, except earnings per share)*|**Q2 FY27**|**Q1 FY27**|**Q2 FY26**|**Q/Q**|**Y/Y**|\n|Revenue|$96,221|$81,615|$46,743|18 %|106 %|\n|Gross margin|75.0 %|74.9 %|72.4 %|0.1 pts|2.6 pts|\n|Operating expenses|$8,408|$7,621|$5,413|10 %|55 %|\n|Operating income|$63,734|$53,536|$28,440|19 %|124 %|\n|Net income|$59,688|$58,321|$26,422|2 %|126 %|\n|Diluted earnings per share|$2.46|$2.39|$1.08|3 %|128 %|\n\n|**Non-GAAP**|**Non-GAAP**|**Non-GAAP**|**Non-GAAP**|**Non-GAAP**|**Non-GAAP**|\n|--|--|--|--|--|--|\n|*($ in millions, except earnings per share)*|**Q2 FY27**|**Q1 FY27**|**Q2 FY26**|**Q/Q**|**Y/Y**|\n|Revenue|$96,221|$81,615|$46,743|18 %|106 %|\n|Gross margin|75.0 %|75.0 %|72.5 %|--|2.5 pts|\n|Operating expenses|$8,232|$7,449|$5,361|11 %|54 %|\n|Operating income|$63,956|$53,783|$28,541|19 %|124 %|\n|Net income|$53,954|$45,548|$24,763|18 %|118 %|\n|Diluted earnings per share|$2.22|$1.87|$1.01|19 %|120 %|\n| | | | | | |\n\n**Outlook**\n\nNVIDIA’s outlook for the third quarter of fiscal 2027 is as follows:\n\n- Revenue is expected to be $108.0 billion, plus or minus 2%. NVIDIA is not assuming any Data Center compute revenue from China in its outlook.\n- GAAP and non-GAAP gross margins are expected to be 74.0%, plus or minus 50 basis points.\n- GAAP and non-GAAP operating expenses are expected to be approximately $9.2 billion and $9.0 billion, respectively.\n\nFor the full year fiscal 2027, NVIDIA expects GAAP and non-GAAP tax rates to be between 16.0% and 18.0%, excluding any discrete items and material changes to NVIDIA’s tax environment.\n\n**Highlights**\n\n**Data Center **\n\n- Second-quarter revenue was $89.0 billion, up 18% from the previous quarter and up 117% from a year ago.\n- Announced the NVIDIA Vera Rubin platform is ramping into full production with racks running at partners including CoreWeave, Google Cloud, Microsoft Azure, Oracle Cloud Infrastructure and Nebius.\n- Revealed that NVIDIA Spectrum™-6 switch systems — supporting both pluggable and co-packaged optics as part of the NVIDIA Vera Rubin platform — are arriving across the world’s gigascale AI factories.\n- Unveiled NVIDIA Vera, the first CPU built for AI agents, with broad adoption planned across the world’s leading technology providers.\n- Announced that NVIDIA Groq 3 LPX, the interactive AI inference accelerator, is now in full production.\n- Introduced new security innovations for NVIDIA Vera BlueField™-4 STX, delivering agentic AI storage processing with in-silicon security for AI factories.\n- Launched the NVIDIA DSX™ platform, providing infrastructure builders a complete playbook to design, build and operate AI factories at scale.\n- Announced strategic partnerships to establish independent compute financing platforms with Apollo, BlackRock, Blackstone, Brookfield, Goldman Sachs and KKR to mobilize over $500 billion of third-party capital for the buildout of AI infrastructure over time, subject to definitive agreements.\n- Announced that SpaceXAI will deploy NVIDIA Vera CPUs to accelerate its next generation of agentic AI applications.\n- Secured land, power and shell capacity through a partnership with SB Energy at the PORTS-Pike Technology Campus in Ohio to host NVIDIA compute.\n- Revealed that NVIDIA Blackwell led across every category in the MLPerf Training 6.0 benchmarks and in AgentPerf, the industry’s first agentic AI infrastructure benchmark.\n- Announced new software, open source models and partnerships with the world’s leading software platform providers to build autonomous AI agents for industries and enterprises; expanded NVIDIA Agent Toolkit with NVIDIA PhysicsNeMo and new and updated NVIDIA CUDA-X™ libraries.\n- Launched NVIDIA BioNeMo™ Agent Toolkit, which provides domain-specific tools and skills for the agentic life sciences era.\n- Formed the Open Secure AI Alliance with industry leaders to advance AI safety and security.\n- Revealed that NVIDIA GPUs with Confidential Computing are now used for confidential inference in Apple’s Private Cloud Compute.\n- Expanded Korea’s AI factory ecosystem through strategic partnerships with SK Telecom, NAVER and Brookfield to build sovereign AI infrastructure at gigawatt scale on the NVIDIA DSX platform, as part of a broader NVIDIA-powered national AI push across Korea’s industries and research institutions.\n- Announced a multiyear technology partnership with SK hynix to advance next-generation memory for the global AI factory buildout.\n- Partnered with the Japan government and industrial leaders to launch the world’s first national AI infrastructure; revealed that Japan’s leading enterprises, startups and research institutions are building industry-specialized AI models with NVIDIA Nemotron™ open models.\n- Announced that the NVIDIA Vera Rubin platform delivers world-class supercomputers for science; announced a record 35 new NVIDIA AI HPC supercomputers in development across Europe.\n\n**Edge Computing**\n\n- Second-quarter Edge Computing revenue was $7.2 billion, up 13% from the previous quarter and up 27% from a year ago.\n- Partnered with Microsoft to reinvent the Windows PC with NVIDIA RTX Spark™ — a 1-petaflop superchip with the full CUDA™ and NVIDIA RTX™ ecosystem.\n- Announced NVIDIA DGX Station™ for Windows, the world’s most powerful deskside AI supercomputer for developing and running agents on Windows.\n- Launched a local AI initiative with optimizations for top open models — DeepSeek v4 Flash, Diffusion Gemma, Nemotron 3.5 Lightning and Qwen 3.8 — and agent harnesses Hermes Agent and OpenClaw across RTX and DGX platforms.\n- Expanded the NVIDIA DRIVE Hyperion™ robotaxi-ready platform ecosystem, including strategic collaborations with Foxconn, VinFast, Uber and HUMAIN.\n- Introduced NVIDIA Alpamayo 2 Super, the frontier open reasoning model for safe robotaxi and autonomous vehicle development, for commercial use.\n- Launched NVIDIA Cosmos™ 3, the world’s first fully open frontier omnimodel for physical AI.\n- Announced the NVIDIA Isaac™ GR00T Reference Humanoid Robot, the first open humanoid robot reference design built on NVIDIA Jetson Thor™ and the NVIDIA Isaac GR00T open development platform.\n- Announced NVIDIA Halos for Robotics, the industry’s first full-stack safety system for physical AI, unifying AI compute and safety in a single comprehensive platform.\n- Released a major collection of open source agent tools and skills for physical AI, enabling developers to turn complex robotics, autonomous vehicle and vision AI workflows into agent-executable tasks.\n\n**CFO Commentary**\n\nCommentary on the quarter by Colette Kress, NVIDIA’s executive vice president and chief financial officer, is available at https://investor.nvidia.com.\n\n**Conference Call and Webcast Information**\n\nNVIDIA will conduct a conference call with analysts and investors to discuss its second quarter fiscal 2027 financial results and current financial prospects today at 2 p.m. Pacific time (5 p.m. Eastern time). A live webcast (listen-only mode) of the conference call will be accessible at NVIDIA’s investor relations website, https://investor.nvidia.com. The webcast will be recorded and available for replay until NVIDIA’s conference call to discuss its financial results for its third quarter of fiscal 2027.\n\n**Non-GAAP Measures**\n\nTo supplement NVIDIA’s condensed consolidated financial statements presented in accordance with GAAP, the company uses non-GAAP measures of certain components of financial performance. These non-GAAP measures include non-GAAP gross profit, non-GAAP gross margin, non-GAAP operating expenses, non-GAAP operating income, non-GAAP other income (expense), net, non-GAAP net income, non-GAAP net income, or earnings, per diluted share, and free cash flow. For NVIDIA’s investors to be better able to compare its current results with those of previous periods, the company has shown a reconciliation of GAAP to non-GAAP financial measures. These reconciliations adjust the related GAAP financial measures to exclude acquisition-related and other costs, other, gains/losses from equity securities, net, certain other income and expense, and the associated tax impact of these items where applicable. Beginning in the first quarter of fiscal 2027, NVIDIA’s non-GAAP financial measures no longer exclude stock-based compensation expense. The historical non-GAAP financial information presented has been updated to include stock-based compensation expense. Free cash flow is calculated as GAAP net cash provided by operating activities less both purchases related to property and equipment and intangible assets and principal payments on property and equipment and intangible assets. NVIDIA believes the presentation of its non-GAAP financial measures enhances the users’ overall understanding of the company’s historical financial performance. The presentation of the company’s non-GAAP financial measures is not meant to be considered in isolation or as a substitute for the company’s financial results prepared in accordance with GAAP, and the company’s non-GAAP measures may be different from non-GAAP measures used by other companies.\n\n|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|\n|--|--|--|--|--|--|--|--|--|--|--|--|--|--|\n|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|**CONDENSED CONSOLIDATED STATEMENTS OF INCOME**|\n|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|(In millions, except per share data)|\n|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|\n| | | | | | | | | | | | | | |\n| | | | | | | | | | | | | | |\n| | | |**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**| |**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|\n| | | |**July 26,**|**July 26,**| |**July 27,**|**July 27,**| |**July 26,**|**July 26,**| |**July 27,**|**July 27,**|\n| | | |**2026**|**2026**| |**2025**|**2025**| |**2026**|**2026**| |**2025**|**2025**|\n| | | | | | | | | | | | | | |\n|Revenue|Revenue|Revenue|$|96,221| |$|46,743| |$|177,837| |$|90,805|\n|Cost of revenue|Cost of revenue|Cost of revenue| |24,079| | |12,890| | |44,538| | |30,284|\n|**Gross profit**|**Gross profit**|**Gross profit**| |**72,142**| | |**33,853**| | |**133,299**| | |**60,521**|\n| | | | | | | | | | | | | | |\n|Operating expenses|Operating expenses|Operating expenses| | | | | | | | | | | |\n| |Research and development|Research and development| |7,054| | |4,291| | |13,375| | |8,280|\n| |Sales, general and administrative|Sales, general and administrative| |1,354| | |1,122| | |2,654| | |2,163|\n| | |**Total operating expenses**| |**8,408**| | |**5,413**| | |**16,029**| | |**10,443**|\n| | | | | | | | | | | | | | |\n|Operating income|Operating income|Operating income| |63,734| | |28,440| | |117,270| | |50,078|\n|Other income, net|Other income, net|Other income, net| |7,773| | |2,766| | |24,140| | |3,039|\n| | | | | | | | | | | | | | |\n|Income before income tax|Income before income tax|Income before income tax| |71,507| | |31,206| | |141,410| | |53,117|\n|Income tax expense|Income tax expense|Income tax expense| |11,819| | |4,784| | |23,400| | |7,920|\n|**Net income**|**Net income**|**Net income**|**$**|**59,688**| |**$**|**26,422**| |**$**|**118,010**| |**$**|**45,197**|\n| | | | | | | | | | | | | | |\n|Net income per share:|Net income per share:|Net income per share:| | | | | | | | | | | |\n| |Basic|Basic|$|2.47| |$|1.08| |$|4.87| |$|1.85|\n| |Diluted|Diluted|$|2.46| |$|1.08| |$|4.85| |$|1.84|\n| | | | | | | | | | | | | | |\n|Weighted average shares used in per share computation:|Weighted average shares used in per share computation:|Weighted average shares used in per share computation:| | | | | | | | | | | |\n| |Basic|Basic| |24,190| | |24,366| | |24,238| | |24,404|\n| |Diluted|Diluted| |24,285| | |24,532| | |24,338| | |24,571|\n| | | | | | | | | | | | | | |\n\n|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|\n|--|--|--|--|--|--|--|--|--|\n|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|**CONDENSED CONSOLIDATED BALANCE SHEETS**|\n|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|\n|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|\n| | | | | | | | | |\n| | | | | | | | | |\n| | | | |**July 26,**|**July 26,**| |**January 25,**|**January 25,**|\n| | | | |**2026**|**2026**| |**2026**|**2026**|\n|**ASSETS**|**ASSETS**|**ASSETS**| | | | | | |\n| | | | | | | | | |\n|Current assets:|Current assets:|Current assets:| | | | | | |\n| |Cash and cash equivalents|Cash and cash equivalents| |$|22,443| |$|10,605|\n| |Marketable debt securities|Marketable debt securities| | |34,143| | |39,065|\n| |Marketable equity securities|Marketable equity securities| | |42,783| | |12,886|\n| |Accounts receivable, net|Accounts receivable, net| | |63,059| | |38,466|\n| |Inventories|Inventories| | |31,575| | |21,403|\n| |Prepaid expenses and other current assets|Prepaid expenses and other current assets| | |3,409| | |3,180|\n| | |**Total current assets**| | |**197,412**| | |**125,605**|\n| | | | | | | | | |\n|Property and equipment, net|Property and equipment, net|Property and equipment, net| | |14,285| | |10,383|\n|Operating lease assets|Operating lease assets|Operating lease assets| | |5,390| | |2,867|\n|Goodwill|Goodwill|Goodwill| | |21,125| | |20,832|\n|Intangible assets, net|Intangible assets, net|Intangible assets, net| | |2,998| | |3,306|\n|Deferred income tax assets|Deferred income tax assets|Deferred income tax assets| | |12,159| | |13,258|\n|Non-marketable securities|Non-marketable securities|Non-marketable securities| | |51,157| | |22,251|\n|Other assets|Other assets|Other assets| | |15,746| | |8,301|\n| | |**Total assets**| |**$**|**320,272**| |**$**|**206,803**|\n| | | | | | | | | |\n|**LIABILITIES AND SHAREHOLDERS' EQUITY**|**LIABILITIES AND SHAREHOLDERS' EQUITY**|**LIABILITIES AND SHAREHOLDERS' EQUITY**| | | | | | |\n| | | | | | | | | |\n|Current liabilities:|Current liabilities:|Current liabilities:| | | | | | |\n| |Accounts payable|Accounts payable| |$|15,059| |$|9,812|\n| |Accrued and other current liabilities|Accrued and other current liabilities| | |26,960| | |21,352|\n| |Short-term debt|Short-term debt| | |1,000| | |999|\n| | |**Total current liabilities**| | |**43,019**| | |**32,163**|\n| | | | | | | | | |\n|Long-term debt|Long-term debt|Long-term debt| | |32,366| | |7,469|\n|Long-term operating lease liabilities|Long-term operating lease liabilities|Long-term operating lease liabilities| | |4,985| | |2,572|\n|Other long-term liabilities|Other long-term liabilities|Other long-term liabilities| | |10,918| | |7,306|\n| | |**Total liabilities**| | |**91,288**| | |**49,510**|\n| | | | | | | | | |\n|Shareholders' equity|Shareholders' equity|Shareholders' equity| | |228,984| | |157,293|\n| | |**Total liabilities and shareholders' equity**| |**$**|**320,272**| |**$**|**206,803**|\n| | | | | | | | | |\n\n|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|\n|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|\n|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|**CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS**|\n|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|(In millions)|\n|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|\n| | | | | | | | | | | | | | | | | | |\n| | | | | | | | | | | | | | | | | | |\n| | | |**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**| |**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|\n| | | |**July 26,**|**July 26,**|**July 26,**| |**July 27,**|**July 27,**|**July 27,**| |**July 26,**|**July 26,**|**July 26,**| |**July 27,**|**July 27,**|**July 27,**|\n| | | | |**2026**| | | |**2025**| | | |**2026**| | | |**2025**| |\n| | | | | | | | | | | | | | | | | | |\n|Cash flows from operating activities:|Cash flows from operating activities:|Cash flows from operating activities:| | | | | | | | | | | | | | | |\n|Net income|Net income|Net income|$|59,688| | |$|26,422| | |$|118,010| | |$|45,197| |\n|Adjustments to reconcile net income to net cash|Adjustments to reconcile net income to net cash|Adjustments to reconcile net income to net cash| | | | | | | | | | | | | | | |\n|provided by operating activities:|provided by operating activities:|provided by operating activities:| | | | | | | | | | | | | | | |\n| |Stock-based compensation expense|Stock-based compensation expense| |2,027| | | |1,624| | | |3,954| | | |3,099| |\n| |Depreciation and amortization|Depreciation and amortization| |1,127| | | |668| | | |2,124| | | |1,280| |\n| |Deferred income taxes|Deferred income taxes| |(602|)| | |18| | | |982| | | |(2,160|)|\n| |Gains from equity securities, net|Gains from equity securities, net| |(7,771|)| | |(2,247|)| | |(23,707|)| | |(2,073|)|\n| |Other|Other| |315| | | |(100|)| | |222| | | |(196|)|\n|Changes in operating assets and liabilities, net of acquisitions:|Changes in operating assets and liabilities, net of acquisitions:|Changes in operating assets and liabilities, net of acquisitions:| | | | | | | | | | | | | | | |\n| |Accounts receivable|Accounts receivable| |(22,346|)| | |(5,675|)| | |(24,590|)| | |(4,743|)|\n| |Inventories|Inventories| |(5,784|)| | |(3,622|)| | |(10,204|)| | |(4,880|)|\n| |Prepaid expenses and other assets|Prepaid expenses and other assets| |(5,497|)| | |387| | | |(6,480|)| | |946| |\n| |Accounts payable|Accounts payable| |1,915| | | |1,314| | | |4,125| | | |2,255| |\n| |Accrued and other current liabilities|Accrued and other current liabilities| |252| | | |(4,053|)| | |8,015| | | |3,075| |\n| |Other long-term liabilities|Other long-term liabilities| |753| | | |629| | | |1,970| | | |979| |\n|**Net cash provided by operating activities**|**Net cash provided by operating activities**|**Net cash provided by operating activities**| |**24,077**| | | |**15,365**| | | |**74,421**| | | |**42,779**| |\n| | | | | | | | | | | | | | | | | | |\n|Cash flows from investing activities:|Cash flows from investing activities:|Cash flows from investing activities:| | | | | | | | | | | | | | | |\n| |Proceeds from sales and maturities of debt securities|Proceeds from sales and maturities of debt securities| |24,592| | | |3,150| | | |26,563| | | |6,739| |\n| |Proceeds from sales of equity securities|Proceeds from sales of equity securities| |7,215| | | |70| | | |7,241| | | |70| |\n| |Purchases of equity securities|Purchases of equity securities| |(15,822|)| | |(346|)| | |(42,404|)| | |(1,245|)|\n| |Purchases of debt securities|Purchases of debt securities| |(21,777|)| | |(7,812|)| | |(21,777|)| | |(14,108|)|\n| |Purchases related to property and equipment and intangible assets|Purchases related to property and equipment and intangible assets| |(2,677|)| | |(1,894|)| | |(4,434|)| | |(3,122|)|\n| |Acquisitions, net of cash acquired|Acquisitions, net of cash acquired| |(211|)| | |(294|)| | |(298|)| | |(677|)|\n| |Other|Other| |(15|)| | |-| | | |(15|)| | |-| |\n|**Net cash used in investing activities**|**Net cash used in investing activities**|**Net cash used in investing activities**| |**(8,695**|**)**| | |**(7,126**|**)**| | |**(35,124**|**)**| | |**(12,343**|**)**|\n| | | | | | | | | | | | | | | | | | |\n|Cash flows from financing activities:|Cash flows from financing activities:|Cash flows from financing activities:| | | | | | | | | | | | | | | |\n| |Proceeds related to issuance of debt, net of costs|Proceeds related to issuance of debt, net of costs| |24,896| | | |-| | | |24,896| | | |-| |\n| |Proceeds related to employee stock plans|Proceeds related to employee stock plans| |-| | | |-| | | |515| | | |370| |\n| |Payments related to repurchases of common stock|Payments related to repurchases of common stock| |(19,732|)| | |(9,721|)| | |(39,044|)| | |(23,815|)|\n| |Dividends paid|Dividends paid| |(6,047|)| | |(244|)| | |(6,290|)| | |(488|)|\n| |Payments related to employee stock plan taxes|Payments related to employee stock plan taxes| |(2,402|)| | |(1,848|)| | |(4,531|)| | |(3,380|)|\n| |Groq, Inc.|Groq, Inc.| |(2,944|)| | |-| | | |(2,944|)| | |-| |\n| |Principal payments on property and equipment and intangible assets|Principal payments on property and equipment and intangible assets| |(59|)| | |(21|)| | |(92|)| | |(73|)|\n| |Other|Other| |112| | | |-| | | |31| | | |-| |\n|**Net cash used in financing activities**|**Net cash used in financing activities**|**Net cash used in financing activities**| |**(6,176**|**)**| | |**(11,834**|**)**| | |**(27,459**|**)**| | |**(27,386**|**)**|\n| | | | | | | | | | | | | | | | | | |\n|Change in cash and cash equivalents|Change in cash and cash equivalents|Change in cash and cash equivalents| |9,206| | | |(3,595|)| | |11,838| | | |3,050| |\n|Cash and cash equivalents at beginning of period|Cash and cash equivalents at beginning of period|Cash and cash equivalents at beginning of period| |13,237| | | |15,234| | | |10,605| | | |8,589| |\n|**Cash and cash equivalents at end of period**|**Cash and cash equivalents at end of period**|**Cash and cash equivalents at end of period**|**$**|** 22,443**| | |**$**|** 11,639**| | |**$**|** 22,443**| | |**$**|** 11,639**| |\n| | | | | | | | | | | | | | | | | | |\n\n|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|\n|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|\n|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|**RECONCILIATION OF GAAP TO NON-GAAP FINANCIAL MEASURES**|\n|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|($ in millions, except per share data)|\n|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|(Unaudited)|\n| | | | | | | | | | | | | | | | | | | | | | |\n| | | |**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**| |**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|\n| | | |**July 26,**|**July 26,**|**July 26,**| |**April 26,**|**April 26,**|**April 26,**| |**July 27,**|**July 27,**|**July 27,**| |**July 26,**|**July 26,**|**July 26,**| |**July 27,**|**July 27,**|**July 27,**|\n| | | | |**2026**| | | |**2026**| | | |**2025**| | | |**2026**| | | |**2025**| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|GAAP cost of revenue|GAAP cost of revenue|GAAP cost of revenue|$|24,079| | |$|20,458| | |$|12,890| | |$|44,538| | |$|30,284| |\n|GAAP gross profit|GAAP gross profit|GAAP gross profit|$|72,142| | |$|61,157| | |$|33,853| | |$|133,299| | |$|60,521| |\n|* GAAP gross margin*|* GAAP gross margin*|* GAAP gross margin*| |*75.0*|*%*| | |*74.9*|*%*| | |*72.4*|*%*| | |*75.0*|*%*| | |*66.6*|*%*|\n| |Acquisition-related and other costs (A)|Acquisition-related and other costs (A)| |46| | | |47| | | |49| | | |93| | | |170| |\n| |Other| | |-| | | |28| | | |-| | | |28| | | |4| |\n|**Non-GAAP cost of revenue**|**Non-GAAP cost of revenue**|**Non-GAAP cost of revenue**|**$**|**24,033**| | |**$**|**20,383**| | |**$**|**12,841**| | |**$**|**44,417**| | |**$**|**30,110**| |\n|**Non-GAAP gross profit**|**Non-GAAP gross profit**|**Non-GAAP gross profit**|**$**|**72,188**| | |**$**|**61,232**| | |**$**|**33,902**| | |**$**|**133,420**| | |**$**|**60,695**| |\n|*** Non-GAAP gross margin*** *|*** Non-GAAP gross margin*** *|*** Non-GAAP gross margin*** *| |***75.0** *|***%** *| | |***75.0** *|***%** *| | |***72.5** *|***%** *| | |***75.0** *|***%** *| | |***66.8** *|***%** *|\n| | | | | | | | | | | | | | | | | | | | | | |\n|GAAP operating expenses|GAAP operating expenses|GAAP operating expenses|$|8,408| | |$|7,621| | |$|5,413| | |$|16,029| | |$|10,443| |\n| |Acquisition-related and other costs (A)|Acquisition-related and other costs (A)| |(176|)| | |(172|)| | |(37|)| | |(348|)| | |(74|)|\n| |Other| | |-| | | |-| | | |(15|)| | |-| | | |(15|)|\n|**Non-GAAP operating expenses**|**Non-GAAP operating expenses**|**Non-GAAP operating expenses**|**$**|**8,232**| | |**$**|**7,449**| | |**$**|**5,361**| | |**$**|**15,681**| | |**$**|**10,354**| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|GAAP operating income|GAAP operating income|GAAP operating income|$|63,734| | |$|53,536| | |$|28,440| | |$|117,270| | |$|50,078| |\n| |Total impact of non-GAAP adjustments to operating income|Total impact of non-GAAP adjustments to operating income| |222| | | |247| | | |101| | | |469| | | |263| |\n|**Non-GAAP operating income***|**Non-GAAP operating income***|**Non-GAAP operating income***|**$**|**63,956**| | |**$**|**53,783**| | |**$**|**28,541**| | |**$**|**117,739**| | |**$**|**50,341**| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|GAAP other income, net|GAAP other income, net|GAAP other income, net|$|7,773| | |$|16,367| | |$|2,766| | |$|24,140| | |$|3,039| |\n| |Gains from equity securities, net|Gains from equity securities, net| |(7,771|)| | |(15,936|)| | |(2,247|)| | |(23,707|)| | |(2,073|)|\n| |Other (B)| | |298| | | |26| | | |1| | | |323| | | |2| |\n|**Non-GAAP other income, net**|**Non-GAAP other income, net**|**Non-GAAP other income, net**|**$**|**300**| | |**$**|**457**| | |**$**|**520**| | |**$**|**756**| | |**$**|**968**| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|GAAP net income|GAAP net income|GAAP net income|$|59,688| | |$|58,321| | |$|26,422| | |$|118,010| | |$|45,197| |\n| |Total pre-tax impact of non-GAAP adjustments|Total pre-tax impact of non-GAAP adjustments| |(7,251|)| | |(15,663|)| | |(2,145|)| | |(22,915|)| | |(1,808|)|\n| |Income tax impact of non-GAAP adjustments|Income tax impact of non-GAAP adjustments| |1,517| | | |2,890| | | |438| | | |4,407| | | |418| |\n| |Tax expense from OBBBA**|Tax expense from OBBBA**| |-| | | |-| | | |48| | | |-| | | |48| |\n|**Non-GAAP net income***|**Non-GAAP net income***|**Non-GAAP net income***|**$**|**53,954**| | |**$**|**45,548**| | |**$**|**24,763**| | |**$**|**99,502**| | |**$**|**43,855**| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|Diluted net income per share|Diluted net income per share|Diluted net income per share| | | | | | | | | | | | | | | | | | | |\n| |GAAP| |$|2.46| | |$|2.39| | |$|1.08| | |$|4.85| | |$|1.84| |\n| |Non-GAAP*| |$|2.22| | |$|1.87| | |$|1.01| | |$|4.09| | |$|1.78| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|Weighted average shares used in diluted net income per share computation|Weighted average shares used in diluted net income per share computation| | |24,285| | | |24,391| | | |24,532| | | |24,338| | | |24,571| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|GAAP net cash provided by operating activities|GAAP net cash provided by operating activities|GAAP net cash provided by operating activities|$|24,077| | |$|50,344| | |$|15,365| | |$|74,421| | |$|42,779| |\n| |Purchases related to property and equipment and intangible assets|Purchases related to property and equipment and intangible assets| |(2,677|)| | |(1,757|)| | |(1,894|)| | |(4,434|)| | |(3,122|)|\n| |Principal payments on property and equipment and intangible assets|Principal payments on property and equipment and intangible assets| |(59|)| | |(33|)| | |(21|)| | |(92|)| | |(73|)|\n|**Free cash flow**|**Free cash flow**| |**$**|**21,341**| | |**$**|**48,554**| | |**$**|**13,450**| | |**$**|**69,895**| | |**$**|**39,584**| |\n| | | | | | | | | | | | | | | | | | | | | | |\n|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|**Includes H20 charges/(releases), net, which were $4.5 billion and none for the first quarter, and ($180 million) and insignificant for the second quarter, of fiscal years 2026 and 2027, respectively.*|\n|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|***Tax expense included represents impact from OBBBA (One Big Beautiful Bill Act).*|\n| | | | | | | | | | | | | | | | | | | | | | |\n|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|(A) Acquisition-related and other costs are comprised of amortization of intangible assets, transaction costs, and certain compensation charges and are included in the following line items:|\n| | | |**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**|**Three Months Ended**| |**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|**Six Months Ended**|\n| | | |**July 26,**|**July 26,**|**July 26,**| |**April 26,**|**April 26,**|**April 26,**| |**July 27,**|**July 27,**|**July 27,**| |**July 26,**|**July 26,**|**July 26,**| |**July 27,**|**July 27,**|**July 27,**|\n| | | | |**2026**| | | |**2026**| | | |**2025**| | | |**2026**| | | |**2025**| |\n| |Cost of revenue|Cost of revenue|$|46| | |$|47| | |$|49| | |$|93| | |$|170| |\n| |Research and development|Research and development|$|170| | |$|167| | |$|29| | |$|337| | |$|57| |\n| |Sales, general and administrative|Sales, general and administrative|$|6| | |$|5| | |$|8| | |$|11| | |$|17| |\n| | | | | | | | | | | | | | | | | | | | | | |\n| | | | | | | | | | | | | | | | | | | | | | |\n|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|(B) Comprised of net (gains)/losses on equity derivatives, interest expense related to acquisition consideration discount to be paid in the future, share of net (earnings)/losses related to equity method investments, and dividend income on equity securities.|\n\n|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|**NVIDIA CORPORATION**|\n|--|--|--|--|--|\n|**RECONCILIATION OF GAAP TO NON-GAAP OUTLOOK**|**RECONCILIATION OF GAAP TO NON-GAAP OUTLOOK**|**RECONCILIATION OF GAAP TO NON-GAAP OUTLOOK**|**RECONCILIATION OF GAAP TO NON-GAAP OUTLOOK**|**RECONCILIATION OF GAAP TO NON-GAAP OUTLOOK**|\n| | | | | |\n| | | | | |\n| | |**Q3 FY27 Outlook**|**Q3 FY27 Outlook**|**Q3 FY27 Outlook**|\n| | |($ in billions)|($ in billions)|($ in billions)|\n| | | | | |\n|GAAP gross margin|GAAP gross margin| |74.0|%|\n| |Impact of acquisition-related costs and other costs| |-| |\n|**Non-GAAP gross margin**|**Non-GAAP gross margin**| |**74.0**|**%**|\n| | | | | |\n|GAAP operating expenses|GAAP operating expenses|$|9.2| |\n| |Acquisition-related costs and other costs| |(0.2|)|\n|**Non-GAAP operating expenses**|**Non-GAAP operating expenses**|**$**|**9.0**| |\n| | | | | |\n\n**\n**\n\n**About NVIDIA**\n\nNVIDIA (NASDAQ: NVDA) is the world leader in AI and accelerated computing.\n\nFor further information, contact:\n\n|Toshiya Hari|Mylene Mangalindan|\n|--|--|\n|Investor Relations|Corporate Communications|\n|**NVIDIA Corporation**|**NVIDIA Corporation**|\n|IR@nvidia.com|press@nvidia.com|\n| | |\n\nCertain statements in this press release including, but not limited to, statements as to: the buildout of AI factories; expectations with respect to growth, performance and benefits of NVIDIA’s products, services and technologies, including Blackwell and Vera Rubin, and related trends and drivers; expectations with respect to supply and demand for NVIDIA’s products, services and technologies, including Blackwell and Vera Rubin, and related matters including inventory, production and distribution; expectations with respect to NVIDIA’s third party arrangements, including with its collaborators and partners; expectations with respect to our investments; expectations with respect to our financing arrangements; expectations with respect to technology developments, and related trends and drivers; future NVIDIA cash dividends or other returns to stockholders; NVIDIA’s financial and business outlook for the third quarter of fiscal 2027 and beyond; projected market growth and trends; expectations with respect to AI and related industries; and other statements that are not historical facts are forward-looking statements within the meaning of Section 27A of the Securities Act of 1933, as amended, and Section 21E of the Securities Exchange Act of 1934, as amended, which are subject to the “safe harbor” created by those sections based on management’s beliefs and assumptions and on information currently available to management and are subject to risks and uncertainties that could cause results to be materially different than expectations. Important factors that could cause actual results to differ materially include: global economic and political conditions; NVIDIA’s reliance on third parties to manufacture, assemble, package and test NVIDIA’s products; the impact of technological development and competition; development of new products and technologies or enhancements to NVIDIA’s existing products and technologies; market acceptance of NVIDIA’s products or NVIDIA’s partners’ products; design, manufacturing or software defects; changes in consumer preferences or demands; changes in industry standards and interfaces; unexpected loss of performance of NVIDIA’s products or technologies when integrated into systems; NVIDIA’s ability to realize the potential benefits of business investments or acquisitions; and changes in applicable laws and regulations, as well as other factors detailed from time to time in the most recent reports NVIDIA files with the Securities and Exchange Commission, or SEC, including, but not limited to, its Annual Report on Form 10-K and Quarterly Reports on Form 10-Q. Copies of reports filed with the SEC are posted on the company’s website and are available from NVIDIA without charge. These forward-looking statements are not guarantees of future performance and speak only as of the date hereof, and, except as required by law, NVIDIA disclaims any obligation to update these forward-looking statements to reflect future events or circumstances.\n\n© 2026 NVIDIA Corporation. All rights reserved. NVIDIA, the NVIDIA logo, BlueField, Cosmos, Nemotron, NVIDIA Isaac, BioNeMo, CUDA-X, NVIDIA DRIVE Hyperion, NVIDIA Spectrum, NVIDIA DSX, NVIDIA RTX, RTX Spark, DGX Station, and Jetson Thor are trademarks and/or registered trademarks of NVIDIA Corporation in the U.S. and/or other countries. Other company and product names may be trademarks of the respective companies with which they are associated. Features, pricing, availability and specifications are subject to change without notice.\n\nA photo accompanying this announcement is available at https://www.globenewswire.com/NewsRoom/AttachmentNg/ef35707a-78bc-4b04-bc35-ff7fad530550\n\n##### NVIDIA corporate headquarters\n\n##### NVIDIA corporate headquarters in Silicon Valley\n\nSource: NVIDIA\n\nCategories: Press Releases\n\nView all news",
                 "title": "NVIDIA Announces Financial Results for Second Quarter ...",
@@ -829,11 +1036,11 @@
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"**There is no single knowable value in ten years.** The calculation will show what your {{amount}} NVDA investment would be worth under low, base and high scenarios.\\n\\nIt starts with NVDA’s current price of {{price}} as of September eleventh, twenty twenty-six, and NVIDIA’s latest reported six-month GAAP diluted earnings of {{per_share}} per share for the period ended July twenty-six, twenty twenty-six.\\n\\nThe scenarios assume annual per-share earnings growth of {{growth_low_pct}}, {{growth_base_pct}} and {{growth_high_pct}}, paired with terminal valuation multiples of {{multiple_low}}, {{multiple_base}} and {{multiple_high}}. These growth rates and multiples are assumptions; NVIDIA does not publish a ten-year value for the shares. The results exclude dividends, taxes, fees and currency effects.\",\"calculation\":{\"inputs\":[{\"as_of\":null,\"currency\":null,\"name\":\"currency\",\"source\":\"user\",\"source_url\":null,\"value\":\"USD\"},{\"as_of\":null,\"currency\":null,\"name\":\"symbol\",\"source\":\"user\",\"source_url\":null,\"value\":\"NVDA\"},{\"as_of\":\"2026-09-11\",\"currency\":\"USD\",\"name\":\"price\",\"source\":\"market_data\",\"source_url\":null,\"value\":218.29},{\"as_of\":\"2026-07-26\",\"currency\":\"USD\",\"name\":\"per_share\",\"source\":\"page\",\"source_url\":\"https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-Second-Quarter-Fiscal-2027/default.aspx\",\"value\":4.85},{\"as_of\":null,\"currency\":null,\"name\":\"growth_low_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":5},{\"as_of\":null,\"currency\":null,\"name\":\"growth_base_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":10},{\"as_of\":null,\"currency\":null,\"name\":\"growth_high_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":15},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_low\",\"source\":\"assumption\",\"source_url\":null,\"value\":25},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_base\",\"source\":\"assumption\",\"source_url\":null,\"value\":35},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_high\",\"source\":\"assumption\",\"source_url\":null,\"value\":45},{\"as_of\":null,\"currency\":null,\"name\":\"horizon_years\",\"source\":\"user\",\"source_url\":null,\"value\":10},{\"as_of\":null,\"currency\":\"USD\",\"name\":\"amount\",\"source\":\"user\",\"source_url\":null,\"value\":10000}],\"kind\":\"valuation_scenarios\",\"solve_for\":null},\"rows\":[{\"as_of\":\"2026-07-26\",\"kind\":\"currency\",\"label\":\"six-month GAAP diluted earnings per share\",\"source_url\":\"https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-Second-Quarter-Fiscal-2027/default.aspx\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":4.85}]}",
+                "text": "{\"answer_markdown\":\"There is no single knowable future value. The calculation will show low, base and high outcomes for your {{amount}} investment over {{horizon_years}}, using NVDA’s {{price}} share price as of 2026-09-11 and trailing diluted earnings of {{per_share}} per share through 2026-07-26.\\n\\nThe scenarios assume annual earnings growth of {{growth_low_pct}}, {{growth_base_pct}} and {{growth_high_pct}}. These are assumptions—not company forecasts—and each scenario holds NVDA’s current earnings multiple constant because no future valuation multiple is stated by a public source.\\n\\nNVIDIA cautions that forward-looking statements are not guarantees of future performance and that actual results may differ materially. Accordingly, the calculated outcomes are scenarios rather than a prediction.\",\"calculation\":{\"inputs\":[{\"as_of\":null,\"currency\":\"USD\",\"name\":\"currency\",\"source\":\"user\",\"source_url\":null,\"value\":\"USD\"},{\"as_of\":null,\"currency\":null,\"name\":\"symbol\",\"source\":\"user\",\"source_url\":null,\"value\":\"NVDA\"},{\"as_of\":\"2026-09-11\",\"currency\":\"USD\",\"name\":\"price\",\"source\":\"market_data\",\"source_url\":null,\"value\":218.29},{\"as_of\":\"2026-07-26\",\"currency\":\"USD\",\"name\":\"per_share\",\"source\":\"page\",\"source_url\":\"https://www.stocktitan.net/financials/NVDA/eps/\",\"value\":7.91},{\"as_of\":null,\"currency\":null,\"name\":\"growth_low_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":10},{\"as_of\":null,\"currency\":null,\"name\":\"growth_base_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":20},{\"as_of\":null,\"currency\":null,\"name\":\"growth_high_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":30},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_low\",\"source\":\"assumption\",\"source_url\":null,\"value\":null},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_base\",\"source\":\"assumption\",\"source_url\":null,\"value\":null},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_high\",\"source\":\"assumption\",\"source_url\":null,\"value\":null},{\"as_of\":null,\"currency\":null,\"name\":\"horizon_years\",\"source\":\"user\",\"source_url\":null,\"value\":10},{\"as_of\":null,\"currency\":\"USD\",\"name\":\"amount\",\"source\":\"user\",\"source_url\":null,\"value\":10000}],\"kind\":\"valuation_scenarios\",\"solve_for\":null},\"rows\":[{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"latest share price\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":218.29},{\"as_of\":\"2026-07-26\",\"kind\":\"currency\",\"label\":\"trailing twelve-month diluted earnings per share\",\"source_url\":\"https://www.stocktitan.net/financials/NVDA/eps/\",\"subject\":\"Nvidia Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":7.91}]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_a8a72a7e-6fce-4493-80d4-148340f6b11a",
+            "id": "msg_a7fe8c5c-87ad-4a7c-b4df-52247d51ff7c",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -878,28 +1085,28 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.13836,
-            "cache_read_cost": 0.01091,
+            "cache_creation_cost": 0.15318,
+            "cache_read_cost": 0.01588,
             "currency": "USD",
-            "input_cost": 5e-05,
-            "output_cost": 0.0326,
-            "tool_calls_cost": 0.008,
+            "input_cost": 6e-05,
+            "output_cost": 0.0495,
+            "tool_calls_cost": 0.0105,
             "tool_calls_cost_details": {
               "fetch_url": 0.0005,
               "finance_search": 0.005,
-              "search_web": 0.0025
+              "search_web": 0.005
             },
-            "total_cost": 0.18992
+            "total_cost": 0.22912
           },
-          "input_tokens": 54953,
+          "input_tokens": 70360,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 27672,
-            "cache_read_input_tokens": 27269,
-            "cached_tokens": 27269
+            "cache_creation_input_tokens": 30636,
+            "cache_read_input_tokens": 39709,
+            "cached_tokens": 39709
           },
-          "output_tokens": 1630,
+          "output_tokens": 2475,
           "output_tokens_details": {
-            "reasoning_tokens": 755
+            "reasoning_tokens": 1492
           },
           "tool_calls_details": {
             "fetch_url": {
@@ -911,11 +1118,11 @@
               "invocation": 1
             },
             "search_web": {
-              "cost_usd": 0.0025,
-              "invocation": 1
+              "cost_usd": 0.005,
+              "invocation": 2
             }
           },
-          "total_tokens": 56583
+          "total_tokens": 72835
         },
         "user": null
       }
