@@ -203,6 +203,7 @@ export type StrategyConfirmationPeriodAdjustment = {
   code: string;
   requested_date_range: StrategyConfirmationDateRange;
   effective_date_range: StrategyConfirmationDateRange;
+  limited_by?: { symbol: string; first_available: string };
 };
 
 export type StrategyConfirmationBenchmarkAdjustment = {

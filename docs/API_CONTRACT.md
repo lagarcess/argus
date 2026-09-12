@@ -1087,9 +1087,12 @@ machine-readable fields alongside display labels:
   action always keeps its normal localized label. There is no second action,
   modal, toast, or client-owned execution state.
 - `period_adjustment`: optional typed sidecar with
-  `code = effective_window_adjusted`, `requested_date_range`, and
-  `effective_date_range`. The frontend renders one localized, provider-neutral
-  assistant lead-in directly above the corrected card. The backend emits this
+  `code = effective_window_adjusted`, `requested_date_range`,
+  `effective_date_range`, and optional `limited_by = { symbol,
+  first_available }`. The frontend renders one localized, provider-neutral
+  assistant lead-in directly above the corrected card. When `limited_by` is
+  present the lead-in names that symbol and its first available date; cards
+  without it keep the shared data window reason. The backend emits this
   sidecar only when `data_coverage.adjustment_reason =
   provider_coverage_adjustment`; ordinary calendar alignment, full coverage,
   and legacy coverage without a reason omit it. Clients must not infer the
@@ -1618,6 +1621,13 @@ New coverage records include the code-owned `adjustment_reason`:
 optional when reading older records. Requested and effective ranges remain
 independent provenance; consumers must not classify their difference with
 fixed day thresholds.
+
+When one series' own history sets a start later than the request and the first
+session the window could open, new coverage records also carry
+`limited_by = { symbol, first_available }`: the series whose first bar is the
+effective start, and that bar's ISO date. Calendar alignment, full coverage,
+starts set by interleaved gaps, and older records omit it. Like
+`adjustment_reason`, it is provenance and is not part of the launch identity.
 
 `save_strategy` is accepted only as a stale-action compatibility request. It
 never mutates Strategy records; Argus responds that the completed run remains

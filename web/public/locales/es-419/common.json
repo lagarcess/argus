@@ -813,6 +813,7 @@
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
       "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
+      "period_adjustment_limited_by": "Ajusté el período de la prueba a {{period}} porque Argus solo tiene precios de {{symbol}} desde el {{date}}.",
       "undo": "Deshacer",
       "peer_add_failed": "No se pudo cambiar esa prueba. La tarjeta no cambió.",
       "status": {

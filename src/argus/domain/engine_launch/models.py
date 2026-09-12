@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from argus.domain.backtesting.date_window import validate_backtest_date_window
-from argus.domain.backtesting.types import CoverageAdjustmentReason
+from argus.domain.backtesting.types import CoverageAdjustmentReason, CoverageLimitedBy
 
 LaunchStrategyType = Literal[
     "buy_and_hold",
@@ -36,7 +36,13 @@ class CoveragePreflight(BaseModel):
     outcome: Literal["full_coverage", "adjusted_coverage"]
     requested_date_range: DateRange
     effective_date_range: DateRange
+    # Coverage provenance stays out of the launch identity, so validated dumps
+    # drop it and confirmation surfaces restore it from the preflight.
     adjustment_reason: CoverageAdjustmentReason | None = Field(
+        default=None,
+        exclude=True,
+    )
+    limited_by: CoverageLimitedBy | None = Field(
         default=None,
         exclude=True,
     )
