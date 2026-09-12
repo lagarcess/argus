@@ -24,9 +24,11 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 from argus.agent_runtime.next_experiments_contract import NEXT_EXPERIMENT_ACTION_LABELS
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.result_fact_figures import (
-    FIGURELESS_FACT_IDS,
     PAIRED_FACT_IDS,
+    UNCHECKED_TEXT_FACT_IDS,
+    reply_names_ticker,
     stated_fact_rows,
+    stated_tickers,
 )
 from argus.agent_runtime.result_followups import symbols_list
 from argus.agent_runtime.result_next_steps import (
@@ -235,7 +237,12 @@ async def compose_result_conversation_answer(
     # Argus writes in English and Spanish; any other reader language gets English.
     resolved = normalize_readout_language(language) or "en"
     facts, declared = _run_facts(metadata, requested_fact)
-    if requested_fact and requested_fact not in FIGURELESS_FACT_IDS and not declared:
+    tickers = stated_tickers(facts, requested_fact) if requested_fact else ()
+    if (
+        requested_fact
+        and requested_fact not in UNCHECKED_TEXT_FACT_IDS
+        and not (declared or tickers)
+    ):
         logger.info(
             f"Result fact reply declined fact_key={requested_fact}"
             " reason=requested_fact_not_stated"
@@ -276,6 +283,7 @@ async def compose_result_conversation_answer(
         test_kinds=test_kinds,
         invoke_json_schema_func=invoke_json_schema_func,
         declared=declared,
+        tickers=tickers,
     )
     if requested_fact and answered.text is None:
         logger.info(
@@ -300,10 +308,11 @@ def run_headline_facts(metadata: dict[str, Any]) -> dict[str, Any]:
 
 
 def stored_fact_is_stated(metadata: dict[str, Any], fact_key: str) -> bool:
-    """Whether the run's typed fact sheet states a stored fact a reply can declare."""
-    return fact_key in FIGURELESS_FACT_IDS or bool(
-        stated_fact_rows(_run_sheet(metadata), fact_key)
-    )
+    """Whether the run's typed facts state a stored fact a reply is checked against."""
+    if fact_key in UNCHECKED_TEXT_FACT_IDS:
+        return True
+    sheet = _run_sheet(metadata)
+    return bool(stated_tickers(sheet, fact_key) or stated_fact_rows(sheet, fact_key))
 
 
 def _run_sheet(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -370,10 +379,12 @@ def accepted_conversation_answer(
     sources: Sequence[ResearchSource],
     source: AnswerSource,
     declared: tuple[str, ...] = (),
+    tickers: tuple[str, ...] = (),
 ) -> ResultConversationAnswer:
     """The readout's light guard, then returned-source links and clean steps.
 
-    Every fact named in ``declared`` must be among the reply's validated figures."""
+    Every fact named in ``declared`` must be among the reply's validated figures,
+    and every ticker in ``tickers`` must appear in the reply as a whole word."""
     if not isinstance(draft, dict):
         return ResultConversationAnswer(text=None, failure_mode="invalid_draft")
     text, failure = accepted_readout_text(
@@ -390,6 +401,8 @@ def accepted_conversation_answer(
     }
     if not set(declared) <= cited:
         return ResultConversationAnswer(text=None, failure_mode="requested_fact_undeclared")
+    if not all(reply_names_ticker(text, ticker) for ticker in tickers):
+        return ResultConversationAnswer(text=None, failure_mode="requested_ticker_unstated")
     return ResultConversationAnswer(
         text=returned_source_links(text, sources),
         source=source,
@@ -457,6 +470,7 @@ async def _no_search_answer(
     test_kinds: tuple[str, ...],
     invoke_json_schema_func: Any,
     declared: tuple[str, ...] = (),
+    tickers: tuple[str, ...] = (),
 ) -> ResultConversationAnswer:
     messages = [
         {
@@ -497,6 +511,7 @@ async def _no_search_answer(
         sources=(),
         source="chat_model",
         declared=declared,
+        tickers=tickers,
     )
 
 

@@ -299,3 +299,97 @@ async def test_a_declined_fact_reply_keeps_the_recovery_without_research(
     assert "latest_result_followup_unavailable" in str(result)
     assert any("reason=requested_fact_undeclared" in line for line in lines)
     assert any("kept the recovery fact_key=peak_date" in line for line in lines)
+
+
+NAME_QUESTIONS = [
+    pytest.param("en", "Which assets and benchmark did it use?", id="english"),
+    pytest.param("es-419", "¿Qué activos y qué referencia usó?", id="spanish"),
+]
+TICKER_CASES = [
+    pytest.param(["COST", "TGT"], "SPY", "equity", "symbols", "COST y TGT", None, id="assets"),
+    pytest.param(["BTC/USD"], "BTC", "crypto", "symbols", "(BTC/USD)", None, id="crypto_pair"),
+    pytest.param(
+        ["EUR/USD"], "EUR/USD", "currency_pair", "benchmark_symbol", "EUR/USD", None,
+        id="currency_pair_benchmark",
+    ),
+    pytest.param(["COST"], "SPY", "equity", "benchmark_symbol", "¿SPY?", None, id="punctuated"),
+    pytest.param(
+        ["COST", "TGT"], "SPY", "equity", "symbols", "COST", "requested_ticker_unstated",
+        id="an_asset_missing",
+    ),
+    pytest.param(
+        ["COST"], "SPY", "equity", "benchmark_symbol", "SPYG", "requested_ticker_unstated",
+        id="not_a_whole_word",
+    ),
+    pytest.param(
+        ["BTC/USD"], "BTC", "crypto", "symbols", "BTC", "requested_ticker_unstated",
+        id="pair_shortened",
+    ),
+]
+
+
+def _naming_reply(language: str, names: str) -> dict[str, Any]:
+    text = (
+        f"Esta prueba usó {names}." if language.startswith("es") else f"This test used {names}."
+    )
+    return {"language": language, "text": text, "figures": [], "next_steps": []}
+
+
+def _named_snapshot(symbols: list[str], benchmark: str, asset_class: str) -> TaskSnapshot:
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    reference.metadata.update(
+        {"symbols": symbols, "benchmark_symbol": benchmark, "asset_class": asset_class}
+    )
+    reference.metadata["config_snapshot"].update(
+        {"symbols": symbols, "benchmark_symbol": benchmark}
+    )
+    return snapshot
+
+
+@pytest.mark.parametrize(("language", "message"), NAME_QUESTIONS)
+@pytest.mark.parametrize(
+    ("symbols", "benchmark_ticker", "asset_class", "fact", "names", "reason"),
+    TICKER_CASES,
+)
+def test_an_asset_or_benchmark_reply_must_name_each_stored_ticker(
+    language: str,
+    message: str,
+    symbols: list[str],
+    benchmark_ticker: str,
+    asset_class: str,
+    fact: str,
+    names: str,
+    reason: str | None,
+) -> None:
+    snapshot = _named_snapshot(symbols, benchmark_ticker, asset_class)
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    # The tickers are checked in exactly the form the answer's facts give the model.
+    given = conversation.run_headline_facts(dict(reference.metadata))
+    assert (given["symbols"], given["benchmark_symbol"]) == (symbols, benchmark_ticker)
+    chat = _ChatModel(_naming_reply(language, names))
+
+    with _logs() as lines:
+        result = _fact_answer(
+            language, message, _composer(_Agent(), chat), fact=fact, snapshot=snapshot
+        )
+
+    declined = [line for line in lines if "Result fact reply declined" in line]
+    if reason is None:
+        assert result.patch["assistant_response"] == chat.draft["text"]
+        assert declined == []
+    else:
+        assert isinstance(result, LatestResultFactComposerDeclined)
+        assert len(declined) == 1
+        assert f"fact_key={fact} reason={reason}" in declined[0]
+
+
+@pytest.mark.parametrize(("language", "message"), NAME_QUESTIONS)
+def test_a_strategy_reply_is_not_checked(language: str, message: str) -> None:
+    chat = _ChatModel(_naming_reply(language, "una estrategia"))
+
+    result = _fact_answer(language, message, _composer(_Agent(), chat), fact="strategy")
+
+    assert result.patch["assistant_response"] == chat.draft["text"]

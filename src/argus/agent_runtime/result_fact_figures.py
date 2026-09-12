@@ -2,6 +2,8 @@
 
 A reply to a resolved fact question is accepted only when it declares these rows,
 so a fact counts as stored for a run only when the sheet states every one of them.
+Asset and benchmark facts are tickers: a reply must name each one as the answer's
+facts give it.
 """
 
 from __future__ import annotations
@@ -12,8 +14,10 @@ from typing import Any
 from argus.domain.result_readout_fact_sheet import resolve_readout_fact
 from argus.domain.result_readout_quotes import readout_figure_keys
 
-# Stated to the model as text (assets, benchmark, strategy); no figure to declare.
-FIGURELESS_FACT_IDS: frozenset[str] = frozenset({"symbols", "benchmark_symbol", "strategy"})
+# Stated to the model as tickers in text; a reply names each one as a whole word.
+TICKER_FACT_IDS: frozenset[str] = frozenset({"symbols", "benchmark_symbol"})
+# Text from the run record that the card shows; no reply check applies to it.
+UNCHECKED_TEXT_FACT_IDS: frozenset[str] = frozenset({"strategy"})
 
 # Companion facts offered beside the asked fact so date and value pairs stay
 # grounded on the same curve point.
@@ -80,6 +84,33 @@ def stated_fact_rows(sheet: dict[str, Any], fact_key: str) -> dict[str, dict[str
     if not keys or len(readout_figure_keys({"facts": stated})) != len(keys):
         return {}
     return stated
+
+
+def stated_tickers(facts: dict[str, Any], fact_key: str) -> tuple[str, ...]:
+    """The tickers the answer's facts give the model for an asset or benchmark fact."""
+    if fact_key not in TICKER_FACT_IDS:
+        return ()
+    values = (
+        facts.get("symbols") if fact_key == "symbols" else [facts.get("benchmark_symbol")]
+    )
+    if not isinstance(values, list):
+        return ()
+    return tuple(
+        value.strip() for value in values if isinstance(value, str) and value.strip()
+    )
+
+
+def reply_names_ticker(text: str, ticker: str) -> bool:
+    """Whether ``ticker`` appears in ``text`` with no letter or digit touching it."""
+    start = text.find(ticker)
+    while start != -1:
+        end = start + len(ticker)
+        before = text[start - 1] if start > 0 else ""
+        after = text[end] if end < len(text) else ""
+        if not before.isalnum() and not after.isalnum():
+            return True
+        start = text.find(ticker, start + 1)
+    return False
 
 
 def _close_time_keys(sheet: dict[str, Any], fact_key: str) -> tuple[str, ...]:
