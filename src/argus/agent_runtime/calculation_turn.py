@@ -1,13 +1,13 @@
-"""A money question Argus computes itself, from the interpreter's typed read.
+"""A money question Argus computes itself, from the calculation read.
 
-The model maps the question to a declared calculation and the numbers the
-user stated (``interpretation.calculation``); everything after that is
-deterministic: the declaration validates the inputs, a missing one becomes
-the model's own clarification and is asked for once, the tool runs in
-process with no provider call, and the card carries every figure. The prose
-lead never states a number. A read that needs published inputs for a named
-asset is left to research, which computes the same way after retrieval.
-Every guard that compensates for the read records a reason code.
+The calculation read maps the question to a declared calculation and the
+numbers the user stated (``interpretation.calculation``); everything after that
+is deterministic: the declaration validates the inputs, a missing one becomes
+the read's own question and is asked for once, the tool runs in process with
+no provider call, and the card carries every figure. Argus writes the lead,
+which never states a number. A read that needs published inputs for a named
+asset is left to research, which computes the same way after retrieval. Every
+guard that compensates for the read records a reason code.
 """
 
 from __future__ import annotations
@@ -53,7 +53,6 @@ KIND_UNKNOWN_REASON_CODE = "calculation_kind_unknown"
 INPUTS_DROPPED_REASON_CODE = "calculation_inputs_dropped"
 SOLVE_FOR_CLEARED_REASON_CODE = "calculation_solve_for_cleared"
 CURRENCY_DEFAULTED_REASON_CODE = "calculation_currency_defaulted"
-LEAD_REPLACED_REASON_CODE = "calculation_lead_replaced"
 RETRIEVAL_OWNS_REASON_CODE = "calculation_retrieval_needed"
 RESEARCH_QUERY_SYNTHESIZED_REASON_CODE = "calculation_research_query_synthesized"
 NOTHING_TO_SOLVE_REASON_CODE = "calculation_nothing_to_solve"
@@ -70,16 +69,15 @@ async def calculation_turn_stage_result(
     user: UserState,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
-    request = _request_for_turn(interpretation, selected_thread_metadata)
-    if request is None or request.kind is None:
-        recovered = await focused_calculation_request(
+    pending = _pending_request(selected_thread_metadata)
+    if interpretation.calculation is None:
+        interpretation.calculation = await focused_calculation_request(
             interpretation=interpretation,
             message=state.current_user_message,
             history=state.recent_thread_history,
+            pending=pending,
         )
-        if recovered is not None:
-            interpretation.calculation = recovered
-            request = recovered
+    request = _request_for_turn(interpretation, pending)
     if request is None:
         return None
     if request.kind is None:
@@ -162,20 +160,20 @@ async def _retrieved_inputs_result(
 
 
 def _request_for_turn(
-    interpretation: StructuredInterpretation, metadata: dict[str, Any]
+    interpretation: StructuredInterpretation, pending: CalculationRequest | None
 ) -> CalculationRequest | None:
-    """The turn's read, merged over a pending calculation the user is answering."""
+    """The turn's read, merged over a pending calculation the user is answering.
+    Without a read the user moved on, and the primary route owns the turn."""
     read = interpretation.calculation
-    pending = _pending_request(metadata)
-    if pending is None:
+    if pending is None or read is None:
         return read
-    if read is not None and read.kind not in (None, pending.kind):
+    if read.kind not in (None, pending.kind):
         return read
     merged = CalculationRequest(
         kind=pending.kind,
-        inputs={**pending.inputs, **(read.inputs if read else {})},
-        solve_for=(read.solve_for if read and read.solve_for else pending.solve_for),
-        retrieve=list(read.retrieve if read and read.retrieve else pending.retrieve),
+        inputs={**pending.inputs, **read.inputs},
+        solve_for=read.solve_for or pending.solve_for,
+        retrieve=list(read.retrieve or pending.retrieve),
     )
     _note(interpretation, PENDING_MERGED_REASON_CODE, kind=pending.kind)
     return merged
@@ -309,16 +307,10 @@ def _clarification_result(
     arguments: dict[str, Any],
 ) -> StageResult:
     field = missing[0]
-    prompt = (
-        interpretation.assistant_response
-        if interpretation.requires_clarification and interpretation.assistant_response
-        else None
+    # The calculation read's own question for what the calculation still needs.
+    prompt = next(
+        (text.strip() for text in request.follow_up_questions if text.strip()), None
     )
-    if prompt is None:
-        # The model's own question for what the calculation still needs.
-        prompt = next(
-            (text.strip() for text in request.follow_up_questions if text.strip()), None
-        )
     pending = request.model_copy(
         update={
             "inputs": {
@@ -363,8 +355,7 @@ def _follow_up_result(
         outcome="ready_to_respond",
         decision=_decision(interpretation, user, CALCULATION_FOLLOW_UPS_REASON_CODE),
         stage_patch={
-            "assistant_response": (interpretation.assistant_response or "").strip()
-            or _follow_up_lead(user),
+            "assistant_response": _follow_up_lead(user),
             **patch,
         },
     )
@@ -394,7 +385,7 @@ async def _computed_result(
     patch = dict(executed.stage_patch)
     cards = (patch.get("final_response_payload") or {}).get("tool_result_cards") or []
     succeeded = bool(cards) and cards[0].get("outcome", {}).get("status") == "succeeded"
-    patch["assistant_response"] = _lead(interpretation, user, succeeded=succeeded)
+    patch["assistant_response"] = _answer_lead(user, succeeded=succeeded)
     if succeeded:
         rows = market_counterfactual_rows(arguments, language=user.language_preference)
         patch.update(next_steps_patch(rows, offered_test_steps(rows)))
@@ -405,20 +396,9 @@ async def _computed_result(
     )
 
 
-def _lead(
-    interpretation: StructuredInterpretation, user: UserState, *, succeeded: bool
-) -> str:
-    """The model's own short lead when it states no figure and the card succeeded;
-    the card states every figure, and a failed card explains itself."""
-    lead = (interpretation.assistant_response or "").strip()
-    if succeeded and lead and not any(character.isdigit() for character in lead):
-        return lead
-    if succeeded and lead:
-        _note(interpretation, LEAD_REPLACED_REASON_CODE)
-    return _fallback_lead(user, succeeded=succeeded)
-
-
-def _fallback_lead(user: UserState, *, succeeded: bool) -> str:
+def _answer_lead(user: UserState, *, succeeded: bool) -> str:
+    """Argus's own lead: the card states every figure, and a failed card explains
+    itself. The primary interpretation's prose never leads a calculation."""
     spanish = user.language_preference.startswith("es")
     if succeeded:
         if spanish:

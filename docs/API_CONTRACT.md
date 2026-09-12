@@ -5209,8 +5209,17 @@ provider call.
 
 ### Calculation turns
 
-The interpreter's `calculation` read is `{kind, inputs, solve_for, retrieve,
-follow_up_questions}`. `kind` is a registered calculation kind or null;
+The calculation read is `{kind, inputs, solve_for, retrieve,
+follow_up_questions}`, one model read that runs after interpretation. The
+primary interpretation routes the turn and never maps a calculation; it only
+marks `computed_figure_decides` when a figure Argus computes would answer or
+decide the money question. The read runs on that mark or on a reply to a
+pending calculation question, never on an ordinary turn, and records
+`calculation_read_money_question` or `calculation_read_pending_reply`, with
+`calculation_read_mapped` whenever its read reaches the turn. A mark on a turn
+the primary routed to an action (a runnable test, discovery, an artifact or a
+result follow-up) keeps that route and records
+`calculation_read_skipped_for_route`. `kind` is a registered calculation kind or null;
 `inputs` holds the values the user stated under the declaration's argument
 names; `solve_for` names the one blank for a kind with an unknown rule;
 `retrieve` names inputs a published page supplies for a named asset; and
@@ -5218,8 +5227,7 @@ names; `solve_for` names the one blank for a kind with an unknown rule;
 and language, when the question is too broad to compute. No phrase, pattern or
 language check runs before the read. Each guard after it records a reason code
 on the turn: `calculation_inputs_dropped`, `calculation_solve_for_cleared`,
-`calculation_currency_defaulted`, `calculation_lead_replaced`,
-`calculation_kind_unknown`, `calculation_nothing_to_solve`,
+`calculation_currency_defaulted`, `calculation_kind_unknown`, `calculation_nothing_to_solve`,
 `calculation_pending_merged`, `calculation_retrieval_needed` and
 `scenario_calculation_defaulted`.
 
@@ -5237,13 +5245,14 @@ over those years, or monthly buys of a stated payment, and `next_steps` lists
 it. The row runs only when tapped.
 
 A missing input only the user can supply answers `await_user_reply` with the
-model's question as `assistant_prompt`, `requested_field` naming the argument,
+read's question as `assistant_prompt`, `requested_field` naming the argument,
 and `clarification = {kind: "clarification", reason_code:
 "calculation_input_missing", prompt_source, requested_field, requested_fields,
 semantic_needs: [], payload: {calculation: <the pending read with the inputs so
 far>}, options: []}`. The next reply merges over the pending read; a reply that
-names a different kind starts that kind instead. A broad question answers with
-the lead and `next_steps` items of type `question`, one per follow-up, and
+names a different kind starts that kind instead, and a reply the read does not
+map leaves the turn to the primary route. A broad question answers with
+Argus's own lead and `next_steps` items of type `question`, one per follow-up, and
 stores no card.
 
 A calculation read that names inputs a published page supplies, and every

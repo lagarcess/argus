@@ -171,40 +171,6 @@ class CalculationRequest(BaseModel):
     )
 
 
-CALCULATION_GUIDANCE = (
-    "Money questions Argus computes. Independent of the act, decide on every "
-    "turn whether the user wants a figure computed, in any language: a saving "
-    "or loan payment, what a balance grows to, the rate or time a plan needs, "
-    "what an income affords, a yield, a price multiple, an effective rate, a "
-    "debt ratio, what a fee costs, a ranking of offers, a discounted cash flow, "
-    "a bond or certificate value, or what an investment will be worth. If yes, "
-    "fill calculation and keep a question turn (conversation_followup or "
-    "beginner_guidance with an educational_question act). Never read such a "
-    "question as a test or a strategy, and never put a product, loan, bond, "
-    "certificate or card in candidate_strategy_draft or "
-    "unsupported_constraints. Choose the closest kind below even when inputs "
-    "are missing: put the numbers the user stated in inputs, and put every "
-    "input a published page states (a product's price, a lender's or bank's "
-    "rate, local inflation, an asset's price or earnings) in retrieve; never "
-    "ask the user for those. When an input only the user knows is still "
-    "missing (their income, balance, payment or horizon), set "
-    "requires_clarification=true, name that one argument in "
-    "missing_required_fields and ask for it in assistant_response. For "
-    "example, a 25,000 loan at 9 percent with no payment stated fills "
-    "time_value with direction borrow, present_value 25000, future_value 0 and "
-    "annual_rate_pct 9, and asks for the monthly payment. Leave kind null and "
-    "fill follow_up_questions only when no kind below fits the question at "
-    "all. Argus shows every computed figure, so write assistant_response as one "
-    "short lead with no numbers in it. A reply to a pending calculation "
-    "question (requested_field in the selected thread metadata) fills "
-    "calculation with the answered argument alone; Argus keeps the rest. Leave "
-    "calculation null for requests to build or run a test over past market "
-    "data, edits, approvals, questions about a visible result or confirmation, "
-    "and questions whose answer is a figure read from a page rather than "
-    "computed. Kinds and their inputs:\n"
-)
-
-
 def calculation_kinds_clause() -> str:
     """The catalogue the model reads, generated from the declarations."""
     lines = [

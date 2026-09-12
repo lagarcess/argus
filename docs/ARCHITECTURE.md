@@ -512,8 +512,8 @@ stays blank and the input revision advances with the result. Public sharing
 freezes a computed answer's card as its own `calculation` leaf through the
 shipped selected-turn contract.
 
-A computed answer is an artifact without a run. The interpreter maps a money
-question to a declared calculation; the runtime validates the read, computes in
+A computed answer is an artifact without a run. A calculation read after
+interpretation maps a money question to a declared calculation; the runtime validates the read, computes in
 process and publishes the card, and the one marker owner
 (`argus.domain.computation_marker`) writes `metadata.computation` from it. Every
 later reader derives from that pair and nothing else: a decision stores its

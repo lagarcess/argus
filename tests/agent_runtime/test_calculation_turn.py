@@ -1,11 +1,12 @@
-"""Any grounded math, step 9: the model maps a money question to a declared
-calculation and Argus computes it in process.
+"""Any grounded math, step 9: the calculation read maps a money question to a
+declared calculation and Argus computes it in process.
 
-The interpreter's typed ``calculation`` read is the only routing signal; no
-phrase, regex or language gate runs before it. A missing input is the model's
-own clarification, asked once and merged on the reply. A broad question gets
-the model's own follow-ups as question steps, never a catalogue. Every guard
-that compensates for the read records a reason code on the turn.
+The calculation read is the only mapping signal; no phrase, regex or language
+gate runs before it. A missing input is the read's own question, asked once and
+merged on the reply. A broad question gets the read's follow-ups as question
+steps under Argus's own lead, never a catalogue, and the primary
+interpretation's prose never leads a calculation. Every guard that compensates
+for the read records a reason code on the turn.
 """
 
 from __future__ import annotations
@@ -22,7 +23,6 @@ from argus.agent_runtime.calculation_rows import (
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.interpreter.calculation_request import (
-    CALCULATION_GUIDANCE,
     CalculationRequest,
     calculation_kinds,
     calculation_kinds_clause,
@@ -32,7 +32,6 @@ from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret import interpret_stage_async
 from argus.agent_runtime.stages.interpret_types import (
-    InterpretationRequest,
     StageResult,
     StructuredInterpretation,
 )
@@ -45,7 +44,7 @@ from argus.domain.tool_declaration import ToolCatalog
 
 @pytest.fixture(autouse=True)
 def _no_focused_read(monkeypatch: pytest.MonkeyPatch) -> None:
-    """These tests pin the turn after a primary read; the backstop has its own."""
+    """These tests hand the turn a calculation read; the read has its own tests."""
     from argus.agent_runtime.interpreter import calculation_focused_read
 
     async def declined(**_kwargs):
@@ -141,7 +140,7 @@ def test_a_stated_plan_computes_in_process_and_states_no_figure_in_prose(
     assert card["arguments"]["future_value"] is None
     assert card["arguments"]["currency"] == "USD"
     patch = result.patch
-    assert patch["assistant_response"] == "Here is what that plan grows to."
+    assert patch["assistant_response"] == "Here is the calculation from your numbers. Change any input to recompute it."
     assert not any(character.isdigit() for character in patch["assistant_response"])
     assert patch["tool_calls"] == []
     assert "research" not in patch
@@ -191,15 +190,16 @@ def test_a_monthly_plan_offers_the_same_monthly_buys_in_the_market() -> None:
     )
 
 
-def test_a_missing_input_is_the_models_own_clarification_asked_once() -> None:
+def test_a_missing_input_is_the_reads_own_question_asked_once() -> None:
     result = _run(
         _read(
             {
                 "kind": "time_value",
                 "inputs": {"direction": "save", "payment": 500, "annual_rate_pct": 5},
                 "solve_for": "future_value",
+                "follow_up_questions": ["For how many months would you keep that up?"],
             },
-            assistant_response="For how many months would you keep that up?",
+            assistant_response="Saving is a great habit.",
             requires_clarification=True,
             missing_required_fields=["periods"],
         )
@@ -292,7 +292,7 @@ def test_a_pending_calculation_yields_to_a_different_kind_the_user_moved_to() ->
     assert turn.PENDING_MERGED_REASON_CODE not in result.decision.reason_codes
 
 
-def test_a_broad_question_gets_the_models_follow_ups_as_question_steps() -> None:
+def test_a_broad_question_gets_the_reads_follow_ups_under_argus_own_lead() -> None:
     result = _run(
         _read(
             {
@@ -310,8 +310,8 @@ def test_a_broad_question_gets_the_models_follow_ups_as_question_steps() -> None
     assert result is not None
     assert result.outcome == "ready_to_respond"
     patch = result.patch
-    assert (
-        patch["assistant_response"] == "A few details would let me compute this for you."
+    assert patch["assistant_response"] == (
+        "A couple more details would let me compute this. Pick a question to continue."
     )
     assert patch["next_steps"]["items"] == [
         {"type": "question", "text": "How much can you put aside each month?"},
@@ -590,7 +590,7 @@ def test_the_profile_currency_counts_the_answer_and_a_default_is_recorded() -> N
     assert _card(stated)["arguments"]["currency"] == "MXN"
 
 
-def test_a_lead_that_states_a_figure_is_replaced_and_recorded() -> None:
+def test_the_primary_interpretations_prose_never_leads_a_calculation() -> None:
     result = _run(
         _read(
             {"kind": "time_value", "inputs": SAVING_PLAN, "solve_for": "future_value"},
@@ -601,7 +601,6 @@ def test_a_lead_that_states_a_figure_is_replaced_and_recorded() -> None:
     assert result.patch["assistant_response"] == (
         "Here is the calculation from your numbers. Change any input to recompute it."
     )
-    assert turn.LEAD_REPLACED_REASON_CODE in result.decision.reason_codes
 
 
 def test_a_plan_that_does_not_solve_keeps_its_card_and_offers_no_test() -> None:
@@ -682,17 +681,18 @@ def test_the_calculation_owns_the_turn_through_the_whole_interpret_stage() -> No
     card = _card(result)
     assert card["tool_name"] == "income_yield"
     assert card["outcome"]["result"]["yield_pct"] == 4
-    assert result.patch["assistant_response"] == "Here is that yield."
+    assert result.patch["assistant_response"] == "Here is the calculation from your numbers. Change any input to recompute it."
     assert result.patch.get("confirmation_payload") is None
 
 
-def test_the_prompt_reads_the_guidance_and_the_catalogue_of_declared_kinds() -> None:
+def test_the_catalogue_of_declared_kinds_reaches_only_the_calculation_read() -> None:
     prompt = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
     )._system_prompt()
-    assert CALCULATION_GUIDANCE in prompt
     clause = calculation_kinds_clause()
-    assert clause in prompt
+    assert clause not in prompt, "the primary interpretation never maps a calculation"
+    assert "set computed_figure_decides=true so Argus computes it" in prompt
+    assert "answer it in assistant_response with the formula" not in prompt
     for declaration in get_calculation_declarations():
         assert f"- {declaration.name}: {declaration.description}" in clause
         for rule in declaration.rules:
@@ -703,21 +703,16 @@ def test_the_prompt_reads_the_guidance_and_the_catalogue_of_declared_kinds() -> 
     assert "sources" not in clause
     follow_ups = CalculationRequest.model_fields["follow_up_questions"]
     assert "Never a list of what Argus can calculate" in str(follow_ups.description)
-    assert (
-        "Leave kind null and fill follow_up_questions only when no kind"
-        in CALCULATION_GUIDANCE
-    )
-    assert "fill calculation with the kind and the stated inputs" in prompt
-    assert "answer it in assistant_response with the formula" not in prompt
 
 
-def test_the_response_schema_types_the_calculation_and_copies_it_through() -> None:
+def test_the_calculation_read_types_every_field_and_the_primary_read_has_none() -> None:
     assert set(calculation_kinds()) == {
         declaration.name for declaration in get_calculation_declarations()
     }
-    field = LLMInterpretationResponse.model_fields["calculation"]
-    assert field.default is None
-    assert "computes" in str(field.description)
+    assert "calculation" not in LLMInterpretationResponse.model_fields
+    primary = LLMInterpretationResponse.model_json_schema()
+    assert "computed_figure_decides" in primary["required"]
+    assert primary["properties"]["computed_figure_decides"]["type"] == "boolean"
     schema = CalculationRequest.model_json_schema()
     assert set(schema["properties"]) == {
         "kind",
@@ -726,28 +721,9 @@ def test_the_response_schema_types_the_calculation_and_copies_it_through() -> No
         "retrieve",
         "follow_up_questions",
     }
+    assert set(schema["required"]) == set(schema["properties"])
     with pytest.raises(ValueError):
         CalculationRequest(kind="loan_wizard")
-    response = LLMInterpretationResponse(
-        intent="conversation_followup",
-        task_relation="new_task",
-        user_goal_summary="compute",
-        semantic_turn_act="educational_question",
-        calculation={"kind": "time_value", "inputs": SAVING_PLAN, "solve_for": "periods"},
-    )
-    interpreter = OpenRouterStructuredInterpreter(
-        contract=build_default_capability_contract()
-    )
-    runtime = interpreter._to_runtime_interpretation(
-        response,
-        request=InterpretationRequest(
-            current_user_message="how long to reach it",
-            recent_thread_history=[],
-            latest_task_snapshot=None,
-            user=UserState(user_id="u1"),
-        ),
-    )
-    assert runtime.calculation == response.calculation
 
 
 def test_the_runtime_user_carries_the_profile_currency() -> None:

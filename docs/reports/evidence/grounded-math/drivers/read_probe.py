@@ -1,7 +1,7 @@
 """The interpreter's typed read for the smoke questions and a few prompts that
 must not become calculations, through the production interpreter only: no
 stage, no research, no persistence. Paid, interpreter calls only.
-Usage: GM_TREE=<repo> [GM_ENV_FILE=<.env>] python read_probe.py <out.json>"""
+Usage: GM_TREE=<repo> [GM_ENV_FILE=<.env>] [GM_ONLY=q4,q5,backtest] python read_probe.py <out.json>"""
 from __future__ import annotations
 
 import asyncio
@@ -40,6 +40,9 @@ NOT_CALCULATIONS = [
     ("counterfactual", "en", "What if I had bought Coca-Cola every month for five years?"),
     ("discovery", "en", "find me cryptos that are trending"),
     ("dca", "es-419", "Invierte $200 al mes en SPY desde enero hasta diciembre de 2024."),
+    ("inflation-concept", "es-419", "¿Qué significa inflación?"),
+    ("diversification", "en", "What does diversification mean?"),
+    ("boundary", "en", "Should I put my emergency fund in crypto?"),
 ]
 
 
@@ -51,6 +54,9 @@ async def main() -> None:
         if row["id"] not in ("q9", "q10")
         for language in ("en", "es-419")
     ] + NOT_CALCULATIONS
+    only = {label for label in os.environ.get("GM_ONLY", "").split(",") if label}
+    if only:
+        prompts = [prompt for prompt in prompts if prompt[0] in only]
     rows = []
     for label, language, text in prompts:
         user = UserState(
@@ -77,6 +83,7 @@ async def main() -> None:
                 act=read.semantic_turn_act,
                 requires_clarification=read.requires_clarification,
                 missing=read.missing_required_fields,
+                mark=read.computed_figure_decides,
                 calculation=read.calculation.model_dump(mode="json") if read.calculation else None,
                 research_query=read.research_query.question_kind if read.research_query else None,
                 strategy_assets=list(read.candidate_strategy_draft.asset_universe or []),
@@ -89,7 +96,7 @@ async def main() -> None:
             row.update(focused_trigger=trigger, recovered=recovered.model_dump(mode="json") if recovered else None)
         rows.append(row)
         calc = row.get("recovered") or row.get("calculation") or {}
-        print(json.dumps({"label": f"{label}-{language}", "kind": calc.get("kind"), "inputs": calc.get("inputs"), "retrieve": calc.get("retrieve"), "follow_ups": len(calc.get("follow_up_questions") or []), "trigger": row.get("focused_trigger"), "clarify": row.get("requires_clarification"), "missing": row.get("missing"), "intent": row.get("intent"), "strategy": row.get("strategy_type"), "unsupported": row.get("unsupported")}, ensure_ascii=False))
+        print(json.dumps({"label": f"{label}-{language}", "kind": calc.get("kind"), "inputs": calc.get("inputs"), "retrieve": calc.get("retrieve"), "follow_ups": len(calc.get("follow_up_questions") or []), "mark": row.get("mark"), "trigger": row.get("focused_trigger"), "clarify": row.get("requires_clarification"), "missing": row.get("missing"), "intent": row.get("intent"), "strategy": row.get("strategy_type"), "unsupported": row.get("unsupported")}, ensure_ascii=False))
     Path(sys.argv[1]).write_text(json.dumps({"captured_at": datetime.now(timezone.utc).isoformat(), "rows": rows}, indent=2, ensure_ascii=False) + "\n")
 
 

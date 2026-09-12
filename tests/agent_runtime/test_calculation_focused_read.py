@@ -1,5 +1,8 @@
-"""The focused calculation read runs only on a typed contradiction in the
-primary read, recovers a declared kind, and records that it fired."""
+"""The calculation read is the one model read that maps a money question to a
+declared calculation. It runs after the primary interpretation only on the
+primary's computed-figure mark or a pending calculation reply, so an ordinary
+turn spends no read; it owns its leads and questions and records when it
+reaches the turn."""
 
 from __future__ import annotations
 
@@ -13,12 +16,31 @@ from argus.agent_runtime.interpreter.calculation_request import (
     CalculationRequest,
     calculation_kinds_clause,
 )
-from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     AssetDiscoveryRequest,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    UnsupportedConstraint,
+    UserState,
+)
+
+CAR_LOAN = {
+    "present_value": 180000,
+    "annual_rate_pct": 14,
+    "direction": "borrow",
+    "future_value": 0,
+}
+PENDING = {
+    "last_stage_outcome": "await_user_reply",
+    "clarification": {
+        "payload": {
+            "calculation": {"kind": "time_value", "inputs": CAR_LOAN, "solve_for": "periods"}
+        }
+    },
+}
 
 
 def _read(**updates: Any) -> StructuredInterpretation:
@@ -28,187 +50,206 @@ def _read(**updates: Any) -> StructuredInterpretation:
         user_goal_summary="money question",
         semantic_turn_act="educational_question",
         candidate_strategy_draft=StrategySummary(),
+        computed_figure_decides=True,
     )
     return base.model_copy(update=updates)
 
 
-def test_the_read_runs_only_on_a_typed_contradiction() -> None:
+def test_the_read_runs_only_on_the_mark_or_a_pending_reply() -> None:
+    trigger = focused.focused_calculation_trigger
+    assert trigger(_read()) == focused.MONEY_QUESTION_TRIGGER
+    assert trigger(_read(computed_figure_decides=False)) is None, "an ordinary turn"
     assert (
-        focused.focused_calculation_trigger(
-            _read(
-                calculation=CalculationRequest(
-                    kind=None, inputs={"present_value": 180000}
-                )
-            )
-        )
-        == focused.KIND_MISSING_TRIGGER
+        trigger(_read(intent="unsupported_or_out_of_scope", semantic_turn_act="unsupported_request"))
+        == focused.MONEY_QUESTION_TRIGGER
+    ), "a marked refusal is read for a calculation before it names a capability"
+    assert (
+        trigger(_read(intent="strategy_drafting", semantic_turn_act="new_idea"))
+        == focused.MONEY_QUESTION_TRIGGER
+    ), "a marked draft with nothing to run"
+    runnable = StrategySummary(
+        strategy_type="buy_and_hold", asset_universe=["AAPL"], capital_amount=10000
     )
     assert (
-        focused.focused_calculation_trigger(
-            _read(calculation=CalculationRequest(kind="time_value"))
-        )
+        trigger(_read(intent="strategy_drafting", semantic_turn_act="new_idea", candidate_strategy_draft=runnable))
         is None
-    )
-    concept = ResearchQueryExtraction(question_kind="concept")
-    assert (
-        focused.focused_calculation_trigger(_read(research_query=concept))
-        == focused.UNROUTED_CONCEPT_TRIGGER
+    ), "a runnable test keeps its route"
+    unrunnable = UnsupportedConstraint(
+        category="unsupported_symbol", raw_value="a local bond", explanation="not listed"
     )
     assert (
-        focused.focused_calculation_trigger(_read()) is None
-    ), "no research read, such as a greeting"
-    assert (
-        focused.focused_calculation_trigger(
+        trigger(
             _read(
-                research_query=ResearchQueryExtraction(
-                    question_kind="company_lookup", symbols=["AAPL"]
-                )
-            )
-        )
-        is None
-    )
-    assert (
-        focused.focused_calculation_trigger(
-            _read(
-                research_query=concept,
                 intent="strategy_drafting",
                 semantic_turn_act="new_idea",
+                candidate_strategy_draft=runnable,
+                unsupported_constraints=[unrunnable],
             )
         )
-        is None
-    )
-    discovery = AssetDiscoveryRequest(
-        relationship="category", category_description="banks"
-    )
+        == focused.MONEY_QUESTION_TRIGGER
+    ), "a draft that names something the runtime cannot run"
+    assert trigger(_read(intent="backtest_execution")) is None
+    assert trigger(_read(intent="results_explanation", semantic_turn_act="result_followup")) is None
+    assert trigger(_read(semantic_turn_act="approval")) is None
+    discovery = AssetDiscoveryRequest(relationship="category", category_description="banks")
+    assert trigger(_read(asset_discovery=discovery)) is None
+    pending = CalculationRequest(kind="time_value", inputs=CAR_LOAN)
     assert (
-        focused.focused_calculation_trigger(
-            _read(research_query=concept, asset_discovery=discovery)
+        trigger(
+            _read(intent="strategy_drafting", semantic_turn_act="answer_pending_need", computed_figure_decides=False),
+            pending=pending,
         )
-        is None
-    )
-    draft = StrategySummary(
-        strategy_type="buy_and_hold", asset_universe=["AAPL"], capital_amount=1000
-    )
-    assert (
-        focused.focused_calculation_trigger(
-            _read(research_query=concept, candidate_strategy_draft=draft)
-        )
-        is None
+        == focused.PENDING_REPLY_TRIGGER
     )
 
 
-def test_the_read_carries_the_declared_catalogue_and_the_message() -> None:
+def test_the_read_carries_the_catalogue_the_conversation_and_a_pending_calculation() -> None:
+    pending = CalculationRequest(kind="time_value", inputs=CAR_LOAN)
     messages = focused._read_messages(
-        "I owe 25,000 at 9 percent", [{"role": "user", "content": "hi"}]
+        "48 months", [{"role": "assistant", "content": "How many months are left?"}], pending
     )
     assert messages[0]["content"].startswith(focused.FOCUSED_CALCULATION_READ_GUIDANCE)
     assert calculation_kinds_clause() in messages[0]["content"]
     assert "Recent conversation" in messages[1]["content"]
-    assert messages[-1] == {"role": "user", "content": "I owe 25,000 at 9 percent"}
+    assert "waiting for the user's reply to a time_value calculation" in messages[2]["content"]
+    assert '"present_value": 180000' in messages[2]["content"]
+    assert messages[-1] == {"role": "user", "content": "48 months"}
+    assert len(focused._read_messages("hello", [])) == 2
 
 
 def _run(
-    interpretation: StructuredInterpretation, monkeypatch: pytest.MonkeyPatch, read: Any
+    interpretation: StructuredInterpretation,
+    monkeypatch: pytest.MonkeyPatch,
+    read: Any,
+    *,
+    metadata: dict[str, Any] | None = None,
+    message: str = "I owe 180,000 at 14 percent on the car",
 ):
+    seen: list[dict[str, Any]] = []
+
     async def invoke(**kwargs):
         assert kwargs["schema_model"] is focused.FocusedCalculationRead
+        seen.append(kwargs)
         if isinstance(read, Exception):
             raise read
         return read
 
     monkeypatch.setattr(focused, "invoke_openrouter_json_schema", invoke)
-    return asyncio.run(
+    result = asyncio.run(
         turn.calculation_turn_stage_result(
             interpretation=interpretation,
-            state=RunState.new(
-                current_user_message="I owe 180,000 at 14 percent on the car",
-                recent_thread_history=[],
-            ),
+            state=RunState.new(current_user_message=message, recent_thread_history=[]),
             user=UserState(user_id="u1", language_preference="en", currency="USD"),
-            selected_thread_metadata={},
+            selected_thread_metadata=metadata or {},
         )
     )
+    return result, seen
 
 
-def test_a_missing_kind_is_recovered_and_the_models_question_asks_for_the_input(
+def test_a_mapped_question_asks_the_reads_own_question_for_the_missing_input(
     monkeypatch,
 ) -> None:
-    interpretation = _read(
-        calculation=CalculationRequest(
-            kind=None,
-            inputs={
-                "present_value": 180000,
-                "annual_rate_pct": 14,
-                "direction": "borrow",
-            },
-            follow_up_questions=["What is your current monthly payment?"],
-        ),
-        requires_clarification=True,
-    )
+    interpretation = _read(assistant_response="Paying extra is a personal choice.")
     read = focused.FocusedCalculationRead(
-        wants_a_computed_figure=True,
+        answered_by_a_calculation=True,
         calculation=CalculationRequest(
             kind="time_value",
-            inputs={"future_value": 0},
+            inputs=CAR_LOAN,
             solve_for="periods",
             follow_up_questions=["What is your current monthly payment?"],
         ),
     )
-    result = _run(interpretation, monkeypatch, read)
+    result, _ = _run(interpretation, monkeypatch, read)
     assert result is not None
     assert result.outcome == "await_user_reply"
     assert result.patch["assistant_prompt"] == "What is your current monthly payment?"
     assert result.patch["requested_field"] == "payment"
     pending = result.patch["clarification"]["payload"]["calculation"]
     assert pending["kind"] == "time_value"
-    assert (
-        pending["inputs"]["present_value"] == 180000
-    ), "the primary's stated inputs are kept"
-    assert focused.FOCUSED_READ_REASON_CODE in interpretation.reason_codes
+    assert pending["inputs"]["present_value"] == 180000
+    assert focused.MONEY_QUESTION_TRIGGER in interpretation.reason_codes
+    assert focused.READ_MAPPED_REASON_CODE in interpretation.reason_codes
 
 
-def test_a_declined_or_failed_read_leaves_the_primary_follow_ups(monkeypatch) -> None:
+def test_a_declined_failed_or_empty_read_leaves_the_turn_to_the_primary_route(
+    monkeypatch,
+) -> None:
     for read in (
-        focused.FocusedCalculationRead(wants_a_computed_figure=False),
+        focused.FocusedCalculationRead(answered_by_a_calculation=False),
+        focused.FocusedCalculationRead(
+            answered_by_a_calculation=True, calculation=CalculationRequest(kind=None)
+        ),
         RuntimeError("provider down"),
         None,
     ):
-        interpretation = _read(
-            calculation=CalculationRequest(
-                kind=None, follow_up_questions=["What is the price you have in mind?"]
-            ),
-            assistant_response="A few details would help.",
-        )
-        result = _run(interpretation, monkeypatch, read)
-        assert result is not None
-        assert result.patch["next_steps"]["items"] == [
-            {"type": "question", "text": "What is the price you have in mind?"}
-        ]
-        assert focused.FOCUSED_READ_REASON_CODE not in interpretation.reason_codes
+        interpretation = _read()
+        result, seen = _run(interpretation, monkeypatch, read)
+        assert result is None
+        assert len(seen) == 1
+        assert focused.READ_MAPPED_REASON_CODE not in interpretation.reason_codes
+    backtest = _read(intent="backtest_execution")
+    result, seen = _run(backtest, monkeypatch, None)
+    assert result is None and seen == [], "a marked test keeps its route and spends no read"
+    assert focused.ROUTE_KEPT_REASON_CODE in backtest.reason_codes
 
 
-def test_an_unrouted_concept_question_that_wants_a_figure_becomes_a_calculation(
+def test_an_ordinary_turn_spends_no_calculation_read(monkeypatch) -> None:
+    for intent in ("conversation_followup", "beginner_guidance", "unsupported_or_out_of_scope"):
+        ordinary = _read(intent=intent, computed_figure_decides=False)
+        result, seen = _run(ordinary, monkeypatch, None, message="What is compound interest?")
+        assert result is None and seen == []
+        assert ordinary.reason_codes == []
+
+
+def test_a_broad_question_gets_the_reads_three_questions_under_argus_own_lead(
     monkeypatch,
 ) -> None:
     interpretation = _read(
-        research_query=ResearchQueryExtraction(question_kind="concept"),
-        intent="beginner_guidance",
+        intent="unsupported_or_out_of_scope",
+        semantic_turn_act="unsupported_request",
+        assistant_response="I cannot recommend a card.",
     )
+    questions = [
+        "Do you carry a balance from month to month?",
+        "About how much do you spend on the card each month?",
+        "Which cards are you choosing between?",
+    ]
     read = focused.FocusedCalculationRead(
-        wants_a_computed_figure=True,
-        calculation=CalculationRequest(
-            kind="time_value",
-            inputs={
-                "direction": "save",
-                "present_value": 10000,
-                "payment": 0,
-                "annual_rate_pct": 5,
-                "periods": 120,
-            },
-            solve_for="future_value",
-        ),
+        answered_by_a_calculation=True,
+        calculation=CalculationRequest(kind=None, follow_up_questions=questions),
     )
-    result = _run(interpretation, monkeypatch, read)
+    result, _ = _run(interpretation, monkeypatch, read, message="Which credit card should I get?")
     assert result is not None
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["next_steps"]["items"] == [
+        {"type": "question", "text": text} for text in questions
+    ]
+    assert result.patch["assistant_response"] == turn._follow_up_lead(
+        UserState(user_id="u1", language_preference="en")
+    )
+
+
+def test_a_reply_to_a_pending_calculation_is_read_with_it_and_computes(monkeypatch) -> None:
+    interpretation = _read(intent="strategy_drafting", semantic_turn_act="answer_pending_need")
+    read = focused.FocusedCalculationRead(
+        answered_by_a_calculation=True,
+        calculation=CalculationRequest(kind="time_value", inputs={"payment": 3000}),
+    )
+    result, seen = _run(interpretation, monkeypatch, read, metadata=PENDING, message="3,000 a month")
+    assert result is not None
+    assert result.outcome == "ready_to_respond"
     card = result.patch["final_response_payload"]["tool_result_cards"][0]
     assert card["tool_name"] == "time_value" and card["outcome"]["status"] == "succeeded"
+    assert "time_value calculation" in seen[0]["messages"][-2]["content"]
+    assert focused.PENDING_REPLY_TRIGGER in interpretation.reason_codes
+    assert turn.PENDING_MERGED_REASON_CODE in interpretation.reason_codes
+
+
+def test_a_reply_the_read_does_not_map_leaves_the_pending_calculation_alone(
+    monkeypatch,
+) -> None:
+    interpretation = _read(intent="strategy_drafting", semantic_turn_act="new_idea")
+    read = focused.FocusedCalculationRead(answered_by_a_calculation=False)
+    result, _ = _run(interpretation, monkeypatch, read, metadata=PENDING, message="backtest AAPL instead")
+    assert result is None
+    assert turn.PENDING_MERGED_REASON_CODE not in interpretation.reason_codes

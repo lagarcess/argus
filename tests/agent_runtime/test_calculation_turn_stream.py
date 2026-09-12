@@ -1,7 +1,7 @@
 """A calculation turn through the real workflow and the chat stream.
 
-The stub interpreter stands in for the model's typed read; everything after it
-is the production graph, router and store. The stored assistant message carries
+The stub interpreter stands in for the primary read and carries the calculation
+read's result; everything after it is the production graph, router and store. The stored assistant message carries
 the card and the ``metadata.computation`` marker derived from it, and a missing
 input is asked once and merged when the user answers on the next turn.
 """
@@ -127,7 +127,9 @@ def test_a_calculation_turn_stores_its_card_and_marker(monkeypatch) -> None:
     ]
     stored = messages[-1]
     assert stored["role"] == "assistant"
-    assert stored["content"] == "Here is what that plan grows to."
+    assert stored["content"] == (
+        "Here is the calculation from your numbers. Change any input to recompute it."
+    )
     card = stored["metadata"]["tool_result_cards"][0]
     assert card["outcome"]["status"] == "succeeded"
     assert stored["metadata"]["computation"] == {
@@ -155,8 +157,9 @@ def test_a_missing_input_is_asked_once_and_the_reply_computes(monkeypatch) -> No
                         "annual_rate_pct": 5,
                     },
                     "solve_for": "future_value",
+                    "follow_up_questions": ["For how many months would you save?"],
                 },
-                lead="For how many months would you save?",
+                lead="Saving is a great habit.",
                 clarify=True,
                 missing=["periods"],
             ),

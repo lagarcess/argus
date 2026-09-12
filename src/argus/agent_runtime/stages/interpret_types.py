@@ -226,6 +226,7 @@ class StructuredInterpretation(BaseModel):
     artifact_target: ArtifactTarget | None = None
     asset_discovery: AssetDiscoveryRequest | None = None
     calculation: CalculationRequest | None = None
+    computed_figure_decides: bool = False
 
 
 class InterpretationRequest(BaseModel):

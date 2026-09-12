@@ -2,7 +2,7 @@
 each turn stored: the card, its marker, the clarification and the research
 sidecar. A later reply continues the same conversation.
 Usage: python ask.py <label> <language> <country> <out.json> <message> [<reply> ...]
-Set GM_CONVERSATION_ID to continue an existing conversation. Paid."""
+Set GM_CONVERSATION_ID to continue an existing conversation; its turns append to <out.json>. Paid."""
 from __future__ import annotations
 
 import json
@@ -48,6 +48,9 @@ def summarize(metadata: dict, content: str) -> dict:
 
 
 record = {"label": label, "language": language, "country": country, "asked_at": datetime.now(timezone.utc).isoformat(), "turns": []}
+if os.getenv("GM_CONVERSATION_ID") and os.path.exists(out):
+    with open(out) as handle:
+        record = json.load(handle)
 with httpx.Client(base_url=API, timeout=600) as client:
     profile = client.patch("/me", json={"language": language, "country": country})
     if profile.status_code >= 400:
