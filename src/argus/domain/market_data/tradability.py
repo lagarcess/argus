@@ -63,11 +63,14 @@ def clear_tradable_history_cache() -> None:
 # How far back an equity's history can begin is the provider's floor; an asset
 # listed later begins on its own first bar, which only the feed knows.
 ASSET_HISTORY_START_BUDGET_SECONDS = 3.0
+# US equity markets have never closed for two weeks, so a longer silence in the
+# feed marks where its continuous daily history begins.
+_CONTINUOUS_HISTORY_GAP = timedelta(days=14)
 _HISTORY_START_CACHE: dict[tuple[str, date], date] = {}
 
 
 def asset_history_start(symbol: str, asset_class: str) -> date | None:
-    """The first day the price feed has a daily bar for this asset.
+    """The first day of the price feed's continuous daily history for this asset.
 
     None when that cannot be established inside the budget, and for crypto and
     currency pairs, whose feeds can fall back to a recent rolling window; a
@@ -114,11 +117,18 @@ def _first_equity_bar_date(symbol: str, today: date) -> date | None:
     from argus.domain.market_data.capabilities import ALPACA_EQUITY_HISTORY_START
     from argus.domain.market_data.provider import fetch_price_series
 
-    series = fetch_price_series(symbol, "equity", ALPACA_EQUITY_HISTORY_START, today, "1d")
+    series = fetch_price_series(
+        symbol, "equity", ALPACA_EQUITY_HISTORY_START, today, "1d"
+    )
     index = getattr(series, "index", None)
     if index is None or len(index) == 0:
         return None
-    return date.fromisoformat(str(index[0])[:10])
+    days = [date.fromisoformat(str(stamp)[:10]) for stamp in index]
+    start = days[0]
+    for previous, current in zip(days, days[1:], strict=False):
+        if current - previous > _CONTINUOUS_HISTORY_GAP:
+            start = current
+    return start
 
 
 def tradable_history(symbol: str, asset_class: str) -> TradableHistory:

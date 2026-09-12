@@ -30,7 +30,9 @@ def _series(first: str) -> pd.Series:
 def _install(monkeypatch: pytest.MonkeyPatch, handler: Any) -> list[tuple[Any, ...]]:
     calls: list[tuple[Any, ...]] = []
 
-    def fetch(symbol: str, asset_class: str, start: date, end: date, timeframe: str) -> pd.Series:
+    def fetch(
+        symbol: str, asset_class: str, start: date, end: date, timeframe: str
+    ) -> pd.Series:
         calls.append((symbol, asset_class, start, end, timeframe))
         return handler(symbol)
 
@@ -89,3 +91,29 @@ def test_a_run_shares_the_latest_start_and_none_when_any_is_unknown(
     assert shared_history_start(["SPY", "DOCN"], "equity") == date(2021, 3, 24)
     assert shared_history_start(["SPY", "NOPE"], "equity") is None
     assert shared_history_start([], "equity") is None
+
+
+def test_a_stray_early_bar_does_not_start_the_continuous_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The feed carries one SPY bar in November 2018 and none again until July 2020.
+    index = pd.DatetimeIndex([pd.Timestamp("2018-11-01", tz="UTC")]).append(
+        pd.date_range("2020-07-27", periods=3, freq="D", tz="UTC")
+    )
+    _install(monkeypatch, lambda symbol: pd.Series([1.0, 2.0, 3.0, 4.0], index=index))
+
+    assert asset_history_start("SPY", "equity") == date(2020, 7, 27)
+
+
+def test_a_short_market_closure_keeps_the_first_bar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    index = pd.DatetimeIndex(
+        [
+            pd.Timestamp(day, tz="UTC")
+            for day in ("2021-03-24", "2021-03-25", "2021-03-29")
+        ]
+    )
+    _install(monkeypatch, lambda symbol: pd.Series([1.0, 2.0, 3.0], index=index))
+
+    assert asset_history_start("DOCN", "equity") == date(2021, 3, 24)
