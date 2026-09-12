@@ -64,15 +64,22 @@ def _seed() -> None:
             pass
         time.sleep(0.5)
     from argus.agent_runtime import research_grounded as grounded
-    from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
     from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
     from argus.agent_runtime.state.models import StrategySummary, UserState
     from argus.api import state as api_state
     from argus.api.message_store import create_message, memory_conversation
     from argus.domain.capability_registry import get_tool_catalog
-    from argus.domain.computation_marker import computation_from_tool_card, computation_from_tool_cards
+    from argus.domain.computation_marker import (
+        computation_from_tool_card,
+        computation_from_tool_cards,
+    )
     from argus.domain.research.contracts import ResearchPacket
-    from argus.domain.tool_contracts import ToolCall, ToolFailure, ToolOutcome, ToolResultCard
+    from argus.domain.tool_contracts import (
+        ToolCall,
+        ToolFailure,
+        ToolOutcome,
+        ToolResultCard,
+    )
 
     from tests.domain.calculations.support import run_calculation
 
@@ -148,27 +155,41 @@ def _seed() -> None:
         interpretation = StructuredInterpretation(
             intent="conversation_followup", task_relation="new_task", user_goal_summary="scenario",
             semantic_turn_act="educational_question", candidate_strategy_draft=StrategySummary(),
-            calculation=CalculationRequest(kind="valuation_scenarios", inputs={"amount": 10000, "horizon_years": 10}),
         )
+        # A failed lookup: nothing was retrieved and the calculation cites pages
+        # this answer never read, so the answer step answers without the lookup.
+        not_retrieved = "https://example.com/not-retrieved"
+        uncited = {"kind": "valuation_scenarios", "inputs": [
+            {"name": "symbol", "value": "NVDA", "source": "user"},
+            {"name": "price", "value": None, "source": "market_data"},
+            {"name": "per_share", "value": 4.5, "source": "page", "source_url": not_retrieved, "as_of": "2026-09-10"},
+            {"name": "growth_base_pct", "value": 25, "source": "page", "source_url": not_retrieved, "as_of": "2026-09-10"},
+            {"name": "amount", "value": 10000, "source": "user"},
+            {"name": "horizon_years", "value": 10, "source": "user"},
+        ]}
         result = grounded._packet_stage_result(
-            packet=ResearchPacket(answer_markdown=""),
+            packet=ResearchPacket(answer_markdown="NVIDIA in ten years: {{price_at_horizon_base}}.", calculation=uncited),
             subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
             shape="balanced", capability_class="balanced_lookup", language=language,
             interpretation=interpretation,
             user=UserState(user_id=owner, language_preference=language, currency="USD"),
             cache_status="miss", question_kind="company_lookup",
-            scenario=True, computation=grounded._scenario_computation(interpretation),
+            scenario=True, message=question,
         )
         patch = result.stage_patch
-        cards = patch["final_response_payload"]["tool_result_cards"]
-        marker = computation_from_tool_cards([ToolResultCard.model_validate(card) for card in cards])
+        cards = (patch.get("final_response_payload") or {}).get("tool_result_cards") or []
         metadata = {
-            "tool_result_cards": cards,
-            "computation": marker.model_dump(mode="json"),
             "research": patch["research"],
             "agent_runtime_turn": {"terminal": True, "status": "completed"},
             **({"next_experiments": patch["next_experiments"]} if patch.get("next_experiments") else {}),
         }
+        if cards:
+            marker = computation_from_tool_cards([ToolResultCard.model_validate(card) for card in cards])
+            metadata["tool_result_cards"] = cards
+            if marker is not None:
+                metadata["computation"] = marker.model_dump(mode="json")
+            if patch.get("answer_text_template"):
+                metadata["answer_text_template"] = patch["answer_text_template"]
         seeds[f"withheld-{language}"] = {"conversation_id": withheld, "message_id": say(withheld, "assistant", patch["assistant_response"], metadata)}
 
     Path(os.environ.get("GM_SEED_OUT", "seeds.json")).write_text(json.dumps(seeds, indent=2) + "\n")

@@ -28,6 +28,10 @@ import httpx
 from loguru import logger
 from pydantic import ValidationError
 
+from argus.domain.research.answer_contract import (
+    TypedAnswer,
+    typed_answer_response_format,
+)
 from argus.domain.research.billing import (
     UnpricedResearchSpend,
     UnpricedSpendRecorder,
@@ -51,8 +55,6 @@ from argus.domain.research.contracts import (
     ResearchUnavailableError,
     ResearchUsage,
     RetrievedRow,
-    TypedRetrieval,
-    typed_response_format,
 )
 from argus.domain.research.pricing import validated_research_cost_usd
 
@@ -300,7 +302,7 @@ class PerplexityAgentClient:
             body["language_preference"] = spec.language
         if spec.typed_output:
             body["instructions"] = spec.instructions
-            body["response_format"] = typed_response_format()
+            body["response_format"] = typed_answer_response_format()
         return body
 
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
@@ -437,6 +439,11 @@ def _packet_from_priced_response(
         rows=tuple(rows),
         typed_answer=typed is not None,
         unsourced_rows=tuple(unsourced),
+        calculation=(
+            typed.calculation.model_dump(mode="json")
+            if typed is not None and typed.calculation is not None
+            else None
+        ),
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
@@ -454,7 +461,7 @@ class _ParsedToolResults:
     tool_results: list[str] = field(default_factory=list)
 
 
-def _typed_retrieval(text: str) -> TypedRetrieval | None:
+def _typed_retrieval(text: str) -> TypedAnswer | None:
     """The answer in its requested typed shape, or None when it is prose.
 
     Machine format only: a JSON object, optionally inside a code fence. A
@@ -482,7 +489,7 @@ def _typed_retrieval(text: str) -> TypedRetrieval | None:
             "malformed_response", "typed answer is not the answer object"
         )
     try:
-        return TypedRetrieval.model_validate(parsed)
+        return TypedAnswer.model_validate(parsed)
     except ValidationError as exc:
         raise ResearchUnavailableError(
             "malformed_response",

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
 from argus.agent_runtime.recovery_messages import recovery_state_from_text
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.state.models import (
@@ -225,7 +224,6 @@ class StructuredInterpretation(BaseModel):
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None
     asset_discovery: AssetDiscoveryRequest | None = None
-    calculation: CalculationRequest | None = None
 
 
 class InterpretationRequest(BaseModel):

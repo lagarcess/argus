@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 from functools import partial
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -153,6 +154,7 @@ async def recompute_tool_result(
     metadata: dict[str, JsonValue] = {"tool_result_cards": documents}
     if computation is not None:
         metadata["computation"] = computation.model_dump(mode="json")
+    content = _recomputed_answer_text(source, revised)
     # The message remains the only durable owner. No checkpoint projection is
     # written here; subsequent turns re-read these current artifact facts.
     try:
@@ -161,9 +163,7 @@ async def recompute_tool_result(
             source_message=source,
             expected_source_metadata=copy.deepcopy(source.metadata),
             expected_latest_message_id=latest.id,
-            prepare=lambda: PendingArtifactUpdate(
-                content=source.content, metadata=metadata
-            ),
+            prepare=lambda: PendingArtifactUpdate(content=content, metadata=metadata),
             write=partial(
                 update_message_artifact, user_id=user.id, conversation_id=conversation
             ),
@@ -172,6 +172,32 @@ async def recompute_tool_result(
         raise _changed(request) from exc
     assert updated is not None  # This adapter always supplies a prepared update.
     return ToolResultRecomputeResponse(message=updated)
+
+
+def _recomputed_answer_text(source: Message, revised: Any) -> str:
+    """The prose re-rendered from the recomputed card when the answer stated its
+    figures through references, so every figure it states stays the card's;
+    any other prose stays as stored."""
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_TEMPLATE_KEY,
+        fallback_answer_lead,
+        render_answer_text,
+    )
+
+    template = (source.metadata or {}).get(ANSWER_TEMPLATE_KEY)
+    if (
+        not isinstance(template, dict)
+        or template.get("artifact_id") != revised.artifact_id
+    ):
+        return source.content
+    succeeded = revised.outcome.status == "succeeded"
+    if succeeded:
+        text, failure = render_answer_text(str(template.get("text") or ""), revised)
+        if failure is None:
+            return text
+    return fallback_answer_lead(
+        str(template.get("language") or "en"), succeeded=succeeded
+    )
 
 
 def _changed(request: Request) -> Exception:

@@ -46,7 +46,6 @@ from argus.domain.tool_contracts import (
 CONTINUED_FROM_KEY = "continued_from"
 CONTINUED_TITLE = "New idea"
 RERUN_IDENTITY = "decision_rerun"
-FALLBACK_CURRENCY = "USD"
 
 
 class ComputedAnswerNotFoundError(LookupError):
@@ -268,14 +267,16 @@ async def refresh_computed_answer(
     message_id: str,
     guest_visitor_key: str | None,
 ) -> ComputationRefreshResponse:
-    """Retrieve the answer's cited inputs again and compute them beside it."""
+    """Look up the answer's cited inputs again and compute them beside it. A
+    page input is looked up through the research allowance; a market data input
+    reads Argus's own latest close for free. The stored answer never moves."""
     from argus.agent_runtime import research_grounded as grounded
-    from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
-    from argus.agent_runtime.research_answer import _resolved_subjects
-    from argus.agent_runtime.research_inputs import (
-        arguments_from_rows,
-        retrieval_inputs,
+    from argus.agent_runtime.answer_calculation import (
+        cited_page_inputs,
+        latest_market_close,
     )
+    from argus.agent_runtime.research_answer import _resolved_subjects
+    from argus.agent_runtime.research_calculation import retrieved_pages
     from argus.agent_runtime.research_query import ResearchQueryExtraction
     from argus.api.chat.research_evidence import claim_research_provider_attempt
     from argus.domain.capability_registry import get_tool_catalog
@@ -300,20 +301,6 @@ async def refresh_computed_answer(
     declaration = get_tool_catalog().get(answer.card.tool_name)
     if declaration is None or not cited:
         raise NothingToRefreshError("This answer cites no page to look up again.")
-    request = CalculationRequest(
-        kind=declaration.name,
-        inputs={
-            name: value
-            for name, value in arguments.items()
-            if name not in cited
-            and name != TOOL_INPUT_SOURCES_FIELD
-            and value is not None
-        },
-        retrieve=cited,
-    )
-    inputs = retrieval_inputs(request, declaration)
-    if not inputs:
-        raise NothingToRefreshError("This answer cites no page to look up again.")
     if not research_rail_enabled():
         raise RefreshUnavailableError("not_configured")
     client = grounded._client()
@@ -333,7 +320,7 @@ async def refresh_computed_answer(
         question_kind=None,
         publisher_sources_required=True,
         scenario=True,
-        inputs=inputs,
+        lookup_inputs=cited,
     )
     spec = retrieval_spec(
         "balanced",
@@ -361,9 +348,7 @@ async def refresh_computed_answer(
             )
             raise RefreshUnavailableError(exc.reason) from exc
     packet = packet.model_copy(update={"usage": spend.reported(packet.usage)})
-    degraded = grounded._not_grounded_code(
-        packet, survey=False
-    ) or grounded._scenario_inputs_code(packet, scenario=True)
+    degraded = grounded._not_grounded_code(packet, survey=False)
     sidecar = grounded.build_research_sidecar(
         capability_class="balanced_lookup",
         shape="balanced",
@@ -382,26 +367,34 @@ async def refresh_computed_answer(
         degraded_code=degraded,
     )
     _record_refresh(user, conversation_id, sidecar)
-    refreshed = arguments_from_rows(
-        packet,
-        request,
-        declaration,
-        currency=str(arguments.get("currency") or FALLBACK_CURRENCY),
-        symbol=subjects[0]["symbol"] if subjects else None,
+    found = (
+        {}
+        if degraded is not None
+        else cited_page_inputs(packet.calculation, retrieved_pages(packet), cited)
     )
-    found = refreshed.get(TOOL_INPUT_SOURCES_FIELD) or {}
-    if degraded is not None or not found:
+    if not found:
         return ComputationRefreshResponse(
             computation=answer.computation,
             status="inputs_not_found",
             sources=list(sidecar["sources"]),
         )
-    kept: dict[str, Any] = dict(found)
-    for name in cited:
-        # A cited input no page states today keeps its stored value and date.
-        if name not in refreshed and arguments.get(name) is not None:
-            refreshed[name] = arguments[name]
-            kept[name] = dict(stored_sources[name])
+    refreshed: dict[str, Any] = {
+        name: value
+        for name, value in arguments.items()
+        if name != TOOL_INPUT_SOURCES_FIELD
+    }
+    # A cited input no page states today keeps its stored value and date.
+    kept: dict[str, Any] = {name: dict(source) for name, source in stored_sources.items()}
+    for name, (value, source) in found.items():
+        refreshed[name] = value
+        kept[name] = source
+    symbol = next(iter(answer.computation.symbols), None)
+    for name, source in stored_sources.items():
+        if isinstance(source, Mapping) and source.get("kind") == "market_data" and symbol:
+            close = latest_market_close(symbol)
+            if close is not None:
+                refreshed[name] = close[0]
+                kept[name] = {"kind": "market_data", "date": close[1]}
     refreshed[TOOL_INPUT_SOURCES_FIELD] = kept
     outcome = declaration.invoke_sync(refreshed)
     card = declaration.result_card(

@@ -2,8 +2,8 @@
 the input-retrieval contract is frozen the way the other retrieval recordings
 are (tests/research/test_retrieval_contract_probe.py). The request is byte for
 byte what production sends for a scenario question on the balanced
-configuration: the retrieve-only instructions and the ask that names each
-input the valuation declaration computes from. Paid.
+configuration: the instructions that ask the answer for its calculation with
+every input's source. Paid.
 Usage: GM_TREE=<repo> [GM_ENV_FILE=<.env>] python record_scenario_probe.py <out.json>"""
 from __future__ import annotations
 
@@ -23,10 +23,7 @@ TREE = Path(os.environ["GM_TREE"]).resolve()
 sys.path.insert(0, str(TREE / "src"))
 load_dotenv(os.environ.get("GM_ENV_FILE") or TREE / ".env", override=False)
 
-from argus.agent_runtime.interpreter.calculation_request import CalculationRequest  # noqa: E402
 from argus.agent_runtime.research_grounded import _research_prompt  # noqa: E402
-from argus.agent_runtime.research_inputs import retrieval_inputs  # noqa: E402
-from argus.domain.capability_registry import get_tool_catalog  # noqa: E402
 from argus.domain.research.config import retrieval_spec  # noqa: E402
 from argus.domain.research.contracts import ResearchUnavailableError  # noqa: E402
 from argus.domain.research.perplexity_agent import PerplexityAgentClient  # noqa: E402
@@ -60,15 +57,6 @@ class RecordingHTTPTransport(httpx.HTTPTransport):
 
 
 question = os.environ.get("GM_QUESTION", "what will $10,000 in NVDA be worth in ten years?")
-# The interpreter's read of that question: the valuation kind, the user's own
-# amount and horizon, every page input left to retrieval.
-request = CalculationRequest(
-    kind="valuation_scenarios",
-    inputs={"symbol": "NVDA", "amount": 10000, "horizon_years": 10},
-    retrieve=[],
-)
-declaration = get_tool_catalog().get("valuation_scenarios")
-inputs = retrieval_inputs(request, declaration)
 prompt = _research_prompt(
     message=question,
     subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
@@ -77,7 +65,6 @@ prompt = _research_prompt(
     question_kind=None,
     publisher_sources_required=True,
     scenario=True,
-    inputs=inputs,
 )
 spec = retrieval_spec("balanced", question_kind="company_lookup", language_tag="en", country=None, scenario=True)
 transport = RecordingHTTPTransport()
@@ -85,12 +72,10 @@ client = PerplexityAgentClient(os.environ["PERPLEXITY_API_KEY"], transport=trans
 started = time.monotonic()
 record: dict[str, Any] = {
     "probe": "scenario_inputs_balanced",
-    "purpose": "any grounded math: the retrieve-only scenario contract on the balanced configuration",
+    "purpose": "any grounded math: the answer returns its calculation with every input source, balanced configuration",
     "candidate_sha": subprocess.check_output(["git", "-C", str(TREE), "rev-parse", "HEAD"], text=True).strip(),
     "captured_at": datetime.now(timezone.utc).isoformat(),
     "question": question,
-    "calculation": request.model_dump(mode="json"),
-    "inputs": [name for name, _ in inputs],
 }
 try:
     packet = client.run_research(prompt, spec)
@@ -103,5 +88,5 @@ record["elapsed_s"] = round(time.monotonic() - started, 2)
 record["exchanges"] = transport.exchanges
 Path(sys.argv[1]).write_text(json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n")
 packet = record.get("packet") or {}
-print(json.dumps({"elapsed_s": record["elapsed_s"], "error": record["error"], "rows": [(r["label"], r["value"], bool(r["source_url"])) for r in (packet.get("rows") or [])], "usage": packet.get("usage")}, indent=1, default=str))
+print(json.dumps({"elapsed_s": record["elapsed_s"], "error": record["error"], "calculation": packet.get("calculation"), "usage": packet.get("usage")}, indent=1, default=str))
 print((packet.get("answer_markdown") or "")[:1500])

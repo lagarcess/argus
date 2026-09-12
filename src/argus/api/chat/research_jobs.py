@@ -134,6 +134,7 @@ def apply_research_job_request(
         if composed.get("next_experiments") is not None:
             runtime_result["next_experiments"] = composed["next_experiments"]
         _attach_completed_tool_card(runtime_result, job_request)
+        _attach_computed_answer(runtime_result, composed.get("computed"))
         return None
     runtime_result["assistant_response"] = research_failure_note(
         str(job_request.get("language") or "en")
@@ -152,6 +153,26 @@ def _attach_completed_tool_card(
     )
     if card is not None:
         patch["tool_result_cards"] = [card]
+
+
+def _attach_computed_answer(patch: dict[str, Any], computed: Any) -> None:
+    """A thorough answer's computed calculation joins its research card, with
+    the prose template a recompute re-renders."""
+    from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
+    from argus.api.chat.tool_results import computation_marker
+
+    if not isinstance(computed, dict):
+        return
+    payload = computed.get("final_response_payload") or {}
+    cards = list(payload.get("tool_result_cards") or [])
+    if not cards:
+        return
+    patch["tool_result_cards"] = [*(patch.get("tool_result_cards") or []), *cards]
+    marker = computation_marker(patch["tool_result_cards"])
+    if marker:
+        patch["computation"] = marker
+    if computed.get(ANSWER_TEMPLATE_KEY) is not None:
+        patch[ANSWER_TEMPLATE_KEY] = computed[ANSWER_TEMPLATE_KEY]
 
 
 def start_research_job(
@@ -434,6 +455,7 @@ async def _finalize_success(
     )
     if card is not None:
         metadata["tool_result_cards"] = [card]
+    _attach_computed_answer(metadata, composed.get("computed"))
     if composed.get("next_experiments") is not None:
         metadata["next_experiments"] = composed["next_experiments"]
     message = await persist_research_job_answer(

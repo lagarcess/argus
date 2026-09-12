@@ -187,9 +187,13 @@ def set_research_query(monkeypatch, namespace, **fields):
     monkeypatch.setitem(target, "_interpretation", interpreted)
 
 
-def typed_answer_text(answer: str, rows: list[dict[str, Any]]) -> str:
-    """The provider's message text under the strict typed retrieval schema."""
-    return json.dumps({"answer_markdown": answer, "rows": rows})
+def typed_answer_text(
+    answer: str, rows: list[dict[str, Any]], calculation: dict[str, Any] | None = None
+) -> str:
+    """The provider's message text under the strict typed answer schema."""
+    return json.dumps(
+        {"answer_markdown": answer, "rows": rows, "calculation": calculation}
+    )
 
 
 def retrieved_row(

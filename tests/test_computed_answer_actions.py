@@ -265,7 +265,7 @@ def test_a_guest_cannot_continue_a_result_in_a_new_chat(client, monkeypatch) -> 
     assert "account_conversion_required" in response.text
 
 
-def _wire_refresh(monkeypatch, rows: list[dict[str, Any]]):
+def _wire_refresh(monkeypatch, calculation: Any):
     from argus.agent_runtime import research_grounded as grounded
     from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
@@ -279,7 +279,11 @@ def _wire_refresh(monkeypatch, rows: list[dict[str, Any]]):
     transport = RecordingTransport(
         [
             agent_response(
-                text=typed_answer_text("NVIDIA inputs as of today.", rows),
+                text=typed_answer_text(
+                    "NVIDIA inputs as of today.",
+                    [],
+                    calculation if isinstance(calculation, dict) else None,
+                ),
                 sources=["https://example.com/eps"],
                 tickers=["NVDA"],
             )
@@ -296,32 +300,29 @@ def test_refresh_looks_up_the_cited_inputs_and_never_rewrites_the_answer(
 ) -> None:
     from argus.domain.research.config import SCENARIO_RETRIEVAL_INSTRUCTIONS
 
-    from tests.research.conftest import retrieved_row
-
+    page = "https://example.com/eps"
     transport = _wire_refresh(
         monkeypatch,
-        [
-            retrieved_row(
-                subject="NVIDIA",
-                symbol="NVDA",
-                label="price",
-                value=218.36,
-                kind="currency",
-                unit="USD",
-                as_of="2026-09-11",
-                source_url="https://www.perplexity.ai/finance/NVDA",
-            ),
-            retrieved_row(
-                subject="NVIDIA",
-                symbol="NVDA",
-                label="per_share",
-                value=4.5,
-                kind="currency",
-                unit="USD",
-                as_of="2026-09-10",
-                source_url="https://example.com/eps",
-            ),
-        ],
+        {
+            "kind": "valuation_scenarios",
+            "inputs": [
+                {
+                    "name": "price",
+                    "value": 218.36,
+                    "source": "page",
+                    "source_url": page,
+                    "as_of": "2026-09-11",
+                },
+                {
+                    "name": "per_share",
+                    "value": 4.5,
+                    "source": "page",
+                    "source_url": page,
+                    "as_of": "2026-09-10",
+                },
+                {"name": "amount", "value": 99999, "source": "user"},
+            ],
+        },
     )
     conversation = _conversation(client, "NVIDIA in ten years")
     message_id = _answer(
@@ -347,14 +348,17 @@ def test_refresh_looks_up_the_cited_inputs_and_never_rewrites_the_answer(
     # No page states the growth forecast today: it keeps its stored value and date.
     assert card["arguments"]["growth_base_pct"] == 20
     assert card["arguments"]["sources"]["growth_base_pct"]["date"] == "2026-09-01"
+    # Only cited inputs are looked up again; the user's amount never moves.
     assert card["arguments"]["amount"] == 10000
     assert body["sources"]
     assert len(transport.requests) == 1
     sent = json.loads(transport.requests[0].content.decode())
     assert sent["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "- price: the current share price" in sent["input"]
-    assert "- growth_base_pct: " in sent["input"]
-    assert "- multiple_base" not in sent["input"]
+    assert (
+        "Look up the current published value of each of these calculation inputs"
+        in sent["input"]
+    )
+    assert "price, per_share, growth_base_pct" in sent["input"]
     stored = client.get(f"/api/v1/conversations/{conversation}/messages").json()["items"][
         -1
     ]

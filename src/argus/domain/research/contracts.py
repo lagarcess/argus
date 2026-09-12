@@ -296,6 +296,11 @@ class ResearchPacket(BaseModel):
     # cited rows; the turn names them under the answer as figures it could
     # not tie to a source, from their own typed subject and label.
     unsourced_rows: tuple[RetrievedRow, ...] = ()
+    # The one calculation the answer asks Argus to compute, as the provider
+    # wrote it under the typed answer schema; the answer step validates and
+    # computes it. JSON here because the calculation catalogue imports the
+    # tool contracts that import this module.
+    calculation: dict[str, Any] | None = None
     # Tool result items in the provider's output, by item type and in order.
     # This is the retrieval record; the invoice's tool counts are billing.
     tool_results: tuple[str, ...] = ()

@@ -44,6 +44,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.domain.calculations.answer_request import ANSWER_CALCULATION_INSTRUCTIONS
 from argus.domain.research.config import (
     RETRIEVAL_INSTRUCTIONS,
     SCENARIO_RETRIEVAL_INSTRUCTIONS,
@@ -295,7 +296,7 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     figures through; every other question keeps the retrieval contract the
     recordings froze, byte for byte."""
     prompt = _prompt(scenario=True)
-    assert "Argus computes the answer itself" in prompt
+    assert "Argus computes the answer from the calculation you return" in prompt
     assert "Do not compute the answer, scenario values" in prompt
     assert "never estimate a live number. No investment advice." in prompt
     assert "scenarios" not in _prompt(scenario=False)
@@ -313,11 +314,13 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     assert scenario_spec.instructions == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert plain_spec.instructions == RETRIEVAL_INSTRUCTIONS
     assert SCENARIO_RETRIEVAL_INSTRUCTIONS.startswith(RETRIEVAL_INSTRUCTIONS)
-    assert "a calculation Argus computes from typed inputs" in SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "Never compute the answer, scenario values" in SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "label exactly the input name" in SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "never say what the reader should do" in SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "arithmetic" not in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert ANSWER_CALCULATION_INSTRUCTIONS in RETRIEVAL_INSTRUCTIONS
+    scenario_ask = SCENARIO_RETRIEVAL_INSTRUCTIONS[len(RETRIEVAL_INSTRUCTIONS) :]
+    assert "fill calculation" in scenario_ask
+    assert "the current price from market_data" in scenario_ask
+    assert "Never compute the answer, scenario values" in scenario_ask
+    assert "never say what the reader should do" in scenario_ask
+    assert "arithmetic" not in scenario_ask
 
 
 def test_the_research_query_types_the_scenario_signal() -> None:

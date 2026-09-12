@@ -23,6 +23,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from argus.domain.calculations.answer_request import (
+    ANSWER_CALCULATION_INSTRUCTIONS,
+    calculation_kinds_clause,
+)
 from argus.domain.research.cache import DataClass, data_class_for
 from argus.domain.research.contracts import CapabilityClass, QuestionShape
 
@@ -54,26 +58,23 @@ RETRIEVAL_INSTRUCTIONS = (
     "the figure could not be retrieved. Reply in the requested JSON shape. "
     "answer_markdown is the prose for the reader: no links, no list of sources, "
     "no mention of tools, providers or models. Every figure answer_markdown "
-    "states appears once in rows, with the URL of the retrieved page it was "
-    "read from."
+    "states in digits appears once in rows, with the URL of the retrieved page "
+    "it was read from. "
+    + ANSWER_CALCULATION_INSTRUCTIONS
+    + calculation_kinds_clause()
 )
 
 # The same contract for a question whose answer is computed (decision 10):
-# the model retrieves the inputs a declared calculation needs, one typed row
-# each with its page, and Argus computes the scenario figures itself. Frozen
-# by its own recording under docs/reports/evidence/grounded-math/probes.
+# the answer returns its calculation with every input's source, and Argus
+# computes the scenario figures itself. Frozen by its own recording under
+# docs/reports/evidence/grounded-math/probes.
 SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
-    " This question is answered by a calculation Argus computes from typed "
-    "inputs, such as what something will be worth, what a plan costs or what a "
-    "price implies. Never compute the answer, scenario values, ranges or "
-    "future figures yourself. The question names each input to retrieve: a "
-    "price, a rate, a per-share figure, a published forecast or a multiple. Row "
-    "every input you find, one row per input, with label exactly the input "
-    "name as the question writes it, value as a plain number, and the page it "
-    "was read from; the current price may come from finance data. In "
-    "answer_markdown state the inputs found with their dates and sources, and "
-    "name any input no page states. Never present one number as the future, "
-    "and never say what the reader should do."
+    "This question is answered by a calculation: fill calculation, "
+    "valuation_scenarios unless another listed kind fits the question better, "
+    "with the current price from market_data and every other input from a page "
+    "or a stated assumption. Never compute the answer, scenario values, ranges "
+    "or future figures yourself, never present one number as the future, and "
+    "never say what the reader should do."
 )
 
 

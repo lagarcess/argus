@@ -13,9 +13,8 @@ model wrote records a reason code.
 
 from __future__ import annotations
 
-import asyncio
 import re
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
@@ -67,7 +66,7 @@ _SYMBOL_MONEY = re.compile(r"(?:[A-Z]{0,3}\$|€|£)\s?\d")
 _CODE_MONEY = re.compile(r"\b([A-Z]{3})\s?\d|\d\s?([A-Z]{3})\b")
 _MARKET_WINDOW_DAYS = 14
 
-MarketClose = Callable[[str], Awaitable[tuple[float, str] | None]]
+MarketClose = Callable[[str], tuple[float, str] | None]
 
 
 @dataclass
@@ -97,7 +96,7 @@ class PublishedCalculation:
     not_looked_up: tuple[str, ...]
 
 
-async def publish_calculation(
+def publish_calculation(
     request: AnswerCalculation,
     *,
     template: str,
@@ -110,7 +109,7 @@ async def publish_calculation(
     notes: list[str],
 ) -> PublishedCalculation | None:
     """The card and prose for an answer's request, or None for an unknown kind."""
-    resolved = await resolve_calculation(
+    resolved = resolve_calculation(
         request,
         catalog=catalog,
         retrieved=retrieved,
@@ -142,7 +141,7 @@ async def publish_calculation(
     )
 
 
-async def resolve_calculation(
+def resolve_calculation(
     request: AnswerCalculation,
     *,
     catalog: Any,
@@ -187,7 +186,7 @@ async def resolve_calculation(
             arguments[name], sources[name] = item.value, ToolFactSource(kind="assumption")
             resolved.assumed.append(name)
         elif item.source == "market_data":
-            price = await _market_price(name, symbol, market_close, notes)
+            price = _market_price(name, symbol, market_close, notes)
             if price is None:
                 resolved.not_looked_up.append(name)
                 continue
@@ -198,7 +197,7 @@ async def resolve_calculation(
                 resolved.not_looked_up.append(name)
                 _note(notes, PAGE_UNCITED_REASON_CODE, name=name)
                 continue
-            arguments[name], sources[name] = item.value, _page_source(page, item.as_of)
+            arguments[name], sources[name] = item.value, page_source(page, item.as_of)
     if request.solve_for in declared:
         arguments[request.solve_for] = None
     if sources:
@@ -249,7 +248,7 @@ def render_answer_text(
     text = _REFERENCE.sub(fill, template)
     if unresolved:
         return text, "invalid_figure_reference"
-    if _states_a_figure(_REFERENCE.sub("", template)):
+    if states_a_figure(_REFERENCE.sub("", template)):
         return text, "unreferenced_figure"
     referenced = set(_REFERENCE.findall(template))
     if any(name not in referenced for name in assumed):
@@ -290,7 +289,7 @@ def fallback_answer_lead(language: str, *, succeeded: bool) -> str:
     return "The numbers as stated do not solve. The card names what is missing and offers a fix."
 
 
-async def latest_market_close(symbol: str) -> tuple[float, str] | None:
+def latest_market_close(symbol: str) -> tuple[float, str] | None:
     """The latest daily close Argus's own market data has for a symbol, and its date."""
     try:
         # Lazy: the compute stack loads only when an answer needs a price.
@@ -300,8 +299,7 @@ async def latest_market_close(symbol: str) -> tuple[float, str] | None:
 
         asset = classify_symbol(symbol)
         end = new_york_today()
-        series = await asyncio.to_thread(
-            fetch_price_series,
+        series = fetch_price_series(
             symbol,
             asset.asset_class,
             end - timedelta(days=_MARKET_WINDOW_DAYS),
@@ -322,6 +320,36 @@ async def latest_market_close(symbol: str) -> tuple[float, str] | None:
     return close, str(index)[:10]
 
 
+def cited_page_inputs(
+    calculation: dict[str, Any] | None,
+    sources: Sequence[ResearchSource],
+    names: Sequence[str],
+) -> dict[str, tuple[Any, dict[str, Any]]]:
+    """The named inputs a refreshed answer read from pages it retrieved, each
+    with its page source; anything else in the calculation is ignored."""
+    if not calculation:
+        return {}
+    try:
+        request = AnswerCalculation.model_validate(calculation)
+    except ValidationError:
+        return {}
+    pages = {source.url: source for source in sources}
+    found: dict[str, tuple[Any, dict[str, Any]]] = {}
+    for item in request.inputs:
+        page = pages.get(item.source_url or "")
+        if (
+            item.name in names
+            and item.source == "page"
+            and page
+            and item.value is not None
+        ):
+            found[item.name] = (
+                item.value,
+                page_source(page, item.as_of).model_dump(mode="json"),
+            )
+    return found
+
+
 def _reference_facts(card: ToolResultCard) -> dict[str, ToolFact]:
     presentation = card.presentation
     facts: dict[str, ToolFact] = {
@@ -333,7 +361,7 @@ def _reference_facts(card: ToolResultCard) -> dict[str, ToolFact]:
     return facts
 
 
-def _states_a_figure(text: str) -> bool:
+def states_a_figure(text: str) -> bool:
     """A money or percent figure written as digits rather than referenced."""
     if _PERCENT_FIGURE.search(text) or _SYMBOL_MONEY.search(text):
         return True
@@ -384,13 +412,13 @@ def _stated_symbol(request: AnswerCalculation) -> str | None:
     )
 
 
-async def _market_price(
+def _market_price(
     name: str, symbol: str | None, market_close: MarketClose, notes: list[str]
 ) -> tuple[float, ToolFactSource] | None:
     if name != PRICE_FIELD:
         _note(notes, MARKET_DATA_NOT_A_PRICE_REASON_CODE, name=name)
         return None
-    close = await market_close(symbol) if symbol else None
+    close = market_close(symbol) if symbol else None
     if close is None:
         _note(notes, MARKET_PRICE_UNAVAILABLE_REASON_CODE, symbol=symbol)
         return None
@@ -399,7 +427,7 @@ async def _market_price(
     return value, ToolFactSource(kind="market_data", date=dated)
 
 
-def _page_source(page: ResearchSource, as_of: str | None) -> ToolFactSource:
+def page_source(page: ResearchSource, as_of: str | None) -> ToolFactSource:
     dated = next(
         (
             value[:10]

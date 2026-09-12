@@ -4,7 +4,6 @@ references filled from the card and checked."""
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from argus.agent_runtime import answer_calculation as ac
@@ -31,7 +30,7 @@ LOAN: list[dict[str, Any]] = [
 ]
 
 
-async def _close(symbol: str) -> tuple[float, str] | None:
+def _close(symbol: str) -> tuple[float, str] | None:
     return (187.5, "2026-09-11") if symbol == "AAPL" else None
 
 
@@ -42,32 +41,28 @@ def _request(kind: str, inputs: list[dict[str, Any]], solve_for: str | None = No
 
 
 def _resolve(request, *, retrieved=(RATE_PAGE,), currency="DOP", notes=None):
-    return asyncio.run(
-        ac.resolve_calculation(
-            request,
-            catalog=get_tool_catalog(),
-            retrieved=list(retrieved),
-            currency=currency,
-            subject_symbol=None,
-            market_close=_close,
-            notes=notes if notes is not None else [],
-        )
+    return ac.resolve_calculation(
+        request,
+        catalog=get_tool_catalog(),
+        retrieved=list(retrieved),
+        currency=currency,
+        subject_symbol=None,
+        market_close=_close,
+        notes=notes if notes is not None else [],
     )
 
 
 def _published(template, *, inputs=LOAN, solve_for="payment", notes=None, language="en"):
-    return asyncio.run(
-        ac.publish_calculation(
-            _request("time_value", inputs, solve_for),
-            template=template,
-            language=language,
-            catalog=get_tool_catalog(),
-            retrieved=[RATE_PAGE],
-            currency="DOP",
-            subject_symbol=None,
-            market_close=_close,
-            notes=notes if notes is not None else [],
-        )
+    return ac.publish_calculation(
+        _request("time_value", inputs, solve_for),
+        template=template,
+        language=language,
+        catalog=get_tool_catalog(),
+        retrieved=[RATE_PAGE],
+        currency="DOP",
+        subject_symbol=None,
+        market_close=_close,
+        notes=notes if notes is not None else [],
     )
 
 

@@ -29,7 +29,6 @@ from argus.agent_runtime.capabilities.answers import (
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.research_answer import discovery_turn_stage_result
-from argus.agent_runtime.calculation_turn import calculation_turn_stage_result
 from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
 )
@@ -429,14 +428,6 @@ async def interpret_stage_async(
     )
     if pending_response_option_interpretation is not None:
         interpretation = pending_response_option_interpretation
-    calculation_result = await calculation_turn_stage_result(
-        interpretation=interpretation,
-        state=state,
-        user=user,
-        selected_thread_metadata=selected_metadata,
-    )
-    if calculation_result is not None:
-        return calculation_result
     knowledge_result = await knowledge_answer_stage_result(
         interpretation=interpretation,
         state=state,

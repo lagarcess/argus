@@ -23,10 +23,7 @@ TREE = Path(os.environ["GM_TREE"]).resolve()
 sys.path.insert(0, str(TREE / "src"))
 load_dotenv(os.environ.get("GM_ENV_FILE") or TREE / ".env", override=False)
 
-from argus.agent_runtime.interpreter.calculation_request import CalculationRequest  # noqa: E402
 from argus.agent_runtime.research_grounded import _research_prompt  # noqa: E402
-from argus.agent_runtime.research_inputs import retrieval_inputs  # noqa: E402
-from argus.domain.capability_registry import get_tool_catalog  # noqa: E402
 from argus.domain.research.config import retrieval_spec  # noqa: E402
 from argus.domain.research.contracts import ResearchUnavailableError  # noqa: E402
 from argus.domain.research.perplexity_agent import PerplexityAgentClient  # noqa: E402
@@ -63,11 +60,8 @@ class RecordingHTTPTransport(httpx.HTTPTransport):
         return response
 
 
-out, kind, inputs, retrieve = sys.argv[1], sys.argv[2], json.loads(sys.argv[3]), json.loads(sys.argv[4])
+out = sys.argv[1]
 question = "If I invest $10,000 in Bitcoin and just hold it, what will it be worth in ten years?"
-calculation = CalculationRequest(kind=kind, inputs=inputs, retrieve=retrieve)
-declaration = get_tool_catalog().get(kind)
-asked = retrieval_inputs(calculation, declaration)
 prompt = _research_prompt(
     message=question,
     subjects=[{"symbol": "BTC-USD", "name": "Bitcoin", "asset_class": "crypto"}],
@@ -76,7 +70,6 @@ prompt = _research_prompt(
     question_kind=None,
     publisher_sources_required=True,
     scenario=True,
-    inputs=asked,
 )
 spec = retrieval_spec("balanced", question_kind="company_lookup", language_tag="en", country=None, scenario=True)
 spec = spec.model_copy(update={"tools": tuple(tool for tool in spec.tools if tool != "finance_search")})
@@ -89,8 +82,6 @@ record: dict[str, Any] = {
     "candidate_sha": subprocess.check_output(["git", "-C", str(TREE), "rev-parse", "HEAD"], text=True).strip(),
     "captured_at": datetime.now(timezone.utc).isoformat(),
     "question": question,
-    "calculation": calculation.model_dump(mode="json"),
-    "inputs": [name for name, _ in asked],
     "tools": list(spec.tools),
     "timeout_seconds": spec.timeout_seconds,
 }
@@ -105,4 +96,4 @@ record["elapsed_s"] = round(time.monotonic() - started, 2)
 record["exchanges"] = transport.exchanges
 Path(out).write_text(json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n")
 packet = record.get("packet") or {}
-print(json.dumps({"elapsed_s": record["elapsed_s"], "error": record["error"], "statuses": [exchange.get("http_status") or exchange.get("error") for exchange in transport.exchanges], "rows": [(row["label"], row["value"], bool(row["source_url"])) for row in (packet.get("rows") or [])], "cost_usd": (packet.get("usage") or {}).get("cost_usd")}, indent=1, default=str))
+print(json.dumps({"elapsed_s": record["elapsed_s"], "error": record["error"], "statuses": [exchange.get("http_status") or exchange.get("error") for exchange in transport.exchanges], "calculation": packet.get("calculation"), "cost_usd": (packet.get("usage") or {}).get("cost_usd")}, indent=1, default=str))
