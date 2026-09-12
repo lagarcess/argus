@@ -1545,7 +1545,7 @@ paths:
     get:
       tags:
       - market
-      description: 'Backend-owned session truth.
+      description: 'Backend-owned session truth, and what the caller has shown interest in.
 
 
         Eastern time and the real trading calendar live behind this, so no caller
@@ -3268,6 +3268,14 @@ components:
       additionalProperties: false
       type: object
       description: Input overrides merged over the stored inputs; the decision is unchanged.
+    DemonstratedInterest:
+      properties:
+        markets:
+          type: boolean
+      type: object
+      required:
+      - markets
+      description: What a person's own records show interest in.
     DiscoveryItem:
       properties:
         id:
@@ -3775,9 +3783,16 @@ components:
           - type: 'null'
           description: Null when the trading calendar is unreachable. Callers say nothing
             about the market rather than guessing an open or a holiday.
+        interest:
+          anyOf:
+          - $ref: '#/components/schemas/DemonstratedInterest'
+          - type: 'null'
+          description: Null when the caller's records are unreadable. Callers treat it as
+            no shown interest.
       type: object
       required:
       - session
+      - interest
     MemoryAvailabilityResponse:
       properties:
         available:

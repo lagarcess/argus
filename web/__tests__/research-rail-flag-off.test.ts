@@ -37,9 +37,7 @@ describe("research rail flag-off equivalence", () => {
 
   test("flag-off empty chat keeps the legacy pills and no greeting", () => {
     const emptyChat = source("components/chat/EmptyChatSurface.tsx");
-    expect(emptyChat).toContain(
-      "const showSignedInGreeting = researchRailEnabled && !isGuest;",
-    );
+    expect(emptyChat).toContain("const showGreeting = researchRailEnabled;");
     const starterActions = source("components/chat/StarterActions.tsx");
     expect(starterActions).toContain(
       "const entries: StarterEntry[] = researchRailEnabled",

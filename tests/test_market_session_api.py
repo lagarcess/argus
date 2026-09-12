@@ -60,7 +60,7 @@ def test_an_unreachable_calendar_is_a_null_session_not_an_error(
     response = _client().get("/api/v1/market/session")
 
     assert response.status_code == 200
-    assert response.json() == {"session": None}
+    assert response.json()["session"] is None
 
 
 def test_a_raising_resolver_is_a_null_session_not_an_error(
@@ -74,7 +74,7 @@ def test_a_raising_resolver_is_a_null_session_not_an_error(
     response = _client().get("/api/v1/market/session")
 
     assert response.status_code == 200
-    assert response.json() == {"session": None}
+    assert response.json()["session"] is None
 
 
 def test_the_endpoint_is_owner_authenticated() -> None:

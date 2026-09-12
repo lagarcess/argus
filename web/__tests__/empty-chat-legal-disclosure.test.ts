@@ -15,7 +15,10 @@ describe("empty-chat legal disclosure", () => {
     const emptyChat = source("components/chat/EmptyChatSurface.tsx");
     expect(emptyChat).toContain("<ChatLegalNotice");
     expect(emptyChat).toContain(
-      "showRegisteredDisclaimer={showSignedInGreeting}",
+      "const showRegisteredDisclaimer = researchRailEnabled && !isGuest;",
+    );
+    expect(emptyChat).toContain(
+      "showRegisteredDisclaimer={showRegisteredDisclaimer}",
     );
     expect(emptyChat).toContain("showGuestSafetyLine={researchRailEnabled}");
   });

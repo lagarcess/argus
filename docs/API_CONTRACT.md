@@ -2836,8 +2836,8 @@ Three operation classes, one meter each:
 
 ## `GET /market/session`
 
-Return which session US equities are in. Owner-authenticated read; it holds no
-per-account state.
+Return which session US equities are in, and what the caller's own records show
+interest in. Owner-authenticated read.
 
 **Response:**
 ```json
@@ -2846,9 +2846,23 @@ per-account state.
     "phase": "closed_weekend",
     "is_market_day": false,
     "as_of": "2026-08-09T13:04:22-04:00"
+  },
+  "interest": {
+    "markets": true
   }
 }
 ```
+
+**Interest semantics:**
+- `interest` has one backend owner, `argus.api.demonstrated_interest`, and it
+  reads only typed records the caller owns. It never classifies message text
+  and never reads personalization memory.
+- `markets` is `true` once the caller owns a completed backtest run.
+- Guests are answered like anyone else. The empty chat greets a guest from the
+  neutral pool regardless of `interest`, because that is a greeting rule, not a
+  fact about the caller.
+- `interest` is `null` when the caller's records are unreadable. Clients treat
+  `null` as no shown interest, and the session is still returned.
 
 **Session semantics:**
 - `phase` is one of `pre_market`, `open`, `after_hours`, `closed_weekend`,

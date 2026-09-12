@@ -5,13 +5,15 @@ import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
 import { getMarketSession } from "@/lib/argus-api";
 import {
+  greetingAudience,
   greetingSlotForHour,
   pickGreetingKey,
+  type DemonstratedInterest,
   type MarketSessionPhase,
 } from "./greetingPool";
 
 
-/* The signed-in empty chat: the muted mark reuses the treatment from
+/* The empty chat greeting: the muted mark reuses the treatment from
  * ConversationRetrievalState (currentColor at low alpha), and the typewriter
  * greeting is the screen's one animated element. Screen readers get the full
  * sentence once through a polite status region, never character by character;
@@ -23,8 +25,10 @@ const TYPE_INTERVAL_MS = 35;
 const SESSION_TIMEOUT_MS = 2_000;
 
 export default function EmptyChatGreeting({
+  isGuest,
   preferredName,
 }: {
+  isGuest: boolean;
   /** What the user asked to be called. Blank means the nameless pool. */
   preferredName?: string | null;
 }) {
@@ -33,9 +37,10 @@ export default function EmptyChatGreeting({
   const [visibleCount, setVisibleCount] = useState(0);
   const [done, setDone] = useState(false);
   const [session, setSession] = useState<MarketSessionPhase | null>(null);
+  const [interest, setInterest] = useState<DemonstratedInterest | null>(null);
   const [sessionSettled, setSessionSettled] = useState(false);
 
-  // Session is backend truth in Eastern time; the client never computes it.
+  // Session and interest are backend truth; the client computes neither.
   useEffect(() => {
     const controller = new AbortController();
     const timeout = window.setTimeout(
@@ -43,8 +48,14 @@ export default function EmptyChatGreeting({
       SESSION_TIMEOUT_MS,
     );
     getMarketSession(controller.signal)
-      .then((response) => setSession(response.session?.phase ?? null))
-      .catch(() => setSession(null))
+      .then((response) => {
+        setSession(response.session?.phase ?? null);
+        setInterest(response.interest ?? null);
+      })
+      .catch(() => {
+        setSession(null);
+        setInterest(null);
+      })
       .finally(() => {
         window.clearTimeout(timeout);
         setSessionSettled(true);
@@ -60,15 +71,20 @@ export default function EmptyChatGreeting({
     // Local clock only after mount: the server cannot know the visitor's hour,
     // and a mismatched SSR greeting would flash-correct on hydration.
     const now = new Date();
-    const name = preferredName?.trim() ?? "";
+    const { name, marketFan } = greetingAudience({
+      isGuest,
+      preferredName,
+      interest,
+    });
     const key = pickGreetingKey({
       slot: greetingSlotForHour(now.getHours()),
       session,
       hasName: name.length > 0,
+      marketFan,
       at: now,
     });
     const text = t(`chat.greeting.${key}`, {
-      defaultValue: "What should we try today?",
+      defaultValue: "What should we look into?",
       name,
     });
     setGreeting(text);
@@ -90,7 +106,7 @@ export default function EmptyChatGreeting({
       }
     }, TYPE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [preferredName, session, sessionSettled, t]);
+  }, [interest, isGuest, preferredName, session, sessionSettled, t]);
 
   return (
     <div

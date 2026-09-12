@@ -877,6 +877,14 @@ class MarketSession(BaseModel):
     as_of: datetime
 
 
+class DemonstratedInterest(BaseModel):
+    """What a person's own records show interest in."""
+
+    model_config = ConfigDict(frozen=True)
+
+    markets: bool
+
+
 class MarketSessionResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -884,6 +892,12 @@ class MarketSessionResponse(BaseModel):
         description=(
             "Null when the trading calendar is unreachable. Callers say nothing "
             "about the market rather than guessing an open or a holiday."
+        )
+    )
+    interest: DemonstratedInterest | None = Field(
+        description=(
+            "Null when the caller's records are unreadable. Callers treat it as "
+            "no shown interest."
         )
     )
 

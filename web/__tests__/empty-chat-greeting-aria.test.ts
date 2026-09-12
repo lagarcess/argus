@@ -89,10 +89,15 @@ describe("what Argus calls the user", () => {
     }
   });
 
-  test("guests never reach the named pool", () => {
-    // They have no profile, so there is nothing to address them by.
+  test("the greeting knows whether it speaks to a guest", () => {
+    // A guest has no profile, so there is nothing to address them by. The pool
+    // owns that rule through greetingAudience; see greeting-pool.test.ts.
     const surface = source("components/chat/EmptyChatSurface.tsx");
+    const greeting = source("components/chat/EmptyChatGreeting.tsx");
 
-    expect(surface).toContain("researchRailEnabled && !isGuest");
+    expect(surface).toContain(
+      "<EmptyChatGreeting isGuest={isGuest} preferredName={preferredName} />",
+    );
+    expect(greeting).toContain("greetingAudience({");
   });
 });

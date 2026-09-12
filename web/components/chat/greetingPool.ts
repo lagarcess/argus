@@ -6,6 +6,11 @@
  * pool members, never overrides: time of day describes the user and session
  * describes the market, and the two decouple outside Eastern time.
  *
+ * Market flavor is earned. Lines about testing and about the market go only to
+ * a market fan, a registered person whose own records show market interest as
+ * the backend reports it. Everyone else, every guest included, gets a neutral
+ * line.
+ *
  * A memory-driven greeting would plug in at `pickGreetingKey`, choosing its own
  * line and falling back here. Nothing does yet, and the corpus for it does not
  * exist: the `memory` field `research_memory_block()` writes into the research
@@ -25,6 +30,11 @@ export type MarketSessionPhase =
   | "closed_holiday"
   | "closed";
 
+/** What a person's own records show interest in. Backend-owned. */
+export type DemonstratedInterest = {
+  markets: boolean;
+};
+
 type PoolMember = {
   /** Key under `chat.greeting` in the locale files. */
   key: string;
@@ -32,6 +42,8 @@ type PoolMember = {
   session?: MarketSessionPhase;
   /** Eligible only once the user has said what Argus should call them. */
   needsName?: boolean;
+  /** Eligible only to a market fan. */
+  marketFan?: boolean;
   /**
    * Candidate slots this member takes, which is how often it comes up.
    * Defaults to 1.
@@ -46,62 +58,81 @@ export function greetingSlotForHour(hour: number): GreetingSlot {
   return "night";
 }
 
-/* Six for `day`, because a weekday user lives entirely inside it. Only some
- * members carry a name; every greeting using one gets grating in a few days. */
+/* Only some members carry a name; every greeting using one gets grating in a
+ * few days. `day_d` reads true at any hour, so night shares it. */
 const SLOT_POOL: Record<GreetingSlot, PoolMember[]> = {
   early: [
     { key: "early_a" },
-    { key: "early_b" },
+    { key: "early_b", marketFan: true },
     { key: "early_c" },
     { key: "early_named_a", needsName: true },
   ],
   day: [
-    { key: "day_a" },
-    { key: "day_b" },
-    { key: "day_c" },
+    { key: "day_a", marketFan: true },
+    { key: "day_c", marketFan: true },
     { key: "day_d" },
-    { key: "day_e" },
+    { key: "day_e", marketFan: true },
     { key: "day_f" },
-    { key: "day_named_a", needsName: true },
+    { key: "day_named_a", needsName: true, marketFan: true },
     { key: "day_named_b", needsName: true },
   ],
   evening: [
     { key: "evening_a" },
-    { key: "evening_b" },
-    { key: "evening_c" },
+    { key: "evening_b", marketFan: true },
     { key: "evening_d" },
     { key: "evening_named_a", needsName: true },
   ],
   night: [
-    { key: "night_a" },
     { key: "night_b" },
-    { key: "night_c" },
+    { key: "night_c", marketFan: true },
     { key: "night_named_a", needsName: true },
+    { key: "day_d" },
   ],
 };
 
 /*
- * Weighted unevenly: a closure speaks often, pre-market and after-hours only
- * occasionally. An open market and an overnight lull get no line at all.
+ * A session line comes up no more often than any other line. An open market
+ * and an overnight lull get no line at all.
  *
  * The session resolves the US equity calendar and nothing else, so a closure
  * line may name only that and crypto, which genuinely never closes. FX closes
  * most of the weekend and a holiday weekend is not always three days.
  */
 const SESSION_POOL: PoolMember[] = [
-  { key: "session_closed_weekend_a", session: "closed_weekend", weight: 3 },
-  { key: "session_closed_weekend_b", session: "closed_weekend", weight: 3 },
-  { key: "session_closed_holiday_a", session: "closed_holiday", weight: 3 },
-  { key: "session_closed_holiday_b", session: "closed_holiday", weight: 3 },
-  { key: "session_pre_market_a", session: "pre_market" },
-  { key: "session_after_hours_a", session: "after_hours" },
+  { key: "session_closed_weekend_a", session: "closed_weekend", marketFan: true },
+  { key: "session_closed_holiday_a", session: "closed_holiday", marketFan: true },
+  { key: "session_pre_market_a", session: "pre_market", marketFan: true },
 ];
 
 /** Every key the pools can ask for, for the locale-coverage guard. */
 export const GREETING_KEYS: readonly string[] = [
-  ...Object.values(SLOT_POOL).flat(),
-  ...SESSION_POOL,
-].map((member) => member.key);
+  ...new Set(
+    [...Object.values(SLOT_POOL).flat(), ...SESSION_POOL].map(
+      (member) => member.key,
+    ),
+  ),
+];
+
+/**
+ * Who the greeting speaks to. A guest has no profile and no history of its
+ * own, so a guest is nameless and never a market fan, whatever the backend
+ * reports.
+ */
+export function greetingAudience({
+  isGuest,
+  preferredName,
+  interest,
+}: {
+  isGuest: boolean;
+  preferredName?: string | null;
+  interest: DemonstratedInterest | null;
+}): { name: string; marketFan: boolean } {
+  if (isGuest) return { name: "", marketFan: false };
+  return {
+    name: preferredName?.trim() ?? "",
+    marketFan: interest?.markets === true,
+  };
+}
 
 /** FNV-1a, so a pool's starting point is the pool and nothing else. */
 function hash(text: string): number {
@@ -127,19 +158,24 @@ function localDayOrdinal(at: Date): number {
   );
 }
 
+type PoolOptions = {
+  slot: GreetingSlot;
+  session: MarketSessionPhase | null;
+  hasName: boolean;
+  marketFan: boolean;
+};
+
 function eligibleMembers({
   slot,
   session,
   hasName,
-}: {
-  slot: GreetingSlot;
-  session: MarketSessionPhase | null;
-  hasName: boolean;
-}): PoolMember[] {
+  marketFan,
+}: PoolOptions): PoolMember[] {
   return [...SLOT_POOL[slot], ...SESSION_POOL].filter(
     (member) =>
       (member.session === undefined || member.session === session) &&
-      (!member.needsName || hasName),
+      (!member.needsName || hasName) &&
+      (!member.marketFan || marketFan),
   );
 }
 
@@ -170,17 +206,10 @@ function arrangeRing(members: PoolMember[]): string[] {
  * are neighbours and neighbours are never equal.
  */
 export function pickGreetingKey({
-  slot,
-  session,
-  hasName,
   at,
-}: {
-  slot: GreetingSlot;
-  session: MarketSessionPhase | null;
-  hasName: boolean;
-  at: Date;
-}): string {
-  const members = eligibleMembers({ slot, session, hasName });
+  ...options
+}: PoolOptions & { at: Date }): string {
+  const members = eligibleMembers(options);
   const ring = arrangeRing(members);
   // Two pools of the same size start at different points.
   const offset = hash(members.map((member) => member.key).join("|"));
@@ -188,10 +217,6 @@ export function pickGreetingKey({
 }
 
 /** Test seam: the ring a pool resolves to, for the adjacency invariant. */
-export function greetingRingFor(options: {
-  slot: GreetingSlot;
-  session: MarketSessionPhase | null;
-  hasName: boolean;
-}): string[] {
+export function greetingRingFor(options: PoolOptions): string[] {
   return arrangeRing(eligibleMembers(options));
 }
