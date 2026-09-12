@@ -936,55 +936,120 @@ still readable unchanged.
 
 ### Any grounded math  ·  ships in **The calculations**
 
-**Reframed 2026-09-10, founder: not five calculations.** Argus does any finance
-math a question needs, free form. The primitives below are examples of the
-math, never a list of what Argus answers. Three rules are fixed: every input is
-cited or given by the user; every figure is computed by code, with its inputs
-shown and editable; every answer returns to the money decision and offers the
-opportunity-cost contrast. **The AI answers first** (decision 10 and the lane
-that removes the blocking guardrails); polished cards and graphs for structured
-math, such as a valuation matrix, come later. In scope, by analogy to Driven's
-official skills without its agent skill: deep research, market pulse, sector
-radar, screening, competitor analysis, single-stock analysis and valuation, plus
-the consumer finance topics in the smoke test. **Deferred:** portfolio monitor,
-quant calculator, insider tracking. No skill store and no picker.
+**Scoped end to end, founder, 2026-09-11.** One lane builds this from the
+question to everywhere the answer lives afterward: the answer, decisions,
+Search, the rail, sharing and every failure. It replaces "polished cards
+later": the registry already renders any declared tool as one generic card
+with editable inputs and instant recompute, so a calculation needs no card
+design of its own.
 
-**The original item, kept for its detail:**
+**The outcome.** Any money question gets an answer whose every figure is
+computed by our code from inputs that are cited or given by the user. The
+inputs sit under the answer, each showing where it came from, editable and
+recomputing instantly. The answer returns to the money decision and offers the
+market counterfactual as a test Argus can run. Nothing the math can answer is
+refused.
 
+**The math underneath.** Examples of the math, never a list of questions
+(operating rule 8).
 
-The board schedules all five, not one. Four of the smoke-test questions need
-ratios or comparison, and shipping only time value of money leaves the goalpost
-unreachable.
-
-| Primitive | Ships |
+| Primitive | Covers |
 | --- | --- |
-| **Time value of money**, any unknown | first; proves the registry |
-| **Growth and compounding** | with TVM; they share inputs |
-| **Ratios** | second |
-| **Comparison over a set** | second; consumes retrieved rows |
-| **Historical performance** | already built; registered, not rebuilt |
+| **Time value of money**, solved for any unknown | savings goals, affordability, loans and amortization, bonds, CDs, DCF and reverse DCF |
+| **Growth and compounding** | projections, real returns after inflation |
+| **Ratios** | P/E, yield, effective APR, debt to income, expense ratio |
+| **Comparison over a set** | products and instruments ranked by a computed key, never by recommendation (decision 6) |
+| **Historical performance** | the backtest, already built |
 
-**Done means.** Each is a declaration, a compute function, tests, and its own
-card, per operating rule 3. Each
-carries the inverted shape from operating rule 2: answer first, inputs shown
-underneath and editable, recomputing live. Each ends with the counterfactual
-offer where one applies. Comparison takes retrieved rows and a computed ranking
-key; it never ranks by recommendation. See decision 6.
+**Built from what exists** (operating rule 9).
 
-**Currency.** Infer the operating currency from geography, let the user
-override, label it in prose. Cards stay as they are. At a handoff to a backtest
-the prose converts explicitly, so the card is honest without being redesigned.
+- **A calculation is four artifacts** (rule 3): a `ToolDeclaration`
+  (`src/argus/domain/tool_declaration.py`), its compute function, tests against
+  worked examples, and its presenter. A free calculation is local, never
+  confirmed, with editable fields, and uses `ExactlyOneUnknown` where one input
+  is solved for (rule 2). Each joins `get_tool_catalog()` in
+  `src/argus/domain/capability_registry.py`. `ToolResultCard.tsx` renders it,
+  `POST /conversations/{conversation_id}/tool-results/{artifact_id}/recompute`
+  recomputes it, and its sources use the grouped sources element research
+  answers use.
+- **The model maps, retrieval supplies, code computes.** A missing input is
+  asked for. A broad question gets three specific follow-ups built from the
+  user's own words, moved here from Teach the method. Retrieval returns typed
+  input rows with their pages and dates (rules 4 and 5). Decision 10's scenario
+  values, today the research model's own arithmetic under
+  `SCENARIO_RETRIEVAL_INSTRUCTIONS`, move into this math.
+- **One marker.** A computed answer declares `metadata.computation` (API
+  contract, Decisions on computed answers). Decisions, Search, the rail and
+  sharing read it, and it never disagrees with the answer's card after a
+  recompute.
+- **Currency** comes from the user's home country through `resolved_currency`
+  in `src/argus/domain/home_country.py`, overridable and labeled. Backtest
+  cards stay in dollars; a handoff to a backtest converts explicitly in prose.
+- **Stated personal figures stay in the conversation** and never reach
+  personalization memory (decision 8). On a shared page they stay private.
 
-**Surface.** New calculation files, the registry, and the compute kernels.
-Money math stays in Python in this repository under unit tests; operating rule
-6.
+**Where the answer lives afterward.**
 
-**Do not touch.** No branch for a named scenario. A Porsche and an iPad are the
-same calculation. Operating rule 8.
+- **Decisions.** Each calculation kind registers a kernel in
+  `src/argus/domain/computations.py` that calls the same compute function, so
+  opening a decision recomputes it and a changed input re-runs it.
+- **Search.** A computed answer gets a dossier like a run's: what was asked,
+  what Argus used with its sources, what came out, the decision, and recompute.
+  Editing inputs is free and instant and shows the new result beside the stored
+  one without rewriting it; refreshing cited inputs is a paid retrieval the
+  user starts and reviews. The run dossier and its retest stay as they are. The
+  preview never calls a model. The asset row counts computed results involving
+  the asset, not only runs. When nothing matches, the last row offers "Ask
+  Argus" with the typed text, and nothing runs until Enter.
+- **The rail. Founder, 2026-09-11: "Backtest finished" widens to "result".** A
+  result is a settled backtest or an answer with a backend-declared
+  computation, never a render-time guess. Decision saved and needs attention
+  are unchanged, research answers still do not tick, and hovering a
+  calculation shows its headline.
+- **Sharing.** A computed answer becomes an eligible candidate in the existing
+  selection, with a typed receipt kind and the same receipt body (Share the
+  answer). A receipt freezes (sharing spec section 5) and never offers
+  recompute.
+- **Compare and continue.** From Search or a rail result, compare two results
+  of the same kind side by side, with differences from the figures owner, or
+  continue in a new chat that carries only that result. Owner only; a shared
+  page offers neither (sharing spec section 8).
 
-**Proof.** Unit tests per primitive against worked examples. The smoke test's
-ten questions answered end to end, in both languages, with browser evidence. A
-committed scorecard for the model-facing surface.
+**Failures reuse what exists.** No new failure kind without founder sign-off.
+Tool outcomes (`invalid`, `ambiguous`, `bounded`, `unavailable`), clarification,
+retest states and decision re-run reasons carry every case, and
+`web/lib/failure-treatment.ts` renders all of them, including the tool card's
+unsuccessful states, which render outside it today.
+
+| Case | Behavior |
+| --- | --- |
+| A needed input is missing | a clarification asks for it |
+| No source gives an input | the input shows as not found and editable; the answer computes once it is given |
+| The inputs have no solution | a typed outcome naming the field, with a repair the user can tap |
+| Recompute changes nothing | "Already up to date" |
+| A decision cannot re-run | the existing re-run reason codes |
+| Model or provider outage | the retryable notice |
+| Retrieval withheld | `research_not_grounded`, and the inputs stay typeable |
+
+**Surface.** New calculation modules, the catalog, `computations.py`, the
+interpreter and clarifier, research retrieval and scenarios, the answer's
+metadata and card, Search readers and the palette, `conversation-rail.ts`, the
+receipt candidates and payload, both locales, `API_CONTRACT.md`, and the rail
+spec's addendum.
+
+**Do not touch.** No branch for a named scenario (rule 8). No new failure kind.
+No second compute function behind any recompute: in chat, in Search and on a
+decision, every recompute calls the declaration's one function. No money math
+in the web (rule 6). No per-calculation card component (rule 3). No
+confirmation for a free calculation (rule 2). No welcome or greeting copy.
+
+**Proof.** Unit tests per primitive against worked examples. Smoke test
+questions 1 to 8 answered end to end in both languages with browser evidence:
+recompute, a decision reopened after an input changes, the Search dossier, a
+rail result, a shared calculation receipt opened signed out, and each failure
+row above. Question 10 still stops at the boundary, and a backtest still runs
+as before. The held-out replay, once the founder approves reading those
+transcripts. A committed scorecard with the fingerprint refrozen.
 
 ---
 
@@ -1188,6 +1253,12 @@ and they are the founder's to author.
 ---
 
 ### Teach the method  ·  ships in **Grounding**
+
+**Founder, 2026-09-11.** The welcome line approach below, one line stating
+the method plus a rotating example, is rejected, and the current
+`chat.welcome` is too wordy; the welcome waits for a new direction. The
+broad-question follow-ups moved into Any grounded math. Greetings gated by
+demonstrated interest stay here and run after the calculations.
 
 Both of Johana's suggestions, which are one request stated twice.
 
@@ -1403,8 +1474,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
 | The conversation after a result | its own promotion | **Scoped 2026-09-11 in its item section; can start now that #588 landed.** "What should I try next?" and questions about a result are answered by the model, with the Try next rows kept as actions and a few next questions offered; availability dates use the asset's own first date instead of the 2016 provider floor. Judged side by side with Perplexity. |
-| Any grounded math | The calculations | **Not started.** Reframed 2026-09-10 from "the five calculations": any finance math, grounded, never a list. The AI answers first; polished cards later. Portfolio monitor, quant calculator and insider tracking deferred. |
-| Teach the method | Grounding | **Not started.** The frozen-text wait ended when #588 landed; the welcome copy is still unchosen. |
+| Any grounded math | The calculations | **Scoped end to end 2026-09-11** in its item: answers, decisions, Search, the rail widened to "result", sharing, compare and continue, and every failure, as one lane in two phases. Portfolio monitor, quant calculator and insider tracking stay deferred. |
+| Teach the method | Grounding | **Not started.** Founder 2026-09-11: the welcome approach is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math; greetings gated by interest remain, after the calculations. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
@@ -1446,8 +1517,8 @@ rules below.
 | **Plumbing** | metering, decisions | nothing, behavior preserving | no |
 | **Sharing** | sharing on, mobile verification | a result can be shared | probably not |
 | **The spine** | lift the loop, the registry | **nothing, if done right** | yes |
-| **The calculations** | any grounded math, the AI first, polished cards later | Argus answers money questions it used to refuse | yes |
-| **Grounding** | retrieval parameters, teach the method | cited local rates, guided broad questions | yes |
+| **The calculations** | any grounded math end to end, with sharing | Argus answers money questions with figures anyone can check | yes |
+| **Grounding** | retrieval parameters, teach the method | cited local rates, greetings that fit the person | yes |
 
 **The ordering rule is distribution, not checkpoint number.** Founder,
 2026-09-08: *this initiative is to get Argus outside of its box so I can
@@ -1464,10 +1535,9 @@ refusal log's value scales with how long it has collected. That reasoning is
 wrong while nobody is using the product. The refusal log ships **before**
 distribution so it is live when signal arrives, not first.
 
-**The calculations may be two promotions.** Time value of money and growth ship together and
-prove the registry; ratios and comparison follow. Splitting them is allowed and
-the checkpoint table stays one row, because the cut is cohesive either way: each
-half is a set of primitives, not half a primitive.
+**The calculations ship as one lane, end to end.** Founder, 2026-09-11. The
+earlier allowance to split the primitives across two promotions is withdrawn:
+there is one promotion, when the roadmap is done.
 
 **The spine ships with nothing else in it.** A pure extraction plus a registry holding
 only the calculations that already exist should be invisible. If a user notices
@@ -1707,7 +1777,8 @@ declared user settings.
   support burden that do not exist today.
 - **A universal input schema**, until two calculations exist to derive it from.
 - **A skill grid or capability menu.** The classification lives in the model.
-- **Card currency rendering.** The calculations covers prose only.
+- **Backtest card currency rendering.** Backtest cards stay in dollars; a
+  calculation shows the currency it computed in.
 - **Product memory as Idea and IdeaVersion.** The `DecisionNote` is the part
   worth keeping; the scaffolding around it is backtest-shaped.
 
