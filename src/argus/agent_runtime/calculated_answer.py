@@ -53,6 +53,12 @@ PENDING_PAYLOAD_KEY = "calculation"
 CALCULATED_ANSWER_REASON_CODE = "calculated_answer"
 PENDING_REPLY_REASON_CODE = "calculation_pending_reply"
 INPUT_MISSING_REASON_CODE = "calculation_input_missing"
+# A research answer's calculation that needs figures only the reader knows is
+# offered under the answer, and taken through a typed action.
+CALCULATION_OFFER_KEY = "calculation_offer"
+CALCULATION_OFFER_ACTION = "calculation_offer"
+CALCULATION_OFFERED_REASON_CODE = "calculation_offered"
+CALCULATION_OFFER_TAKEN_REASON_CODE = "calculation_offer_taken"
 _HISTORY_TURNS = 4
 
 # Model-facing contract for the one no-search answer that computes.
@@ -124,6 +130,7 @@ def calculated_answer(
     retrieved: Sequence[ResearchSource] = (),
     market_close: MarketClose = latest_market_close,
     lookup_failed: bool = False,
+    offered: bool = False,
 ) -> CalculatedAnswer | None:
     """One voicing call and its computed calculation, or None when voicing failed."""
     if not resolve_openrouter_api_key():
@@ -137,6 +144,7 @@ def calculated_answer(
             not_looked_up=not_looked_up,
             pending=pending,
             lookup_failed=lookup_failed,
+            offered=offered,
         )
     )
     if voiced is None:
@@ -207,6 +215,7 @@ async def calculated_answer_stage_result(
     state: RunState,
     user: UserState,
     pending: dict[str, Any] | None = None,
+    offered: bool = False,
 ) -> StageResult | None:
     """The no-search answer as a turn: its computed card under the prose, or one
     plain question for the figure only the user knows."""
@@ -224,6 +233,7 @@ async def calculated_answer_stage_result(
         history=state.recent_thread_history,
         pending=pending,
         retrieved=retrieved,
+        offered=offered,
     )
     if answered is None:
         return None
@@ -249,6 +259,82 @@ async def calculated_answer_stage_result(
         decision=research_decision(interpretation, user, code),
         stage_patch=patch,
     )
+
+
+async def calculation_offer_stage_result(
+    *,
+    state: RunState,
+    user: UserState,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    """The reader took a research answer's offered calculation: one plain
+    question for the figures only they know, with the cited ones kept, which the
+    reply completes like any pending calculation."""
+    action = state.structured_action
+    if action is None or action.type != CALCULATION_OFFER_ACTION:
+        return None
+    from argus.agent_runtime.recovery_messages import recovery_message
+    from argus.agent_runtime.research_grounded import research_decision
+    from argus.agent_runtime.state.models import StrategySummary
+
+    interpretation = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="new_task",
+        user_goal_summary=state.current_user_message,
+        semantic_turn_act="educational_question",
+        candidate_strategy_draft=StrategySummary(),
+        reason_codes=[CALCULATION_OFFER_TAKEN_REASON_CODE],
+    )
+    offer = selected_thread_metadata.get(CALCULATION_OFFER_KEY)
+    if not isinstance(offer, dict) or not isinstance(
+        offer.get(PENDING_PAYLOAD_KEY), dict
+    ):
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=research_decision(
+                interpretation, user, CALCULATION_OFFER_TAKEN_REASON_CODE
+            ),
+            stage_patch={
+                "assistant_response": recovery_message(
+                    "artifact_action_invalid_state", language=user.language_preference
+                )
+            },
+        )
+    asked = await calculated_answer_stage_result(
+        interpretation=interpretation,
+        state=state,
+        user=user,
+        pending=offer,
+        offered=True,
+    )
+    if asked is not None and asked.outcome == "await_user_reply":
+        return asked
+    field = str(offer.get("requested_field") or "")
+    return question_stage_result(
+        CalculatedAnswer(
+            answer_text=question_text(field, user.language_preference),
+            patch={},
+            template=None,
+            question_field=field,
+            pending=offer,
+        ),
+        decision=research_decision(interpretation, user, INPUT_MISSING_REASON_CODE),
+    )
+
+
+def pending_calculation_reply(
+    interpretation: StructuredInterpretation, metadata: dict[str, Any]
+) -> dict[str, Any] | None:
+    """A reply to the answer's one question completes its calculation, unless
+    the primary read routed the reply to an action of its own."""
+    from argus.agent_runtime.interpreter.research_routing import (
+        research_turn_has_conflicting_owner,
+    )
+
+    pending = pending_calculation(metadata)
+    if pending is None or interpretation.asset_discovery is not None:
+        return None
+    return None if research_turn_has_conflicting_owner(interpretation) else pending
 
 
 def pending_calculation(metadata: dict[str, Any]) -> dict[str, Any] | None:
@@ -325,6 +411,7 @@ def _messages(
     not_looked_up: Sequence[str],
     pending: dict[str, Any] | None,
     lookup_failed: bool = False,
+    offered: bool = False,
 ) -> list[dict[str, str]]:
     context = [
         NO_SEARCH_ANSWER_GUIDANCE,
@@ -365,11 +452,20 @@ def _messages(
         )
     if pending:
         calculation = pending.get(PENDING_PAYLOAD_KEY) or {}
-        context.append(
-            f"Argus asked the user for {pending.get('requested_field')} of a "
-            f"{calculation.get('kind')} calculation. Keep that kind and its inputs so "
-            f"far, and fill the answered figure: {json.dumps(calculation, ensure_ascii=False)}\n"
-        )
+        payload = json.dumps(calculation, ensure_ascii=False)
+        if offered:
+            context.append(
+                "The reader chose to work this out with their own figures. Keep "
+                f"this {calculation.get('kind')} calculation and the inputs it "
+                "already holds with their sources, and ask one plain question for "
+                f"every figure only the reader knows: {payload}\n"
+            )
+        else:
+            context.append(
+                f"Argus asked the user for {pending.get('requested_field')} of a "
+                f"{calculation.get('kind')} calculation. Keep that kind and its inputs "
+                f"so far, and fill the answered figure: {payload}\n"
+            )
     return [
         {"role": "system", "content": "".join(context)},
         {"role": "user", "content": str(message)},

@@ -3465,6 +3465,10 @@ disagree and a decision saved afterward stores the recomputed inputs.
   A valid action reaches LangGraph with the pending strategy and continuity
   artifacts recovered from that exact source message, not from a newer
   checkpoint draft.
+- `calculation_offer` takes the calculation offered under the latest research
+  answer (see Calculation turns). It carries no payload and its label is the
+  display text; the offer itself is read from that answer's
+  `metadata.calculation_offer`, and a tap without one runs nothing.
 - `retest_run` replays a stored supported experiment through the latest
   available data while preserving its original start. New actions use a
   bounded v2 envelope containing exactly `source_run_id`,
@@ -5283,10 +5287,25 @@ as `assistant_prompt`, `requested_field` naming the argument, no card, and
 "calculation_input_missing", prompt_source, requested_field, requested_fields,
 semantic_needs: [], payload: {calculation, requested_field, retrieved}, options:
 []}`, where `retrieved` keeps the pages the answer read so the reply may still
-cite them (`calculation_pending_reply`). A research answer that asks keeps its
-`research` sidecar, so the packet it read reaches the ledger; a background
-answer that asks stores the same `clarification` and `requested_field` on its
+cite them (`calculation_pending_reply`). That question belongs to the no-search
+answer; a research turn whose lookup failed and whose fallback asks keeps its
+`research` sidecar, so the packet it read reaches the ledger, and a background
+job in that case stores the same `clarification` and `requested_field` on its
 message with `last_stage_outcome = "await_user_reply"`.
+
+A research answer never turns into a question. When its calculation needs a
+figure only the reader knows, the answer keeps its prose, with any reference to
+an input it already holds filled (prose that leans on a result the offer cannot
+show is not published: `calculation_inputs_not_found`), stores
+`metadata.calculation_offer = {calculation, requested_field, retrieved}` with the
+cited inputs and the pages it read, records `calculation_offered`, and leads its
+`next_steps` with a `calculation_offer` row. Tapping the row sends the typed chat
+action `calculation_offer` with the row's label as its display text: the turn asks
+one plain question for every figure only the reader knows
+(`calculation_offer_taken`) through the pending clarification above, and the
+reply completes the calculation with the cited inputs kept. A tap whose latest
+answer carries no offer answers with a short note and runs nothing. A background
+answer stores the same offer on its message.
 
 A failed lookup never becomes the answer and never names the conversation.
 When research is unavailable, retrieves nothing (`research_not_grounded`),

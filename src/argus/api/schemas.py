@@ -743,6 +743,7 @@ ChatActionType = Literal[
     "select_response_option",
     "select_discovery_candidate",
     "retest_run",
+    "calculation_offer",
 ]
 
 

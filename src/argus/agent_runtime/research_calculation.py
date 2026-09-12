@@ -17,10 +17,16 @@ from loguru import logger
 from pydantic import ValidationError
 
 from argus.agent_runtime.answer_calculation import (
+    card_in,
+    computed_answer_patch,
     latest_market_close,
     publish_calculation,
+    render_answer_text,
+    resolve_calculation,
 )
 from argus.agent_runtime.calculated_answer import (
+    CALCULATION_OFFERED_REASON_CODE,
+    PENDING_PAYLOAD_KEY,
     CalculatedAnswer,
     answer_from_published,
     calculated_answer,
@@ -93,6 +99,53 @@ def packet_answer(
         language=language,
         retrieved=retrieved,
     )
+
+
+def offered_calculation(
+    prose: str,
+    offer: dict[str, Any],
+    *,
+    subjects: Sequence[dict[str, str]],
+    user: UserState,
+    notes: list[str],
+) -> tuple[str, dict[str, Any]] | None:
+    """A research answer never turns into a question: its calculation is offered
+    on the reader's own figures, and the prose stands with any input it already
+    holds filled. None when the prose leans on a result the offer cannot show."""
+    if "{{" in prose:
+        from argus.domain.capability_registry import get_tool_catalog
+
+        try:
+            request = AnswerCalculation.model_validate(offer.get(PENDING_PAYLOAD_KEY))
+            resolved = resolve_calculation(
+                request,
+                catalog=get_tool_catalog(),
+                retrieved=[
+                    ResearchSource.model_validate(page)
+                    for page in offer.get("retrieved") or []
+                ],
+                currency=user.currency,
+                subject_symbol=_first_symbol(subjects),
+                market_close=latest_market_close,
+                notes=notes,
+            )
+            if resolved is None:
+                return None
+            prose, failure = render_answer_text(
+                prose, card_in(computed_answer_patch(resolved))
+            )
+        except (ValidationError, KeyError, ValueError):
+            return None
+        if failure is not None:
+            return None
+    if CALCULATION_OFFERED_REASON_CODE not in notes:
+        notes.append(CALCULATION_OFFERED_REASON_CODE)
+    logger.info(
+        "Calculation offered on the reader's own figures",
+        kind=(offer.get(PENDING_PAYLOAD_KEY) or {}).get("kind"),
+        requested_field=offer.get("requested_field"),
+    )
+    return prose, offer
 
 
 def answer_without_lookup(

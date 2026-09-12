@@ -66,14 +66,16 @@ def _interpretation() -> StructuredInterpretation:
     )
 
 
-def _turn(monkeypatch: pytest.MonkeyPatch, calculation: dict[str, Any]):
+def _turn(
+    monkeypatch: pytest.MonkeyPatch, calculation: dict[str, Any], prose: str = PROSE
+):
     set_research_query(
         monkeypatch, globals(), question_kind="current_external", symbols=[]
     )
     transport = RecordingTransport(
         [
             agent_response(
-                text=typed_answer_text(PROSE, [], calculation),
+                text=typed_answer_text(prose, [], calculation),
                 sources=[PRICE_PAGE],
                 tickers=[],
             )
@@ -130,17 +132,42 @@ def test_a_price_in_another_currency_is_not_computed_and_no_blank_card_renders(
     assert "{{" not in answer and "DOP" not in answer
 
 
-def test_an_answer_that_needs_a_figure_only_the_user_knows_asks_and_keeps_its_research(
+def test_an_answer_that_needs_a_figure_only_the_user_knows_offers_the_calculation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.calculated_answer import (
+        CALCULATION_OFFER_KEY,
+        CALCULATION_OFFERED_REASON_CODE,
+    )
+
+    goal = _goal("DOP")
+    goal["inputs"][1] = {"name": "present_value", "value": None, "source": "user"}
+    prose = "Una iPad cuesta {{future_value}}; ahorrarla depende de lo que ya tienes."
+    result, _, _ = _turn(monkeypatch, goal, prose=prose)
+    assert result is not None and result.outcome == "ready_to_respond"
+    answer = result.stage_patch["assistant_response"]
+    assert "DOP 45,000" in answer and "{{" not in answer
+    offer = result.stage_patch[CALCULATION_OFFER_KEY]
+    assert offer["requested_field"] == "present_value"
+    assert offer["calculation"]["kind"] == "time_value"
+    assert offer["retrieved"][0]["url"] == PRICE_PAGE
+    assert result.stage_patch["next_steps"]["items"][0] == {
+        "type": "test",
+        "kind": "calculation_offer",
+    }
+    assert "final_response_payload" not in result.stage_patch
+    assert "degraded" not in result.stage_patch["research"]
+    assert CALCULATION_OFFERED_REASON_CODE in result.decision.reason_codes
+
+
+def test_an_offer_whose_prose_leans_on_a_result_it_cannot_show_is_not_published(
     monkeypatch,
 ) -> None:
     goal = _goal("DOP")
     goal["inputs"][1] = {"name": "present_value", "value": None, "source": "user"}
     result, _, _ = _turn(monkeypatch, goal)
-    assert result is not None and result.outcome == "await_user_reply"
-    assert result.stage_patch["requested_field"] == "present_value"
-    assert result.stage_patch["clarification"]["payload"]["retrieved"][0]["url"] == (
-        PRICE_PAGE
-    )
-    research = result.stage_patch["research"]
-    assert research["usage"]["cache_status"] == "miss"
-    assert "degraded" not in research
+    assert result is not None
+    assert result.stage_patch["research"]["degraded"] == {
+        "code": "calculation_inputs_not_found"
+    }
+    assert "{{" not in str(result.stage_patch.get("assistant_response"))

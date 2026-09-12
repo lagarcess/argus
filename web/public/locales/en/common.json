@@ -912,6 +912,7 @@
       "section": "Try next",
       "labels": {
         "research_dynamic": "{{defaultValue}}",
+        "calculation_offer": "Work it out with your own figures",
         "change_date_range": "Test a different date range",
         "same_setup_peer_asset": "Test the same setup on a similar asset",
         "same_rule_peer_asset": "Test the same rule on a similar asset",

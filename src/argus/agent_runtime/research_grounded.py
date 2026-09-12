@@ -527,17 +527,22 @@ def _packet_stage_result(
             degraded_code = "survey_synthesis_incomplete"
     from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
     from argus.agent_runtime.calculated_answer import (
+        CALCULATION_OFFER_KEY,
         INPUT_MISSING_REASON_CODE,
         question_stage_result,
     )
+    from argus.agent_runtime.calculation_rows import with_calculation_offer
     from argus.agent_runtime.research_calculation import (
+        CALCULATION_NOT_COMPUTED_CODE,
         LOOKUP_FAILURE_CODES,
         NotComputed,
         answer_without_lookup,
+        offered_calculation,
         packet_answer,
     )
 
     answered = None
+    offer: dict[str, Any] | None = None
     not_found: tuple[str, ...] = ()
     if degraded_code is None and not survey:
         read = packet_answer(
@@ -549,6 +554,18 @@ def _packet_stage_result(
         )
         if isinstance(read, NotComputed):
             degraded_code, not_found = read.code, read.not_looked_up
+        elif read is not None and read.question_field is not None:
+            offered = offered_calculation(
+                published_answer(packet, language),
+                read.pending or {},
+                subjects=subjects,
+                user=user,
+                notes=interpretation.reason_codes,
+            )
+            if offered is None:
+                degraded_code = CALCULATION_NOT_COMPUTED_CODE
+            else:
+                answer, offer = offered
         elif read is not None:
             answered = read
             answer = read.answer_text
@@ -612,9 +629,11 @@ def _packet_stage_result(
         language=language,
         entry_rule=getattr(interpretation.candidate_strategy_draft, "entry_rule", None),
     )
+    if offer is not None:
+        rows = with_calculation_offer(rows, language=language)
     suffix = f"\n\n{honest_no_next_line(language)}" if not rows and subjects else ""
     answer = f"{answer}{suffix}"
-    computed = None
+    computed = {CALCULATION_OFFER_KEY: offer} if offer is not None else None
     if answered is not None and answered.patch:
         computed = dict(answered.patch)
         if answered.template is not None:
@@ -1720,11 +1739,17 @@ def compose_completed_research(
         or _scenario_inputs_code(packet, scenario=scenario)
     )
     from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
-    from argus.agent_runtime.calculated_answer import question_stage_result
+    from argus.agent_runtime.calculated_answer import (
+        CALCULATION_OFFER_KEY,
+        question_stage_result,
+    )
+    from argus.agent_runtime.calculation_rows import with_calculation_offer
     from argus.agent_runtime.research_calculation import (
+        CALCULATION_NOT_COMPUTED_CODE,
         LOOKUP_FAILURE_CODES,
         NotComputed,
         answer_without_lookup,
+        offered_calculation,
         packet_answer,
     )
     from argus.agent_runtime.state.models import UserState
@@ -1737,6 +1762,8 @@ def compose_completed_research(
     )
     notes: list[str] = []
     answered = None
+    offer: dict[str, Any] | None = None
+    offer_text: str | None = None
     not_found: tuple[str, ...] = ()
     if degraded_code is None and not survey:
         read = packet_answer(
@@ -1744,6 +1771,18 @@ def compose_completed_research(
         )
         if isinstance(read, NotComputed):
             degraded_code, not_found = read.code, read.not_looked_up
+        elif read is not None and read.question_field is not None:
+            offered = offered_calculation(
+                published_answer(packet, language),
+                read.pending or {},
+                subjects=subjects,
+                user=user,
+                notes=notes,
+            )
+            if offered is None:
+                degraded_code = CALCULATION_NOT_COMPUTED_CODE
+            else:
+                offer_text, offer = offered
         elif read is not None:
             answered = read
     if degraded_code in LOOKUP_FAILURE_CODES and not survey:
@@ -1786,8 +1825,12 @@ def compose_completed_research(
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
+    if offer is not None:
+        rows = with_calculation_offer(rows, language=language)
     if answered is not None:
         answer = answered.answer_text
+    elif offer_text is not None:
+        answer = offer_text
     elif degraded_code is not None:
         answer = _withheld_note(language, code=degraded_code, question_kind=question_kind)
     else:
@@ -1821,7 +1864,12 @@ def compose_completed_research(
         ),
         "computed": computed,
     }
-    return {**composed, **research_next_steps(composed["research"]["follow_up"], rows)}
+    offer_patch = {CALCULATION_OFFER_KEY: offer} if offer is not None else {}
+    return {
+        **composed,
+        **research_next_steps(composed["research"]["follow_up"], rows),
+        **offer_patch,
+    }
 
 
 def _job_sidecar_fields(

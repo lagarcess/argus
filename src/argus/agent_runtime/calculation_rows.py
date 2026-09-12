@@ -1,4 +1,9 @@
-"""The market counterfactual offered under a computed answer, never run by itself.
+"""Calculation rows under an answer: the market counterfactual and the offer.
+
+A research answer whose calculation needs figures only the reader knows offers
+it as its first row; tapping it asks for those figures and keeps the cited ones.
+
+The market counterfactual is offered under a computed answer, never run by itself.
 
 A plan computed at a stated rate invites one honest comparison: what the same
 amount did in the market over the same number of years. The row carries the
@@ -13,9 +18,18 @@ from collections.abc import Mapping
 from typing import Any
 
 from argus.agent_runtime.asset_identity import asset_label_parts, label_from_parts
-from argus.agent_runtime.next_experiments import NEXT_EXPERIMENTS_VERSION
+from argus.agent_runtime.next_experiments import (
+    NEXT_EXPERIMENTS_ROW_CAP,
+    NEXT_EXPERIMENTS_VERSION,
+)
 
 MARKET_COUNTERFACTUAL_KIND = "calculation_market_counterfactual"
+CALCULATION_OFFER_KIND = "calculation_offer"
+_OFFER_LABEL_KEY = "chat.next_experiments.labels.calculation_offer"
+_OFFER_LABELS = {
+    "en": "Work it out with your own figures",
+    "es-419": "Calcúlalo con tus propios números",
+}
 MARKET_PROXY = {"symbol": "SPY", "name": "S&P 500", "asset_class": "equity"}
 # A label_key the catalogs deliberately lack, so the backend label renders.
 _DYNAMIC_LABEL_KEY = "chat.next_experiments.labels.research_dynamic"
@@ -135,3 +149,21 @@ def _whole_years(value: float) -> int | None:
     if years < 1 or abs(value - years) > 1e-6 or years > MAX_COUNTERFACTUAL_YEARS:
         return None
     return years
+
+
+def with_calculation_offer(
+    rows: dict[str, Any] | None, *, language: str
+) -> dict[str, Any]:
+    """The offer first among an answer's rows, within the row bound."""
+    label = _OFFER_LABELS["es-419" if str(language or "").startswith("es") else "en"]
+    offer = {
+        "kind": CALCULATION_OFFER_KIND,
+        "label": label,
+        "label_key": _OFFER_LABEL_KEY,
+        "send_text": label,
+    }
+    offered = [offer, *((rows or {}).get("rows") or [])]
+    return {
+        **(rows or {"version": NEXT_EXPERIMENTS_VERSION}),
+        "rows": offered[:NEXT_EXPERIMENTS_ROW_CAP],
+    }

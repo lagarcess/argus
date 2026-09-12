@@ -274,6 +274,7 @@ StructuredActionType = Literal[
     "save_strategy",
     "retry_failed_action",
     "select_response_option",
+    "calculation_offer",
 ]
 
 

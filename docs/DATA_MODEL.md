@@ -524,7 +524,10 @@ Represents individual messages within a conversation.
   language}`), the prose with its `{{name}}` figure references, which the
   recompute route re-renders into `content` from the recomputed card. A pending
   calculation question keeps `{calculation, requested_field, retrieved}` in its
-  clarification payload until the reply completes it.
+  clarification payload until the reply completes it. A research answer whose
+  calculation needs figures only the reader knows stores the same shape as
+  `metadata.calculation_offer` instead; the typed `calculation_offer` action turns
+  it into that question.
   `metadata.continued_from` (`{conversation_id, message_id}`) marks a result
   continued in a new chat; the source message is never changed. Comparing,
   refreshing and re-running a computed answer store nothing: the stored card

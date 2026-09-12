@@ -239,3 +239,78 @@ def test_the_no_search_answer_writes_its_calculation_before_its_prose() -> None:
     schema = ca.CalculatedVoicedAnswer.model_json_schema()
     assert list(schema["properties"])[0] == "calculation"
     assert schema["required"] == list(schema["properties"])
+
+
+OFFER = {
+    "calculation": {
+        "kind": "time_value",
+        "solve_for": "payment",
+        "inputs": [*LOAN, {"name": "periods", "value": None, "source": "user"}],
+    },
+    "requested_field": "periods",
+    "retrieved": [],
+}
+
+
+def test_taking_the_offer_asks_once_for_the_readers_figures(monkeypatch) -> None:
+    seen = _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "How many months are left on the loan?",
+                [*LOAN, {"name": "periods", "value": None, "source": "user"}],
+            )
+        ],
+    )
+    state = RunState.new(
+        current_user_message="Work it out with your own figures",
+        recent_thread_history=[],
+        action_context={
+            "type": "calculation_offer",
+            "label": "Work it out with your own figures",
+        },
+    )
+    asked = asyncio.run(
+        ca.calculation_offer_stage_result(
+            state=state, user=USER, selected_thread_metadata={"calculation_offer": OFFER}
+        )
+    )
+    assert asked is not None and asked.outcome == "await_user_reply"
+    assert asked.patch["requested_field"] == "periods"
+    assert asked.patch["clarification"]["payload"]["calculation"]["kind"] == "time_value"
+    assert (
+        "The reader chose to work this out with their own figures"
+        in seen[0][0]["content"]
+    )
+    assert ca.CALCULATION_OFFER_TAKEN_REASON_CODE in asked.decision.reason_codes
+
+
+def test_a_stale_offer_tap_says_so_and_other_turns_are_not_offers(monkeypatch) -> None:
+    monkeypatch.setattr(ca, "resolve_openrouter_api_key", lambda: None)
+    tapped = RunState.new(
+        current_user_message="Work it out with your own figures",
+        recent_thread_history=[],
+        action_context={"type": "calculation_offer"},
+    )
+    stale = asyncio.run(
+        ca.calculation_offer_stage_result(
+            state=tapped, user=USER, selected_thread_metadata={}
+        )
+    )
+    assert stale is not None and stale.outcome == "ready_to_respond"
+    without_voicing = asyncio.run(
+        ca.calculation_offer_stage_result(
+            state=tapped, user=USER, selected_thread_metadata={"calculation_offer": OFFER}
+        )
+    )
+    assert without_voicing is not None and without_voicing.outcome == "await_user_reply"
+    assert without_voicing.patch["requested_field"] == "periods"
+    plain = RunState.new(current_user_message="hi", recent_thread_history=[])
+    assert (
+        asyncio.run(
+            ca.calculation_offer_stage_result(
+                state=plain, user=USER, selected_thread_metadata={}
+            )
+        )
+        is None
+    )

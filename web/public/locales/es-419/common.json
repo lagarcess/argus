@@ -912,6 +912,7 @@
       "section": "Qué probar después",
       "labels": {
         "research_dynamic": "{{defaultValue}}",
+        "calculation_offer": "Calcúlalo con tus propios números",
         "change_date_range": "Probar otro rango de fechas",
         "same_setup_peer_asset": "Probar el mismo enfoque en un activo similar",
         "same_rule_peer_asset": "Probar la misma regla en un activo similar",

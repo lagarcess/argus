@@ -97,7 +97,8 @@ export type ChatActionOption = {
     | "retry_last_turn"
     | "retry_load_conversation"
     | "retest_run"
-    | "add_confirmation_peer";
+    | "add_confirmation_peer"
+    | "calculation_offer";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
