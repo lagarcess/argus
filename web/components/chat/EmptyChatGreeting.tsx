@@ -40,8 +40,10 @@ export default function EmptyChatGreeting({
   const [interest, setInterest] = useState<DemonstratedInterest | null>(null);
   const [sessionSettled, setSessionSettled] = useState(false);
 
-  // Session and interest are backend truth; the client computes neither.
+  // Session and interest are backend truth; the client computes neither. A
+  // guest's pool reads neither, and a visitor may have no identity to ask with.
   useEffect(() => {
+    if (isGuest) return;
     const controller = new AbortController();
     const timeout = window.setTimeout(
       () => controller.abort(),
@@ -64,10 +66,12 @@ export default function EmptyChatGreeting({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, []);
+  }, [isGuest]);
+
+  const settled = isGuest || sessionSettled;
 
   useEffect(() => {
-    if (!sessionSettled) return;
+    if (!settled) return;
     // Local clock only after mount: the server cannot know the visitor's hour,
     // and a mismatched SSR greeting would flash-correct on hydration.
     const now = new Date();
@@ -106,7 +110,7 @@ export default function EmptyChatGreeting({
       }
     }, TYPE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [interest, isGuest, preferredName, session, sessionSettled, t]);
+  }, [interest, isGuest, preferredName, session, settled, t]);
 
   return (
     <div

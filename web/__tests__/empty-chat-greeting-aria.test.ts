@@ -100,4 +100,17 @@ describe("what Argus calls the user", () => {
     );
     expect(greeting).toContain("greetingAudience({");
   });
+
+  test("a guest greeting never asks the backend", () => {
+    // A visitor may have no identity yet, and a guest's pool reads neither the
+    // session nor interest (greeting-pool.test.ts), so the request could only
+    // cost a round trip and a blank line.
+    const greeting = source("components/chat/EmptyChatGreeting.tsx");
+    const fetchEffect = greeting.slice(
+      greeting.indexOf("useEffect(() => {"),
+      greeting.indexOf("getMarketSession(controller.signal)"),
+    );
+    expect(fetchEffect).toContain("if (isGuest) return;");
+    expect(greeting).toContain("const settled = isGuest || sessionSettled;");
+  });
 });

@@ -186,6 +186,32 @@ describe("who hears which greeting", () => {
       .toEqual(["day_d", "night_b", "night_named_a"]);
   });
 
+  test("a guest's greeting reads neither the session nor interest", () => {
+    // Which is why a guest never asks the backend for either.
+    for (const slot of SLOTS) {
+      for (const preferredName of [null, NAME]) {
+        const rings = new Set<string>();
+        for (const session of ALL_SESSIONS) {
+          for (const interest of [null, { markets: false }, { markets: true }]) {
+            const audience = greetingAudience({ isGuest: true, preferredName, interest });
+            const ring = greetingRingFor({
+              slot,
+              session,
+              hasName: audience.name.length > 0,
+              marketFan: audience.marketFan,
+            });
+            rings.add(JSON.stringify(ring));
+          }
+        }
+        expect({ slot, preferredName, rings: rings.size }).toEqual({
+          slot,
+          preferredName,
+          rings: 1,
+        });
+      }
+    }
+  });
+
   test("a market fan's weekend day pool, spelled out", () => {
     expect(
       [
