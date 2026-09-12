@@ -18,7 +18,12 @@ from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
-from tests.research.conftest import RecordingTransport, agent_response, set_research_query
+from tests.research.conftest import (
+    RecordingTransport,
+    agent_response,
+    set_research_query,
+    typed_answer_text,
+)
 
 USER = UserState(user_id="research-user", language_preference="en")
 SPANISH_USER = UserState(user_id="research-es", language_preference="es")
@@ -659,3 +664,32 @@ def test_a_shared_outage_still_says_shared(monkeypatch, user, must_say) -> None:
 
     assert result is not None
     assert must_say in result.stage_patch["assistant_response"].lower()
+
+
+def test_a_research_answer_ends_with_the_questions_its_research_offered(
+    monkeypatch,
+) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
+    questions = ["How is a drawdown measured?", "What is a maximum drawdown?"]
+    _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "A drawdown is the fall from a peak to the lowest point after it.",
+                    [],
+                    None,
+                    questions,
+                ),
+                sources=["https://www.investor.gov/introduction-investing/drawdown"],
+            )
+        ],
+    )
+
+    result = _run("What is a drawdown?")
+
+    assert result is not None
+    assert result.stage_patch["research"]["follow_up"]["questions"] == questions
+    assert result.stage_patch["next_steps"]["items"] == [
+        {"type": "question", "text": text} for text in questions
+    ]

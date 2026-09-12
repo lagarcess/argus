@@ -195,19 +195,18 @@ def test_the_prose_states_the_computed_payment_through_its_reference() -> None:
     }
 
 
-def test_a_figure_written_as_digits_or_an_unknown_reference_hands_over_to_argus_lead() -> (
-    None
-):
+def test_an_unknown_reference_hands_over_to_argus_lead_and_cited_digits_stand() -> None:
     notes: list[str] = []
-    for template in (
-        "You would pay about DOP 4,900 a month, or {{payment}}.",
-        "About 14% a year, so {{payment}} a month.",
-        "It costs {{monthly_cost}}.",
-    ):
-        published = _published(template, notes=notes)
-        assert published.answer_text == ac.fallback_answer_lead("en", succeeded=True)
-        assert published.template is None
+    published = _published("It costs {{monthly_cost}}.", notes=notes)
+    assert published.answer_text == ac.fallback_answer_lead("en", succeeded=True)
+    assert published.template is None
     assert ac.FIGURE_CHECK_REASON_CODE in notes
+    cited = _published(
+        "At the bank's published 14% rate, paying {{present_value}} at "
+        "{{annual_rate_pct}} over {{periods}} months costs {{payment}} a month."
+    )
+    assert cited.template is not None
+    assert "published 14% rate" in cited.answer_text
     assert (
         _published("Cuesta {{payment}} al mes.", language="es-419").template is not None
     )

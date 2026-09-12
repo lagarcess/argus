@@ -298,7 +298,7 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     prompt = _prompt(scenario=True)
     assert "Argus computes the answer from the calculation you return" in prompt
     assert "Do not compute the answer, scenario values" in prompt
-    assert "never estimate a live number. No investment advice." in prompt
+    assert "never estimate a live number. No investment or product advice." in prompt
     assert "scenarios" not in _prompt(scenario=False)
 
     scenario_spec = retrieval_spec(
@@ -319,7 +319,9 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     assert "fill calculation" in scenario_ask
     assert "the current price from market_data" in scenario_ask
     assert "Never compute the answer, scenario values" in scenario_ask
-    assert "never say what the reader should do" in scenario_ask
+    assert "never which product to choose or what the reader should do" in (
+        RETRIEVAL_INSTRUCTIONS
+    )
     assert "arithmetic" not in scenario_ask
 
 

@@ -131,8 +131,9 @@ def apply_research_job_request(
         store_research_packet_for_job(job_request, sync_packet, composed)
         runtime_result["assistant_response"] = composed["answer"]
         runtime_result["research"] = composed["research"]
-        if composed.get("next_experiments") is not None:
-            runtime_result["next_experiments"] = composed["next_experiments"]
+        for key in ("next_experiments", "next_steps"):
+            if composed.get(key) is not None:
+                runtime_result[key] = composed[key]
         _attach_completed_tool_card(runtime_result, job_request)
         _attach_computed_answer(runtime_result, composed.get("computed"))
         _attach_pending_question(runtime_result, composed.get("question"))
@@ -469,8 +470,9 @@ async def _finalize_success(
         metadata["tool_result_cards"] = [card]
     _attach_computed_answer(metadata, composed.get("computed"))
     _attach_pending_question(metadata, composed.get("question"))
-    if composed.get("next_experiments") is not None:
-        metadata["next_experiments"] = composed["next_experiments"]
+    for key in ("next_experiments", "next_steps"):
+        if composed.get(key) is not None:
+            metadata[key] = composed[key]
     message = await persist_research_job_answer(
         job_id=job_id,
         user_id=user_id,

@@ -4094,7 +4094,8 @@ final payload and persisted metadata:
       "subjects": [{"symbol": "NFLX", "name": "Netflix, Inc.", "asset_class": "equity"}],
       "comparison_set": [],
       "peer_suggestions": ["DIS"],
-      "open_thread": {"shape": "balanced", "period_of_interest": null}
+      "open_thread": {"shape": "balanced", "period_of_interest": null},
+      "questions": ["How did Netflix's margins change?", "What drove membership growth?"]
     }
   }
 }
@@ -4339,9 +4340,11 @@ Contract rules:
   or more subjects were compared, peer suggestions, and the open thread, in
   a consumable shape. It is not a memory record and carries none of the four
   memory categories. The rail only emits; nothing reads or writes memory
-  here, and consumption ships in the memory lane. The app does not render
-  `follow_up`; a research answer that later offers next steps adopts the
-  `next_steps` list instead of a new shape.
+  here, and consumption ships in the memory lane. `follow_up.questions` holds the
+  two to four questions the answer suggested the reader may ask next (empty on a
+  degraded turn); the one next-steps owner builds the answer's `next_steps` from
+  them and the answer's runnable rows. The app renders that list, never
+  `follow_up` itself.
 - `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
   ground through the balanced shape; the provider's `etf_holdings` table is
   parsed deterministically, weight order preserved, and each named holding
@@ -4815,8 +4818,9 @@ the reader asked what to try next (`result_followup_focus: "next_experiment"`)
 and the answer lists no steps, or no model answered and the retryable
 `recovery.code = "latest_result_followup_unavailable"` is shown, the list holds
 the result's tests alone (#590). `next_steps` is not specific to results: a
-research answer can adopt it later without a new shape, and research answers
-carry only `next_experiments` today.
+research answer, inline or finished by a background job, ends with the same list,
+its runnable tests and calculations first and then two to four of the questions
+its research suggested (`research.follow_up.questions`), at most five items.
 
 ```json
 "next_steps": {
@@ -5258,10 +5262,11 @@ malformed request computes nothing (`answer_calculation_kind_unknown`,
 names, else the profile's resolved currency, else `USD`
 (`calculation_currency_defaulted`).
 
-The prose states figures only as `{{name}}` references to the card's answer,
-rows and inputs, filled from the computed card. A reference that does not
-resolve, a money or percent figure written as digits, or an assumption the prose
-never references replaces the prose with Argus's own lead
+The prose states the calculation's figures only as `{{name}}` references to the
+card's answer, rows and inputs, filled from the computed card; a cited figure a
+page published may stand in digits beside them, held to its row. A reference
+that does not resolve, or an assumption that drives the result and that the
+prose never references, replaces the prose with Argus's own lead
 (`answer_figures_replaced`); a plan that does not solve keeps its card under
 that lead. A computed answer answers `ready_to_respond`:
 `final_response_payload.tool_result_cards` holds the card, the stored message

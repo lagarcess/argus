@@ -1,4 +1,4 @@
-"""One ordered list of next steps after an answer about a result.
+"""One ordered list of next steps after an answer about a result or a research answer.
 
 The model orders the steps; Argus attaches each runnable test's typed Try next
 row and cleans each question. A test step runs exactly as its Try next row
@@ -17,6 +17,10 @@ from argus.domain.visible_reply import rewrite_visible_reply
 
 NEXT_STEPS_VERSION = "argus_next_steps/v1"
 MAX_NEXT_STEPS = 5
+# A research answer keeps at least two of the questions its research offered,
+# and at most four.
+MIN_RESEARCH_QUESTIONS = 2
+MAX_RESEARCH_QUESTIONS = 4
 QUESTION_STEP = "question"
 _MAX_QUESTION_CHARS = 160
 
@@ -102,6 +106,25 @@ def next_steps_patch(
     if tested:
         patch["next_experiments"] = {**(rows_sidecar or {}), "rows": tested}
     return patch
+
+
+def research_next_steps(
+    follow_up: dict[str, Any] | None, rows_sidecar: dict[str, Any] | None
+) -> dict[str, Any]:
+    """A research answer's list: its runnable tests and calculations, then the
+    questions its research offered, within the one list's bound."""
+    questions: list[NextStep] = []
+    seen: set[str] = set()
+    raw = follow_up.get("questions") if isinstance(follow_up, dict) else None
+    for value in raw if isinstance(raw, list) else []:
+        text = visible_question(value)
+        if text and text.casefold() not in seen:
+            seen.add(text.casefold())
+            questions.append(NextStep(kind=QUESTION_STEP, text=text))
+    questions = questions[:MAX_RESEARCH_QUESTIONS]
+    tests = list(offered_test_steps(rows_sidecar))
+    tests = tests[: MAX_NEXT_STEPS - min(len(questions), MIN_RESEARCH_QUESTIONS)]
+    return next_steps_patch(rows_sidecar, [*tests, *questions][:MAX_NEXT_STEPS])
 
 
 def _rows(sidecar: dict[str, Any] | None) -> list[dict[str, Any]]:

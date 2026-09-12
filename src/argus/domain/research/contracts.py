@@ -301,6 +301,9 @@ class ResearchPacket(BaseModel):
     # computes it. JSON here because the calculation catalogue imports the
     # tool contracts that import this module.
     calculation: dict[str, Any] | None = None
+    # Questions the answer suggests the reader may ask next, as the provider
+    # wrote them; the next-steps list cleans and bounds them.
+    follow_up_questions: tuple[str, ...] = ()
     # Tool result items in the provider's output, by item type and in order.
     # This is the retrieval record; the invoice's tool counts are billing.
     tool_results: tuple[str, ...] = ()

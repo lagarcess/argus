@@ -153,7 +153,7 @@ def _cache_key_for(
     finalizer serves the same question asked inline later. Packets carry the
     answer's calculation, so a key never serves one stored under the older
     contract without it."""
-    contract = ("scenario" if scenario else "retrieval") + ":answer_calculation"
+    contract = ("scenario" if scenario else "retrieval") + ":answer_calculation:reader"
     return research_cache_key(
         capability_class=capability_class,
         shape=shape,
@@ -657,10 +657,6 @@ def _with_market_counterfactual(
     in the same asset over the same years, first among the rows; never run."""
     from argus.agent_runtime.calculation_rows import market_counterfactual_rows
     from argus.agent_runtime.next_experiments import NEXT_EXPERIMENTS_ROW_CAP
-    from argus.agent_runtime.result_next_steps import (
-        next_steps_patch,
-        offered_test_steps,
-    )
 
     final = computed.get("final_response_payload") or {}
     cards = final.get("tool_result_cards") or []
@@ -674,9 +670,7 @@ def _with_market_counterfactual(
     if counterfactual is None:
         return rows
     offered = [*counterfactual["rows"], *((rows or {}).get("rows") or [])]
-    merged = {**(rows or counterfactual), "rows": offered[:NEXT_EXPERIMENTS_ROW_CAP]}
-    computed.update(next_steps_patch(merged, offered_test_steps(merged)))
-    return merged
+    return {**(rows or counterfactual), "rows": offered[:NEXT_EXPERIMENTS_ROW_CAP]}
 
 
 def thorough_job_result(
@@ -1385,13 +1379,12 @@ def _research_prompt(
             + "."
         )
     lines.append(
-        "Answer the question directly for a curious non-expert, leading with "
-        "the answer. Use compact tables only where they genuinely help. State "
-        "the as-of date for any current figure. If a figure is unavailable, "
-        "say so plainly; never estimate a live number. No investment advice. "
-        "Do not write a sources or citations line and do not include links: "
-        "the interface lists sources beside your answer. Never name tools, "
-        "providers, models, or internal systems."
+        "Lead with the direct answer, then go as deep as the question deserves. "
+        "State the as-of date for any current figure. If a figure is "
+        "unavailable, say so plainly; never estimate a live number. No "
+        "investment or product advice. Do not write a sources or citations line "
+        "and do not include links: the interface lists sources beside your "
+        "answer. Never name tools, providers, models, or internal systems."
     )
     if language == "es-419":
         lines.append("Responde en español latinoamericano (es-419).")
@@ -1812,7 +1805,9 @@ def compose_completed_research(
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )
-    return {
+    from argus.agent_runtime.result_next_steps import research_next_steps
+
+    composed = {
         "answer": answer,
         "research": build_research_sidecar(
             **_job_sidecar_fields(
@@ -1824,9 +1819,9 @@ def compose_completed_research(
                 degraded_code=degraded_code,
             )
         ),
-        "next_experiments": rows,
         "computed": computed,
     }
+    return {**composed, **research_next_steps(composed["research"]["follow_up"], rows)}
 
 
 def _job_sidecar_fields(
@@ -1844,6 +1839,7 @@ def _job_sidecar_fields(
         shape="thorough",
         sources=sources,
         retrieved_rows=typed_rows(packet),
+        follow_up_questions=packet.follow_up_questions,
         retrieved_at=packet.retrieved_at.isoformat(),
         subjects=subjects,
         peers=peers,
@@ -2074,6 +2070,7 @@ def research_follow_up_block(
     shape: str,
     period_of_interest: str | None,
     category: str | None = None,
+    questions: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Typed producer seam for the memory program (spec sections 11 and 11b).
 
@@ -2101,6 +2098,9 @@ def research_follow_up_block(
         "comparison_set": ([s["symbol"] for s in subjects] if len(subjects) >= 2 else []),
         "peer_suggestions": [p["symbol"] for p in peers if p.get("symbol")],
         "open_thread": open_thread,
+        # The questions the answer suggested the reader may ask next; the one
+        # next-steps list is built from them.
+        "questions": list(questions),
     }
 
 
@@ -2117,6 +2117,7 @@ def build_research_sidecar(
     category: str | None = None,
     degraded_code: str | None = None,
     retrieved_rows: list[dict[str, Any]] | None = None,
+    follow_up_questions: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Build the only supported research sidecar shape."""
     sidecar: dict[str, Any] = {
@@ -2137,6 +2138,7 @@ def build_research_sidecar(
             shape=shape,
             period_of_interest=period_of_interest,
             category=category,
+            questions=() if degraded_code else follow_up_questions,
         ),
     }
     if degraded_code:
@@ -2197,6 +2199,7 @@ def _packet_sidecar_fields(
             question_as_of_date=question_as_of_date,
         ),
         retrieved_rows=typed_rows(packet),
+        follow_up_questions=packet.follow_up_questions,
         retrieved_at=packet.retrieved_at.isoformat(),
         subjects=subjects,
         peers=peers,
@@ -2256,8 +2259,12 @@ def research_stage_result(
             )
         ),
     }
-    if rows is not None:
-        stage_patch["next_experiments"] = rows
+    from argus.agent_runtime.result_next_steps import research_next_steps
+
+    stage_patch = {
+        **stage_patch,
+        **research_next_steps(stage_patch["research"]["follow_up"], rows),
+    }
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,

@@ -268,8 +268,6 @@ def render_answer_text(
     text = _REFERENCE.sub(fill, _without_written_currency(template, facts))
     if unresolved:
         return text, "invalid_figure_reference"
-    if states_a_figure(_REFERENCE.sub("", template)):
-        return text, "unreferenced_figure"
     referenced = set(_REFERENCE.findall(template))
     if any(name not in referenced for name in assumed):
         return text, "assumption_not_stated"

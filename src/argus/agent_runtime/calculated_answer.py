@@ -69,7 +69,6 @@ NO_SEARCH_ANSWER_GUIDANCE = (
     "term, income or horizon, is never assumed: list each one with source user "
     "and a null value, still return calculation, and write the answer as one "
     "plain question asking for all of them. "
-    "State no figure the calculation does not use or produce. "
     "No advice, no forecast stated as fact, no em dashes, no headings, no "
     "tables. Compose lead (required), one short sentence that answers the "
     "question or asks the one question; bullets (optional, up to 4), short "

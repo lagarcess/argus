@@ -444,6 +444,9 @@ def _packet_from_priced_response(
             if typed is not None and typed.calculation is not None
             else None
         ),
+        follow_up_questions=(
+            tuple(typed.follow_up_questions) if typed is not None else ()
+        ),
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
