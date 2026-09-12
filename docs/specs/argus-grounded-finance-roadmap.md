@@ -363,27 +363,20 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-Dispatched 2026-09-08 from integration `00331188`. Seven lanes, all disjoint
-except one pair. **Nothing has landed yet.**
+**Updated 2026-09-12 at integration `7c49772f`.** Landing state for every item is
+in "Where this board actually stands" below.
 
-| Lane | Kind | Model | Notes |
-| --- | --- | --- | --- |
-| Lift the loop, Lane A relocation | build | Opus 5 | sent first; the `confirmation.py` window was open |
-| Refusal log | build | GPT Astra | |
-| Metering | build | Fable 5.1 | **overlaps decisions on `schemas.py`** |
-| Decisions | build | Fable 5.1 | **overlaps metering on `schemas.py`** |
-| Retrieval parameters | build | Fable 5.1 | |
-| Sharing on | verification | GPT Astra | already built and dark; no build expected |
-| #462 latency | measurement | GPT Astra | measure only, optimize nothing |
+| Lane | Where it is |
+| --- | --- |
+| The conversation after a result | PR #597, final round: live measurement, browser walk, then a Codex review on its final head. |
+| Any grounded math | Phase 1 built on `claude/grounded-math-build-71d49b` at `eeffd59f` and captain-verified, not on integration. Phase 2 starts after #597 merges. |
 
-**Before landing metering and decisions**, do a real
-`git merge --no-commit --no-ff` in a throwaway worktree. Do not read the
-file-overlap list and do not trust `git merge-tree`: `grep -c` inside `$(...)`
-has returned blank rather than 0 in this repo and cost a wrong call.
+**Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
+throwaway worktree. Do not read the file-overlap list and do not trust
+`git merge-tree`: `grep -c` inside `$(...)` has returned blank rather than 0 in
+this repo and cost a wrong call.
 
-**Observed 2026-09-08, 21:15Z, at integration `2846b421`.** Only the board doc
-has landed since the dispatch base, so every lane is still effectively current
-and none needs a rebase.
+**History: the 2026-09-08 dispatch**, observed at integration `2846b421`.
 
 | Lane | Where it actually is |
 | --- | --- |
@@ -1470,6 +1463,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Decisions | Plumbing | **Landed** `67facaf5`. |
 | Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569, answered by PR #571: a turn now reports what it paid rather than what it published, so a discarded packet, a retry either kept or thrown away, and a response rejected after its invoice all reach the ledger. Eleven inline degraded turns between 2026-08-13 and 2026-09-02 recorded zero spend, under about $1.50 and not worth a backfill; the three thorough `missing_public_sources` turns on 2026-09-08 were already correct, and no research job has ever failed in production. |
 | Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
+| Share the answer | The calculations | **LANDED** `ba5a9fb7`, PR #574, 2026-09-09. Answers are shared from a header turn selection, behind `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, which is off in production. Calculations become eligible turns in Any grounded math. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
@@ -1483,8 +1477,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | A clarification reply keeps what the user said | outside the releases | **LANDED** `05196b33`, PR #591. After Argus asks a question, the reply keeps every fact the user already gave (asset, dates, money, costs), an explicit new idea starts clean, money the user typed outranks an audit's guess, and one owner removes em dashes from visible replies. Its full live run on the merged tree was 65 passed and 6 failed; four passed a rerun, and the other two failed outside its code (research publishing on a Spanish forward question, and a discovery answer whose voicing model timed out). On the Haiku fallback it refused a named cap three times out of three where integration lost it once. The founder kept the rule that money the user typed outranks an audit's cap of the same amount. |
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
-| The conversation after a result | its own promotion | **Scoped 2026-09-11 in its item section; can start now that #588 landed.** "What should I try next?" and questions about a result are answered by the model, with the Try next rows kept as actions and a few next questions offered; availability dates use the asset's own first date instead of the 2016 provider floor. Judged side by side with Perplexity. |
-| Any grounded math | The calculations | **Scoped end to end 2026-09-11** in its item: answers, decisions, Search, the rail widened to "result", sharing, compare and continue, and every failure, as one lane in two phases. Portfolio monitor, quant calculator and insider tracking stay deferred. |
+| The conversation after a result | its own promotion | **In review, PR #597.** Final round in progress: live measurement, browser walk and a Codex review on the final head. It lands before Any grounded math Phase 2. |
+| Any grounded math | The calculations | **Scoped end to end 2026-09-11** in its item: answers, decisions, Search, the rail widened to "result", sharing, compare and continue, and every failure, as one lane in two phases. **Phase 1 built** at `eeffd59f` on its branch and captain-verified: the prompt freeze and budget pass, and it touches no #597 files. Phase 2 waits for #597. Portfolio monitor, quant calculator and insider tracking stay deferred. |
 | Teach the method | Grounding | **Greetings LANDED** `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The welcome line is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
@@ -1563,10 +1557,10 @@ item that needs it.
 
 | Document | Change | When |
 | --- | --- | --- |
-| **`docs/PRODUCT.md`** | Section 1 Product Truth says "speak an investing or trading idea," and section 11 supported AI responsibilities is written around that. Both widen to "bring a money question." **The file is marked locked and only the founder can move it.** The audience does not change, which is what makes this an additive refinement rather than the scope shift the lock forbids. | **Founder-approved 2026-09-08, see decision 7.** The edit itself is still owed before lift the loop merges; nothing in the spine ships against the old Product Truth. |
-| **`docs/ARCHITECTURE.md`** | The registry layer; in-process versus Workflow execution; artifacts without runs. | With the registry. |
-| **`docs/API_CONTRACT.md`** | Calculation request and response shapes; the allowance response going from two meters to three operation classes. | With the registry and metering. |
-| **`docs/DATA_MODEL.md`** | Artifacts beyond backtest results; decisions carrying inputs and detaching from `run_label`. | With the calculations and decisions. |
+| **`docs/PRODUCT.md`** | Section 1 Product Truth says "speak an investing or trading idea," and section 11 supported AI responsibilities is written around that. Both widen to "bring a money question." **The file is marked locked and only the founder can move it.** The audience does not change, which is what makes this an additive refinement rather than the scope shift the lock forbids. | **Done** `de3481a2`, founder-approved 2026-09-08 (decision 7). |
+| **`docs/ARCHITECTURE.md`** | The registry layer; in-process versus Workflow execution; artifacts without runs. | **Registry layer done** `acc89125`. Artifacts without runs: with the calculations. |
+| **`docs/API_CONTRACT.md`** | Calculation request and response shapes; the allowance response going from two meters to three operation classes. | **Operation classes done** `b2ec7d99`. Calculation shapes: with the calculations. |
+| **`docs/DATA_MODEL.md`** | Artifacts beyond backtest results; decisions carrying inputs and detaching from `run_label`. | **Decisions carrying inputs done** `3edf5191`. Artifacts beyond backtest results: with the calculations. |
 | **`.agent/designs/argus/DESIGN.md`** | The answer-first-then-editable-inputs pattern from operating rule 2. | With the calculations. |
 | **`AGENTS.md`** | Operating rules 1 through 7 become permanent repository rules rather than board rules. A board is superseded; these should outlive it. | Any time after lift-the-loop proves rule 1 holds. |
 
@@ -1734,19 +1728,16 @@ you, never prescribe what they should do" still stands.
 
 ### Still open
 
-**Dropped 2026-09-10, founder: no Dominican source list.** A hand-kept domain
-allowlist adds rigidity Argus does not need. Perplexity is a search engine and
-finds local sources well once the right guardrails are removed. The #545 probes
-agreed: Banco Popular publishes no certificate rate online, and a three-site list
-with a one-week window returned nothing. `LOCAL_SOURCE_DOMAINS` and the
-`local_sources` parameter in `src/argus/domain/research/config.py` are unused
-code to delete in a later cleanup.
+- **Held-out replay needs founder approval.** Acceptance replays the real
+  2026-08-12 transcripts, which means reading production conversation text.
+- **The welcome line waits for a new direction.** Founder, 2026-09-11.
 
-**Home country comes from the user, not the deployment.** Founder, 2026-09-10:
-Argus must adapt to each user's home country. Today `ARGUS_RESEARCH_HOME_COUNTRY`
-is one country for every user, sent to the provider as the reader's location.
-Per decision 9's personalization condition, country (and currency) become
-declared user settings.
+Resolved:
+
+- **No Dominican source list.** Dropped by the founder 2026-09-10; #593 removed
+  `LOCAL_SOURCE_DOMAINS` and `local_sources`.
+- **Home country comes from the user.** Landed in #593: country and currency are
+  user settings, and `ARGUS_RESEARCH_HOME_COUNTRY` is gone.
 
 ---
 
@@ -1759,14 +1750,12 @@ declared user settings.
 - **Field provenance has no typed model.** A dict key 35 files agree on by
   convention, 24 value strings, three readers checking different subsets. It
   will have to be typed eventually; it is out of scope for the spine.
-- **Research has no fallback model and is a single point of failure.** The
-  request body sends `"model": spec.model`, one string, and there is no fallback
-  logic anywhere in `src/argus/domain/research/`. The Agents API accepts a
-  `models` array of up to five. A provider hiccup on `openai/gpt-5.6-sol` takes
-  research down with nothing behind it, while every OpenRouter tier has a
-  fallback configured. Adding the array is one line and belongs in the retrieval
-  lane. Model costs differ by provider, so the chain is also a cost lever, which
-  the founder parked as later tinkering on 2026-09-08.
+- **Resolved: research has a fallback chain.** Commit `02d1b03d` (#404, #545)
+  sends the Agents API `models` list, and each research tier lists the other as
+  its fallback (`src/argus/domain/research/config.py`).
+- **Confirmed bugs are tracked as issues:** #596 the support address has two
+  owners, #598 a second tab never shows the reply, #599 the BTC forward research
+  never publishes, #600 a timed-out interpretation drops stated money and costs.
 - **The CONFIRM graph node is hard-wired to `LaunchBacktestRequest`.** Waits for
   the first expensive non-backtest calculation.
 

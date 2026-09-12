@@ -17,9 +17,10 @@ progresses**, ready for specification only.
 
 Current source stack after the canon docs:
 
-1. `docs/specs/argus-active-roadmap.md` is the active execution board
-   (opened 2026-08-06). It owns current priorities, execution order, and the
-   serial-versus-parallel rules.
+1. `docs/specs/argus-grounded-finance-roadmap.md` is the active execution board
+   (opened 2026-09-05). It owns current priorities, execution order, and the
+   serial-versus-parallel rules. `docs/specs/argus-active-roadmap.md` is
+   superseded history.
 2. `docs/specs/private-alpha-next-roadmap.md` is superseded P2 history and
    contract reference. The interim roadmap completed with the 2026-08-05
    promotion and is archived.
@@ -71,7 +72,8 @@ roadmap links.
 | `docs/API_CONTRACT.md` | canon | Defined as canon API contract source of truth. | None | Current |
 | `docs/DATA_MODEL.md` | canon | Defined as canon data model source of truth. | None | Current |
 | `.agent/designs/argus/DESIGN.md` | canon | Explicitly listed as canon design source of truth. | None | Current |
-| `docs/specs/argus-active-roadmap.md` | active execution board | Owns current priorities, execution order, serial-versus-parallel rules, operating rules, and the deliberately-not-doing list. | Use as the first non-canon execution source. | Opened 2026-08-06 |
+| `docs/specs/argus-grounded-finance-roadmap.md` | active execution board | Owns current priorities, items, operating rules, landing status, and the deliberately-not-doing list. | Use as the first non-canon execution source. | Opened 2026-09-05 |
+| `docs/specs/argus-active-roadmap.md` | superseded reference | Previous board; its landed work and tracker state remain valid history. | Read for provenance; do not take work from it. | Superseded 2026-09-05 |
 | `docs/archive/private-alpha-interim-roadmap.md` | archived | Interim pivot slate; completed with the 2026-08-05 production promotion. | Historical reference only. | Archived 2026-08-06 |
 | `docs/specs/private-alpha-next-roadmap.md` | superseded reference | P2 history, execution-realism contract, and slice provenance. | Read for provenance; do not take work from it. | Superseded 2026-08-06 |
 | `docs/specs/private-alpha-next-decision-memo.md` | active strategic source | Strategic north star for Private Alpha Next; contains the addenda and details each slice must onboard through. | Read relevant sections before planning or implementation. | Current |
