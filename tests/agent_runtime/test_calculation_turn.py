@@ -42,6 +42,20 @@ from argus.api.schemas import User
 from argus.domain.calculations import get_calculation_declarations
 from argus.domain.tool_declaration import ToolCatalog
 
+
+@pytest.fixture(autouse=True)
+def _no_focused_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests pin the turn after a primary read; the backstop has its own."""
+    from argus.agent_runtime.interpreter import calculation_focused_read
+
+    async def declined(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        calculation_focused_read, "invoke_openrouter_json_schema", declined
+    )
+
+
 SAVING_PLAN = {
     "direction": "save",
     "present_value": 10_000,
@@ -631,7 +645,10 @@ def test_the_prompt_reads_the_guidance_and_the_catalogue_of_declared_kinds() -> 
     assert "sources" not in clause
     follow_ups = CalculationRequest.model_fields["follow_up_questions"]
     assert "Never a list of what Argus can calculate" in str(follow_ups.description)
-    assert "Leave kind null and fill follow_up_questions only when no kind" in CALCULATION_GUIDANCE
+    assert (
+        "Leave kind null and fill follow_up_questions only when no kind"
+        in CALCULATION_GUIDANCE
+    )
     assert "fill calculation with the kind and the stated inputs" in prompt
     assert "answer it in assistant_response with the formula" not in prompt
 

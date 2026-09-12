@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
@@ -19,6 +20,18 @@ from argus.agent_runtime.state.models import StrategySummary
 from argus.api import state as api_state
 from argus.api.main import app
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def _no_focused_read(monkeypatch) -> None:
+    from argus.agent_runtime.interpreter import calculation_focused_read
+
+    async def declined(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        calculation_focused_read, "invoke_openrouter_json_schema", declined
+    )
 
 
 class _ScriptedInterpreter:
@@ -76,7 +89,9 @@ def _client_with(monkeypatch, interpreter: _ScriptedInterpreter) -> TestClient:
         structured_interpreter=interpreter,
         checkpointer=checkpointer,
     )
-    monkeypatch.setattr(app.state, "agent_runtime_checkpointer", checkpointer, raising=False)
+    monkeypatch.setattr(
+        app.state, "agent_runtime_checkpointer", checkpointer, raising=False
+    )
     monkeypatch.setattr(app.state, "agent_runtime_workflow", workflow, raising=False)
     return client
 
@@ -155,7 +170,9 @@ def test_a_missing_input_is_asked_once_and_the_reply_computes(monkeypatch) -> No
     conversation_id = client.post("/api/v1/conversations", json={}).json()[
         "conversation"
     ]["id"]
-    _stream(client, conversation_id, "If I save 500 a month at 5%, what do I end up with?")
+    _stream(
+        client, conversation_id, "If I save 500 a month at 5%, what do I end up with?"
+    )
     messages = client.get(f"/api/v1/conversations/{conversation_id}/messages").json()[
         "items"
     ]

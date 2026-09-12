@@ -33,14 +33,6 @@ CalculationKind = Literal[calculation_kinds()]  # type: ignore[valid-type]
 
 
 class CalculationRequest(BaseModel):
-    kind: CalculationKind | None = Field(
-        default=None,
-        description=(
-            "The calculation Argus runs for this turn, from the kinds listed in "
-            "the instructions. Null when the money question is too broad to "
-            "compute; fill follow_up_questions instead."
-        ),
-    )
     inputs: dict[str, JsonValue] = Field(
         default_factory=dict,
         description=(
@@ -79,6 +71,14 @@ class CalculationRequest(BaseModel):
             "would make it computable, each asking for one concrete figure "
             "or choice the user alone knows, never a figure a published page "
             "states. Never a list of what Argus can calculate."
+        ),
+    )
+    kind: CalculationKind | None = Field(
+        default=None,
+        description=(
+            "The calculation Argus runs for this turn: the kind listed in the "
+            "instructions whose inputs the fields above name, chosen even when "
+            "an input is still missing. Null only when no listed kind fits."
         ),
     )
 

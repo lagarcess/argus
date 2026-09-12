@@ -19,6 +19,9 @@ from loguru import logger
 from pydantic import ValidationError
 
 from argus.agent_runtime.calculation_rows import market_counterfactual_rows
+from argus.agent_runtime.interpreter.calculation_focused_read import (
+    focused_calculation_request,
+)
 from argus.agent_runtime.interpreter.calculation_request import (
     RUNTIME_ARGUMENTS,
     CalculationRequest,
@@ -67,6 +70,15 @@ async def calculation_turn_stage_result(
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
     request = _request_for_turn(interpretation, selected_thread_metadata)
+    if request is None or request.kind is None:
+        recovered = await focused_calculation_request(
+            interpretation=interpretation,
+            message=state.current_user_message,
+            history=state.recent_thread_history,
+        )
+        if recovered is not None:
+            interpretation.calculation = recovered
+            request = recovered
     if request is None:
         return None
     if request.kind is None:
@@ -282,6 +294,11 @@ def _clarification_result(
         if interpretation.requires_clarification and interpretation.assistant_response
         else None
     )
+    if prompt is None:
+        # The model's own question for what the calculation still needs.
+        prompt = next(
+            (text.strip() for text in request.follow_up_questions if text.strip()), None
+        )
     pending = request.model_copy(
         update={
             "inputs": {
