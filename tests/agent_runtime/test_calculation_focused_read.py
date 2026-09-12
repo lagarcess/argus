@@ -1,7 +1,7 @@
 """The calculation read is the one model read that maps a money question to a
 declared calculation. It runs after the primary interpretation only on the
-primary's computed-figure mark or a pending calculation reply, so an ordinary
-turn spends no read; it owns its leads and questions and records when it
+primary's computed-figure mark, a pending calculation reply or a refusal the
+primary chose, so an ordinary turn spends no read; it owns its leads and questions and records when it
 reaches the turn."""
 
 from __future__ import annotations
@@ -60,6 +60,20 @@ def test_the_read_runs_only_on_the_mark_or_a_pending_reply() -> None:
     assert trigger(_read()) == focused.MONEY_QUESTION_TRIGGER
     assert trigger(_read(computed_figure_decides=False)) is None, "an ordinary turn"
     assert (
+        trigger(_read(intent="unsupported_or_out_of_scope", computed_figure_decides=False))
+        == focused.BEFORE_REFUSAL_TRIGGER
+    ), "an unmarked refusal is read before it names a capability"
+    assert (
+        trigger(
+            _read(
+                intent="unsupported_or_out_of_scope",
+                computed_figure_decides=False,
+                capability_question_focus="limits",
+            )
+        )
+        is None
+    ), "a question about Argus keeps its capability answer"
+    assert (
         trigger(_read(intent="unsupported_or_out_of_scope", semantic_turn_act="unsupported_request"))
         == focused.MONEY_QUESTION_TRIGGER
     ), "a marked refusal is read for a calculation before it names a capability"
@@ -88,6 +102,18 @@ def test_the_read_runs_only_on_the_mark_or_a_pending_reply() -> None:
         )
         == focused.MONEY_QUESTION_TRIGGER
     ), "a draft that names something the runtime cannot run"
+    assert (
+        trigger(
+            _read(
+                intent="strategy_drafting",
+                semantic_turn_act="new_idea",
+                candidate_strategy_draft=runnable,
+                unsupported_constraints=[unrunnable],
+                computed_figure_decides=False,
+            )
+        )
+        == focused.BEFORE_REFUSAL_TRIGGER
+    ), "an unmarked unrunnable draft is read before its refusal"
     assert trigger(_read(intent="backtest_execution")) is None
     assert trigger(_read(intent="results_explanation", semantic_turn_act="result_followup")) is None
     assert trigger(_read(semantic_turn_act="approval")) is None
@@ -194,7 +220,7 @@ def test_a_declined_failed_or_empty_read_leaves_the_turn_to_the_primary_route(
 
 
 def test_an_ordinary_turn_spends_no_calculation_read(monkeypatch) -> None:
-    for intent in ("conversation_followup", "beginner_guidance", "unsupported_or_out_of_scope"):
+    for intent in ("conversation_followup", "beginner_guidance"):
         ordinary = _read(intent=intent, computed_figure_decides=False)
         result, seen = _run(ordinary, monkeypatch, None, message="What is compound interest?")
         assert result is None and seen == []

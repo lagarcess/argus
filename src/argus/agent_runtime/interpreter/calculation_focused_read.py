@@ -2,9 +2,9 @@
 declared calculation.
 
 The primary interpreter routes the turn and never maps calculations; it only
-marks ``computed_figure_decides``. This read runs after it on that mark or on a
-reply to a pending calculation question, never on an ordinary turn and never on
-the message text. It reads the current message with the recent conversation and
+marks ``computed_figure_decides``. This read runs after it on that mark, on a
+reply to a pending calculation question, or before a refusal the primary chose,
+never on an ordinary turn and never on the message text. It reads the current message with the recent conversation and
 the declared catalogue, and records the signal and a reason code whenever its
 read reaches the turn, or when a mark yields to the route the primary chose
 (AGENTS.md: redundancy over an LLM read must be observable).
@@ -29,6 +29,7 @@ from argus.llm.openrouter import invoke_openrouter_json_schema
 
 PENDING_REPLY_TRIGGER = "calculation_read_pending_reply"
 MONEY_QUESTION_TRIGGER = "calculation_read_money_question"
+BEFORE_REFUSAL_TRIGGER = "calculation_read_before_refusal"
 ROUTE_KEPT_REASON_CODE = "calculation_read_skipped_for_route"
 READ_MAPPED_REASON_CODE = "calculation_read_mapped"
 _ROUTED_INTENTS = frozenset(
@@ -64,28 +65,27 @@ FOCUSED_CALCULATION_READ_GUIDANCE = (
     "into a stock, fund or cryptocurrency, which Argus answers with the "
     "asset's history; for concept education with no figure to compute; for "
     "questions about Argus or a visible result; and for social turns. When "
-    "true, choose the closest kind even when inputs are missing. When figures "
-    "would decide the question but no kind can compute it until the user "
-    "names the amount or the options, set true, leave kind null and ask the "
-    "three questions. An amount put in at a rate, such as a deposit, a "
-    "certificate or a bond held to maturity, is a time_value plan with the "
-    "amount as present_value. When Argus is waiting for the user's reply to a "
-    "calculation, a message that answers it keeps that kind and puts only the "
-    "answered figures in inputs. Put every number the user stated in inputs "
-    "under the listed argument names: amounts as plain numbers, percentages "
-    "as percent numbers (7 for 7 percent), counts of periods as integers, and "
-    "the currency as an ISO 4217 code only when the user names one "
-    "unambiguously. Put in retrieve every listed input a published page "
-    "states that the user did not: a product's price, a lender's, bank's or "
-    "card's published rate or fee, the inflation rate where the user lives, "
-    "an asset's price, earnings, growth forecast or multiple. Never ask the "
-    "user for a figure a page states. Set solve_for to the one blank the "
-    "decision needs when the kind lists blanks. Fill follow_up_questions, at "
-    "most three, only with figures or choices the user alone knows that the "
-    "calculation still needs, such as their balance, payment, income, "
-    "spending or horizon, in the user's words and language; a question too "
-    "broad to name the amount or the options gets three such questions. Kinds "
-    "and their inputs:\n"
+    "true, choose the closest kind even when inputs are missing. A question "
+    "that names no amount or no options yet still gets the kind that would "
+    "decide it, with follow_up_questions asking for what only the user knows. "
+    "An amount put in at a rate, such as a deposit, a certificate or a bond "
+    "held to maturity, is a time_value plan with the amount as present_value. "
+    "When Argus is waiting for the user's reply to a calculation, a message "
+    "that answers it keeps that kind and puts only the answered figures in "
+    "inputs. Put every number the user stated in inputs under the listed "
+    "argument names: amounts as plain numbers, percentages as percent numbers "
+    "(7 for 7 percent), counts of periods as integers, and the currency as an "
+    "ISO 4217 code only when the user names one unambiguously. Put in "
+    "retrieve every listed input a published page states that the user did "
+    "not: a product's price, a lender's, bank's or card's published rate or "
+    "fee, the inflation rate where the user lives, an asset's price, "
+    "earnings, growth forecast or multiple. Never ask the user for a figure a "
+    "page states. Set solve_for to the one blank the decision needs when the "
+    "kind lists blanks. Fill follow_up_questions, at most three, only with "
+    "figures or choices the user alone knows that the calculation still "
+    "needs, such as their balance, payment, income, spending or horizon, in "
+    "the user's words and language; a question too broad to name the amount "
+    "or the options gets three such questions. Kinds and their inputs:\n"
 )
 
 
@@ -110,11 +110,17 @@ def focused_calculation_trigger(
     """The typed signal that sends this turn to the calculation read, or None."""
     if pending is not None:
         return PENDING_REPLY_TRIGGER
-    if not getattr(interpretation, "computed_figure_decides", False):
-        return None
     if _owned_by_another_route(interpretation):
         return None
-    return MONEY_QUESTION_TRIGGER
+    if getattr(interpretation, "computed_figure_decides", False):
+        return MONEY_QUESTION_TRIGGER
+    if (
+        interpretation.intent == "unsupported_or_out_of_scope"
+        or interpretation.unsupported_constraints
+    ):
+        # A refusal must never name a capability the user did not ask about.
+        return BEFORE_REFUSAL_TRIGGER
+    return None
 
 
 def _owned_by_another_route(interpretation: Any) -> bool:
