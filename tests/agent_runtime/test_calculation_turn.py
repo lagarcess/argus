@@ -468,6 +468,64 @@ def test_without_research_a_published_input_is_asked_of_the_user() -> None:
     )
 
 
+def test_argument_names_are_advertised_and_stray_names_are_dropped_with_a_record() -> (
+    None
+):
+    from argus.agent_runtime.interpreter.calculation_request import (
+        calculation_argument_names,
+    )
+
+    names = set(calculation_argument_names())
+    assert {
+        "future_value",
+        "present_value",
+        "annual_rate_pct",
+        "price",
+        "per_share",
+    } <= names
+    assert "currency" not in names and "sources" not in names
+    schema = CalculationRequest.model_json_schema()["properties"]
+    assert set(schema["retrieve"]["items"]["enum"]) == names
+    assert schema["solve_for"]["anyOf"][0]["enum"] == sorted(names)
+    assert CalculationRequest.model_json_schema()["required"] == [
+        "inputs",
+        "solve_for",
+        "retrieve",
+        "follow_up_questions",
+        "kind",
+    ]
+    assert CalculationRequest.model_validate({"kind": "time_value"}).inputs == {}
+    pairs = schema["inputs"]
+    assert pairs["type"] == "array"
+    assert pairs["items"]["additionalProperties"] is False
+    assert set(pairs["items"]["properties"]["name"]["enum"]) == names | {"currency"}
+    parsed = CalculationRequest.model_validate(
+        {
+            "kind": "time_value",
+            "inputs": [
+                {"name": "present_value", "value": 25000},
+                {"name": "currency", "value": "USD"},
+            ],
+        }
+    )
+    assert parsed.inputs == {"present_value": 25000, "currency": "USD"}
+    assert CalculationRequest.model_validate({"inputs": {"payment": 5}}).inputs == {
+        "payment": 5
+    }
+    interpretation = _read(
+        {
+            "kind": "time_value",
+            "inputs": SAVING_PLAN,
+            "solve_for": "the ending balance",
+            "retrieve": ["iPad price"],
+        }
+    )
+    result = _run(interpretation)
+    assert result is not None
+    assert result.outcome == "await_user_reply" or result.patch["final_response_payload"]
+    assert turn.UNKNOWN_NAMES_REASON_CODE in interpretation.reason_codes
+
+
 def test_a_kind_the_catalog_lacks_is_recorded_and_left_alone(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -20,8 +20,16 @@ os.environ["ARGUS_RESEARCH_RAIL_ENABLED"] = "true"
 os.environ["ARGUS_MARKET_DATA_PROVIDER_MODE"] = "live_provider"
 os.environ["ARGUS_ASSET_PROVIDER_MODE"] = "live_provider"
 
-from argus.agent_runtime.capabilities.contract import build_default_capability_contract  # noqa: E402
-from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter  # noqa: E402
+from argus.agent_runtime.capabilities.contract import (  # noqa: E402
+    build_default_capability_contract,  # noqa: E402
+)
+from argus.agent_runtime.interpreter.calculation_focused_read import (  # noqa: E402
+    focused_calculation_request,
+    focused_calculation_trigger,
+)
+from argus.agent_runtime.llm_interpreter import (  # noqa: E402
+    OpenRouterStructuredInterpreter,  # noqa: E402
+)
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest  # noqa: E402
 from argus.agent_runtime.state.models import UserState  # noqa: E402
 
@@ -76,9 +84,12 @@ async def main() -> None:
                 unsupported=[item.category for item in read.unsupported_constraints],
                 lead=read.assistant_response,
             )
+            trigger = focused_calculation_trigger(read)
+            recovered = await focused_calculation_request(interpretation=read, message=text, history=[]) if trigger else None
+            row.update(focused_trigger=trigger, recovered=recovered.model_dump(mode="json") if recovered else None)
         rows.append(row)
-        calc = row.get("calculation") or {}
-        print(json.dumps({"label": f"{label}-{language}", "kind": calc.get("kind"), "inputs": calc.get("inputs"), "retrieve": calc.get("retrieve"), "follow_ups": len(calc.get("follow_up_questions") or []), "clarify": row.get("requires_clarification"), "missing": row.get("missing"), "intent": row.get("intent"), "strategy": row.get("strategy_type"), "unsupported": row.get("unsupported")}, ensure_ascii=False))
+        calc = row.get("recovered") or row.get("calculation") or {}
+        print(json.dumps({"label": f"{label}-{language}", "kind": calc.get("kind"), "inputs": calc.get("inputs"), "retrieve": calc.get("retrieve"), "follow_ups": len(calc.get("follow_up_questions") or []), "trigger": row.get("focused_trigger"), "clarify": row.get("requires_clarification"), "missing": row.get("missing"), "intent": row.get("intent"), "strategy": row.get("strategy_type"), "unsupported": row.get("unsupported")}, ensure_ascii=False))
     Path(sys.argv[1]).write_text(json.dumps({"captured_at": datetime.now(timezone.utc).isoformat(), "rows": rows}, indent=2, ensure_ascii=False) + "\n")
 
 

@@ -71,7 +71,7 @@ def test_the_ask_names_the_reads_inputs_minus_what_the_user_stated() -> None:
     read = CalculationRequest(
         kind="valuation_scenarios",
         inputs={"symbol": "NVDA", "amount": 10000, "horizon_years": 10, "price": 200},
-        retrieve=["per_share", "growth_base_pct", "price", "not_an_input"],
+        retrieve=["per_share", "growth_base_pct", "price", "horizon_years"],
     )
     assert [name for name, _ in retrieval_inputs(read, declaration)] == [
         "per_share",

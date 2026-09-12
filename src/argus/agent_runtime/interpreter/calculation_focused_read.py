@@ -17,10 +17,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from argus.agent_runtime.interpreter.calculation_request import (
     CalculationRequest,
+    all_properties_required,
     calculation_kinds_clause,
 )
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
@@ -61,6 +62,8 @@ FOCUSED_CALCULATION_READ_GUIDANCE = (
 
 class FocusedCalculationRead(BaseModel):
     """One narrow read: which declared calculation answers this message."""
+
+    model_config = ConfigDict(json_schema_extra=all_properties_required)
 
     wants_a_computed_figure: bool = Field(
         description=(

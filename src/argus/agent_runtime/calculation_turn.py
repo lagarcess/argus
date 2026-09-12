@@ -57,6 +57,7 @@ LEAD_REPLACED_REASON_CODE = "calculation_lead_replaced"
 RETRIEVAL_OWNS_REASON_CODE = "calculation_retrieval_needed"
 RESEARCH_QUERY_SYNTHESIZED_REASON_CODE = "calculation_research_query_synthesized"
 NOTHING_TO_SOLVE_REASON_CODE = "calculation_nothing_to_solve"
+UNKNOWN_NAMES_REASON_CODE = "calculation_unknown_argument_names_dropped"
 DEFAULT_CURRENCY = "USD"
 CURRENCY_FIELD = "currency"
 PENDING_PAYLOAD_KEY = "calculation"
@@ -90,6 +91,7 @@ async def calculation_turn_stage_result(
     if declaration is None or not is_free_calculation(declaration):
         _note(interpretation, KIND_UNKNOWN_REASON_CODE, kind=request.kind)
         return None
+    request = _known_names(declaration, request, interpretation)
     arguments = _arguments(declaration, request, interpretation=interpretation, user=user)
     retrieving = (
         {name for name in request.retrieve if arguments.get(name) is None}
@@ -192,6 +194,24 @@ def _pending_request(metadata: dict[str, Any]) -> CalculationRequest | None:
     except ValidationError:
         return None
     return request if request.kind is not None else None
+
+
+def _known_names(
+    declaration: ToolDeclaration,
+    request: CalculationRequest,
+    interpretation: StructuredInterpretation,
+) -> CalculationRequest:
+    """Retrieve and solve_for keep only this declaration's argument names."""
+    declared = set(declaration.arguments_type.model_fields) - RUNTIME_ARGUMENTS
+    retrieve = [name for name in request.retrieve if name in declared]
+    solve_for = request.solve_for if request.solve_for in declared else None
+    dropped = sorted(set(request.retrieve) - set(retrieve)) + (
+        [str(request.solve_for)] if request.solve_for and solve_for is None else []
+    )
+    if not dropped:
+        return request
+    _note(interpretation, UNKNOWN_NAMES_REASON_CODE, dropped=dropped)
+    return request.model_copy(update={"retrieve": retrieve, "solve_for": solve_for})
 
 
 def _arguments(

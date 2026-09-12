@@ -10,9 +10,16 @@ catalogue the model reads and the math that runs share one owner.
 
 from __future__ import annotations
 
-from typing import Any, Literal, get_args, get_origin
+from typing import Annotated, Any, Literal, get_args, get_origin
 
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    JsonValue,
+    WithJsonSchema,
+)
 
 from argus.domain.calculations import get_calculation_declarations
 from argus.domain.tool_declaration import ToolDeclaration
@@ -32,11 +39,86 @@ def calculation_kinds() -> tuple[str, ...]:
 CalculationKind = Literal[calculation_kinds()]  # type: ignore[valid-type]
 
 
+def calculation_argument_names() -> tuple[str, ...]:
+    """Every argument a declared calculation accepts from the model."""
+    names: set[str] = set()
+    for declaration in get_calculation_declarations():
+        names.update(
+            name
+            for name in declaration.arguments_type.model_fields
+            if name not in RUNTIME_ARGUMENTS and name != "currency"
+        )
+    return tuple(sorted(names))
+
+
+# Advertised to the model as the only valid names; parsed leniently so one
+# stray name never fails the whole interpretation (the runtime drops it).
+_ARGUMENT_NAMES = list(calculation_argument_names())
+
+
+def _inputs_from_pairs(value: Any) -> Any:
+    """The model sends inputs as name and value pairs; the runtime keeps a map."""
+    if not isinstance(value, list):
+        return value
+    return {
+        item["name"]: item.get("value")
+        for item in value
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+
+
+_OFFER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "label": {"type": "string"},
+        "symbol": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "value": {"type": "number"},
+    },
+    "required": ["label", "symbol", "value"],
+    "additionalProperties": False,
+}
+# A strict structured output cannot describe an open object, so the inputs
+# travel as a closed list of pairs and are folded into a map on parse.
+_INPUT_PAIRS_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "enum": [*_ARGUMENT_NAMES, "currency"]},
+            "value": {
+                "anyOf": [
+                    {"type": "number"},
+                    {"type": "string"},
+                    {"type": "boolean"},
+                    {"type": "array", "items": _OFFER_SCHEMA},
+                    {"type": "null"},
+                ]
+            },
+        },
+        "required": ["name", "value"],
+        "additionalProperties": False,
+    },
+}
+CalculationInputs = Annotated[
+    dict[str, JsonValue],
+    BeforeValidator(_inputs_from_pairs),
+    WithJsonSchema(_INPUT_PAIRS_SCHEMA),
+]
+
+
+def all_properties_required(schema: dict[str, Any]) -> None:
+    """A structured read writes every field; parsing keeps the defaults."""
+    schema["required"] = list(schema.get("properties", {}))
+
+
 class CalculationRequest(BaseModel):
-    inputs: dict[str, JsonValue] = Field(
+    model_config = ConfigDict(json_schema_extra=all_properties_required)
+
+    inputs: CalculationInputs = Field(
         default_factory=dict,
         description=(
-            "Every input the user stated, under the argument names the "
+            "Every input the user stated, one name and value pair each, under "
+            "the argument names the "
             "instructions list for the kind: amounts as plain numbers, "
             "percentages as plain percent numbers (7 for 7%), counts of periods "
             "as integers, dates as ISO dates, a ticker under symbol, and "
@@ -46,16 +128,22 @@ class CalculationRequest(BaseModel):
     )
     solve_for: str | None = Field(
         default=None,
+        json_schema_extra={
+            "anyOf": [{"type": "string", "enum": _ARGUMENT_NAMES}, {"type": "null"}]
+        },
         description=(
-            "For a kind that lists blanks, the one argument the user wants "
-            "solved; leave it out of inputs. Null for kinds without blanks."
+            "For a kind that lists blanks, the argument name of the one blank "
+            "the user wants solved; leave it out of inputs. Null for kinds "
+            "without blanks."
         ),
     )
     retrieve: list[str] = Field(
         default_factory=list,
         max_length=MAX_RETRIEVED_INPUTS,
+        json_schema_extra={"items": {"type": "string", "enum": _ARGUMENT_NAMES}},
         description=(
-            "Listed inputs the user did not state that a published page "
+            "Argument names, from the kind's listed inputs, that the user did "
+            "not state and a published page "
             "supplies: a named product's or asset's price, a bank's or lender's "
             "published rate, the inflation rate where the user lives, per-share "
             "earnings, growth forecasts or multiples. Never ask the user for "
