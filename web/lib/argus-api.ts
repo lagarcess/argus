@@ -25,7 +25,10 @@ import {
   normalizeUsageAllowances,
   type RawUsageAllowanceResponse,
 } from "./usage-allowance";
-import type { MarketSessionPhase } from "@/components/chat/greetingPool";
+import type {
+  DemonstratedInterest,
+  MarketSessionPhase,
+} from "@/components/chat/greetingPool";
 import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
@@ -604,12 +607,14 @@ export type MarketSessionResponse = {
     is_market_day: boolean;
     as_of: string;
   } | null;
+  interest: DemonstratedInterest | null;
 };
 
 /**
  * Which session US equities are in, resolved by the backend in Eastern time
- * against the real trading calendar. `session` is null when that calendar is
- * unreachable, and callers say nothing about the market rather than guessing.
+ * against the real trading calendar, and what the caller's own records show
+ * interest in. Either is null when unreadable, and callers say nothing about
+ * the market rather than guessing.
  */
 export async function getMarketSession(signal?: AbortSignal) {
   return apiFetch<MarketSessionResponse>("/market/session", { signal });
