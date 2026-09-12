@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import pytest
+from argus.agent_runtime.interpreter.audits import StatedRunFieldFidelityAudit
+from argus.agent_runtime.interpreter.execution_cost_fidelity import apply_cost_fidelity
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
-from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+from argus.agent_runtime.llm_interpreter_types import (
+    LLMInterpretationResponse,
+    LLMStrategyDraft,
+)
 from argus.agent_runtime.stages import interpret as interpret_module
 from argus.agent_runtime.stages.interpret import interpret_stage
 from argus.agent_runtime.stages.interpret_types import (
@@ -198,3 +203,198 @@ def test_the_clarify_stage_asks_for_a_missing_assumption_on_a_new_request(
 
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "assumption"
+
+
+_NO_COST_MONTHLY_BUYS = [
+    pytest.param(
+        "en",
+        "I'll start by putting in $200 a month into SPY, from January 2024 "
+        "through December 2024.",
+        id="english",
+    ),
+    pytest.param(
+        "es-419",
+        "Voy a empezar poniendo $200 al mes en SPY, de enero de 2024 a "
+        "diciembre de 2024.",
+        id="spanish",
+    ),
+]
+
+_STATED_SLIPPAGE_MONTHLY_BUYS = [
+    pytest.param(
+        "en",
+        "Put $200 a month into SPY through 2024, with 10 bps slippage per trade.",
+        id="english",
+    ),
+    pytest.param(
+        "es-419",
+        "Pon $200 al mes en SPY durante 2024, con deslizamiento de 10 bps por operación.",
+        id="spanish",
+    ),
+]
+
+
+def _monthly_buy_read(message: str, costs: dict[str, float]) -> LLMInterpretationResponse:
+    return LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=message,
+        semantic_turn_act="new_idea",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_type="dca_accumulation",
+            asset_universe=["SPY"],
+            asset_class="equity",
+            capital_amount=200,
+            cadence="monthly",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            extra_parameters=dict(costs),
+        ),
+    )
+
+
+@pytest.mark.parametrize(("language", "message"), _NO_COST_MONTHLY_BUYS)
+@pytest.mark.parametrize(
+    "costs",
+    [{"fee_rate": 0.0, "slippage": 0.0}, {"slippage": 0.0}],
+    ids=["both-zero", "slippage-zero"],
+)
+def test_a_zero_cost_only_the_read_carries_is_dropped_without_a_question(
+    monkeypatch: pytest.MonkeyPatch,
+    language: str,
+    message: str,
+    costs: dict[str, float],
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    response = _monthly_buy_read(message, costs)
+
+    apply_cost_fidelity(response, StatedRunFieldFidelityAudit(), message, None)
+
+    assert response.requires_clarification is False
+    assert "assumption" not in response.missing_required_fields
+    assert "execution_cost_evidence_unresolved" not in response.reason_codes
+    assert "execution_cost_default_zero_dropped" in response.reason_codes
+    extra = response.candidate_strategy_draft.extra_parameters
+    assert "fee_rate" not in extra
+    assert "slippage" not in extra
+
+
+@pytest.mark.parametrize(("language", "message"), _NO_COST_MONTHLY_BUYS)
+def test_a_nonzero_cost_the_message_does_not_ground_is_still_asked(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    response = _monthly_buy_read(message, {"slippage": 0.0005})
+
+    apply_cost_fidelity(response, StatedRunFieldFidelityAudit(), message, None)
+
+    assert response.requires_clarification is True
+    assert "assumption" in response.missing_required_fields
+    assert "execution_cost_default_zero_dropped" not in response.reason_codes
+
+
+@pytest.mark.parametrize(("language", "message"), _STATED_SLIPPAGE_MONTHLY_BUYS)
+def test_a_stated_cost_the_audit_does_not_read_is_still_asked(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    response = _monthly_buy_read(message, {"slippage": 0.001})
+
+    apply_cost_fidelity(response, StatedRunFieldFidelityAudit(), message, None)
+
+    assert response.requires_clarification is True
+    assert "assumption" in response.missing_required_fields
+    assert "execution_cost_evidence_unresolved" in response.reason_codes
+
+
+@pytest.mark.parametrize(("language", "message"), _NO_COST_MONTHLY_BUYS)
+@pytest.mark.asyncio
+async def test_a_request_without_costs_passes_the_field_audit_without_a_question(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str
+) -> None:
+    # Defaults the read carried never stop a request that states no cost.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def empty_audit(*, schema_name, schema_model, **_):
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return schema_model()
+        raise RuntimeError(schema_name)
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", empty_audit)
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol, **_: ResolvedAssetStub(symbol.strip().upper(), "equity"),
+    )
+
+    repaired = await interpreter_module._audit_stated_run_field_fidelity(
+        response=_monthly_buy_read(message, {"fee_rate": 0.0, "slippage": 0.0}),
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u-271", language_preference=language),
+        ),
+    )
+
+    assert repaired is not None
+    assert repaired.requires_clarification is False
+    assert "assumption" not in repaired.missing_required_fields
+    assert "execution_cost_default_zero_dropped" in repaired.reason_codes
+
+
+_SLIPPAGE_AND_FEE_MONTHLY_BUYS = [
+    pytest.param(
+        "en",
+        "Put $200 a month into SPY through 2024, with 10 bps slippage and a 5 bps fee.",
+        "10 bps slippage",
+        id="english",
+    ),
+    pytest.param(
+        "es-419",
+        "Pon $200 al mes en SPY durante 2024, con deslizamiento de 10 bps y una "
+        "comisión de 5 bps.",
+        "deslizamiento de 10 bps",
+        id="spanish",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("language", "message", "slippage_span"), _SLIPPAGE_AND_FEE_MONTHLY_BUYS
+)
+def test_a_zero_beside_a_cost_the_audit_read_is_still_asked(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str, slippage_span: str
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    response = _monthly_buy_read(message, {"slippage": 0.001, "fee_rate": 0.0})
+    audit = StatedRunFieldFidelityAudit.model_validate(
+        {"slippage": {"rate": 0.001, "evidence_span": slippage_span}, "confidence": 0.9}
+    )
+
+    apply_cost_fidelity(response, audit, message, None)
+
+    assert response.requires_clarification is True
+    assert "assumption" in response.missing_required_fields
+    assert "execution_cost_default_zero_dropped" not in response.reason_codes
+    assert response.candidate_strategy_draft.extra_parameters["slippage"] == 0.001
+
+
+@pytest.mark.parametrize(
+    ("language", "message", "slippage_span"), _SLIPPAGE_AND_FEE_MONTHLY_BUYS
+)
+def test_a_zero_the_read_quotes_from_the_message_is_still_asked(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str, slippage_span: str
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    response = _monthly_buy_read(message, {"slippage": 0.0})
+    response.candidate_strategy_draft.evidence_spans["slippage"] = slippage_span
+
+    apply_cost_fidelity(response, StatedRunFieldFidelityAudit(), message, None)
+
+    assert response.requires_clarification is True
+    assert "assumption" in response.missing_required_fields
+    assert "execution_cost_default_zero_dropped" not in response.reason_codes
