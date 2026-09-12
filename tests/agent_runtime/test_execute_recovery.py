@@ -2460,11 +2460,11 @@ async def test_explain_stage_async_accepts_spanish_decimal_comma_benchmark_gap(
 
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return readout_draft(
-            "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; quedaron por debajo por 3,1 puntos porcentuales.\n\nSe probó comprar y mantener AAPL y MSFT en la ventana confirmada.\n\nLa comparación nombra SPY y la brecha frente a la referencia.\n\nSimulación histórica solamente.",
+            "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; quedaron por debajo por 3,0 puntos porcentuales.\n\nSe probó comprar y mantener AAPL y MSFT en la ventana confirmada.\n\nLa comparación nombra SPY y la brecha frente a la referencia.\n\nSimulación histórica solamente.",
             [
                 ("portfolio.total_return", 13.56),
                 ("portfolio.benchmark_return", 16.63),
-                ("portfolio.benchmark_gap", -3.0699999999999985),
+                ("portfolio.benchmark_gap", -3.0),
             ],
             language="es-419",
         )

@@ -110,6 +110,7 @@ _SEND_TEMPLATES: dict[str, dict[str, str]] = {
     },
 }
 
+
 def next_experiments_sidecar(
     result_facts: dict[str, Any],
     *,
@@ -129,8 +130,8 @@ def next_experiments_sidecar(
     already_asked = _kinds_already_asked(recent_user_messages) | set(
         previously_offered_kinds or []
     )
-    # benchmark_delta is the engine's own comparison (delta_vs_benchmark_pct);
-    # the sidecar never subtracts two rounded returns to rebuild it.
+    # benchmark_delta is the gap shown_benchmark_gap states; the sidecar never
+    # derives a comparison of its own.
     comparison = benchmark_comparison_from_delta(benchmark_delta)
     why = _row_reason(
         comparison=comparison,

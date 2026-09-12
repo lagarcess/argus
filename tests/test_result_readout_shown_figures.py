@@ -114,7 +114,7 @@ def test_a_monthly_buy_run_names_purchases_not_purchases_and_sales() -> None:
     assert "Purchases and sales" not in facts
 
 
-def test_a_gap_without_both_returns_keeps_the_stored_value() -> None:
+def test_a_gap_without_both_returns_reads_the_stored_value_at_display_precision() -> None:
     sheet = stored_readout_facts(
         metrics={"aggregate": {"performance": {"delta_vs_benchmark_pct": 12.34}}},
         config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
@@ -124,7 +124,7 @@ def test_a_gap_without_both_returns_keeps_the_stored_value() -> None:
         chart=None,
     )
 
-    assert sheet["facts"]["portfolio.benchmark_gap"]["value"] == 12.34
+    assert sheet["facts"]["portfolio.benchmark_gap"]["value"] == 12.3
 
 
 @pytest.mark.parametrize(

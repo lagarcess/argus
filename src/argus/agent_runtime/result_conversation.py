@@ -30,7 +30,6 @@ from argus.agent_runtime.result_next_steps import (
     NextStep,
     accepted_next_steps,
 )
-from argus.domain.display_figure import display_difference
 from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.contracts import (
     ResearchSource,
@@ -286,7 +285,6 @@ def run_headline_facts(metadata: dict[str, Any]) -> dict[str, Any]:
         chart=metadata.get("chart"),
     )
     rows = _mapping(sheet.get("facts"))
-    _align_shown_differences(rows)
     headline = headline_readout_facts(sheet)
     headline["facts"].update(
         {
@@ -296,25 +294,6 @@ def run_headline_facts(metadata: dict[str, Any]) -> dict[str, Any]:
         }
     )
     return headline
-
-
-# An answer's stated difference is the difference of the two figures it shows,
-# even where the card prints a gap rounded from unrounded returns (#533).
-_SHOWN_DIFFERENCES = (
-    ("portfolio.benchmark_gap", "portfolio.total_return", "portfolio.benchmark_return"),
-    ("portfolio.cost_drag", "portfolio.gross_return", "portfolio.net_return"),
-)
-
-
-def _align_shown_differences(rows: dict[str, Any]) -> None:
-    for difference, minuend, subtrahend in _SHOWN_DIFFERENCES:
-        row = rows.get(difference)
-        shown = display_difference(
-            _mapping(rows.get(minuend)).get("value"),
-            _mapping(rows.get(subtrahend)).get("value"),
-        )
-        if isinstance(row, dict) and row.get("value") is not None and shown is not None:
-            rows[difference] = {**row, "value": shown}
 
 
 def accepted_conversation_answer(

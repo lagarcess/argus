@@ -1263,7 +1263,8 @@ def test_build_result_card_shows_execution_realism_cost_and_effect(
         "slippage_bps": 5.0,
         "gross_total_return_pct": 12.0,
         "net_total_return_pct": 11.83,
-        "return_drag_pct": 0.17,
+        # The shown 12.0 minus the shown 11.8, not the stored engine 0.17.
+        "return_drag_pct": 0.2,
         "benchmark_treatment": "same_modeled_costs",
     }
 

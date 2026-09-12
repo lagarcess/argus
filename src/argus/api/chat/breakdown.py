@@ -27,6 +27,7 @@ from argus.domain.research.contracts import (
 )
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.result_figures import shown_benchmark_gap
 from argus.domain.result_readout_content import (
     normalize_readout_language,
 )
@@ -240,10 +241,15 @@ def fallback_result_breakdown_message(
         "max_drawdown_pct",
         row_keys=("max_drawdown_pct", "max_drawdown"),
     )
-    delta_vs_benchmark = _result_breakdown_metric(
-        context,
-        "delta_vs_benchmark_pct",
-        row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
+    # The gap beside the two printed returns is their shown difference.
+    delta_vs_benchmark = shown_benchmark_gap(
+        total_return,
+        benchmark_return,
+        _result_breakdown_metric(
+            context,
+            "delta_vs_benchmark_pct",
+            row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
+        ),
     )
     assumptions = context.get("assumptions")
     assumption_lines = (

@@ -1130,8 +1130,11 @@ run-derived context object for result follow-ups; it is not a second metrics
 source of truth. On every public read it also carries `figures`, the
 one-decimal display projection of its own `metrics` (`total_return_pct`,
 `benchmark_return_pct`, `delta_vs_benchmark_pct`, `benchmark_comparison_claim`,
-`max_drawdown_pct`, plus `gross_total_return_pct` and `net_total_return_pct`
-when costs were modeled). Public runs carry the same `figures` beside their
+`max_drawdown_pct`, plus `gross_total_return_pct`, `net_total_return_pct` and
+`return_drag_pct` when costs were modeled). `delta_vs_benchmark_pct` is the shown
+return minus the shown benchmark return, and `return_drag_pct` is the shown gross
+return minus the shown net return; the stored engine value is quoted only when a
+return is missing. Public runs carry the same `figures` beside their
 `metrics`. The backend rounds once, with the same rounding its own prose uses;
 clients print those digits verbatim with locale separators and grouping and
 never round `metrics` for display. Legacy `saved_strategy_id` metadata remains
@@ -1291,12 +1294,12 @@ request. Missing dated evidence remains unavailable.
 Template readouts and dossier outcomes render from the same typed run facts
 in the current workspace language. The figures those
 surfaces share with the result card (returns, the benchmark gap, worst drop)
-are the backend's `figures`: rounded once, from the engine's own
-`delta_vs_benchmark_pct` and returns, and printed verbatim in the workspace
-locale. No reader subtracts two rounded returns or rounds a figure a second
-time, so the card, the prose beside it, and the dossier cannot show two numbers
-for one fact. Original LLM result prose remains immutable audit/model context,
-not a presentation fallback. Only the versioned, creation-time envelope above
+are the backend's `figures`: rounded once from the engine's returns, with the
+gap stated as the difference of the two returns as shown, and printed verbatim
+in the workspace locale. Only the backend owner states that difference and no
+reader rounds a figure a second time, so the card, the prose beside it, and the
+dossier cannot show two numbers for one fact. Original LLM result prose remains
+immutable audit/model context, not a presentation fallback. Only the versioned, creation-time envelope above
 authorizes visible model readout text.
 Public result messages carry empty `content`; live result finals carry empty
 `assistant_response`. Public run/card payloads omit stored `quick_take`,
@@ -4728,7 +4731,8 @@ localized row label, `why` is a typed reason (`code` + `params`, e.g.
 suffix such as the pre-resolved peer symbol) plus `send_text` (the exact
 localized sentence a tap submits as an ordinary user turn). Reason params are
 one-decimal display figures the backend rounded: `points` is the magnitude of
-the run's `delta_vs_benchmark_pct` and `drawdown` is its `max_drawdown_pct`; a
+the run's shown benchmark gap (the `figures` `delta_vs_benchmark_pct`) and
+`drawdown` is its `max_drawdown_pct`; a
 gap inside the in-line cut carries no benchmark reason. The client prints them
 verbatim in the workspace locale, so the reason never quotes a different
 number than the card above it. The frontend

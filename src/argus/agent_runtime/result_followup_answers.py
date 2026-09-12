@@ -26,8 +26,8 @@ from argus.agent_runtime.result_conversation import (
 )
 from argus.agent_runtime.result_fact_enrichment import metric_number
 from argus.agent_runtime.result_followups import (
-    BENCHMARK_DELTA_METRIC_PATHS,
     MAX_DRAWDOWN_METRIC_PATHS,
+    benchmark_gap_metric,
 )
 from argus.agent_runtime.result_next_steps import next_steps_patch, offered_test_steps
 
@@ -78,7 +78,7 @@ def result_next_experiments(
     """
     return next_experiments_sidecar(
         metadata,
-        benchmark_delta=metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS),
+        benchmark_delta=benchmark_gap_metric(metadata),
         max_drawdown=metric_number(metadata, paths=MAX_DRAWDOWN_METRIC_PATHS),
         language=language,
         source_run_id=source_run_id,

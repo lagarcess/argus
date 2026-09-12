@@ -29,6 +29,7 @@ from argus.domain.engine_launch.result_facts import (
     runnable_next_tests,
     structured_next_experiments,
 )
+from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     log_openrouter_failure,
@@ -37,6 +38,11 @@ from argus.llm.openrouter import (
 INTERNAL_ONLY_FACT_IDS = frozenset({"benchmark_comparison_claim"})
 # Engine metric paths every follow-up surface reads, so the Try next rows and
 # the fact bank compare against the same figures.
+TOTAL_RETURN_METRIC_PATHS = (("metrics", "aggregate", "performance", "total_return_pct"),)
+BENCHMARK_RETURN_METRIC_PATHS = (
+    ("metrics", "aggregate", "performance", "benchmark_return_pct"),
+    ("metrics", "benchmark_metrics", "aggregate", "total_return_pct"),
+)
 BENCHMARK_DELTA_METRIC_PATHS = (
     ("metrics", "aggregate", "performance", "delta_vs_benchmark_pct"),
 )
@@ -305,23 +311,14 @@ def result_followup_fact_bank(
     ).strip()
     if benchmark:
         fact_bank["benchmark_symbol"] = benchmark
-    total_return = metric_number(
-        metadata,
-        paths=(("metrics", "aggregate", "performance", "total_return_pct"),),
-    )
+    total_return = metric_number(metadata, paths=TOTAL_RETURN_METRIC_PATHS)
     if total_return is not None:
         fact_bank["total_return"] = format_percent(total_return)
-    benchmark_return = metric_number(
-        metadata,
-        paths=(
-            ("metrics", "aggregate", "performance", "benchmark_return_pct"),
-            ("metrics", "benchmark_metrics", "aggregate", "total_return_pct"),
-        ),
-    )
+    benchmark_return = metric_number(metadata, paths=BENCHMARK_RETURN_METRIC_PATHS)
     if benchmark_return is not None:
         fact_bank["benchmark_return"] = format_percent(benchmark_return)
     enriched_facts = enriched_result_fact_entries(metadata)
-    benchmark_delta = metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS)
+    benchmark_delta = benchmark_gap_metric(metadata)
     comparison = (
         benchmark_comparison_from_delta(benchmark_delta)
         if benchmark_delta is not None
@@ -403,6 +400,15 @@ def result_followup_fact_bank(
     return fact_bank
 
 
+def benchmark_gap_metric(metadata: dict[str, Any]) -> float | None:
+    """The shown benchmark gap, from the metric paths every follow-up reads."""
+    return shown_benchmark_gap(
+        metric_number(metadata, paths=TOTAL_RETURN_METRIC_PATHS),
+        metric_number(metadata, paths=BENCHMARK_RETURN_METRIC_PATHS),
+        metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS),
+    )
+
+
 def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
     result_card = _mapping(
         metadata.get("result_card") or metadata.get("conversation_result_card")
@@ -424,7 +430,9 @@ def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
     net_return = as_float(costs.get("net_total_return_pct"))
     if net_return is not None:
         entries["net_total_return"] = format_percent(net_return)
-    return_drag = as_float(costs.get("return_drag_pct"))
+    return_drag = shown_cost_drag(
+        gross_return, net_return, as_float(costs.get("return_drag_pct"))
+    )
     if return_drag is not None:
         entries["return_drag"] = _format_percentage_points(abs(return_drag))
     benchmark_treatment = str(costs.get("benchmark_treatment") or "").strip()

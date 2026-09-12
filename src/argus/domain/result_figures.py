@@ -6,6 +6,13 @@ the dossier print. It runs at the reader boundary, from the metrics the payload
 already carries, so historical results need no repair and no second metrics
 owner exists. Readers never round; a payload without figures has no printable
 figure.
+
+A stated difference is the difference of the two figures shown beside it. The
+benchmark gap is the shown return minus the shown benchmark return, and the
+modeled cost drag is the shown gross return minus the shown net return. The
+engine's stored gap and drag, taken before rounding, are quoted only when one of
+the two returns is missing. Every reader, stored runs included, states the gap
+and the drag through ``shown_benchmark_gap`` and ``shown_cost_drag``.
 """
 
 from __future__ import annotations
@@ -14,9 +21,25 @@ from collections.abc import Mapping
 from typing import Any
 
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
-from argus.domain.display_figure import display_figure
+from argus.domain.display_figure import display_difference, display_figure
 
 RESULT_FIGURES_KEY = "figures"
+
+
+def shown_benchmark_gap(
+    total_return_pct: object, benchmark_return_pct: object, stored_gap: object
+) -> float | None:
+    """The benchmark gap every reader states: the shown returns' difference."""
+    shown = display_difference(total_return_pct, benchmark_return_pct)
+    return shown if shown is not None else display_figure(stored_gap)
+
+
+def shown_cost_drag(
+    gross_return_pct: object, net_return_pct: object, stored_drag: object
+) -> float | None:
+    """The modeled cost drag every reader states: shown gross minus shown net."""
+    shown = display_difference(gross_return_pct, net_return_pct)
+    return shown if shown is not None else display_figure(stored_drag)
 
 
 def result_display_figures(metrics: object) -> dict[str, Any] | None:
@@ -25,14 +48,18 @@ def result_display_figures(metrics: object) -> dict[str, Any] | None:
     if not performance:
         return None
     figures: dict[str, Any] = {}
-    for key in ("total_return_pct", "benchmark_return_pct", "delta_vs_benchmark_pct"):
+    for key in ("total_return_pct", "benchmark_return_pct"):
         figure = display_figure(performance.get(key))
         if figure is not None:
             figures[key] = figure
-    if "delta_vs_benchmark_pct" in figures:
-        figures["benchmark_comparison_claim"] = benchmark_comparison_from_delta(
-            performance.get("delta_vs_benchmark_pct")
-        ).claim
+    gap = shown_benchmark_gap(
+        performance.get("total_return_pct"),
+        performance.get("benchmark_return_pct"),
+        performance.get("delta_vs_benchmark_pct"),
+    )
+    if gap is not None:
+        figures["delta_vs_benchmark_pct"] = gap
+        figures["benchmark_comparison_claim"] = benchmark_comparison_from_delta(gap).claim
     drawdown = display_figure(_mapping(aggregate.get("risk")).get("max_drawdown_pct"))
     if drawdown is None:
         # Flat legacy shape kept readable; the canonical block is risk.
@@ -45,6 +72,13 @@ def result_display_figures(metrics: object) -> dict[str, Any] | None:
             figure = display_figure(realism.get(key))
             if figure is not None:
                 figures[key] = figure
+        drag = shown_cost_drag(
+            realism.get("gross_total_return_pct"),
+            realism.get("net_total_return_pct"),
+            realism.get("return_drag_pct"),
+        )
+        if drag is not None:
+            figures["return_drag_pct"] = drag
     return figures or None
 
 

@@ -539,10 +539,18 @@ def test_partial_figure_sets_refuse_all_new_receipt_paths(owner, monkeypatch, av
 
 
 @pytest.mark.parametrize(
-    "field", ["total_return_pct", "benchmark_return_pct", "delta_vs_benchmark_pct"]
-)
-@pytest.mark.parametrize(
-    "invalid", [None, "unavailable", True, float("nan"), float("inf")]
+    ("field", "invalid"),
+    [
+        (field, invalid)
+        for field in (
+            "total_return_pct",
+            "benchmark_return_pct",
+            "delta_vs_benchmark_pct",
+        )
+        for invalid in (None, "unavailable", True, float("nan"), float("inf"))
+        # A run without its stored gap still states the gap of its shown returns.
+        if (field, invalid) != ("delta_vs_benchmark_pct", None)
+    ],
 )
 def test_missing_or_invalid_required_figures_refuse_publication(
     owner, monkeypatch, field, invalid
@@ -555,6 +563,21 @@ def test_missing_or_invalid_required_figures_refuse_publication(
             performance[field] = invalid
 
     assert_incomplete_backtest_refused(owner, monkeypatch, change)
+
+
+def test_a_run_without_its_stored_gap_publishes_the_gap_of_its_shown_returns(owner):
+    from argus.domain.display_figure import display_difference
+
+    _, run, message = seed_backtest(owner)
+    performance = run.metrics["aggregate"]["performance"]
+    del performance["delta_vs_benchmark_pct"]
+
+    figures = preview(owner, [message]).payload.turns[0].fact_bank.figures
+
+    assert figures.delta_vs_benchmark_pct == display_difference(
+        performance["total_return_pct"], performance["benchmark_return_pct"]
+    )
+    assert figures.benchmark_comparison_claim == "beat_benchmark"
 
 
 def set_benchmark_name(run, location):
