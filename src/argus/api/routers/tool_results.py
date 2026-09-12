@@ -17,6 +17,7 @@ from argus.api.message_store import (
     update_message_artifact,
 )
 from argus.api.schemas import Message, User
+from argus.domain.computation_marker import computation_from_tool_card
 from argus.domain.pending_artifacts import (
     DeadPendingArtifactError,
     PendingArtifactLayout,
@@ -146,6 +147,12 @@ async def recompute_tool_result(
         (revised if item.artifact_id == artifact else item).model_dump(mode="json")
         for item in cards
     ]
+    # The marker is derived from the recomputed card by its one owner, so a
+    # decision saved after this edit stores the recomputed inputs.
+    computation = computation_from_tool_card(revised, catalog=get_tool_catalog())
+    metadata: dict[str, JsonValue] = {"tool_result_cards": documents}
+    if computation is not None:
+        metadata["computation"] = computation.model_dump(mode="json")
     # The message remains the only durable owner. No checkpoint projection is
     # written here; subsequent turns re-read these current artifact facts.
     try:
@@ -155,7 +162,7 @@ async def recompute_tool_result(
             expected_source_metadata=copy.deepcopy(source.metadata),
             expected_latest_message_id=latest.id,
             prepare=lambda: PendingArtifactUpdate(
-                content=source.content, metadata={"tool_result_cards": documents}
+                content=source.content, metadata=metadata
             ),
             write=partial(
                 update_message_artifact, user_id=user.id, conversation_id=conversation

@@ -1,0 +1,5124 @@
+{
+  "cards": {
+    "bond_value": {
+      "card": {
+        "arguments": {
+          "coupon_rate_pct": 9.0,
+          "coupons_per_year": 2,
+          "currency": "DOP",
+          "face_value": 1000000.0,
+          "price": null,
+          "sources": {},
+          "symbol": null,
+          "years": 3.0,
+          "yield_to_maturity_pct": 10.0
+        },
+        "artifact_id": "artifact-bond_value",
+        "artifact_state": "active",
+        "call_id": "call-bond_value",
+        "card_type": "bond_value",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "annual_coupon": 90000.0,
+            "current_yield_pct": 9.234353678563124,
+            "price": 974621.5396636627,
+            "solved_field": "price",
+            "solved_value": 974621.5396636627,
+            "total_coupons": 270000.0,
+            "total_return": 295378.46033633733,
+            "yield_to_maturity_pct": 10.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.price"
+            },
+            "name": "price",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {
+                "code": "DOP"
+              },
+              "locale_key": "tools.calc.units.currency"
+            },
+            "value": 974621.54,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.face_value"
+              },
+              "name": "face_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 1000000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.coupon_rate_pct"
+              },
+              "name": "coupon_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 9.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.years"
+              },
+              "name": "years",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.years"
+              },
+              "unknown": false,
+              "value": 3.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.coupons_per_year"
+              },
+              "name": "coupons_per_year",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": 2,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.price"
+              },
+              "name": "price",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.yield_to_maturity_pct"
+              },
+              "name": "yield_to_maturity_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 10.0,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.current_yield_pct"
+              },
+              "name": "current_yield_pct",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 9.23,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.annual_coupon"
+              },
+              "name": "annual_coupon",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 90000.0,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.total_coupons"
+              },
+              "name": "total_coupons",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 270000.0,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.total_return"
+              },
+              "name": "total_return",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 295378.46,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.bond_value.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "bond_value"
+      },
+      "computation": {
+        "inputs": {
+          "coupon_rate_pct": 9.0,
+          "coupons_per_year": 2,
+          "currency": "DOP",
+          "face_value": 1000000.0,
+          "price": null,
+          "sources": {},
+          "symbol": null,
+          "years": 3.0,
+          "yield_to_maturity_pct": 10.0
+        },
+        "kind": "bond_value"
+      }
+    },
+    "debt_to_income": {
+      "card": {
+        "arguments": {
+          "currency": "MXN",
+          "monthly_debt_payments": 1500.0,
+          "monthly_income": 5000.0,
+          "ratio_pct": null,
+          "sources": {}
+        },
+        "artifact_id": "artifact-debt_to_income",
+        "artifact_state": "active",
+        "call_id": "call-debt_to_income",
+        "card_type": "debt_to_income",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "income_after_debt": 3500.0,
+            "monthly_debt_payments": 1500.0,
+            "monthly_income": 5000.0,
+            "ratio_pct": 30.0,
+            "solved_field": "ratio_pct",
+            "solved_value": 30.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.ratio_pct"
+            },
+            "name": "ratio_pct",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "chat.tools.units.percent"
+            },
+            "value": 30.0,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.monthly_debt_payments"
+              },
+              "name": "monthly_debt_payments",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "MXN"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 1500.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.monthly_income"
+              },
+              "name": "monthly_income",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "MXN"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 5000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.ratio_pct"
+              },
+              "name": "ratio_pct",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.income_after_debt"
+              },
+              "name": "income_after_debt",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "MXN"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 3500.0,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.debt_to_income.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "debt_to_income"
+      },
+      "computation": {
+        "inputs": {
+          "currency": "MXN",
+          "monthly_debt_payments": 1500.0,
+          "monthly_income": 5000.0,
+          "ratio_pct": null,
+          "sources": {}
+        },
+        "kind": "debt_to_income"
+      }
+    },
+    "discounted_cash_flow": {
+      "card": {
+        "arguments": {
+          "cash_flow": 100.0,
+          "currency": "USD",
+          "discount_rate_pct": 10.0,
+          "growth_rate_pct": 5.0,
+          "sources": {},
+          "symbol": "AAPL",
+          "terminal_growth_rate_pct": 2.0,
+          "value": null,
+          "years": 5
+        },
+        "artifact_id": "artifact-discounted_cash_flow",
+        "artifact_state": "active",
+        "call_id": "call-discounted_cash_flow",
+        "card_type": "discounted_cash_flow",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "cash_flow_at_horizon": 127.62815625000003,
+            "growth_rate_pct": 5.0,
+            "solved_field": "value",
+            "solved_value": 1446.2118899836075,
+            "value": 1446.2118899836075
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.value"
+            },
+            "name": "value",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {
+                "code": "USD"
+              },
+              "locale_key": "tools.calc.units.currency"
+            },
+            "value": 1446.21,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "AAPL",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.cash_flow"
+              },
+              "name": "cash_flow",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 100.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.growth_rate_pct"
+              },
+              "name": "growth_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 5.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.discount_rate_pct"
+              },
+              "name": "discount_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 10.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.years"
+              },
+              "name": "years",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.years"
+              },
+              "unknown": false,
+              "value": 5,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.terminal_growth_rate_pct"
+              },
+              "name": "terminal_growth_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 2.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.value"
+              },
+              "name": "value",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.cash_flow_at_horizon"
+              },
+              "name": "cash_flow_at_horizon",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 127.63,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.discounted_cash_flow.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "discounted_cash_flow"
+      },
+      "computation": {
+        "inputs": {
+          "cash_flow": 100.0,
+          "currency": "USD",
+          "discount_rate_pct": 10.0,
+          "growth_rate_pct": 5.0,
+          "sources": {},
+          "symbol": "AAPL",
+          "terminal_growth_rate_pct": 2.0,
+          "value": null,
+          "years": 5
+        },
+        "kind": "discounted_cash_flow",
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    },
+    "effective_rate": {
+      "card": {
+        "arguments": {
+          "amount": 10000.0,
+          "compounding_per_year": 12,
+          "currency": "USD",
+          "fees": 300.0,
+          "nominal_rate_pct": 10.0,
+          "periods": 36,
+          "sources": {}
+        },
+        "artifact_id": "artifact-effective_rate",
+        "artifact_state": "active",
+        "call_id": "call-effective_rate",
+        "card_type": "effective_rate",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "effective_rate_pct": 12.801244021033975,
+            "includes_fees": true,
+            "payment": 322.6718719383758,
+            "total_cost": 1916.1873897815276,
+            "total_paid": 11916.187389781528
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.effective_rate_pct"
+            },
+            "name": "effective_rate_pct",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "chat.tools.units.percent"
+            },
+            "value": 12.8,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.nominal_rate_pct"
+              },
+              "name": "nominal_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 10.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.compounding_per_year"
+              },
+              "name": "compounding_per_year",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": 12,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.amount"
+              },
+              "name": "amount",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 10000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.fees"
+              },
+              "name": "fees",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 300.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods"
+              },
+              "name": "periods",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.months"
+              },
+              "unknown": false,
+              "value": 36,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [
+            {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.notes.includes_fees"
+            }
+          ],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.payment"
+              },
+              "name": "payment",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 322.67,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.total_paid"
+              },
+              "name": "total_paid",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 11916.19,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.total_cost"
+              },
+              "name": "total_cost",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 1916.19,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.effective_rate.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "effective_rate"
+      },
+      "computation": {
+        "inputs": {
+          "amount": 10000.0,
+          "compounding_per_year": 12,
+          "currency": "USD",
+          "fees": 300.0,
+          "nominal_rate_pct": 10.0,
+          "periods": 36,
+          "sources": {}
+        },
+        "kind": "effective_rate"
+      }
+    },
+    "expense_ratio": {
+      "card": {
+        "arguments": {
+          "annual_fee": null,
+          "assets": 10000.0,
+          "currency": "USD",
+          "growth_rate_pct": 7.0,
+          "ratio_pct": 0.5,
+          "sources": {},
+          "symbol": null,
+          "years": 30
+        },
+        "artifact_id": "artifact-expense_ratio",
+        "artifact_state": "active",
+        "call_id": "call-expense_ratio",
+        "card_type": "expense_ratio",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "annual_fee": 50.0,
+            "cost_over_years": 10627.911391326837,
+            "ending_with_fee": 65494.639035293585,
+            "ending_without_fee": 76122.55042662042,
+            "ratio_pct": 0.5,
+            "solved_field": "annual_fee",
+            "solved_value": 50.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.annual_fee"
+            },
+            "name": "annual_fee",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {
+                "code": "USD"
+              },
+              "locale_key": "tools.calc.units.currency"
+            },
+            "value": 50.0,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.assets"
+              },
+              "name": "assets",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 10000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.annual_fee"
+              },
+              "name": "annual_fee",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.ratio_pct"
+              },
+              "name": "ratio_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 0.5,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.years"
+              },
+              "name": "years",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.years"
+              },
+              "unknown": false,
+              "value": 30,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.growth_rate_pct"
+              },
+              "name": "growth_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 7.0,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.cost_over_years"
+              },
+              "name": "cost_over_years",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 10627.91,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.ending_with_fee"
+              },
+              "name": "ending_with_fee",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 65494.64,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.ending_without_fee"
+              },
+              "name": "ending_without_fee",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 76122.55,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.expense_ratio.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "expense_ratio"
+      },
+      "computation": {
+        "inputs": {
+          "annual_fee": null,
+          "assets": 10000.0,
+          "currency": "USD",
+          "growth_rate_pct": 7.0,
+          "ratio_pct": 0.5,
+          "sources": {},
+          "symbol": null,
+          "years": 30
+        },
+        "kind": "expense_ratio"
+      }
+    },
+    "growth_projection": {
+      "card": {
+        "arguments": {
+          "annual_rate_pct": 1.0,
+          "contribution": 0.0,
+          "currency": "USD",
+          "end_value": null,
+          "inflation_rate_pct": 4.0,
+          "periods": 12,
+          "periods_per_year": 12,
+          "sources": {},
+          "start_value": 10000.0
+        },
+        "artifact_id": "artifact-growth_projection",
+        "artifact_state": "active",
+        "call_id": "call-growth_projection",
+        "card_type": "growth_projection",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "annual_rate_pct": 1.0,
+            "end_value": 10100.45960887181,
+            "growth": 100.4596088718099,
+            "periods": 12.0,
+            "real_annual_rate_pct": -2.8846153846153855,
+            "real_end_value": 9711.98039314597,
+            "solved_field": "end_value",
+            "solved_value": 10100.45960887181,
+            "start_value": 10000.0,
+            "total_contributed": 10000.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.end_value"
+            },
+            "name": "end_value",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {
+                "code": "USD"
+              },
+              "locale_key": "tools.calc.units.currency"
+            },
+            "value": 10100.46,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.start_value"
+              },
+              "name": "start_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 10000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.contribution"
+              },
+              "name": "contribution",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 0.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.end_value"
+              },
+              "name": "end_value",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.annual_rate_pct"
+              },
+              "name": "annual_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 1.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods"
+              },
+              "name": "periods",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.months"
+              },
+              "unknown": false,
+              "value": 12,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods_per_year"
+              },
+              "name": "periods_per_year",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": 12,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.inflation_rate_pct"
+              },
+              "name": "inflation_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 4.0,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.total_contributed"
+              },
+              "name": "total_contributed",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 10000.0,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.growth"
+              },
+              "name": "growth",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 100.46,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.real_end_value"
+              },
+              "name": "real_end_value",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 9711.98,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.real_annual_rate_pct"
+              },
+              "name": "real_annual_rate_pct",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": -2.88,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.growth_projection.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "growth_projection"
+      },
+      "computation": {
+        "inputs": {
+          "annual_rate_pct": 1.0,
+          "contribution": 0.0,
+          "currency": "USD",
+          "end_value": null,
+          "inflation_rate_pct": 4.0,
+          "periods": 12,
+          "periods_per_year": 12,
+          "sources": {},
+          "start_value": 10000.0
+        },
+        "kind": "growth_projection"
+      }
+    },
+    "growth_projection_unreachable": {
+      "card": {
+        "arguments": {
+          "annual_rate_pct": 0.0,
+          "contribution": 0.0,
+          "currency": "USD",
+          "end_value": 2000.0,
+          "inflation_rate_pct": 0.0,
+          "periods": null,
+          "periods_per_year": 12,
+          "sources": {},
+          "start_value": 1000.0
+        },
+        "artifact_id": "artifact-growth_projection",
+        "artifact_state": "active",
+        "call_id": "call-growth_projection",
+        "card_type": "growth_projection",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": {
+            "code": "rate_never_reaches_target",
+            "fields": [
+              "annual_rate_pct"
+            ],
+            "repair": null
+          },
+          "result": null,
+          "status": "invalid"
+        },
+        "presentation": {
+          "answer": null,
+          "inputs": [
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.start_value"
+              },
+              "name": "start_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 1000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.contribution"
+              },
+              "name": "contribution",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 0.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.end_value"
+              },
+              "name": "end_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 2000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.annual_rate_pct"
+              },
+              "name": "annual_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 0.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods"
+              },
+              "name": "periods",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.months"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods_per_year"
+              },
+              "name": "periods_per_year",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": 12,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.inflation_rate_pct"
+              },
+              "name": "inflation_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 0.0,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.growth_projection.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "growth_projection"
+      },
+      "computation": {
+        "inputs": {
+          "annual_rate_pct": 0.0,
+          "contribution": 0.0,
+          "currency": "USD",
+          "end_value": 2000.0,
+          "inflation_rate_pct": 0.0,
+          "periods": null,
+          "periods_per_year": 12,
+          "sources": {},
+          "start_value": 1000.0
+        },
+        "kind": "growth_projection"
+      }
+    },
+    "income_yield": {
+      "card": {
+        "arguments": {
+          "annual_income": 4.0,
+          "currency": "USD",
+          "price": 100.0,
+          "sources": {},
+          "symbol": null,
+          "yield_pct": null
+        },
+        "artifact_id": "artifact-income_yield",
+        "artifact_state": "active",
+        "call_id": "call-income_yield",
+        "card_type": "income_yield",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "annual_income": 4.0,
+            "monthly_income": 0.3333333333333333,
+            "price": 100.0,
+            "solved_field": "yield_pct",
+            "solved_value": 4.0,
+            "yield_pct": 4.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.yield_pct"
+            },
+            "name": "yield_pct",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "chat.tools.units.percent"
+            },
+            "value": 4.0,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.annual_income"
+              },
+              "name": "annual_income",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 4.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.price"
+              },
+              "name": "price",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 100.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.yield_pct"
+              },
+              "name": "yield_pct",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.monthly_income"
+              },
+              "name": "monthly_income",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 0.33,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.income_yield.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "income_yield"
+      },
+      "computation": {
+        "inputs": {
+          "annual_income": 4.0,
+          "currency": "USD",
+          "price": 100.0,
+          "sources": {},
+          "symbol": null,
+          "yield_pct": null
+        },
+        "kind": "income_yield"
+      }
+    },
+    "price_multiple": {
+      "card": {
+        "arguments": {
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 6.0,
+          "price": 150.0,
+          "sources": {
+            "price": {
+              "date": "2026-09-10",
+              "kind": "page",
+              "title": "Quote",
+              "url": "https://example.com/aapl"
+            }
+          },
+          "symbol": "AAPL"
+        },
+        "artifact_id": "artifact-price_multiple",
+        "artifact_state": "active",
+        "call_id": "call-price_multiple",
+        "card_type": "price_multiple",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "earnings_yield_pct": 4.0,
+            "multiple": 25.0,
+            "per_share": 6.0,
+            "price": 150.0,
+            "solved_field": "multiple",
+            "solved_value": 25.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.multiple"
+            },
+            "name": "multiple",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.units.multiple"
+            },
+            "value": 25.0,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "AAPL",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.price"
+              },
+              "name": "price",
+              "source": {
+                "date": "2026-09-10",
+                "kind": "page",
+                "title": "Quote",
+                "url": "https://example.com/aapl"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 150.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.per_share"
+              },
+              "name": "per_share",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 6.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple"
+              },
+              "name": "multiple",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.earnings_yield_pct"
+              },
+              "name": "earnings_yield_pct",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 4.0,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.price_multiple.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "price_multiple"
+      },
+      "computation": {
+        "inputs": {
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 6.0,
+          "price": 150.0,
+          "sources": {
+            "price": {
+              "date": "2026-09-10",
+              "kind": "page",
+              "title": "Quote",
+              "url": "https://example.com/aapl"
+            }
+          },
+          "symbol": "AAPL"
+        },
+        "kind": "price_multiple",
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    },
+    "price_multiple_division_by_zero": {
+      "card": {
+        "arguments": {
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 0.0,
+          "price": 150.0,
+          "sources": {},
+          "symbol": "AAPL"
+        },
+        "artifact_id": "artifact-price_multiple",
+        "artifact_state": "active",
+        "call_id": "call-price_multiple",
+        "card_type": "price_multiple",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": {
+            "code": "division_by_zero",
+            "fields": [
+              "per_share"
+            ],
+            "repair": null
+          },
+          "result": null,
+          "status": "invalid"
+        },
+        "presentation": {
+          "answer": null,
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "AAPL",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.price"
+              },
+              "name": "price",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 150.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.per_share"
+              },
+              "name": "per_share",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 0.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple"
+              },
+              "name": "multiple",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.price_multiple.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "price_multiple"
+      },
+      "computation": {
+        "inputs": {
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 0.0,
+          "price": 150.0,
+          "sources": {},
+          "symbol": "AAPL"
+        },
+        "kind": "price_multiple",
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    },
+    "ranked_comparison": {
+      "card": {
+        "arguments": {
+          "currency": "DOP",
+          "items": [
+            {
+              "label": "Card A",
+              "symbol": null,
+              "value": 24.9
+            },
+            {
+              "label": "Card B",
+              "symbol": null,
+              "value": 18.5
+            },
+            {
+              "label": "Card C",
+              "symbol": null,
+              "value": 18.5
+            }
+          ],
+          "key_kind": "percent",
+          "key_label": "Annual rate",
+          "prefer": "lower",
+          "sources": {}
+        },
+        "artifact_id": "artifact-ranked_comparison",
+        "artifact_state": "active",
+        "call_id": "call-ranked_comparison",
+        "card_type": "ranked_comparison",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "key_label": "Annual rate",
+            "prefer": "lower",
+            "rows": [
+              {
+                "gap_to_best": 0.0,
+                "label": "Card B",
+                "rank": 1,
+                "symbol": null,
+                "value": 18.5
+              },
+              {
+                "gap_to_best": 0.0,
+                "label": "Card C",
+                "rank": 1,
+                "symbol": null,
+                "value": 18.5
+              },
+              {
+                "gap_to_best": 6.399999999999999,
+                "label": "Card A",
+                "rank": 3,
+                "symbol": null,
+                "value": 24.9
+              }
+            ]
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {
+                "label": "Card B",
+                "rank": 1
+              },
+              "locale_key": "tools.calc.ranked_comparison.row"
+            },
+            "name": "rank_0",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "chat.tools.units.percent"
+            },
+            "value": 18.5,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.key_label"
+              },
+              "name": "key_label",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "Annual rate",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.prefer"
+              },
+              "name": "prefer",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "lower",
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [
+            {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.notes.ranked_not_recommended"
+            }
+          ],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {
+                  "label": "Card C",
+                  "rank": 1
+                },
+                "locale_key": "tools.calc.ranked_comparison.row"
+              },
+              "name": "rank_1",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 18.5,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "label": "Card A",
+                  "rank": 3
+                },
+                "locale_key": "tools.calc.ranked_comparison.row"
+              },
+              "name": "rank_2",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 24.9,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {
+              "key": "Annual rate"
+            },
+            "locale_key": "tools.calc.ranked_comparison.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "ranked_comparison"
+      },
+      "computation": {
+        "inputs": {
+          "currency": "DOP",
+          "items": [
+            {
+              "label": "Card A",
+              "symbol": null,
+              "value": 24.9
+            },
+            {
+              "label": "Card B",
+              "symbol": null,
+              "value": 18.5
+            },
+            {
+              "label": "Card C",
+              "symbol": null,
+              "value": 18.5
+            }
+          ],
+          "key_kind": "percent",
+          "key_label": "Annual rate",
+          "prefer": "lower",
+          "sources": {}
+        },
+        "kind": "ranked_comparison"
+      }
+    },
+    "time_value": {
+      "card": {
+        "arguments": {
+          "annual_rate_pct": 6.0,
+          "currency": "USD",
+          "direction": "borrow",
+          "future_value": 0.0,
+          "payment": null,
+          "payment_timing": "end",
+          "periods": 360,
+          "periods_per_year": 12,
+          "present_value": 200000.0,
+          "sources": {
+            "annual_rate_pct": {
+              "date": "2026-09-01",
+              "kind": "page",
+              "title": "Rate sheet",
+              "url": "https://example.com/rates"
+            }
+          },
+          "start_date": "2026-09-11"
+        },
+        "artifact_id": "artifact-time_value",
+        "artifact_state": "active",
+        "call_id": "call-time_value",
+        "card_type": "time_value",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "annual_rate_pct": 6.0,
+            "balances": [
+              199800.8989496945,
+              199600.80239413748,
+              199399.70535580267,
+              199197.60283227617,
+              198994.48979613205,
+              198790.36119480722,
+              198585.21195047576,
+              198379.03695992264,
+              198171.83109441676,
+              197963.58919958334,
+              197754.30609527577,
+              197543.97657544664,
+              197332.59540801836,
+              197120.15733475296,
+              196906.65707112124,
+              196692.08930617134,
+              196476.4487023967,
+              196259.7298956032,
+              196041.9274947757,
+              195823.0360819441,
+              195603.0502120483,
+              195381.96441280306,
+              195159.77318456158,
+              194936.4710001789,
+              194712.0523048743,
+              194486.51151609316,
+              194259.84302336813,
+              194032.04118817946,
+              193803.10034381485,
+              193573.01479522843,
+              193341.77881889907,
+              193109.38666268805,
+              192875.832545696,
+              192641.11065811897,
+              192405.21516110408,
+              192168.14018660408,
+              191929.8798372316,
+              191690.42818611226,
+              191449.77927673733,
+              191207.9271228155,
+              190964.8657081241,
+              190720.58898635922,
+              190475.09088098552,
+              190228.36528508493,
+              189980.40606120485,
+              189731.20704120537,
+              189480.7620261059,
+              189229.0647859309,
+              188976.10905955508,
+              188721.88855454736,
+              188466.3969470146,
+              188209.62788144418,
+              187951.5749705459,
+              187692.2317950931,
+              187431.59190376307,
+              187169.64881297637,
+              186906.39600673577,
+              186641.82693646394,
+              186375.93502084076,
+              186108.71364563945,
+              185840.15616356215,
+              185570.25589407445,
+              185299.00612323932,
+              185026.40010355003,
+              184752.43105376227,
+              184477.09215872557,
+              184200.3765692137,
+              183922.27740175425,
+              183642.78773845753,
+              183361.90062684432,
+              183079.60907967304,
+              182795.9060747659,
+              182510.78455483422,
+              182224.2374273029,
+              181936.2575641339,
+              181646.8378016491,
+              181355.97094035184,
+              181063.6497447481,
+              180769.86694316636,
+              180474.6152275767,
+              180177.88725340908,
+              179879.67563937063,
+              179579.97296726197,
+              179278.77178179278,
+              178976.06459039624,
+              178671.8438630427,
+              178366.1020320524,
+              178058.83149190719,
+              177750.02459906123,
+              177439.67367175105,
+              177127.7709898043,
+              176814.3087944478,
+              176499.27928811454,
+              176182.67463424962,
+              175864.48695711535,
+              175544.70834159543,
+              175223.3308329979,
+              174900.3464368574,
+              174575.74711873618,
+              174249.52480402438,
+              173921.671377739,
+              173592.1786843222,
+              173261.0385274383,
+              172928.24266977,
+              172593.78283281336,
+              172257.65069667192,
+              171919.83789984978,
+              171580.33603904353,
+              171239.13666893324,
+              170896.2313019724,
+              170551.61140817677,
+              170205.26841491216,
+              169857.19370668122,
+              169507.37862490912,
+              169155.81446772817,
+              168802.4924897613,
+              168447.4039019046,
+              168090.5398711086,
+              167731.89152015865,
+              167371.44992745394,
+              167009.20612678572,
+              166645.15110711416,
+              166279.27581234422,
+              165911.57114110043,
+              165542.02794650043,
+              165170.63703592742,
+              164797.38917080156,
+              164422.27506635006,
+              164045.28539137632,
+              163666.4107680277,
+              163285.64177156234,
+              162902.96893011464,
+              162518.38272445972,
+              162131.87358777653,
+              161743.4319054099,
+              161353.04801463147,
+              160960.7122043991,
+              160566.4147151156,
+              160170.14573838568,
+              159771.8954167721,
+              159371.65384355048,
+              158969.41106246272,
+              158565.15706746952,
+              158158.88180250136,
+              157750.57516120837,
+              157340.2269867089,
+              156927.82707133694,
+              156513.3651563881,
+              156096.83093186456,
+              155678.21403621839,
+              155257.50405609398,
+              154834.69052606894,
+              154409.7629283938,
+              153982.71069273027,
+              153553.5231958884,
+              153122.18976156236,
+              152688.69966006468,
+              152253.0421080595,
+              151815.2062682943,
+              151375.1812493303,
+              150932.95610527144,
+              150488.5198354923,
+              150041.86138436425,
+              149592.96964098056,
+              149141.83343887996,
+              148688.44155576886,
+              148232.7827132422,
+              147774.8455765029,
+              147314.61875407991,
+              146852.0907975448,
+              146387.25020122703,
+              145920.08540192767,
+              145450.5847786318,
+              144978.73665221946,
+              144504.52928517506,
+              144027.95088129543,
+              143548.9895853964,
+              143067.63348301788,
+              142583.87060012747,
+              142097.6889028226,
+              141609.07629703122,
+              141118.02062821088,
+              140624.50968104645,
+              140128.53117914617,
+              139630.0727847364,
+              139129.1220983546,
+              138625.66665854087,
+              138119.69394152806,
+              137611.1913609302,
+              137100.14626742937,
+              136586.54594846102,
+              136070.37762789783,
+              135551.62846573183,
+              135030.28555775498,
+              134506.33593523825,
+              133979.76656460896,
+              133450.5643471265,
+              132918.71611855662,
+              132384.2086488439,
+              131847.0286417826,
+              131307.16273468602,
+              130764.59749805393,
+              130219.31943523868,
+              129671.31498210935,
+              129120.57050671439,
+              128567.07230894244,
+              128010.80662018164,
+              127451.75960297704,
+              126889.9173506864,
+              126325.26588713432,
+              125757.79116626448,
+              125187.47907179028,
+              124614.31541684372,
+              124038.28594362242,
+              123459.37632303502,
+              122877.57215434467,
+              122292.85896481088,
+              121705.22220932941,
+              121114.64727007055,
+              120521.11945611538,
+              119924.62400309044,
+              119325.14607280039,
+              118722.67075285887,
+              118117.18305631765,
+              117508.66792129372,
+              116897.11021059466,
+              116282.49471134212,
+              115664.80613459332,
+              115044.02911496078,
+              114420.14821023007,
+              113793.1479009757,
+              113163.01259017507,
+              112529.72660282043,
+              111893.27418552902,
+              111253.63950615116,
+              110610.80665337639,
+              109964.75963633775,
+              109315.48238421393,
+              108662.95874582948,
+              108007.17248925312,
+              107348.10730139387,
+              106685.74678759533,
+              106020.0744712278,
+              105351.07379327843,
+              104678.7281119393,
+              104003.02070219348,
+              103323.93475539894,
+              102641.45337887041,
+              101955.55959545926,
+              101266.23634313104,
+              100573.46647454117,
+              99877.23275660837,
+              99177.5178700859,
+              98474.30440913081,
+              97767.57488087095,
+              97057.31170496979,
+              96343.49721318913,
+              95626.11364894955,
+              94905.14316688878,
+              94180.56783241771,
+              93452.36962127428,
+              92720.53041907513,
+              91985.032020865,
+              91245.8561306638,
+              90502.98436101161,
+              89756.39823251116,
+              89006.0791733682,
+              88252.00851892952,
+              87494.16751121865,
+              86732.53729846922,
+              85967.09893465605,
+              85197.83337902382,
+              84424.72149561343,
+              83647.74405278597,
+              82866.8817227444,
+              82082.1150810526,
+              81293.42460615234,
+              80500.79067887759,
+              79704.19358196646,
+              78903.61349957078,
+              78099.03051676312,
+              77290.42461904141,
+              76477.7756918311,
+              75661.06351998475,
+              74840.26778727915,
+              74015.36807591004,
+              73186.34386598408,
+              72353.17453500848,
+              71515.839357378,
+              70674.31750385938,
+              69828.58804107316,
+              68978.62993097301,
+              68124.42203032236,
+              67265.94309016845,
+              66403.17175531379,
+              65536.08656378483,
+              64664.665946298235,
+              63788.888225724215,
+              62908.731616547324,
+              62024.174224324546,
+              61135.194045140655,
+              60241.768965060844,
+              59343.876759580635,
+              58441.49509307303,
+              57534.60151823288,
+              56623.173475518524,
+              55707.1882925906,
+              54786.623183748045,
+              53861.45524936127,
+              52931.661475302564,
+              51997.21873237356,
+              51058.10377572991,
+              50114.293244303044,
+              49165.76366021905,
+              48212.49142821463,
+              47254.452835050186,
+              46291.62404891992,
+              45323.981118859,
+              44351.49997414778,
+              43374.15642371301,
+              42391.92615552606,
+              41404.784735998175,
+              40412.70760937265,
+              39415.670097114,
+              38413.64739729406,
+              37406.61458397502,
+              36394.54660658938,
+              35377.41828931681,
+              34355.20433045788,
+              33327.87930180465,
+              32295.41764800816,
+              31257.793685942685,
+              30214.981604066885,
+              29166.955461781705,
+              28113.689188785098,
+              27055.15658442351,
+              25991.331317040112,
+              24922.186923319798,
+              23847.69680763088,
+              22767.83424136352,
+              21682.572362264822,
+              20591.88417377063,
+              19495.74254433397,
+              18394.120206750125,
+              17286.98975747836,
+              16174.32365596024,
+              15056.094223934528,
+              13932.273644748688,
+              12802.833962666919,
+              11667.74708217474,
+              10526.9847672801,
+              9380.518640810988,
+              8228.32018370953,
+              7070.360734322562,
+              5906.611487688661,
+              4737.043494821591,
+              3561.6276619901846,
+              2380.334749994622,
+              1193.1353734390816,
+              7.6329342846293e-10
+            ],
+            "future_value": 0.0,
+            "notes": [],
+            "payment": 1199.1010503055138,
+            "periods": 360.0,
+            "present_value": 200000.0,
+            "solved_field": "payment",
+            "solved_value": 1199.1010503055138,
+            "total_interest": 231676.37810998497,
+            "total_payments": 431676.378109985
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.payment"
+            },
+            "name": "payment",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {
+                "code": "USD"
+              },
+              "locale_key": "tools.calc.units.currency"
+            },
+            "value": 1199.1,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.direction"
+              },
+              "name": "direction",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "borrow",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.present_value"
+              },
+              "name": "present_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 200000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.payment"
+              },
+              "name": "payment",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.future_value"
+              },
+              "name": "future_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 0.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.annual_rate_pct"
+              },
+              "name": "annual_rate_pct",
+              "source": {
+                "date": "2026-09-01",
+                "kind": "page",
+                "title": "Rate sheet",
+                "url": "https://example.com/rates"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 6.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods"
+              },
+              "name": "periods",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.months"
+              },
+              "unknown": false,
+              "value": 360,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods_per_year"
+              },
+              "name": "periods_per_year",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": 12,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.payment_timing"
+              },
+              "name": "payment_timing",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "end",
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.total_payments"
+              },
+              "name": "total_payments",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 431676.38,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.total_interest"
+              },
+              "name": "total_interest",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 231676.38,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.future_value"
+              },
+              "name": "future_value",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 0.0,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.time_value.title_borrow"
+          },
+          "visual": {
+            "base_value": 200000.0,
+            "currency": "USD",
+            "kind": "value_path",
+            "series": [
+              {
+                "time": "2026-10-11",
+                "value": 199800.8989496945
+              },
+              {
+                "time": "2026-11-11",
+                "value": 199600.80239413748
+              },
+              {
+                "time": "2026-12-11",
+                "value": 199399.70535580267
+              },
+              {
+                "time": "2027-01-11",
+                "value": 199197.60283227617
+              },
+              {
+                "time": "2027-02-11",
+                "value": 198994.48979613205
+              },
+              {
+                "time": "2027-03-11",
+                "value": 198790.36119480722
+              },
+              {
+                "time": "2027-04-11",
+                "value": 198585.21195047576
+              },
+              {
+                "time": "2027-05-11",
+                "value": 198379.03695992264
+              },
+              {
+                "time": "2027-06-11",
+                "value": 198171.83109441676
+              },
+              {
+                "time": "2027-07-11",
+                "value": 197963.58919958334
+              },
+              {
+                "time": "2027-08-11",
+                "value": 197754.30609527577
+              },
+              {
+                "time": "2027-09-11",
+                "value": 197543.97657544664
+              },
+              {
+                "time": "2027-10-11",
+                "value": 197332.59540801836
+              },
+              {
+                "time": "2027-11-11",
+                "value": 197120.15733475296
+              },
+              {
+                "time": "2027-12-11",
+                "value": 196906.65707112124
+              },
+              {
+                "time": "2028-01-11",
+                "value": 196692.08930617134
+              },
+              {
+                "time": "2028-02-11",
+                "value": 196476.4487023967
+              },
+              {
+                "time": "2028-03-11",
+                "value": 196259.7298956032
+              },
+              {
+                "time": "2028-04-11",
+                "value": 196041.9274947757
+              },
+              {
+                "time": "2028-05-11",
+                "value": 195823.0360819441
+              },
+              {
+                "time": "2028-06-11",
+                "value": 195603.0502120483
+              },
+              {
+                "time": "2028-07-11",
+                "value": 195381.96441280306
+              },
+              {
+                "time": "2028-08-11",
+                "value": 195159.77318456158
+              },
+              {
+                "time": "2028-09-11",
+                "value": 194936.4710001789
+              },
+              {
+                "time": "2028-10-11",
+                "value": 194712.0523048743
+              },
+              {
+                "time": "2028-11-11",
+                "value": 194486.51151609316
+              },
+              {
+                "time": "2028-12-11",
+                "value": 194259.84302336813
+              },
+              {
+                "time": "2029-01-11",
+                "value": 194032.04118817946
+              },
+              {
+                "time": "2029-02-11",
+                "value": 193803.10034381485
+              },
+              {
+                "time": "2029-03-11",
+                "value": 193573.01479522843
+              },
+              {
+                "time": "2029-04-11",
+                "value": 193341.77881889907
+              },
+              {
+                "time": "2029-05-11",
+                "value": 193109.38666268805
+              },
+              {
+                "time": "2029-06-11",
+                "value": 192875.832545696
+              },
+              {
+                "time": "2029-07-11",
+                "value": 192641.11065811897
+              },
+              {
+                "time": "2029-08-11",
+                "value": 192405.21516110408
+              },
+              {
+                "time": "2029-09-11",
+                "value": 192168.14018660408
+              },
+              {
+                "time": "2029-10-11",
+                "value": 191929.8798372316
+              },
+              {
+                "time": "2029-11-11",
+                "value": 191690.42818611226
+              },
+              {
+                "time": "2029-12-11",
+                "value": 191449.77927673733
+              },
+              {
+                "time": "2030-01-11",
+                "value": 191207.9271228155
+              },
+              {
+                "time": "2030-02-11",
+                "value": 190964.8657081241
+              },
+              {
+                "time": "2030-03-11",
+                "value": 190720.58898635922
+              },
+              {
+                "time": "2030-04-11",
+                "value": 190475.09088098552
+              },
+              {
+                "time": "2030-05-11",
+                "value": 190228.36528508493
+              },
+              {
+                "time": "2030-06-11",
+                "value": 189980.40606120485
+              },
+              {
+                "time": "2030-07-11",
+                "value": 189731.20704120537
+              },
+              {
+                "time": "2030-08-11",
+                "value": 189480.7620261059
+              },
+              {
+                "time": "2030-09-11",
+                "value": 189229.0647859309
+              },
+              {
+                "time": "2030-10-11",
+                "value": 188976.10905955508
+              },
+              {
+                "time": "2030-11-11",
+                "value": 188721.88855454736
+              },
+              {
+                "time": "2030-12-11",
+                "value": 188466.3969470146
+              },
+              {
+                "time": "2031-01-11",
+                "value": 188209.62788144418
+              },
+              {
+                "time": "2031-02-11",
+                "value": 187951.5749705459
+              },
+              {
+                "time": "2031-03-11",
+                "value": 187692.2317950931
+              },
+              {
+                "time": "2031-04-11",
+                "value": 187431.59190376307
+              },
+              {
+                "time": "2031-05-11",
+                "value": 187169.64881297637
+              },
+              {
+                "time": "2031-06-11",
+                "value": 186906.39600673577
+              },
+              {
+                "time": "2031-07-11",
+                "value": 186641.82693646394
+              },
+              {
+                "time": "2031-08-11",
+                "value": 186375.93502084076
+              },
+              {
+                "time": "2031-09-11",
+                "value": 186108.71364563945
+              },
+              {
+                "time": "2031-10-11",
+                "value": 185840.15616356215
+              },
+              {
+                "time": "2031-11-11",
+                "value": 185570.25589407445
+              },
+              {
+                "time": "2031-12-11",
+                "value": 185299.00612323932
+              },
+              {
+                "time": "2032-01-11",
+                "value": 185026.40010355003
+              },
+              {
+                "time": "2032-02-11",
+                "value": 184752.43105376227
+              },
+              {
+                "time": "2032-03-11",
+                "value": 184477.09215872557
+              },
+              {
+                "time": "2032-04-11",
+                "value": 184200.3765692137
+              },
+              {
+                "time": "2032-05-11",
+                "value": 183922.27740175425
+              },
+              {
+                "time": "2032-06-11",
+                "value": 183642.78773845753
+              },
+              {
+                "time": "2032-07-11",
+                "value": 183361.90062684432
+              },
+              {
+                "time": "2032-08-11",
+                "value": 183079.60907967304
+              },
+              {
+                "time": "2032-09-11",
+                "value": 182795.9060747659
+              },
+              {
+                "time": "2032-10-11",
+                "value": 182510.78455483422
+              },
+              {
+                "time": "2032-11-11",
+                "value": 182224.2374273029
+              },
+              {
+                "time": "2032-12-11",
+                "value": 181936.2575641339
+              },
+              {
+                "time": "2033-01-11",
+                "value": 181646.8378016491
+              },
+              {
+                "time": "2033-02-11",
+                "value": 181355.97094035184
+              },
+              {
+                "time": "2033-03-11",
+                "value": 181063.6497447481
+              },
+              {
+                "time": "2033-04-11",
+                "value": 180769.86694316636
+              },
+              {
+                "time": "2033-05-11",
+                "value": 180474.6152275767
+              },
+              {
+                "time": "2033-06-11",
+                "value": 180177.88725340908
+              },
+              {
+                "time": "2033-07-11",
+                "value": 179879.67563937063
+              },
+              {
+                "time": "2033-08-11",
+                "value": 179579.97296726197
+              },
+              {
+                "time": "2033-09-11",
+                "value": 179278.77178179278
+              },
+              {
+                "time": "2033-10-11",
+                "value": 178976.06459039624
+              },
+              {
+                "time": "2033-11-11",
+                "value": 178671.8438630427
+              },
+              {
+                "time": "2033-12-11",
+                "value": 178366.1020320524
+              },
+              {
+                "time": "2034-01-11",
+                "value": 178058.83149190719
+              },
+              {
+                "time": "2034-02-11",
+                "value": 177750.02459906123
+              },
+              {
+                "time": "2034-03-11",
+                "value": 177439.67367175105
+              },
+              {
+                "time": "2034-04-11",
+                "value": 177127.7709898043
+              },
+              {
+                "time": "2034-05-11",
+                "value": 176814.3087944478
+              },
+              {
+                "time": "2034-06-11",
+                "value": 176499.27928811454
+              },
+              {
+                "time": "2034-07-11",
+                "value": 176182.67463424962
+              },
+              {
+                "time": "2034-08-11",
+                "value": 175864.48695711535
+              },
+              {
+                "time": "2034-09-11",
+                "value": 175544.70834159543
+              },
+              {
+                "time": "2034-10-11",
+                "value": 175223.3308329979
+              },
+              {
+                "time": "2034-11-11",
+                "value": 174900.3464368574
+              },
+              {
+                "time": "2034-12-11",
+                "value": 174575.74711873618
+              },
+              {
+                "time": "2035-01-11",
+                "value": 174249.52480402438
+              },
+              {
+                "time": "2035-02-11",
+                "value": 173921.671377739
+              },
+              {
+                "time": "2035-03-11",
+                "value": 173592.1786843222
+              },
+              {
+                "time": "2035-04-11",
+                "value": 173261.0385274383
+              },
+              {
+                "time": "2035-05-11",
+                "value": 172928.24266977
+              },
+              {
+                "time": "2035-06-11",
+                "value": 172593.78283281336
+              },
+              {
+                "time": "2035-07-11",
+                "value": 172257.65069667192
+              },
+              {
+                "time": "2035-08-11",
+                "value": 171919.83789984978
+              },
+              {
+                "time": "2035-09-11",
+                "value": 171580.33603904353
+              },
+              {
+                "time": "2035-10-11",
+                "value": 171239.13666893324
+              },
+              {
+                "time": "2035-11-11",
+                "value": 170896.2313019724
+              },
+              {
+                "time": "2035-12-11",
+                "value": 170551.61140817677
+              },
+              {
+                "time": "2036-01-11",
+                "value": 170205.26841491216
+              },
+              {
+                "time": "2036-02-11",
+                "value": 169857.19370668122
+              },
+              {
+                "time": "2036-03-11",
+                "value": 169507.37862490912
+              },
+              {
+                "time": "2036-04-11",
+                "value": 169155.81446772817
+              },
+              {
+                "time": "2036-05-11",
+                "value": 168802.4924897613
+              },
+              {
+                "time": "2036-06-11",
+                "value": 168447.4039019046
+              },
+              {
+                "time": "2036-07-11",
+                "value": 168090.5398711086
+              },
+              {
+                "time": "2036-08-11",
+                "value": 167731.89152015865
+              },
+              {
+                "time": "2036-09-11",
+                "value": 167371.44992745394
+              },
+              {
+                "time": "2036-10-11",
+                "value": 167009.20612678572
+              },
+              {
+                "time": "2036-11-11",
+                "value": 166645.15110711416
+              },
+              {
+                "time": "2036-12-11",
+                "value": 166279.27581234422
+              },
+              {
+                "time": "2037-01-11",
+                "value": 165911.57114110043
+              },
+              {
+                "time": "2037-02-11",
+                "value": 165542.02794650043
+              },
+              {
+                "time": "2037-03-11",
+                "value": 165170.63703592742
+              },
+              {
+                "time": "2037-04-11",
+                "value": 164797.38917080156
+              },
+              {
+                "time": "2037-05-11",
+                "value": 164422.27506635006
+              },
+              {
+                "time": "2037-06-11",
+                "value": 164045.28539137632
+              },
+              {
+                "time": "2037-07-11",
+                "value": 163666.4107680277
+              },
+              {
+                "time": "2037-08-11",
+                "value": 163285.64177156234
+              },
+              {
+                "time": "2037-09-11",
+                "value": 162902.96893011464
+              },
+              {
+                "time": "2037-10-11",
+                "value": 162518.38272445972
+              },
+              {
+                "time": "2037-11-11",
+                "value": 162131.87358777653
+              },
+              {
+                "time": "2037-12-11",
+                "value": 161743.4319054099
+              },
+              {
+                "time": "2038-01-11",
+                "value": 161353.04801463147
+              },
+              {
+                "time": "2038-02-11",
+                "value": 160960.7122043991
+              },
+              {
+                "time": "2038-03-11",
+                "value": 160566.4147151156
+              },
+              {
+                "time": "2038-04-11",
+                "value": 160170.14573838568
+              },
+              {
+                "time": "2038-05-11",
+                "value": 159771.8954167721
+              },
+              {
+                "time": "2038-06-11",
+                "value": 159371.65384355048
+              },
+              {
+                "time": "2038-07-11",
+                "value": 158969.41106246272
+              },
+              {
+                "time": "2038-08-11",
+                "value": 158565.15706746952
+              },
+              {
+                "time": "2038-09-11",
+                "value": 158158.88180250136
+              },
+              {
+                "time": "2038-10-11",
+                "value": 157750.57516120837
+              },
+              {
+                "time": "2038-11-11",
+                "value": 157340.2269867089
+              },
+              {
+                "time": "2038-12-11",
+                "value": 156927.82707133694
+              },
+              {
+                "time": "2039-01-11",
+                "value": 156513.3651563881
+              },
+              {
+                "time": "2039-02-11",
+                "value": 156096.83093186456
+              },
+              {
+                "time": "2039-03-11",
+                "value": 155678.21403621839
+              },
+              {
+                "time": "2039-04-11",
+                "value": 155257.50405609398
+              },
+              {
+                "time": "2039-05-11",
+                "value": 154834.69052606894
+              },
+              {
+                "time": "2039-06-11",
+                "value": 154409.7629283938
+              },
+              {
+                "time": "2039-07-11",
+                "value": 153982.71069273027
+              },
+              {
+                "time": "2039-08-11",
+                "value": 153553.5231958884
+              },
+              {
+                "time": "2039-09-11",
+                "value": 153122.18976156236
+              },
+              {
+                "time": "2039-10-11",
+                "value": 152688.69966006468
+              },
+              {
+                "time": "2039-11-11",
+                "value": 152253.0421080595
+              },
+              {
+                "time": "2039-12-11",
+                "value": 151815.2062682943
+              },
+              {
+                "time": "2040-01-11",
+                "value": 151375.1812493303
+              },
+              {
+                "time": "2040-02-11",
+                "value": 150932.95610527144
+              },
+              {
+                "time": "2040-03-11",
+                "value": 150488.5198354923
+              },
+              {
+                "time": "2040-04-11",
+                "value": 150041.86138436425
+              },
+              {
+                "time": "2040-05-11",
+                "value": 149592.96964098056
+              },
+              {
+                "time": "2040-06-11",
+                "value": 149141.83343887996
+              },
+              {
+                "time": "2040-07-11",
+                "value": 148688.44155576886
+              },
+              {
+                "time": "2040-08-11",
+                "value": 148232.7827132422
+              },
+              {
+                "time": "2040-09-11",
+                "value": 147774.8455765029
+              },
+              {
+                "time": "2040-10-11",
+                "value": 147314.61875407991
+              },
+              {
+                "time": "2040-11-11",
+                "value": 146852.0907975448
+              },
+              {
+                "time": "2040-12-11",
+                "value": 146387.25020122703
+              },
+              {
+                "time": "2041-01-11",
+                "value": 145920.08540192767
+              },
+              {
+                "time": "2041-02-11",
+                "value": 145450.5847786318
+              },
+              {
+                "time": "2041-03-11",
+                "value": 144978.73665221946
+              },
+              {
+                "time": "2041-04-11",
+                "value": 144504.52928517506
+              },
+              {
+                "time": "2041-05-11",
+                "value": 144027.95088129543
+              },
+              {
+                "time": "2041-06-11",
+                "value": 143548.9895853964
+              },
+              {
+                "time": "2041-07-11",
+                "value": 143067.63348301788
+              },
+              {
+                "time": "2041-08-11",
+                "value": 142583.87060012747
+              },
+              {
+                "time": "2041-09-11",
+                "value": 142097.6889028226
+              },
+              {
+                "time": "2041-10-11",
+                "value": 141609.07629703122
+              },
+              {
+                "time": "2041-11-11",
+                "value": 141118.02062821088
+              },
+              {
+                "time": "2041-12-11",
+                "value": 140624.50968104645
+              },
+              {
+                "time": "2042-01-11",
+                "value": 140128.53117914617
+              },
+              {
+                "time": "2042-02-11",
+                "value": 139630.0727847364
+              },
+              {
+                "time": "2042-03-11",
+                "value": 139129.1220983546
+              },
+              {
+                "time": "2042-04-11",
+                "value": 138625.66665854087
+              },
+              {
+                "time": "2042-05-11",
+                "value": 138119.69394152806
+              },
+              {
+                "time": "2042-06-11",
+                "value": 137611.1913609302
+              },
+              {
+                "time": "2042-07-11",
+                "value": 137100.14626742937
+              },
+              {
+                "time": "2042-08-11",
+                "value": 136586.54594846102
+              },
+              {
+                "time": "2042-09-11",
+                "value": 136070.37762789783
+              },
+              {
+                "time": "2042-10-11",
+                "value": 135551.62846573183
+              },
+              {
+                "time": "2042-11-11",
+                "value": 135030.28555775498
+              },
+              {
+                "time": "2042-12-11",
+                "value": 134506.33593523825
+              },
+              {
+                "time": "2043-01-11",
+                "value": 133979.76656460896
+              },
+              {
+                "time": "2043-02-11",
+                "value": 133450.5643471265
+              },
+              {
+                "time": "2043-03-11",
+                "value": 132918.71611855662
+              },
+              {
+                "time": "2043-04-11",
+                "value": 132384.2086488439
+              },
+              {
+                "time": "2043-05-11",
+                "value": 131847.0286417826
+              },
+              {
+                "time": "2043-06-11",
+                "value": 131307.16273468602
+              },
+              {
+                "time": "2043-07-11",
+                "value": 130764.59749805393
+              },
+              {
+                "time": "2043-08-11",
+                "value": 130219.31943523868
+              },
+              {
+                "time": "2043-09-11",
+                "value": 129671.31498210935
+              },
+              {
+                "time": "2043-10-11",
+                "value": 129120.57050671439
+              },
+              {
+                "time": "2043-11-11",
+                "value": 128567.07230894244
+              },
+              {
+                "time": "2043-12-11",
+                "value": 128010.80662018164
+              },
+              {
+                "time": "2044-01-11",
+                "value": 127451.75960297704
+              },
+              {
+                "time": "2044-02-11",
+                "value": 126889.9173506864
+              },
+              {
+                "time": "2044-03-11",
+                "value": 126325.26588713432
+              },
+              {
+                "time": "2044-04-11",
+                "value": 125757.79116626448
+              },
+              {
+                "time": "2044-05-11",
+                "value": 125187.47907179028
+              },
+              {
+                "time": "2044-06-11",
+                "value": 124614.31541684372
+              },
+              {
+                "time": "2044-07-11",
+                "value": 124038.28594362242
+              },
+              {
+                "time": "2044-08-11",
+                "value": 123459.37632303502
+              },
+              {
+                "time": "2044-09-11",
+                "value": 122877.57215434467
+              },
+              {
+                "time": "2044-10-11",
+                "value": 122292.85896481088
+              },
+              {
+                "time": "2044-11-11",
+                "value": 121705.22220932941
+              },
+              {
+                "time": "2044-12-11",
+                "value": 121114.64727007055
+              },
+              {
+                "time": "2045-01-11",
+                "value": 120521.11945611538
+              },
+              {
+                "time": "2045-02-11",
+                "value": 119924.62400309044
+              },
+              {
+                "time": "2045-03-11",
+                "value": 119325.14607280039
+              },
+              {
+                "time": "2045-04-11",
+                "value": 118722.67075285887
+              },
+              {
+                "time": "2045-05-11",
+                "value": 118117.18305631765
+              },
+              {
+                "time": "2045-06-11",
+                "value": 117508.66792129372
+              },
+              {
+                "time": "2045-07-11",
+                "value": 116897.11021059466
+              },
+              {
+                "time": "2045-08-11",
+                "value": 116282.49471134212
+              },
+              {
+                "time": "2045-09-11",
+                "value": 115664.80613459332
+              },
+              {
+                "time": "2045-10-11",
+                "value": 115044.02911496078
+              },
+              {
+                "time": "2045-11-11",
+                "value": 114420.14821023007
+              },
+              {
+                "time": "2045-12-11",
+                "value": 113793.1479009757
+              },
+              {
+                "time": "2046-01-11",
+                "value": 113163.01259017507
+              },
+              {
+                "time": "2046-02-11",
+                "value": 112529.72660282043
+              },
+              {
+                "time": "2046-03-11",
+                "value": 111893.27418552902
+              },
+              {
+                "time": "2046-04-11",
+                "value": 111253.63950615116
+              },
+              {
+                "time": "2046-05-11",
+                "value": 110610.80665337639
+              },
+              {
+                "time": "2046-06-11",
+                "value": 109964.75963633775
+              },
+              {
+                "time": "2046-07-11",
+                "value": 109315.48238421393
+              },
+              {
+                "time": "2046-08-11",
+                "value": 108662.95874582948
+              },
+              {
+                "time": "2046-09-11",
+                "value": 108007.17248925312
+              },
+              {
+                "time": "2046-10-11",
+                "value": 107348.10730139387
+              },
+              {
+                "time": "2046-11-11",
+                "value": 106685.74678759533
+              },
+              {
+                "time": "2046-12-11",
+                "value": 106020.0744712278
+              },
+              {
+                "time": "2047-01-11",
+                "value": 105351.07379327843
+              },
+              {
+                "time": "2047-02-11",
+                "value": 104678.7281119393
+              },
+              {
+                "time": "2047-03-11",
+                "value": 104003.02070219348
+              },
+              {
+                "time": "2047-04-11",
+                "value": 103323.93475539894
+              },
+              {
+                "time": "2047-05-11",
+                "value": 102641.45337887041
+              },
+              {
+                "time": "2047-06-11",
+                "value": 101955.55959545926
+              },
+              {
+                "time": "2047-07-11",
+                "value": 101266.23634313104
+              },
+              {
+                "time": "2047-08-11",
+                "value": 100573.46647454117
+              },
+              {
+                "time": "2047-09-11",
+                "value": 99877.23275660837
+              },
+              {
+                "time": "2047-10-11",
+                "value": 99177.5178700859
+              },
+              {
+                "time": "2047-11-11",
+                "value": 98474.30440913081
+              },
+              {
+                "time": "2047-12-11",
+                "value": 97767.57488087095
+              },
+              {
+                "time": "2048-01-11",
+                "value": 97057.31170496979
+              },
+              {
+                "time": "2048-02-11",
+                "value": 96343.49721318913
+              },
+              {
+                "time": "2048-03-11",
+                "value": 95626.11364894955
+              },
+              {
+                "time": "2048-04-11",
+                "value": 94905.14316688878
+              },
+              {
+                "time": "2048-05-11",
+                "value": 94180.56783241771
+              },
+              {
+                "time": "2048-06-11",
+                "value": 93452.36962127428
+              },
+              {
+                "time": "2048-07-11",
+                "value": 92720.53041907513
+              },
+              {
+                "time": "2048-08-11",
+                "value": 91985.032020865
+              },
+              {
+                "time": "2048-09-11",
+                "value": 91245.8561306638
+              },
+              {
+                "time": "2048-10-11",
+                "value": 90502.98436101161
+              },
+              {
+                "time": "2048-11-11",
+                "value": 89756.39823251116
+              },
+              {
+                "time": "2048-12-11",
+                "value": 89006.0791733682
+              },
+              {
+                "time": "2049-01-11",
+                "value": 88252.00851892952
+              },
+              {
+                "time": "2049-02-11",
+                "value": 87494.16751121865
+              },
+              {
+                "time": "2049-03-11",
+                "value": 86732.53729846922
+              },
+              {
+                "time": "2049-04-11",
+                "value": 85967.09893465605
+              },
+              {
+                "time": "2049-05-11",
+                "value": 85197.83337902382
+              },
+              {
+                "time": "2049-06-11",
+                "value": 84424.72149561343
+              },
+              {
+                "time": "2049-07-11",
+                "value": 83647.74405278597
+              },
+              {
+                "time": "2049-08-11",
+                "value": 82866.8817227444
+              },
+              {
+                "time": "2049-09-11",
+                "value": 82082.1150810526
+              },
+              {
+                "time": "2049-10-11",
+                "value": 81293.42460615234
+              },
+              {
+                "time": "2049-11-11",
+                "value": 80500.79067887759
+              },
+              {
+                "time": "2049-12-11",
+                "value": 79704.19358196646
+              },
+              {
+                "time": "2050-01-11",
+                "value": 78903.61349957078
+              },
+              {
+                "time": "2050-02-11",
+                "value": 78099.03051676312
+              },
+              {
+                "time": "2050-03-11",
+                "value": 77290.42461904141
+              },
+              {
+                "time": "2050-04-11",
+                "value": 76477.7756918311
+              },
+              {
+                "time": "2050-05-11",
+                "value": 75661.06351998475
+              },
+              {
+                "time": "2050-06-11",
+                "value": 74840.26778727915
+              },
+              {
+                "time": "2050-07-11",
+                "value": 74015.36807591004
+              },
+              {
+                "time": "2050-08-11",
+                "value": 73186.34386598408
+              },
+              {
+                "time": "2050-09-11",
+                "value": 72353.17453500848
+              },
+              {
+                "time": "2050-10-11",
+                "value": 71515.839357378
+              },
+              {
+                "time": "2050-11-11",
+                "value": 70674.31750385938
+              },
+              {
+                "time": "2050-12-11",
+                "value": 69828.58804107316
+              },
+              {
+                "time": "2051-01-11",
+                "value": 68978.62993097301
+              },
+              {
+                "time": "2051-02-11",
+                "value": 68124.42203032236
+              },
+              {
+                "time": "2051-03-11",
+                "value": 67265.94309016845
+              },
+              {
+                "time": "2051-04-11",
+                "value": 66403.17175531379
+              },
+              {
+                "time": "2051-05-11",
+                "value": 65536.08656378483
+              },
+              {
+                "time": "2051-06-11",
+                "value": 64664.665946298235
+              },
+              {
+                "time": "2051-07-11",
+                "value": 63788.888225724215
+              },
+              {
+                "time": "2051-08-11",
+                "value": 62908.731616547324
+              },
+              {
+                "time": "2051-09-11",
+                "value": 62024.174224324546
+              },
+              {
+                "time": "2051-10-11",
+                "value": 61135.194045140655
+              },
+              {
+                "time": "2051-11-11",
+                "value": 60241.768965060844
+              },
+              {
+                "time": "2051-12-11",
+                "value": 59343.876759580635
+              },
+              {
+                "time": "2052-01-11",
+                "value": 58441.49509307303
+              },
+              {
+                "time": "2052-02-11",
+                "value": 57534.60151823288
+              },
+              {
+                "time": "2052-03-11",
+                "value": 56623.173475518524
+              },
+              {
+                "time": "2052-04-11",
+                "value": 55707.1882925906
+              },
+              {
+                "time": "2052-05-11",
+                "value": 54786.623183748045
+              },
+              {
+                "time": "2052-06-11",
+                "value": 53861.45524936127
+              },
+              {
+                "time": "2052-07-11",
+                "value": 52931.661475302564
+              },
+              {
+                "time": "2052-08-11",
+                "value": 51997.21873237356
+              },
+              {
+                "time": "2052-09-11",
+                "value": 51058.10377572991
+              },
+              {
+                "time": "2052-10-11",
+                "value": 50114.293244303044
+              },
+              {
+                "time": "2052-11-11",
+                "value": 49165.76366021905
+              },
+              {
+                "time": "2052-12-11",
+                "value": 48212.49142821463
+              },
+              {
+                "time": "2053-01-11",
+                "value": 47254.452835050186
+              },
+              {
+                "time": "2053-02-11",
+                "value": 46291.62404891992
+              },
+              {
+                "time": "2053-03-11",
+                "value": 45323.981118859
+              },
+              {
+                "time": "2053-04-11",
+                "value": 44351.49997414778
+              },
+              {
+                "time": "2053-05-11",
+                "value": 43374.15642371301
+              },
+              {
+                "time": "2053-06-11",
+                "value": 42391.92615552606
+              },
+              {
+                "time": "2053-07-11",
+                "value": 41404.784735998175
+              },
+              {
+                "time": "2053-08-11",
+                "value": 40412.70760937265
+              },
+              {
+                "time": "2053-09-11",
+                "value": 39415.670097114
+              },
+              {
+                "time": "2053-10-11",
+                "value": 38413.64739729406
+              },
+              {
+                "time": "2053-11-11",
+                "value": 37406.61458397502
+              },
+              {
+                "time": "2053-12-11",
+                "value": 36394.54660658938
+              },
+              {
+                "time": "2054-01-11",
+                "value": 35377.41828931681
+              },
+              {
+                "time": "2054-02-11",
+                "value": 34355.20433045788
+              },
+              {
+                "time": "2054-03-11",
+                "value": 33327.87930180465
+              },
+              {
+                "time": "2054-04-11",
+                "value": 32295.41764800816
+              },
+              {
+                "time": "2054-05-11",
+                "value": 31257.793685942685
+              },
+              {
+                "time": "2054-06-11",
+                "value": 30214.981604066885
+              },
+              {
+                "time": "2054-07-11",
+                "value": 29166.955461781705
+              },
+              {
+                "time": "2054-08-11",
+                "value": 28113.689188785098
+              },
+              {
+                "time": "2054-09-11",
+                "value": 27055.15658442351
+              },
+              {
+                "time": "2054-10-11",
+                "value": 25991.331317040112
+              },
+              {
+                "time": "2054-11-11",
+                "value": 24922.186923319798
+              },
+              {
+                "time": "2054-12-11",
+                "value": 23847.69680763088
+              },
+              {
+                "time": "2055-01-11",
+                "value": 22767.83424136352
+              },
+              {
+                "time": "2055-02-11",
+                "value": 21682.572362264822
+              },
+              {
+                "time": "2055-03-11",
+                "value": 20591.88417377063
+              },
+              {
+                "time": "2055-04-11",
+                "value": 19495.74254433397
+              },
+              {
+                "time": "2055-05-11",
+                "value": 18394.120206750125
+              },
+              {
+                "time": "2055-06-11",
+                "value": 17286.98975747836
+              },
+              {
+                "time": "2055-07-11",
+                "value": 16174.32365596024
+              },
+              {
+                "time": "2055-08-11",
+                "value": 15056.094223934528
+              },
+              {
+                "time": "2055-09-11",
+                "value": 13932.273644748688
+              },
+              {
+                "time": "2055-10-11",
+                "value": 12802.833962666919
+              },
+              {
+                "time": "2055-11-11",
+                "value": 11667.74708217474
+              },
+              {
+                "time": "2055-12-11",
+                "value": 10526.9847672801
+              },
+              {
+                "time": "2056-01-11",
+                "value": 9380.518640810988
+              },
+              {
+                "time": "2056-02-11",
+                "value": 8228.32018370953
+              },
+              {
+                "time": "2056-03-11",
+                "value": 7070.360734322562
+              },
+              {
+                "time": "2056-04-11",
+                "value": 5906.611487688661
+              },
+              {
+                "time": "2056-05-11",
+                "value": 4737.043494821591
+              },
+              {
+                "time": "2056-06-11",
+                "value": 3561.6276619901846
+              },
+              {
+                "time": "2056-07-11",
+                "value": 2380.334749994622
+              },
+              {
+                "time": "2056-08-11",
+                "value": 1193.1353734390816
+              },
+              {
+                "time": "2056-09-11",
+                "value": 7.6329342846293e-10
+              }
+            ]
+          }
+        },
+        "schema_version": 1,
+        "tool_name": "time_value"
+      },
+      "computation": {
+        "inputs": {
+          "annual_rate_pct": 6.0,
+          "currency": "USD",
+          "direction": "borrow",
+          "future_value": 0.0,
+          "payment": null,
+          "payment_timing": "end",
+          "periods": 360,
+          "periods_per_year": 12,
+          "present_value": 200000.0,
+          "sources": {
+            "annual_rate_pct": {
+              "date": "2026-09-01",
+              "kind": "page",
+              "title": "Rate sheet",
+              "url": "https://example.com/rates"
+            }
+          },
+          "start_date": "2026-09-11"
+        },
+        "kind": "time_value"
+      }
+    },
+    "time_value_payment_below_interest": {
+      "card": {
+        "arguments": {
+          "annual_rate_pct": 14.0,
+          "currency": "DOP",
+          "direction": "borrow",
+          "future_value": 0.0,
+          "payment": 2000.0,
+          "payment_timing": "end",
+          "periods": null,
+          "periods_per_year": 12,
+          "present_value": 180000.0,
+          "sources": {},
+          "start_date": null
+        },
+        "artifact_id": "artifact-time_value",
+        "artifact_state": "active",
+        "call_id": "call-time_value",
+        "card_type": "time_value",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": {
+            "code": "payment_below_interest",
+            "fields": [
+              "payment"
+            ],
+            "repair": {
+              "changes": {
+                "payment": 2205.0
+              },
+              "kind": "set_inputs",
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.repairs.payment_below_interest"
+              }
+            }
+          },
+          "result": null,
+          "status": "invalid"
+        },
+        "presentation": {
+          "answer": null,
+          "inputs": [
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.direction"
+              },
+              "name": "direction",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "borrow",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.present_value"
+              },
+              "name": "present_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 180000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.payment"
+              },
+              "name": "payment",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 2000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.future_value"
+              },
+              "name": "future_value",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "DOP"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 0.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.annual_rate_pct"
+              },
+              "name": "annual_rate_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 14.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods"
+              },
+              "name": "periods",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.months"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.periods_per_year"
+              },
+              "name": "periods_per_year",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": 12,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.payment_timing"
+              },
+              "name": "payment_timing",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "end",
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.time_value.title_borrow"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "time_value"
+      },
+      "computation": {
+        "inputs": {
+          "annual_rate_pct": 14.0,
+          "currency": "DOP",
+          "direction": "borrow",
+          "future_value": 0.0,
+          "payment": 2000.0,
+          "payment_timing": "end",
+          "periods": null,
+          "periods_per_year": 12,
+          "present_value": 180000.0,
+          "sources": {},
+          "start_date": null
+        },
+        "kind": "time_value"
+      }
+    },
+    "valuation_scenarios": {
+      "card": {
+        "arguments": {
+          "currency": "USD",
+          "growth_base_pct": 8.0,
+          "growth_high_pct": 12.0,
+          "growth_low_pct": 3.0,
+          "horizon_years": 5,
+          "multiple_base": 22.0,
+          "multiple_high": 28.0,
+          "multiple_low": 18.0,
+          "per_share": 6.0,
+          "price": 150.0,
+          "sources": {},
+          "symbol": "AAPL"
+        },
+        "artifact_id": "artifact-valuation_scenarios",
+        "artifact_state": "active",
+        "call_id": "call-valuation_scenarios",
+        "card_type": "valuation_scenarios",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "current_multiple": 25.0,
+            "scenarios": [
+              {
+                "annual_return_pct": -3.5496686470481653,
+                "growth_pct": 3.0,
+                "label": "low",
+                "multiple": 18.0,
+                "price_at_horizon": 125.20160002440002
+              },
+              {
+                "annual_return_pct": 5.273797637325561,
+                "growth_pct": 8.0,
+                "label": "base",
+                "multiple": 22.0,
+                "price_at_horizon": 193.95130613760008
+              },
+              {
+                "annual_return_pct": 14.56755034211541,
+                "growth_pct": 12.0,
+                "label": "high",
+                "multiple": 28.0,
+                "price_at_horizon": 296.0734027776001
+              }
+            ]
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {
+                "scenario": "base"
+              },
+              "locale_key": "tools.calc.valuation_scenarios.annual_return"
+            },
+            "name": "base_annual_return_pct",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "chat.tools.units.percent"
+            },
+            "value": 5.27,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "AAPL",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.price"
+              },
+              "name": "price",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 150.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.per_share"
+              },
+              "name": "per_share",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 6.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.growth_low_pct"
+              },
+              "name": "growth_low_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 3.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.growth_base_pct"
+              },
+              "name": "growth_base_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 8.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.growth_high_pct"
+              },
+              "name": "growth_high_pct",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 12.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple_low"
+              },
+              "name": "multiple_low",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "unknown": false,
+              "value": 18.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple_base"
+              },
+              "name": "multiple_base",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "unknown": false,
+              "value": 22.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple_high"
+              },
+              "name": "multiple_high",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "unknown": false,
+              "value": 28.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.horizon_years"
+              },
+              "name": "horizon_years",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.years"
+              },
+              "unknown": false,
+              "value": 5,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [
+            {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.notes.scenarios_not_forecasts"
+            }
+          ],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple"
+              },
+              "name": "current_multiple",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "value": 25.0,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "scenario": "low"
+                },
+                "locale_key": "tools.calc.valuation_scenarios.price_at_horizon"
+              },
+              "name": "price_at_horizon_low",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 125.2,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "scenario": "low"
+                },
+                "locale_key": "tools.calc.valuation_scenarios.annual_return"
+              },
+              "name": "annual_return_pct_low",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": -3.55,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "scenario": "base"
+                },
+                "locale_key": "tools.calc.valuation_scenarios.price_at_horizon"
+              },
+              "name": "price_at_horizon_base",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 193.95,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "scenario": "base"
+                },
+                "locale_key": "tools.calc.valuation_scenarios.annual_return"
+              },
+              "name": "annual_return_pct_base",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 5.27,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "scenario": "high"
+                },
+                "locale_key": "tools.calc.valuation_scenarios.price_at_horizon"
+              },
+              "name": "price_at_horizon_high",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "value": 296.07,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "scenario": "high"
+                },
+                "locale_key": "tools.calc.valuation_scenarios.annual_return"
+              },
+              "name": "annual_return_pct_high",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 14.57,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.valuation_scenarios.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "valuation_scenarios"
+      },
+      "computation": {
+        "inputs": {
+          "currency": "USD",
+          "growth_base_pct": 8.0,
+          "growth_high_pct": 12.0,
+          "growth_low_pct": 3.0,
+          "horizon_years": 5,
+          "multiple_base": 22.0,
+          "multiple_high": 28.0,
+          "multiple_low": 18.0,
+          "per_share": 6.0,
+          "price": 150.0,
+          "sources": {},
+          "symbol": "AAPL"
+        },
+        "kind": "valuation_scenarios",
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    }
+  },
+  "generated_by": "scripts/dump_calculation_fixtures.py"
+}

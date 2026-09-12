@@ -42,6 +42,9 @@ class ComputationKernel:
     compute: Callable[[BaseModel, RerunContext], DecisionRerun]
     # A backtest's inputs are its immutable run; editing them is a new run.
     inputs_editable: bool = True
+    # How overrides merge over stored inputs; a calculation keeps its unknown
+    # and marks the edited input as stated, through its declaration.
+    merge: Callable[[Mapping[str, Any], Mapping[str, Any]], dict[str, Any]] | None = None
 
 
 class InvalidComputationInputs(ValueError):
@@ -67,11 +70,66 @@ def unregister_kernel(kind: str) -> None:
 
 
 def kernel_for(kind: str) -> ComputationKernel | None:
-    return _KERNELS.get(kind)
+    registered = _KERNELS.get(kind)
+    if registered is not None:
+        return registered
+    return _calculation_kernels().get(kind)
 
 
 def registered_kinds() -> tuple[str, ...]:
-    return tuple(sorted(_KERNELS))
+    return tuple(sorted({*_KERNELS, *_calculation_kernels()}))
+
+
+def _calculation_kernels() -> dict[str, ComputationKernel]:
+    """One kernel per free calculation, each calling the declaration's one function.
+
+    Built on first use so this module stays importable from the API schemas
+    without loading the catalog.
+    """
+    from argus.domain.calculations import get_calculation_declarations
+
+    kernels: dict[str, ComputationKernel] = {}
+    for declaration in get_calculation_declarations():
+        kernels[declaration.name] = calculation_kernel(declaration)
+    return kernels
+
+
+CALCULATION_RERUN_CALL_ID = "decision_rerun"
+CALCULATION_RERUN_ARTIFACT_ID = "decision_rerun"
+
+
+def calculation_kernel(declaration: Any) -> ComputationKernel:
+    """The kernel for a declared calculation: the same compute function, as a card."""
+    from argus.domain.tool_contracts import ToolCall
+
+    def compute(inputs: BaseModel, _context: RerunContext) -> DecisionRerun:
+        arguments = inputs.model_dump(mode="json")
+        outcome = declaration.invoke_sync(arguments)
+        card = declaration.result_card(
+            call=ToolCall(
+                tool_name=declaration.name,
+                call_id=CALCULATION_RERUN_CALL_ID,
+                arguments=arguments,
+            ),
+            outcome=outcome,
+            artifact_id=CALCULATION_RERUN_ARTIFACT_ID,
+        )
+        return DecisionRerun(
+            kind=declaration.name,
+            inputs=dict(card.arguments),
+            status="computed",
+            result=card.model_dump(mode="json"),
+        )
+
+    def merge(stored: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:
+        return declaration.recompute_arguments(stored, overrides).model_dump(mode="json")
+
+    return ComputationKernel(
+        kind=declaration.name,
+        inputs_model=declaration.call_arguments_type,
+        compute=compute,
+        merge=merge,
+    )
 
 
 def unavailable_rerun(
@@ -110,9 +168,15 @@ def rerun_computation(
             computation, inputs=merged, reason_code="inputs_not_editable"
         )
     try:
+        if overrides and kernel.merge is not None:
+            merged = kernel.merge(computation.inputs, overrides)
         typed_inputs = kernel.inputs_model.model_validate(merged)
     except ValidationError as exc:
         raise InvalidComputationInputs(computation.kind, exc.errors()) from exc
+    except (ValueError, TypeError) as exc:
+        raise InvalidComputationInputs(
+            computation.kind, [{"type": "value_error", "msg": str(exc), "loc": []}]
+        ) from exc
     return kernel.compute(typed_inputs, context)
 
 

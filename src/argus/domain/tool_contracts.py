@@ -13,10 +13,12 @@ from pydantic import (
     ConfigDict,
     Field,
     JsonValue,
+    SerializerFunctionWrapHandler,
     StrictBool,
     StrictFloat,
     StrictInt,
     StrictStr,
+    model_serializer,
     model_validator,
 )
 
@@ -96,6 +98,11 @@ class ToolFactSource(ToolContract):
         if self.kind != "page" and (self.title or self.url or self.date):
             raise ValueError("Only a page source carries a title, url or date")
         return self
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_citation(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        return {key: value for key, value in data.items() if value is not None}
 
 
 class ToolFact(ToolContract):

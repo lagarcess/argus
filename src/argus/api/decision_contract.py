@@ -20,7 +20,15 @@ import json
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 DecisionActionAvailability = Literal[
@@ -61,7 +69,12 @@ def bounded_computation_inputs(value: dict[str, Any]) -> dict[str, Any]:
 
 
 class DecisionComputation(BaseModel):
-    """What a decision can re-run: a registered kind and its typed inputs."""
+    """What a decision can re-run: a registered kind and its typed inputs.
+
+    ``symbols`` names the assets the computation is about, derived from its
+    typed inputs by the marker owner, so Search can count a computed answer
+    under an asset without reading its card.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -71,11 +84,20 @@ class DecisionComputation(BaseModel):
         pattern=r"^[a-z][a-z0-9_]*$",
     )
     inputs: dict[str, Any] = Field(default_factory=dict)
+    symbols: list[str] = Field(default_factory=list, max_length=5)
 
     @field_validator("inputs")
     @classmethod
     def bound_inputs(cls, value: dict[str, Any]) -> dict[str, Any]:
         return bounded_computation_inputs(value)
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_symbols(self, handler: SerializerFunctionWrapHandler):
+        # A computation about no asset serializes exactly as it did before.
+        data = handler(self)
+        if not data.get("symbols"):
+            data.pop("symbols", None)
+        return data
 
 
 class DecisionNote(BaseModel):
