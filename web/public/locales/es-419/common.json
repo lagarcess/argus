@@ -2068,7 +2068,10 @@
         "page": "{{title}}",
         "page_dated": "{{title}}, {{date}}",
         "computed": "Calculado a partir de los otros datos",
-        "not_found": "No encontrado"
+        "not_found": "No encontrado",
+        "market_data": "Datos de mercado de Argus",
+        "market_data_dated": "Datos de mercado de Argus, {{date}}",
+        "assumption": "Supuesto en la respuesta"
       },
       "failure": {
         "exactly_one_unknown": "Deja exactamente un dato en blanco para calcularlo.",
@@ -2094,6 +2097,8 @@
       "named_input": "Dato {{name}}",
       "inputs": "Datos usados",
       "unknown": "Por calcular",
+      "show_numbers": "Ver los números",
+      "hide_numbers": "Ocultar los números",
       "yes": "Sí",
       "no": "No",
       "unavailable": "Este resultado no está disponible.",

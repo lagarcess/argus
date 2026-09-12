@@ -7,9 +7,10 @@ export type ToolScalar = string | number | boolean | null;
 export type LocalizedToolText = { locale_key: string; interpolation_args: Record<string, ToolScalar> };
 export type ToolProgress = LocalizedToolText & { call_id: string; tool_name: string };
 /** Where a fact came from; older cards carry none and stay readable. */
-export type ToolFactSource = { kind: "user" | "page" | "computed" | "not_found"; title?: string | null; url?: string | null; date?: string | null };
+export type ToolFactSource = { kind: "user" | "page" | "market_data" | "assumption" | "computed" | "not_found"; title?: string | null; url?: string | null; date?: string | null };
 export type ToolFact = { name: string; label: LocalizedToolText; value: ToolScalar; unit: LocalizedToolText | null; value_text?: LocalizedToolText | null; source?: ToolFactSource | null };
-export type ToolInputFact = ToolFact & { editable: boolean; unknown: boolean; visibility?: "public" | "private" };
+/** `driving` marks one of the few inputs the backend says drive the result. */
+export type ToolInputFact = ToolFact & { editable: boolean; unknown: boolean; driving?: boolean; visibility?: "public" | "private" };
 export type ToolResearchSource = { url: string; title: string; source_date?: string | null };
 export type ToolCardPresentation = {
   title: LocalizedToolText; answer: ToolFact | null; rows: ToolFact[];
@@ -45,7 +46,7 @@ function localized(value: unknown): value is LocalizedToolText {
   return record(value) && text(value.locale_key) && record(value.interpolation_args) &&
     Object.values(value.interpolation_args).every(scalar);
 }
-const SOURCE_KINDS = new Set(["user", "page", "computed", "not_found"]);
+const SOURCE_KINDS = new Set(["user", "page", "market_data", "assumption", "computed", "not_found"]);
 function source(value: unknown): value is ToolFactSource {
   if (!record(value) || !SOURCE_KINDS.has(String(value.kind))) return false;
   return ["title", "url", "date"].every((key) => value[key] == null || typeof value[key] === "string");
@@ -67,6 +68,8 @@ export function parseToolPresentation(value: unknown): ToolCardPresentation | nu
       record(input) && typeof input.editable === "boolean" &&
       typeof input.unknown === "boolean" &&
       !(input.unknown && (input.value !== null || input.editable)) &&
+      (input.driving === undefined || typeof input.driving === "boolean") &&
+      !(input.driving === true && input.value === null) &&
       (input.visibility === undefined || input.visibility === "public" || input.visibility === "private") && fact(input))) return null;
   if (value.narrative != null && typeof value.narrative !== "string") return null;
   if (value.sources !== undefined && (!Array.isArray(value.sources) || researchSourcesFromFacts(value.sources).length !== value.sources.length)) return null;
@@ -149,16 +152,31 @@ export function toolFactValue(value: ToolFact, t: ToolTranslator, locale: string
   return value.unit ? `${content} ${localizedToolText(value.unit, t)}` : content;
 }
 
-/** The provenance line under an input: stated, cited with its date, or computed. */
+/** The provenance line under an input: stated, cited with its date, read from
+ * Argus market data on its date, assumed in the answer, or computed. */
 export function toolFactSourceText(fact: ToolFact, t: ToolTranslator, locale: string): string | null {
   const provenance = fact.source;
   if (!provenance) return null;
+  const date = provenance.date ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${provenance.date}T00:00:00Z`)) : "";
   if (provenance.kind === "page") {
-    const date = provenance.date ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${provenance.date}T00:00:00Z`)) : "";
     const title = provenance.title?.trim() || (provenance.url ? safeHost(provenance.url) : "");
     return title && date ? t("tools.card.source.page_dated", { title, date }) : t("tools.card.source.page", { title: title || date });
   }
+  if (provenance.kind === "market_data" && date) return t("tools.card.source.market_data_dated", { date });
   return t(`tools.card.source.${provenance.kind}`, { defaultValue: "" }) || null;
+}
+/** The inputs a card shows: the few the backend marks as driving the result,
+ * otherwise every input that carries a value. A blank is never shown. */
+export function shownToolInputs(presentation: ToolCardPresentation): ToolInputFact[] {
+  const driving = presentation.inputs.filter((input) => input.driving === true);
+  if (driving.length > 0) return driving;
+  return presentation.inputs.filter((input) => input.value !== null && !input.unknown);
+}
+/** A solved calculation starts collapsed under the prose; the backend marks one
+ * by naming its driving inputs. A failure stays open so its fix is visible. */
+export function toolCardStartsCollapsed(card: ToolResultCard): boolean {
+  return card.outcome.status === "succeeded" && card.presentation.answer !== null &&
+    card.presentation.inputs.some((input) => input.driving === true);
 }
 function safeHost(url: string): string {
   try { return new URL(url).hostname; } catch { return ""; }

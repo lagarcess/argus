@@ -2068,7 +2068,10 @@
         "page": "{{title}}",
         "page_dated": "{{title}}, {{date}}",
         "computed": "Computed from the other inputs",
-        "not_found": "Not found"
+        "not_found": "Not found",
+        "market_data": "Argus market data",
+        "market_data_dated": "Argus market data, {{date}}",
+        "assumption": "Assumed in the answer"
       },
       "failure": {
         "exactly_one_unknown": "Leave exactly one input blank to solve for it.",
@@ -2094,6 +2097,8 @@
       "named_input": "Input {{name}}",
       "inputs": "Inputs",
       "unknown": "To solve",
+      "show_numbers": "Show the numbers",
+      "hide_numbers": "Hide the numbers",
       "yes": "Yes",
       "no": "No",
       "unavailable": "This result is unavailable.",

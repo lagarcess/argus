@@ -47,7 +47,7 @@ describe("declaration-generated calculation cards", () => {
     expect(toolFactSourceText(inputs.payment, t, "en")).toBe("Computed from the other inputs");
     expect(card.presentation.answer?.source?.kind).toBe("computed");
     const html = renderToStaticMarkup(
-      <I18nextProvider i18n={instance}><ToolResultCard card={card} /></I18nextProvider>,
+      <I18nextProvider i18n={instance}><ToolResultCard card={card} defaultOpen /></I18nextProvider>,
     );
     expect(html).toContain('data-tool-input-source="page"');
     expect(html).toContain("Rate sheet, Sep 1, 2026");

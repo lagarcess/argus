@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import type { ToolTranslator } from "@/lib/tool-result-card";
-import { localizedToolText, type ToolResultCard, type ToolScalar } from "@/lib/tool-result-card";
+import { localizedToolText, shownToolInputs, type ToolResultCard, type ToolScalar } from "@/lib/tool-result-card";
 import { alreadyUpToDateText, toolOutcomeTreatment, type ToolOutcomeTreatment } from "@/lib/tool-outcome-treatment";
 import { changesAreEmpty, rerunChanges } from "@/lib/computed-rerun";
 import ToolCardPresentation from "./ToolCardPresentation";
@@ -52,7 +52,7 @@ export default function ComputedRerunPanel({ stored, latest, busy, unavailable, 
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">{labels.stored}</p>
         {storedTreatment ? <div className="mb-3"><ToolOutcomeNotice treatment={storedTreatment} repairLabel={storedTreatment.repair ? localizedToolText(storedTreatment.repair.label, t) : null} retryLabel={t("tools.card.retry")} onRepair={applyRepair} onRetry={() => onRerun({})} disabled={busy} /></div> : null}
         <ToolCardPresentation presentation={stored.presentation} t={t} locale={locale} withheld={stored.outcome.status !== "succeeded"}
-          inputs={<ToolInputEditor idPrefix={`rerun-${stored.artifact_id}`} inputs={stored.presentation.inputs} drafts={drafts} editable={!unavailable} busy={busy} onChange={change} t={t} locale={locale} />} />
+          inputs={<ToolInputEditor idPrefix={`rerun-${stored.artifact_id}`} inputs={shownToolInputs(stored.presentation)} drafts={drafts} editable={!unavailable} busy={busy} onChange={change} t={t} locale={locale} />} />
       </section>
       <section data-computed-rerun="latest" className="min-w-0 rounded-2xl border border-black/10 p-4 dark:border-white/10">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">{labels.latest}</p>
