@@ -363,13 +363,12 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-12 at integration `7c49772f`.** Landing state for every item is
+**Updated 2026-09-12 at integration `f14c0dec`.** Landing state for every item is
 in "Where this board actually stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| The conversation after a result | PR #597, final round: live measurement, browser walk, then a Codex review on its final head. |
-| Any grounded math | Phase 1 built on `claude/grounded-math-build-71d49b` at `eeffd59f` and captain-verified, not on integration. Phase 2 starts after #597 merges. |
+| Any grounded math | Phase 1 built on `claude/grounded-math-build-71d49b` at `eeffd59f` and captain-verified, not on integration. Phase 2 is unblocked now that #597 landed. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1477,8 +1476,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | A clarification reply keeps what the user said | outside the releases | **LANDED** `05196b33`, PR #591. After Argus asks a question, the reply keeps every fact the user already gave (asset, dates, money, costs), an explicit new idea starts clean, money the user typed outranks an audit's guess, and one owner removes em dashes from visible replies. Its full live run on the merged tree was 65 passed and 6 failed; four passed a rerun, and the other two failed outside its code (research publishing on a Spanish forward question, and a discovery answer whose voicing model timed out). On the Haiku fallback it refused a named cap three times out of three where integration lost it once. The founder kept the rule that money the user typed outranks an audit's cap of the same amount. |
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
-| The conversation after a result | its own promotion | **In review, PR #597.** Final round in progress: live measurement, browser walk and a Codex review on the final head. It lands before Any grounded math Phase 2. |
-| Any grounded math | The calculations | **Scoped end to end 2026-09-11** in its item: answers, decisions, Search, the rail widened to "result", sharing, compare and continue, and every failure, as one lane in two phases. **Phase 1 built** at `eeffd59f` on its branch and captain-verified: the prompt freeze and budget pass, and it touches no #597 files. Phase 2 waits for #597. Portfolio monitor, quant calculator and insider tracking stay deferred. |
+| The conversation after a result | its own promotion | **LANDED** `f14c0dec`, PR #597, 2026-09-12. Questions after a result are answered by the model with one ordered list of next steps, runnable tests and questions together. One owner states the benchmark gap and cost drag as the difference of the shown returns. Runs record fee and slippage dollars, and a stored dollar cost is answered. A stated cost the audit cannot confirm is asked about, never shown at 0 bps, while a 0 only the model's read carries is dropped. New monthly-buy runs store the worst drop's dates; answers never invent a date, order or cause and carry no heading. A stored run fact is answered without research and the reply must state it, and an asset or benchmark reply must name each ticker. A moved start names the asset whose data sets it, from continuous history. Its live run was 64 passed and 7 failed against 67 and 4; the six new failures passed a rerun at the fix, and NVDA failed in both. The fingerprint is refrozen on that run. No migration. |
+| Any grounded math | The calculations | **Scoped end to end 2026-09-11** in its item: answers, decisions, Search, the rail widened to "result", sharing, compare and continue, and every failure, as one lane in two phases. **Phase 1 built** at `eeffd59f` on its branch and captain-verified: the prompt freeze and budget pass, and it touches no #597 files. Phase 2 is unblocked; it also owes the NVDA future-performance case, whose scenario figures show no citations on screen, and #599. Portfolio monitor, quant calculator and insider tracking stay deferred. |
 | Teach the method | Grounding | **Greetings LANDED** `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The welcome line is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
@@ -1756,6 +1755,10 @@ Resolved:
 - **Confirmed bugs are tracked as issues:** #596 the support address has two
   owners, #598 a second tab never shows the reply, #599 the BTC forward research
   never publishes, #600 a timed-out interpretation drops stated money and costs.
+- **A fact answer can show no next steps.** In the final walk of PR #597, one of
+  four worst-drop answers had no Try next list, because the model listed none.
+  Integration showed no list under fact answers before that PR. It waits under the
+  product decision filter: it does not change whether the answer can be checked.
 - **The CONFIRM graph node is hard-wired to `LaunchBacktestRequest`.** Waits for
   the first expensive non-backtest calculation.
 
