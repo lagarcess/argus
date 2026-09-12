@@ -3,6 +3,8 @@ floor; when market data cannot say, nothing states a start."""
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import date
 from typing import Any
 
@@ -12,9 +14,11 @@ from argus.domain.market_data import (
     asset_history_start,
     clear_tradable_history_cache,
     shared_history_start,
+    tradability,
 )
 from argus.domain.market_data import provider as provider_module
 from argus.domain.market_data.capabilities import ALPACA_EQUITY_HISTORY_START
+from argus.domain.market_data.tradability import tradable_history
 
 
 @pytest.fixture(autouse=True)
@@ -117,3 +121,67 @@ def test_a_short_market_closure_keeps_the_first_bar(
     _install(monkeypatch, lambda symbol: pd.Series([1.0, 2.0, 3.0], index=index))
 
     assert asset_history_start("DOCN", "equity") == date(2021, 3, 24)
+
+
+def _blocked_until(release: threading.Event, first: str) -> Any:
+    def handler(symbol: str) -> pd.Series:
+        release.wait(timeout=5)
+        return _series(first)
+
+    return handler
+
+
+def _settled() -> None:
+    for _ in range(500):
+        if not tradability._PENDING_PROBES:
+            return
+        time.sleep(0.01)
+    raise AssertionError("a probe did not finish")
+
+
+def test_a_probe_past_its_budget_is_not_started_again_and_its_late_answer_is_kept(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tradability, "ASSET_HISTORY_START_BUDGET_SECONDS", 0.05)
+    release = threading.Event()
+    calls = _install(monkeypatch, _blocked_until(release, "2021-03-24"))
+
+    assert asset_history_start("DOCN", "equity") is None
+    assert asset_history_start("DOCN", "equity") is None
+    assert len(calls) == 1
+
+    release.set()
+    _settled()
+    assert asset_history_start("DOCN", "equity") == date(2021, 3, 24)
+    assert len(calls) == 1
+
+
+def test_unfinished_probes_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tradability, "ASSET_HISTORY_START_BUDGET_SECONDS", 0.05)
+    monkeypatch.setattr(tradability, "_MAX_PENDING_PROBES", 2)
+    release = threading.Event()
+    calls = _install(monkeypatch, _blocked_until(release, "2021-03-24"))
+
+    for symbol in ("AAA", "BBB", "CCC"):
+        assert asset_history_start(symbol, "equity") is None
+    release.set()
+    _settled()
+
+    assert sorted(call[0] for call in calls) == ["AAA", "BBB"]
+
+
+def test_tradable_history_waits_on_its_running_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tradability, "TRADABLE_HISTORY_BUDGET_SECONDS", 0.05)
+    release = threading.Event()
+    calls = _install(monkeypatch, _blocked_until(release, "2026-08-01"))
+
+    assert tradable_history("DOCN", "equity").is_our_outage
+    assert tradable_history("DOCN", "equity").is_our_outage
+    assert len(calls) == 1
+
+    release.set()
+    _settled()
+    assert tradable_history("DOCN", "equity").is_tradable
+    assert len(calls) == 1

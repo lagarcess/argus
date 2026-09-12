@@ -13,10 +13,12 @@ assert they are not tradable. Callers must be able to tell those apart.
 from __future__ import annotations
 
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable, Hashable
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Literal
+from functools import partial
+from typing import Any, Literal, TypeVar
 
 from loguru import logger
 
@@ -34,7 +36,18 @@ _MIN_CLOSES = 2
 _CACHE: dict[tuple[str, str], "TradableHistory"] = {}
 _CACHE_LOCK = threading.Lock()
 
+# Every budgeted probe runs on one bounded pool. A probe past its budget keeps
+# running under its key, so asking again waits on that request instead of
+# starting another, and beyond this many unfinished probes nothing new starts.
+_PROBE_WORKERS = 4
+_MAX_PENDING_PROBES = 16
+_PROBE_POOL = ThreadPoolExecutor(
+    max_workers=_PROBE_WORKERS, thread_name_prefix="market-data-probe"
+)
+_PENDING_PROBES: dict[Hashable, Future[Any]] = {}
+
 Verdict = Literal["tradable", "no_history", "unknown"]
+_Answer = TypeVar("_Answer")
 
 
 @dataclass(frozen=True)
@@ -58,6 +71,7 @@ def clear_tradable_history_cache() -> None:
     with _CACHE_LOCK:
         _CACHE.clear()
         _HISTORY_START_CACHE.clear()
+        _PENDING_PROBES.clear()
 
 
 # How far back an equity's history can begin is the provider's floor; an asset
@@ -81,14 +95,13 @@ def asset_history_start(symbol: str, asset_class: str) -> date | None:
     if not key_symbol or str(asset_class or "").strip().lower() != "equity":
         return None
     key = (key_symbol, new_york_today())
-    with _CACHE_LOCK:
-        cached = _HISTORY_START_CACHE.get(key)
-    if cached is not None:
-        return cached
-    executor = ThreadPoolExecutor(max_workers=1)
     try:
-        start = executor.submit(_first_equity_bar_date, *key).result(
-            timeout=ASSET_HISTORY_START_BUDGET_SECONDS
+        return _run_budgeted(
+            ("history_start", *key),
+            partial(_first_equity_bar_date, *key),
+            budget=ASSET_HISTORY_START_BUDGET_SECONDS,
+            lookup=partial(_HISTORY_START_CACHE.get, key),
+            keep=partial(_keep_history_start, key),
         )
     except Exception as exc:  # noqa: BLE001
         logger.debug(
@@ -97,12 +110,11 @@ def asset_history_start(symbol: str, asset_class: str) -> date | None:
             error=str(exc),
         )
         return None
-    finally:
-        executor.shutdown(wait=False, cancel_futures=False)
+
+
+def _keep_history_start(key: tuple[str, date], start: date | None) -> None:
     if start is not None:
-        with _CACHE_LOCK:
-            _HISTORY_START_CACHE[key] = start
-    return start
+        _HISTORY_START_CACHE[key] = start
 
 
 def shared_history_start(symbols: list[str], asset_class: str) -> date | None:
@@ -136,35 +148,67 @@ def tradable_history(symbol: str, asset_class: str) -> TradableHistory:
     key = (str(symbol or "").strip().upper(), str(asset_class or "").strip().lower())
     if not key[0]:
         return TradableHistory("no_history")
-    with _CACHE_LOCK:
-        cached = _CACHE.get(key)
-    if cached is not None:
-        return cached
-    result = _probe_under_budget(key[0], key[1])
-    if result.verdict != "unknown":
-        # Only a decided answer is cached; an outage must be re-asked.
-        with _CACHE_LOCK:
-            _CACHE[key] = result
-    return result
-
-
-def _probe_under_budget(symbol: str, asset_class: str) -> TradableHistory:
-    executor = ThreadPoolExecutor(max_workers=1)
     try:
-        return executor.submit(_probe, symbol, asset_class).result(
-            timeout=TRADABLE_HISTORY_BUDGET_SECONDS
+        return _run_budgeted(
+            ("tradable", *key),
+            partial(_probe, *key),
+            budget=TRADABLE_HISTORY_BUDGET_SECONDS,
+            lookup=partial(_CACHE.get, key),
+            keep=partial(_keep_tradable_history, key),
         )
     except Exception as exc:  # noqa: BLE001
         # A slow provider is our problem, never the asset's.
         logger.debug(
             "Tradable-history probe exceeded its budget",
-            symbol=symbol,
-            asset_class=asset_class,
+            symbol=key[0],
+            asset_class=key[1],
             error=str(exc),
         )
         return TradableHistory("unknown")
-    finally:
-        executor.shutdown(wait=False, cancel_futures=False)
+
+
+def _keep_tradable_history(key: tuple[str, str], result: TradableHistory) -> None:
+    # Only a decided answer is cached; an outage must be re-asked.
+    if result.verdict != "unknown":
+        _CACHE[key] = result
+
+
+def _run_budgeted(
+    key: Hashable,
+    work: Callable[[], _Answer],
+    *,
+    budget: float,
+    lookup: Callable[[], _Answer | None],
+    keep: Callable[[_Answer], None],
+) -> _Answer:
+    """The cached answer, else wait up to ``budget`` on this key's one probe."""
+    with _CACHE_LOCK:
+        cached = lookup()
+        if cached is not None:
+            return cached
+        future = _PENDING_PROBES.get(key)
+        if future is not None and future.done() and future.exception() is not None:
+            future = None
+        started = future is None
+        if future is None:
+            if len(_PENDING_PROBES) >= _MAX_PENDING_PROBES:
+                raise RuntimeError("market data probes are at capacity")
+            future = _PROBE_POOL.submit(work)
+            _PENDING_PROBES[key] = future
+    if started:
+        future.add_done_callback(partial(_settle_probe, key, keep))
+    return future.result(timeout=budget)
+
+
+def _settle_probe(
+    key: Hashable, keep: Callable[[Any], None], future: Future[Any]
+) -> None:
+    """Forget a finished probe and keep its answer, even when no caller waited."""
+    with _CACHE_LOCK:
+        if _PENDING_PROBES.get(key) is future:
+            del _PENDING_PROBES[key]
+        if not future.cancelled() and future.exception() is None:
+            keep(future.result())
 
 
 def _probe(symbol: str, asset_class: str) -> TradableHistory:
