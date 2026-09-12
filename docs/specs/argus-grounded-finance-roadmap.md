@@ -1258,7 +1258,17 @@ and they are the founder's to author.
 the method plus a rotating example, is rejected, and the current
 `chat.welcome` is too wordy; the welcome waits for a new direction. The
 broad-question follow-ups moved into Any grounded math. Greetings gated by
-demonstrated interest stay here and run after the calculations.
+demonstrated interest stay here.
+
+**Greetings LANDED `7e9efe71`, PR #601, 2026-09-12.** Everyone gets neutral
+time-of-day lines. Testing and market-session lines go only to a registered
+person who owns a completed run, decided by one owner,
+`src/argus/api/demonstrated_interest.py`, and served on `GET /market/session`
+as `interest`. Guests never get name or market lines and make no request for
+the greeting. Six lines were cut, including `noctámbulo` and the weekend
+filler, and session lines count once. Founder, 2026-09-12: a guest now sees
+the A mark and a neutral greeting in place of the "argus" heading and "Test
+an investing idea against history."
 
 Both of Johana's suggestions, which are one request stated twice.
 
@@ -1475,7 +1485,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
 | The conversation after a result | its own promotion | **Scoped 2026-09-11 in its item section; can start now that #588 landed.** "What should I try next?" and questions about a result are answered by the model, with the Try next rows kept as actions and a few next questions offered; availability dates use the asset's own first date instead of the 2016 provider floor. Judged side by side with Perplexity. |
 | Any grounded math | The calculations | **Scoped end to end 2026-09-11** in its item: answers, decisions, Search, the rail widened to "result", sharing, compare and continue, and every failure, as one lane in two phases. Portfolio monitor, quant calculator and insider tracking stay deferred. |
-| Teach the method | Grounding | **Not started.** Founder 2026-09-11: the welcome approach is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math; greetings gated by interest remain, after the calculations. |
+| Teach the method | Grounding | **Greetings LANDED** `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The welcome line is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
