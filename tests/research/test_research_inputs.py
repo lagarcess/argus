@@ -94,10 +94,12 @@ def test_a_scenario_read_without_a_calculation_defaults_to_valuation_and_records
     assert scenario_calculation(typed) is typed.calculation
     assert SCENARIO_CALCULATION_DEFAULTED_REASON_CODE not in typed.reason_codes
 
-    stated_kind_without_pages = _read({"kind": "time_value", "inputs": {"payment": 5}})
+    stated_kind_without_pages = _read(
+        {"kind": "debt_to_income", "inputs": {"monthly_income": 5000}}
+    )
     request = scenario_calculation(stated_kind_without_pages)
     assert request.kind == "valuation_scenarios"
-    assert request.inputs == {"payment": 5}
+    assert request.inputs == {"monthly_income": 5000}
 
 
 def test_rows_feed_inputs_only_under_their_exact_names_and_the_user_wins() -> None:
@@ -117,10 +119,10 @@ def test_rows_feed_inputs_only_under_their_exact_names_and_the_user_wins() -> No
         ),
     )
     arguments = arguments_from_rows(
-        packet, read, declaration, currency="DOP", symbol="nvda"
+        packet, read, declaration, currency="USD", symbol="nvda"
     )
     assert arguments["symbol"] == "nvda"
-    assert arguments["currency"] == "DOP"
+    assert arguments["currency"] == "USD"
     assert arguments["price"] == 218.36
     assert arguments["per_share"] == 4.5
     assert arguments["growth_base_pct"] == 12, "the user's stated input wins"

@@ -541,7 +541,7 @@ def test_a_scenario_question_sends_the_scenario_contract(monkeypatch) -> None:
     assert result is not None
     body = __import__("json").loads(transport.requests[0].content.decode())
     assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "Argus computes the scenarios itself" in body["input"]
+    assert "Argus computes the answer itself" in body["input"]
     assert "- price: the current share price" in body["input"]
     assert "- growth_base_pct: " in body["input"]
     assert body["instructions"] != RETRIEVAL_INSTRUCTIONS

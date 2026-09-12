@@ -92,7 +92,8 @@ def _run(
         turn.calculation_turn_stage_result(
             interpretation=interpretation,
             state=RunState.new(current_user_message=message, recent_thread_history=[]),
-            user=user or UserState(user_id="u1", language_preference="en", currency="USD"),
+            user=user
+            or UserState(user_id="u1", language_preference="en", currency="USD"),
             selected_thread_metadata=dict(metadata or {}),
         )
     )
@@ -112,7 +113,9 @@ def test_a_stated_plan_computes_in_process_and_states_no_figure_in_prose(
     def no_provider(*_args, **_kwargs):
         raise AssertionError("a calculation never calls a provider")
 
-    monkeypatch.setattr(perplexity_agent.PerplexityAgentClient, "run_research", no_provider)
+    monkeypatch.setattr(
+        perplexity_agent.PerplexityAgentClient, "run_research", no_provider
+    )
     result = _run(
         _read({"kind": "time_value", "inputs": SAVING_PLAN, "solve_for": "future_value"})
     )
@@ -162,7 +165,10 @@ def test_a_monthly_plan_offers_the_same_monthly_buys_in_the_market() -> None:
     assert rows["rows"][0]["send_text"] == (
         "Prueba comprar 5000 DOP de SPY cada mes durante los últimos 20 años"
     )
-    assert market_counterfactual_rows({"currency": "USD", "periods": 7}, language="en") is None
+    assert (
+        market_counterfactual_rows({"currency": "USD", "periods": 7}, language="en")
+        is None
+    )
     assert (
         market_counterfactual_rows(
             {"currency": "USD", "present_value": 100, "periods": 400}, language="en"
@@ -244,7 +250,11 @@ def test_the_reply_merges_the_pending_calculation_and_computes() -> None:
 def test_a_pending_calculation_yields_to_a_different_kind_the_user_moved_to() -> None:
     first = _run(
         _read(
-            {"kind": "time_value", "inputs": {"direction": "save"}, "solve_for": "payment"},
+            {
+                "kind": "time_value",
+                "inputs": {"direction": "save"},
+                "solve_for": "payment",
+            },
             requires_clarification=True,
         )
     )
@@ -286,7 +296,9 @@ def test_a_broad_question_gets_the_models_follow_ups_as_question_steps() -> None
     assert result is not None
     assert result.outcome == "ready_to_respond"
     patch = result.patch
-    assert patch["assistant_response"] == "A few details would let me compute this for you."
+    assert (
+        patch["assistant_response"] == "A few details would let me compute this for you."
+    )
     assert patch["next_steps"]["items"] == [
         {"type": "question", "text": "How much can you put aside each month?"},
         {"type": "question", "text": "For how many years?"},
@@ -302,12 +314,47 @@ def test_a_read_with_neither_a_kind_nor_follow_ups_leaves_the_turn_alone() -> No
     assert _run(_read(None)) is None
 
 
-def test_published_inputs_about_a_named_asset_are_left_to_research() -> None:
+def test_published_inputs_route_to_research_which_computes_this_declaration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import research_answer
+
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    dispatched: list[Any] = []
+
+    async def dispatch(query, **kwargs):
+        dispatched.append((query, kwargs["interpretation"].calculation))
+        return StageResult(
+            outcome="ready_to_respond", stage_patch={"assistant_response": "computed"}
+        )
+
+    monkeypatch.setattr(research_answer, "_dispatch", dispatch)
     interpretation = _read(
+        {
+            "kind": "time_value",
+            "inputs": {
+                "direction": "save",
+                "present_value": 0,
+                "annual_rate_pct": 0,
+                "periods": 12,
+            },
+            "solve_for": "payment",
+            "retrieve": ["future_value"],
+        }
+    )
+    result = _run(interpretation, message="¿Cuánto debo ahorrar al mes para una iPad?")
+    assert result is not None and result.patch["assistant_response"] == "computed"
+    ((query, calculation),) = dispatched
+    assert query.question_kind == "current_external" and query.symbols == []
+    assert calculation.retrieve == ["future_value"]
+    assert turn.RESEARCH_QUERY_SYNTHESIZED_REASON_CODE in interpretation.reason_codes
+    assert turn.RETRIEVAL_OWNS_REASON_CODE in interpretation.reason_codes
+
+    named = _read(
         {
             "kind": "valuation_scenarios",
             "inputs": {"symbol": "NVDA", "horizon_years": 10},
-            "retrieve": ["price", "per_share", "growth_base_pct", "multiple_base"],
+            "retrieve": ["price", "per_share", "growth_base_pct"],
         },
         research_query={
             "question_kind": "company_lookup",
@@ -315,8 +362,30 @@ def test_published_inputs_about_a_named_asset_are_left_to_research() -> None:
             "scenario_question": True,
         },
     )
-    assert _run(interpretation, message="What will NVDA be worth in ten years?") is None
-    assert turn.RETRIEVAL_OWNS_REASON_CODE in interpretation.reason_codes
+    dispatched.clear()
+    assert _run(named) is not None
+    assert dispatched[0][0].symbols == ["NVDA"]
+    assert turn.RESEARCH_QUERY_SYNTHESIZED_REASON_CODE not in named.reason_codes
+
+
+def test_without_research_a_published_input_is_asked_of_the_user() -> None:
+    result = _run(
+        _read(
+            {
+                "kind": "valuation_scenarios",
+                "inputs": {"symbol": "NVDA", "horizon_years": 10, "amount": 10000},
+                "retrieve": ["price", "per_share", "growth_base_pct"],
+            },
+            assistant_response=None,
+        )
+    )
+    assert result is not None
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "price"
+    assert (
+        result.patch["clarification"]["payload"]["calculation"]["kind"]
+        == "valuation_scenarios"
+    )
 
 
 def test_a_kind_the_catalog_lacks_is_recorded_and_left_alone(
@@ -363,7 +432,8 @@ def test_undeclared_inputs_and_a_valued_unknown_are_dropped_and_recorded() -> No
 def test_the_profile_currency_counts_the_answer_and_a_default_is_recorded() -> None:
     read = {"kind": "time_value", "inputs": SAVING_PLAN, "solve_for": "future_value"}
     with_currency = _run(
-        _read(read), user=UserState(user_id="u1", language_preference="es-419", currency="DOP")
+        _read(read),
+        user=UserState(user_id="u1", language_preference="es-419", currency="DOP"),
     )
     assert with_currency is not None
     assert _card(with_currency)["arguments"]["currency"] == "DOP"

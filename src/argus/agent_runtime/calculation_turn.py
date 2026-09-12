@@ -23,7 +23,7 @@ from argus.agent_runtime.interpreter.calculation_request import (
     RUNTIME_ARGUMENTS,
     CalculationRequest,
 )
-from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.agent_runtime.research_inputs import retrievable
 from argus.agent_runtime.result_next_steps import (
     QUESTION_STEP,
     NextStep,
@@ -37,7 +37,7 @@ from argus.agent_runtime.stages.interpret_types import (
 from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
 from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.calculations import is_free_calculation
-from argus.domain.calculations._shared import MISSING_INPUT_CODE
+from argus.domain.calculations._shared import MISSING_INPUT_CODE, SYMBOL_FIELD
 from argus.domain.tool_contracts import ToolCall
 from argus.domain.tool_declaration import ToolDeclaration, ToolInvocationError
 
@@ -52,6 +52,7 @@ SOLVE_FOR_CLEARED_REASON_CODE = "calculation_solve_for_cleared"
 CURRENCY_DEFAULTED_REASON_CODE = "calculation_currency_defaulted"
 LEAD_REPLACED_REASON_CODE = "calculation_lead_replaced"
 RETRIEVAL_OWNS_REASON_CODE = "calculation_retrieval_needed"
+RESEARCH_QUERY_SYNTHESIZED_REASON_CODE = "calculation_research_query_synthesized"
 NOTHING_TO_SOLVE_REASON_CODE = "calculation_nothing_to_solve"
 DEFAULT_CURRENCY = "USD"
 CURRENCY_FIELD = "currency"
@@ -77,11 +78,12 @@ async def calculation_turn_stage_result(
     if declaration is None or not is_free_calculation(declaration):
         _note(interpretation, KIND_UNKNOWN_REASON_CODE, kind=request.kind)
         return None
-    if request.retrieve and primary_research_query(interpretation) is not None:
-        # Published inputs about a named asset: research retrieves them with
-        # their pages and computes the same declaration afterwards.
-        _note(interpretation, RETRIEVAL_OWNS_REASON_CODE, retrieve=request.retrieve)
-        return None
+    if retrievable(request):
+        routed = await _retrieved_inputs_result(
+            interpretation, request, state=state, user=user
+        )
+        if routed is not None:
+            return routed
     arguments = _arguments(declaration, request, interpretation=interpretation, user=user)
     missing = _missing_inputs(declaration, arguments, request, interpretation)
     if missing is None:
@@ -92,6 +94,43 @@ async def calculation_turn_stage_result(
         )
     return await _computed_result(
         interpretation, declaration, arguments, state=state, user=user, catalog=catalog
+    )
+
+
+async def _retrieved_inputs_result(
+    interpretation: StructuredInterpretation,
+    request: CalculationRequest,
+    *,
+    state: RunState,
+    user: UserState,
+) -> StageResult | None:
+    """Published inputs: research retrieves them with their pages and computes
+    this declaration from the typed rows. Without research the user types them."""
+    from argus.domain.research.config import research_rail_enabled
+
+    if not research_rail_enabled():
+        return None
+    from argus.agent_runtime import research_answer
+    from argus.agent_runtime.research_query import ResearchQueryExtraction
+
+    interpretation.calculation = request
+    query = interpretation.research_query
+    if query is None:
+        symbol = request.inputs.get(SYMBOL_FIELD)
+        named = isinstance(symbol, str) and bool(symbol.strip())
+        query = ResearchQueryExtraction(
+            question_kind="company_lookup" if named else "current_external",
+            symbols=[str(symbol).strip()] if named else [],
+        )
+        _note(interpretation, RESEARCH_QUERY_SYNTHESIZED_REASON_CODE, kind=request.kind)
+    _note(interpretation, RETRIEVAL_OWNS_REASON_CODE, retrieve=request.retrieve)
+    return await research_answer._dispatch(
+        query,
+        interpretation=interpretation,
+        state=state,
+        user=user,
+        discovery_request=None,
+        decision=None,
     )
 
 
@@ -188,6 +227,11 @@ def _missing_inputs(
         return _ordered(missing, interpretation) if missing else []
     except (ValueError, TypeError):
         return []
+    outcome = declaration.invoke_sync(arguments)
+    if outcome.failure is not None and outcome.failure.code == MISSING_INPUT_CODE:
+        # An input the declaration requires at compute time, such as a price
+        # no page supplied: the user types it.
+        return _ordered(list(outcome.failure.fields), interpretation)
     return []
 
 

@@ -111,16 +111,21 @@ SCENARIO_FROM_HORIZON_REASON_CODE = "scenario_contract_from_horizon"
 def scenario_contract_applies(
     query: ResearchQueryExtraction, interpretation: StructuredInterpretation
 ) -> bool:
-    """Whether this turn is a computed scenario (decision 10).
+    """Whether this turn is computed from published inputs (decision 10).
 
-    Two independent typed facts say so and either is enough: the research
-    query's ``scenario_question`` bit, or a ``future_window`` horizon the
-    interpreter typed on the draft. Neither reads the message; a read that
-    carries neither is an ordinary lookup and takes the recorded contract."""
+    Three independent typed facts say so and any is enough: a calculation read
+    that names inputs a page supplies, the research query's
+    ``scenario_question`` bit, or a ``future_window`` horizon the interpreter
+    typed on the draft. None reads the message; a read that carries none is an
+    ordinary lookup and takes the recorded contract."""
     from argus.agent_runtime.interpreter.draft_shape import (
         strategy_draft_future_horizon,
     )
     from argus.agent_runtime.interpreter.research_routing import scenario_is_typed
+    from argus.agent_runtime.research_inputs import retrievable
+
+    if retrievable(getattr(interpretation, "calculation", None)):
+        return True
 
     if not scenario_is_typed(query, interpretation):
         return False
@@ -593,6 +598,7 @@ def _packet_stage_result(
             subjects=subjects,
             user=user,
             withheld=degraded_code is not None,
+            interpretation=interpretation,
         )
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
@@ -625,6 +631,7 @@ def _computed_scenario(
     subjects: list[dict[str, str]],
     user: UserState,
     withheld: bool,
+    interpretation: StructuredInterpretation | None = None,
 ) -> dict[str, Any]:
     """The scenario card: retrieved inputs with their pages when the answer
     publishes; only what the user stated, blanks typeable, when it is withheld."""
@@ -643,6 +650,7 @@ def _computed_scenario(
         declaration,
         currency=user.currency or DEFAULT_CURRENCY,
         symbol=subjects[0]["symbol"] if subjects else None,
+        interpretation=interpretation,
     )
     return computed_scenario_patch(declaration, arguments)
 
@@ -665,10 +673,12 @@ def _with_market_counterfactual(
 
     final = computed.get("final_response_payload") or {}
     cards = final.get("tool_result_cards") or []
-    if not subjects or not cards or cards[0]["outcome"]["status"] != "succeeded":
+    if not cards or cards[0]["outcome"]["status"] != "succeeded":
         return rows
     counterfactual = market_counterfactual_rows(
-        cards[0]["arguments"], language=language, subject=subjects[0]
+        cards[0]["arguments"],
+        language=language,
+        subject=subjects[0] if subjects else None,
     )
     if counterfactual is None:
         return rows
@@ -1302,12 +1312,12 @@ def _research_prompt(
         )
     if scenario:
         lines.append(
-            "Argus computes the scenarios itself. Retrieve the inputs below, one "
-            "row each, with label exactly the input name as written here, the "
-            "value as a plain number, and the page it was read from with its "
-            "date. Do not compute scenario values, ranges or future prices; state "
-            "the inputs you found, their dates and their sources, and name any "
-            "input no page states. No advice."
+            "Argus computes the answer itself. Retrieve the inputs below, one row "
+            "each, with label exactly the input name as written here, the value "
+            "as a plain number, and the page it was read from with its date. Do "
+            "not compute the answer, scenario values, ranges or future figures; "
+            "state the inputs you found, their dates and their sources, and name "
+            "any input no page states. No advice."
         )
         for name, meaning in inputs:
             lines.append(f"- {name}: {meaning}")

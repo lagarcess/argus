@@ -5246,8 +5246,10 @@ names a different kind starts that kind instead. A broad question answers with
 the lead and `next_steps` items of type `question`, one per follow-up, and
 stores no card.
 
-A forward-looking or valuation research answer (decision 10) computes the same
-way after retrieval. `SCENARIO_RETRIEVAL_INSTRUCTIONS` asks the provider to
+A calculation read that names inputs a published page supplies, and every
+forward-looking or valuation research answer (decision 10), computes the same
+way after retrieval; with the research rail off, the user is asked for those
+inputs instead. `SCENARIO_RETRIEVAL_INSTRUCTIONS` asks the provider to
 retrieve inputs and never to compute scenario values; the prompt names each
 input by its argument name with its meaning, and a typed row feeds an input
 only when its `label` is that name. The research turn then carries the

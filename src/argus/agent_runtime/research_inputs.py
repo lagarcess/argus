@@ -31,6 +31,9 @@ from argus.domain.tool_declaration import ToolDeclaration
 # and the valuation declaration was chosen for it.
 SCENARIO_CALCULATION_DEFAULTED_REASON_CODE = "scenario_calculation_defaulted"
 SCENARIO_DEFAULT_KIND = "valuation_scenarios"
+# Recorded when a retrieved money row is counted in another currency than the
+# calculation, so the input stays blank for the reader to type.
+CURRENCY_MISMATCH_REASON_CODE = "calculation_input_currency_mismatch"
 CURRENCY_FIELD = "currency"
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
@@ -59,6 +62,26 @@ RETRIEVAL_MEANINGS: dict[str, dict[str, str]] = {
         "multiple_low": "the low end of a published price-to-earnings range",
         "multiple_high": "the high end of a published price-to-earnings range",
     },
+    "time_value": {
+        "present_value": (
+            "the current price of the item or loan the question names, in the "
+            "question's currency"
+        ),
+        "future_value": (
+            "the current price of the goal the question names, in the question's "
+            "currency"
+        ),
+        "annual_rate_pct": (
+            "the published yearly rate for the loan, deposit or product the "
+            "question names, as a percent"
+        ),
+    },
+    "effective_rate": {
+        "nominal_rate_pct": (
+            "the published nominal yearly rate for the product the question "
+            "names, as a percent"
+        ),
+    },
     "price_multiple": {
         "price": "the current share price",
         "per_share": "earnings per share for the trailing twelve months",
@@ -71,6 +94,10 @@ RETRIEVAL_MEANINGS: dict[str, dict[str, str]] = {
     },
     "growth_projection": {
         "annual_rate_pct": "a published forecast of yearly growth or return, as a percent",
+        "inflation_rate_pct": (
+            "the latest published yearly inflation rate where the reader lives, "
+            "as a percent"
+        ),
     },
     "discounted_cash_flow": {
         "cash_flow": "free cash flow per share for the trailing twelve months",
@@ -90,6 +117,14 @@ RETRIEVAL_MEANINGS: dict[str, dict[str, str]] = {
         "ratio_pct": "the fund's expense ratio, as a percent",
     },
 }
+
+
+def retrievable(read: CalculationRequest | None) -> bool:
+    """Whether a read names an input a published page can supply for its kind."""
+    if read is None or read.kind not in RETRIEVAL_MEANINGS:
+        return False
+    meanings = RETRIEVAL_MEANINGS[str(read.kind)]
+    return any(name in meanings for name in read.retrieve)
 
 
 def scenario_calculation(interpretation: StructuredInterpretation) -> CalculationRequest:
@@ -135,9 +170,11 @@ def arguments_from_rows(
     *,
     currency: str,
     symbol: str | None,
+    interpretation: StructuredInterpretation | None = None,
 ) -> dict[str, Any]:
     """The declaration's arguments: the user's stated inputs, then one retrieved
-    row per named input, each carrying its page and date as its source."""
+    row per named input, each carrying its page and date as its source. A money
+    row counted in another currency feeds nothing."""
     declared = set(declaration.arguments_type.model_fields) - RUNTIME_ARGUMENTS
     arguments: dict[str, Any] = {
         name: value
@@ -149,14 +186,29 @@ def arguments_from_rows(
     arguments.setdefault(CURRENCY_FIELD, currency)
     sources: dict[str, dict[str, Any]] = {}
     wanted = {name for name, _ in retrieval_inputs(request, declaration)}
+    counted_in = str(arguments[CURRENCY_FIELD]).strip().upper()
+    mismatched: list[str] = []
     for row in packet.rows:
         name = row.label.strip().casefold()
         if name not in wanted or name in arguments:
+            continue
+        if row.kind == "currency" and row.unit.strip().upper() != counted_in:
+            mismatched.append(name)
             continue
         arguments[name] = row.value
         sources[name] = _row_source(row).model_dump(mode="json")
     if sources:
         arguments[TOOL_INPUT_SOURCES_FIELD] = sources
+    if mismatched:
+        if (
+            interpretation is not None
+            and CURRENCY_MISMATCH_REASON_CODE not in interpretation.reason_codes
+        ):
+            interpretation.reason_codes.append(CURRENCY_MISMATCH_REASON_CODE)
+        logger.info(
+            f"Retrieved money inputs in another currency left blank inputs={mismatched} currency={counted_in}",
+            failure_classification=CURRENCY_MISMATCH_REASON_CODE,
+        )
     return arguments
 
 

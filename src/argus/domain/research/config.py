@@ -63,11 +63,11 @@ RETRIEVAL_INSTRUCTIONS = (
 # each with its page, and Argus computes the scenario figures itself. Frozen
 # by its own recording under docs/reports/evidence/grounded-math/probes.
 SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
-    " This question asks what something will be worth, what it must grow "
-    "into, or what it is worth today. Argus computes the scenarios from typed "
-    "inputs, so never compute scenario values, ranges or future prices "
-    "yourself. The question names each input to retrieve: the current price, "
-    "a per-share figure, published growth forecasts, valuation multiples. Row "
+    " This question is answered by a calculation Argus computes from typed "
+    "inputs, such as what something will be worth, what a plan costs or what a "
+    "price implies. Never compute the answer, scenario values, ranges or "
+    "future figures yourself. The question names each input to retrieve: a "
+    "price, a rate, a per-share figure, a published forecast or a multiple. Row "
     "every input you find, one row per input, with label exactly the input "
     "name as the question writes it, value as a plain number, and the page it "
     "was read from; the current price may come from finance data. In "
