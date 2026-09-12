@@ -92,7 +92,7 @@ class RetrievedRow(BaseModel):
         if isinstance(data, dict) and data.get("kind") == "currency":
             unit = data.get("unit")
             if isinstance(unit, str):
-                code = unit.strip().replace("/", " ").split(" ")[0].upper()
+                code = unit.strip().replace("/", " ").split(" ")[0]
                 if code in CURRENCY_CODES and code != unit.strip():
                     return {**data, "unit": code}
         return data

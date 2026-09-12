@@ -172,7 +172,7 @@ ANSWER_CALCULATION_INSTRUCTIONS = (
     "as {{name}}, with its input or result name, never as digits, including in a "
     "worked example; Argus fills each one from the computed result. Every other "
     "figure is written in digits and is never a reference. Leave calculation null "
-    "when the answer computes nothing. Kinds, their inputs and their results:\\n"
+    "when the answer computes nothing. Kinds, their inputs and their results:\n"
 )
 
 
