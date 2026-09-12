@@ -73,3 +73,25 @@ def test_the_catalogue_lists_every_kind_with_its_inputs_and_results() -> None:
     assert "Results: " in clause and "total_interest" in clause
     assert "{{name}}" in ANSWER_CALCULATION_INSTRUCTIONS
     assert "—" not in ANSWER_CALCULATION_INSTRUCTIONS + clause
+
+
+def test_the_provider_schema_carries_no_bound_a_strict_model_refuses() -> None:
+    """Anthropic-backed research models refuse a strict schema with item or
+    numeric bounds (recorded 2026-09-12: HTTP 400 until maxItems was removed),
+    so limits are enforced at parse time instead."""
+    import json
+
+    from argus.domain.research.answer_contract import typed_answer_json_schema
+
+    text = json.dumps(typed_answer_json_schema())
+    for bound in ("maxItems", "minItems", "maximum", "minimum", "maxLength", "minLength"):
+        assert f'"{bound}"' not in text, bound
+    many = [{"name": "amount", "value": index, "source": "user"} for index in range(40)]
+    assert (
+        len(
+            AnswerCalculation.model_validate(
+                {"kind": "time_value", "inputs": many}
+            ).inputs
+        )
+        == 16
+    )

@@ -71,7 +71,17 @@ async function shot(tab, name, width, language, extra = {}, fullPage = true) {
   return { screenshot: file, ...extra };
 }
 
+async function openFirstCard(tab) {
+  const toggle = tab.locator('[data-tool-result-card] [data-tool-card-toggle][aria-expanded="false"]').first();
+  if (await toggle.count()) {
+    await toggle.scrollIntoViewIfNeeded();
+    await toggle.click();
+    await tab.waitForTimeout(500);
+  }
+}
+
 async function editFirstInput(tab, factor) {
+  await openFirstCard(tab);
   const input = tab.locator("[data-tool-result-card] [data-tool-input] input:not([disabled])").first();
   await input.scrollIntoViewIfNeeded();
   const before = await input.inputValue();
@@ -118,6 +128,10 @@ await scene("answers", async ({ tab, width, language }) => {
     if (!record) continue;
     await open(tab, record.conversation_id);
     shots.push((await shot(tab, `answer-${id}`, width, language)).screenshot);
+    if (await tab.locator("[data-tool-card-toggle]").count()) {
+      await openFirstCard(tab);
+      shots.push((await shot(tab, `answer-${id}-open`, width, language)).screenshot);
+    }
   }
   return { shots };
 });
@@ -190,10 +204,13 @@ await scene("outage", async ({ tab, width, language }) => {
   return shot(tab, "failure-outage", width, language);
 });
 
-await scene("withheld", async ({ tab, width, language }) => {
+await scene("failed-lookup", async ({ tab, width, language }) => {
+  // A failed lookup answers from market data and stated assumptions; no card
+  // with blank inputs renders and the failure never becomes the answer.
   await open(tab, SEEDS[`withheld-${language}`].conversation_id);
-  await tab.waitForSelector("[data-tool-result-card]", { timeout: 15000 });
-  return shot(tab, "failure-withheld", width, language);
+  const blank = await tab.evaluate((unknown) => [...document.querySelectorAll("[data-tool-input]")].some((node) => node.textContent?.includes(unknown)), language === "en" ? "To solve" : "Por calcular");
+  const cards = await tab.locator("[data-tool-result-card]").count();
+  return shot(tab, "failure-lookup-answered", width, language, { cards, blank_inputs_shown: blank });
 });
 
 await scene("no-solution", async ({ tab, width, language }) => {

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema
+from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, field_validator
 
 from argus.domain.calculations import get_calculation_declarations
 from argus.domain.tool_declaration import ToolDeclaration
@@ -138,9 +138,17 @@ class AnswerCalculation(BaseModel):
     )
     inputs: list[AnswerCalculationInput] = Field(
         default_factory=list,
-        max_length=MAX_ANSWER_INPUTS,
         description="Every input the kind needs, one entry each, with its source.",
     )
+
+    @field_validator("inputs")
+    @classmethod
+    def _bounded(
+        cls, inputs: list[AnswerCalculationInput]
+    ) -> list[AnswerCalculationInput]:
+        # Enforced here, not advertised: a strict provider schema that carries an
+        # item bound is refused outright by Anthropic-backed research models.
+        return inputs[:MAX_ANSWER_INPUTS]
 
 
 # Model-facing contract shared by every answering model; frozen by the

@@ -16,13 +16,13 @@ from typing import Any
 from urllib.parse import urlparse
 
 import pytest
+from argus.domain.research.answer_contract import typed_answer_response_format
 from argus.domain.research.config import (
     RESEARCH_CONFIG_SPECS,
     RETRIEVAL_INSTRUCTIONS,
     SCENARIO_RETRIEVAL_INSTRUCTIONS,
     retrieval_spec,
 )
-from argus.domain.research.contracts import typed_response_format
 from argus.domain.research.perplexity_agent import _packet_from_response
 
 PROBES = Path(__file__).resolve().parents[2] / "docs/reports/evidence/545/probes"
@@ -62,7 +62,7 @@ def test_the_recorded_request_is_the_request_the_code_builds_today(name: str) ->
     has to be re-recorded, the way an interpreter change is re-measured."""
     request = _request(name)
     assert request["instructions"] == RETRIEVAL_INSTRUCTIONS
-    assert request["response_format"] == typed_response_format()
+    assert request["response_format"] == typed_answer_response_format()
     shape = _recording(name)["exchanges"][0]["request"]
     spec = RESEARCH_CONFIG_SPECS[
         "fast"
@@ -189,13 +189,10 @@ def test_the_finance_tool_refusal_is_the_provider_not_the_request_shape() -> Non
 
 def test_the_scenario_recording_is_the_request_the_code_builds_today() -> None:
     """The scenario contract travels with its own recording: a change to
-    SCENARIO_RETRIEVAL_INSTRUCTIONS, the input ask, the retrieval meanings, the
-    balanced configuration or the typed schema has to be re-recorded, like
-    every other retrieval text."""
-    from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
+    SCENARIO_RETRIEVAL_INSTRUCTIONS, the answer calculation contract, the
+    balanced configuration or the typed answer schema has to be re-recorded,
+    like every other retrieval text."""
     from argus.agent_runtime.research_grounded import _research_prompt
-    from argus.agent_runtime.research_inputs import retrieval_inputs
-    from argus.domain.capability_registry import get_tool_catalog
 
     recording = json.loads(SCENARIO_PROBE.read_text(encoding="utf-8"))
     request = recording["exchanges"][0]["request"]
@@ -208,15 +205,10 @@ def test_the_scenario_recording_is_the_request_the_code_builds_today() -> None:
     )
     assert request["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert request["instructions"] == spec.instructions
-    assert request["response_format"] == typed_response_format()
+    assert request["response_format"] == typed_answer_response_format()
     assert request["models"] == list(spec.models)
     assert request["max_steps"] == spec.max_steps
     assert [tool["type"] for tool in request["tools"]] == list(spec.tools)
-    calculation = CalculationRequest.model_validate(recording["calculation"])
-    declaration = get_tool_catalog().get(str(calculation.kind))
-    assert declaration is not None
-    inputs = retrieval_inputs(calculation, declaration)
-    assert [name for name, _ in inputs] == recording["inputs"]
     assert request["input"] == _research_prompt(
         message=recording["question"],
         subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
@@ -225,19 +217,17 @@ def test_the_scenario_recording_is_the_request_the_code_builds_today() -> None:
         question_kind=None,
         publisher_sources_required=True,
         scenario=True,
-        inputs=inputs,
     )
 
 
-def test_the_provider_retrieves_the_named_inputs_and_argus_computes_the_scenarios() -> None:
-    """What the retrieve-only contract buys: one row per input under the name
-    the ask spells out, cited to its page, and the valuation declaration
-    computes a card from exactly those rows."""
-    from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
-    from argus.agent_runtime.research_inputs import (
-        arguments_from_rows,
-        computed_scenario_patch,
-    )
+def test_the_provider_returns_its_calculation_and_argus_computes_the_scenarios() -> None:
+    """What the answer contract buys: the answer names its calculation with each
+    input's source, the current price from market data, a figure from a page it
+    retrieved and assumptions it states, writes every figure as a reference, and
+    the valuation declaration computes a card from exactly those inputs."""
+    from argus.agent_runtime.answer_calculation import publish_calculation
+    from argus.agent_runtime.research_calculation import retrieved_pages
+    from argus.domain.calculations.answer_request import AnswerCalculation
     from argus.domain.capability_registry import get_tool_catalog
 
     recording = json.loads(SCENARIO_PROBE.read_text(encoding="utf-8"))
@@ -245,29 +235,36 @@ def test_the_provider_retrieves_the_named_inputs_and_argus_computes_the_scenario
     packet = _packet_from_response(
         recording["exchanges"][-1]["response"], latency_ms=0, on_unpriced=lambda _: None
     )
-    assert packet.rows, "the inputs must be rowed"
-    labels = [row.label for row in packet.rows]
-    assert set(labels) <= set(recording["inputs"]), labels
-    assert {"price", "per_share", "growth_base_pct"} <= set(labels)
-    assert any(row.source_url for row in packet.rows), "inputs cite their pages"
-    assert packet.unsourced_rows == ()
-    answer = packet.answer_markdown.lower()
-    assert "bear" not in answer and "bull" not in answer
-    calculation = CalculationRequest.model_validate(recording["calculation"])
-    declaration = get_tool_catalog().get(str(calculation.kind))
-    arguments = arguments_from_rows(
-        packet, calculation, declaration, currency="USD", symbol="NVDA"
+    request = AnswerCalculation.model_validate(packet.calculation)
+    assert request.kind == "valuation_scenarios"
+    sources = {item.name: item.source for item in request.inputs}
+    assert sources["price"] == "market_data"
+    assert "page" in sources.values() and "assumption" in sources.values()
+    assert "{{price}}" in packet.answer_markdown
+    notes: list[str] = []
+    published = publish_calculation(
+        request,
+        template=packet.answer_markdown,
+        language="en",
+        catalog=get_tool_catalog(),
+        retrieved=retrieved_pages(packet),
+        currency="USD",
+        subject_symbol="NVDA",
+        market_close=lambda symbol: (218.29, "2026-09-11"),
+        notes=notes,
     )
-    card = computed_scenario_patch(declaration, arguments)["final_response_payload"][
-        "tool_result_cards"
-    ][0]
+    assert published is not None and not published.not_looked_up, notes
+    assert published.template is not None, notes
+    card = published.patch["final_response_payload"]["tool_result_cards"][0]
     assert card["outcome"]["status"] == "succeeded"
     assert card["arguments"]["amount"] == 10000
-    assert card["arguments"]["horizon_years"] == 10
-    inputs = {fact["name"]: fact for fact in card["presentation"]["inputs"]}
-    assert inputs["growth_base_pct"]["source"]["kind"] == "page"
-    assert inputs["growth_base_pct"]["source"]["url"].startswith("http")
-    assert inputs["growth_base_pct"]["source"]["date"]
+    assert card["arguments"]["sources"]["price"] == {
+        "kind": "market_data",
+        "date": "2026-09-11",
+    }
+    assert card["arguments"]["sources"]["growth_base_pct"] == {"kind": "assumption"}
+    page = card["arguments"]["sources"]["per_share"]
+    assert page["kind"] == "page" and page["url"].startswith("https://") and page["date"]
     rows = {fact["name"]: fact for fact in card["presentation"]["rows"]}
     assert rows["value_at_horizon_base"]["value"] > 0
-    assert rows["value_at_horizon_base"]["source"] == {"kind": "computed"}
+    assert "{{" not in published.answer_text
