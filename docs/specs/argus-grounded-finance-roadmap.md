@@ -935,6 +935,16 @@ later": the registry already renders any declared tool as one generic card
 with editable inputs and instant recompute, so a calculation needs no card
 design of its own.
 
+**Direction, founder, 2026-09-12.** Two corrections after live testing. First,
+the answer step owns the math: the interpreter does not pick calculations, and
+its response schema stays as it was. Second, a money question gets an answer as
+deep as a top search answer, sourced, with calculations only where the answer
+computes on specific figures and editable inputs collapsed under it. Concept
+questions such as "is my savings account losing money?" reach research instead
+of the no-search answer. Argus adds what a search answer cannot: the reader's
+own numbers computed on the spot, their home country, runnable next steps, and
+options shown with their math instead of advice.
+
 **The outcome.** Any money question gets an answer whose every figure is
 computed by our code from inputs that are cited or given by the user. The
 inputs sit under the answer, each showing where it came from, editable and
@@ -1564,6 +1574,26 @@ item that needs it.
 | **`AGENTS.md`** | Operating rules 1 through 7 become permanent repository rules rather than board rules. A board is superseded; these should outlive it. | Any time after lift-the-loop proves rule 1 holds. |
 
 ---
+
+## Monetization notes, brainstorm only
+
+**Not a decision, and no lane builds from this section.** Founder heads-up,
+2026-09-12, while comparing answers with Perplexity, which previews its
+"advanced search" as a paid feature inside the answer.
+
+- **What that product charges for** is what costs it money: deeper multi-step
+  search, and agent tasks such as building a calculator, a dashboard or a
+  monitor. The upsell appears at the moment of use.
+- **Argus already meters the same split.** Usage is keyed by operation class,
+  compute, grounding and execution. Computation is free; searches with sources
+  and backtests cost money.
+- **Ideas to weigh later:** fast sourced answers and calculators free; deep
+  research, higher research and backtest allowances, saved decisions that
+  re-run, and monitoring (for example a bank's rate against the market) paid;
+  perks tied to leagues if they ship.
+- **Tensions to keep in view:** sending every money question to research raises
+  the cost per answer and uses guests' small daily research allowance faster.
+  The metering item already says pricing waits for real usage.
 
 ## Privacy and terms
 
