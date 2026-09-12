@@ -171,3 +171,22 @@ def test_an_offer_whose_prose_leans_on_a_result_it_cannot_show_is_not_published(
         "code": "calculation_inputs_not_found"
     }
     assert "{{" not in str(result.stage_patch.get("assistant_response"))
+
+
+def test_a_money_unit_with_a_qualifier_keeps_its_code() -> None:
+    from argus.domain.research.contracts import RetrievedRow
+
+    row = {
+        "subject": "NVIDIA",
+        "symbol": "NVDA",
+        "label": "fiscal-year diluted earnings per share",
+        "value": 4.9,
+        "kind": "currency",
+        "unit": "USD per share",
+        "as_of": "2026-01-25",
+        "source_url": "https://example.com/nvda/eps",
+    }
+    assert RetrievedRow.model_validate(row).unit == "USD"
+    assert RetrievedRow.model_validate({**row, "unit": "USD/share"}).unit == "USD"
+    with pytest.raises(ValueError):
+        RetrievedRow.model_validate({**row, "unit": "dollars"})

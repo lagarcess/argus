@@ -6,6 +6,7 @@ research job is the message the job posts later. Each record's full answers are
 also written as markdown beside it (turns/ becomes answers/) for side-by-side
 reading.
 Usage: python ask.py <label> <language> <country> <out.json> <message> [<reply> ...]
+A reply written @action:<type>:<label> is sent as that typed chat action with its label, the way a tapped row sends it.
 Set GM_CONVERSATION_ID to continue an existing conversation; its turns append to <out.json>. Paid."""
 from __future__ import annotations
 
@@ -122,11 +123,18 @@ with httpx.Client(base_url=API, timeout=600) as client:
         conversation_id = created.json()["conversation"]["id"]
     record["conversation_id"] = conversation_id
     for message in messages:
+        action = None
+        if message.startswith("@action:"):
+            _, action_type, message = message.split(":", 2)
+            action = {"type": action_type, "label": message}
+        body = {"conversation_id": conversation_id, "message": message, "language": language, "memory_opt_out": True}
+        if action is not None:
+            body["action"] = action
         started = time.monotonic()
         timeline: list[dict] = []
         first_answer = final_at = None
         tool_jobs: list = []
-        with client.stream("POST", "/chat/stream", json={"conversation_id": conversation_id, "message": message, "language": language, "memory_opt_out": True}) as stream:
+        with client.stream("POST", "/chat/stream", json=body) as stream:
             stream.raise_for_status()
             for line in stream.iter_lines():
                 if not line.startswith("data:"):
@@ -163,6 +171,7 @@ with httpx.Client(base_url=API, timeout=600) as client:
                 time.sleep(3)
         turn = {
             "message": message,
+            "action": action,
             "message_id": final["id"],
             "first_answer_seconds": first_answer,
             "final_answer_seconds": answered_at,

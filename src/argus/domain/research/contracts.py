@@ -78,11 +78,24 @@ class RetrievedRow(BaseModel):
     kind: RowKind
     """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares."""
     unit: str
-    """The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count."""
+    """The unit of value: only the ISO 4217 code of a money amount such as USD or DOP, with a per-share or per-unit figure saying so in its label; % for a percentage, x for a multiple, the thing counted for a count."""
     as_of: str | None
     """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
     source_url: str | None
     """The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _currency_code_before_its_qualifier(cls, data: Any) -> Any:
+        """A money unit written with a qualifier, such as USD per share, keeps its
+        code; the label already says what the amount is per."""
+        if isinstance(data, dict) and data.get("kind") == "currency":
+            unit = data.get("unit")
+            if isinstance(unit, str):
+                code = unit.strip().replace("/", " ").split(" ")[0].upper()
+                if code in CURRENCY_CODES and code != unit.strip():
+                    return {**data, "unit": code}
+        return data
 
     @field_validator("unit")
     @classmethod
