@@ -55,7 +55,8 @@ class _Table:
 
     def execute(self) -> SimpleNamespace:
         self.client.queries.append(self)
-        rows = [row for row in self.client.rows if self._matches(row)]
+        source = self.client.tables.get(self.table_name, [])
+        rows = [row for row in source if self._matches(row)]
         for key, desc in reversed(self.orders):
             rows.sort(key=lambda row: str(row.get(key)), reverse=desc)
         if self.limit_value is not None:
@@ -70,18 +71,22 @@ class _Table:
                 return False
             if kind == "in" and row.get(key) not in value:
                 return False
-            if kind == "not_is":
+            if kind in {"is", "not_is"}:
                 current: Any = row
                 for part in key.split("->"):
                     current = current.get(part) if isinstance(current, dict) else None
-                if current is None:
+                if (current is None) != (kind == "is"):
                     return False
         return True
 
 
 class _Client:
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
-        self.rows = rows
+    def __init__(
+        self,
+        messages: list[dict[str, Any]],
+        conversations: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self.tables = {"messages": messages, "conversations": conversations or []}
         self.queries: list[_Table] = []
 
     def table(self, table_name: str) -> _Table:
@@ -105,6 +110,12 @@ def _message(
         "created_at": created_at,
         "user_id": "owner",
     }
+
+
+def _conversation(
+    conversation_id: str, *, deleted_at: str | None = None
+) -> dict[str, Any]:
+    return {"id": conversation_id, "user_id": "owner", "deleted_at": deleted_at}
 
 
 def test_latest_computed_answer_per_conversation_with_its_question() -> None:
@@ -144,15 +155,11 @@ def test_latest_computed_answer_per_conversation_with_its_question() -> None:
     assert reader.latest_computed_answers(user_id="owner", conversation_ids=[]) == {}
 
 
-def test_symbol_rows_are_owner_scoped_and_optionally_one_conversation() -> None:
-    mine, other = fake.uuid4(), fake.uuid4()
+def test_symbol_rows_are_owner_scoped_live_and_optionally_one_conversation() -> None:
+    mine, other, deleted = fake.uuid4(), fake.uuid4(), fake.uuid4()
+    apple = {"kind": "price_multiple", "inputs": {}, "symbols": ["AAPL"]}
     rows = [
-        _message(
-            mine,
-            "assistant",
-            "2026-09-10T10:00:00+00:00",
-            computation={"kind": "price_multiple", "inputs": {}, "symbols": ["AAPL"]},
-        ),
+        _message(mine, "assistant", "2026-09-10T10:00:00+00:00", computation=apple),
         _message(
             other,
             "assistant",
@@ -165,10 +172,39 @@ def test_symbol_rows_are_owner_scoped_and_optionally_one_conversation() -> None:
             "2026-09-10T10:00:00+00:00",
             computation={"kind": "time_value", "inputs": {}},
         ),
+        _message(deleted, "assistant", "2026-09-10T11:00:00+00:00", computation=apple),
     ]
-    reader = _Reader(_Client(rows))
-    assert len(reader.computed_answer_rows_for_symbols(user_id="owner")) == 2
+    conversations = [
+        _conversation(mine),
+        _conversation(other),
+        _conversation(deleted, deleted_at="2026-09-11T00:00:00+00:00"),
+    ]
+    reader = _Reader(_Client(rows, conversations))
+
+    everything = reader.computed_answer_rows_for_symbols(user_id="owner")
+
+    assert sorted(row["conversation_id"] for row in everything) == sorted([mine, other])
+    messages, live = reader.client.queries
+    assert messages.table_name == "messages"
+    assert ("not_is", "metadata->computation->symbols", "null") in messages.filters
+    assert live.table_name == "conversations"
+    assert ("eq", "user_id", "owner") in live.filters
+    assert ("is", "deleted_at", "null") in live.filters
+    asked = next(
+        value for kind, key, value in live.filters if (kind, key) == ("in", "id")
+    )
+    assert set(asked) == {mine, other, deleted}
     scoped = reader.computed_answer_rows_for_symbols(
         user_id="owner", conversation_id=mine
     )
     assert [row["conversation_id"] for row in scoped] == [mine]
+    assert (
+        reader.computed_answer_rows_for_symbols(user_id="owner", conversation_id=deleted)
+        == []
+    )
+
+
+def test_no_symbol_row_skips_the_conversation_read() -> None:
+    client = _Client([])
+    assert _Reader(client).computed_answer_rows_for_symbols(user_id="owner") == []
+    assert [query.table_name for query in client.queries] == ["messages"]

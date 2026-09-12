@@ -66,7 +66,7 @@ class SupabaseComputedAnswerReadMixin:
     def computed_answer_rows_for_symbols(
         self, *, user_id: str, conversation_id: str | None = None
     ) -> list[dict[str, Any]]:
-        """Computed answers that name at least one asset, newest first, bounded."""
+        """Computed answers that name an asset, in live conversations, newest first."""
         query = (
             self.client.table("messages")
             .select(_MESSAGE_SELECT)
@@ -82,7 +82,8 @@ class SupabaseComputedAnswerReadMixin:
             .limit(_COMPUTED_ANSWER_LIMIT)
             .execute()
         )
-        return [dict(row) for row in getattr(rows, "data", None) or []]
+        found = [dict(row) for row in getattr(rows, "data", None) or []]
+        return self._in_live_conversations(user_id=user_id, rows=found)
 
     def computed_answers_of_kind(
         self, *, user_id: str, kind: str, limit: int
@@ -100,10 +101,16 @@ class SupabaseComputedAnswerReadMixin:
             .execute()
         )
         found = [dict(row) for row in getattr(rows, "data", None) or []]
+        return self._in_live_conversations(user_id=user_id, rows=found)
+
+    def _in_live_conversations(
+        self, *, user_id: str, rows: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """The rows whose conversation the owner holds and has not soft-deleted."""
         conversation_ids = list(
             dict.fromkeys(
                 str(row.get("conversation_id"))
-                for row in found
+                for row in rows
                 if row.get("conversation_id")
             )
         )
@@ -118,4 +125,4 @@ class SupabaseComputedAnswerReadMixin:
             .execute()
         )
         live_ids = {str(row.get("id")) for row in getattr(live, "data", None) or []}
-        return [row for row in found if str(row.get("conversation_id")) in live_ids]
+        return [row for row in rows if str(row.get("conversation_id")) in live_ids]
