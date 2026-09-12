@@ -74,7 +74,11 @@ RETRIEVAL_INSTRUCTIONS = (
     "is likely to ask next and Argus can answer. When the calculation needs a "
     "figure only the reader knows, leave that input null and write answer_markdown "
     "without the calculation's results: Argus offers the reader the calculation "
-    "with that figure left to enter. "
+    "with that figure left to enter. When the request is not a money question, or "
+    "asks Argus to place a trade, move money or act on an account, set declined to "
+    "true, retrieve nothing, and write answer_markdown as one or two plain sentences "
+    "saying Argus does not do that and what it can help with instead, with no "
+    "figures, no calculation and no follow-up questions. "
     + ANSWER_CALCULATION_INSTRUCTIONS
     + calculation_kinds_clause()
 )

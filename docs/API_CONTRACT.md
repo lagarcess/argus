@@ -5248,7 +5248,12 @@ question takes the grounded balanced research path
 (`research_answers_concept_question`), and an out-of-scope verdict that typed no
 question, no refusal payload, no pending need and nothing to run is researched as
 a current external question (`research_answers_unsupported_verdict`), so a money
-question is never refused as out of scope. When the rail still declines a
+question is never refused as out of scope. Typed fields cannot tell a money
+question from any other request with nothing to run, so the research answer does:
+for a request that is not a money question, or that asks Argus to place a trade,
+move money or act on an account, the typed answer sets `declined`, retrieves
+nothing, and its one or two plain sentences are published as they stand, with no
+figures, calculation or next steps (`research_declined_not_a_money_request`). When the rail still declines a
 knowledge-shaped read, its intent, act, kind and scenario bit are logged. A reply
 to the answer's one question completes its pending calculation through the
 no-search answer unless the primary read routed the reply to an action of its
@@ -5272,7 +5277,11 @@ page published may stand in digits beside them, held to its row. A reference
 that does not resolve, or an assumption that drives the result and that the
 prose never references, replaces the prose with Argus's own lead
 (`answer_figures_replaced`); a plan that does not solve keeps its card under
-that lead. A computed answer answers `ready_to_respond`:
+that lead. Separately, every research or no-search answer's prose is audited:
+each figure written in digits that is neither a cited row nor a value of its
+calculation is recorded with `answer_figures_unsourced` and a log line with the
+count and the figures, and nothing is replaced. Dates, years and numbers inside
+words are not counted. A computed answer answers `ready_to_respond`:
 `final_response_payload.tool_result_cards` holds the card, the stored message
 carries `tool_result_cards`, the `metadata.computation` derived from it and
 `metadata.answer_text_template = {artifact_id, text, language}`, the prose with

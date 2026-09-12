@@ -246,6 +246,15 @@ async def calculated_answer_stage_result(
             decision=research_decision(interpretation, user, INPUT_MISSING_REASON_CODE),
         )
     patch: dict[str, Any] = {**answered.patch, "assistant_response": answered.answer_text}
+    from argus.agent_runtime.answer_calculation import cards_in, record_unsourced_figures
+
+    record_unsourced_figures(
+        answered.answer_text,
+        cited=[],
+        cards=cards_in(answered.patch),
+        notes=interpretation.reason_codes,
+        message=state.current_user_message,
+    )
     if answered.template is not None:
         patch[ANSWER_TEMPLATE_KEY] = answered.template
     cards = (answered.patch.get("final_response_payload") or {}).get("tool_result_cards")

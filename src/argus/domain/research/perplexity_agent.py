@@ -447,6 +447,7 @@ def _packet_from_priced_response(
         follow_up_questions=(
             tuple(typed.follow_up_questions) if typed is not None else ()
         ),
+        declined=bool(typed.declined) if typed is not None else False,
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,

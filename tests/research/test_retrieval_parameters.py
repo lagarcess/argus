@@ -429,7 +429,11 @@ def test_why_it_is_moving_grounds_through_the_balanced_shape(monkeypatch) -> Non
     assert sidecar["sources"][0]["source_date"] == "2026-09-04"
     assert sidecar["rows"] == [retrieved_row(source_url=PUBLISHER)]
     assert "http" not in result.stage_patch["assistant_response"]
-    assert result.decision.reason_codes == ["research_answer_balanced_lookup"]
+    # The prose states a figure with no typed row: recorded, never replaced.
+    assert result.decision.reason_codes == [
+        "answer_figures_unsourced",
+        "research_answer_balanced_lookup",
+    ]
 
 
 def test_why_it_is_moving_fails_closed_without_a_publisher_page(monkeypatch) -> None:

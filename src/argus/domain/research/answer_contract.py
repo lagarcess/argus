@@ -36,6 +36,8 @@ class TypedAnswer(TypedRetrieval):
     """The one calculation Argus computes for this answer, with every input and its source, or null when the answer computes nothing."""
     follow_up_questions: list[str] = Field(default_factory=list)
     """Two to four short questions, in the reader's language, that this reader is likely to ask next."""
+    declined: bool = False
+    """True when the request is not a money question, or asks Argus to place a trade, move money or act on an account; answer_markdown then says so plainly."""
 
     @field_validator("follow_up_questions")
     @classmethod

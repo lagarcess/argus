@@ -478,6 +478,29 @@ def _packet_stage_result(
     resolver verifies."""
     if survey is None:
         survey = is_market_survey(question_kind)
+    if packet.declined and packet.answer_markdown.strip():
+        # Not a money question, or a request that Argus act: the plain reply
+        # stands, with no figures, calculation or next steps.
+        _note_declined(interpretation)
+        return research_stage_result(
+            answer=packet.answer_markdown,
+            interpretation=interpretation,
+            user=user,
+            capability_class=capability_class,
+            shape=shape,
+            packet=packet.model_copy(
+                update={"rows": (), "unsourced_rows": (), "follow_up_questions": ()}
+            ),
+            peers=[],
+            rows=None,
+            subjects=[],
+            cache_status=cache_status,
+            period_of_interest=period_of_interest,
+            question_kind=freshness_kind(question_kind, survey=survey),
+            decision=decision,
+            period_start_date=period_start_date,
+            question_as_of_date=question_as_of_date,
+        )
     answer = published_answer(packet, language)
     degraded_code = (
         _not_grounded_code(packet, survey=survey)
@@ -644,6 +667,15 @@ def _packet_stage_result(
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )
+    from argus.agent_runtime.answer_calculation import cards_in, record_unsourced_figures
+
+    record_unsourced_figures(
+        answer,
+        cited=[row.value for row in packet.rows],
+        cards=cards_in(computed),
+        notes=interpretation.reason_codes,
+        message=message,
+    )
     return research_stage_result(
         answer=answer,
         interpretation=interpretation,
@@ -662,6 +694,22 @@ def _packet_stage_result(
         period_start_date=period_start_date,
         question_as_of_date=question_as_of_date,
         computed=computed,
+    )
+
+
+# Recorded when the research answer declined a request that is not a money
+# question or asks Argus to place a trade, move money or act on an account.
+DECLINED_REASON_CODE = "research_declined_not_a_money_request"
+
+
+def _note_declined(interpretation: StructuredInterpretation) -> None:
+    if DECLINED_REASON_CODE not in interpretation.reason_codes:
+        interpretation.reason_codes.append(DECLINED_REASON_CODE)
+    logger.info(
+        "Research declined a request that is not a money question intent={} act={}",
+        interpretation.intent,
+        interpretation.semantic_turn_act,
+        failure_classification=DECLINED_REASON_CODE,
     )
 
 
@@ -1727,6 +1775,27 @@ def compose_completed_research(
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
+    if packet.declined and packet.answer_markdown.strip():
+        return {
+            "answer": packet.answer_markdown,
+            "research": build_research_sidecar(
+                **_job_sidecar_fields(
+                    job_request,
+                    packet.model_copy(
+                        update={
+                            "rows": (),
+                            "unsourced_rows": (),
+                            "follow_up_questions": (),
+                        }
+                    ),
+                    sources=sources,
+                    subjects=[],
+                    peers=[],
+                    degraded_code=None,
+                )
+            ),
+            "computed": None,
+        }
     degraded_code = (
         _not_grounded_code(
             packet, survey=is_market_survey(question_kind) and not scenario
@@ -1848,8 +1917,16 @@ def compose_completed_research(
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )
+    from argus.agent_runtime.answer_calculation import cards_in, record_unsourced_figures
     from argus.agent_runtime.result_next_steps import research_next_steps
 
+    record_unsourced_figures(
+        answer,
+        cited=[row.value for row in packet.rows],
+        cards=cards_in(computed),
+        notes=notes,
+        message=str(job_request.get("question") or ""),
+    )
     composed = {
         "answer": answer,
         "research": build_research_sidecar(

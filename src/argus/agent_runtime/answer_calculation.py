@@ -58,6 +58,9 @@ MARKET_DATA_NOT_A_PRICE_REASON_CODE = "answer_market_data_not_a_price"
 CURRENCY_MISMATCH_REASON_CODE = "calculation_input_currency_mismatch"
 CURRENCY_DEFAULTED_REASON_CODE = "calculation_currency_defaulted"
 FIGURE_CHECK_REASON_CODE = "answer_figures_replaced"
+# Recorded, never replacing anything, when an answer's prose states a figure in
+# digits that is neither a cited row nor a value of its calculation.
+UNSOURCED_FIGURE_REASON_CODE = "answer_figures_unsourced"
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _REFERENCE = re.compile(r"\{\{\s*([a-z][a-z0-9_]*)\s*\}\}")
@@ -536,3 +539,112 @@ def _note(notes: list[str], code: str, **context: Any) -> None:
     logger.info(
         "Answer calculation guard {} {}", code, context, failure_classification=code
     )
+
+
+_PROSE_FIGURE = re.compile(
+    r"(?<![\w/.,-])(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)(%|x\b)?"
+    r"(?:\s+(billion|bn|million|thousand|mil millones|millones|mil))?(?![\w/-])"
+)
+_SCALES = {
+    "billion": 1e9,
+    "bn": 1e9,
+    "mil millones": 1e9,
+    "million": 1e6,
+    "millones": 1e6,
+    "thousand": 1e3,
+    "mil": 1e3,
+}
+
+
+def _figure_value(token: str) -> tuple[float, int]:
+    """The number a digit token states and its shown decimals, for either
+    decimal separator."""
+    last_dot, last_comma = token.rfind("."), token.rfind(",")
+    decimal = "." if last_dot > last_comma else ","
+    whole, _, fraction = token.rpartition(decimal)
+    if (
+        not whole
+        or len(fraction) == 3
+        and token.count(decimal) >= 1
+        and (token.count(decimal) > 1 or last_dot > -1 and last_comma > -1 or not whole)
+    ):
+        whole, fraction = token, ""
+    if (
+        fraction
+        and len(fraction) == 3
+        and "." not in token.replace(decimal, "", 1)
+        and "," not in token.replace(decimal, "", 1)
+    ):
+        # One separator followed by three digits reads as a thousands group.
+        whole, fraction = token, ""
+    digits = "".join(ch for ch in whole if ch.isdigit())
+    number = float(digits or 0) + (float(f"0.{fraction}") if fraction.isdigit() else 0.0)
+    return number, len(fraction) if fraction.isdigit() else 0
+
+
+def unsourced_prose_figures(
+    prose: str, *, cited: Sequence[float], cards: Sequence[ToolResultCard]
+) -> list[str]:
+    """The digit figures an answer's prose states that match neither a cited row
+    nor a value of its calculation; dates, years and numbers inside words are
+    not figures."""
+    known = [float(value) for value in cited]
+    for card in cards:
+        presentation = card.presentation
+        facts = [*presentation.inputs, *presentation.rows]
+        if presentation.answer is not None:
+            facts.append(presentation.answer)
+        known.extend(
+            float(fact.value)
+            for fact in facts
+            if isinstance(fact.value, (int, float)) and not isinstance(fact.value, bool)
+        )
+    text = _ISO_DATE.sub(" ", prose)
+    unsourced: list[str] = []
+    for match in _PROSE_FIGURE.finditer(text):
+        token, suffix, scale = match.group(1), match.group(2), match.group(3)
+        if not suffix and not scale and re.fullmatch(r"(19|20)\d{2}", token):
+            continue
+        value, decimals = _figure_value(token)
+        candidates = [value, value * _SCALES.get(str(scale or "").lower(), 1.0)]
+        if any(
+            abs(candidate - item) <= max(abs(item) * 0.005, 0.5 * 10**-decimals)
+            for candidate in candidates
+            for item in known
+        ):
+            continue
+        unsourced.append(match.group(0).strip())
+    return unsourced
+
+
+def record_unsourced_figures(
+    prose: str,
+    *,
+    cited: Sequence[float],
+    cards: Sequence[ToolResultCard],
+    notes: list[str],
+    message: str,
+) -> int:
+    """Records, and never replaces, the figures an answer states with no source."""
+    figures = unsourced_prose_figures(prose, cited=cited, cards=cards)
+    if figures:
+        if UNSOURCED_FIGURE_REASON_CODE not in notes:
+            notes.append(UNSOURCED_FIGURE_REASON_CODE)
+        logger.info(
+            "Answer prose figures with no cited row or calculation value "
+            "count={} figures={} question={}",
+            len(figures),
+            figures[:20],
+            " ".join(str(message).split())[:160],
+            failure_classification=UNSOURCED_FIGURE_REASON_CODE,
+        )
+    return len(figures)
+
+
+def cards_in(patch: dict[str, Any] | None) -> list[ToolResultCard]:
+    """Every card a computed patch carries."""
+    payload = (patch or {}).get("final_response_payload") or {}
+    return [
+        ToolResultCard.model_validate(card)
+        for card in payload.get("tool_result_cards") or []
+    ]

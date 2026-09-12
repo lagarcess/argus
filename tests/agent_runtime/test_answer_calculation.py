@@ -294,3 +294,20 @@ def test_only_an_assumption_that_drives_the_result_must_be_stated() -> None:
     )
     loan = [item for item in LOAN if item["name"] != "annual_rate_pct"]
     assert _published(unstated, inputs=[*loan, rate]).template is None
+
+
+def test_the_prose_audit_counts_only_figures_with_no_row_or_calculation_value() -> None:
+    card = ac.card_in(
+        _published(
+            "Paying {{present_value}} over {{periods}} months costs {{payment}}."
+        ).patch
+    )
+    payment = card.presentation.answer.value
+    prose = (
+        f"At 14% over 48 months the payment is DOP {payment:,.2f}. Inflation was 3,1% "
+        "in 2025, revenue reached 33.72 billion on 2026-09-11, and costs rose 22%."
+    )
+    assert ac.unsourced_prose_figures(
+        prose, cited=[3.1, 33_720_000_000], cards=[card]
+    ) == ["22%"]
+    assert ac.unsourced_prose_figures("Nothing to count here.", cited=[], cards=[]) == []

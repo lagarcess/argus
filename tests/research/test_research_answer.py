@@ -111,7 +111,11 @@ def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
     assert sidecar["shape"] == "fast"
     assert sidecar["usage"]["cache_status"] == "miss"
     assert result.stage_patch["assistant_response"].startswith("Apple closed")
-    assert result.decision.reason_codes == ["research_answer_fast_quote"]
+    # The quote's prose states a figure with no typed row: recorded, never replaced.
+    assert result.decision.reason_codes == [
+        "answer_figures_unsourced",
+        "research_answer_fast_quote",
+    ]
     # Runnable rows ride along; the sidecar carries anchors and peers so the
     # persisted transcript can serve later confirmation cards.
     assert result.stage_patch["next_experiments"]["rows"]
@@ -693,3 +697,59 @@ def test_a_research_answer_ends_with_the_questions_its_research_offered(
     assert result.stage_patch["next_steps"]["items"] == [
         {"type": "question", "text": text} for text in questions
     ]
+
+
+def test_a_declined_request_keeps_its_plain_reply_and_offers_nothing(monkeypatch) -> None:
+    from argus.agent_runtime.research_grounded import DECLINED_REASON_CODE
+
+    reply = "Argus does not place trades. It can test a trading idea on past data."
+    _wire_client(
+        monkeypatch,
+        [agent_response(text=typed_answer_text(reply, [], None, [], declined=True))],
+    )
+
+    result = _run("Buy 10 shares of Apple for me right now.")
+
+    assert result is not None
+    assert result.stage_patch["assistant_response"] == reply
+    assert "next_steps" not in result.stage_patch
+    assert "degraded" not in result.stage_patch["research"]
+    assert DECLINED_REASON_CODE in result.decision.reason_codes
+
+
+def test_an_answer_stating_a_figure_with_no_source_is_recorded_not_replaced(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.answer_calculation import UNSOURCED_FIGURE_REASON_CODE
+
+    set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
+    prose = "Savings accounts often pay about 4% while prices rose 3.1% last year."
+    _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    prose,
+                    [
+                        {
+                            "subject": "United States",
+                            "symbol": None,
+                            "label": "consumer price inflation 2025",
+                            "value": 3.1,
+                            "kind": "percent",
+                            "unit": "%",
+                            "as_of": "2026-01-15",
+                            "source_url": "https://www.bls.gov/cpi/",
+                        }
+                    ],
+                ),
+                sources=["https://www.bls.gov/cpi/"],
+            )
+        ],
+    )
+
+    result = _run("Is my savings account actually losing money?")
+
+    assert result is not None
+    assert result.stage_patch["assistant_response"].startswith(prose)
+    assert UNSOURCED_FIGURE_REASON_CODE in result.decision.reason_codes

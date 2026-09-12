@@ -192,6 +192,7 @@ def typed_answer_text(
     rows: list[dict[str, Any]],
     calculation: dict[str, Any] | None = None,
     follow_up_questions: list[str] | None = None,
+    declined: bool = False,
 ) -> str:
     """The provider's message text under the strict typed answer schema."""
     return json.dumps(
@@ -200,6 +201,7 @@ def typed_answer_text(
             "rows": rows,
             "calculation": calculation,
             "follow_up_questions": follow_up_questions or [],
+            "declined": declined,
         }
     )
 
