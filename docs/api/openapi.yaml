@@ -519,6 +519,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/computations/answers:
+    get:
+      tags:
+      - computations
+      parameters:
+      - name: kind
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 80
+      - name: exclude_message_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputedAnswerList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/computations/compare:
+    post:
+      tags:
+      - computations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputationCompareRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputationComparison'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations:
     get:
       tags:
@@ -976,6 +1048,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/messages/{message_id}/computation/refresh:
+    post:
+      tags:
+      - computations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputationRefreshResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/messages/{message_id}/computation/rerun:
     post:
       tags:
@@ -1004,6 +1112,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageComputationRerunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/messages/{message_id}/continue:
+    post:
+      tags:
+      - computations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContinuedResultResponse'
         '422':
           description: Validation Error
           content:
@@ -2922,6 +3066,173 @@ components:
       type: object
       required:
       - conversation_id
+    ComparedAnswer:
+      properties:
+        conversation_id:
+          type: string
+        message_id:
+          type: string
+        asked:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        computed_at:
+          type: string
+          format: date-time
+        card:
+          additionalProperties: true
+          type: object
+      type: object
+      required:
+      - conversation_id
+      - message_id
+      - computed_at
+      - card
+    ComputationCompareRequest:
+      properties:
+        left:
+          $ref: '#/components/schemas/ComputedAnswerRef'
+        right:
+          $ref: '#/components/schemas/ComputedAnswerRef'
+      additionalProperties: false
+      type: object
+      required:
+      - left
+      - right
+    ComputationComparison:
+      properties:
+        kind:
+          type: string
+        left:
+          $ref: '#/components/schemas/ComparedAnswer'
+        right:
+          $ref: '#/components/schemas/ComparedAnswer'
+        differences:
+          items:
+            $ref: '#/components/schemas/ComputationDifference'
+          type: array
+      type: object
+      required:
+      - kind
+      - left
+      - right
+      - differences
+    ComputationDifference:
+      properties:
+        section:
+          type: string
+          enum:
+          - answer
+          - row
+          - input
+        name:
+          type: string
+        label:
+          $ref: '#/components/schemas/LocalizedText'
+        unit:
+          anyOf:
+          - $ref: '#/components/schemas/LocalizedText'
+          - type: 'null'
+        left:
+          type: number
+        right:
+          type: number
+        difference:
+          type: number
+      type: object
+      required:
+      - section
+      - name
+      - label
+      - left
+      - right
+      - difference
+      description: Right minus left for one fact both cards state as a number in one unit.
+    ComputationRefreshResponse:
+      properties:
+        computation:
+          $ref: '#/components/schemas/DecisionComputation'
+        status:
+          type: string
+          enum:
+          - refreshed
+          - inputs_not_found
+        rerun:
+          anyOf:
+          - $ref: '#/components/schemas/DecisionRerun'
+          - type: 'null'
+        sources:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+      type: object
+      required:
+      - computation
+      - status
+      description: 'Freshly retrieved inputs computed beside the stored answer.
+
+
+        ``refreshed`` carries the recomputed card in ``rerun``; ``inputs_not_found``
+
+        means the retrieval named no cited input, so nothing was recomputed.
+
+        ``sources`` lists the pages the retrieval read, dated.'
+    ComputedAnswerList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ComputedAnswerSummary'
+          type: array
+          maxItems: 10
+      type: object
+      required:
+      - items
+    ComputedAnswerRef:
+      properties:
+        conversation_id:
+          type: string
+          maxLength: 64
+          minLength: 1
+        message_id:
+          type: string
+          maxLength: 64
+          minLength: 1
+      additionalProperties: false
+      type: object
+      required:
+      - conversation_id
+      - message_id
+    ComputedAnswerSummary:
+      properties:
+        conversation_id:
+          type: string
+        message_id:
+          type: string
+        kind:
+          type: string
+          maxLength: 80
+        asked:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        computed_at:
+          type: string
+          format: date-time
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+      type: object
+      required:
+      - conversation_id
+      - message_id
+      - kind
+      - computed_at
+      description: One owned computed answer a comparison can pick.
     ConfirmationDirectEditRequest:
       properties:
         capital:
@@ -3035,6 +3346,17 @@ components:
       type: object
       required:
       - message
+    ContinuedResultResponse:
+      properties:
+        conversation:
+          $ref: '#/components/schemas/Conversation'
+        message_id:
+          type: string
+      type: object
+      required:
+      - conversation
+      - message_id
+      description: The new chat and the one message that carries the continued result.
     Conversation:
       properties:
         id:
@@ -3877,6 +4199,25 @@ components:
       - conversation_id
       - expires_at
     JsonValue: {}
+    LocalizedText:
+      properties:
+        locale_key:
+          type: string
+          maxLength: 160
+          minLength: 1
+        interpolation_args:
+          additionalProperties:
+            anyOf:
+            - type: boolean
+            - type: integer
+            - type: number
+            - type: string
+            - type: 'null'
+          type: object
+      additionalProperties: false
+      type: object
+      required:
+      - locale_key
     LoginRequest:
       properties:
         email:
@@ -4686,6 +5027,138 @@ components:
       required:
       - idea_title
       - fact_bank
+    PublicExcerptCalculationFact:
+      properties:
+        label:
+          $ref: '#/components/schemas/PublicExcerptCalculationText'
+        value:
+          anyOf:
+          - type: boolean
+          - type: integer
+          - type: number
+          - type: string
+          - type: 'null'
+        value_text:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptCalculationText'
+          - type: 'null'
+        unit:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptCalculationText'
+          - type: 'null'
+        source:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptCalculationSource'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - label
+    PublicExcerptCalculationSource:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+        url:
+          anyOf:
+          - type: string
+            maxLength: 2048
+          - type: 'null'
+        date:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      description: The public page an input was read from, dated.
+    PublicExcerptCalculationText:
+      properties:
+        locale_key:
+          type: string
+          maxLength: 160
+          minLength: 1
+          pattern: ^[a-z][a-z0-9_.]*$
+        interpolation_args:
+          additionalProperties:
+            anyOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
+            - type: 'null'
+          type: object
+      additionalProperties: false
+      type: object
+      required:
+      - locale_key
+      description: 'A card''s localized text as the receipt renders it: a key and its values.'
+    PublicExcerptCalculationTurn:
+      properties:
+        kind:
+          type: string
+          const: calculation
+          default: calculation
+        question:
+          type: string
+          maxLength: 500
+          minLength: 1
+        title:
+          $ref: '#/components/schemas/PublicExcerptCalculationText'
+        answer:
+          $ref: '#/components/schemas/PublicExcerptCalculationFact'
+        rows:
+          items:
+            $ref: '#/components/schemas/PublicExcerptCalculationFact'
+          type: array
+          maxItems: 24
+        inputs:
+          items:
+            $ref: '#/components/schemas/PublicExcerptCalculationFact'
+          type: array
+          maxItems: 24
+        notes:
+          items:
+            $ref: '#/components/schemas/PublicExcerptCalculationText'
+          type: array
+          maxItems: 8
+        computed_at:
+          type: string
+          format: date-time
+        owner_note:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+        content_language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        framing:
+          type: string
+          const: calculation_not_advice
+          default: calculation_not_advice
+        provenance_mark:
+          type: string
+          const: tested_with_argus
+          default: tested_with_argus
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      - title
+      - answer
+      - computed_at
+      description: 'A computed answer frozen as typed facts; a receipt never recomputes.
+
+
+        Inputs publish only when a public page stated them; an input the user
+
+        typed and the card''s arguments stay in the account.'
     PublicExcerptCandidate:
       properties:
         message_id:
@@ -4700,6 +5173,7 @@ components:
             enum:
             - backtest
             - research_answer
+            - calculation
           - type: 'null'
         eligible:
           type: boolean
@@ -4721,6 +5195,7 @@ components:
             - preview_changed
             - invalid_source
             - unsupported_backtest
+            - private_inputs
           - type: 'null'
         field:
           anyOf:
@@ -4827,6 +5302,7 @@ components:
           enum:
           - backtest
           - research_answer
+          - calculation
           - mixed
           default: backtest
       additionalProperties: false
@@ -4862,6 +5338,7 @@ components:
           enum:
           - backtest
           - research_answer
+          - calculation
           - mixed
           default: backtest
         created_at:
@@ -5034,6 +5511,7 @@ components:
           enum:
           - backtest
           - research_answer
+          - calculation
           - mixed
         existing_receipt:
           anyOf:
@@ -5227,10 +5705,12 @@ components:
             oneOf:
             - $ref: '#/components/schemas/PublicExcerptResearchTurn'
             - $ref: '#/components/schemas/PublicExcerptBacktestTurn'
+            - $ref: '#/components/schemas/PublicExcerptCalculationTurn'
             discriminator:
               propertyName: kind
               mapping:
                 backtest: '#/components/schemas/PublicExcerptBacktestTurn'
+                calculation: '#/components/schemas/PublicExcerptCalculationTurn'
                 research_answer: '#/components/schemas/PublicExcerptResearchTurn'
           type: array
           maxItems: 500
@@ -5254,6 +5734,7 @@ components:
             enum:
             - backtest
             - research_answer
+            - calculation
             - mixed
           - type: 'null'
         indexing:

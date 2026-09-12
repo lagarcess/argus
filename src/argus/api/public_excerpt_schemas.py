@@ -199,7 +199,7 @@ class PublicExcerptPayload(BaseModel):
 # owner about it, and it exists so a request of nonexistent ids cannot buy
 # unbounded work before it is refused.
 PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT = 500
-PublicExcerptKind = Literal["backtest", "research_answer", "mixed"]
+PublicExcerptKind = Literal["backtest", "research_answer", "calculation", "mixed"]
 PublicExcerptRefusalReason = Literal[
     "not_completed",
     "unsupported_turn",
@@ -215,6 +215,7 @@ PublicExcerptRefusalReason = Literal[
     "preview_changed",
     "invalid_source",
     "unsupported_backtest",
+    "private_inputs",
 ]
 PublicExcerptRefusalField = Literal["question", "answer", "owner_note", "sources"]
 
@@ -263,8 +264,60 @@ class PublicExcerptBacktestTurn(BaseModel):
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
 
+class PublicExcerptCalculationText(BaseModel):
+    """A card's localized text as the receipt renders it: a key and its values."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    locale_key: str = Field(min_length=1, max_length=160, pattern=r"^[a-z][a-z0-9_.]*$")
+    interpolation_args: dict[str, str | int | float | bool | None] = Field(
+        default_factory=dict
+    )
+
+
+class PublicExcerptCalculationSource(BaseModel):
+    """The public page an input was read from, dated."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    title: str | None = Field(default=None, max_length=300)
+    url: str | None = Field(default=None, max_length=2048)
+    date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class PublicExcerptCalculationFact(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    label: PublicExcerptCalculationText
+    value: bool | int | float | str | None = None
+    value_text: PublicExcerptCalculationText | None = None
+    unit: PublicExcerptCalculationText | None = None
+    source: PublicExcerptCalculationSource | None = None
+
+
+class PublicExcerptCalculationTurn(BaseModel):
+    """A computed answer frozen as typed facts; a receipt never recomputes.
+
+    Inputs publish only when a public page stated them; an input the user
+    typed and the card's arguments stay in the account."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["calculation"] = "calculation"
+    question: str = Field(min_length=1, max_length=500)
+    title: PublicExcerptCalculationText
+    answer: PublicExcerptCalculationFact
+    rows: list[PublicExcerptCalculationFact] = Field(default_factory=list, max_length=24)
+    inputs: list[PublicExcerptCalculationFact] = Field(
+        default_factory=list, max_length=24
+    )
+    notes: list[PublicExcerptCalculationText] = Field(default_factory=list, max_length=8)
+    computed_at: datetime
+    owner_note: str | None = Field(default=None, max_length=280)
+    content_language: Language = "en"
+    framing: Literal["calculation_not_advice"] = "calculation_not_advice"
+    provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
+
 PublicExcerptTurn = Annotated[
-    PublicExcerptResearchTurn | PublicExcerptBacktestTurn, Field(discriminator="kind")
+    PublicExcerptResearchTurn | PublicExcerptBacktestTurn | PublicExcerptCalculationTurn,
+    Field(discriminator="kind"),
 ]
 
 
@@ -399,7 +452,7 @@ class PublicExcerptCandidate(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     message_id: str
     question: str | None = None
-    kind: Literal["backtest", "research_answer"] | None = None
+    kind: Literal["backtest", "research_answer", "calculation"] | None = None
     eligible: bool
     reason: PublicExcerptRefusalReason | None = None
     field: PublicExcerptRefusalField | None = None

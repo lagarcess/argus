@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -135,7 +136,7 @@ def get_ranked_comparison_declaration() -> ToolDeclaration:
             "Items carry the figure a page or the user supplied; nothing is recommended."
         ),
         handler=compute_ranked_comparison,
-        policy=free_policy("prefer", "key_label"),
+        policy=replace(free_policy("prefer", "key_label"), public_receipt="cited_facts"),
         progress=ToolProgressTemplate(
             locale_key="tools.calc.ranked_comparison.progress",
             argument_fields=("key_label",),
