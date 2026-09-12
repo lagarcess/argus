@@ -520,9 +520,69 @@ def test_provider_failure_degrades_without_fabricating(monkeypatch) -> None:
     )
 
 
-def test_concept_and_none_fall_through(monkeypatch) -> None:
+def test_a_none_read_falls_through(monkeypatch) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="none", symbols=[])
+    assert _run("Thanks, that helps.") is None
+
+
+def test_a_concept_question_takes_the_grounded_balanced_path(monkeypatch) -> None:
+    from argus.agent_runtime.interpreter.research_routing import (
+        CONCEPT_QUESTION_REASON_CODE,
+    )
+
     set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
-    assert _run("What is a drawdown?") is None
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="A drawdown is the fall from a peak to the lowest point after it.",
+                sources=["https://www.investor.gov/introduction-investing/drawdown"],
+            )
+        ],
+    )
+
+    result = _run("What is a drawdown?")
+
+    assert result is not None
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["max_steps"] == RESEARCH_CONFIG_SPECS["balanced"].max_steps
+    assert CONCEPT_QUESTION_REASON_CODE in result.decision.reason_codes
+
+
+def test_an_out_of_scope_verdict_with_nothing_to_run_is_researched(monkeypatch) -> None:
+    from argus.agent_runtime.interpreter.research_routing import (
+        UNSUPPORTED_VERDICT_REASON_CODE,
+    )
+
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Cards differ most by annual fee, rewards rate and APR.",
+                sources=["https://www.consumerfinance.gov/consumer-tools/credit-cards/"],
+            )
+        ],
+    )
+
+    result = _run("Which credit card should I get?")
+
+    assert result is not None and transport.requests
+    assert UNSUPPORTED_VERDICT_REASON_CODE in result.decision.reason_codes
+
+
+def test_an_out_of_scope_verdict_that_asks_or_can_run_keeps_its_route(
+    monkeypatch,
+) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"requires_clarification": True}),
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+
+    assert _run("Buy it when it starts rising.") is None
+    assert not transport.requests
 
 
 def test_spanish_turn_carries_the_language_into_the_prompt(monkeypatch) -> None:

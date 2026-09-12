@@ -5235,10 +5235,16 @@ figure a page must supply (a product's price, a lender's or bank's rate or
 fees, local inflation or exchange rates, an asset's price or earnings) is a
 research turn, including a scenario with no subject when its kind names a
 published figure. A computed answer on the user's own numbers (the scenario bit,
-no subject, kind `none` or `concept`, no other owner) is the no-search answer.
-A reply to the answer's one question completes its pending calculation through
-the no-search answer unless the primary read routed the reply to an action of
-its own. An ordinary concept or capability turn spends no extra call.
+no subject, kind `none`, no other owner) is the no-search answer. A concept
+question takes the grounded balanced research path
+(`research_answers_concept_question`), and an out-of-scope verdict that typed no
+question, no refusal payload, no pending need and nothing to run is researched as
+a current external question (`research_answers_unsupported_verdict`), so a money
+question is never refused as out of scope. When the rail still declines a
+knowledge-shaped read, its intent, act, kind and scenario bit are logged. A reply
+to the answer's one question completes its pending calculation through the
+no-search answer unless the primary read routed the reply to an action of its
+own. A capability turn spends no extra call.
 
 Each input is held to its source before the declaration computes, and every
 guard records a reason code on the turn: a page this answer did not retrieve

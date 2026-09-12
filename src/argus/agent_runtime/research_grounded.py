@@ -1016,6 +1016,7 @@ def shape_for_kind(kind: str) -> QuestionShape:
         "company_lookup",
         "etf_constituents",
         "current_external",
+        "concept",
     ) or is_market_survey(kind):
         return "balanced"
     return "thorough"

@@ -19,9 +19,11 @@ from __future__ import annotations
 
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.interpreter.research_routing import (
+    concept_research_query,
     primary_research_query,
     research_turn_has_conflicting_owner,
     scenario_is_typed,
+    unsupported_verdict_research_query,
 )
 
 # Re-exported composition surface: the job lifecycle and tests reach these
@@ -63,7 +65,11 @@ async def research_answer_stage_result(
     """
     if not research_rail_enabled():
         return None
-    query = primary_research_query(interpretation)
+    query = (
+        primary_research_query(interpretation)
+        or concept_research_query(interpretation)
+        or unsupported_verdict_research_query(interpretation)
+    )
     if query is None:
         return None
     return await _dispatch(
@@ -215,7 +221,7 @@ async def _dispatch(
             state=state,
             user=user,
         )
-    if query.question_kind in ("concept", "none") and not scenario:
+    if query.question_kind == "none" and not scenario:
         return None
     subjects = _resolved_subjects(query)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]

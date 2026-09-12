@@ -80,6 +80,9 @@ def test_the_users_own_numbers_reach_the_no_search_answer_and_a_published_figure
     named = _read(question_kind="none", scenario_question=True, symbols=["AAPL"])
     assert not primary_read_is_arithmetic(named)
     assert not primary_read_is_arithmetic(_read(question_kind="concept"))
+    assert not primary_read_is_arithmetic(
+        _read(question_kind="concept", scenario_question=True)
+    )
     assert not primary_read_is_arithmetic(_read())
 
 
