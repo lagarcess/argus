@@ -31,6 +31,11 @@ from argus.agent_runtime.result_followups import (
 )
 from argus.agent_runtime.result_next_steps import next_steps_patch, offered_test_steps
 
+# Focuses the stored results and runnable tests answer, so they never claim research.
+LOCAL_RESULT_FOCUSES: frozenset[str] = frozenset(
+    {"what_tested", "next_experiment", "assumptions"}
+)
+
 
 async def answered_result_followup_patch(
     *,
@@ -60,6 +65,7 @@ async def answered_result_followup_patch(
             language=language,
             recent_messages=recent_messages,
             next_test_rows=rows["rows"] if rows is not None else (),
+            research=focus not in LOCAL_RESULT_FOCUSES,
         )
     patch = (
         unavailable_result_followup_patch(language=language)

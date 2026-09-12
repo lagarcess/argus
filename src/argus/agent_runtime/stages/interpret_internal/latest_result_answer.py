@@ -1,7 +1,7 @@
 """Typed routing for factual latest-result questions.
 
-The runtime resolves which fact was asked for and whether the shared result
-fact bank and the run's typed fact sheet state it; ``compose_result_conversation_answer`` writes the
+The runtime resolves which fact was asked for and whether the run's typed fact
+sheet states it; ``compose_result_conversation_answer`` writes the
 user-visible answer in the detected turn language. Keep this module free of
 user-visible copy, language gates, and fact-key synonym tables; unknown or
 unavailable keys route to the typed limitation path.
@@ -132,10 +132,8 @@ async def latest_result_answer_stage_result_if_applicable(
     fact_bank = result_followup_fact_bank(metadata, language=answer_language)
     focus = _focus_for_answer(decision.result_followup_focus, requested_fact_key)
     # A stored value is answered only when the typed fact sheet states it.
-    answerable = (
-        requested_fact_key in fact_bank
-        and requested_fact_key not in _NON_ANSWERABLE_FACT_IDS
-        and stored_fact_is_stated(metadata, requested_fact_key)
+    answerable = requested_fact_key not in _NON_ANSWERABLE_FACT_IDS and (
+        stored_fact_is_stated(metadata, requested_fact_key)
     )
     rows = result_next_experiments(
         metadata, language=answer_language, source_run_id=reference.artifact_id

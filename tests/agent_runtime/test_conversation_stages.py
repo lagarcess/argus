@@ -3121,7 +3121,10 @@ def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
     assert not any(
         "2016" in option["label"] for option in constraint["simplification_options"]
     )
-    assert constraint["available_from"] == shared_history_start(["AAPL"], "equity").isoformat()
+    assert (
+        constraint["available_from"]
+        == shared_history_start(["AAPL", "SPY"], "equity").isoformat()
+    )
 
 
 def test_confirm_stage_prioritizes_data_window_before_missing_rule_details() -> None:

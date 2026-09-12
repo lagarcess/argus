@@ -73,6 +73,9 @@ _SHEET_ROWS: dict[str, tuple[str, ...]] = {
     "gross_total_return": ("portfolio.gross_return",),
     "net_total_return": ("portfolio.net_return",),
     "return_drag": ("portfolio.cost_drag",),
+    "modeled_fee_cost": ("portfolio.fee_cost",),
+    "modeled_slippage_cost": ("portfolio.slippage_cost",),
+    "modeled_cost_total": ("portfolio.cost_total",),
 }
 
 

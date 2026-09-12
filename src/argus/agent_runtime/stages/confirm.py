@@ -603,7 +603,13 @@ def _date_limit_recovery_patch(
                 {"label": "Use a shorter recent window"},
             ],
         }
+        from argus.agent_runtime.stages.execute import _resolve_benchmark_symbol
+
         symbols = [str(symbol) for symbol in strategy.get("asset_universe") or []]
+        if symbols:
+            # Coverage preflight needs the launch benchmark's history as well.
+            benchmark = _resolve_benchmark_symbol(symbols[0], {}, strategy=strategy)
+            symbols = list(dict.fromkeys([*symbols, benchmark]))
         available_from = shared_history_start(symbols, asset_class) if symbols else None
         if available_from is not None:
             constraint["available_from"] = available_from.isoformat()

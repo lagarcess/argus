@@ -233,12 +233,14 @@ async def compose_result_conversation_answer(
     next_test_rows: Sequence[dict[str, Any]] = (),
     requested_fact: str | None = None,
     unavailable_fact: str | None = None,
+    research: bool = True,
     client: PerplexityAgentClient | None = None,
     invoke_json_schema_func: Any = invoke_openrouter_json_schema,
 ) -> ResultConversationAnswer:
     """Answer with the research Agent, or without search when it cannot serve.
 
-    A question resolved to a stored run fact is answered without search, and its
+    A question resolved to a stored run fact, or one the caller marks as answered
+    by the stored results (``research=False``), is answered without search; a fact
     reply is accepted only when it declares the requested fact."""
     # Argus writes in English and Spanish; any other reader language gets English.
     resolved = normalize_readout_language(language) or "en"
@@ -268,9 +270,12 @@ async def compose_result_conversation_answer(
         requested_fact=requested_fact,
         unavailable_fact=unavailable_fact,
     )
-    # A question the interpreter resolved to a run fact never searches or claims research.
+    # A question resolved to a run fact, or one the stored results answer, never
+    # searches or claims research.
     researched = ResultConversationAnswer(text=None, failure_mode="stored_run_fact")
-    if requested_fact is None and unavailable_fact is None:
+    if requested_fact is None and unavailable_fact is None and not research:
+        researched = ResultConversationAnswer(text=None, failure_mode="local_result_focus")
+    elif requested_fact is None and unavailable_fact is None:
         researched = await _research_answer(
             prompt,
             schema=schema,
