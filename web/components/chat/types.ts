@@ -203,6 +203,7 @@ export type StrategyConfirmationPeriodAdjustment = {
   code: string;
   requested_date_range: StrategyConfirmationDateRange;
   effective_date_range: StrategyConfirmationDateRange;
+  limited_by?: { symbol: string; first_available: string };
 };
 
 export type StrategyConfirmationBenchmarkAdjustment = {
@@ -340,8 +341,6 @@ export type Message = {
   artifactType?: ArtifactType;
   artifactStatus?: string;
   savedStrategyId?: string | null;
-  /** Canonical fact key for a latest-result fact answer; localized heading chrome. */
-  resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
   /** Existing backend-owned strategy facts used to prove turn continuity. */
@@ -371,6 +370,8 @@ export type Message = {
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
   /** The rows' run when the message carries no result card; continuity rows anchor on it. */
   nextExperimentsSourceRunId?: string | null;
+  /** One ordered list of tests and questions under an answer about a result. */
+  nextSteps?: import("@/lib/chat-next-steps").NextStep[] | null;
 };
 
 export type DiscoverySource = {

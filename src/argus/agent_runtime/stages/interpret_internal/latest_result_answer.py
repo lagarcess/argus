@@ -1,19 +1,29 @@
 """Typed routing for factual latest-result questions.
 
-The runtime resolves which fact was asked for and whether it exists in the
-shared result fact bank; ``compose_result_followup_response`` writes the
-user-visible prose in the detected turn language. Keep this module free of
-user-visible copy, language gates, and fact-key synonym tables — unknown or
+The runtime resolves which fact was asked for and whether the run's typed fact
+sheet states it; ``compose_result_conversation_answer`` writes the
+user-visible answer in the detected turn language. Keep this module free of
+user-visible copy, language gates, and fact-key synonym tables; unknown or
 unavailable keys route to the typed limitation path.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
+from argus.agent_runtime.result_conversation import (
+    compose_result_conversation_answer,
+    stored_fact_is_stated,
+)
 from argus.agent_runtime.result_fact_enrichment import normalize_fact_key
+from argus.agent_runtime.result_fact_figures import PAIRED_FACT_IDS
+from argus.agent_runtime.result_followup_answers import (
+    result_answer_sidecars,
+    result_next_experiments,
+    unavailable_result_followup_patch,
+)
 from argus.agent_runtime.result_followups import (
-    compose_result_followup_response,
     public_result_followup_fact_bank,
     result_followup_fact_bank,
 )
@@ -65,35 +75,6 @@ _NON_ANSWERABLE_FACT_IDS: frozenset[str] = frozenset(
     }
 )
 
-# Companion facts pinned alongside the asked fact so date/value pairs stay
-# grounded on the same curve point.
-_PAIRED_FACT_IDS: dict[str, tuple[str, ...]] = {
-    "peak_date": ("peak_date", "peak_value"),
-    "peak_value": ("peak_value", "peak_date"),
-    "drawdown_date": ("drawdown_date", "drawdown_depth", "max_drawdown"),
-    "max_drawdown": ("max_drawdown", "drawdown_date"),
-    "lowest_date": ("lowest_date", "lowest_value"),
-    "lowest_value": ("lowest_value", "lowest_date"),
-    "final_value": ("final_value", "final_date"),
-    "fee_bps": ("fee_bps", "slippage_bps"),
-    "slippage_bps": ("slippage_bps", "fee_bps"),
-    "gross_total_return": (
-        "gross_total_return",
-        "net_total_return",
-        "return_drag",
-    ),
-    "net_total_return": (
-        "net_total_return",
-        "gross_total_return",
-        "return_drag",
-    ),
-    "return_drag": (
-        "return_drag",
-        "gross_total_return",
-        "net_total_return",
-    ),
-}
-
 
 def overrides_refinement(
     interpretation: StructuredInterpretation,
@@ -117,114 +98,92 @@ def overrides_refinement(
     return True
 
 
+def stored_fact_key(
+    *, decision: InterpretDecision, snapshot: TaskSnapshot | None
+) -> str | None:
+    """The stored run fact a result follow-up asked for, when the fact answer owns it."""
+    if decision.semantic_turn_act != "result_followup":
+        return None
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return None
+    return _requested_fact_key(decision)
+
+
 async def latest_result_answer_stage_result_if_applicable(
     *,
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
     language: str = "en",
+    recent_messages: Sequence[Any] = (),
     compose_response_func=None,
 ) -> StageResult | LatestResultFactComposerDeclined | None:
     """Answer factual latest-result questions from typed intent and run facts."""
 
-    if decision.semantic_turn_act != "result_followup":
-        return None
-    if snapshot is None or snapshot.latest_backtest_result_reference is None:
-        return None
-    requested_fact_key = _requested_fact_key(decision)
-    if requested_fact_key is None:
+    requested_fact_key = stored_fact_key(decision=decision, snapshot=snapshot)
+    reference = snapshot.latest_backtest_result_reference if snapshot else None
+    if requested_fact_key is None or reference is None:
         return None
     if compose_response_func is None:
-        compose_response_func = compose_result_followup_response
+        compose_response_func = compose_result_conversation_answer
 
-    reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     answer_language = _answer_language(decision=decision, fallback=language)
     fact_bank = result_followup_fact_bank(metadata, language=answer_language)
     focus = _focus_for_answer(decision.result_followup_focus, requested_fact_key)
-    run_patch = _run_reference_patch(
-        metadata=metadata,
-        artifact_id=reference.artifact_id,
+    # A stored value is answered only when the typed fact sheet states it.
+    answerable = requested_fact_key not in _NON_ANSWERABLE_FACT_IDS and (
+        stored_fact_is_stated(metadata, requested_fact_key)
     )
+    rows = result_next_experiments(
+        metadata, language=answer_language, source_run_id=reference.artifact_id
+    )
+    answer = await compose_response_func(
+        metadata=metadata,
+        user_message=current_user_message,
+        language=answer_language,
+        recent_messages=recent_messages,
+        next_test_rows=rows["rows"] if rows is not None else (),
+        **(
+            {"requested_fact": requested_fact_key}
+            if answerable
+            else {"unavailable_fact": requested_fact_key}
+        ),
+    )
+    if answer.text is None and answer.research_usage is None:
+        return LatestResultFactComposerDeclined(requested_fact_key)
 
-    if (
-        requested_fact_key in fact_bank
-        and requested_fact_key not in _NON_ANSWERABLE_FACT_IDS
-    ):
-        response = await compose_response_func(
-            metadata=metadata,
-            focus=focus,
-            user_message=current_user_message,
-            language=answer_language,
-            fact_key=requested_fact_key,
-            # The runtime computed these facts itself, so a draft that omits
-            # them from fact_ids gets them appended instead of rejected.
-            extra_appendable_fact_ids={
-                "symbols",
-                *_PAIRED_FACT_IDS.get(requested_fact_key, (requested_fact_key,)),
-            },
-        )
-        if not response:
-            return LatestResultFactComposerDeclined(requested_fact_key)
+    if answerable:
         facts: dict[str, Any] = {
             fact_id: fact_bank[fact_id]
-            for fact_id in _PAIRED_FACT_IDS.get(requested_fact_key, (requested_fact_key,))
+            for fact_id in PAIRED_FACT_IDS.get(requested_fact_key, (requested_fact_key,))
             if fact_id in fact_bank
         }
         facts["fact_key"] = requested_fact_key
         facts["source"] = "result_followup_fact_bank"
-        updated_decision = decision.model_copy(
-            update={
-                "intent": "conversation_followup",
-                "requires_clarification": False,
-                "missing_required_fields": [],
-                "semantic_turn_act": "result_followup",
-                "result_followup_focus": focus,
-                "result_followup_fact_key": requested_fact_key,
-                "reason_codes": [
-                    *decision.reason_codes,
-                    "latest_result_fact_answer",
-                ],
-            }
-        )
-        return StageResult(
-            outcome="ready_to_respond",
-            decision=updated_decision,
-            stage_patch={
-                "assistant_response": response,
-                "response_intent": {
-                    "kind": "beginner_guidance",
-                    "facts": facts,
-                },
-                **run_patch,
+        reason_code = "latest_result_fact_answer"
+        response_intent: dict[str, Any] = {"kind": "beginner_guidance", "facts": facts}
+    else:
+        available_facts = _available_result_facts(fact_bank)
+        reason_code = "latest_result_fact_limitation"
+        response_intent = {
+            "kind": "unsupported_recovery",
+            "facts": {
+                "limitation_code": "latest_result_metric_unavailable",
+                "requested_metric": requested_fact_key,
+                "available_result_facts": available_facts,
             },
-        )
-
-    available_facts = _available_result_facts(fact_bank)
-    response = await compose_response_func(
-        metadata=metadata,
-        focus=focus,
-        user_message=current_user_message,
-        language=answer_language,
-        extra_facts={
-            "requested_fact_unavailable": (
-                f"The exact '{requested_fact_key.replace('_', ' ')}' value is not "
-                "stored for this saved result"
-            ),
-            "available_result_facts": ", ".join(available_facts),
-        },
-        extra_required_fact_ids={
-            "requested_fact_unavailable",
-            "available_result_facts",
-        },
-        extra_appendable_fact_ids={
-            "symbols",
-            "requested_fact_unavailable",
-            "available_result_facts",
-        },
-    )
-    if not response:
-        return LatestResultFactComposerDeclined(requested_fact_key)
+            "options": [
+                {
+                    "label": "Ask about an available result fact",
+                    "label_key": "chat.result_followup.options.ask_supported",
+                    "replacement_values": {
+                        "semantic_turn_act": "result_followup",
+                        "artifact_target": "latest_result",
+                    },
+                }
+            ],
+        }
     updated_decision = decision.model_copy(
         update={
             "intent": "conversation_followup",
@@ -233,36 +192,22 @@ async def latest_result_answer_stage_result_if_applicable(
             "semantic_turn_act": "result_followup",
             "result_followup_focus": focus,
             "result_followup_fact_key": requested_fact_key,
-            "reason_codes": [
-                *decision.reason_codes,
-                "latest_result_fact_limitation",
-            ],
+            "reason_codes": [*decision.reason_codes, reason_code],
         }
+    )
+    # A paid Agent response that produced no answer still reaches the ledger.
+    answer_patch = (
+        {"assistant_response": answer.text, "response_intent": response_intent}
+        if answer.text is not None
+        else unavailable_result_followup_patch(language=answer_language)
     )
     return StageResult(
         outcome="ready_to_respond",
         decision=updated_decision,
         stage_patch={
-            "assistant_response": response,
-            "response_intent": {
-                "kind": "unsupported_recovery",
-                "facts": {
-                    "limitation_code": "latest_result_metric_unavailable",
-                    "requested_metric": requested_fact_key,
-                    "available_result_facts": available_facts,
-                },
-                "options": [
-                    {
-                        "label": "Ask about an available result fact",
-                        "label_key": "chat.result_followup.options.ask_supported",
-                        "replacement_values": {
-                            "semantic_turn_act": "result_followup",
-                            "artifact_target": "latest_result",
-                        },
-                    }
-                ],
-            },
-            **run_patch,
+            **answer_patch,
+            **result_answer_sidecars(answer, rows),
+            **_run_reference_patch(metadata=metadata, artifact_id=reference.artifact_id),
         },
     )
 

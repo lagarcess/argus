@@ -54,9 +54,8 @@ def runnable_next_tests(facts: dict[str, Any]) -> str:
         return f"Try next: {labels}"
 
     return (
-        "Try next: change the date range, test the same supported setup on "
-        "a different same-class asset, or simplify the idea into a supported RSI or "
-        "SMA/EMA rule"
+        "Try next: change the date range, test the same setup on a different "
+        "same-class asset, or simplify the idea into an RSI or moving average rule"
     )
 
 
@@ -82,7 +81,7 @@ def structured_next_experiments(facts: dict[str, Any]) -> list[dict[str, Any]]:
             ),
             _next_experiment(
                 "supported_ma_crossover",
-                f"try a supported SMA/EMA crossover{asset_phrase}",
+                f"try a moving average crossover{asset_phrase}",
             ),
         ]
     if strategy_type == "indicator_threshold":
@@ -131,11 +130,11 @@ def structured_next_experiments(facts: dict[str, Any]) -> list[dict[str, Any]]:
         _next_experiment("change_date_range", "change the date range"),
         _next_experiment(
             "same_setup_peer_asset",
-            "test the same supported setup on a different same-class asset",
+            "test the same setup on a different same-class asset",
         ),
         _next_experiment(
             "supported_rsi_or_ma_rule",
-            "simplify the idea into a supported RSI or SMA/EMA rule",
+            "simplify the idea into an RSI or moving average rule",
         ),
     ]
 

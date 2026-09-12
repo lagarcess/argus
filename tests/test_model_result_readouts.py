@@ -106,7 +106,7 @@ async def compose(surface, text, result, monkeypatch, language="en", figures=())
 async def test_readouts_accept_repeated_and_unreferenced_numbers(
     surface, language, text, stored_result, monkeypatch
 ):
-    key = "Purchases and sales" if surface == "breakdown" else "portfolio.executed_fills"
+    key = "Trades executed" if surface == "breakdown" else "portfolio.executed_fills"
     rendered, _ = await compose(
         surface, text, stored_result, monkeypatch, language, figures=[(key, 17)]
     )
@@ -158,7 +158,7 @@ async def test_breakdown_sends_headline_facts_without_chart_or_internal_paths(
     ) in prompt
     assert "15.1%" in prompt and "15.126" not in prompt
     assert "Total return on starting capital" in prompt
-    assert "Purchases and sales" in prompt
+    assert "Trades executed" in prompt
     for internal in (
         "series",
         "markers",

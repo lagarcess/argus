@@ -165,6 +165,8 @@ def _compute_metrics_from_equity(
     invested_capital: float,
     time_basis: MetricTimeBasis,
     trade_count: int,
+    buy_fills: int,
+    sell_fills: int,
     closed_trade_pnls: Sequence[float],
 ) -> dict[str, Any]:
     return _metrics._compute_metrics_from_equity(
@@ -173,6 +175,8 @@ def _compute_metrics_from_equity(
         invested_capital=invested_capital,
         time_basis=time_basis,
         trade_count=trade_count,
+        buy_fills=buy_fills,
+        sell_fills=sell_fills,
         closed_trade_pnls=closed_trade_pnls,
     )
 

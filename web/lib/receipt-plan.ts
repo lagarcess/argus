@@ -267,21 +267,19 @@ export function benchmarkVerdict(
     return match ? Number.parseFloat(match[0]) : null;
   };
 
-  // The engine's own delta, when the payload carries it. Subtracting two already
-  // rounded display strings can land a tenth of a point away from what the run
-  // actually computed, and this page is a record.
-  const frozenDelta = find("delta_vs_benchmark_pct");
+  // The gap is the difference of the two frozen returns the page shows, so
+  // stored receipts agree with their figures; the frozen delta covers the rest.
   const theirs = find("benchmark_return_pct");
+  const mine = find("total_return_pct") ?? find("contribution_return_pct");
+  const left = mine ? parse(mine) : null;
+  const right = theirs ? parse(theirs) : null;
+  const frozenDelta = find("delta_vs_benchmark_pct");
   const delta =
-    frozenDelta !== null
-      ? parse(frozenDelta)
-      : (() => {
-          const mine =
-            find("total_return_pct") ?? find("contribution_return_pct");
-          const left = mine ? parse(mine) : null;
-          const right = theirs ? parse(theirs) : null;
-          return left === null || right === null ? null : left - right;
-        })();
+    left !== null && right !== null
+      ? left - right
+      : frozenDelta !== null
+        ? parse(frozenDelta)
+        : null;
 
   if (delta === null) {
     return theirs ? interpolate(copy.hero.vs, { symbol, value: theirs }) : null;

@@ -12,6 +12,7 @@ from argus.domain.engine_launch.display import (
     format_benchmark_comparison_phrase,
     format_date_range_label,
 )
+from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
 
 
 def _format_money(value: float) -> str:
@@ -88,8 +89,13 @@ def build_result_card(
     if is_dca:
         assumptions = _dca_assumptions(config, is_es=is_es) + assumptions
 
+    # The row states the gap between the two returns as shown.
     benchmark_comparison = benchmark_comparison_from_delta(
-        performance["delta_vs_benchmark_pct"]
+        shown_benchmark_gap(
+            performance["total_return_pct"],
+            performance.get("benchmark_return_pct"),
+            performance["delta_vs_benchmark_pct"],
+        )
     )
 
     rows = [
@@ -194,7 +200,11 @@ def _execution_costs_payload(performance: dict[str, Any]) -> dict[str, Any] | No
         "slippage_bps": effect.get("slippage_bps"),
         "gross_total_return_pct": effect.get("gross_total_return_pct"),
         "net_total_return_pct": effect.get("net_total_return_pct"),
-        "return_drag_pct": effect.get("return_drag_pct"),
+        "return_drag_pct": shown_cost_drag(
+            effect.get("gross_total_return_pct"),
+            effect.get("net_total_return_pct"),
+            effect.get("return_drag_pct"),
+        ),
         "benchmark_treatment": "same_modeled_costs",
     }
 

@@ -1,0 +1,311 @@
+{
+  "reruns": [
+    {
+      "id": "natural_language_establishes_modeled_costs_issue_271",
+      "category": "action_chip_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 5,
+        "reported_cost_receipt_count": 5,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.01535155
+      }
+    },
+    {
+      "id": "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "category": "action_chip_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 4,
+        "reported_cost_receipt_count": 4,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0240017
+      }
+    },
+    {
+      "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "category": "action_chip_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.02545415
+      }
+    },
+    {
+      "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "category": "action_chip_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0145231
+      }
+    },
+    {
+      "id": "capability_honesty_golden_cross_control_aapl",
+      "category": "capability_honesty",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 4,
+        "reported_cost_receipt_count": 4,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.024701
+      }
+    },
+    {
+      "id": "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "category": "dca_capital_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 6,
+        "reported_cost_receipt_count": 6,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0124404
+      }
+    },
+    {
+      "id": "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "category": "dca_capital_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [
+        {
+          "task": "clarification",
+          "schema_name": "ClarificationResponse",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError"
+        }
+      ],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "needs_clarification",
+        "await_user_reply"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 4,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 1,
+        "reported_cost_usd": 0.0082466
+      }
+    },
+    {
+      "id": "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "category": "dca_capital_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0086099
+      }
+    },
+    {
+      "id": "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "category": "dca_capital_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 2,
+        "reported_cost_receipt_count": 2,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.00854635
+      }
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "category": "dca_capital_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 17,
+        "reported_cost_receipt_count": 17,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.06949857208
+      }
+    },
+    {
+      "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+      "category": "dca_capital_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 6,
+        "reported_cost_receipt_count": 6,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0193629
+      }
+    },
+    {
+      "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+      "category": "dca_capital_semantics",
+      "reason": "One run at the fix for requests that state no cost stopping at a cost question: each case that passed in the first measurement and failed in this one, and six passing cases whose path runs through the cost check.",
+      "commit": "23dbe692",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 6,
+        "reported_cost_receipt_count": 6,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0240606
+      }
+    }
+  ],
+  "provider_usage": {
+    "route_receipt_count": 63,
+    "reported_cost_receipt_count": 62,
+    "unreported_cost_receipt_count": 1,
+    "reported_cost_usd": 0.25479682208
+  }
+}

@@ -588,23 +588,36 @@ def _date_limit_recovery_patch(
     if violation is None:
         return None
     if violation.code == "provider_history_start_unavailable":
+        from argus.domain.market_data import shared_history_start
+
+        constraint: dict[str, Any] = {
+            "category": "data_window_unavailable",
+            "raw_value": raw_date_range,
+            "explanation": (
+                "The requested start date is earlier than the price history "
+                "available for this asset."
+            ),
+            "simplification_options": [
+                {"label": "Choose a later start date"},
+                {"label": "Use the maximum available launch window"},
+                {"label": "Use a shorter recent window"},
+            ],
+        }
+        from argus.agent_runtime.stages.execute import _resolve_benchmark_symbol
+
+        symbols = [str(symbol) for symbol in strategy.get("asset_universe") or []]
+        if symbols:
+            # Coverage preflight needs the launch benchmark's history as well.
+            benchmark = _resolve_benchmark_symbol(symbols[0], {}, strategy=strategy)
+            symbols = list(dict.fromkeys([*symbols, benchmark]))
+        available_from = shared_history_start(symbols, asset_class) if symbols else None
+        if available_from is not None:
+            constraint["available_from"] = available_from.isoformat()
         return _recoverable_constraint_patch(
             optional_parameter_status=optional_parameter_status,
             requested_field="date_range",
             missing_required_fields=["date_range"],
-            constraint={
-                "category": "data_window_unavailable",
-                "raw_value": raw_date_range,
-                "explanation": (
-                    "The requested start date is earlier than the available "
-                    "equity launch window."
-                ),
-                "simplification_options": [
-                    {"label": "Choose a start date in 2016 or later"},
-                    {"label": "Use the maximum available launch window"},
-                    {"label": "Use a shorter recent window"},
-                ],
-            },
+            constraint=constraint,
         )
     if violation.code == "provider_timeframe_unavailable":
         return _recoverable_constraint_patch(

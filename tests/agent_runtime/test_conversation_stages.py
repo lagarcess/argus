@@ -1267,7 +1267,8 @@ def test_clarifier_system_prompt_keeps_vague_ideas_on_supported_proxies() -> Non
     assert "current engine cannot execute P/E as a rule yet" in system_prompt
     assert "Translate that concept to the closest supported proxy" in system_prompt
     assert "name P/E or valuation as valid context" in system_prompt
-    assert "equity launch history starts in 2016" in system_prompt
+    assert "only from asset_history_starts" in system_prompt
+    assert "2016" not in system_prompt
     assert "bounded recent-data window" in system_prompt
     assert "do not silently widen the timeframe" in system_prompt
     assert "Do not mention provider names" in system_prompt
@@ -3094,6 +3095,8 @@ def test_confirm_stage_does_not_require_thesis_for_executable_artifact_patch() -
 
 
 def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
+    from argus.domain.market_data import shared_history_start
+
     state = RunState.new(
         current_user_message="Backtest Apple since 2015.",
         recent_thread_history=[],
@@ -3114,8 +3117,13 @@ def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
     constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "data_window_unavailable"
     assert "provider" not in constraint["explanation"].lower()
-    assert any(
+    # The provider floor is never offered as the asset's start.
+    assert not any(
         "2016" in option["label"] for option in constraint["simplification_options"]
+    )
+    assert (
+        constraint["available_from"]
+        == shared_history_start(["AAPL", "SPY"], "equity").isoformat()
     )
 
 

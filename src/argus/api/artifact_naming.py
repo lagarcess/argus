@@ -8,6 +8,7 @@ from argus.api import state as api_state
 from argus.api.message_store import load_runtime_thread_history
 from argus.api.naming import suggest_entity_name
 from argus.api.schemas import BacktestRun, Conversation
+from argus.domain.result_figures import shown_benchmark_gap
 from argus.domain.store import utcnow
 
 MAX_ARTIFACT_NAME_CHARS = 80
@@ -218,7 +219,15 @@ def _run_fact_context(run: BacktestRun) -> str:
         "max_drawdown_pct",
         "win_rate",
     ):
-        value = performance.get(key)
+        value = (
+            shown_benchmark_gap(
+                performance.get("total_return_pct"),
+                performance.get("benchmark_return_pct"),
+                performance.get(key),
+            )
+            if key == "delta_vs_benchmark_pct"
+            else performance.get(key)
+        )
         if value is not None:
             lines.append(f"{key}: {value}")
 

@@ -3595,17 +3595,18 @@ def test_refine_strategy_result_action_preserves_result_parameters_without_llm()
 def test_result_followup_date_patch_routes_to_confirmation_without_guidance(
     monkeypatch,
 ) -> None:
-    from argus.agent_runtime.stages import interpret_actions as action_module
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
 
     called: list[dict[str, Any]] = []
 
-    async def _unexpected_followup(**kwargs: object) -> str:
+    async def _unexpected_followup(**kwargs: object) -> ResultConversationAnswer:
         called.append(dict(kwargs))
-        return "Try next: change the date range."
+        return ResultConversationAnswer(text="Try next: change the date range.")
 
     monkeypatch.setattr(
-        action_module,
-        "_compose_result_followup_with_timeout",
+        answers_module,
+        "compose_result_conversation_answer",
         _unexpected_followup,
     )
     reference = ArtifactReference(
@@ -3675,8 +3676,9 @@ def test_result_followup_date_patch_routes_to_confirmation_without_guidance(
 
 
 def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -> None:
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as action_module
 
     monkeypatch.setattr(
         interpret_module,
@@ -3684,12 +3686,12 @@ def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
 
-    async def _bad_followup(**_: object) -> str:
-        return "Try next: change the date range."
+    async def _bad_followup(**_: object) -> ResultConversationAnswer:
+        return ResultConversationAnswer(text="Try next: change the date range.")
 
     monkeypatch.setattr(
-        action_module,
-        "_compose_result_followup_with_timeout",
+        answers_module,
+        "compose_result_conversation_answer",
         _bad_followup,
     )
     pending = StrategySummary(
@@ -3739,14 +3741,15 @@ def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -
 
 
 def test_latest_result_followup_requires_validated_artifact_target(monkeypatch) -> None:
-    from argus.agent_runtime.stages import interpret_actions as action_module
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
 
-    async def _grounded_followup(**_: object) -> str:
-        return "This answer used the latest result facts."
+    async def _grounded_followup(**_: object) -> ResultConversationAnswer:
+        return ResultConversationAnswer(text="This answer used the latest result facts.")
 
     monkeypatch.setattr(
-        action_module,
-        "_compose_result_followup_with_timeout",
+        answers_module,
+        "compose_result_conversation_answer",
         _grounded_followup,
     )
 

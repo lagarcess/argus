@@ -10,6 +10,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "src" / "argus"
 BUILDER_NAME = "build_research_sidecar"
+# The returned-sources helper hands back the builder's sidecar unchanged, so
+# calling it is calling the builder.
+BUILDER_NAMES = frozenset({BUILDER_NAME, "returned_sources_research_sidecar"})
 MUTATING_METHODS = frozenset(
     {"__delitem__", "__setitem__", "clear", "pop", "popitem", "setdefault", "update"}
 )
@@ -37,9 +40,9 @@ def _is_builder_call(node: ast.AST) -> bool:
     function = node.func
     return (
         isinstance(function, ast.Name)
-        and function.id == BUILDER_NAME
+        and function.id in BUILDER_NAMES
         or isinstance(function, ast.Attribute)
-        and function.attr == BUILDER_NAME
+        and function.attr in BUILDER_NAMES
     )
 
 

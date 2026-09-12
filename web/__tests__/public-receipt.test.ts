@@ -643,9 +643,9 @@ describe("the plan sentence", () => {
     expect(benchmarkVerdict(behind, copy)).toBe("7.1 pts behind SPY");
   });
 
-  test("prefers the engine's own delta over subtracting two rounded strings", () => {
-    // The displayed figures round to a 9.3 point gap; the run computed 9.4. The
-    // page is a record, so it states what the engine measured.
+  test("states the difference of the two shown returns, even beside an older frozen delta", () => {
+    // A receipt frozen before one owner stated the gap carries the engine's 9.4
+    // beside +18.4% and +9.1%; the page states the 9.3 those figures show.
     const frozen = {
       ...PAYLOAD,
       metrics: [
@@ -654,7 +654,15 @@ describe("the plan sentence", () => {
         { key: "delta_vs_benchmark_pct", value: "9.4" },
       ],
     } satisfies PublicReceiptPayload;
-    expect(benchmarkVerdict(frozen, copy)).toBe("9.4 pts ahead of SPY");
+    expect(benchmarkVerdict(frozen, copy)).toBe("9.3 pts ahead of SPY");
+    const withoutHeadline = {
+      ...PAYLOAD,
+      metrics: [
+        { key: "benchmark_return_pct", value: "+9.1%" },
+        { key: "delta_vs_benchmark_pct", value: "-9.4" },
+      ],
+    } satisfies PublicReceiptPayload;
+    expect(benchmarkVerdict(withoutHeadline, copy)).toBe("9.4 pts behind SPY");
   });
 
   test("says nothing when the payload names no benchmark at all", () => {

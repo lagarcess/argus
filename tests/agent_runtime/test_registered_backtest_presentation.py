@@ -186,7 +186,8 @@ def test_projection_preserves_seed_and_zero_benchmark_without_fallback(seed, mon
     assert assumptions["recurring_contribution"] == engine["dca_capital"]["contribution"]
     assert assumptions["modeled_fee_bps"] == engine["_execution_realism"]["fee_bps"]
     assert metrics["benchmark_return_pct"] == "+0.0%"
-    assert metrics["delta_vs_benchmark_pct"] == "0"
+    # A zero benchmark leaves the whole shown return as the gap.
+    assert metrics["delta_vs_benchmark_pct"] == "18.4"
 
 
 def test_crossover_preserves_independent_exit_windows():

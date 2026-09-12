@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from collections.abc import Sequence
 from typing import Any
 
 from argus.agent_runtime.artifacts.continuity import (
@@ -18,18 +18,7 @@ from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
 )
-from argus.agent_runtime.result_followup_answers import (
-    composed_result_followup_patch,
-    next_experiment_followup_patch,
-    unavailable_result_followup_patch,
-)
-from argus.agent_runtime.result_followups import (
-    compose_result_followup_response,
-    context_packet_ids_from_fact_bank,
-    record_result_followup_recovery_receipt,
-    result_followup_fact_bank,
-    result_followup_llm_task,
-)
+from argus.agent_runtime.result_followup_answers import answered_result_followup_patch
 from argus.agent_runtime.stages.approval_guard import (
     decision_contains_material_strategy_patch,
     decision_is_pure_approval,
@@ -54,6 +43,9 @@ from argus.agent_runtime.stages.artifact_context import (
     strategy_from_result_action_snapshot,
     validated_approval_confirmation_payload_from_snapshot,
     validated_approval_confirmation_payload_from_state,
+)
+from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+    stored_fact_key,
 )
 from argus.agent_runtime.stages.interpret_internal.result_action_routing import (
     typed_result_action_stage_result_if_applicable,
@@ -91,9 +83,6 @@ COVERAGE_RECOVERY_ACTION_FIELDS = {
     "change_asset": "asset_universe",
     "change_benchmark": "comparison_baseline",
 }
-
-RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
-
 
 def final_interpret_stage_result(
     *,
@@ -1045,6 +1034,7 @@ async def artifact_followup_stage_result_if_applicable(
     snapshot: TaskSnapshot | None,
     current_user_message: str,
     language: str = "en",
+    recent_messages: Sequence[Any] = (),
 ) -> StageResult | None:
     deterministic_patch_result = (
         _deterministic_result_artifact_patch_stage_result_if_applicable(
@@ -1077,54 +1067,16 @@ async def artifact_followup_stage_result_if_applicable(
     )
     if reference is None:
         return None
-    metadata = dict(reference.metadata)
-    if focus == "next_experiment":
-        answer = next_experiment_followup_patch(
-            metadata, language=language, source_run_id=reference.artifact_id
-        )
-    else:
-        answer = composed_result_followup_patch(
-            await _compose_result_followup_with_timeout(
-                metadata=metadata,
-                focus=focus,
-                user_message=current_user_message,
-                language=language,
-            ),
-            focus=focus,
-        )
     return StageResult(
         outcome="ready_to_respond",
         decision=_result_followup_decision(decision, focus=focus),
-        stage_patch=(
-            answer
-            if answer is not None
-            else unavailable_result_followup_patch(language=language)
+        stage_patch=await answered_result_followup_patch(
+            metadata=dict(reference.metadata),
+            focus=focus,
+            user_message=current_user_message,
+            language=language,
+            recent_messages=recent_messages,
+            source_run_id=reference.artifact_id,
+            stored_fact=stored_fact_key(decision=decision, snapshot=snapshot),
         ),
     )
-
-
-async def _compose_result_followup_with_timeout(
-    *,
-    metadata: dict[str, Any],
-    focus: str,
-    user_message: str,
-    language: str = "en",
-) -> str | None:
-    try:
-        return await asyncio.wait_for(
-            compose_result_followup_response(
-                metadata=metadata,
-                focus=focus,
-                user_message=user_message,
-                language=language,
-            ),
-            timeout=RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS,
-        )
-    except (TimeoutError, asyncio.TimeoutError):
-        fact_bank = result_followup_fact_bank(metadata)
-        record_result_followup_recovery_receipt(
-            task=result_followup_llm_task(fact_bank=fact_bank, focus=focus),
-            failure_mode="result_followup_timeout",
-            context_packet_ids=context_packet_ids_from_fact_bank(fact_bank),
-        )
-        return None

@@ -266,7 +266,7 @@ def market_data_window_violation(
             return MarketDataWindowViolation(
                 code="provider_history_start_unavailable",
                 provider="alpaca",
-                detail="Alpaca equity history starts in 2016 for this launch path.",
+                detail="The start is before the earliest equity history the provider serves.",
             )
         return None
 

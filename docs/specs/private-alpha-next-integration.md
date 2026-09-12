@@ -1,8 +1,11 @@
 # Private Alpha Next Integration
 
-Status: Active integration staging/process context
+Status: Active integration staging/process context. Current product state,
+running lanes and landing status live in
+[`argus-grounded-finance-roadmap.md`](argus-grounded-finance-roadmap.md); the
+product-change ledger below stops at 2026-08-02 and is history.
 Date: 2026-06-10
-Last reconciled: 2026-08-02
+Last reconciled: 2026-08-02 (header pointer added 2026-09-12)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 

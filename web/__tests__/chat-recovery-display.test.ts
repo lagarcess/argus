@@ -335,6 +335,43 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("a result fact the run does not store keeps the model's answer, not recovery copy", () => {
+    const limitation = {
+      kind: "unsupported_recovery",
+      facts: {
+        limitation_code: "latest_result_metric_unavailable",
+        requested_metric: "drawdown_date",
+        available_result_facts: ["max_drawdown", "peak_date"],
+      },
+      options: [
+        {
+          label: "Ask about an available result fact",
+          label_key: "chat.result_followup.options.ask_supported",
+          replacement_values: {
+            semantic_turn_act: "result_followup",
+            artifact_target: "latest_result",
+          },
+        },
+      ],
+    };
+    const strategyRecovery = {
+      ...limitation,
+      facts: { strategy: { asset_universe: ["NVDA"] } },
+    };
+
+    for (const catalog of [enCatalog, esCatalog]) {
+      const display = recoveryDisplayFromMetadata({ response_intent: limitation });
+      expect(display).toBeNull();
+      expect(recoveryDisplayText(display, tFromCatalog(catalog))).toBe("");
+      expect(
+        recoveryDisplayText(
+          recoveryDisplayFromMetadata({ response_intent: strategyRecovery }),
+          tFromCatalog(catalog),
+        ),
+      ).not.toBe("");
+    }
+  });
+
   test("renders unsupported recovery options from typed replacement values", () => {
     const display = recoveryDisplayFromMetadata({
       response_intent: {

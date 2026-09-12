@@ -1,10 +1,12 @@
 # ruff: noqa: F403, F405
 from __future__ import annotations
 
+from argus.agent_runtime import result_followup_answers as answers_module
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
+from argus.agent_runtime.result_conversation import ResultConversationAnswer
 from argus.agent_runtime.result_followups import result_followup_fact_bank
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.interpret_internal import (
@@ -201,9 +203,9 @@ class _RecordingComposer:
         self.response = response
         self.calls: list[dict[str, Any]] = []
 
-    async def __call__(self, **kwargs: Any) -> str | None:
+    async def __call__(self, **kwargs: Any) -> ResultConversationAnswer:
         self.calls.append(kwargs)
-        return self.response
+        return ResultConversationAnswer(text=self.response)
 
 
 class _MessageSwitchInterpreter:
@@ -221,10 +223,12 @@ class _SequencedComposer:
         self.responses = responses
         self.calls: list[dict[str, Any]] = []
 
-    async def __call__(self, **kwargs: Any) -> str | None:
+    async def __call__(self, **kwargs: Any) -> ResultConversationAnswer:
         self.calls.append(kwargs)
         index = len(self.calls) - 1
-        return self.responses[index] if index < len(self.responses) else None
+        return ResultConversationAnswer(
+            text=self.responses[index] if index < len(self.responses) else None
+        )
 
 
 def test_fact_bank_is_enriched_with_curve_and_supplemental_facts() -> None:
@@ -269,8 +273,7 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
     assert result.patch["assistant_response"] == "COMPOSED_FACT_ANSWER"
     assert len(composer.calls) == 1
     call = composer.calls[0]
-    assert call["focus"] == "peak_date"
-    assert call["fact_key"] == "peak_date"
+    assert call["requested_fact"] == "peak_date"
     assert call["language"] == "en"
     assert call["user_message"] == "what date did this strategy peak in value?"
     facts = result.patch["response_intent"]["facts"]
@@ -282,6 +285,43 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
     assert result.patch["latest_run_id"] == "run-140"
     assert result.patch["result_conversation_id"] == "conversation-140"
     assert "latest_result_fact_answer" in result.decision.reason_codes
+
+
+def _costed_snapshot() -> TaskSnapshot:
+    """Modeled costs stored the way a run records them: configuration and metrics."""
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    reference.metadata["config_snapshot"].update({"fee_bps": 10.0, "slippage_bps": 5.0})
+    reference.metadata["metrics"]["aggregate"]["performance"]["execution_realism"] = {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "gross_total_return_pct": 28.9,
+        "net_total_return_pct": 28.4,
+        "return_drag_pct": 0.5,
+    }
+    return snapshot
+
+
+@pytest.mark.asyncio
+async def test_a_text_cost_fact_the_answer_is_not_given_is_a_limitation() -> None:
+    composer = _RecordingComposer()
+    decision = _decision("result_card_fact").model_copy(
+        update={"result_followup_fact_key": "benchmark_cost_treatment"}
+    )
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=_costed_snapshot(),
+        current_user_message="did the benchmark pay the same costs?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    assert composer.calls[0]["unavailable_fact"] == "benchmark_cost_treatment"
+    assert "latest_result_fact_limitation" in result.decision.reason_codes
 
 
 @pytest.mark.asyncio
@@ -301,10 +341,6 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
             "return_drag",
             {"return_drag": "0.5 percentage points"},
         ),
-        (
-            "benchmark_cost_treatment",
-            {"benchmark_cost_treatment": ("Benchmark used the same modeled costs")},
-        ),
     ],
 )
 async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
@@ -318,7 +354,7 @@ async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
 
     result = await latest_result_answer_stage_result_if_applicable(
         decision=decision,
-        snapshot=_snapshot(),
+        snapshot=_costed_snapshot(),
         current_user_message="what execution costs did this use?",
         language="en",
         compose_response_func=composer,
@@ -326,7 +362,7 @@ async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
 
     assert result is not None
     assert result.patch["assistant_response"] == "COMPOSED_FACT_ANSWER"
-    assert composer.calls[0]["fact_key"] == fact_key
+    assert composer.calls[0]["requested_fact"] == fact_key
     facts = result.patch["response_intent"]["facts"]
     assert facts["fact_key"] == fact_key
     for key, value in expected_fact.items():
@@ -363,7 +399,7 @@ async def test_latest_result_benchmark_delta_answer_replaces_stored_prose() -> N
     )
 
     assert result is not None
-    assert composer.calls[0]["fact_key"] == "benchmark_delta"
+    assert composer.calls[0]["requested_fact"] == "benchmark_delta"
     facts = result.patch["response_intent"]["facts"]
     assert facts["benchmark_delta"] == "-5.3 percentage points"
     assert facts["source"] == "result_followup_fact_bank"
@@ -392,8 +428,47 @@ async def test_stage_declines_untyped_focus_without_fact_key() -> None:
     assert composer.calls == []
 
 
+def _fixed_capital_snapshot() -> TaskSnapshot:
+    """One asset with fixed capital, where the fact sheet states the worst drop's dates."""
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    reference.metadata["symbols"] = ["COST"]
+    reference.metadata["config_snapshot"] = {
+        "template": "buy_and_hold",
+        "symbols": ["COST"],
+        "start_date": "2020-02-01",
+        "end_date": "2026-07-02",
+        "starting_capital": 10000,
+        "date_range": {"start": "2020-02-01", "end": "2026-07-02"},
+    }
+    performance = reference.metadata["metrics"]["aggregate"]["performance"]
+    performance["benchmark_coverage"] = {"target_points": 4}
+    return snapshot
+
+
 @pytest.mark.asyncio
 async def test_latest_result_drawdown_date_pairs_depth_with_trough_date() -> None:
+    composer = _RecordingComposer()
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=_decision("drawdown_date"),
+        snapshot=_fixed_capital_snapshot(),
+        current_user_message="when was the worst drawdown?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    facts = result.patch["response_intent"]["facts"]
+    assert facts["drawdown_date"] == "2022-06-16"
+    # Depth is computed at the same trough as the date.
+    assert facts["drawdown_depth"] == "12.3%"
+
+
+@pytest.mark.asyncio
+async def test_a_drawdown_date_the_fact_sheet_withholds_is_a_limitation() -> None:
+    # Deposits move a monthly-buy run's balance, so its sheet states no drop dates.
     composer = _RecordingComposer()
 
     result = await latest_result_answer_stage_result_if_applicable(
@@ -405,10 +480,8 @@ async def test_latest_result_drawdown_date_pairs_depth_with_trough_date() -> Non
     )
 
     assert result is not None
-    facts = result.patch["response_intent"]["facts"]
-    assert facts["drawdown_date"] == "2022-06-16"
-    # Depth is computed at the same trough as the date.
-    assert facts["drawdown_depth"] == "12.3%"
+    assert composer.calls[0]["unavailable_fact"] == "drawdown_date"
+    assert "latest_result_fact_limitation" in result.decision.reason_codes
 
 
 @pytest.mark.asyncio
@@ -469,7 +542,7 @@ async def test_non_canonical_fact_key_normalizes_mechanically() -> None:
     )
 
     assert result is not None
-    assert composer.calls[0]["fact_key"] == "peak_date"
+    assert composer.calls[0]["requested_fact"] == "peak_date"
     assert result.decision.result_followup_fact_key == "peak_date"
 
 
@@ -488,8 +561,7 @@ async def test_latest_result_missing_peak_date_returns_typed_limitation() -> Non
     assert result is not None
     assert result.patch["assistant_response"] == "COMPOSED_LIMITATION"
     call = composer.calls[0]
-    assert "requested_fact_unavailable" in call["extra_facts"]
-    assert "available_result_facts" in call["extra_facts"]
+    assert call["unavailable_fact"] == "peak_date"
     intent = result.patch["response_intent"]
     assert intent["kind"] == "unsupported_recovery"
     assert intent["facts"]["limitation_code"] == "latest_result_metric_unavailable"
@@ -564,7 +636,7 @@ async def test_latest_result_context_packet_ids_routes_to_limitation() -> None:
 
     assert result is not None
     assert result.patch["assistant_response"] == "COMPOSED_LIMITATION"
-    assert composer.calls[0].get("fact_key") is None
+    assert composer.calls[0].get("requested_fact") is None
     facts = result.patch["response_intent"]["facts"]
     assert facts["limitation_code"] == "latest_result_metric_unavailable"
     assert facts["requested_metric"] == "context_packet_ids"
@@ -626,7 +698,7 @@ async def test_workflow_latest_result_fact_answer_uses_typed_turn_language(
     )
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     interpreter = _StaticInterpreter(
@@ -674,7 +746,7 @@ async def test_workflow_refine_then_result_fact_answer_keeps_pending_state(
     )
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     interpreter = _StaticInterpreter(
@@ -737,12 +809,12 @@ async def test_workflow_fact_answer_then_composer_none_edit_reroutes_to_planner(
     )
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
 
@@ -845,22 +917,21 @@ async def test_workflow_post_result_composer_none_edit_without_pending_reroutes_
         EditOperation,
     )
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
 
     composer = _RecordingComposer(response=None)
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_actions_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
 
@@ -949,22 +1020,21 @@ async def test_workflow_composer_none_cadence_edit_confirms_with_new_cadence(
         EditOperation,
     )
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
 
     composer = _RecordingComposer(response=None)
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_actions_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
 
@@ -1052,22 +1122,21 @@ async def test_workflow_composer_none_edit_during_active_confirmation_reroutes_t
         EditOperation,
     )
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
 
     composer = _RecordingComposer(response=None)
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_actions_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
 
@@ -1137,22 +1206,21 @@ async def test_workflow_composer_none_without_edit_plan_keeps_recovery(
     the existing followup recovery — the guard never invents a route."""
 
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
 
     composer = _RecordingComposer(response=None)
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_actions_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
 
@@ -1208,7 +1276,7 @@ async def test_workflow_refine_result_question_with_strategy_baggage_does_not_co
     )
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     interpreter = _StaticInterpreter(
@@ -1255,8 +1323,7 @@ async def test_workflow_refine_result_question_with_strategy_baggage_does_not_co
         "The peak portfolio value was $14,500.25 on 2021-11-09."
         in result["assistant_response"]
     )
-    assert composer.calls[0]["focus"] == "peak_date"
-    assert composer.calls[0]["fact_key"] == "peak_date"
+    assert composer.calls[0]["requested_fact"] == "peak_date"
 
 
 @pytest.mark.asyncio
@@ -1266,7 +1333,7 @@ async def test_workflow_result_fact_limitation_exposes_response_intent(
     composer = _RecordingComposer(response="COMPOSED_LIMITATION")
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     interpreter = _StaticInterpreter(
@@ -1309,7 +1376,7 @@ async def test_workflow_unknown_metric_during_active_confirmation_preserves_card
     composer = _RecordingComposer(response="COMPOSED_LIMITATION")
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     interpreter = _StaticInterpreter(
@@ -1358,78 +1425,31 @@ async def test_workflow_unknown_metric_during_active_confirmation_preserves_card
     assert snapshot.latest_backtest_result_reference is not None
 
 
-def test_render_appends_runtime_pinned_facts_instead_of_rejecting() -> None:
-    from argus.agent_runtime.result_followups import (
-        ResultFollowupDraft,
-        render_result_followup_draft,
-    )
-
-    fact_bank = {
-        "caveat": "Historical simulation evidence, not a prediction",
-        "symbols": "AAPL",
-        "peak_date": "2026-06-02",
-        "peak_value": "$1,501.36",
-    }
-    draft = ResultFollowupDraft(
-        relative_performance_claim="unknown",
-        causal_attribution_claim="none",
-        answer="The peak was $1,501.36 on June 2, 2026.",
-        answer_blocks=["The peak was $1,501.36 on June 2, 2026."],
-        fact_ids=["caveat"],
-    )
-    required = {"caveat", "symbols", "peak_date", "peak_value"}
-
-    # The runtime computed the pinned facts itself: a draft that omits them
-    # from fact_ids gets them appended as a grounded fact line.
-    rendered = render_result_followup_draft(
-        draft=draft,
-        fact_bank=fact_bank,
-        required_fact_ids=required,
-        focus="peak_date",
-        extra_appendable_fact_ids={"symbols", "peak_date", "peak_value"},
-    )
-    assert rendered is not None
-    assert "$1,501.36" in rendered
-
-    # Without the appendable extension the same draft is rejected.
-    assert (
-        render_result_followup_draft(
-            draft=draft,
-            fact_bank=fact_bank,
-            required_fact_ids=required,
-            focus="peak_date",
-        )
-        is None
-    )
-
-
 @pytest.mark.asyncio
 async def test_recovery_followup_never_wears_result_chrome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Issue #249 / AP-STRESS-05: a failed composition ships the generic
     recovery message without result_followup_chrome, so the frontend never
-    renders failure prose under Try next / What happened headings. A what-next
-    focus answers with rows before any composer runs (#590), so the composed
+    renders failure prose under Try next / What happened headings. The composed
     focus here is the general one."""
 
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
 
     composer = _RecordingComposer(response=None)
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_actions_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
 
@@ -1476,31 +1496,28 @@ async def test_recovery_followup_never_wears_result_chrome(
 
 
 @pytest.mark.asyncio
-async def test_successful_followup_still_wears_result_chrome(
+async def test_successful_followup_wears_no_result_chrome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The chrome stays owned by real fact answers: a composed response keeps
-    its typed heading intent."""
-
-    from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+    """A composed answer about the result carries no typed heading; the one
+    list of next steps under it is its only chrome."""
 
     composer = _RecordingComposer(
         response="COST and TGT beat SPY over the window; the drawdown stayed shallow."
     )
     monkeypatch.setattr(
         latest_result_answer_module,
-        "compose_result_followup_response",
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
     monkeypatch.setattr(
-        interpret_actions_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         composer,
     )
 
@@ -1534,4 +1551,4 @@ async def test_successful_followup_still_wears_result_chrome(
     )
 
     assert "latest_result_followup_unavailable" not in str(result)
-    assert "result_followup_chrome" in str(result)
+    assert "result_followup_chrome" not in str(result)

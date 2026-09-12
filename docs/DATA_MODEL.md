@@ -875,6 +875,7 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - Runs are immutable after completion.
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
 - `metrics.aggregate.performance.portfolio_value_range` stores aggregate strategy portfolio equity close peak/lowest values for the run period.
+- Every `metrics` `efficiency` block, aggregate and per symbol, stores `buy_fills` and `sell_fills` beside `total_trades`. When costs were modeled, `metrics.aggregate.performance.execution_realism` also stores `modeled_fee_cost`, `modeled_slippage_cost`, and `modeled_cost_total` in dollars. Older rows omit these keys, and readers treat a missing key as unknown, never zero. No migration is required.
 - `chart` stores the aggregate portfolio equity curve, its matching `value_summary`, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
 - New chart writers also persist two optional additive objects inside the same
   immutable `chart` JSON: `exploration_policy` (generic range-eligibility hints

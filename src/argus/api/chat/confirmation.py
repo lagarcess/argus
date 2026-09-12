@@ -459,10 +459,28 @@ def _period_adjustment_from_launch_payload(
     effective = _date_range_payload(coverage.get("effective_date_range"))
     if requested is None or effective is None:
         return None
-    return {
+    adjustment: dict[str, Any] = {
         "code": "effective_window_adjusted",
         "requested_date_range": dict(requested),
         "effective_date_range": dict(effective),
+    }
+    limited_by = _limited_by_payload(coverage.get("limited_by"))
+    if limited_by is not None:
+        adjustment["limited_by"] = limited_by
+    return adjustment
+
+
+def _limited_by_payload(value: Any) -> dict[str, str] | None:
+    if not (
+        isinstance(value, dict)
+        and isinstance(value.get("symbol"), str)
+        and value["symbol"].strip()
+        and isinstance(value.get("first_available"), str)
+    ):
+        return None
+    return {
+        "symbol": value["symbol"].strip(),
+        "first_available": value["first_available"],
     }
 
 

@@ -1,72 +1,130 @@
-"""The three shapes a latest-result follow-up answer takes.
+"""Stage patches for answers about the latest result.
 
-A what-next follow-up answers with the result's Try next rows, any other
-focus with the composer's prose under its typed heading, and both fall back
-to the retryable recovery when nothing could be built.
+Every answer is written by `compose_result_conversation_answer`, and the one
+list of next steps under it comes from `result_next_steps`: the result's tests
+and the model's questions in the order the answer recommends. A turn no model
+answered gets the retryable recovery, and the Agent's invoice rides the
+research sidecar either way so the ledger records it.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
-from argus.agent_runtime.next_experiments import (
-    next_experiments_lead_in,
-    next_experiments_sidecar,
-)
+from loguru import logger
+
+from argus.agent_runtime.next_experiments import next_experiments_sidecar
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
 )
-from argus.agent_runtime.response_style import result_followup_response_intent
+from argus.agent_runtime.research_grounded import returned_sources_research_sidecar
+from argus.agent_runtime.result_conversation import (
+    ResultConversationAnswer,
+    compose_result_conversation_answer,
+)
 from argus.agent_runtime.result_fact_enrichment import metric_number
 from argus.agent_runtime.result_followups import (
-    BENCHMARK_DELTA_METRIC_PATHS,
     MAX_DRAWDOWN_METRIC_PATHS,
+    benchmark_gap_metric,
+)
+from argus.agent_runtime.result_next_steps import next_steps_patch, offered_test_steps
+
+# Focuses the stored results and runnable tests answer, so they never claim research.
+LOCAL_RESULT_FOCUSES: frozenset[str] = frozenset(
+    {"what_tested", "next_experiment", "assumptions"}
 )
 
 
-def next_experiment_followup_patch(
+async def answered_result_followup_patch(
+    *,
+    metadata: dict[str, Any],
+    focus: str,
+    user_message: str,
+    language: str,
+    recent_messages: Sequence[Any] = (),
+    source_run_id: str | None = None,
+    stored_fact: str | None = None,
+) -> dict[str, Any]:
+    """Stage patch answering the reader's message about the latest result.
+
+    A turn resolved to a stored run fact already had its fact answer, so here it
+    keeps the recovery and never gets an answer that researches.
+    """
+    rows = result_next_experiments(
+        metadata, language=language, source_run_id=source_run_id
+    )
+    if stored_fact is not None:
+        logger.info(f"Result fact question kept the recovery fact_key={stored_fact}")
+        answer = ResultConversationAnswer(text=None, failure_mode="stored_fact_declined")
+    else:
+        answer = await compose_result_conversation_answer(
+            metadata=metadata,
+            user_message=user_message,
+            language=language,
+            recent_messages=recent_messages,
+            next_test_rows=rows["rows"] if rows is not None else (),
+            research=focus not in LOCAL_RESULT_FOCUSES,
+        )
+    patch = (
+        unavailable_result_followup_patch(language=language)
+        if answer.text is None
+        else {"assistant_response": answer.text}
+    )
+    return {
+        **patch,
+        **result_answer_sidecars(answer, rows, offer_tests=focus == "next_experiment"),
+    }
+
+
+def result_next_experiments(
     metadata: dict[str, Any],
     *,
-    language: str = "en",
-    source_run_id: str | None = None,
+    language: str,
+    source_run_id: str | None,
 ) -> dict[str, Any] | None:
-    """Stage patch answering "what should I try next?" from the latest result.
+    """The latest result's full Try next offer (#590).
 
-    `next_experiments_sidecar` is the one owner of the rows (#590). An explicit
-    ask gets the result's full offer: spec §4.3's non-repetition rule restrains
-    unsolicited re-offers, not an answer to a question. The Try next section is
-    the heading, so the patch carries no result chrome. The message has no
-    card, so the sidecar names its run and a continuity row keeps its typed
-    action. None when no row can be built.
+    An explicit ask gets the whole offer: spec §4.3's non-repetition rule
+    restrains unsolicited re-offers, not an answer to a question. The message
+    has no card, so the sidecar names its run and a continuity row keeps its
+    typed action.
     """
-    sidecar = next_experiments_sidecar(
+    return next_experiments_sidecar(
         metadata,
-        benchmark_delta=metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS),
+        benchmark_delta=benchmark_gap_metric(metadata),
         max_drawdown=metric_number(metadata, paths=MAX_DRAWDOWN_METRIC_PATHS),
         language=language,
         source_run_id=source_run_id,
     )
-    if sidecar is None:
-        return None
-    return {
-        "assistant_response": next_experiments_lead_in(language),
-        "next_experiments": sidecar,
-    }
 
 
-def composed_result_followup_patch(
-    response: str | None,
+def result_answer_sidecars(
+    answer: ResultConversationAnswer,
+    rows: dict[str, Any] | None,
     *,
-    focus: str,
-) -> dict[str, Any] | None:
-    """A composed answer wears the typed heading for its focus."""
-    if response is None:
-        return None
-    return {
-        "assistant_response": response,
-        "response_intent": result_followup_response_intent(focus),
-    }
+    offer_tests: bool = False,
+) -> dict[str, Any]:
+    """The research invoice with its sources, and the list of next steps.
+
+    A reader who asked what to try next is offered the result's tests even when
+    no model listed any.
+    """
+    sidecars: dict[str, Any] = {}
+    if answer.research_usage is not None:
+        served = answer.source == "research_agent"
+        sidecars["research"] = returned_sources_research_sidecar(
+            sources=answer.sources if served else (),
+            usage=answer.research_usage,
+            degraded_code=None if served else "result_followup_research_unused",
+        )
+    steps = answer.next_steps if answer.text is not None else ()
+    if not steps and offer_tests:
+        if answer.text is not None:
+            logger.info("Result follow-up listed no next steps; offering the tests")
+        steps = offered_test_steps(rows)
+    return {**sidecars, **next_steps_patch(rows, steps)}
 
 
 def unavailable_result_followup_patch(*, language: str | None) -> dict[str, Any]:

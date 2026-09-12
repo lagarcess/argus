@@ -302,7 +302,7 @@ def project_backtest_turn(
             asset_class=bank["asset_class"],
             benchmark_symbol=bank["benchmark_symbol"],
             config_snapshot=config,
-            figures=bank.get("figures") or {},
+            figures=_subset(bank.get("figures"), ReceiptFigures),
             result_card={
                 "execution_costs": _subset(source_card["execution_costs"], ReceiptCosts)
             }

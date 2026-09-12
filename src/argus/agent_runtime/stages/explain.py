@@ -29,6 +29,7 @@ from argus.domain.engine_launch.result_facts import (
 from argus.domain.engine_launch.result_facts import (
     resolved_rule_summary as result_rule_summary,
 )
+from argus.domain.result_figures import shown_benchmark_gap
 from argus.domain.result_readout_content import normalize_readout_language
 from argus.domain.result_readout_grounding import (
     READOUT_GROUNDING_INSTRUCTIONS,
@@ -992,10 +993,10 @@ def _resolved_return_metrics(
         return _ReturnMetrics(
             total_return=total_return_pct,
             benchmark_return=benchmark_return_pct,
-            benchmark_delta=_benchmark_delta(
-                engine_performance,
-                total_return_pct=total_return_pct,
-                benchmark_return_pct=benchmark_return_pct,
+            benchmark_delta=shown_benchmark_gap(
+                total_return_pct,
+                benchmark_return_pct,
+                _nested_number(engine_performance, ("delta_vs_benchmark_pct",)),
             ),
             same_period=same_period,
         )
@@ -1005,33 +1006,9 @@ def _resolved_return_metrics(
     return _ReturnMetrics(
         total_return=total_return,
         benchmark_return=benchmark_return,
-        benchmark_delta=_return_difference(total_return, benchmark_return),
+        benchmark_delta=shown_benchmark_gap(total_return, benchmark_return, None),
         same_period=bool(result_payload.get("comparable_same_period")),
     )
-
-
-def _benchmark_delta(
-    engine_performance: dict[str, Any] | None,
-    *,
-    total_return_pct: float,
-    benchmark_return_pct: float,
-) -> float | None:
-    # The engine publishes delta_vs_benchmark_pct beside the two returns it
-    # rounded; subtracting those again can land a tenth away from it (#533).
-    # Only payload shapes without an engine block leave subtraction as the
-    # sole comparison available.
-    if engine_performance is not None:
-        return _nested_number(engine_performance, ("delta_vs_benchmark_pct",))
-    return _return_difference(total_return_pct, benchmark_return_pct)
-
-
-def _return_difference(
-    total_return: float | None,
-    benchmark_return: float | None,
-) -> float | None:
-    if total_return is None or benchmark_return is None:
-        return None
-    return total_return - benchmark_return
 
 
 def _nested_dict(payload: Any, path: tuple[str, ...]) -> dict[str, Any] | None:

@@ -26,10 +26,8 @@ from argus.domain.research.contracts import (
     ResearchUsage,
 )
 from argus.domain.research.credentials import perplexity_api_key
-from argus.domain.research.perplexity_agent import (
-    PerplexityAgentClient,
-    StructuredAgentLimits,
-)
+from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.result_figures import shown_benchmark_gap
 from argus.domain.result_readout_content import (
     normalize_readout_language,
 )
@@ -41,34 +39,19 @@ from argus.domain.result_readout_headlines import (
     headline_readout_facts,
     headline_request_lines,
 )
+from argus.domain.result_readout_research import (
+    RESULT_RESEARCH_LIMITS,
+    result_research_spec,
+)
 from argus.domain.result_readout_sources import (
     BREAKDOWN_SOURCE_INSTRUCTIONS,
     accepted_breakdown_text,
     result_breakdown_schema,
 )
 
-RESULT_BREAKDOWN_MODEL = "openai/gpt-5.6-luna"
-RESULT_BREAKDOWN_LIMITS = StructuredAgentLimits(
-    max_tool_calls=4,
-    parallel_tool_calls=False,
-    web_search_max_tokens=8000,
-    web_search_max_tokens_per_page=2000,
-    web_search_max_results=4,
-    fetch_url_max_urls=2,
-    fetch_url_total_budget_tokens=8000,
-)
-
 
 def result_breakdown_spec(language: str) -> ResearchConfigSpec:
-    return ResearchConfigSpec(
-        shape="balanced",
-        models=(RESULT_BREAKDOWN_MODEL,),
-        max_steps=3,
-        max_output_tokens=2200,
-        tools=("web_search", "fetch_url"),
-        timeout_seconds=75.0,
-        language=language.split("-", 1)[0],
-    )
+    return result_research_spec(language)
 
 
 def _client() -> PerplexityAgentClient | None:
@@ -169,7 +152,7 @@ def _llm_result_breakdown_with_metadata(
             schema_model=result_breakdown_schema(headline_facts),
             schema_name="ResultBreakdownDraft",
             instructions=messages[0]["content"],
-            limits=RESULT_BREAKDOWN_LIMITS,
+            limits=RESULT_RESEARCH_LIMITS,
         )
     except ResearchUnavailableError as exc:
         logger.warning("Result breakdown unavailable; using template", reason=exc.reason)
@@ -258,10 +241,15 @@ def fallback_result_breakdown_message(
         "max_drawdown_pct",
         row_keys=("max_drawdown_pct", "max_drawdown"),
     )
-    delta_vs_benchmark = _result_breakdown_metric(
-        context,
-        "delta_vs_benchmark_pct",
-        row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
+    # The gap beside the two printed returns is their shown difference.
+    delta_vs_benchmark = shown_benchmark_gap(
+        total_return,
+        benchmark_return,
+        _result_breakdown_metric(
+            context,
+            "delta_vs_benchmark_pct",
+            row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
+        ),
     )
     assumptions = context.get("assumptions")
     assumption_lines = (

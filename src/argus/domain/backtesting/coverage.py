@@ -12,7 +12,7 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel
 
-from argus.domain.backtesting.types import CoverageAdjustmentReason
+from argus.domain.backtesting.types import CoverageAdjustmentReason, CoverageLimitedBy
 from argus.domain.market_data import fetch_ohlcv as _DEFAULT_FETCH_OHLC
 from argus.domain.market_data.capabilities import (
     EASTERN,
@@ -109,6 +109,7 @@ class PreparedMarketData:
     bars_by_symbol: dict[str, pd.DataFrame]
     observations_by_symbol: dict[str, int]
     equity_market_sessions: tuple[EquityMarketSession, ...] | None = None
+    limited_by: CoverageLimitedBy | None = None
 
     def bars_for(self, symbol: str) -> pd.DataFrame:
         try:
@@ -145,6 +146,8 @@ class PreparedMarketData:
         }
         if self.adjustment_reason is not None:
             payload["adjustment_reason"] = self.adjustment_reason
+        if self.limited_by is not None:
+            payload["limited_by"] = self.limited_by.model_dump()
         return payload
 
 
@@ -161,6 +164,7 @@ def prepare_market_data(
     fetch_market_calendar_func: FetchMarketCalendar | None = None,
     approved_coverage: dict[str, Any] | None = None,
     approved_adjustment_reason: CoverageAdjustmentReason | None = None,
+    approved_limited_by: CoverageLimitedBy | None = None,
     now: datetime | None = None,
 ) -> PreparedMarketData:
     uses_default_market_data_provider = fetch_ohlcv_func is _DEFAULT_FETCH_OHLC
@@ -254,6 +258,7 @@ def prepare_market_data(
     outcome = "full_coverage" if effective == requested else "adjusted_coverage"
     if approved_coverage is not None:
         adjustment_reason = approved_adjustment_reason
+        limited_by = approved_limited_by
     else:
         adjustment_reason = _coverage_adjustment_reason(
             asset_class=str(config["asset_class"]),
@@ -262,6 +267,18 @@ def prepare_market_data(
             candidate_start=fetch_start,
             candidate_end=fetch_end,
             equity_market_sessions=equity_market_sessions,
+        )
+        expected_start, _ = _expected_window(
+            asset_class=str(config["asset_class"]),
+            candidate_start=fetch_start,
+            candidate_end=fetch_end,
+            equity_market_sessions=equity_market_sessions,
+        )
+        limited_by = _coverage_limited_by(
+            frames,
+            requested=requested,
+            effective=effective,
+            expected_start=expected_start,
         )
     observations = {symbol: len(frame) for symbol, frame in trimmed.items()}
     return PreparedMarketData(
@@ -273,6 +290,7 @@ def prepare_market_data(
         bars_by_symbol=trimmed,
         observations_by_symbol=observations,
         equity_market_sessions=equity_market_sessions,
+        limited_by=limited_by,
     )
 
 
@@ -288,11 +306,12 @@ def _coverage_adjustment_reason(
     if effective == requested:
         return "none"
 
-    expected_start = candidate_start
-    expected_end = candidate_end
-    if asset_class == "equity" and equity_market_sessions:
-        expected_start = min(session.session_date for session in equity_market_sessions)
-        expected_end = max(session.session_date for session in equity_market_sessions)
+    expected_start, expected_end = _expected_window(
+        asset_class=asset_class,
+        candidate_start=candidate_start,
+        candidate_end=candidate_end,
+        equity_market_sessions=equity_market_sessions,
+    )
 
     if (
         effective.start == expected_start.isoformat()
@@ -300,6 +319,43 @@ def _coverage_adjustment_reason(
     ):
         return "calendar_alignment"
     return "provider_coverage_adjustment"
+
+
+def _expected_window(
+    *,
+    asset_class: str,
+    candidate_start: date,
+    candidate_end: date,
+    equity_market_sessions: Sequence[EquityMarketSession] | None,
+) -> tuple[date, date]:
+    if asset_class == "equity" and equity_market_sessions:
+        session_dates = [session.session_date for session in equity_market_sessions]
+        return min(session_dates), max(session_dates)
+    return candidate_start, candidate_end
+
+
+def _coverage_limited_by(
+    frames: dict[str, pd.DataFrame],
+    *,
+    requested: CoverageDateRange,
+    effective: CoverageDateRange,
+    expected_start: date,
+) -> CoverageLimitedBy | None:
+    """Names the series whose own first bar is the effective start, when that start
+    is later than both the request and the first session the window could open."""
+    effective_start = date.fromisoformat(effective.start)
+    if effective_start <= date.fromisoformat(requested.start):
+        return None
+    if effective_start <= expected_start:
+        return None
+    symbol, frame = max(frames.items(), key=lambda item: item[1].index[0])
+    first_available = pd.Timestamp(frame.index[0]).date()
+    if first_available != effective_start:
+        return None
+    return CoverageLimitedBy(
+        symbol=symbol,
+        first_available=first_available.isoformat(),
+    )
 
 
 def apply_coverage_to_config(

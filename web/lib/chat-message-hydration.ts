@@ -19,7 +19,6 @@ import {
   unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
-import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
 import type {
   ChatActionOption,
   ChatMention,
@@ -524,9 +523,6 @@ export function hydrateTextMessageFromApi(
     actions: actions.length > 0 ? actions : undefined,
     contentPresentation: isAssistant
       ? runtimeFailureContentPresentation(metadata, options.contentPresentation)
-      : undefined,
-    resultFactHeadingKey: isAssistant
-      ? resultFactHeadingKeyFromMetadata(metadata)
       : undefined,
     recoveryDisplay: recoveryDisplayFromMetadata(metadata),
     resultReadoutContent: isAssistant ? resultReadoutContentFromMetadata(metadata) : undefined,

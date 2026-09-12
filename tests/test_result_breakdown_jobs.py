@@ -11,6 +11,7 @@ from argus.api import state as api_state
 from argus.api.chat import breakdown, research_jobs
 from argus.api.schemas import Message
 from argus.domain.research.contracts import ResearchSource, ResearchUsage
+from argus.domain.result_readout_research import RESULT_RESEARCH_MODEL
 from argus.domain.store import utcnow
 
 from tests.research.test_research_jobs import _JobGateway
@@ -77,7 +78,7 @@ async def test_disconnect_preserves_one_complete_billed_answer(
             else "Compró una vez y mantuvo.",
             source="llm_breakdown_stage",
             fallback_used=False,
-            usage=ResearchUsage(model=breakdown.RESULT_BREAKDOWN_MODEL, cost_usd=0.01),
+            usage=ResearchUsage(model=RESULT_RESEARCH_MODEL, cost_usd=0.01),
             sources=(ResearchSource(title="Results", url="https://example.com/results"),),
         )
 

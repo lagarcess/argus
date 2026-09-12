@@ -24,6 +24,7 @@ from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     EXECUTION_COST_FIDELITY_INSTRUCTIONS,
     apply_cost_fidelity,
 )
+from argus.agent_runtime.interpreter.latest_result_context import latest_result_facts
 from argus.agent_runtime.interpreter.shared import (
     _bounded_date_evidence_candidates,
     _date_range_from_bounded_evidence,
@@ -55,7 +56,6 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
-from argus.agent_runtime.result_followups import result_followup_fact_bank
 from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
@@ -960,29 +960,7 @@ def _latest_result_fact_bank_for_routing(
     snapshot = request.latest_task_snapshot
     if snapshot is None or snapshot.latest_backtest_result_reference is None:
         return {}
-    metadata = dict(snapshot.latest_backtest_result_reference.metadata)
-    fact_bank = result_followup_fact_bank(metadata)
-    return {
-        key: fact_bank[key]
-        for key in (
-            "symbols",
-            "strategy",
-            "date_range",
-            "total_return",
-            "benchmark_symbol",
-            "benchmark_return",
-            "benchmark_delta",
-            "max_drawdown",
-            "fee_bps",
-            "slippage_bps",
-            "gross_total_return",
-            "net_total_return",
-            "return_drag",
-            "benchmark_cost_treatment",
-            "runnable_next_tests",
-        )
-        if key in fact_bank
-    }
+    return latest_result_facts(snapshot.latest_backtest_result_reference)
 
 
 def _stated_run_field_fidelity_messages(

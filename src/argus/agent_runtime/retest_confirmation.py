@@ -18,6 +18,7 @@ from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.backtesting.confirmation_preflight import (
     materialize_confirmation_strategy,
     prepare_confirmation_launch,
+    restore_coverage_limited_by,
 )
 from argus.domain.market_data.capabilities import (
     AssetClass,
@@ -168,7 +169,10 @@ def prepare_retest_confirmation_payload(
     if not strategy_can_be_approved(pending_strategy):
         return RetestConfirmationPreparation()
 
-    validated_launch_payload = validation.launch_payload
+    validated_launch_payload = restore_coverage_limited_by(
+        validation.launch_payload,
+        preflight_launch_payload=launch_payload,
+    )
     if requested_date_range is not None:
         coverage = dict(validated_launch_payload["coverage_preflight"])
         coverage["adjustment_reason"] = "provider_coverage_adjustment"

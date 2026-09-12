@@ -363,6 +363,7 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
     from argus.domain.research.contracts import ResearchUnavailableError
     from argus.domain.research.credentials import perplexity_api_key
     from argus.domain.research.perplexity_agent import PerplexityAgentClient
+    from argus.domain.result_readout_research import RESULT_RESEARCH_MODEL
     from argus.llm import openrouter
     from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
 
@@ -372,7 +373,7 @@ def run_probe(request: dict[str, Any]) -> dict[str, Any]:
     models = openrouter.openrouter_model_candidates(task="result_summary")
     if openrouter.openrouter_model_tier_for_task("result_summary") != "readout":
         raise ValueError("readout_tier_required")
-    if models and models != [breakdown.RESULT_BREAKDOWN_MODEL]:
+    if models and models != [RESULT_RESEARCH_MODEL]:
         raise ValueError("luna_only_readout_required")
     spec = breakdown.result_breakdown_spec(language)
     configuration = {

@@ -863,7 +863,8 @@ def test_llm_interpreter_prompt_uses_provider_date_allowances() -> None:
 
     prompt = interpreter._system_prompt().lower()
 
-    assert "equity launch history starts in 2016" in prompt
+    assert "do not invent a history limit or a start year for any asset" in prompt
+    assert "2016" not in prompt
     assert "bounded recent-data window" in prompt
     assert "1h, 4h, or 1d" in prompt
     assert "preserve those requested fields" in prompt

@@ -48,7 +48,8 @@ export default function EmptyChatSurface({
   const disabled =
     isStreamingResponse || isHydratingConversation || guestSubmissionPending;
 
-  const showSignedInGreeting = researchRailEnabled && !isGuest;
+  const showGreeting = researchRailEnabled;
+  const showRegisteredDisclaimer = researchRailEnabled && !isGuest;
 
   // The tall top inset belongs to tablet and up. Expressing it as a min-width
   // variant rather than overriding a base value keeps `sm:` from winning the
@@ -59,9 +60,9 @@ export default function EmptyChatSurface({
           settles the pills and the composer onto the bottom edge where a thumb
           rests. Above it, the surface keeps its centered composition. */}
       <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
-        {showSignedInGreeting ? (
-          // Guests never reach this, so they always get the nameless pool.
-          <EmptyChatGreeting preferredName={preferredName} />
+        {showGreeting ? (
+          // A guest always gets the neutral, nameless pool.
+          <EmptyChatGreeting isGuest={isGuest} preferredName={preferredName} />
         ) : (
           <EmptyChatHeading isGuest={isGuest} />
         )}
@@ -70,7 +71,7 @@ export default function EmptyChatSurface({
       <div
         aria-busy={guestSubmissionPending}
         className={
-          showSignedInGreeting
+          showGreeting
             ? "order-3 w-full max-w-2xl"
             : "order-3 w-full max-w-2xl tablet:order-2"
         }
@@ -115,7 +116,7 @@ export default function EmptyChatSurface({
         <ChatLegalNotice
           expiresAt={expiresAt}
           isGuest={isGuest}
-          showRegisteredDisclaimer={showSignedInGreeting}
+          showRegisteredDisclaimer={showRegisteredDisclaimer}
           showGuestSafetyLine={researchRailEnabled}
           variant="before_message"
         />
@@ -126,7 +127,7 @@ export default function EmptyChatSurface({
           at every width. They stop when this surface stops rendering. */}
       <div
         className={
-          showSignedInGreeting
+          showGreeting
             ? "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:mb-2"
             : "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3"
         }

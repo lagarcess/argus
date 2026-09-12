@@ -446,46 +446,90 @@ async def test_unavailable_cost_fidelity_audit_requires_clarification(
     assert "execution_cost_evidence_unresolved" in repaired.reason_codes
 
 
+async def _no_cost_audit(*, task, messages, schema_model, schema_name, model_name=None):
+    del task, messages, schema_name, model_name
+    return schema_model.model_validate(
+        _audit_payload(
+            fee_rate=None,
+            fee_span=None,
+            slippage=None,
+            slippage_span=None,
+        )
+    )
+
+
 @pytest.mark.asyncio
-async def test_unowned_zero_costs_require_clarification_instead_of_silent_clear(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    ("message", "language"),
+    [("Test MSFT.", "en"), ("Prueba MSFT.", "es-419")],
+    ids=["english", "spanish"],
+)
+async def test_unowned_zero_costs_on_a_new_request_are_dropped_without_a_question(
+    monkeypatch: pytest.MonkeyPatch, message: str, language: str
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
-    async def fake_json_schema(
-        *, task, messages, schema_model, schema_name, model_name=None
-    ):
-        del task, messages, schema_name, model_name
-        return schema_model.model_validate(
-            _audit_payload(
-                fee_rate=None,
-                fee_span=None,
-                slippage=None,
-                slippage_span=None,
-            )
-        )
-
-    monkeypatch.setattr(
-        interpreter_module,
-        "invoke_openrouter_json_schema",
-        fake_json_schema,
-    )
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", _no_cost_audit)
 
     repaired = await interpreter_module._audit_stated_run_field_fidelity(
         response=_primary_cost_response(fee_rate=0.0, slippage=0.0),
         preferred_model="test-model",
-        request=_request("Test MSFT."),
+        request=_request(message, language=language),
+    )
+
+    assert repaired is not None
+    assert repaired.requires_clarification is False
+    assert "assumption" not in repaired.missing_required_fields
+    assert "execution_cost_default_zero_dropped" in repaired.reason_codes
+    strategy = _strategy_from_llm(
+        repaired.candidate_strategy_draft,
+        current_user_message=message,
+    )
+    assert "fee_rate" not in strategy.extra_parameters
+    assert "slippage" not in strategy.extra_parameters
+
+
+@pytest.mark.asyncio
+async def test_unowned_zero_costs_require_clarification_instead_of_clearing_owned_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", _no_cost_audit)
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": "2022-01-01", "end": "2022-12-31"},
+        capital_amount=12000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    )
+    response = _primary_cost_response(fee_rate=0.0, slippage=0.0)
+    response.task_relation = "refine"
+    response.semantic_turn_act = "refine_current_idea"
+    request = _request("Test MSFT.").model_copy(
+        update={"latest_task_snapshot": TaskSnapshot(pending_strategy_summary=prior)}
+    )
+
+    repaired = await interpreter_module._audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model="test-model",
+        request=request,
     )
 
     assert repaired is not None
     assert repaired.requires_clarification is True
     assert "assumption" in repaired.missing_required_fields
-    strategy = _strategy_from_llm(
-        repaired.candidate_strategy_draft,
-        current_user_message="Test MSFT.",
-    )
-    assert "fee_rate" not in strategy.extra_parameters
-    assert "slippage" not in strategy.extra_parameters
+    assert "execution_cost_default_zero_dropped" not in repaired.reason_codes
 
 
 @pytest.mark.asyncio

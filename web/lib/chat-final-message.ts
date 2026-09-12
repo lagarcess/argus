@@ -5,6 +5,7 @@ import type {
   Message,
 } from "@/components/chat/types";
 import type { NextExperimentRow } from "./chat-next-experiments";
+import type { NextStep } from "./chat-next-steps";
 import type { RecoveryDisplay } from "./chat-recovery-display";
 import type { MemoryRecallItem } from "./memory-recalls";
 
@@ -16,7 +17,6 @@ type MergeFinalTextOptions = {
   toolResultCards?: Message["toolResultCards"];
   finalActions: ChatActionOption[];
   contentPresentation?: Message["contentPresentation"];
-  resultFactHeadingKey?: string | null;
   recoveryDisplay?: RecoveryDisplay | null;
   strategyPathContext?: Message["strategyPathContext"];
   assistantRecoveryCode?: string | null;
@@ -28,6 +28,7 @@ type MergeFinalTextOptions = {
   memoryRecalls?: MemoryRecallItem[] | null;
   nextExperiments?: NextExperimentRow[] | null;
   nextExperimentsSourceRunId?: string | null;
+  nextSteps?: NextStep[] | null;
 };
 
 export function mergeFinalTextMessage(
@@ -40,7 +41,6 @@ export function mergeFinalTextMessage(
     toolResultCards,
     finalActions,
     contentPresentation,
-    resultFactHeadingKey,
     recoveryDisplay,
     strategyPathContext,
     assistantRecoveryCode,
@@ -50,6 +50,7 @@ export function mergeFinalTextMessage(
     memoryRecalls,
     nextExperiments,
     nextExperimentsSourceRunId,
+    nextSteps,
   }: MergeFinalTextOptions,
 ): Message {
   if (message.id !== assistantId) {
@@ -64,7 +65,6 @@ export function mergeFinalTextMessage(
     contentPresentation: contentPresentation ?? message.contentPresentation,
     resultReadoutContent,
     resultReadoutFacts,
-    resultFactHeadingKey: resultFactHeadingKey ?? message.resultFactHeadingKey,
     recoveryDisplay: recoveryDisplay ?? message.recoveryDisplay,
     strategyPathContext:
       strategyPathContext ?? message.strategyPathContext,
@@ -76,5 +76,6 @@ export function mergeFinalTextMessage(
     nextExperiments: nextExperiments ?? message.nextExperiments,
     nextExperimentsSourceRunId:
       nextExperimentsSourceRunId ?? message.nextExperimentsSourceRunId,
+    nextSteps: nextSteps ?? message.nextSteps,
   };
 }
