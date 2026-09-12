@@ -1,0 +1,179 @@
+{
+  "billed_usd": 0.369,
+  "reports": [
+    {
+      "key": "buy_and_hold",
+      "language": "en",
+      "steps": [
+        {
+          "step": "01-card",
+          "sent": "Buy and hold DOCN since September 2023 against SPY.",
+          "seconds": 91.5,
+          "answer": "DOCN\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$1,000\nPERIOD\nSep 1, 2023 → Sep 11, 2026\nStocks\nDaily data\nThrough Sep 11\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel",
+          "billed_usd": 0.005161799999999994
+        },
+        {
+          "step": "02-result",
+          "sent": "Run backtest",
+          "seconds": 8.2,
+          "answer": "DOCN\nBuy and Hold\n\nSep 1, 2023 → Sep 11, 2026 · Daily data\n\nSimulation Complete\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n1M\n3M\nYTD\n1Y\nAll\nRange details\n\nVisible period: Sep 1, 2023 to Sep 11, 2026.\n\nEnding value\n\n$4,594\n\n+$3,594 gain · +359.4% total return\n\nCompared with SPY\nBeat by 290.0 percentage points\nWorst drop\n-44.9%\n\nStocks · Historical simulation · No fees/slippage · Not advice\n\nView details\nExplain result\nRefine idea\nAdd decision\nQUICK TAKE\n\nBuying DOCN once and holding through this run turned $1,000 of invested capital into $4,594, a 359.4% return, beating SPY’s 69.4%. The tradeoff was a rough ride: the account fell from $1,747 to $963 during its largest drawdown before recovering, so the stronger result came with much steeper declines along the way.\n\nTRY NEXT\n↳\nTest a different date range·Beat the benchmark by 290.0 points\n↳\nTest the same setup on a similar asset\n↳\nTry monthly recurring buys",
+          "billed_usd": 0.006607449999999987
+        },
+        {
+          "step": "max-drawdown",
+          "sent": "What was the max drawdown?",
+          "seconds": 20.4,
+          "answer": "DRAWDOWN\n\nThe maximum drawdown was 44.9%. That means from the peak before the drop to the bottom, the portfolio lost nearly half its value. Specifically, the account fell from $1,747 on February 18, 2025 to $963 on August 1, 2025, a decline of $784. This was the price of the strong overall return, DOCN is a volatile stock, and the run shows it can drop sharply and stay down for months before recovering.",
+          "research_rows": 0,
+          "billed_usd": 0.021067035999999983
+        },
+        {
+          "step": "peak",
+          "sent": "When did it peak?",
+          "seconds": 20.7,
+          "answer": "PEAK DATE\n\nThe portfolio peaked on June 15, 2026, when it reached $6,784. That was the highest value before the run ended on September 11, 2026. The worst drop you asked about earlier started from a lower peak of $1,747 on February 18, 2025, so the all-time high came later, well after the drawdown had already recovered.\n\nTRY NEXT\n↳\nWhat happened around February 18, 2025 that might have triggered the drop?\n↳\nTry a moving average crossover\n↳\nTry monthly recurring buys\n↳\nTest a different date range",
+          "research_rows": 0,
+          "billed_usd": 0.02075952432
+        },
+        {
+          "step": "benchmark",
+          "sent": "Which benchmark did it use?",
+          "seconds": 44.9,
+          "answer": "BENCHMARK\n\nThe backtest used SPY as the benchmark. Over the run period from September 1, 2023 to September 11, 2026, SPY returned 69.4%, while the DOCN buy-and-hold strategy returned 359.4%, outperforming the benchmark by 290.0 percentage points.\n\nTRY NEXT\n↳\nTest a different date range\n↳\nTry a moving average crossover\n↳\nHow did DOCN perform compared to SPY during the specific window of the worst drop, from February 18, 2025 to August 1, 2025?\n↳\nWhat was the annualized volatility of DOCN versus SPY during the run, and how did that difference contribute to the higher returns?",
+          "research_rows": 0,
+          "billed_usd": 0.020953959999999994
+        },
+        {
+          "step": "benchmark-gap",
+          "sent": "How did it do against the benchmark?",
+          "seconds": 25.9,
+          "answer": "AGAINST BENCHMARK\n\nThe buy-and-hold strategy on DOCN returned 359.4% from September 1, 2023 to September 11, 2026, while the SPY benchmark returned 69.4% over the same period. That means the strategy outperformed the benchmark by 290.0 percentage points. The annualized return was 65.5% versus the benchmark's return, and the Sharpe ratio of 1.07 shows the return per unit of volatility, which was high at 68.6% annualized. The worst drop of 44.9% from February 18, 2025 to August 1, 2025 was a steep decline, but the stock recovered to reach a peak portfolio value of $6,784 on June 15, 2026, before the run ended at $4,594.\n\nTRY NEXT\n↳\nTry monthly recurring buys\n↳\nTry a moving average crossover\n↳\nTest a different date range\n↳\nWhat drove the 44.9% drop from February to August 2025?",
+          "research_rows": 0,
+          "billed_usd": 0.021445446320000006
+        },
+        {
+          "step": "why-it-fell",
+          "sent": "Why did it fall so much?",
+          "seconds": 46.2,
+          "answer": "The portfolio’s worst drop ran from February 18, 2025 to August 1, 2025. It fell from $1,747 to $963, a dollar decline of $784, or 44.9%.\n\nThe run itself cannot identify one exact cause. It shows a buy-and-hold position in a single stock, with one purchase and no sales, so the portfolio had no built-in way to reduce exposure during the decline. The strategy also had 68.6% annualized volatility, which is consistent with a large move in either direction.\n\nThe timing overlaps with several documented pressures. On April 3, broad technology stocks sold off sharply after new U.S. tariffs raised fears of a trade war and recession, as Reuters reported in its coverage of the market rout. That likely added market pressure to a growth-oriented cloud stock such as DOCN. Company-specific concerns were also reported in July, including DOCN’s 98.2% first-quarter net revenue retention and relatively low gross margin, in this July analysis of the stock.\n\nThis was not simply a period of consistently worsening company news. DigitalOcean’s first-quarter results release reported revenue growth and continued profitability. Its second-quarter results and raised full-year guidance were released on August 5, after the run’s recorded bottom on August 1, so they cannot explain the decline inside the measured window. The clearest explanation is therefore a combination of concentrated single-stock exposure, high volatility, broad technology-market selling, and investor concerns about DOCN’s customer retention and infrastructure costs, rather than one event proven by the backtest.\n\n5 sources ›\nTRY NEXT\n↳\nTry monthly recurring buys\n↳\nTry a moving average crossover\n↳\nTest a different date range\n↳\nHow did DOCN’s results and guidance compare with the broader market during the February-to-August 2025 decline?",
+          "research_rows": 1,
+          "billed_usd": 0.023343649999999966
+        }
+      ],
+      "page_errors": []
+    },
+    {
+      "key": "buy_and_hold",
+      "language": "es-419",
+      "steps": [
+        {
+          "step": "01-card",
+          "sent": "Compra y mantén DOCN desde septiembre de 2023 y compáralo con SPY.",
+          "seconds": 24.3,
+          "answer": "DOCN\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$1,000\nPERIODO\n1 sept 2023 → 11 sept 2026\nAcciones\nDatos diarios\nHasta 11 sept\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar",
+          "billed_usd": 0.023780699999999988
+        },
+        {
+          "step": "02-result",
+          "sent": "Ejecutar backtest",
+          "seconds": 9.7,
+          "answer": "DOCN\nComprar y mantener\n\n1 sept 2023 → 11 sept 2026 · Datos diarios\n\nSimulación completa\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n1M\n3M\nEste año\n1A\nTodo\nDetalles del rango\n\nPeríodo visible: 1 sept 2023 al 11 sept 2026.\n\nValor final\n\n$4,594\n\n+$3,594 ganancia · +359.4% rendimiento total\n\nComparado con SPY\nSuperó por 290.0 puntos porcentuales\nPeor caída\n-44.9%\n\nAcciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría\n\nVer detalles\nExplicar resultado\nAjustar idea\nAgregar decisión\nLECTURA RÁPIDA\n\nComprar DOCN una vez y mantenerlo durante este periodo terminó muy por encima de SPY: el capital de la prueba ganó 359.4%, frente a 69.4% del benchmark. La contrapartida fue una experiencia bastante más brusca: en el peor retroceso, la cuenta cayó 44.9% desde un máximo anterior, aunque terminó con una ganancia registrada de $3,594 sobre los $1,000 invertidos.\n\nQUÉ PROBAR DESPUÉS\n↳\nProbar otro rango de fechas·Superó la referencia por 290.0 puntos\n↳\nProbar el mismo enfoque en un activo similar\n↳\nProbar compras mensuales recurrentes",
+          "billed_usd": 0.006652700000000011
+        },
+        {
+          "step": "max-drawdown",
+          "sent": "¿Cuál fue la caída máxima?",
+          "seconds": 24.1,
+          "answer": "CAÍDA MÁXIMA\n\nLa caída máxima fue de 44.9%. Ese retroceso comenzó el 18 de febrero de 2025, cuando el portafolio valía $1,747, y tocó fondo el 1 de agosto de 2025 en $963, una pérdida de $784 desde el máximo anterior. Aunque la prueba terminó con una ganancia de 359.4%, ese tramo fue el más duro del período.\n\nQUÉ PROBAR DESPUÉS\n↳\n¿Qué eventos del mercado coincidieron con esa caída del 44.9% entre febrero y agosto de 2025?\n↳\n¿Cómo se habría comportado DOCN con un cruce de medias móviles para evitar ese retroceso?\n↳\n¿Qué tal si pruebas compras mensuales recurrentes para suavizar el impacto de esa caída?\n↳\n¿DOCN tuvo una recuperación completa después de ese mínimo de $963 en agosto de 2025?",
+          "research_rows": 0,
+          "billed_usd": 0.02144900999999999
+        },
+        {
+          "step": "peak",
+          "sent": "¿Cuándo alcanzó su valor más alto?",
+          "seconds": 18.5,
+          "answer": "FECHA DEL MÁXIMO\n\nEl valor más alto del portafolio se alcanzó el 15 de junio de 2026, cuando la cuenta llegó a $6,784. Eso fue después de que terminara el peor retroceso (que tocó fondo el 1 de agosto de 2025 en $963) y antes del cierre de la prueba el 11 de septiembre de 2026 en $4,594.\n\nQUÉ PROBAR DESPUÉS\n↳\n¿Qué pasó entre el 1 de agosto de 2025 y el 15 de junio de 2026 que impulsó esa subida?\n↳\nProbar compras mensuales recurrentes\n↳\nProbar un cruce de medias móviles\n↳\nProbar otro rango de fechas",
+          "research_rows": 0,
+          "billed_usd": 0.02208554123999995
+        },
+        {
+          "step": "benchmark",
+          "sent": "¿Qué referencia usó?",
+          "seconds": 40.8,
+          "answer": "REFERENCIA\n\nUsé el SPY como referencia. Ese es el índice S&P 500, que es el benchmark más común para medir el rendimiento de una acción individual como DOCN. Durante el período de la prueba, del 1 de septiembre de 2023 al 11 de septiembre de 2026, el SPY rindió 69.4%, mientras que DOCN entregó 359.4%.",
+          "research_rows": 0,
+          "billed_usd": 0.020828146000000047
+        },
+        {
+          "step": "benchmark-gap",
+          "sent": "¿Cómo le fue frente a la referencia?",
+          "seconds": 23.2,
+          "answer": "FRENTE A LA REFERENCIA\n\nDOCN superó a la referencia por 290.0 puntos porcentuales. La acción rindió 359.4% frente al 69.4% del SPY en el mismo período, del 1 de septiembre de 2023 al 11 de septiembre de 2026. Eso es una ventaja muy amplia, aunque la acción tuvo una volatilidad anualizada de 68.6% y una caída máxima de 44.9%, mientras que el SPY suele ser mucho menos volátil. El rendimiento extra vino con un riesgo considerable.",
+          "research_rows": 0,
+          "billed_usd": 0.0223240777
+        }
+      ],
+      "page_errors": [],
+      "error": "Error: spend guard: $0.3690 spent before a research step, cap $0.4"
+    },
+    {
+      "key": "monthly_buy_costs",
+      "language": "en",
+      "steps": [
+        {
+          "step": "01-card",
+          "sent": "Invest $1,000 in DOCN in September 2023, then buy $100 more every month, with 5 bps fees and 10 bps slippage per trade, compared with SPY.",
+          "seconds": 53,
+          "answer": "DOCN\nRecurring Buys\nReady to run\nCONTRIBUTION\n$100 monthly\nPERIOD\nSep 1, 2023 → Sep 11, 2026\nStarting capital\n$1,000\nStocks\nDaily data\nThrough Sep 11\nModeled costs: 5 bps fee + 10 bps slippage\nBenchmark: SPY\nEdit amounts\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel",
+          "billed_usd": 0.037744849999999996
+        },
+        {
+          "step": "02-result",
+          "sent": "Run backtest",
+          "seconds": 8.2,
+          "answer": "DOCN\nRecurring Buys\n\nSep 1, 2023 → Sep 11, 2026 · Daily data\n\nSimulation Complete\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n3M\nYTD\n1Y\nAll\nRange details\n\nVisible period: Sep 1, 2023 to Sep 11, 2026.\n\nJanuary 11, 2024\n$2,050\n\nEnding value\n\n$16,273\n\n+$11,573 gain · +246.2% return on contributions\n\nCompared with SPY\nBeat by 206.6 percentage points\nWorst drop\n-44.9%\n\nStocks · Historical simulation · 5 bps fee + 10 bps slippage · Not advice\n\nView details\nExplain result\nRefine idea\nAdd decision\nQUICK TAKE\n\nBuying DOCN every month and holding through the run turned $4,700 of contributions into $11,573 of profit, outperforming SPY by 206.6 percentage points. The tradeoff was a rough ride: the portfolio experienced a 44.9% drawdown along the way, so the strong result came with substantial swings.\n\nTRY NEXT\n↳\nTest a different date range·Beat the benchmark by 206.6 points\n↳\nTest the same setup on a similar asset\n↳\nTest a different contribution schedule",
+          "billed_usd": 0.007148599999999998
+        },
+        {
+          "step": "worst-drop",
+          "sent": "When was the worst drop?",
+          "seconds": 21.4,
+          "answer": "DRAWDOWN DATE\n\nWhat rule should I test? Which supported direction should I use: Ask about an available result fact?\n\nTRY NEXT\n↳\nWhat was the date of the worst drop?\n↳\nTest a different date range\n↳\nCompare with buy and hold\n↳\nTest a different contribution schedule",
+          "research_rows": 0,
+          "billed_usd": 0.021406349999999998,
+          "answer_after_web_fix": "DRAWDOWN DATE\n\nThe run facts show the largest investment decline excluding new deposits was 44.9%, but they do not store the date when that worst drop occurred. The run does show that the highest portfolio value was reached on June 15, 2026, at $23,595, so the worst drop happened sometime after that peak and before the end of the run on September 11, 2026. To find the exact date, you would need to check the price history for DOCN between those dates.\n\nTRY NEXT\n↳\nWhat was the date of the worst drop?\n↳\nTest a different date range\n↳\nCompare with buy and hold\n↳\nTest a different contribution schedule"
+        }
+      ],
+      "page_errors": [],
+      "reloaded_after_web_fix": true
+    },
+    {
+      "key": "monthly_buy_costs",
+      "language": "es-419",
+      "steps": [
+        {
+          "step": "01-card",
+          "sent": "Invierte $1,000 en DOCN en septiembre de 2023 y luego compra $100 más cada mes, con comisiones de 5 bps y deslizamiento de 10 bps por operación, comparado con SPY.",
+          "answer": "DOCN\nCompras recurrentes\nListo para ejecutar\nAPORTE\n$100 cada mes\nPERIODO\n1 sept 2023 → 11 sept 2026\nCapital inicial\n$1,000\nAcciones\nDatos diarios\nHasta 11 sept\nCostos modelados: comisión de 5 bps + deslizamiento de 0 bps\nReferencia: SPY\nEditar montos\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar"
+        },
+        {
+          "step": "02-result",
+          "sent": "Ejecutar backtest",
+          "seconds": 9.7,
+          "answer": "DOCN\nCompras recurrentes\n\n1 sept 2023 → 11 sept 2026 · Datos diarios\n\nSimulación completa\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n3M\nEste año\n1A\nTodo\nDetalles del rango\n\nPeríodo visible: 1 sept 2023 al 11 sept 2026.\n\n15 de febrero de 2024\nUSD 2,422\n\nValor final\n\n$16,289\n\n+$11,589 ganancia · +246.6% retorno sobre aportes\n\nComparado con SPY\nSuperó por 206.9 puntos porcentuales\nPeor caída\n-44.9%\n\nAcciones · Simulación histórica · comisión de 5 bps + deslizamiento de 0 bps · No es asesoría\n\nVer detalles\nExplicar resultado\nAjustar idea\nAgregar decisión\nLECTURA RÁPIDA\n\nComprar DOCN cada mes y mantener la posición durante este periodo terminó muy por encima de SPY: el retorno fue de 246.6% frente a 39.7%. El resultado fue una ganancia de $11,589 sobre $4,700 aportados, pero el recorrido tuvo un costo importante: la cuenta llegó a caer 44.9% desde un máximo anterior. En resumen, superó ampliamente al benchmark, a cambio de soportar mucha más variación en el camino.\n\nQUÉ PROBAR DESPUÉS\n↳\nProbar otro rango de fechas·Superó la referencia por 206.9 puntos\n↳\nProbar el mismo enfoque en un activo similar\n↳\nProbar otro calendario de aportes",
+          "billed_usd": 0.007178050000000005
+        },
+        {
+          "step": "worst-drop",
+          "sent": "¿Cuándo fue la peor caída?",
+          "seconds": 29.7,
+          "answer": "FECHA DE LA CAÍDA\n\nLa peor caída fue del 44.9%, pero el backtest no registra la fecha exacta en que ocurrió. Lo que sí muestra es que el valor más alto de la cartera se alcanzó el 15 de junio de 2026, con $23,618. La caída máxima ocurrió en algún momento después de ese pico y antes del cierre del período el 11 de septiembre de 2026.\n\nQUÉ PROBAR DESPUÉS\n↳\nProbar otro rango de fechas\n↳\nComparar con comprar y mantener\n↳\nProbar otro calendario de aportes\n↳\n¿Qué eventos del mercado entre junio y septiembre de 2026 pudieron haber causado esa caída del 44.9% en DOCN?",
+          "research_rows": 0,
+          "billed_usd": 0.022418709999999994
+        }
+      ],
+      "continued_from_card": true,
+      "page_errors": []
+    }
+  ]
+}
