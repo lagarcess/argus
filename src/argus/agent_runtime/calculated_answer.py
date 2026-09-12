@@ -66,14 +66,15 @@ NO_SEARCH_ANSWER_GUIDANCE = (
     "rate, becomes an assumption: choose a typical value, mark it assumption "
     "and say plainly in the answer that you assumed it and that the user can "
     "change it. A figure only the user knows, such as their balance, payment, "
-    "term, income or horizon, is never assumed: list it with source user and "
-    "a null value, and write the answer as one plain question asking for it. "
+    "term, income or horizon, is never assumed: list each one with source user "
+    "and a null value, still return calculation, and write the answer as one "
+    "plain question asking for all of them. "
     "State no figure the calculation does not use or produce. "
     "No advice, no forecast stated as fact, no em dashes, no headings, no "
     "tables. Compose lead (required), one short sentence that answers the "
     "question or asks the one question; bullets (optional, up to 4), short "
-    "plain phrases; note (optional), one closing sentence such as what could "
-    "not be looked up. "
+    "plain phrases; note (optional), one closing sentence, which mentions a "
+    "lookup only when this message lists one that failed. "
 )
 
 

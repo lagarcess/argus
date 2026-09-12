@@ -61,6 +61,9 @@ FIGURE_CHECK_REASON_CODE = "answer_figures_replaced"
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _REFERENCE = re.compile(r"\{\{\s*([a-z][a-z0-9_]*)\s*\}\}")
+_WRITTEN_CURRENCY = re.compile(
+    r"(?:\b([A-Z]{3})|[A-Z]{0,3}\$|€|£)\s?(\{\{\s*([a-z][a-z0-9_]*)\s*\}\})"
+)
 _PERCENT_FIGURE = re.compile(r"\d\s?%")
 _SYMBOL_MONEY = re.compile(r"(?:[A-Z]{0,3}\$|€|£)\s?\d")
 _CODE_MONEY = re.compile(r"\b([A-Z]{3})\s?\d|\d\s?([A-Z]{3})\b")
@@ -247,13 +250,17 @@ def render_answer_text(
     unresolved: list[str] = []
 
     def fill(match: re.Match[str]) -> str:
-        fact = facts.get(match.group(1))
-        if fact is None:
-            unresolved.append(match.group(1))
+        name = match.group(1)
+        fact = facts.get(name)
+        if fact is not None:
+            return figure_text(fact)
+        stated = _stated_argument(card, name)
+        if stated is None:
+            unresolved.append(name)
             return match.group(0)
-        return figure_text(fact)
+        return stated
 
-    text = _REFERENCE.sub(fill, template)
+    text = _REFERENCE.sub(fill, _without_written_currency(template, facts))
     if unresolved:
         return text, "invalid_figure_reference"
     if states_a_figure(_REFERENCE.sub("", template)):
@@ -267,7 +274,13 @@ def render_answer_text(
 def unresolved_references(template: str, card: ToolResultCard) -> list[str]:
     """The ``{{name}}`` references a card cannot fill, for the guard's record."""
     facts = _reference_facts(card)
-    return sorted({name for name in _REFERENCE.findall(template) if name not in facts})
+    return sorted(
+        {
+            name
+            for name in _REFERENCE.findall(template)
+            if name not in facts and _stated_argument(card, name) is None
+        }
+    )
 
 
 def figure_text(fact: ToolFact) -> str:
@@ -277,8 +290,7 @@ def figure_text(fact: ToolFact) -> str:
         return str(value)
     key = fact.unit.locale_key if fact.unit is not None else None
     if key == UNIT_CURRENCY_KEY:
-        code = str(fact.unit.interpolation_args.get("code") or "").strip()
-        return f"{code} {_number(value, money=True)}".strip()
+        return f"{_money_code(fact) or ''} {_number(value, money=True)}".strip()
     if key == UNIT_PERCENT_KEY:
         return f"{_number(value)}%"
     if key == UNIT_MULTIPLE_KEY:
@@ -373,6 +385,32 @@ def _reference_facts(card: ToolResultCard) -> dict[str, ToolFact]:
     if presentation.answer is not None:
         facts[presentation.answer.name] = presentation.answer
     return facts
+
+
+def _money_code(fact: ToolFact | None) -> str | None:
+    if fact is None or fact.unit is None or fact.unit.locale_key != UNIT_CURRENCY_KEY:
+        return None
+    return str(fact.unit.interpolation_args.get("code") or "").strip() or None
+
+
+def _without_written_currency(template: str, facts: dict[str, ToolFact]) -> str:
+    """A money reference renders with its own code, so a currency the prose wrote
+    just before it, the same code or a symbol, is not stated twice."""
+
+    def drop(match: re.Match[str]) -> str:
+        code = _money_code(facts.get(match.group(3)))
+        if code is None or (match.group(1) and match.group(1) != code):
+            return match.group(0)
+        return match.group(2)
+
+    return _WRITTEN_CURRENCY.sub(drop, template)
+
+
+def _stated_argument(card: ToolResultCard, name: str) -> str | None:
+    """A declared input the card holds as text rather than as a figure, such as a
+    start date or a choice, stated as the card received it."""
+    value = card.arguments.get(name)
+    return value if isinstance(value, str) and value.strip() else None
 
 
 def states_a_figure(text: str) -> bool:

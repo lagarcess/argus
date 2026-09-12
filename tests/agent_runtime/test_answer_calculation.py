@@ -252,3 +252,31 @@ def test_an_owed_or_unfound_figure_publishes_no_card() -> None:
     ]
     unfound = _published("It costs {{payment}}.", inputs=uncited)
     assert unfound.patch == {} and unfound.not_looked_up == ("annual_rate_pct",)
+
+
+def test_a_declared_input_held_as_text_is_stated_as_the_card_received_it() -> None:
+    template = "Starting {{start_date}}, the payment is **{{payment}}** a month."
+    published = _published(
+        template,
+        inputs=[*LOAN, {"name": "start_date", "value": "2026-10-01", "source": "user"}],
+    )
+    card = ac.card_in(published.patch)
+    payment = ac.figure_text(card.presentation.answer)
+    assert published.answer_text == (
+        f"Starting 2026-10-01, the payment is **{payment}** a month."
+    )
+    assert published.template is not None
+    assert ac.unresolved_references(template, card) == []
+
+
+def test_a_currency_written_before_a_money_reference_is_not_stated_twice() -> None:
+    published = _published(
+        "For DOP {{present_value}} or RD$ {{present_value}} at {{annual_rate_pct}} "
+        "over {{periods}} months, the payment is {{payment}}."
+    )
+    card = ac.card_in(published.patch)
+    payment = ac.figure_text(card.presentation.answer)
+    assert published.answer_text == (
+        "For DOP 180,000 or DOP 180,000 at 14% over 48 months, the payment is "
+        f"{payment}."
+    )
