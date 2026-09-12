@@ -1,0 +1,4 @@
+fan-weekend-en-390: greeting="Stocks are closed for the weekend. Crypto is still trading." expected=session_closed_weekend_a served_interest={"markets":true}
+fan-weekend-en-1280: greeting="Stocks are closed for the weekend. Crypto is still trading." expected=session_closed_weekend_a served_interest={"markets":true}
+fan-weekend-es-419-390: greeting="La bolsa está cerrada por el fin de semana. Las criptos siguen operando." expected=session_closed_weekend_a served_interest={"markets":true}
+fan-weekend-es-419-1280: greeting="La bolsa está cerrada por el fin de semana. Las criptos siguen operando." expected=session_closed_weekend_a served_interest={"markets":true}
