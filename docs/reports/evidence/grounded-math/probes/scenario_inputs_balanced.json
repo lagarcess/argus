@@ -1,8 +1,8 @@
 {
   "probe": "scenario_inputs_balanced",
   "purpose": "any grounded math: the retrieve-only scenario contract on the balanced configuration",
-  "candidate_sha": "0810f2961edcb7b1bbeb9898231c81831dcdadfc",
-  "captured_at": "2026-09-12T18:19:16.697303+00:00",
+  "candidate_sha": "18f0c2df376030709d87cbc8d51a7fe7965bb17c",
+  "captured_at": "2026-09-12T19:15:10.719715+00:00",
   "question": "what will $10,000 in NVDA be worth in ten years?",
   "calculation": {
     "kind": "valuation_scenarios",
@@ -26,55 +26,14 @@
     "multiple_high"
   ],
   "packet": {
-    "answer_markdown": "A ten-year future value cannot be stated without applying assumptions, so the scenario calculator should use these retrieved inputs:\n\n| Input | Retrieved value | As of | Published by |\n|---|---:|---|---|\n| price | $218.29 | 2026-09-11 | NVIDIA market-data page |\n| per_share | $7.91 | 2026-07-26 | NVIDIA financials page |\n| growth_base_pct | 21.8% | 2026-06-19 | Simply Wall St |\n| multiple_base | 24.2x | 2026-09-06 | The Motley Fool |\n| multiple_low | 25.4x | 2026-09-04 | Stock Rover |\n| multiple_high | 257.6x | 2026-09-04 | Stock Rover |\n\nNo retrieved page stated **growth_low_pct** or **growth_high_pct**. The published multiple bounds are a historical five-year P/E range, not a forecast of where NVIDIA’s valuation will be in ten years.",
+    "answer_markdown": "A future value is not presented here because it is calculated from the retrieved inputs. The available inputs are:\n\n| Input | Retrieved value | Date | Source context |\n|---|---:|---|---|\n| price | $218.29 | 2026-09-11 | Latest market quote |\n| per_share | $5.84 | 2026-09-11 | Trailing earnings per share from the market quote |\n| growth_base_pct | 44% | 2026-08-13 | Published consensus annual earnings-growth forecast for the next three years, from The Motley Fool |\n| multiple_base | 24.9x | 2026-09-11 | Published forward P/E from MCH Advisory Research |\n| multiple_low | 12x | 2026-09-11 | Lowest published scenario P/E from MCH Advisory Research |\n| multiple_high | 32x | 2026-09-11 | Highest published scenario P/E from MCH Advisory Research |\n\nNo page retrieved stated **growth_low_pct** or **growth_high_pct** as the lowest and highest yearly earnings-growth forecasts. The published consensus growth period is also shorter than the requested holding period.",
     "categories": [
-      "quote",
-      "financials"
+      "quote"
     ],
     "tickers": [
       "NVDA"
     ],
     "sources": [
-      {
-        "url": "https://www.techtimes.com/articles/325952/20260829/micron-still-six-times-forward-earnings-nvidia-pays-premium-memory.htm",
-        "title": "Micron Still at Six Times Forward Earnings as Nvidia Pays Premium for Memory",
-        "source_date": "2026-08-29"
-      },
-      {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-nvda-first-ever-ahead-223147950.html",
-        "title": "Nvidia (NVDA)'s First-Ever Year-Ahead Forecast Puts It on a Path to ...",
-        "source_date": "2026-09-06"
-      },
-      {
-        "url": "https://www.marketbeat.com/instant-alerts/estimates-fy2027-eps-estimates-for-nvidia-lifted-by-erste-group-bank-2026-08-31/",
-        "title": "FY2027 EPS Estimates for NVIDIA Lifted by Erste Group Bank",
-        "source_date": "2026-08-31"
-      },
-      {
-        "url": "https://www.fool.com/investing/2026/09/01/nvidia-just-proved-it-doesnt-need-china-anymore/",
-        "title": "Nvidia Just Proved It Doesn't Need China Anymore | The Motley Fool",
-        "source_date": "2026-09-01"
-      },
-      {
-        "url": "https://www.spglobal.com/market-intelligence/en/news-insights/research/2026/09/nvidia-postq-growth-outlook-resets-expectations-well-above-preq-consensus",
-        "title": "Nvidia postQ: Growth outlook resets expectations well above ...",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://www.marketbeat.com/instant-alerts/estimates-erste-group-bank-boosts-earnings-estimates-for-nvidia-2026-09-11/",
-        "title": "Erste Group Bank Boosts Earnings Estimates for NVIDIA - MarketBeat",
-        "source_date": "2026-09-11"
-      },
-      {
-        "url": "https://www.fool.com/investing/2026/09/01/prediction-nvidia-stock-price-end-of-2027-latest-forecast/",
-        "title": "Prediction: This Will Be Nvidia's Stock Price by the End of ...",
-        "source_date": "2026-09-01"
-      },
-      {
-        "url": "https://247wallst.com/investing/2026/08/25/prediction-nvidia-stock-is-entering-its-most-important-quarter-yet/",
-        "title": "Prediction: Nvidia Stock Is Entering Its Most Important Quarter Yet",
-        "source_date": "2026-08-25"
-      },
       {
         "url": "https://www.fool.com/investing/2026/08/13/nvidia-stock-investors-good-news-from-wall-street/",
         "title": "Nvidia Stock Investors Just Got Good News From Wall Street (Hint: It's Time to Buy) | The Motley Fool",
@@ -86,149 +45,19 @@
         "source_date": "2026-08-26"
       },
       {
-        "url": "https://www.fool.com/investing/2026/09/06/skyrocket-nvidia-stock-valuation-market-warning/",
-        "title": "Despite Revenue Skyrocketing More Than 100%, Nvidia Stock Trades at 24 Times Forward Earnings. Is the Market Warning Investors About What's to Come? | The Motley Fool",
-        "source_date": "2026-09-06"
-      },
-      {
-        "url": "https://www.thestreet.com/investing/louis-navellier-sets-eye-opening-nvidia-stock-price-target-for-rest-of-this-year",
-        "title": "Louis Navellier sets eye-opening Nvidia stock price target for ...",
-        "source_date": "2026-08-19"
-      },
-      {
-        "url": "https://watcher.guru/news/nvidia-stock-forecast-ahead-of-earnings-97-growth-expected",
-        "title": "Nvidia Stock Forecast Ahead of Earnings: 97% Growth Expected",
-        "source_date": "2026-08-26"
-      },
-      {
-        "url": "https://www.fool.com/investing/2026/09/10/70-revenue-growth-for-nvidia-next-year-may-make-it/",
-        "title": "70% Revenue Growth for Nvidia Next Year May Make It ...",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://www.fool.com/investing/2026/08/31/prediction-this-is-where-nvidia-stock-will-be-when/",
-        "title": "This Is Where Nvidia Stock Will Be When September Ends",
-        "source_date": "2026-08-31"
-      },
-      {
-        "url": "https://www.investing.com/analysis/nvidia-earnings-preview-blackwell-growth-meets-a-skyhigh-valuation-bar-200686599",
-        "title": "Nvidia Earnings Preview: Blackwell Growth Meets a Sky-High ...",
-        "source_date": "2026-08-26"
-      },
-      {
-        "url": "https://www.reuters.com/business/media-telecom/nvidia-forecasts-quarterly-revenue-above-estimates-2026-08-26/",
-        "title": "Nvidia forecasts 70% sales growth next year, signals AI ... - Reuters",
-        "source_date": "2026-08-28"
-      },
-      {
-        "url": "https://www.investopedia.com/nvidia-earnings-live-nvda-stock-ai-trade-12068393",
-        "title": "Nvidia Earnings Live, Aug. 26, 2026: Q2 Profits, Revenue ...",
-        "source_date": "2026-08-26"
-      },
-      {
-        "url": "https://fortune.com/2026/08/26/nvidia-q2-growth-results-jensen-huang/",
-        "title": "Nvidia unleashes 70% growth bombshell and defends ... - Fortune",
-        "source_date": "2026-08-26"
-      },
-      {
-        "url": "https://www.cnbc.com/2026/08/27/nvidia-reports-blowout-earnings-heres-why-analysts-are-impressed.html",
-        "title": "Nvidia reports blowout earnings. Here's why analysts are impressed",
-        "source_date": "2026-08-27"
-      },
-      {
-        "url": "https://www.gate.com/blog/nvidia-nvda-18x-pe-high-growth-valuation-re-rating",
-        "title": "Nvidia PE Falls to 18x: Can High Growth Drive the Next ...",
-        "source_date": "2026-08-31"
-      },
-      {
-        "url": "https://scanx.trade/stock-market-news/companies/nvidia-q2fy26-results-revenue-estimated-92b-eps-2-09/49056731",
-        "title": "Nvidia Q2FY26 Results: Revenue estimated at $92B, EPS at $2.09",
-        "source_date": "2026-08-23"
-      },
-      {
-        "url": "https://global.morningstar.com/en-ca/stocks/going-into-earnings-is-nvidia-stock-buy-sell-or-fairly-valued-4",
-        "title": "Going Into Earnings, Is Nvidia Stock a Buy, a Sell, or Fairly Valued?",
-        "source_date": "2026-08-20"
-      },
-      {
-        "url": "https://www.spglobal.com/market-intelligence/en/news-insights/research/2026/08/nvidia-earnings-preview-q2-2027",
-        "title": "Nvidia earnings preview: Q2 2027",
-        "source_date": "2026-08-24"
-      },
-      {
-        "url": "https://nz.finance.yahoo.com/quote/NVDA/analysis/",
-        "title": "NVIDIA Corporation (NVDA) analyst ratings, estimates and forecasts",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://www.kiplinger.com/investing/live/nvidia-earnings-live-updates-and-commentary-august-2026",
-        "title": "Nvidia Earnings: Updates and Commentary August 2026 - Kiplinger",
-        "source_date": "2026-08-25"
-      },
-      {
-        "url": "https://www.linkedin.com/posts/raj70srinivasan_nvidia-earnings-takeaways-huang-forecasts-activity-7498544063172784128-w62R",
-        "title": "NVIDIA Forecasts 70% Revenue Growth by FY2028 - LinkedIn",
-        "source_date": "2026-08-27"
-      },
-      {
-        "url": "https://finance.yahoo.com/technology/article/nvidia-didnt-like-wall-streets-estimates-so-it-tried-to-reset-them-122218541.html",
-        "title": "Nvidia didn't like Wall Street's estimates. So it tried to reset ...",
-        "source_date": "2026-09-02"
-      },
-      {
-        "url": "https://x.com/Borsite/article/2092952431151738895",
-        "title": "NVIDIA Earnings, August 2026: $96.22 Billion in Revenue, Weak ...",
-        "source_date": "2026-08-27"
-      },
-      {
-        "url": "https://tw.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/price-earnings-fwd/",
-        "title": "NVIDIA Corporation的Price to earnings forward - NVDA",
-        "source_date": "2026-08-28"
-      },
-      {
-        "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-trades-near-record-high-as-wall-street-eyes-massive-ai/69950121",
-        "title": "Nvidia stock trades near record high as Wall Street eyes massive AI earnings",
-        "source_date": "2026-08-14"
-      },
-      {
-        "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/future",
-        "title": "NVIDIA (NasdaqGS:NVDA) Stock Forecast & Analyst Predictions",
-        "source_date": "2026-09-09"
-      },
-      {
-        "url": "https://www.mchadvisoryservices.com/research/nvda-research-2026.html",
-        "title": "NVIDIA Corporation (NVDA) — MCH Advisory Research",
-        "source_date": "2026-09-11"
-      },
-      {
-        "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia",
-        "title": "NVIDIA (Nasdaq:NVDA) - Stock Analysis - Simply Wall St",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://worldperatio.com/stock/nvda/",
-        "title": "NVIDIA: current P/E Ratio",
-        "source_date": "2026-09-04"
-      },
-      {
         "url": "https://www.tradingnews.com/news/nvidia-trades-flat-at-225-usd-on-75m-shares-as-ad-jumps-6-percent-and-avgo-drops",
         "title": "Nvidia Stock Price Forecast: NVDA Holds $225 With $91.9B Consensus 9 Days From Earnings",
         "source_date": "2026-08-17"
       },
       {
-        "url": "https://www.stockrover.com/html_reports/NVDA/",
-        "title": "NVIDIA (NVDA) Research Report — Score, Intrinsic Value, Peer ...",
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-nvda-first-ever-ahead-223147950.html",
+        "title": "Nvidia (NVDA)'s First-Ever Year-Ahead Forecast Puts It on a Path to ...",
         "source_date": "2026-09-06"
       },
       {
-        "url": "https://www.moomoo.com/community/feed/nvidia-nvda-us-117128014397446",
-        "title": "Nvidia FY2027 Q2 Earnings Preview: Confirming an FCF ...",
-        "source_date": "2026-08-20"
-      },
-      {
-        "url": "https://es.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/price-earnings-fwd/",
-        "title": "Price to earnings forward de NVIDIA Corporation – NASDAQ:NVDA",
-        "source_date": "2026-09-04"
+        "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/future",
+        "title": "NVIDIA (NasdaqGS:NVDA) Stock Forecast & Analyst Predictions",
+        "source_date": "2026-09-08"
       },
       {
         "url": "https://www.moomoo.com/community/feed/nvidia-nvda-us-117167501672454",
@@ -236,14 +65,124 @@
         "source_date": "2026-08-27"
       },
       {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-gave-first-ever-ahead-003936289.html",
-        "title": "Nvidia gave its first-ever year-ahead forecast—a 70% growth ...",
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-might-deliver-another-beat-134502581.html",
+        "title": "Nvidia Might Deliver Another 'Beat and Raise' Quarter, But Its ...",
+        "source_date": "2026-08-22"
+      },
+      {
+        "url": "https://www.aol.com/articles/nvidia-profits-could-rival-country-163044000.html",
+        "title": "Nvidia's Profits Could Rival a Country's GDP by 2029 - AOL.com",
+        "source_date": "2026-09-06"
+      },
+      {
+        "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-trades-near-record-high-as-wall-street-eyes-massive-ai/69950121",
+        "title": "Nvidia stock trades near record high as Wall Street eyes massive AI earnings",
+        "source_date": "2026-08-14"
+      },
+      {
+        "url": "https://global.morningstar.com/en-gb/stocks/nvidia-what-we-think-stock-after-earnings",
+        "title": "Nvidia: What We Think of the Stock After Earnings | Morningstar UK",
         "source_date": "2026-08-27"
       },
       {
-        "url": "https://fintel.io/news/bmo-capital-initiates-coverage-of-nvidia-wbag-nvda-with-outperform-recommendation-911",
-        "title": "BMO Capital Initiates Coverage of NVIDIA (WBAG:NVDA) with ...",
-        "source_date": "2026-08-23"
+        "url": "https://blockonomi.com/nvidia-nvda-earnings-preview-wall-street-forecasts-and-key-metrics-to-monitor/",
+        "title": "Nvidia (NVDA) Earnings Preview: Wall Street Forecasts and Key ...",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://www.morningstar.com/news/marketwatch/20260827436/is-nvidia-heading-for-1-trillion-in-annual-revenue-one-analyst-now-thinks-thats-possible",
+        "title": "Is Nvidia heading for $1 trillion in annual revenue? One analyst now ...",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://www.theglobeandmail.com/investing/markets/stocks/MPWR/pressreleases/4226450/nvidia-nvda-earns-price-target-upgrades-after-monster-q2/",
+        "title": "Nvidia (NVDA) Earns Price-Target Upgrades After Monster ...",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.tipranks.com/stocks/nvda/forecast",
+        "title": "Nvidia (NVDA) Stock Forecast, Price Targets and Analysts Predictions",
+        "source_date": "2026-09-10"
+      },
+      {
+        "url": "https://www.tipranks.com/news/nvidia-stock-forecast-what-wall-street-expects-ahead-of-q2-earnings",
+        "title": "Nvidia Stock Forecast — What Wall Street Expects Ahead of Q2 Earnings",
+        "source_date": "2026-08-20"
+      },
+      {
+        "url": "https://www.mchadvisoryservices.com/research/nvda-research-2026.html",
+        "title": "NVIDIA Corporation (NVDA) — MCH Advisory Research",
+        "source_date": "2026-09-11"
+      },
+      {
+        "url": "https://www.gate.com/blog/nvidia-nvda-18x-pe-high-growth-valuation-re-rating",
+        "title": "Nvidia PE Falls to 18x: Can High Growth Drive the Next ...",
+        "source_date": "2026-08-31"
+      },
+      {
+        "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/news/nvidia-nvda-stock-looks-fairly-valued-despite-strong-ai-expe",
+        "title": "Nvidia (NVDA) Stock Looks Fairly Valued Despite Strong AI ...",
+        "source_date": "2026-08-15"
+      },
+      {
+        "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia",
+        "title": "NVIDIA (Nasdaq:NVDA) - Stock Analysis - Simply Wall St",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://worldperatio.com/stock/nvda/",
+        "title": "NVIDIA: current P/E Ratio",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.ainvest.com/news/nvidia-doubled-revenue-cheaper-20x-multiple-pricing-2608/",
+        "title": "Nvidia Doubled Its Revenue and Got Cheaper: What a 20x ...",
+        "source_date": "2026-08-28"
+      },
+      {
+        "url": "https://www.edwyn.app/company/0001045810/relative-valuation",
+        "title": "Relative Valuation for NVIDIA CORP (NVDA)",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://stockalpha.ai/tickers/NVDA/nvda-2026-08-29-nvda-ai-leadership-and-valuation-nvda-re",
+        "title": "NVDA: AI Leadership and Valuation — NVDA Report | NVDA Research",
+        "source_date": "2026-08-29"
+      },
+      {
+        "url": "https://www.barchart.com/story/news/4408813/nvidia-stock-is-still-cheap-reckons-fundstrats-tom-lee",
+        "title": "Nvidia Stock Is Still Cheap, Reckons Fundstrat's Tom Lee",
+        "source_date": "2026-09-02"
+      },
+      {
+        "url": "https://www.investing.com/news/analyst-ratings/bofa-reiterates-nvidia-stock-rating-on-supply-commitment-strategy-93CH-4876431",
+        "title": "BofA reiterates Nvidia stock rating on supply commitment ...",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://www.stockrover.com/html_reports/NVDA/",
+        "title": "NVIDIA (NVDA) Research Report — Score, Intrinsic Value, Peer ...",
+        "source_date": "2026-09-06"
+      },
+      {
+        "url": "https://seekingalpha.com/article/4938707-nvidia-the-greatest-company-at-a-fair-price",
+        "title": "Nvidia: The Greatest Company At A Fair Price (NASDAQ:NVDA)",
+        "source_date": "2026-08-20"
+      },
+      {
+        "url": "https://r40.io/stocks/nvda/model/",
+        "title": "NVIDIA Corporation (NVDA) Revenue Model & Fair Value - R40",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://247wallst.com/investing/2026/08/22/nvidia-stock-doesnt-look-as-expensive-as-you-think/",
+        "title": "Nvidia Stock Doesn’t Look as Expensive as You Think",
+        "source_date": "2026-08-22"
+      },
+      {
+        "url": "https://www.aol.com/articles/nvidias-valuation-looks-surprisingly-cheap-191738000.html",
+        "title": "Nvidia's valuation looks surprisingly cheap heading into earnings. Could it be an issue for the stock? - AOL",
+        "source_date": "2026-08-24"
       }
     ],
     "name_pairs": [],
@@ -262,82 +201,80 @@
         "subject": "NVIDIA Corporation",
         "symbol": "NVDA",
         "label": "per_share",
-        "value": 7.91,
+        "value": 5.84,
         "kind": "currency",
         "unit": "USD",
-        "as_of": "2026-07-26",
+        "as_of": "2026-09-11",
         "source_url": null
-      },
-      {
-        "subject": "NVIDIA",
-        "symbol": "NVDA",
-        "label": "growth_base_pct",
-        "value": 21.8,
-        "kind": "percent",
-        "unit": "%",
-        "as_of": "2026-06-19",
-        "source_url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/future"
       },
       {
         "subject": "Nvidia",
         "symbol": "NVDA",
-        "label": "multiple_base",
-        "value": 24.2,
-        "kind": "multiple",
-        "unit": "x",
-        "as_of": "2026-09-06",
-        "source_url": "https://www.fool.com/investing/2026/09/06/skyrocket-nvidia-stock-valuation-market-warning/"
+        "label": "growth_base_pct",
+        "value": 44.0,
+        "kind": "percent",
+        "unit": "%",
+        "as_of": "2026-08-13",
+        "source_url": "https://www.fool.com/investing/2026/08/13/nvidia-stock-investors-good-news-from-wall-street/"
       },
       {
-        "subject": "NVIDIA",
+        "subject": "NVIDIA Corporation",
+        "symbol": "NVDA",
+        "label": "multiple_base",
+        "value": 24.9,
+        "kind": "multiple",
+        "unit": "x",
+        "as_of": "2026-09-11",
+        "source_url": "https://www.mchadvisoryservices.com/research/nvda-research-2026.html"
+      },
+      {
+        "subject": "NVIDIA Corporation",
         "symbol": "NVDA",
         "label": "multiple_low",
-        "value": 25.4,
+        "value": 12.0,
         "kind": "multiple",
         "unit": "x",
-        "as_of": "2026-09-04",
-        "source_url": "https://www.stockrover.com/html_reports/NVDA/"
+        "as_of": "2026-09-11",
+        "source_url": "https://www.mchadvisoryservices.com/research/nvda-research-2026.html"
       },
       {
-        "subject": "NVIDIA",
+        "subject": "NVIDIA Corporation",
         "symbol": "NVDA",
         "label": "multiple_high",
-        "value": 257.6,
+        "value": 32.0,
         "kind": "multiple",
         "unit": "x",
-        "as_of": "2026-09-04",
-        "source_url": "https://www.stockrover.com/html_reports/NVDA/"
+        "as_of": "2026-09-11",
+        "source_url": "https://www.mchadvisoryservices.com/research/nvda-research-2026.html"
       }
     ],
     "typed_answer": true,
     "unsourced_rows": [],
     "tool_results": [
       "finance_results",
-      "finance_results",
+      "search_results",
       "search_results",
       "fetch_url_results",
-      "search_results",
-      "search_results",
       "fetch_url_results"
     ],
     "usage": {
-      "invocations": 2,
-      "finance_search_invocations": 2,
-      "web_search_invocations": 3,
+      "invocations": 1,
+      "finance_search_invocations": 1,
+      "web_search_invocations": 2,
       "fetch_url_invocations": 2,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 34706,
-      "cost_usd": 0.2402,
-      "input_tokens": 74494,
-      "output_tokens": 1560,
-      "cache_creation_input_tokens": 34864,
-      "cache_read_input_tokens": 39540
+      "latency_ms": 33217,
+      "cost_usd": 0.2352,
+      "input_tokens": 57566,
+      "output_tokens": 2020,
+      "cache_creation_input_tokens": 34940,
+      "cache_read_input_tokens": 22614
     },
-    "retrieved_at": "2026-09-12T18:19:51.405654Z",
-    "background_id": "resp_57a39114-0dbc-426c-af2e-0182013b465d"
+    "retrieved_at": "2026-09-12T19:15:43.939767Z",
+    "background_id": "resp_94182d41-e035-48fc-956f-73683c915556"
   },
   "error": null,
-  "elapsed_s": 34.72,
+  "elapsed_s": 33.24,
   "exchanges": [
     {
       "method": "POST",
@@ -347,7 +284,7 @@
           "openai/gpt-5.6-sol",
           "anthropic/claude-opus-4-7"
         ],
-        "input": "what will $10,000 in NVDA be worth in ten years?\nTickers: NVIDIA (NVDA)\nTime window: ten years\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nArgus computes the scenarios itself. Retrieve the inputs below, one row each, with label exactly the input name as written here, the value as a plain number, and the page it was read from with its date. Do not compute scenario values, ranges or future prices; state the inputs you found, their dates and their sources, and name any input no page states. No advice.\n- price: the current share price\n- per_share: earnings per share for the trailing twelve months, or the next fiscal year when that is what pages publish\n- growth_base_pct: the consensus published forecast of yearly earnings growth, as a percent\n- growth_low_pct: the lowest published forecast of yearly earnings growth, as a percent\n- growth_high_pct: the highest published forecast of yearly earnings growth, as a percent\n- multiple_base: the price-to-earnings multiple a page states as fair or forward\n- multiple_low: the low end of a published price-to-earnings range\n- multiple_high: the high end of a published price-to-earnings range\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+        "input": "what will $10,000 in NVDA be worth in ten years?\nTickers: NVIDIA (NVDA)\nTime window: ten years\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nArgus computes the answer itself. Retrieve the inputs below, one row each, with label exactly the input name as written here, the value as a plain number, and the page it was read from with its date. Do not compute the answer, scenario values, ranges or future figures; state the inputs you found, their dates and their sources, and name any input no page states. No advice.\n- price: the current share price\n- per_share: earnings per share for the trailing twelve months, or the next fiscal year when that is what pages publish\n- growth_base_pct: the consensus published forecast of yearly earnings growth, as a percent\n- growth_low_pct: the lowest published forecast of yearly earnings growth, as a percent\n- growth_high_pct: the highest published forecast of yearly earnings growth, as a percent\n- multiple_base: the price-to-earnings multiple a page states as fair or forward\n- multiple_low: the low end of a published price-to-earnings range\n- multiple_high: the high end of a published price-to-earnings range\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
         "tools": [
           {
             "type": "web_search",
@@ -369,7 +306,7 @@
           "effort": "low"
         },
         "language_preference": "en",
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question asks what something will be worth, what it must grow into, or what it is worth today. Argus computes the scenarios from typed inputs, so never compute scenario values, ranges or future prices yourself. The question names each input to retrieve: the current price, a per-share figure, published growth forecasts, valuation multiples. Row every input you find, one row per input, with label exactly the input name as the question writes it, value as a plain number, and the page it was read from; the current price may come from finance data. In answer_markdown state the inputs found with their dates and sources, and name any input no page states. Never present one number as the future, and never say what the reader should do.",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question is answered by a calculation Argus computes from typed inputs, such as what something will be worth, what a plan costs or what a price implies. Never compute the answer, scenario values, ranges or future figures yourself. The question names each input to retrieve: a price, a rate, a per-share figure, a published forecast or a multiple. Row every input you find, one row per input, with label exactly the input name as the question writes it, value as a plain number, and the page it was read from; the current price may come from finance data. In answer_markdown state the inputs found with their dates and sources, and name any input no page states. Never present one number as the future, and never say what the reader should do.",
         "response_format": {
           "type": "json_schema",
           "json_schema": {
@@ -476,13 +413,13 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1789237156,
-        "created_at": 1789237156,
+        "completed_at": 1789240511,
+        "created_at": 1789240511,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_57a39114-0dbc-426c-af2e-0182013b465d",
+        "id": "resp_94182d41-e035-48fc-956f-73683c915556",
         "incomplete_details": null,
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question asks what something will be worth, what it must grow into, or what it is worth today. Argus computes the scenarios from typed inputs, so never compute scenario values, ranges or future prices yourself. The question names each input to retrieve: the current price, a per-share figure, published growth forecasts, valuation multiples. Row every input you find, one row per input, with label exactly the input name as the question writes it, value as a plain number, and the page it was read from; the current price may come from finance data. In answer_markdown state the inputs found with their dates and sources, and name any input no page states. Never present one number as the future, and never say what the reader should do.",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question is answered by a calculation Argus computes from typed inputs, such as what something will be worth, what a plan costs or what a price implies. Never compute the answer, scenario values, ranges or future figures yourself. The question names each input to retrieve: a price, a rate, a per-share figure, a published forecast or a multiple. Row every input you find, one row per input, with label exactly the input name as the question writes it, value as a plain number, and the page it was read from; the current price may come from finance data. In answer_markdown state the inputs found with their dates and sources, and name any input no page states. Never present one number as the future, and never say what the reader should do.",
         "max_output_tokens": 2048,
         "max_tool_calls": null,
         "metadata": {},
@@ -500,7 +437,7 @@
             "results": [
               {
                 "category": "quote",
-                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency |\n| --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-11 20:00:00 UTC | 2026-09-12 18:19:22 UTC | after_hours | 218.29 | USD |\n\nData available in: `NVDA_quotes_132e95.csv` (row key column: symbol)",
+                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | eps | pe |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-11 20:00:00 UTC | 2026-09-12 19:15:16 UTC | after_hours | 218.29 | USD | 5.84 | 27.60 |\n\nData available in: `NVDA_quotes_a7b142.csv` (row key column: symbol)",
                 "sources": [
                   "https://www.perplexity.ai/finance/NVDA"
                 ],
@@ -515,45 +452,41 @@
             "type": "finance_results"
           },
           {
-            "categories": [
-              "financials"
-            ],
-            "results": [
-              {
-                "category": "financials",
-                "content": "## NVDA FY 2027\n| date | period | income_statement_diluted_eps |\n| --- | --- | --- |\n| 2026-07-26 | 2027 FY | 7.91 |\n\nData available in: `NVDA_ttm_2027_Q2_income_statement_8dda8a.csv` (row key column: date)\n\n## NVDA FY 2027\n| date | period | balance_sheet_total_assets |\n| --- | --- | --- |\n| 2026-07-26 | 2027 FY | 320,272,000,000 |\n\nData available in: `NVDA_ttm_2027_Q2_balance_sheet_f5686a.csv` (row key column: date)\n\n## NVDA FY 2027\n| date | period | cash_flow_statement_net_income |\n| --- | --- | --- |\n| 2026-07-26 | 2027 FY | 192,880,000,000 |\n\nData available in: `NVDA_ttm_2027_Q2_cash_flow_bde8f3.csv` (row key column: date)",
-                "sources": [
-                  "https://www.perplexity.ai/finance/NVDA/financials"
-                ],
-                "tickers": [
-                  "NVDA"
-                ]
-              }
-            ],
-            "tickers": [
-              "NVDA"
-            ],
-            "type": "finance_results"
-          },
-          {
             "queries": [
-              "NVIDIA consensus annual earnings growth forecast forward PE September 2026",
-              "NVDA analyst earnings growth forecast low high fair PE",
-              "NVIDIA earnings growth forecast price earnings range"
+              "NVIDIA consensus annual earnings growth forecast low high NVDA",
+              "NVDA analyst earnings growth forecast annual consensus"
             ],
             "results": [
               {
-                "date": "2026-08-29",
-                "id": 1,
-                "last_updated": "2026-09-05",
-                "snippet": "Micron's fiscal year 2026, which ends this month, is projected to deliver earnings growth of approximately 785%, with consensus estimates putting EPS at $73.40 for the full year, per Harsh Chauhan's Motley Fool projection.",
+                "date": "2026-08-13",
+                "id": 16,
+                "last_updated": "2026-09-12",
+                "snippet": "Consensus earnings estimates have recently been revised higher, such that analysts now expect earnings to increase at 44% annually over the next three years.\nIn March, the consensus estimate said earnings would increase at 33% annually over that period.",
                 "source": "web",
-                "title": "Micron Still at Six Times Forward Earnings as Nvidia Pays Premium for Memory",
-                "url": "https://www.techtimes.com/articles/325952/20260829/micron-still-six-times-forward-earnings-nvidia-pays-premium-memory.htm"
+                "title": "Nvidia Stock Investors Just Got Good News From Wall Street (Hint: It's Time to Buy) | The Motley Fool",
+                "url": "https://www.fool.com/investing/2026/08/13/nvidia-stock-investors-good-news-from-wall-street/"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 17,
+                "last_updated": "2026-09-10",
+                "snippet": "Kress told investors that revenue growth in fiscal 2028 will reach 70%, trouncing the 44% average analyst estimate, according to LSEG. Based on the consensus ...",
+                "source": "web",
+                "title": "Nvidia 70% growth forecast puts it on track to be tech No. 2 company",
+                "url": "https://www.cnbc.com/2026/08/26/nvidia-70percent-growth-forecast-puts-it-on-track-to-be-tech-no-2-company.html"
+              },
+              {
+                "date": "2026-08-17",
+                "id": 18,
+                "last_updated": "2026-08-24",
+                "snippet": "Wall Street expects earnings of $2.08 per share against $1.05 in the year-ago quarter, nearly double, on revenue of $91.90 billion representing roughly 97% annual growth.\n...\nFY2027 consensus revenue sits at $391.3 billion with EPS estimates spanning $8.79 to $9.34, the former representing 92% growth over FY2026.\nFY2028 EPS is projected near $12.12, implying a further 38% advance.",
+                "source": "web",
+                "title": "Nvidia Stock Price Forecast: NVDA Holds $225 With $91.9B Consensus 9 Days From Earnings",
+                "url": "https://www.tradingnews.com/news/nvidia-trades-flat-at-225-usd-on-75m-shares-as-ad-jumps-6-percent-and-avgo-drops"
               },
               {
                 "date": "2026-09-06",
-                "id": 2,
+                "id": 19,
                 "last_updated": "2026-09-12",
                 "snippet": "CNBC reported that NVIDIA Corporation (NASDAQ:NVDA) CFO Colette Kress told investors on August 26 that fiscal 2028 revenue growth will reach 70%, far above the 44% average analyst estimate tracked by LSEG, marking the company's first-ever year-ahead revenue forecast.\nApplied to the roughly $396 billion consensus estimate for fiscal 2027, that guidance implies fiscal 2028 revenue near $673 billion to $700 billion.",
                 "source": "web",
@@ -561,121 +494,247 @@
                 "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-nvda-first-ever-ahead-223147950.html"
               },
               {
-                "date": "2026-08-31",
-                "id": 3,
-                "last_updated": "2026-09-12",
-                "snippet": "Key Points Erste Group Bank raised NVIDIA’s FY2027 EPS estimate to $9.00 from $8.97 and projected FY2028 EPS of $12.70, though the FY2027 estimate remains slightly below the $9.10 consensus.\n...\nThe consensus estimate for NVIDIA's current full-year earnings is $9.10 per share.",
+                "date": "2026-09-08",
+                "id": 20,
+                "last_updated": "2026-06-23",
+                "snippet": "EPS estimate increased from US$8.18 to US$9.34 per share. Net income forecast to grow 52% next year vs 54% growth forecast for Semiconductor industry in the US.",
                 "source": "web",
-                "title": "FY2027 EPS Estimates for NVIDIA Lifted by Erste Group Bank",
-                "url": "https://www.marketbeat.com/instant-alerts/estimates-fy2027-eps-estimates-for-nvidia-lifted-by-erste-group-bank-2026-08-31/"
+                "title": "NVIDIA (NasdaqGS:NVDA) Stock Forecast & Analyst Predictions",
+                "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/future"
               },
               {
-                "date": "2026-09-01",
-                "id": 4,
-                "last_updated": "2026-09-12",
-                "snippet": "Nvidia stock trades at a forward price-to-earnings (P/E) ratio of about 23.",
+                "date": "2026-08-27",
+                "id": 21,
+                "last_updated": "2026-08-28",
+                "snippet": "Analysts project NVDA's FY2027 EPS at $9.05, representing 89.76% year-over-year growth.\n...\nThe consensus forecast for FY2028 is $13.13, implying 45.03% growth, with the stock trading at 16.23 times earnings.\nThe FY2029 forecast stands at $16.61, bringing the multiple down to 12.83 times earnings.",
                 "source": "web",
-                "title": "Nvidia Just Proved It Doesn't Need China Anymore | The Motley Fool",
-                "url": "https://www.fool.com/investing/2026/09/01/nvidia-just-proved-it-doesnt-need-china-anymore/"
+                "title": "Nvidia completely refutes bearish arguments—yet the stock ...",
+                "url": "https://www.moomoo.com/community/feed/nvidia-nvda-us-117167501672454"
+              },
+              {
+                "date": "2026-08-22",
+                "id": 22,
+                "last_updated": "2026-09-11",
+                "snippet": "Consensus estimates call for Nvidia's Q2 revenues to nearly double year-over-year (YOY) to $92.01 billion. Nvidia has forecast Q2 revenues at $91 billion, plus ...",
+                "source": "web",
+                "title": "Nvidia Might Deliver Another 'Beat and Raise' Quarter, But Its ...",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-might-deliver-another-beat-134502581.html"
+              },
+              {
+                "date": "2026-09-06",
+                "id": 23,
+                "last_updated": "2026-09-08",
+                "snippet": "### Quick Read\n- Wall Street's 64% EPS growth forecast puts NVDA on track for $851 billion in annual net income by 2029, shattering Aramco's all-time corporate profit record.",
+                "source": "web",
+                "title": "Nvidia's Profits Could Rival a Country's GDP by 2029 - AOL.com",
+                "url": "https://www.aol.com/articles/nvidia-profits-could-rival-country-163044000.html"
+              },
+              {
+                "date": "2026-08-14",
+                "id": 24,
+                "last_updated": "2026-08-22",
+                "snippet": "Looking out to the full fiscal year 2027, current year revenue estimates stand at $393.88 billion versus year-ago sales of $215.94 billion, implying a robust annual growth rate of approximately 82.6 percent if the projections are met.",
+                "source": "web",
+                "title": "Nvidia stock trades near record high as Wall Street eyes massive AI earnings",
+                "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-trades-near-record-high-as-wall-street-eyes-massive-ai/69950121"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 25,
+                "last_updated": "2026-08-27",
+                "snippet": "Nvidia expects October-quarter revenue of USD 108 billion, up 89% year over year and ahead of FactSet consensus estimates of USD 105 billion. Why it matters: ...",
+                "source": "web",
+                "title": "Nvidia: What We Think of the Stock After Earnings | Morningstar UK",
+                "url": "https://global.morningstar.com/en-gb/stocks/nvidia-what-we-think-stock-after-earnings"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 26,
+                "last_updated": "2026-08-26",
+                "snippet": "- Nvidia’s Q2 financial results arrive Wednesday, with analyst consensus pointing to $2.09 EPS and $92.3 billion in revenue, nearly doubling year-over-year figures\n...\nWall Street consensus projects adjusted earnings per share of $2.09 alongside revenue reaching $92.3 billion.\n...\nThe company’s forward price-to-earnings multiple currently trades below the S&P 500 average, even as analysts project 89% earnings growth for the current fiscal year.",
+                "source": "web",
+                "title": "Nvidia (NVDA) Earnings Preview: Wall Street Forecasts and Key ...",
+                "url": "https://blockonomi.com/nvidia-nvda-earnings-preview-wall-street-forecasts-and-key-metrics-to-monitor/"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 27,
+                "last_updated": "2026-09-12",
+                "snippet": "Still, the forecast came in well above the expectation for about 45% growth that had been implied by the FactSet consensus.",
+                "source": "web",
+                "title": "Is Nvidia heading for $1 trillion in annual revenue? One analyst now ...",
+                "url": "https://www.morningstar.com/news/marketwatch/20260827436/is-nvidia-heading-for-1-trillion-in-annual-revenue-one-analyst-now-thinks-thats-possible"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 28,
+                "last_updated": "2026-08-28",
+                "snippet": "Much of that optimism comes from a high bar on the growth side, with the pros looking for earnings improvement of 46% annually over the next three to five years.",
+                "source": "web",
+                "title": "Nvidia (NVDA) Earns Price-Target Upgrades After Monster ...",
+                "url": "https://www.theglobeandmail.com/investing/markets/stocks/MPWR/pressreleases/4226450/nvidia-nvda-earns-price-target-upgrades-after-monster-q2/"
+              },
+              {
+                "date": "2026-09-10",
+                "id": 29,
+                "last_updated": "2025-11-11",
+                "snippet": "The average price target is $324.30 with a high forecast of $465.00 and a low forecast of $275.00. The average price target represents a 52.22% change from the ...",
+                "source": "web",
+                "title": "Nvidia (NVDA) Stock Forecast, Price Targets and Analysts Predictions",
+                "url": "https://www.tipranks.com/stocks/nvda/forecast"
+              },
+              {
+                "date": "2026-08-20",
+                "id": 30,
+                "last_updated": "2026-08-20",
+                "snippet": "Analysts expect EPS of $2.09, nearly double the $1.05 reported a year ago, while revenue is forecast to jump 95% year-over-year to $92.04 billion.",
+                "source": "web",
+                "title": "Nvidia Stock Forecast — What Wall Street Expects Ahead of Q2 Earnings",
+                "url": "https://www.tipranks.com/news/nvidia-stock-forecast-what-wall-street-expects-ahead-of-q2-earnings"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "NVIDIA fair forward PE multiple low high range valuation",
+              "NVDA fair value PE multiple range"
+            ],
+            "results": [
+              {
+                "date": "2026-09-11",
+                "id": 1,
+                "last_updated": "2026-09-11",
+                "snippet": "|Forward P/E|24.9x|\n...\n|52-Week Range|$164–$236|",
+                "source": "web",
+                "title": "NVIDIA Corporation (NVDA) — MCH Advisory Research",
+                "url": "https://www.mchadvisoryservices.com/research/nvda-research-2026.html"
+              },
+              {
+                "date": "2026-08-31",
+                "id": 2,
+                "last_updated": "2026-08-31",
+                "snippet": "Yet as the stock price keeps rising, a seemingly contradictory phenomenon is taking shape: Nvidia’s forward price-to-earnings (P/E) multiple has contracted from the lofty 40-to-50x range common two years ago to around 18x today.\n...\nWith a forward P/E of about 18x, the figure is not only far below Nvidia’s past two-year historical center of 40 to 50x—it’s also below the S&P 500’s forward valuation of around 20x.",
+                "source": "web",
+                "title": "Nvidia PE Falls to 18x: Can High Growth Drive the Next ...",
+                "url": "https://www.gate.com/blog/nvidia-nvda-18x-pe-high-growth-valuation-re-rating"
+              },
+              {
+                "date": "2026-08-15",
+                "id": 3,
+                "last_updated": "2026-08-26",
+                "snippet": "A P/E for NVIDIA, based on its growth profile, margins, size and risk, is estimated at about 47.4x.",
+                "source": "web",
+                "title": "Nvidia (NVDA) Stock Looks Fairly Valued Despite Strong AI ...",
+                "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/news/nvidia-nvda-stock-looks-fairly-valued-despite-strong-ai-expe"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 4,
+                "last_updated": "2026-06-23",
+                "snippet": "Analysts have lifted their NVIDIA fair value estimate from $268.61 to $296.81, reflecting higher projected profitability and AI infrastructure demand, as ...",
+                "source": "web",
+                "title": "NVIDIA (Nasdaq:NVDA) - Stock Analysis - Simply Wall St",
+                "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia"
               },
               {
                 "date": "2026-09-04",
                 "id": 5,
-                "last_updated": "2026-09-10",
-                "snippet": "- Nvidia expects approximately 70% revenue growth in FY 2028, compared with 44% that analyst expected before the earnings.",
+                "last_updated": "2026-09-11",
+                "snippet": "The estimated Price-to-Earnings (P/E) Ratio for NVIDIA is 29.12, calculated on 04 September 2026. Considering the last 5 years, an average P/E interval is [ ...",
                 "source": "web",
-                "title": "Nvidia postQ: Growth outlook resets expectations well above ...",
-                "url": "https://www.spglobal.com/market-intelligence/en/news-insights/research/2026/09/nvidia-postq-growth-outlook-resets-expectations-well-above-preq-consensus"
+                "title": "NVIDIA: current P/E Ratio",
+                "url": "https://worldperatio.com/stock/nvda/"
               },
               {
-                "date": "2026-09-11",
+                "date": "2026-08-28",
                 "id": 6,
-                "last_updated": "2026-09-12",
-                "snippet": "Key Points Erste Group Bank raised NVIDIA’s FY2027 earnings estimate to $9.23 per share from $9.00, above the current analyst consensus of $9.10.",
+                "last_updated": "2026-09-10",
+                "snippet": "- Nvidia's stock surged 8.7% post-report, adding $441B in value, yet trades at a 20x forward P/E—its lowest multiple since 2019 amid AI-driven growth.\n...\n- A 20x multiple reflects pricing in slower growth akin to the S&P 500, with future valuation hinges on revenue execution, margin stability, and 70% growth delivery.\n...\nMeanwhile the forward multiple fell from roughly 30 times in mid-2025 to about 20 today, and through early July it had already touched 22.2x, the lowest since June 2019.",
                 "source": "web",
-                "title": "Erste Group Bank Boosts Earnings Estimates for NVIDIA - MarketBeat",
-                "url": "https://www.marketbeat.com/instant-alerts/estimates-erste-group-bank-boosts-earnings-estimates-for-nvidia-2026-09-11/"
+                "title": "Nvidia Doubled Its Revenue and Got Cheaper: What a 20x ...",
+                "url": "https://www.ainvest.com/news/nvidia-doubled-revenue-cheaper-20x-multiple-pricing-2608/"
               },
               {
-                "date": "2026-09-01",
+                "date": "2026-09-04",
                 "id": 7,
-                "last_updated": "2026-09-12",
-                "snippet": "Nvidia currently has a price-to-earnings (P/E) ratio of roughly 28.",
+                "last_updated": "2026-09-07",
+                "snippet": "Peer-implied fair value\n$126.98\n...\n|Method|Type|Avg.\nmultiple|Coverage|Implied equity value|Fair value / share|Status|",
                 "source": "web",
-                "title": "Prediction: This Will Be Nvidia's Stock Price by the End of ...",
-                "url": "https://www.fool.com/investing/2026/09/01/prediction-nvidia-stock-price-end-of-2027-latest-forecast/"
+                "title": "Relative Valuation for NVIDIA CORP (NVDA)",
+                "url": "https://www.edwyn.app/company/0001045810/relative-valuation"
               },
               {
-                "date": "2026-08-25",
+                "date": "2026-08-29",
                 "id": 8,
-                "last_updated": "2026-09-09",
-                "snippet": "With forward EPS of $8.26, a price of $325 implies a forward P/E near 39x.",
+                "last_updated": "2026-09-03",
+                "snippet": "Using a range-based approach: a conservative multiple consistent with slower growth assumptions supports a fair value near $180 to $220 per share.\nA base case that assumes continued AI acceleration and multiple compression to more normalized high-growth multiples suggests fair value near $280 to $340.\nUpside to analyst consensus mean price targets places a more optimistic fair value near $300.",
                 "source": "web",
-                "title": "Prediction: Nvidia Stock Is Entering Its Most Important Quarter Yet",
-                "url": "https://247wallst.com/investing/2026/08/25/prediction-nvidia-stock-is-entering-its-most-important-quarter-yet/"
+                "title": "NVDA: AI Leadership and Valuation — NVDA Report | NVDA Research",
+                "url": "https://stockalpha.ai/tickers/NVDA/nvda-2026-08-29-nvda-ai-leadership-and-valuation-nvda-re"
               },
               {
-                "date": "2026-08-13",
+                "date": "2026-09-02",
                 "id": 9,
-                "last_updated": "2026-09-12",
-                "snippet": "Consensus earnings estimates have recently been revised higher, such that analysts now expect earnings to increase at 44% annually over the next three years.",
+                "last_updated": "2026-09-11",
+                "snippet": "Compared to the sector median, Nvidia's valuation seems fair.\nIts forward price-to-earnings (P/E) ratio of 24.2 times is similar to the sector median of roughly 22 times.",
                 "source": "web",
-                "title": "Nvidia Stock Investors Just Got Good News From Wall Street (Hint: It's Time to Buy) | The Motley Fool",
-                "url": "https://www.fool.com/investing/2026/08/13/nvidia-stock-investors-good-news-from-wall-street/"
+                "title": "Nvidia Stock Is Still Cheap, Reckons Fundstrat's Tom Lee",
+                "url": "https://www.barchart.com/story/news/4408813/nvidia-stock-is-still-cheap-reckons-fundstrats-tom-lee"
               },
               {
                 "date": "2026-08-26",
                 "id": 10,
-                "last_updated": "2026-09-10",
-                "snippet": "Kress told investors that revenue growth in fiscal 2028 will reach 70%, trouncing the 44% average analyst estimate, according to LSEG.",
+                "last_updated": "2026-09-11",
+                "snippet": "The company’s PEG ratio of just 0.29 and P/E of 32.5 suggest attractive valuation relative to its growth profile.",
                 "source": "web",
-                "title": "Nvidia 70% growth forecast puts it on track to be tech No. 2 company",
-                "url": "https://www.cnbc.com/2026/08/26/nvidia-70percent-growth-forecast-puts-it-on-track-to-be-tech-no-2-company.html"
+                "title": "BofA reiterates Nvidia stock rating on supply commitment ...",
+                "url": "https://www.investing.com/news/analyst-ratings/bofa-reiterates-nvidia-stock-rating-on-supply-commitment-strategy-93CH-4876431"
               },
               {
                 "date": "2026-09-06",
                 "id": 11,
-                "last_updated": "2026-09-12",
-                "snippet": "It trades at a forward price-to-earnings (P/E) ratio of 24.2.",
+                "last_updated": "2026-09-07",
+                "snippet": "|Fair Value|$232.26|\n...\n|5‑Year P/E Range|25.4257.6|",
                 "source": "web",
-                "title": "Despite Revenue Skyrocketing More Than 100%, Nvidia Stock Trades at 24 Times Forward Earnings. Is the Market Warning Investors About What's to Come? | The Motley Fool",
-                "url": "https://www.fool.com/investing/2026/09/06/skyrocket-nvidia-stock-valuation-market-warning/"
+                "title": "NVIDIA (NVDA) Research Report — Score, Intrinsic Value, Peer ...",
+                "url": "https://www.stockrover.com/html_reports/NVDA/"
               },
               {
-                "date": "2026-08-19",
+                "date": "2026-08-20",
                 "id": 12,
-                "last_updated": "2026-09-08",
-                "snippet": "Now, NVIDIA currently has a price-to-earnings (P/E) ratio of 34.",
+                "last_updated": "2026-09-10",
+                "snippet": "Nvidia stock trades at a forward P/E of 23.1 and outperforms peers in growth, profitability, and return metrics. Read more on NVDA stock here.",
                 "source": "web",
-                "title": "Louis Navellier sets eye-opening Nvidia stock price target for ...",
-                "url": "https://www.thestreet.com/investing/louis-navellier-sets-eye-opening-nvidia-stock-price-target-for-rest-of-this-year"
+                "title": "Nvidia: The Greatest Company At A Fair Price (NASDAQ:NVDA)",
+                "url": "https://seekingalpha.com/article/4938707-nvidia-the-greatest-company-at-a-fair-price"
               },
               {
                 "date": "2026-08-26",
                 "id": 13,
-                "last_updated": "2026-08-26",
-                "snippet": "Wall Street expects per-share profit to land around $2.08 to $2.09, almost double what Nvidia reported last year, and analysts have revised the Nvidia earnings forecast up more than once in recent weeks.\n...\nFactSet and Wedbush Securities expect revenue to land somewhere between $91.85 billion and $92.06 billion for the quarter that just ended in late July, and that range lines up with a separate estimate near 97% growth to about $92.2 billion.",
+                "last_updated": "2026-09-11",
+                "snippet": "Fair value per share **$252.93** +13% against $223.42\n...\n|**Fair value per share**|**$252.93**|\n|Against the deployed price of $223.42, as of|+13%|",
                 "source": "web",
-                "title": "Nvidia Stock Forecast Ahead of Earnings: 97% Growth Expected",
-                "url": "https://watcher.guru/news/nvidia-stock-forecast-ahead-of-earnings-97-growth-expected"
+                "title": "NVIDIA Corporation (NVDA) Revenue Model & Fair Value - R40",
+                "url": "https://r40.io/stocks/nvda/model/"
               },
               {
-                "date": "2026-09-10",
+                "date": "2026-08-22",
                 "id": 14,
-                "last_updated": "2026-09-12",
-                "snippet": "For this fiscal year, Wall Street analysts expect $9.31 in earnings per share.\nNvidia's earnings and revenue have grown in lockstep, so it's safe to assume the company's earnings will also rise by about 70%.\nThis projects Nvidia to have EPS of $15.83.Right now, Nvidia trades for 29 times earnings, which is pretty cheap compared to where it has traded over the past three years.",
+                "last_updated": "2026-09-08",
+                "snippet": "The 24/7 Wall St. price target of $270.26 and buy recommendation at 90% confidence rest on one fact: NVIDIA trades at a forward PEG of 0.605 while growing revenue 85.2%.",
                 "source": "web",
-                "title": "70% Revenue Growth for Nvidia Next Year May Make It ...",
-                "url": "https://www.fool.com/investing/2026/09/10/70-revenue-growth-for-nvidia-next-year-may-make-it/"
+                "title": "Nvidia Stock Doesn’t Look as Expensive as You Think",
+                "url": "https://247wallst.com/investing/2026/08/22/nvidia-stock-doesnt-look-as-expensive-as-you-think/"
               },
               {
-                "date": "2026-08-31",
+                "date": "2026-08-24",
                 "id": 15,
-                "last_updated": "2026-09-12",
-                "snippet": "The stock's forward earnings multiple of 26 is slightly higher than the index's average multiple of 24.",
+                "last_updated": "2026-08-26",
+                "snippet": "The forward P/E ratio for Nvidia currently stands at 24 times, not too far removed from the S&P 500's (^GSPC) 21-times multiple, despite the company being one of the fastest-growing companies in corporate America.",
                 "source": "web",
-                "title": "This Is Where Nvidia Stock Will Be When September Ends",
-                "url": "https://www.fool.com/investing/2026/08/31/prediction-this-is-where-nvidia-stock-will-be-when/"
+                "title": "Nvidia's valuation looks surprisingly cheap heading into earnings. Could it be an issue for the stock? - AOL",
+                "url": "https://www.aol.com/articles/nvidias-valuation-looks-surprisingly-cheap-191738000.html"
               }
             ],
             "type": "search_results"
@@ -688,314 +747,24 @@
                 "url": "https://www.fool.com/investing/2026/08/13/nvidia-stock-investors-good-news-from-wall-street/"
               },
               {
-                "snippet": "div\n\n**Nvidia** (NVDA -0.03%) recently announced results that crushed Wall Street estimates. Its sales surged 106% year over year to $96.2 billion. Diluted earnings per share were up by an even better 128%.\n\nIt looks like the leading artificial intelligence (AI) business can do no wrong. Momentum continues to be on its side. Nvidia has possibly been the biggest winner in the ongoing AI infrastructure build-out.\n\nAnd it shows, as shares have jumped 920% in five years (as of Sept. 3). This company has established itself as the world's most valuable enterprise.\n\nBut what's surprising to learn is that the AI stock isn't expensive. It trades at a forward price-to-earnings (P/E) ratio of 24.2. Based strictly on the jaw-dropping financial results this business keeps reporting, it's easy to argue that shares should command double the current valuation multiple.\n\nIs the market warning investors about what's to come?\n\nImage source: The Motley Fool.\n\n## AI to the moon\n\nBy any metric, AI usage is showing no sign of slowing. The number of tokens processed by **Alphabet** model APIs, for example, totaled 22 billion per minute last quarter. This was up from 16 billion three months before.\n\nOpenAI and Anthropic, the two prominent AI labs that are planning for trillion-dollar initial public offerings in the near future, are posting skyrocketing revenue figures. And they have rapidly expanding user bases.\n\n**Amazon** Web Services, **Microsoft** Azure, and Google Cloud are major hyperscalers that continue to reveal gargantuan customer order amounts with each passing quarter. As of June 30, they had a combined $1.7 trillion in cloud backlogs.\n\nConsequently, the spending isn't letting up. Colette Kress, Nvidia's chief financial officer, estimates that hyperscaler capital expenditures (capex) will come in at $1.3 trillion in 2027. And before the end of the decade, management believes annual AI infrastructure spending will be between $3 trillion and $4 trillion.\n\nAll of this demand directly flows to the impressive financial metrics coming from Nvidia. It sells the powerful data center graphics processing units (GPUs) that support AI model training and inference.\n\nOn the recent Q2 2027 earnings call, Kress noted that the company expects 70% revenue growth in fiscal 2028. Assuming consensus estimates hold up and Nvidia's margin profile doesn't change, this outlook implies that the business will report a whopping $461 billion in operating income next fiscal year. This would be well ahead of anyone else.\n\n## NASDAQ: NVDA\n\nNvidia\n\nPremium Feature\n\nMoneyball Superscore\n\n94/100\n\nToday's Change\n\n(-0.03%) $-0.07\n\nCurrent Price\n\n$218.29\n\n### Key Data Points\n\nMarket Cap\n\n$5.3TMarket cap calculated using publicly traded shares outstanding only. Does not include unlisted, private, or dual-class non-traded shares. Implied market cap may vary.\n\nDay's Range\n\n$218.15 - $222.00\n\n52wk Range\n\n$164.27 - $236.54\n\nVolume\n\n89.1M\n\nAvg Vol\n\n131.8M\n\nGross Margin\n\n74.67%\n\nDividend Yield\n\n0.24%\n\n## Durability of demand is the trillion-dollar question\n\nAll of this information should make every investor extremely bullish about Nvidia's prospects. However, the market is concerned about the durability of Nvidia's growth. The forward P/E ratio of 24.2 demonstrates this.\n\nNo matter how smart the experts might sound, no one has any idea how long the AI boom will last. While the robust demand trends and ballooning capex numbers are optimistic data points, things could change quickly.\n\nMaybe the enterprises that are driving usage don't realize the tangible benefits they were hoping for, prompting these customers to cut their AI-related budgets. There's a material probability that meaningful returns come later than the bulls hope, creating a timing gap (and potential bubble bursting) that calls into question how long the sizable capex can continue.\n\nThat would have a ripple effect up the value chain. If there's any evidence that AI spending is going to slow, sell-side analysts will be forced to lower their profit estimates for Nvidia. And the share price could drop.\n\nWatching Nvidia's meteoric rise has been very exciting. AI can truly be a game-changing technology.\n\nHowever, this is uncharted territory. And Nvidia's success rides on the music not stopping, not to mention its ability to fend off rivals developing more advanced chips.\n\nJust like the industry is starved for Nvidia GPUs, the market has an unquenchable thirst for certainty. This is exactly why the company's quarterly results are so closely watched to ensure the growth story is alive. Trillions of dollars are on the line.",
-                "title": "Despite Revenue Skyrocketing More Than 100%, Nvidia Stock Trades at 24 Times Forward Earnings. Is the Market Warning Investors About What's to Come? | The Motley Fool",
-                "url": "https://www.fool.com/investing/2026/09/06/skyrocket-nvidia-stock-valuation-market-warning/"
+                "snippet": "Dividend Adjusted Return\n\nSep 4, 2025 - Sep 4, 2026\nNVDA 230.36 (+35.2%)\n\nTechnology 121.27 (+40.6%)\n\nS&P 500 7718.60 (+21.0%)\n\n|Fair Value|$232.26|\n|--|--|\n|Margin of Safety|1%|\n|Value Score61Value Score: Our value score looks at EV/EBITDA, P/E, P/S, P/TB (Price/Tangible Book) and EPS Predictability. P/S and P/TB are compared within a sector. Other metrics are compared across all stocks|Quality Score100Quality Score: Our quality score compares profitability and balance sheet metrics to find high quality companies using ROIC, Net Margin, Gross Margin, Interest Coverage, and Debt / Equity metrics.|\n|--|--|\n|Growth Score100Growth Score: Our growth score looks at the 5 year history and the forward estimates for EBITDA, Sales, and EPS growth, ranking the best companies across all stocks.|Sentiment Score99Sentiment Score: Our sentiment score finds stocks in favor by analyzing Short Interest, returns in key periods over the last year, Price vs. 52-wk High, Days Since 52-wk High and MACD signals.|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Value Score|61|50|\n|Price / Earnings|29.2|32.4|\n|Price / Sales|18.6|13.8|\n|Price / Free Cash Flow|44.3|46.8|\n|Price / Book|24.3|12.2|\n|Price / Tangible Book|27.2|236.9|\n|EV / EBITDA|23.7|22.3|\n|EPS Predict. Pctl.|80|57|\n|Piotroski F Score|6|7|\n|5‑Year P/E Range|25.4257.6|\n|--|--|\n|5‑Year P/B Range|11.777.7|\n|5‑Year P/S Range|9.655.4|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Growth Score|100|60|\n|Sales Growth| | |\n|Sales Growth Next Year|63.3%|52.8%|\n|Sales 1‑Year Chg (%)|83.4%|47.5%|\n|Sales 3‑Year Avg (%)|109.9%|69.8%|\n|Sales 5‑Year Avg (%)|69.0%|41.4%|\n|EPS Growth| | |\n|Next Yr. Growth Est.|65.7%|72.6%|\n|EPS 1‑Year Chg (%)|125.4%|148.8%|\n|EPS 3‑Year Avg (%)|167.1%|59.6%|\n|EPS 5‑Year Avg (%)|95.0%|29.2%|\n|NVDA|NVIDIA|$5,562,502|29.2|0.4%|8.7%|34.4%|1%|61|100|100|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|$4,669,699|36.6|0.3%|3.5%|33.9%|-7%|67|93|78|\n|--|--|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|$2,007,387|31.9|0.8%|2.8%|84.3%|23%|65|100|99|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|$1,702,714|45.7|0.7%|-14.4%|17.8%|9%|57|100|96|\n|--|--|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|$1,148,129|23.0|0.1%|13.9%|719.8%|17%|57|100|100|\n|--|--|--|--|--|--|--|--|--|--|--|\n|SKHY|SK hynix|$853,606|10.6|-|14.7%|-|0%|74|-|100|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AMD|Advanced Micro Devices|$779,621|122.0|-|-7.9%|195.2%|-9%|51|99|94|\n|--|--|--|--|--|--|--|--|--|--|--|\n|INTC|Intel|$506,408|-|-|-5.0%|289.3%|-14%|52|65|42|\n|--|--|--|--|--|--|--|--|--|--|--|\n|ARM|ARM Holdings|$269,231|256.4|-|-10.1%|86.1%|-16%|51|39|80|\n|--|--|--|--|--|--|--|--|--|--|--|\n|TXN|Texas Instruments|$236,019|39.2|2.2%|-8.9%|41.6%|25%|65|88|95|\n|--|--|--|--|--|--|--|--|--|--|--|\n|MRVL|Marvell Technology|$200,905|74.1|0.1%|2.3%|249.5%|-15%|46|87|93|\n|--|--|--|--|--|--|--|--|--|--|--|\n|QCOM|Qualcomm|$180,224|19.3|2.2%|4.3%|7.9%|17%|80|70|96|\n|--|--|--|--|--|--|--|--|--|--|--|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Quality Score|100|60|\n|Gross Margin|74.7%|63.1%|\n|Operating Margin|65.2%|46.9%|\n|Net Margin|63.7%|44.5%|\n|Return on Assets|97.3%|43.6%|\n|Return on Equity|84.2%|63.8%|\n|ROIC|72.3%|43.0%|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Sentiment Score|99|54|\n|5‑Day Return|5.9%|4.6%|\n|1‑Month Return|8.7%|3.2%|\n|YTD Return|23.7%|34.8%|\n|1‑Year Return|34.4%|52.4%|\n|3‑Year Return|375.8%|279.9%|\n|5‑Year Return|911.8%|383.9%|\n|Beta 1‑Year|1.92|1.89|\n|NVDA|Industry|\n|--|--|\n|Forward Dividend Yield|0.4%|\n|Payout Ratio|3.5%|\n|TTM Yield|0.1%|\n|Fwd. Div. Per Share|$1.00|\n|Div. 1Y Chg (%)|2400.0%|\n|Div. 3Y Avg (%)|296.9%|\n|Div. 5Y Avg (%)|128.7%|\n|Cons. Growth Years|3|\n|Div. Coverage Ratio|7.9|\n|Current Ratio|4.6|\n|--|--|\n|Quick Ratio|3.8|\n|Price|$230.36|\n|Net Cash Per Share|$0.98|\n|Equity Per Share|$9.48|\n|Debt / Equity|0.2|\n|Solvency Ratio|245%|\n|Interest Coverage|496.1|\n|Short % of Float|1.2%|\n|Altman Z‑Score|41.1|\n|Current Quarter EPS|\n|--|\n|# Up Last 30 days|\n|# Down Last 30 days|\n|Mean Estimate|\n|% Change (30 Days)|\n|Next Quarter EPS|\n|--|\n|# Up Last 30 days|\n|# Down Last 30 days|\n|Mean Estimate|\n|% Change (30 Days)|\n|Cur Qtr|Next Qtr|Cur Year|Next Year|\n|--|--|--|--|\n|Latest|$2.47|$2.75|$9.29|\n|30 Days Ago|$2.35|$2.66|$8.96|\n|90 Days Ago|$2.34|$2.65|$8.92|\n|% Change (90 Days)|5.6%|3.7%|4.1%|\n|Surprise Type|Amount|Percent|\n|--|--|--|\n|Positive Quarters (> 2%)|12|100.0%|\n|Negative Quarters (< 2%)|0|-|\n|In-Line Quarters (within 2%)|0|-|\n|Surprise Type|Announce Date|Period End Date|ActualEPS|Est.EPS|Surprise (%)|\n|--|--|--|--|--|--|\n|Positive|08/26/26|07/31/26|$2.22|$2.09|6.2%|\n|Positive|05/20/26|04/30/26|$1.87|$1.77|5.8%|\n|Positive|02/25/26|01/31/26|$1.62|$1.54|5.2%|\n|Positive|11/19/25|10/31/25|$1.30|$1.26|3.2%|\n|Positive|08/27/25|07/31/25|$1.05|$1.01|4.0%|\n|Positive|05/28/25|-|$0.81|$0.75|8.0%|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Best Monthly Return (5Y)|33.7%|26.9%|\n|Worst Monthly Return (5Y)|-30.6%|-19.5%|\n|Beta 1‑Year|1.92|1.89|\n|Volatility 1‑Year|0.37|0.32|\n|Volatility 1Y Pctl.|38|-|\n|Max Drawdown 1‑Year|-20.2%|-24.8%|\n|Max Drawdown 3‑Year|-36.9%|-38.8%|\n|Max Drawdown 5‑Year|-66.3%|-52.9%|\n|MU|Micron Technology|100|345.7%|1368.5%|85.9%|141.5%|79.7%|26.6%|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|99|105.9%|127.8%|63.3%|83.4%|109.9%|69.0%|\n|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|92|36.1%|77.4%|34.2%|30.6%|25.8%|25.0%|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|91|47.9%|85.4%|63.5%|25.9%|28.6%|23.2%|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|69|16.4%|28.7%|10.0%|14.2%|6.7%|6.1%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|90|23.0|6.6|0.4|12.8|11.4|5.6-|\n|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|76|31.9|19.6|1.0|15.9|11.0|12.745.2|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|60|29.2|15.0|0.3|18.6|24.3|25.4257.6|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|40|45.7|18.3|1.3|19.6|17.1|19.2201.7|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|12|36.6|33.6|3.3|10.1|43.5|20.543.4|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|100|48.7%|33.2%|27.6%|115.1%197.0%|26.1%35.8%|\n|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|100|74.7%|65.2%|63.7%|19.5%95.7%|10.2%97.4%|\n|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|97|64.2%|56.1%|49.9%|23.9%34.5%|16.2%28.3%|\n|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|93|68.3%|44.1%|38.9%|7.8%62.8%|4.1%19.3%|\n|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|88|72.6%|65.7%|55.9%|-16.0%50.1%|-10.4%55.8%|\n|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|90|0.2|227.0|2.3|0.3%|105%|0.6%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|89|0.1|257.8|3.0|1.2%|235%|2.7%|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|85|0.2|496.1|3.8|7.5%|245%|1.2%|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|75|0.8|-|0.9|5.3%|64%|0.8%|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|60|0.7|10.7|2.0|70.4%|47%|1.2%|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|89|0.7%|0.7%|$357.89|$2.60|10+|40.1%|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|77|0.4%|0.1%|$230.36|$1.00|3|3.5%|\n|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|68|0.8%|0.8%|$428.91|$3.50|5|25.7%|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|56|0.3%|0.3%|$319.97|$1.08|10+|12.0%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|25|0.1%|0.1%|$1,016.59|$0.53|2|1.1%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|91|13.9%|2.1%|153.8%|256.4%|719.8%|3.34|0.79|81.0%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|82|8.7%|5.4%|26.0%|23.7%|34.4%|1.92|0.37|97.4%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|79|3.5%|2.9%|22.1%|18.0%|33.9%|0.69|0.25|92.9%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|74|2.8%|-3.4%|20.6%|41.9%|84.3%|2.17|0.40|89.5%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|39|-14.4%|-14.4%|13.1%|3.8%|17.8%|2.13|0.47|72.3%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|Price / Earnings|29.2|55.5|62.2|253.2|44.5|\n|--|--|--|--|--|--|\n|Price / Cash Flow|41.8|55.8|65.3|179.0|45.7|\n|--|--|--|--|--|--|\n|Price / Book|24.3|49.8|53.1|48.7|14.2|\n|--|--|--|--|--|--|\n|Price / Tangible Book|27.2|53.9|59.7|64.6|19.5|\n|--|--|--|--|--|--|\n|Price / Sales|18.6|28.6|33.3|46.8|11.6|\n|--|--|--|--|--|--|\n|EV / EBITDA|23.7|40.1|41.2|92.5|35.4|\n|--|--|--|--|--|--|\n|Forward Dividend Yield|0.4%|0.0%|0.0%|0.0%|0.1%|\n|--|--|--|--|--|--|\n|Shareholder Yield|1.4%|1.0%|0.9%|0.7%|0.1%|\n|--|--|--|--|--|--|\n|Gross Margin|74.7%|69.9%|76.0%|64.6%|60.5%|\n|--|--|--|--|--|--|\n|Net Margin|63.7%|52.4%|55.0%|31.6%|26.0%|\n|--|--|--|--|--|--|\n|Return on Assets|97.3%|82.2%|85.1%|23.8%|18.8%|\n|--|--|--|--|--|--|\n|Return on Equity|84.2%|86.5%|91.2%|37.6%|32.5%|\n|--|--|--|--|--|--|\n|ROIC|72.3%|78.4%|78.1%|27.5%|22.5%|\n|--|--|--|--|--|--|\n\nAdditional data provided by Zacks, Intrinio, Quandl, Yodlee, IEX Cloud\n\nNVDA has underperformed its sector by -5.4% in the past year.\n\nThe Technology sector has outperformed the market by 19.6% in the past year.",
+                "title": "NVIDIA (NVDA) Research Report — Score, Intrinsic Value, Peer ...",
+                "url": "https://www.stockrover.com/html_reports/NVDA/"
               }
             ],
             "type": "fetch_url_results"
           },
           {
-            "queries": [
-              "NVDA earnings growth forecast range low high percent analysts 2026",
-              "Nvidia forward PE range low high published 2026",
-              "Nvidia earnings growth lowest forecast highest forecast annually"
-            ],
-            "results": [
+            "contents": [
               {
-                "date": "2026-08-26",
-                "id": 16,
-                "last_updated": "2026-09-12",
-                "snippet": "Analysts forecast revenue of $91.9 billion and earnings per share of $2.08, implying year-over-year growth of roughly 97% and exceeding the company’s guidance of $91.0 billion, plus or minus 2%.",
-                "source": "web",
-                "title": "Nvidia Earnings Preview: Blackwell Growth Meets a Sky-High ...",
-                "url": "https://www.investing.com/analysis/nvidia-earnings-preview-blackwell-growth-meets-a-skyhigh-valuation-bar-200686599"
-              },
-              {
-                "date": "2026-08-28",
-                "id": 17,
-                "last_updated": "2026-09-11",
-                "snippet": "Nvidia forecasts 70% sales growth next year, signals AI spending boom has years left to run · Third-quarter revenue forecast is $108 billion, plus or minus 2%, ...",
-                "source": "web",
-                "title": "Nvidia forecasts 70% sales growth next year, signals AI ... - Reuters",
-                "url": "https://www.reuters.com/business/media-telecom/nvidia-forecasts-quarterly-revenue-above-estimates-2026-08-26/"
-              },
-              {
-                "date": "2026-08-26",
-                "id": 18,
-                "last_updated": "2026-09-10",
-                "snippet": "Kress told investors that revenue growth in fiscal 2028 will reach 70%, trouncing the 44% average analyst estimate, according to LSEG. Based on the consensus ...",
-                "source": "web",
-                "title": "Nvidia 70% growth forecast puts it on track to be tech No. 2 company",
-                "url": "https://www.cnbc.com/2026/08/26/nvidia-70percent-growth-forecast-puts-it-on-track-to-be-tech-no-2-company.html"
-              },
-              {
-                "date": "2026-08-26",
-                "id": 19,
-                "last_updated": "2026-09-10",
-                "snippet": "Nvidia is projected to post adjusted earnings of $2.10 per share on a record $92.37 billion in second-quarter revenue, both roughly double what the company reported a year earlier.",
-                "source": "web",
-                "title": "Nvidia Earnings Live, Aug. 26, 2026: Q2 Profits, Revenue ...",
-                "url": "https://www.investopedia.com/nvidia-earnings-live-nvda-stock-ai-trade-12068393"
-              },
-              {
-                "date": "2026-08-26",
-                "id": 20,
-                "last_updated": "2026-08-28",
-                "snippet": "The 70% preliminary expectation wildly exceeded projections for fiscal 2028 revenue of roughly $570 billion, or 44% growth from fiscal 2027 (the current year).",
-                "source": "web",
-                "title": "Nvidia unleashes 70% growth bombshell and defends ... - Fortune",
-                "url": "https://fortune.com/2026/08/26/nvidia-q2-growth-results-jensen-huang/"
-              },
-              {
-                "date": "2026-08-27",
-                "id": 21,
-                "last_updated": "2026-09-10",
-                "snippet": "Bank of America: Buy rating, $350 price target “The three headlines from NVDA’s beat/raise results are: 1) Significantly raising FY28/CY27 YoY sales growth guidance to ~70% YoY, well-above consensus at 45%, with demand 2x YoY (growth is supply constrained), 2) Providing disclosures for ~$500bn in cumulative multi-yr supply/off-B/S commitments (inline with our preview), tempered by 3) Reduction in GM towards 72-73% from 75% due to rising memory costs.",
-                "source": "web",
-                "title": "Nvidia reports blowout earnings. Here's why analysts are impressed",
-                "url": "https://www.cnbc.com/2026/08/27/nvidia-reports-blowout-earnings-heres-why-analysts-are-impressed.html"
-              },
-              {
-                "date": "2026-08-31",
-                "id": 22,
-                "last_updated": "2026-08-31",
-                "snippet": "Yet as the stock price keeps rising, a seemingly contradictory phenomenon is taking shape: Nvidia’s forward price-to-earnings (P/E) multiple has contracted from the lofty 40-to-50x range common two years ago to around 18x today.",
-                "source": "web",
-                "title": "Nvidia PE Falls to 18x: Can High Growth Drive the Next ...",
-                "url": "https://www.gate.com/blog/nvidia-nvda-18x-pe-high-growth-valuation-re-rating"
-              },
-              {
-                "date": "2026-08-23",
-                "id": 23,
-                "last_updated": "2026-09-11",
-                "snippet": "Nvidia is trading at a forward price-to-earnings ratio of **23**, significantly lower than its five-year average of 42.",
-                "source": "web",
-                "title": "Nvidia Q2FY26 Results: Revenue estimated at $92B, EPS at $2.09",
-                "url": "https://scanx.trade/stock-market-news/companies/nvidia-q2fy26-results-revenue-estimated-92b-eps-2-09/49056731"
-              },
-              {
-                "date": "2026-08-20",
-                "id": 24,
-                "last_updated": "2026-08-26",
-                "snippet": "Nvidia should generate well over USD 300 billion of data center revenue in calendar 2026, Nvidia stock is moderately undervalued compared with our long-term ...",
-                "source": "web",
-                "title": "Going Into Earnings, Is Nvidia Stock a Buy, a Sell, or Fairly Valued?",
-                "url": "https://global.morningstar.com/en-ca/stocks/going-into-earnings-is-nvidia-stock-buy-sell-or-fairly-valued-4"
-              },
-              {
-                "date": "2026-08-24",
-                "id": 25,
-                "last_updated": "2026-08-25",
-                "snippet": "Based on Visible Alpha consensus, Data Center revenue estimates in Q2 2027 range from $83.5 billion to $91.5 billion.",
-                "source": "web",
-                "title": "Nvidia earnings preview: Q2 2027",
-                "url": "https://www.spglobal.com/market-intelligence/en/news-insights/research/2026/08/nvidia-earnings-preview-q2-2027"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 26,
-                "last_updated": "2024-10-07",
-                "snippet": "Estimate 108.89B. Low estimate 104.94B. Sales growth (year/est) Estimate 2.47 2.75 9.31 15.52 Low estimate 2.34 2.56 9.01 9.8 High estimate 2.7 3.12 10.1 18.75 ...",
-                "source": "web",
-                "title": "NVIDIA Corporation (NVDA) analyst ratings, estimates and forecasts",
-                "url": "https://nz.finance.yahoo.com/quote/NVDA/analysis/"
-              },
-              {
-                "date": "2026-08-25",
-                "id": 27,
-                "last_updated": "2026-08-28",
-                "snippet": "So NVDA is down more than 2% since its last report, despite a Wall Street forecast for approximately 97% revenue growth and approximately 99% earnings growth.",
-                "source": "web",
-                "title": "Nvidia Earnings: Updates and Commentary August 2026 - Kiplinger",
-                "url": "https://www.kiplinger.com/investing/live/nvidia-earnings-live-updates-and-commentary-august-2026"
-              },
-              {
-                "date": "2026-08-27",
-                "id": 28,
-                "last_updated": "2026-09-11",
-                "snippet": "That 26x figure sits at the very bottom of Nvidia's historical 25x-56x forward P/E band.",
-                "source": "web",
-                "title": "NVIDIA Forecasts 70% Revenue Growth by FY2028 - LinkedIn",
-                "url": "https://www.linkedin.com/posts/raj70srinivasan_nvidia-earnings-takeaways-huang-forecasts-activity-7498544063172784128-w62R"
-              },
-              {
-                "date": "2026-09-02",
-                "id": 29,
-                "last_updated": "2026-09-12",
-                "snippet": "Yahoo Finance analyst estimates show the Street modeling 63% year-over-year revenue growth for Nvidia in fiscal year 2028 on average, below the 70% target it just guided to.",
-                "source": "web",
-                "title": "Nvidia didn't like Wall Street's estimates. So it tried to reset ...",
-                "url": "https://finance.yahoo.com/technology/article/nvidia-didnt-like-wall-streets-estimates-so-it-tried-to-reset-them-122218541.html"
-              },
-              {
-                "date": "2026-08-27",
-                "id": 30,
-                "last_updated": "2026-09-08",
-                "snippet": "The average twelve-month analyst targets - about $310-317, in a wide band from about $180 to $515 - are not a 31 December 2026 compass.",
-                "source": "web",
-                "title": "NVIDIA Earnings, August 2026: $96.22 Billion in Revenue, Weak ...",
-                "url": "https://x.com/Borsite/article/2092952431151738895"
-              }
-            ],
-            "type": "search_results"
-          },
-          {
-            "queries": [
-              "Nvidia historical forward P E range 25 56",
-              "Nvidia valuation P E range low end high end",
-              "NVDA annual EPS growth forecast low high percent"
-            ],
-            "results": [
-              {
-                "date": "2026-08-26",
-                "id": 31,
-                "last_updated": "2026-09-11",
-                "snippet": "Nvidia's historical 25x-56x forward P/E band. Current forward P/E (2027 basis): 16x vs 36.9x ten-year average → PEG ratio: approximately 0.5x against projected ...",
-                "source": "web",
-                "title": "NVIDIA Forecasts 70% Revenue Growth by FY2028 - LinkedIn",
-                "url": "https://www.linkedin.com/posts/raj70srinivasan_nvidia-earnings-takeaways-huang-forecasts-activity-7498544063172784128-w62R"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 32,
-                "last_updated": "2024-10-07",
-                "snippet": "Estimate, 2.47, 2.75, 9.31, 15.52. Low estimate, 2.34, 2.56, 9.01, 9.8. High estimate, 2.7, 3.12, 10.1, 18.75. Year ago EPS, 1.3, 1.62, 4.77, 9.31. Earnings ...",
-                "source": "web",
-                "title": "NVIDIA Corporation (NVDA) analyst ratings, estimates and forecasts",
-                "url": "https://nz.finance.yahoo.com/quote/NVDA/analysis/"
-              },
-              {
-                "date": "2026-08-28",
-                "id": 33,
-                "last_updated": "2026-08-29",
-                "snippet": "2008\n...\n2022\n...\n2024\n...\n價格\n漲跌",
-                "source": "web",
-                "title": "NVIDIA Corporation的Price to earnings forward - NVDA",
-                "url": "https://tw.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/price-earnings-fwd/"
-              },
-              {
-                "date": "2026-08-14",
-                "id": 34,
-                "last_updated": "2026-08-22",
-                "snippet": "The current quarter EPS consensus of 2.08 comes with a range between 2.03 and 2.2, while the next quarter’s 2.35 estimate sits between 2.13 and 2.59.\nOn a full-year basis, fiscal 2027 EPS is expected at 8.96, with a low bound of 8.2 and a high of 9.58.",
-                "source": "web",
-                "title": "Nvidia stock trades near record high as Wall Street eyes massive AI earnings",
-                "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-trades-near-record-high-as-wall-street-eyes-massive-ai/69950121"
-              },
-              {
-                "date": "2026-09-09",
-                "id": 35,
-                "last_updated": "2026-06-23",
-                "snippet": "NVIDIA is forecast to grow earnings and revenue by 26.5% and 29.3% per annum respectively. EPS is expected to grow by 26.9% per annum. Return on equity is ...",
-                "source": "web",
-                "title": "NVIDIA (NasdaqGS:NVDA) Stock Forecast & Analyst Predictions",
-                "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/future"
-              },
-              {
-                "date": "2026-09-11",
-                "id": 36,
-                "last_updated": "2026-09-11",
-                "snippet": "|Driver|Low|High|Swing|\n...\n|Consensus FY EPS|$9.05; house below (-3.1%)|",
-                "source": "web",
+                "snippet": "FORECAST — expected outcome, not realised return. Performance policy\n01Investment Decision\n\n## Investment Committee Summary\n| | |\n|--|--|\n|**Rating**|SELL|\n|Internal 5-tier|**SELL**|\n|Classification · conviction|secular growth · **medium**|\n|Evidence|8/8 load-bearing inputs sourced|\n|Triangulated fair value|$212 (-3% vs spot · triangulated FV)|\n|12-mo scenario PWEV|$199 (-9% vs spot · 12m PWEV)|\n|Next catalyst|2026-10-15 — Rubin (next-node) volume ramp / first shipments milestone|\n|Primary thesis-break|Data Center revenue YoY growth < 0.2 (2 consecutive prints)|\nDecision detail — rating tables & Research OS strip\n\n## Rating: SELL\n\nInternal 5-tier: **SELL** · *secular growth* · analyst conviction: **medium**\n\n|Metric|Value|\n|--|--|\n|Current Price|$218|\n|Triangulated Fair Value|$212 (-3% vs spot · triangulated FV)|\n|12-mo Scenario PWEV|$199 (-9% vs spot · 12m PWEV)|\n|Forward P/E|24.9x|\n|Market Cap|$5.34T|\n|52-Week Range|$164–$236|\n\n*EPS basis for the forward P/E and all scenario multiples: **consensus forward EPS (broker-adjusted, non-GAAP)**.*\n\n> **Methodology:** Valuation triangulated across five weighted anchors — an intrinsic DCF, a scenario-weighted PWEV, a Monte Carlo median (Student-t + regime switching), a sum-of-parts and a peer P/E re-rate. Anchors that share a market multiple are not independent evidence and are weighted as one view. Figures reconciled to Alpha Vantage 2026-09-10. Each chart below sits with the part of the thesis it evidences.\n\n*General research for a skeptical institutional reader. Not personalised investment advice; no position sizing or trade instructions. Figures as of the analysis date; verify before acting.*\n\n## Decision Support — Research OS jump to detail ↓\n|Research conviction|Exp. return (1y)|Rules stance|Preferred options|Next catalyst|\n|--|--|--|--|--|\n|**78.1**/100 (99th pct)|-8% 1yr expected|Hold|Put Debit Spread|34d — Rubin (next-node) volume ramp / first shipments milestone|\n\n***Research rating: SELL** · **Tactical / decision-rule stance: Hold** — the stance is the machine decision-rules layer (hysteresis, kill-switches, freshness); the rating is the valuation verdict. They may diverge and are reconciled in the Decision Rules section below.*\n\n*Full breakdown — conviction components, position sizing, probability-return distribution, decision rules, factor & portfolio interaction, options intelligence and the catalyst timeline — in the **Decision Support sections below**. Model output for research; not individualised advice.*\n\n📎 **Download the full model (Excel)** — DCF line items, scenarios, sensitivity, assumptions, and extended fundamentals.\n\n## Recommendation: SELL\n\nDefensive: rating SELL; triangulated fair value $212 (-3% vs spot) — the risk/reward is skewed to the downside on Revenue Growth. The debate is Revenue Growth — a fundamental call. SBC runs $4.5bn TTM (~2% of revenue; charged once, as dilution).\n\n02Thesis, Anti-Thesis & Variant View\n\n## Investment Thesis\n\nAt $218 on a forward multiple near 25x, the market is paying a premium-but-not-euphoric price for durable AI-compute leadership: the tape already assumes decelerating-yet-strong Data-Center growth and a mid-seventies gross margin holding through the Blackwell-to-Rubin transition. The engine's blend differs mainly in dispersion, not central tendency — the triangulated fair value sits -3% from spot and the probability-weighted value at $199 — so the SELL is a marginal call rather than a conviction one, driven by the Base path carrying the largest single weight against a combined bear mass that is nearly as large. Cross-checks pull the anchor down, not up: the DCF and the EV/revenue-implied price both sit below the earnings-multiple anchor, so the blend leans on the multiple, not the cash flow. The single most damaging risk is gross-margin durability — a mid-seventies Data-Center margin is scarcity pricing, and custom silicon, AMD and supply normalisation are each built to erode it.\n\n*Narrative drafted 2026-08-16 by claude-fable-5 under supervision; reviewed by Marinus 2026-08-16.*\n\nThe dashboard below is the whole argument on one page: spot ($218) against each valuation anchor, the scenario tree, technicals and the options-implied move.\n\n## Anti-Thesis (The Real Bear Case)\n\nThe largest bear weight in the tree is Structural (AI Winter), and its mechanism is concrete, not rhetorical. Data-Center demand is a near one-for-one derivative of a handful of hyperscalers' AI-capex budgets, and part of that demand is reflexive — financed by vendor stakes and debt-funded neoclouds rather than proven end-market returns. If training-cluster returns disappoint and inference commoditises, those buyers cut in unison and simultaneously accelerate their own silicon (TPU, Trainium, MTIA, Maia) for the highest-volume, most price-sensitive workloads. Revenue rolls over while scarcity pricing breaks: gross margin falls toward the low sixties and operating margin steps down by double-digit points. The multiple then de-rates to a cyclical-semiconductor low-teens level on a shrinking earnings base — a genuine impairment that carries the structural target below the 52-week low, not a transient pullback.\n\n## Key Debate\n\nRevenue Growth explains 59% of Monte Carlo outcome variance — the single variable that decides which side is right.\n\n## What the Market Is Pricing In\n\nAt the current price, the market pays **24.1× consensus forward EPS**, vs the house DCF terminal **22.0×**, and a peer median **31.5×**. The house DCF sits **3% below spot**, so the market is pricing in more than the house case — roughly **0.4pp** of revenue CAGR.\n\n**Variant perception:** the house view is **below-consensus**, and the thesis is primarily **FCF-driven**.\n\n|Metric|Consensus|House|Importance|\n|--|--|--|--|\n|Revenue|397.0|337.2|High|\n|EPS|9.1|8.8|Medium|\n|Target price|327.6|206.7|Medium|\n\n03Scenario & Valuation\n\n## Scenario Analysis\n\nThe scenario tree spans a structural 'Structural (AI Winter)' downside ($69.90) to a 'Supercycle Extended' bull case ($365); the probability-weighted blend (PWEV $199) is -9% versus spot.\n\n|Scenario|Probability|Target|Return vs spot|\n|--|--|--|--|\n|Structural (AI Winter)|22%|$69.90|-68%|\n|Hyperscaler Capex Cut|20%|$116|-47%|\n|Base|38%|$259|+18%|\n|ME Bull|13%|$304|+39%|\n|Supercycle Extended|7%|$365|+67%|\n|**Probability-Weighted (PWEV, after SBC dilution)**|—|**$199**|**-9%**|\n\n*SBC charge: scenario targets are gross per-share prices; the PWEV is reduced by one year of stock-based-compensation dilution (1.5% of shares, on SBC ≈ 2% of revenue), trimming the gross PWEV of $202 to $199 (-1.5%). SBC is charged once, as dilution — never also deducted from FCF.*\n\n**Scenario rationale** — the driver path behind every target:\n\n- **Structural (AI Winter) (22%, $69.90).** AI-capex digestion turns structural: training-cluster ROI disappoints, inference commoditizes, and customers conclude they over-built. DC revenue contracts, gross margin compresses toward the low-60s as scarcity pricing breaks and custom silicon/AMD take share, and the multiple de-rates to ~12x on a falling earnings base. The target sits below the 52-week low — a genuine impairment of the demand thesis, not a pullback. *Drivers — dc growth: negative to flat; gross margin: ~60-62%; op margin: ~50%; multiple: ~12x.*\n- **Hyperscaler Capex Cut (20%, $116).** A coordinated capex-digestion year: the top hyperscalers pause to absorb prior buildout, DC growth stalls to low-single-digits, and gross margin slips toward high-60s as the demand/supply balance loosens. The multiple stays capped ~16x because the market demands proof the AI-capex cycle is durable rather than reflexive before re-rating. *Drivers — dc growth: ~0-10%; gross margin: ~67-70%; op margin: ~58%; multiple: ~16x.*\n- **Base (38%, $259).** The Blackwell-to-Rubin transition sustains ~30-40% DC growth as broad enterprise and sovereign demand offsets some hyperscaler digestion; gross margin normalizes into the low-70s as supply catches up; networking attach rises. The multiple settles ~22x on still-strong but decelerating growth and a maturing (no longer scarcity-priced) cycle. *Drivers — dc growth: ~30-40%; gross margin: ~72-74%; op margin: ~65%; multiple: ~22x.*\n- **ME Bull (13%, $304).** Demand outruns supply through the Rubin ramp: sovereign AI and inference-at-scale add a durable second leg, networking and software attach climb, and gross margin holds mid-70s on sustained pricing power. Operating leverage expands margins and the multiple re-rates toward ~28x on re-accelerating growth. *Drivers — dc growth: ~45-55%; gross margin: ~75%; op margin: ~67%; multiple: ~28x.*\n- **Supercycle Extended (7%, $365).** The AI buildout proves to be a multi-year compute supercycle: NVDA holds full-stack share against custom silicon, software/recurring revenue inflects into a real pillar, and inference demand compounds on top of training. ROIC stays elevated, gross margin sustains mid-70s, and the multiple holds ~32x as the cycle's duration is re-rated rather than its level. *Drivers — dc growth: >55%; gross margin: >75%; op margin: >68%; multiple: ~32x.*\n\n## Valuation Triangulation\n\nFive weighted anchors — an intrinsic dcf, a scenario-weighted pwev, a monte carlo median (student-t + regime switching), a sum-of-parts and a peer p/e re-rate — read them with their *basis* in mind. The Monte Carlo, the DCF terminal and any peer re-rate key off a market **multiple**, so they are **not fully independent**; only discounted cash flows themselves are genuinely multiple-free. The discipline is to read the spread and weight the cash-based view, not to treat five numbers as five independent votes.\n\n|Method|Basis|Fair Value|vs Spot|Weight in this name's blend|\n|--|--|--|--|--|\n|Monte Carlo median (Student-t + regime)|multiple|$203|-7%|**15%**|\n|Sum-of-Parts|multiple|$198|-9%|**15%**|\n|Peer P/E re-rate|multiple|$276|+27%|**10%**|\n|Peer EV/Revenue re-rate|multiple|$121|-45%|0% — cross-check only|\n|Scenario PWEV|multiple|$199|-9%|**25%**|\n|DCF (5-year + terminal)|cash flow + terminal ×|$212|-3%|**35%**|\n|**Triangulated (weighted)**|—|**$212**|**-3%**|100%|\n\n> **Peer EV/Revenue re-rate** — 0% weight: it duplicates the peer-multiple information already carried by the Peer P/E anchor while ignoring margin mix; weighting both would double-count the peer view. Shown as a cross-check.\n\n### Monte Carlo — the outcome distribution\n\n10,000 paths, Student-t shocks (fat tails) with a regime-switching overlay. The median lands at **$203** and **45%** of paths finish above spot. The variance decomposition shows the revenue growth is the dominant swing factor (59% of variance). The fundamental driver, not the multiple, sets the spread — a cleaner setup.\n\n### DCF — the cash-flow anchor\n\nIndependent of the market multiple: a 5-year path, WACC 11.0%, 22.0x terminal FCF multiple → **$212**. This anchor is deliberately the heaviest (35%): it is the valuation least hostage to the current multiple regime.\n\n### Peer benchmarking — relative value\n\nAgainst the peer cohort, re-rating to the peer-median forward multiple (P/E 31.5x) implies **$276**. A premium is only justified by superior growth/margins; otherwise it is multiple risk. Weighted just 10% so market sentiment does not set the fair value.\n\n### Sum-of-parts\n\nValuing each piece at the multiple it deserves (Data Center (compute + networking + software) 22.0x, Gaming 8.0x, Professional Visualization 9.0x, Automotive & Robotics 12.0x, OEM & Other 6.0x) → **$198**. 'Data Center (compute + networking + software)' dominates at 22.0× → $4,757B (99% of EV) — the segment whose multiple matters most.\n\nAcross all anchors the spread is 77% of the median — wide (genuine disagreement — the blend carries low valuation confidence).\n\n## Sensitivity\n\n**DCF/share — WACC × terminal multiple**\n\n|WACC ＼ Term×|15.4x|18.7x|22.0x|25.3x|28.6x|\n|--|--|--|--|--|--|\n|**9.0%**|$175|$203|$230|$258|$286|\n|**10.0%**|$168|$194|$221|$248|$274|\n|**11.0%**|$161|$186|$212|$238|$263|\n|**12.0%**|$155|$179|$203|$228|$252|\n|**13.0%**|$149|$172|$195|$219|$242|\n\n**DCF/share — revenue CAGR Δ × op-margin Δ**\n\n|CAGRΔ ＼ MgnΔ|-3.0pp|-1.5pp|+0.0pp|+1.5pp|+3.0pp|\n|--|--|--|--|--|--|\n|**-3.0pp**|$179|$184|$189|$194|$199|\n|**-1.5pp**|$189|$195|$200|$206|$211|\n|**+0.0pp**|$200|$206|$212|$218|$224|\n|**+1.5pp**|$212|$218|$224|$231|$237|\n|**+3.0pp**|$224|$231|$237|$244|$250|\n\n**Tornado — DCF/share swing by driver** (widest first)\n\n|Driver|Low|High|Swing|\n|--|--|--|--|\n|Terminal × ±15%|$186|$238|$51.00|\n|Revenue CAGR ±3pp|$189|$237|$48.00|\n|Op margin ±3pp|$200|$224|$23.00|\n|WACC ±1pp|$203|$221|$18.00|\n|Capex intensity ±15%|$211|$213|$3.00|\n\n**Company lever — SoP/share vs Data Center (compute + networking + software) multiple (AI re-rating)** (base 22.0x)\n\n|Multiple|15.4x|18.7x|22.0x|25.3x|28.6x|\n|--|--|--|--|--|--|\n|**SoP/share**|$141|$171|$200|$230|$259|\n\n## Peer Quality & Weighting\n|Peer|Fwd P/E|Growth|Op margin|Quality|Weight cap|\n|--|--|--|--|--|--|\n|AMD|35.0×|18%|22%|segment|50%|\n|AVGO|28.0×|25%|45%|direct|100%|\n|INTC|22.0×|4%|8%|direct|100%|\n|ARM|60.0×|25%|25%|broad|25%|\n\n*Quality-weighted forward P/E: **30.0×** (simple median 31.5×). Direct peers count 100%, segment 50%, broad 25%.*\n\n**Historical-range cross-check:** 52-week range $164–$236, centre $197 (-10% vs spot); spot sits at the 75th percentile of the range. *Low-weight mean-reversion cross-check, not a fundamental anchor.*\n\n## Risk / Reward & Margin of Safety\n|Metric|Value|\n|--|--|\n|Upside to triangulated FV|$212 (-3% vs spot · triangulated FV)|\n|Downside to bear case (Structural (AI Winter))|$69.90 (-68% vs spot · bear scenario)|\n|Reward-to-risk ratio|withheld — the triangulated FV is at or below spot, so there is no reward leg to divide by the risk leg|\n|Margin of safety (FV vs spot)|-3%|\n|P(price > spot) — Monte Carlo|45%|\n\n*That ratio compares triangulated upside against the probability-weighted bear target, not the extreme tail; with a leg missing it is withheld rather than computed from a magnitude. Bull case (Supercycle Extended): $365.*\n\n04Business & Financial Quality\n\n## Company Overview & Business Model\n\n**NVIDIA Corporation** — TECHNOLOGY · SEMICONDUCTORS. Nvidia Corporation is an American multinational technology company incorporated in Delaware and based in Santa Clara, California. It designs graphics processing units (GPUs) for the gaming and professional markets, as well as system on a chip units (SoCs) for the mobile computing and automotive market.\n\n**How it makes money.**\n\n|Segment|Rev mix|Growth|Op margin|Key driver|\n|--|--|--|--|--|\n|Data Center (compute + networking + software)|94%|+40%|68%|AI accelerator GPUs (Hopper/Blackwell/Rubin)|\n|Gaming|4%|+5%|35%|GeForce RTX desktop/laptop GPUs|\n|Professional Visualization|1%|+10%|40%|RTX workstation GPUs|\n|Automotive & Robotics|1%|+30%|25%|DRIVE autonomous-vehicle platform|\n|OEM & Other|1%|+5%|20%|Cryptomining & embedded|\n\n**Edge.** Wide moat — The moat is the CUDA software/developer lock-in plus full-stack (chip + NVLink/InfiniBand networking + rack-scale systems) integration and a foundry-supply (TSMC CoWoS/HBM) chokehold — durable for training, weaker for inference. If the moat holds full-stack share against custom silicon, a terminal multiple in the mid-20s is defensible; if lock-in erodes for the price-sensitive inference tier (the falsifiable claim), the terminal multiple should compress toward a cyclical-semiconductor ~12-16x as scarcity pricing breaks.\n\n## Revenue-Segment Breakdown\n\nThe company-specific drivers behind the valuation — each segment carries its own growth, margin, multiple and capex intensity. *(Tags: FACT reported · ESTIMATE from disclosures · INFERENCE judgment.)*\n\n|Segment|Revenue|Mix|Growth|Op margin|EBIT|Multiple|Capex %|Tag|\n|--|--|--|--|--|--|--|--|--|\n|Data Center (compute + networking + software)|$318B|94%|40%|68%|$216.2B|22.0x|2%|FACT/ESTIMATE|\n|Gaming|$13B|4%|5%|35%|$4.5B|8.0x|2%|FACT/ESTIMATE|\n|Professional Visualization|$3B|1%|10%|40%|$1.2B|9.0x|2%|FACT/ESTIMATE|\n|Automotive & Robotics|$4B|1%|30%|25%|$1.0B|12.0x|2%|FACT/ESTIMATE|\n|OEM & Other|$2B|1%|5%|20%|$0.4B|6.0x|2%|FACT/ESTIMATE|\n|*EBIT = segment revenue × operating margin (segment EBITDA not shown — per-segment D&A is not separately disclosed).*| | | | | | | | |\n\n**AI revenue, decomposed** — the AI lines broken out (Azure-AI / Copilot / model-API / pass-through style), so the AI contribution is auditable:\n\n|AI line|Run-rate|Growth|Gross margin|Capex %|Tag|\n|--|--|--|--|--|--|\n|Data Center GPU compute (Hopper/Blackwell/Rubin)|$240B|40%|75%|2%|ESTIMATE|\n|Networking (NVLink / InfiniBand / Spectrum-X)|$45B|45%|70%|2%|ESTIMATE|\n|Software & services (CUDA / AI Enterprise / NIM)|$4B|50%|85%|2%|ESTIMATE/INFERENCE|\n|End-customer mix (hyperscaler / sovereign / enterprise)|$0B|0%|0%|0%|INFERENCE|\n- *Data Center GPU compute (Hopper/Blackwell/Rubin): The bulk of DC and the cycle's swing factor — supply/demand-driven; Blackwell ramp now, Rubin the next node. Volume = customer capex + foundry (TSMC CoWoS/HBM) supply. This is the line that determines the whole thesis.*\n- *Networking (NVLink / InfiniBand / Spectrum-X): Ex-Mellanox + NVLink scale-up fabric. Attaches to rack-scale GB/NVL systems; rising attach rate as deployments move to full-rack. Spectrum-X Ethernet contesting the InfiniBand-vs-Ethernet datacenter-networking debate.*\n- *Software & services (CUDA / AI Enterprise / NIM): Recurring optionality and the durability argument for the moat (CUDA lock-in). Still small (low-single-digit % of DC) — a lever, not yet a pillar. Do NOT confuse the installed-base moat narrative with current recognized software revenue.*\n- *End-customer mix (hyperscaler / sovereign / enterprise): NOT additive — a decomposition of DC demand, not a separate revenue line. ~40-50% of total revenue from a handful of US hyperscalers; sovereign AI a fast-growing but lumpy second leg; enterprise/neocloud the long tail. Concentration is the structural risk; sovereign is the diversification hope.*\n\n## Named Exposures\n\n### Customer concentration & hyperscaler capex cycle (ESTIMATE/INFERENCE)\n|Dimension|Assessment|\n|--|--|\n|Hyperscaler share|~40-50% of total revenue from a handful of large customers (MSFT/META/AMZN/GOOGL and their cloud/AI arms); 10-K discloses several customers each >10% of revenue (est.)|\n|Capex dependency|DC GPU demand is a direct derivative of customer AI capex budgets — a single coordinated capex-digestion pause cuts NVDA revenue growth sharply|\n|Circular financing|OpenAI/Anthropic/neocloud demand partly financed by vendor/strategic investments (incl. NVDA stakes) and debt-funded neoclouds — demand durability is partly reflexive, not purely organic end-demand|\n|Backlog visibility|Multi-quarter supply commitments give near-term visibility but mask whether sell-through reflects deployed utilization vs. inventory/anticipatory buildout|\n|Concentration risk|High — the same buyers can pause in unison; their incentive to develop in-house silicon rises with every quarter of NVDA pricing power|\n\n### China export controls & competitive substitution (ESTIMATE/INFERENCE)\n|Dimension|Assessment|\n|--|--|\n|China revenue hit|Export controls have cut the China DC opportunity materially vs. its prior ~20-25% revenue share; restricted/compliant SKUs only — a multi-billion structural headwind, not a timing issue|\n|Custom silicon|Hyperscaler in-house ASICs (Google TPU, AWS Trainium, Meta MTIA, MSFT Maia) target the largest internal training/inference workloads — the most price-sensitive, highest-volume tier|\n|AMD substitution|MI-series (MI300/MI400) is a credible second source for inference; pressures pricing at the margin even where it doesn't win sockets|\n|Gross-margin durability|Mid-70s DC gross margin is the most valuable and most fragile variable; it reflects scarcity pricing that custom silicon + AMD + supply normalization are all built to erode|\n|Moat dependency|CUDA/software lock-in and full-stack (chip+networking+systems) integration are the durability case; the bear case is that lock-in matters less for inference and for buyers large enough to fund their own stack|\n\n## Industry Context — AI Compute Stack\n\nThis name sits in the **AI Compute Stack** cluster as a **supplier — AI accelerators** name. ≈ the dependent variable: aggregate hyperscaler AI-capex IS NVDA Data-Center revenue, near 1:1. Highest beta to this cycle. Its scenarios are not guessed in isolation — they inherit a single, shared view of the cluster's driver cycle, so the names that depend on the same event are mutually consistent.\n\n**Value chain:** MSFT (buyer (hyperscaler)) · GOOGL (buyer (hyperscaler)) · AMZN (buyer (hyperscaler)) · META (buyer (hyperscaler)) · NVDA (supplier — AI accelerators) · LRCX (supplier — wafer-fab equipment) · MU (supplier — HBM / memory)\n\n|Shared state|Capex path|House view|This name implies|\n|--|--|--|--|\n|AI Capex Bust|FY27 aggregate −30%+ (to ~$350B)|22%|22%|\n|Digestion|FY27 flat / plateau (~$430-460B)|20%|20%|\n|Sustained Build|FY27 +15-20% (to ~$500B)|38%|38%|\n|Supercycle|FY27 +30%+ (to ~$600B+)|20%|20%|\n\n*Mapping note: name-level 'ME Bull' (13%) + 'Supercycle Extended' (7%) map to cluster **Supercycle** (20%) — the cluster row is the SUM of the mapped scenario probabilities, not a different estimate.*\n\nOn the cluster's key downside — **AI Capex Bust** (FY27 aggregate −30%+ (to ~$350B)) — this name implies **22%** vs the cluster house view of **22%** (in line with the house). The cluster's full cross-stock reconciliation governs that the names which ride the same capex cycle assign it comparable odds.\n\n**Structure:** *Concentration* — Demand: 4 hyperscalers ≈ 60-70% of AI capex. Supply: NVDA dominates accelerators; TSMC is the single leading-edge fab; 3 HBM makers. (FACT/ESTIMATE). *Barriers* — CUDA software lock-in, HBM/CoWoS packaging supply, leading-edge fab access, networking (NVLink). (FACT). *Pricing Power* — Sits with NVDA today (~75% gross margin); erodes if custom ASICs (Google TPU, AWS Trainium, Meta MTIA) and AMD take share, or inference shifts to cheaper compute. (INFERENCE). *Substitution Risk* — Custom silicon, model-efficiency gains (DeepSeek-style $/token collapse), inference-vs-training mix shift, and the circular vendor-financing of neoclouds/OpenAI. (INFERENCE).\n\n## Balance Sheet & Liquidity\n|Metric|Value|\n|--|--|\n|Net debt|$-51.1B — **net cash**|\n|Net debt / EBITDA|-0.25x|\n|Interest coverage (EBIT / interest)|547.1x|\n|Current ratio|3.91x|\n|Lease obligations|$2.6B|\n|Cash & ST investments|$62.6B|\n\n*Balance-sheet data as of 2026-01-31 (Alpha Vantage).*\n\n## Capital Allocation\n|Metric|Value|\n|--|--|\n|Free cash flow|$96.7B|\n|Buybacks / dividends|$40.1B / $1.0B|\n|Total shareholder yield|0.8%|\n|Payout as % of FCF|42.5%|\n|Reinvestment (capex / OCF)|5.9%|\n|SBC as % of FCF|6.6%|\n|Allocation stance|balanced|\n\n## Free-Cash-Flow Quality\n|Metric|Value|\n|--|--|\n|FCF margin|38.1%|\n|FCF conversion (FCF / net income)|80.5%|\n|FCF yield|1.8%|\n|Capex intensity (capex / revenue)|2.4%|\n|FCF − SBC (diagnostic)|$90.3B|\n|Capex split (maint / growth)|20% / 80% — NVDA is fabless so absolute capex is small (~2% of revenue), but the ramp above the $6B run-rate is almost entirely growth-oriented (test/validation capacity, supply-chain assurance, internal R&D compute for model training) rather than maintenance — hence D&A ($2.8B) lags gross capex.|\n\n*Accounting quality: SBC 2% of revenue; cash conversion (OCF/NI) 86% — cash-backed.*\n\n## Competitive Moat\n\nMoat sources:\n\n- CUDA software ecosystem + ~4M developer installed base — the switching-cost moat that keeps training workloads captive\n- Full-stack integration (GPU + NVLink/InfiniBand/Spectrum-X networking + reference rack-scale systems) that custom-silicon buyers must rebuild piecemeal\n- TSMC CoWoS advanced-packaging and HBM allocation — a supply chokepoint NVDA controls better than rivals, gating competitor ramp\n- Erosion vector, not a moat source: hyperscaler in-house ASICs (TPU/Trainium/MTIA/Maia) target the largest, most price-sensitive inference tier where CUDA lock-in matters least\n\n05Earnings, Consensus & Catalysts\n\n## Earnings-Call Disconfirmation & Sentiment\n\n*Derived signals from the MCH market-data store (Alpha Vantage transcripts + news). Quantitative tone only — a disconfirmation flag, not a substitute for reading the call.*\n\n**Management vs analyst tone (2026Q3):** management **+0.57** vs analyst floor **+0.23** → delta **+0.34** (n=13 mgmt / 8 Q&A; 37th pctile across the S&P book, z -0.4).\n\n> **Flag: TYPICAL** — management-vs-analyst tone within the normal cross-sectional range.\n|Quarter|Mgmt|Analyst|Delta|\n|--|--|--|--|\n|2026Q3|+0.57|+0.23|+0.34|\n|2026Q2|+0.75|+0.30|+0.45|\n|2026Q1|+0.59|+0.53|+0.06|\n|2025Q4|+0.71|+0.25|+0.46|\n\n**News (last 365d, 4337 articles):** avg ticker sentiment **+0.21** (bullish 12% / bearish 1%)\n\n## Consensus & Market Expectations\n|Reference|Value|\n|--|--|\n|Street target (mean)|$328 (+50% vs spot · street)|\n|House target|$207 (-36.9% vs street)|\n|Sell-side coverage|60 analysts (SB 9 / B 48 / H 2 / S 1 / SS 0; net score 0.54)|\n|Consensus FY EPS|$9.05; house below (-3.1%)|\n|Consensus FY revenue|$397.0B; house below (-15.1%)|\n\n_Consensus figures: Alpha Vantage sell-side aggregates. Where the house view sits materially above or below the street, the divergence is itself a datum — see the thesis.\n\n## Catalyst Calendar\n- **2026-10-15** (~35d) — Rubin (next-node) volume ramp / first shipments milestone *(authored)*\n- **2027-01-31** (~143d) — US-China export-control rule revision window on advanced-AI accelerators *(authored)*\n\n## Forecast Track Record\n- **EPS surprise:** beat 100% of the last 8 quarters; average surprise +5.6%.\n- **Prior-forecast backtest** (36 snapshots, 2026-04-24→2026-09-08): directional hit-rate 72%; mean predicted +3.8% vs realised +3.9%. *Disconfirming track record is reported, not suppressed.*\n\n## Catalyst Timeline\n\n*6 catalysts in the next 90 days (of 14 tracked). Importance 1–3; confidence 0–1.*\n\n|When|Catalyst|Type|Importance|Confidence|\n|--|--|--|--|--|\n|2026-09-16 (in 5d)|FOMC rate decision + SEP dot plot|macro|●●|0.8|\n|2026-09-18 (in 7d)|Quarterly options-expiry cluster (3rd Friday)|opex_cluster|●|1.0|\n|2026-10-14 (in 33d)|September CPI|macro|●●|0.8|\n|2026-10-15 (in 34d)|Rubin (next-node) volume ramp / first shipments milestone|authored|●|0.7|\n|2026-10-28 (in 47d)|FOMC rate decision + press conference|macro|●●|0.8|\n|2026-12-09 (in 89d)|FOMC rate decision + SEP dot plot|macro|●●|0.8|\n|2026-12-18 (in 98d)|Quarterly options-expiry cluster (3rd Friday)|opex_cluster|●|1.0|\n|2027-01-27 (in 138d)|FOMC rate decision + press conference|macro|●●|0.8|\n|2027-01-31 (in 142d)|US-China export-control rule revision window on advanced-AI accelerators|authored|●|0.7|\n|2027-03-17 (in 187d)|FOMC rate decision + SEP dot plot|macro|●●|0.8|\n|2027-03-19 (in 189d)|Quarterly options-expiry cluster (3rd Friday)|opex_cluster|●|1.0|\n|2027-04-28 (in 229d)|FOMC rate decision + press conference|macro|●●|0.8|\n|2027-06-09 (in 271d)|FOMC rate decision + SEP dot plot|macro|●●|0.8|\n|2027-06-18 (in 280d)|Quarterly options-expiry cluster (3rd Friday)|opex_cluster|●|1.0|\n\n_Sources: extended.catalysts, data/catalysts/.json, data/catalysts/*macro.json, AV DIVIDENDS, opex 3rd-Friday calc.*\n\n06Risks & Falsification\n\n## Regulatory & Legal Risk\n|Issue|Probability|Valuation sensitivity|Horizon|\n|--|--|--|--|\n|US export controls on advanced-AI GPUs to China (and third-country diversion rules)|high (~65%) of further tightening or enforcement change over horizon|medium - China is a structurally reduced but non-zero DC opportunity; ~5-10% of FV given compliant-SKU offsets|12-24m|\n|Antitrust / bundling scrutiny (DOJ, EU) of GPU-plus-networking-plus-CUDA tying and acquisition activity|medium (~35%)|medium - remedies could weaken the full-stack lock-in that underpins the wide-moat terminal multiple; ~5-10% of FV|12-24m|\n|Customer-concentration / circular-financing disclosure scrutiny (vendor stakes in OpenAI/Anthropic/neoclouds)|low (~20%)|low - reputational/optics rather than direct earnings; <5% of FV|12-24m|\n\n*Probabilities and sensitivities are analyst estimates, not market-implied.*\n\n## Scenario Macro & Key Risks\n|Scenario|Macro assumption|Key risk|\n|--|--|--|\n|Structural (AI Winter)|AI-capex ROI disappoints across hyperscalers; training-cluster returns fail to materialise, inference commoditises, and buyers conclude they over-built — demand contracts structurally, not cyclically.|Scarcity pricing breaks and custom silicon/AMD take the price-sensitive tier, collapsing gross margin toward the low-60s while the multiple de-rates to cyclical-semis ~12x.|\n|Hyperscaler Capex Cut|A coordinated single-year digestion pause as the top hyperscalers absorb prior buildout; aggregate AI-capex guidance flattens rather than falls structurally.|DC growth stalls to low-single-digits and the multiple stays capped ~16x pending proof the cycle is durable rather than reflexive.|\n|ME Bull|Demand outruns supply through the Rubin ramp; sovereign AI and inference-at-scale add a durable second demand leg beyond US hyperscalers; networking/software attach climbs.|Sovereign demand proves lumpy and politically contingent, and inference-at-scale attracts the cheapest-compute substitutes rather than premium GPUs.|\n\n*Scenario-macro rows withheld pending re-authoring: 2 carrying another cluster's vocabulary or a frozen figure — recorded in the narrative quarantine ledger.*\n\n## Decision Rules (Machine-Checked)\n\n**Stance: Hold** — 0 bullish / 0 bearish / 0 caution rules triggered of 6 evaluable (0 lacked data).\n\n|Rule|Condition|Observed|Triggered|\n|--|--|--|--|\n|R1-valuation-stretch|expected return vs fair value < -12 (`upside_pct`)|-5.32|no|\n|R2-valuation-opportunity|expected return vs fair value > 15 (`upside_pct`)|-5.32|no|\n|R3-street-revisions|street net rating stance < -0.25 (`extended.consensus.street_score`)|0.54|no|\n|R4-earnings-quality|cash conversion of earnings < 80 (`extended.accounting_quality.cash_conversion_pct`)|85.6|no|\n|R5-technical-breakdown|price vs 200-day SMA < 0.85 (`technicals.sma_200`)|1.11|no|\n|R6-vol-regime-shift|IV/RV vol-risk premium > 1.4 (`options_overlay.iv_rv`)|0.81|no|\n\n*Machine-checked rules over disclosed inputs. The authored falsification triggers elsewhere in this report are analyst judgment and are NOT evaluated here. The stance is a portfolio-management signal and does not modify the published research rating.*\n\n## Reasons the Thesis Could Fail (Falsifiable)\n\nPre-registered signals that would break the thesis — each polices a specific scenario boundary and is checked at every earnings update:\n\n- **Data Center revenue YoY growth** < **0.2** (*2 consecutive prints*). *(rationale withheld pending re-authoring — frozen figure or verdict)*\n- **Data Center gross margin** < **0.7** (*2 consecutive prints*). *(rationale withheld pending re-authoring — frozen figure or verdict)*\n- **Share of total revenue from customers each >10% of revenue (10-K/10-Q concentration disclosure)** > **0.45** (*single event*). Concentration is the structural risk: the same handful of hyperscalers can pause in unison. A disclosed step-up in named-customer concentration raises the amplitude of a coordinated-cut scenario and the reflexivity of demand.\n- **Hyperscaler aggregate AI-capex guidance revision (MSFT/GOOGL/AMZN/META combined, next-FY)** < **0.0** (*single event*). NVDA Data-Center revenue tracks aggregate hyperscaler AI capex near 1:1. A coordinated downward revision to combined next-FY capex guidance is the earliest external tell that the Digestion or AI-Capex-Bust state is being priced by the buyers themselves.\n- **Inventory / purchase commitments build vs sequential DC revenue** > **1.5** (*2 consecutive prints*). Backlog and multi-quarter supply commitments can mask whether sell-through reflects deployed utilisation or anticipatory buildout. Inventory plus commitments growing materially faster than DC revenue for two prints flags demand pulled forward — the precursor to an air-pocket.\n\n## Fact / Inference / Speculation\n- **FACT:** Spot $218; 52-week range $164–$236; engine rating SELL; house target $207 (-5%). *(source: Alpha Vantage 2026-09-10, 11 September 2026)*\n- **INFERENCE:** Triangulated FV $212 (-3% vs spot · triangulated FV); the rating tracks the Monte-Carlo + scenario-PWEV core; the cash-flow anchor sits above the multiple-discipline core.\n- **SPECULATION:** At current prices the embedded bet is that Revenue Growth keeps surprising favourably — an operating call the next two prints will test.\n\n07Portfolio & Options\n\n## Conviction Score\n\n*Research Conviction measures the strength and quality of the research setup — input coverage, financial quality, valuation support, process agreement. It is NOT the probability that the recommendation succeeds; the forecast track record section is the evidence on that.*\n\n**78.1/100** (confidence band 68.5–87.6), **99th percentile** of 893 covered names (as of 2026-09-10). Weighted composite under config `ros-1.20.0` — every component and its inputs below.\n\n|Component|Score (0–100)|Weight|Inputs|\n|--|--|--|--|\n|business quality|95|15%|extended.fcf_quality.fcf_margin_pct, extended.balance_sheet.net_debt_to_ebitda, extended.accounting_quality.cash_conversion_pct|\n|financial strength|92|10%|extended.balance_sheet.net_debt_to_ebitda, extended.balance_sheet.interest_coverage|\n|valuation|45|15%|upside_pct|\n|growth|100|10%|reconciliation.ttm_revenue_billions, reconciliation.fy_guide_revenue_billions|\n|earnings visibility|100|10%|extended.forecast_accuracy.eps_surprise.beat_rate_pct|\n|moat|100|10%|enrichment.moat.rating|\n|technical trend *(heuristic — no validation record; weight change reserved for AM-060)*|82|10%|technicals.rsi, technicals.sma_50, technicals.sma_200|\n|macro tailwinds|50|10%|industry_context.house|\n|risk profile|47|10%|monte_carlo.prob_above_current, monte_carlo.p10, monte_carlo.p90, monte_carlo.median|\n\n*Score history: 77.8 → 78.1 → 77.4 → 77.0 → 77.0 → 77.1 → 77.4 → 77.6.*\n\n## Probability-Weighted Return Profile\n\n*Horizon: **1 year** — at this horizon CAGR equals total return by definition. Expected values are the probability-weighted sums over the full scenario set below.*\n\n|Scenario|Probability|Target|Total return|Contribution|\n|--|--|--|--|--|\n|Structural (AI Winter)|22%|$69.90|-68.0%|-15.0pp|\n|Hyperscaler Capex Cut|20%|$116|-47.0%|-9.4pp|\n|Base|38%|$259|+18.4%|+7.0pp|\n|ME Bull|13%|$304|+39.3%|+5.1pp|\n|Supercycle Extended|7%|$365|+67.1%|+4.7pp|\n|Aggregate|Value|\n|--|--|\n|Expected return (gross, 1y)|-7.6%|\n|Expected return net of SBC dilution|-8.9%|\n|Outcome dispersion (σ, from MC p10–p90)|58.7%|\n|Expected Sharpe (rf 4%)|-0.20|\n|Downside expectation (prob-weighted loss branches)|-24.4%|\n\n*The gross expected return is the probability-weighted scenario return (it reconciles to the gross PWEV); the diluted figure applies the SBC share-count charge and matches the published PWEV-based target.*\n\n## Expected Alpha\n\n*Expected return minus the return this name is REQUIRED to deliver for its risk (1-year horizon). Constants are pre-registered (preregistered-static (amendment #2, 2026-07-29); not fitted to MCH outcomes).*\n\n|Component|Value|\n|--|--|\n|Expected return (gross, 1y)|-7.6%|\n|Risk-free rate|4.12% (1y proxy (3m/2y midpoint; AV lacks a 1y tenor), as of 2026-09-03)|\n|Beta (shrunk, 1y vs SPY)|1.61 (as of 2026-09-10)|\n|Equity risk premium|4.5%|\n|**Required return**|**11.4%**|\n|**Expected alpha**|**-19.0%**|\n|Alpha per unit risk (EA/σ)|-0.32|\n\n*A negative expected alpha does not change the rating — it says the expected return does not clear the risk-adjusted hurdle at today's price. Rating mechanics are unchanged by this section.*\n\n## Probability Cross-Checks\n\n***Not authoritative.** The scenario probabilities in this report are AUTHORED — a judgement about how the world might go, not a measurement. Nothing below modifies them, the target, the rating or any position size. These checks ask only whether anything outside our own model agrees with us; where it does not, that is information for the reader, not a correction we have quietly applied.*\n\n|Cross-check|Ours|Comparator|Reading|\n|--|--|--|--|\n|Scenario spread vs options market|45.2% (1σ)|26.6% implied|broadly consistent with the market's implied uncertainty|\n|Mass above spot: scenarios vs our own MC|58.0%|45.4%|the two expressions of our own view agree|\n|Realised scenario frequency|37 dated anchors|—|37 dated anchors available; realised-vs-prior comparison is now meaningful.|\n\n*Authored set: 5 scenarios, probabilities summing to 1.0, mean target $201.88.*\n\n## Factor Exposures\n\n*Cross-sectional percentiles over 893 covered names (style scores sector-demeaned; thematic = return-beta to the theme's proxy ETF). 50 = estate median.*\n\n|Style|Percentile| |Theme|Percentile|\n|--|--|--|--|--|\n|Growth|99| |AI|91|\n|Value|72| |Cloud|88|\n|Quality|94| |Semis|92|\n|Momentum|14| |Consumer|66|\n|Low-Vol|97| |Rates|37|\n| | | |USD|36|\n| | | |Energy|12|\n\n## Portfolio Interaction (Focus Book)\n\n*This name is in the top-conviction focus book. Equal-weight book vol **12.0%**; diversification benefit **67.5%** vs the gross-weighted average single-name vol — combining correlation, the short leg hedging the long leg, and net exposure below 1.0; not diversification alone.*\n\n|Interaction|Value|\n|--|--|\n|Contribution to book risk (component)|-0.47pp|\n|Correlation vs SPY|+0.67|\n|Correlation vs QQQ|+0.74|\n|Correlation vs XLK|+0.78|\n|Correlation vs IWM|+0.41|\n|Correlation vs VIXY|-0.52 (VIXY proxies VIX — roll decay)|\n|Correlation vs GLD|+0.10|\n|Correlation vs UUP|-0.01|\n\n## Options Intelligence\n\n**Preferred structure: Put Debit Spread.** The selector reads the equity view (direction) and the volatility surface — nothing here re-prices the chain.\n\n- bearish with cheap options — buy defined-risk downside\n- Direction **bearish** from the overlay conviction/rating (read-only input).\n- IV/RV at the **16th percentile** of the cross-section → **low** vol bucket. **This is the measure that selects the structure above**: it ranks how rich this name's implied vol is against its own realised vol, relative to other names.\n- Reported alongside and **not used to select**: this name's own ATM IV sits at the **50th percentile of its own month-end history** (decile 6). The two measures **disagree** here — vol is high for this name by its own history while its options are not unusually rich against its realised vol. Where they diverge, the cross-sectional measure is the one acting.\n- IV term structure is in **contango** (longer-dated richer, slope +7.8pp) — favour longer-dated ownership (LEAPS) or calendars that are long the cheaper front.\n- No live-chain **Put Debit Spread** was priced for this name — shown as the indicated strategy; size against a freshly pulled chain.\n\n**IV term structure (contango, slope +7.8pp):** 29-DTE 34% · 99-DTE 39% · 372-DTE 42%\n\n*No live-chain **Put Debit Spread** was priced for this name — shown as the indicated approach; size against a fresh chain.*\n\n*Alternatives: Protective Put. IV rank shown via the name's own monthly IV history (advisory); structure selected on the cross-sectional IV/RV percentile. Model output for research and education only — not individualised investment advice. Position-sizing and stance figures are mechanical outputs of the disclosed rules and inputs; they do not consider any person's objectives, financial situation, or tax status.*\n\n## Position Sizing Framework\n\n*research rating is SELL-tier — the model carries no long position.*\n\n|Parameter|Value|\n|--|--|\n|Initial position|0.00% NAV|\n|Maximum position|0.00% NAV|\n|Risk budget|0.00% NAV|\n|Annualized outcome σ (MC)|58.7%|\n|Indicative holding period|12–36 months|\n|Liquidity|high, ~$28,058M ADV (adv usd 21 (split-adjusted 21d average, AM-046))|\n|Rebalancing trigger|position drifts ±25% from target weight, or the decision-rules stance changes|\n\n*Model output for research and education only — not individualised investment advice. Position-sizing and stance figures are mechanical outputs of the disclosed rules and inputs; they do not consider any person's objectives, financial situation, or tax status.*\n\n## Options Overlay\n\n*A defined-risk way to express the **SELL** equity view. Chain as of **2026-09-10** — end-of-day marks — indicative, not executable quotes.*\n\n**Market signals** — ATM IV **33.7%** (subdued regime) · expected move ±7.5% (2026-10-09) · put/call OI 0.89 · ATM Δ 0.50 / Θ -0.15 / ν 0.25. Direction: **NEUTRAL** (implied return -3.0% to triangulated fair value $211.8).\n\n**Covered Call (if held)** (Income / neutral) — Short 235 C · 2026-10-16 · premium $3.55 · yield 1.6% · *priced from the listed chain (EOD marks)*\n\n> Converts a near-fair holding into income by agreeing to sell at a higher strike — worth weighing when upside looks limited near fair value and being called away is acceptable. Illustrative — no outcome is implied or guaranteed.\n\n**Put Spread (income)** (Income / would-own) — Short 200 P / Long 185 P · 2026-10-23 · net $2.03 · net entry $197.97 · yield 1.0% · RoR 16.0% · max loss $12.96 · *priced from the listed chain (EOD marks)*\n\n> Gets paid to wait for a lower entry, with the tail capped: the sold put collects premium while the cheaper long wing below it caps the maximum loss at the spread width — a defined-risk alternative to a naked cash-secured put.\n\n**Protective Collar (if held)** (Hedge) — Long 195 P / Short 240 C · 2027-03-19 · net $5.72 · floor -11.0% · cap +10.0% · *priced from the listed chain (EOD marks)*\n\n> For a holder who wants to stay invested but cap risk: the sold call funds most of the protective put, fencing the position into a band — a way to ride out a de-rating without selling.\n> Indicative options structures — a defined-risk expression of the equity view, model-and-market illustrated from the last-close chain. NOT personalised advice or an executable quote; premiums, IV and greeks move intraday. Options carry the risk of total loss of premium. Not a registered financial adviser.\n08Model Transparency\n\n## Rating Bridge\n\n**Rating = SELL** because:\n\n- Probability-weighted scenario value implies **-9% vs spot**\n- Monte Carlo median implies **-7% vs spot**\n- DCF fair value implies **-3% vs spot** — but this is **terminal-value sensitive** (exit-multiple $212 vs Gordon $135, 36% apart), so it carries less weight\n- Bear case (Structural (AI Winter)) downside is **-68% vs spot**\n- Net: the valuation anchor itself sits **3.0% below spot**, so there is no reward leg to weigh against the bear case and the reward-to-risk ratio is withheld rather than computed off a negative upside. The rating warrants a Sell.\n\n## Model Appendix\n\n### DCF — line items\n|Year|Revenue|Op income|− Capex|+ D&A|FCF|PV(FCF)|\n|--|--|--|--|--|--|--|\n|FY+1|$355B|$231B|$7B|$6B|$200B|$180B|\n|FY+2|$461B|$291B|$9B|$7B|$251B|$204B|\n|FY+3|$554B|$332B|$10B|$7B|$286B|$209B|\n|FY+4|$637B|$363B|$12B|$8B|$312B|$206B|\n|FY+5|$688B|$371B|$14B|$10B|$319B|$189B|\n|**Terminal**|—|—|—|—|$319B × 22.0x|$4164B|\n\nFCF is bridged: **NOPAT + D&A − Capex − ΔNWC** (capex intensity **2%** of revenue, weighted from the segments) — not a single conversion fudge.\n\nWACC **11.0%** · Σ PV(FCF) **$988B** + PV(terminal) **$4164B** = EV **$5151B**; + net cash **$35.0B** → equity **$5186B** ÷ diluted shares **$24.46B** = **$212/share** (exit-multiple terminal).\n\n- **Gordon terminal** at 2.5% → **$135/share** — a genuinely non-multiple, cash-based cross-check; the exit-multiple and Gordon values bracket the terminal-value risk.\n- **Incremental ROIC on the forecast capex ≈ 236%** vs WACC 11.0% → above WACC — the build is value-creative.\n\n### Peer set\n|Peer|EV/Rev|Fwd P/E|Growth|Op margin|\n|--|--|--|--|--|\n|AMD|6.0x|35.0x|18%|22%|\n|AVGO|17.0x|28.0x|25%|45%|\n|INTC|2.0x|22.0x|4%|8%|\n|ARM|30.0x|60.0x|25%|25%|\n|**Median**|**11.5x**|**31.5x**|—|—|\n\nImplied prices at the peer medians: peer-median fwd P/E → **$276**; EV/Rev → **$121**.\n\n### Weighted fair-value math\n|Anchor|Value|Weight|Contribution|\n|--|--|--|--|\n|DCF|$212|35%|$74.20|\n|Scenario PWEV|$199|25%|$49.72|\n|Monte Carlo median|$203|15%|$30.49|\n|Sum-of-parts|$198|15%|$29.76|\n|Peer P/E|$276|10%|$27.63|\n|**Triangulated**|—|100%|**$212**|\n\n## Assumption Register\n|Assumption|Value|Used in|Source|\n|--|--|--|--|\n|WACC|11.0%|DCF discount rate|estimate (CAPM)|\n|Terminal multiple|22×|DCF exit value|estimate (peer-anchored)|\n|Terminal growth|2.5%|DCF Gordon terminal|estimate|\n|SBC dilution|1.5%/yr|PWEV, MC, DCF (charged once)|estimate (from SBC/rev)|\n|EPS basis|consensus forward EPS (broker-adjusted, non-GAAP)|all forward P/E & scenario multiples|definition|\n\n*Sensitivity-ranked drivers (widest fair-value swing first):* **Terminal × ±15%** (51.0); **Revenue CAGR ±3pp** (48.0); **Op margin ±3pp** (23.0); **WACC ±1pp** (18.0); **Capex intensity ±15%** (3.0).\n\n## Inputs, Sources & Confidence\n\nEvery load-bearing input, labelled by type and confidence. *(reported fact · company guidance · consensus estimate · market data · house estimate · inference.)*\n\n|Input|Value|Type|Source|Confidence|Used in|\n|--|--|--|--|--|--|\n|Revenue TTM|$253.5B|reported fact|10-K/10-Q via AV|High|Forecast base, EV/Rev|\n|FY+1 guided revenue|$337.2B|company guidance|Company guidance|Medium|Forecast, SoP|\n|Consensus FY EPS|$9.0516|consensus estimate|Sell-side consensus via AV|Medium|Variant perception|\n|Diluted shares|24.463B|reported fact|10-K via AV|High|Market cap, per-share|\n|Net debt / cash|$-51.144B|reported fact|Balance sheet via AV|High|EV, DCF equity bridge|\n|WACC|11.0%|house estimate|CAPM (beta/rf)|Medium|DCF discount rate|\n|Terminal multiple|22×|house estimate|Peer/historical range|Medium|DCF exit value|\n|Terminal growth|2.5%|house estimate|Long-run GDP+|Medium|DCF Gordon terminal|\n|SBC dilution|1.5%/yr|house estimate|From SBC/revenue|Medium|PWEV, MC, DCF (charged once)|\n|AI revenue|see AI decomposition|inference|Derived from company comments|Low/Medium|Scenario analysis|\n\n## Research Provenance\n|Field|Value|\n|--|--|\n|Quantitative engine|`mch_stock_engine` v2.0|\n|Research OS config|`ros-1.20.0`|\n|Analysis as-of|2026-09-11 (prices 2026-09-10)|\n|Narrative authorship|claude-fable-5 · Claude Code, supervised, drafted 2026-08-16|\n|Human review|Marinus 2026-08-16|\n|Evidence|8/8 load-bearing inputs sourced; 14/14 mandated claims cited|\n|QA|scanned post-emit by the document-QA layer; the publication label (Draft / Research / Decision-level) is stamped on the published page, not authored here|\n\n## Load-Bearing Assumptions\n\nDCF: WACC 11.0%, terminal multiple 22×, FY+5 revenue $688B. Triangulation leans 35% on DCF, 25% on PWEV, 15% on the Monte Carlo median, 15% on sum-of-parts, 10% on peer-implied value.\n\n09Appendix & Audit Trail\nAppendix & audit trail — source log, data provenance, disclosures\n\n## Source Log\n|Source|Type|Date|Used for|Reference|\n|--|--|--|--|--|\n|Alpha Vantage — GLOBAL_QUOTE / OVERVIEW|market data|2026-09-10|Price, market cap, EV, 52-week range, forward P/E|Alpha Vantage 2026-09-10|\n|Company income statement (10-K / 10-Q) via Alpha Vantage|reported fact|2026-09-10|Revenue, gross/operating margin, EBIT, interest expense|INCOME_STATEMENT / latest annual|\n|Company balance sheet (10-K / 10-Q) via Alpha Vantage|reported fact|2026-09-10|Cash, debt, net debt, leases, equity, coverage|BALANCE_SHEET / latest annual|\n|Company cash-flow statement (10-K / 10-Q) via Alpha Vantage|reported fact|2026-09-10|Operating cash flow, capex, FCF, buybacks, dividends, SBC|CASH_FLOW / latest annual|\n|Company earnings releases via Alpha Vantage|reported fact|2026-09-10|Reported EPS, surprise history|EARNINGS / quarterly|\n|Sell-side consensus via Alpha Vantage|consensus estimate|2026-09-10|Forward revenue/EPS consensus, analyst count|EARNINGS_ESTIMATES|\n|Earnings calendar via Alpha Vantage|market data|2026-09-10|Next earnings date, catalyst timing|EARNINGS_CALENDAR|\n|Company guidance|company guidance|2026-09-10|FY guided revenue / non-GAAP EPS basis|company guidance / earnings call|\n|MCH segment model (from filings & disclosures)|house estimate|2026-09-10|Segment revenue, margins, multiples, AI decomposition|company_context (authored, tagged)|\n|MCH qualitative analysis|inference|2026-09-10|Moat, regulatory risk, scenario macro, catalysts|company_context enrichment (authored)|\n|MCH investment thesis & falsification triggers|house estimate|2026-09-10|Thesis, anti-thesis, thesis-break signals|authored §5.3|\n\n*Citation coverage: 14/14 mandated claims sourced. Filing URLs are not available via the market-data provider; company statements are cited as 10-K/10-Q via Alpha Vantage.*\n\n## Data Sources\n- **Prices, fundamentals, options chain, earnings** — Alpha Vantage.\n- **Company filings (10-K / 10-Q)** — SEC filings via EDGAR.\n\n## Disclosures & Limitations\n\nThis report is for informational and research purposes only. It is **not personalised investment advice** and does not consider any investor's objectives, financial situation, risk tolerance, tax position, or liquidity needs.\n\n- This report is produced by the MCH Advisory quantitative research engine — valuation, scenarios, Monte Carlo and the decision layer are generated systematically from the disclosed inputs and the archetype/industry driver sets, and reviewed rather than written name-by-name. Every figure reconciles to the appendix and every score exposes its inputs.\n- No suitability assessment has been performed for any individual.\n- Market data may be delayed or inaccurate; figures are as of the analysis date.\n- Model outputs (fair values, targets, scenario probabilities) are estimates and may be wrong.\n- Forecasts are uncertain; past performance is not indicative of future returns.\n- The author or publisher may hold positions in securities mentioned.\n- Users should verify information against primary sources (company filings) before acting.\n- Investing involves risk of loss; there is no guarantee any target price is achieved.\n- Ratings follow a defined research methodology (12-month expected-return thresholds), not individual circumstances.",
                 "title": "NVIDIA Corporation (NVDA) — MCH Advisory Research",
                 "url": "https://www.mchadvisoryservices.com/research/nvda-research-2026.html"
               },
               {
-                "date": "2026-09-10",
-                "id": 37,
-                "last_updated": "2026-06-23",
-                "snippet": "After last week's 15% share price gain to US$219, the stock trades at a forward P/E ratio of 21x. Average forward P/E is 28x in the Semiconductor industry in ...",
-                "source": "web",
-                "title": "NVIDIA (Nasdaq:NVDA) - Stock Analysis - Simply Wall St",
-                "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 38,
-                "last_updated": "2026-09-11",
-                "snippet": "The estimated Price-to-Earnings (P/E) Ratio for NVIDIA is 29.12, calculated. P/E values greater than 70 or lower than 1 are logarithmically normalized to ...",
-                "source": "web",
-                "title": "NVIDIA: current P/E Ratio",
-                "url": "https://worldperatio.com/stock/nvda/"
-              },
-              {
-                "date": "2026-08-17",
-                "id": 39,
-                "last_updated": "2026-08-24",
-                "snippet": "FY2027 consensus revenue sits at $391.3 billion with EPS estimates spanning $8.79 to $9.34, the former representing 92% growth over FY2026.\nFY2028 EPS is projected near $12.12, implying a further 38% advance.",
-                "source": "web",
-                "title": "Nvidia Stock Price Forecast: NVDA Holds $225 With $91.9B Consensus 9 Days From Earnings",
-                "url": "https://www.tradingnews.com/news/nvidia-trades-flat-at-225-usd-on-75m-shares-as-ad-jumps-6-percent-and-avgo-drops"
-              },
-              {
-                "date": "2026-09-06",
-                "id": 40,
-                "last_updated": "2026-09-07",
-                "snippet": "|5‑Year P/E Range|25.4257.6|",
-                "source": "web",
-                "title": "NVIDIA (NVDA) Research Report — Score, Intrinsic Value, Peer ...",
-                "url": "https://www.stockrover.com/html_reports/NVDA/"
-              },
-              {
-                "date": "2026-08-20",
-                "id": 41,
-                "last_updated": "2026-09-03",
-                "snippet": "Looking ahead, consensus estimates project full-year FY2027 EPS to reach $8.97 (which represents a substantial 87% growth year-over-year).\nFurther out, consensus forecasts an annualized EPS growth rate of approximately 15.4% over the next 10 years.",
-                "source": "web",
-                "title": "Nvidia FY2027 Q2 Earnings Preview: Confirming an FCF ...",
-                "url": "https://www.moomoo.com/community/feed/nvidia-nvda-us-117128014397446"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 42,
-                "last_updated": "2026-09-05",
-                "snippet": "2025\n...\nPeriodo\nValor\n...\n2023\n‪20,68‬",
-                "source": "web",
-                "title": "Price to earnings forward de NVIDIA Corporation – NASDAQ:NVDA",
-                "url": "https://es.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/price-earnings-fwd/"
-              },
-              {
-                "date": "2026-08-27",
-                "id": 43,
-                "last_updated": "2026-08-28",
-                "snippet": "Analysts project NVDA's FY2027 EPS at $9.05, representing 89.76% year-over-year growth.\n...\nThe consensus forecast for FY2028 is $13.13, implying 45.03% growth, with the stock trading at 16.23 times earnings.\nThe FY2029 forecast stands at $16.61, bringing the multiple down to 12.83 times earnings.",
-                "source": "web",
-                "title": "Nvidia completely refutes bearish arguments—yet the stock ...",
-                "url": "https://www.moomoo.com/community/feed/nvidia-nvda-us-117167501672454"
-              },
-              {
-                "date": "2026-08-27",
-                "id": 44,
-                "last_updated": "2026-09-12",
-                "snippet": "Nvidia gave its first-ever year-ahead forecast—a 70% growth bombshell meant to silence AI bubble critics and ‘circular financing’ doomsayers",
-                "source": "web",
-                "title": "Nvidia gave its first-ever year-ahead forecast—a 70% growth ...",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-gave-first-ever-ahead-003936289.html"
-              },
-              {
-                "date": "2026-08-23",
-                "id": 45,
-                "last_updated": "2026-08-26",
-                "snippet": "However, the projected annual non-GAAP EPS is 33.95, marking a significant increase of 375.54% from the prior forecast.",
-                "source": "web",
-                "title": "BMO Capital Initiates Coverage of NVIDIA (WBAG:NVDA) with ...",
-                "url": "https://fintel.io/news/bmo-capital-initiates-coverage-of-nvidia-wbag-nvda-with-outperform-recommendation-911"
-              }
-            ],
-            "type": "search_results"
-          },
-          {
-            "contents": [
-              {
-                "snippet": "Dividend Adjusted Return\n\nSep 4, 2025 - Sep 4, 2026\nNVDA 230.36 (+35.2%)\n\nTechnology 121.27 (+40.6%)\n\nS&P 500 7718.60 (+21.0%)\n\n|Fair Value|$232.26|\n|--|--|\n|Margin of Safety|1%|\n|Value Score61Value Score: Our value score looks at EV/EBITDA, P/E, P/S, P/TB (Price/Tangible Book) and EPS Predictability. P/S and P/TB are compared within a sector. Other metrics are compared across all stocks|Quality Score100Quality Score: Our quality score compares profitability and balance sheet metrics to find high quality companies using ROIC, Net Margin, Gross Margin, Interest Coverage, and Debt / Equity metrics.|\n|--|--|\n|Growth Score100Growth Score: Our growth score looks at the 5 year history and the forward estimates for EBITDA, Sales, and EPS growth, ranking the best companies across all stocks.|Sentiment Score99Sentiment Score: Our sentiment score finds stocks in favor by analyzing Short Interest, returns in key periods over the last year, Price vs. 52-wk High, Days Since 52-wk High and MACD signals.|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Value Score|61|50|\n|Price / Earnings|29.2|32.4|\n|Price / Sales|18.6|13.8|\n|Price / Free Cash Flow|44.3|46.8|\n|Price / Book|24.3|12.2|\n|Price / Tangible Book|27.2|236.9|\n|EV / EBITDA|23.7|22.3|\n|EPS Predict. Pctl.|80|57|\n|Piotroski F Score|6|7|\n|5‑Year P/E Range|25.4257.6|\n|--|--|\n|5‑Year P/B Range|11.777.7|\n|5‑Year P/S Range|9.655.4|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Growth Score|100|60|\n|Sales Growth| | |\n|Sales Growth Next Year|63.3%|52.8%|\n|Sales 1‑Year Chg (%)|83.4%|47.5%|\n|Sales 3‑Year Avg (%)|109.9%|69.8%|\n|Sales 5‑Year Avg (%)|69.0%|41.4%|\n|EPS Growth| | |\n|Next Yr. Growth Est.|65.7%|72.6%|\n|EPS 1‑Year Chg (%)|125.4%|148.8%|\n|EPS 3‑Year Avg (%)|167.1%|59.6%|\n|EPS 5‑Year Avg (%)|95.0%|29.2%|\n|NVDA|NVIDIA|$5,562,502|29.2|0.4%|8.7%|34.4%|1%|61|100|100|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|$4,669,699|36.6|0.3%|3.5%|33.9%|-7%|67|93|78|\n|--|--|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|$2,007,387|31.9|0.8%|2.8%|84.3%|23%|65|100|99|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|$1,702,714|45.7|0.7%|-14.4%|17.8%|9%|57|100|96|\n|--|--|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|$1,148,129|23.0|0.1%|13.9%|719.8%|17%|57|100|100|\n|--|--|--|--|--|--|--|--|--|--|--|\n|SKHY|SK hynix|$853,606|10.6|-|14.7%|-|0%|74|-|100|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AMD|Advanced Micro Devices|$779,621|122.0|-|-7.9%|195.2%|-9%|51|99|94|\n|--|--|--|--|--|--|--|--|--|--|--|\n|INTC|Intel|$506,408|-|-|-5.0%|289.3%|-14%|52|65|42|\n|--|--|--|--|--|--|--|--|--|--|--|\n|ARM|ARM Holdings|$269,231|256.4|-|-10.1%|86.1%|-16%|51|39|80|\n|--|--|--|--|--|--|--|--|--|--|--|\n|TXN|Texas Instruments|$236,019|39.2|2.2%|-8.9%|41.6%|25%|65|88|95|\n|--|--|--|--|--|--|--|--|--|--|--|\n|MRVL|Marvell Technology|$200,905|74.1|0.1%|2.3%|249.5%|-15%|46|87|93|\n|--|--|--|--|--|--|--|--|--|--|--|\n|QCOM|Qualcomm|$180,224|19.3|2.2%|4.3%|7.9%|17%|80|70|96|\n|--|--|--|--|--|--|--|--|--|--|--|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Quality Score|100|60|\n|Gross Margin|74.7%|63.1%|\n|Operating Margin|65.2%|46.9%|\n|Net Margin|63.7%|44.5%|\n|Return on Assets|97.3%|43.6%|\n|Return on Equity|84.2%|63.8%|\n|ROIC|72.3%|43.0%|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Sentiment Score|99|54|\n|5‑Day Return|5.9%|4.6%|\n|1‑Month Return|8.7%|3.2%|\n|YTD Return|23.7%|34.8%|\n|1‑Year Return|34.4%|52.4%|\n|3‑Year Return|375.8%|279.9%|\n|5‑Year Return|911.8%|383.9%|\n|Beta 1‑Year|1.92|1.89|\n|NVDA|Industry|\n|--|--|\n|Forward Dividend Yield|0.4%|\n|Payout Ratio|3.5%|\n|TTM Yield|0.1%|\n|Fwd. Div. Per Share|$1.00|\n|Div. 1Y Chg (%)|2400.0%|\n|Div. 3Y Avg (%)|296.9%|\n|Div. 5Y Avg (%)|128.7%|\n|Cons. Growth Years|3|\n|Div. Coverage Ratio|7.9|\n|Current Ratio|4.6|\n|--|--|\n|Quick Ratio|3.8|\n|Price|$230.36|\n|Net Cash Per Share|$0.98|\n|Equity Per Share|$9.48|\n|Debt / Equity|0.2|\n|Solvency Ratio|245%|\n|Interest Coverage|496.1|\n|Short % of Float|1.2%|\n|Altman Z‑Score|41.1|\n|Current Quarter EPS|\n|--|\n|# Up Last 30 days|\n|# Down Last 30 days|\n|Mean Estimate|\n|% Change (30 Days)|\n|Next Quarter EPS|\n|--|\n|# Up Last 30 days|\n|# Down Last 30 days|\n|Mean Estimate|\n|% Change (30 Days)|\n|Cur Qtr|Next Qtr|Cur Year|Next Year|\n|--|--|--|--|\n|Latest|$2.47|$2.75|$9.29|\n|30 Days Ago|$2.35|$2.66|$8.96|\n|90 Days Ago|$2.34|$2.65|$8.92|\n|% Change (90 Days)|5.6%|3.7%|4.1%|\n|Surprise Type|Amount|Percent|\n|--|--|--|\n|Positive Quarters (> 2%)|12|100.0%|\n|Negative Quarters (< 2%)|0|-|\n|In-Line Quarters (within 2%)|0|-|\n|Surprise Type|Announce Date|Period End Date|ActualEPS|Est.EPS|Surprise (%)|\n|--|--|--|--|--|--|\n|Positive|08/26/26|07/31/26|$2.22|$2.09|6.2%|\n|Positive|05/20/26|04/30/26|$1.87|$1.77|5.8%|\n|Positive|02/25/26|01/31/26|$1.62|$1.54|5.2%|\n|Positive|11/19/25|10/31/25|$1.30|$1.26|3.2%|\n|Positive|08/27/25|07/31/25|$1.05|$1.01|4.0%|\n|Positive|05/28/25|-|$0.81|$0.75|8.0%|\n|NVDA|Industry|S&P 500|\n|--|--|--|\n|Best Monthly Return (5Y)|33.7%|26.9%|\n|Worst Monthly Return (5Y)|-30.6%|-19.5%|\n|Beta 1‑Year|1.92|1.89|\n|Volatility 1‑Year|0.37|0.32|\n|Volatility 1Y Pctl.|38|-|\n|Max Drawdown 1‑Year|-20.2%|-24.8%|\n|Max Drawdown 3‑Year|-36.9%|-38.8%|\n|Max Drawdown 5‑Year|-66.3%|-52.9%|\n|MU|Micron Technology|100|345.7%|1368.5%|85.9%|141.5%|79.7%|26.6%|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|99|105.9%|127.8%|63.3%|83.4%|109.9%|69.0%|\n|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|92|36.1%|77.4%|34.2%|30.6%|25.8%|25.0%|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|91|47.9%|85.4%|63.5%|25.9%|28.6%|23.2%|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|69|16.4%|28.7%|10.0%|14.2%|6.7%|6.1%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|90|23.0|6.6|0.4|12.8|11.4|5.6-|\n|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|76|31.9|19.6|1.0|15.9|11.0|12.745.2|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|60|29.2|15.0|0.3|18.6|24.3|25.4257.6|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|40|45.7|18.3|1.3|19.6|17.1|19.2201.7|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|12|36.6|33.6|3.3|10.1|43.5|20.543.4|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|100|48.7%|33.2%|27.6%|115.1%197.0%|26.1%35.8%|\n|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|100|74.7%|65.2%|63.7%|19.5%95.7%|10.2%97.4%|\n|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|97|64.2%|56.1%|49.9%|23.9%34.5%|16.2%28.3%|\n|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|93|68.3%|44.1%|38.9%|7.8%62.8%|4.1%19.3%|\n|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|88|72.6%|65.7%|55.9%|-16.0%50.1%|-10.4%55.8%|\n|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|90|0.2|227.0|2.3|0.3%|105%|0.6%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|89|0.1|257.8|3.0|1.2%|235%|2.7%|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|85|0.2|496.1|3.8|7.5%|245%|1.2%|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|75|0.8|-|0.9|5.3%|64%|0.8%|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|60|0.7|10.7|2.0|70.4%|47%|1.2%|\n|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|89|0.7%|0.7%|$357.89|$2.60|10+|40.1%|\n|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|77|0.4%|0.1%|$230.36|$1.00|3|3.5%|\n|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|68|0.8%|0.8%|$428.91|$3.50|5|25.7%|\n|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|56|0.3%|0.3%|$319.97|$1.08|10+|12.0%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|25|0.1%|0.1%|$1,016.59|$0.53|2|1.1%|\n|--|--|--|--|--|--|--|--|--|\n|MU|Micron Technology|91|13.9%|2.1%|153.8%|256.4%|719.8%|3.34|0.79|81.0%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|NVDA|NVIDIA|82|8.7%|5.4%|26.0%|23.7%|34.4%|1.92|0.37|97.4%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AAPL|Apple|79|3.5%|2.9%|22.1%|18.0%|33.9%|0.69|0.25|92.9%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|TSM|Taiwan Semiconductor|74|2.8%|-3.4%|20.6%|41.9%|84.3%|2.17|0.40|89.5%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|AVGO|Broadcom|39|-14.4%|-14.4%|13.1%|3.8%|17.8%|2.13|0.47|72.3%|\n|--|--|--|--|--|--|--|--|--|--|--|\n|Price / Earnings|29.2|55.5|62.2|253.2|44.5|\n|--|--|--|--|--|--|\n|Price / Cash Flow|41.8|55.8|65.3|179.0|45.7|\n|--|--|--|--|--|--|\n|Price / Book|24.3|49.8|53.1|48.7|14.2|\n|--|--|--|--|--|--|\n|Price / Tangible Book|27.2|53.9|59.7|64.6|19.5|\n|--|--|--|--|--|--|\n|Price / Sales|18.6|28.6|33.3|46.8|11.6|\n|--|--|--|--|--|--|\n|EV / EBITDA|23.7|40.1|41.2|92.5|35.4|\n|--|--|--|--|--|--|\n|Forward Dividend Yield|0.4%|0.0%|0.0%|0.0%|0.1%|\n|--|--|--|--|--|--|\n|Shareholder Yield|1.4%|1.0%|0.9%|0.7%|0.1%|\n|--|--|--|--|--|--|\n|Gross Margin|74.7%|69.9%|76.0%|64.6%|60.5%|\n|--|--|--|--|--|--|\n|Net Margin|63.7%|52.4%|55.0%|31.6%|26.0%|\n|--|--|--|--|--|--|\n|Return on Assets|97.3%|82.2%|85.1%|23.8%|18.8%|\n|--|--|--|--|--|--|\n|Return on Equity|84.2%|86.5%|91.2%|37.6%|32.5%|\n|--|--|--|--|--|--|\n|ROIC|72.3%|78.4%|78.1%|27.5%|22.5%|\n|--|--|--|--|--|--|\n\nAdditional data provided by Zacks, Intrinio, Quandl, Yodlee, IEX Cloud\n\nNVDA has underperformed its sector by -5.4% in the past year.\n\nThe Technology sector has outperformed the market by 19.6% in the past year.",
-                "title": "NVIDIA (NVDA) Research Report — Score, Intrinsic Value, Peer ...",
-                "url": "https://www.stockrover.com/html_reports/NVDA/"
-              },
-              {
-                "snippet": "# NVIDIA Future Growth\n\n## Future criteria checks 6/6\n\nNVIDIA is forecast to grow earnings and revenue by 21.8% and 24.6% per annum respectively. EPS is expected to grow by 22.9% per annum. Return on equity is forecast to be 73.3% in 3 years.\n\n## Key information\n\n21.8%\n\nEarnings growth rate\n\n22.87%\n\nEPS growth rate\n\n|Semiconductor earnings growth|27.4%|\n|--|--|\n|Revenue growth rate|24.6%|\n|Future return on equity|73.29%|\n|Analyst coverage|Good|\n|Last updated|19 Jun 2026|\n\n## Recent future growth updates\n\n## Recent updates\n\nSeeking Alpha • Jun 17\n\n### Nvidia Won't Be This Cheap Forever\nSummary Nvidia Corporation remains a Strong Buy, with accelerating growth, expanding margins, and a valuation still at a discount to sector peers. Q1 revenue surged 85% YoY to $81.6B, driven by 92% YoY data center growth and strong AI infrastructure demand. Profitability is robust: gross margin expanded 14.2 points, EPS grew 131%, and FCFs were up 86%. NVDA's Q2 guidance implies 95% YoY revenue growth and further gross margin expansion, while risks include China market loss and U.S. energy infrastructure constraints. Read the full article on Seeking Alpha\n\nNarrative Update • Jun 16\n\n### NVDA: AI Infrastructure Demand And Export Controls Will Shape Future Stock Leadership\nAnalysts have raised their fair value estimate for Nvidia stock from $184.19 to $194.77, citing higher assumed revenue growth, stronger profit margins, and a lower future P/E multiple as they factor in continued demand for AI infrastructure and Nvidia's role across GPUs, CPUs, and networking. Analyst Commentary Wall Street coverage of Nvidia stock remains active, with a long list of recent reports adjusting price targets and framing expectations around AI infrastructure demand, product ramps, and competitive positioning.\n\nAnalysis Article • Jun 12\n\n### Software stocks just gave investors a masterclass\nSoftware stocks crashed on fears AI would make them obsolete, then they came roaring back. This edition of Market Insights aims to hand investors a repeatable playbook for separating real risk from market panic.\n\nAnalysis Article • Jun 12\n\n### Software stocks just gave investors a masterclass\nSoftware stocks crashed on fears AI would make them obsolete, then they came roaring back. This edition of Market Insights aims to hand investors a repeatable playbook for separating real risk from market panic.\n\nAnalysis Article • Jun 02\n\n### We Think Shareholders Should Be Aware Of Some Factors Beyond NVIDIA's (NASDAQ:NVDA) Profit\nEven though NVIDIA Corporation ( NASDAQ:NVDA ) posted strong earnings recently, the stock hasn't reacted in a large...\n\nNarrative Update • Jun 02\n\n### NVDA: AI Infrastructure Backlog And Capital Returns Will Extend Data Center Supercycle\nAnalysts have lifted their NVIDIA fair value estimate from $268.61 to $296.81, reflecting higher projected profitability and AI infrastructure demand, as well as ongoing price target increases across recent research that highlights the Blackwell and Rubin platforms, data center visibility through 2027, and expanded capital return plans. Analyst Commentary Recent research around NVIDIA centers on how durable its AI leadership and earnings power could be, and what risks might justify more cautious valuation frameworks.\n\nNarrative Update • May 12\n\n### NVIDIA's AI Vision Will Continue To Propel Its Market Dominance\nNvidia has delivered on its growth plan even faster than expected. While eventual competition is expected and will limit their outsized margins, Nvidia's dominance and the AI future it envisions has been well proven\n\nNew Narrative • May 07\n\n### NVIDIA: The Indispensable Backbone of the AI Revolution\nNVIDIA Corporation is not just another semiconductor company — it is the foundational infrastructure layer upon which the entire AI economy is being built. But even the best companies can be overbought.\n\nNarrative Update • May 04\n\n### NVDA: AI Backlog Visibility And Export Controls Will Shape Future Leadership\nAnalysts lifted the price target for Nvidia shares by $3 to reflect slightly higher fair value estimates, modestly lower discount rates, and updated expectations for revenue growth, profit margins, and future P/E after a wave of upbeat research that points to sustained AI demand and broadening partnerships around the company’s platform. Analyst Commentary Recent research coverage around Nvidia highlights a wide range of opinions, with many firms updating models after the latest earnings, GTC announcements, and management commentary on long term AI demand.\n\nNew Narrative • Apr 30\n\n### Sustainable Dominance: Justifying a $270 Fair Value\nCatalysts The Rubin Supercycle : The successful shipment of Vera Rubin systems in late 2026—offering up to 10x better performance per watt —ensures that competitors cannot erode market share. This keeps hardware demand \"off the charts\".\n\nNew Narrative • Apr 22\n\n### NVIDIA Is the Best Business in America. That Doesn't Mean You Should Buy It.\nNVIDIA closed fiscal 2026 with $96.6 billion in free cash flow, $54.1 billion of net cash on the balance sheet, and 71% gross margins. The crowd is looking for the right moment to sell.\n\nNarrative Update • Apr 19\n\n### NVDA: Trillion Dollar AI Backlog Will Extend Data Center Supercycle\nNarrative Update Nvidia's updated analyst price target edges higher by about $0.40 to roughly $268.61, as analysts factor in slightly stronger revenue growth expectations, modestly lower discount rates, and a still-elevated future P/E near 29x despite a small trim to projected profit margins. Analyst Commentary Recent Street research around Nvidia clusters around confidence in the AI data center story, with a wide range of firms updating models and price targets after earnings and the GTC conference.\n\nNarrative Update • Apr 19\n\n### NVIDIA – Launch of Open-Source “Ising” Quantum AI Models to Accelerate Scalable Quantum Computing\nAuthor: Qudus Adebara (Founder of Wane Investment House) NVIDIA has unveiled the world’s first open-source family of quantum AI models, NVIDIA Ising , marking a major step toward making quantum computing practical, scalable, and commercially viable. The Ising model suite is designed to address two of the most critical bottlenecks in quantum computing— processor calibration and quantum error correction —using advanced AI techniques to enhance performance, reliability, and scalability of quantum systems.\n\nNew Narrative • Apr 07\n\n### NVIDIA will see a profit margin surge of 55% in the next 5 years\n1. The Undisputed King of AI Infrastructure NVIDIA’s dominance in the AI chip market is not merely a transient trend but a structural, long-term leadership position.\n\nNarrative Update • Apr 05\n\n### NVDA: Trillion Dollar AI Backlog Will Sustain Multi-Year Infrastructure Supercycle\nAnalysts have nudged NVIDIA's fair value estimate slightly lower to $268.22 while keeping revenue growth and margin assumptions effectively unchanged. They cite a series of higher price targets and upbeat GTC takeaways as support for a still robust AI demand outlook and a modestly lower future P/E of about 28.9x.\n\nNarrative Update • Mar 22\n\n### NVDA: Trillion Dollar AI Backlog Will Support Multi-Year Infrastructure Supercycle\nThe analyst fair value estimate for Nvidia has been raised from $253.02 to $269.23. Analysts cite higher modeled revenue growth, continued AI data center demand, and expanding use cases beyond data centers as key factors supporting a lower future P/E assumption and the higher price target.\n\nNew Narrative • Mar 09\n\n### NVIDIA: Durable Infrastructure in AI Leadership, but Nigh-Perfect Precision is Required\nI am still fervently steadfast in the stance that NVDA is the undisputed anchor and future driver of the global AI shift. While it is an 'obvious' megacap investment, my personal analysis depict its transition into a full stack 'AI foundry' with a widened moat that the market presently fails to price in.\n\nNarrative Update • Mar 08\n\n### NVDA: AI Data Center Visibility And China Controls Will Shape Leadership\nOur analyst price target for Nvidia edges higher from $173.50 to $181.39 as analysts highlight the company's AI data center leadership, a reacceleration in data center revenue, and extended visibility into 2027. At the same time, we modestly adjust revenue growth and P/E assumptions alongside a slightly higher discount rate.\n\nNew Narrative • Mar 02\n\n### The NVIDIA Phenomenon\nWe've all by now seen how NVIDIA has experienced one of the most dramatic runs in modern market history over the past few years, but why is that the case? To begin with, its worth stating that NVIDIA didn’t just “get lucky”, it was uniquely positioned when generative AI took off back in 2022–2023.\n\nNew Narrative • Feb 27\n\n### NVIDIA leads the AI charge in 2026 with record revenues and a 75% rise\nNVIDIA (NVDA) – Q4 FY2026 Risk Analysis, Outlook, and Forecast I. Executive Summary NVIDIA reported exceptional Q4 FY2026 results , with record revenue and profitability , driven by unparalleled demand for AI compute infrastructure, especially in data center products.\n\nNew Narrative • Feb 24\n\n### Steam engines 2.0: The world will find a way to meet insatiable demand for GPU’s\nIn the early 1990s three engineers met in a Denny’s diner in San Jose (the same Denny’s where Jensen previously worked as a dishwasher). Video games were exploding in popularity and complexity.\n\nNarrative Update • Feb 22\n\n### NVDA: AI Backlog And China Policy Constraints Will Shape Future Leadership\nOur updated analyst price target for Nvidia edges higher to $173.50 from $172.23 as analysts point to expectations for solid upcoming quarters, a sizable AI-related backlog, and potential catalysts such as Blackwell-driven deployments, CoreWeave related demand, and the GPU Technology Conference. Analyst Commentary Recent research on Nvidia continues to center on AI data center demand, backlog visibility, and upcoming product cycles such as Blackwell.\n\nNarrative Update • Feb 08\n\n### NVDA: AI Infrastructure Demand And Partnerships Will Sustain Market Leadership\nAnalysts nudged their fair value estimate for Nvidia higher from US$326.00 to about US$334.78, as they factor in expectations for stronger profit margins, a higher future P/E and recent research that highlights Nvidia's AI leadership, data center demand and supportive partner deals such as the CoreWeave agreement. Analyst Commentary Recent Street research around Nvidia has been broadly constructive, with many bullish analysts adjusting their models after company updates, product news and partner commentary.\n\nNarrative Update • Jan 24\n\n### NVDA: AI Infrastructure Demand And China Policy Tensions Will Shape Future Leadership\nAnalysts have nudged their Nvidia fair value estimate higher to reflect slightly faster modeled revenue growth and a modestly lower future P/E assumption, with recent price target increases, new coverage initiations, and commentary around Blackwell and Rubin demand all contributing to the updated view. Analyst Commentary Recent Street research around Nvidia has been dominated by upbeat takes on AI accelerators, data center build outs, and long term demand signals for the Blackwell and Rubin product cycles.\n\nNarrative Update • Jan 10\n\n### NVDA: AI Infrastructure Order Visibility And China Constraints Will Shape Future Leadership\nAnalysts trimmed our Nvidia fair value estimate slightly to $171.51 from $175.08, even as they raised revenue growth assumptions and referenced a series of higher Street price targets tied to continued AI data center momentum, Blackwell and Rubin order visibility, and expectations that Nvidia remains a central supplier in large hyperscale and OpenAI related buildouts. Analyst Commentary The recent wave of research on Nvidia has centered on its role in AI data centers, the scale of Blackwell and Rubin demand, and how these themes filter through to earnings expectations and valuations.\n\nNarrative Update • Dec 27\n\n### NVDA: AI Infrastructure Supercycle Will Drive Multi-Year Data Center Leadership\nAnalysts nudged their fair value estimate for Nvidia modestly higher to approximately $253 per share from about $250 per share, citing a wave of post earnings price target hikes that highlight the company's entrenched AI data center leadership and strong multi year demand visibility, despite emerging competition from custom accelerators and TPUs. Analyst Commentary Bullish analysts largely interpret the recent wave of estimate and price target increases as confirmation that Nvidia remains the primary beneficiary of the ongoing AI infrastructure buildout, with multi year visibility supported by a deep order book for Blackwell and Rubin platforms and expanding hyperscaler and sovereign AI commitments. At the same time, there is growing acknowledgment that alternative accelerators, custom ASICs, and TPUs are beginning to carve out share in certain workloads, introducing a more competitive backdrop that could constrain upside to current expectations if Nvidia fails to maintain its performance and ecosystem advantages.\n\n## Earnings and Revenue Growth Forecasts\n\n**NasdaqGS:NVDA - Analysts future estimates and past financials data (USD Millions)**\n|Date|Revenue|Earnings|Free Cash Flow|Cash from Op|Avg. No. Analysts|\n|--|--|--|--|--|--|\n|1/31/2029|671,105|359,212|344,747|357,396|26|\n|1/31/2028|551,694|304,838|273,901|290,383|55|\n|1/31/2027|391,721|227,340|207,437|207,425|52|\n|4/26/2026|253,491|159,613|106,076|125,648|N/A|\n|1/25/2026|215,938|120,067|83,676|102,718|N/A|\n|10/26/2025|187,142|99,198|77,324|83,159|N/A|\n|7/27/2025|165,218|86,597|72,023|77,035|N/A|\n|4/27/2025|148,515|76,774|72,064|76,158|N/A|\n|1/26/2025|130,497|72,880|60,853|64,089|N/A|\n|10/27/2024|113,269|63,074|56,546|58,959|N/A|\n|7/28/2024|96,307|53,008|46,786|48,664|N/A|\n|4/28/2024|79,774|42,598|39,334|40,524|N/A|\n|1/28/2024|60,922|29,760|27,021|28,090|N/A|\n|10/29/2023|44,870|18,889|17,515|18,839|N/A|\n|7/30/2023|32,681|10,326|10,323|11,899|N/A|\n|4/30/2023|25,878|4,793|5,101|6,821|N/A|\n|1/29/2023|26,974|4,368|3,808|5,641|N/A|\n|10/30/2022|28,566|5,957|4,829|6,426|N/A|\n|7/31/2022|29,738|7,741|6,264|7,553|N/A|\n|5/1/2022|29,541|9,458|7,926|8,965|N/A|\n|1/30/2022|26,914|9,752|8,132|9,108|N/A|\n|10/31/2021|24,274|8,206|7,156|8,142|N/A|\n|8/1/2021|21,897|7,078|6,665|7,902|N/A|\n|5/2/2021|19,256|5,327|5,516|6,787|N/A|\n|1/31/2021|16,675|4,332|4,694|5,822|N/A|\n|10/25/2020|14,777|3,826|4,230|5,220|N/A|\n|7/26/2020|13,065|3,388|4,961|5,581|N/A|\n|4/26/2020|11,778|3,319|4,434|4,950|N/A|\n|1/26/2020|10,918|2,796|N/A|4,761|N/A|\n|10/27/2019|10,018|2,411|N/A|4,194|N/A|\n|7/28/2019|10,185|2,743|N/A|3,041|N/A|\n|4/28/2019|10,729|3,291|N/A|3,018|N/A|\n|1/27/2019|11,716|4,141|N/A|3,743|N/A|\n|10/28/2018|12,422|4,694|N/A|4,203|N/A|\n|7/29/2018|11,877|4,301|N/A|4,873|N/A|\n|4/29/2018|10,984|3,784|N/A|4,665|N/A|\n|1/28/2018|9,714|3,047|N/A|3,502|N/A|\n|10/29/2017|8,976|2,582|N/A|2,865|N/A|\n|7/30/2017|8,344|2,288|N/A|2,140|N/A|\n|4/30/2017|7,542|1,965|N/A|1,635|N/A|\n|1/29/2017|6,910|1,666|N/A|1,672|N/A|\n|10/30/2016|6,138|1,220|N/A|1,462|N/A|\n|7/31/2016|5,439|923|N/A|1,285|N/A|\n|5/1/2016|5,164|688|N/A|1,248|N/A|\n|1/31/2016|5,010|614|N/A|1,175|N/A|\n|10/25/2015|4,860|600|N/A|1,107|N/A|\n|7/26/2015|4,780|526|N/A|1,068|N/A|\n\n## Analyst Future Growth Forecasts\n\n> Earnings vs Savings Rate: NVDA's forecast earnings growth (21.8% per year) is above the savings rate (3.5%).\n> Earnings vs Market: NVDA's earnings (21.8% per year) are forecast to grow faster than the US market (18.9% per year).\n> High Growth Earnings: NVDA's earnings are expected to grow significantly over the next 3 years.\n> Revenue vs Market: NVDA's revenue (24.6% per year) is forecast to grow faster than the US market (13% per year).\n> High Growth Revenue: NVDA's revenue (24.6% per year) is forecast to grow faster than 20% per year.\n\n## Earnings per Share Growth Forecasts\n\n## Future Return on Equity\n\n> Future ROE: NVDA's Return on Equity is forecast to be very high in 3 years time (73.3%).\n\n## Discover growth companies\n\n7D\n\n1Y\n\n7D\n\n1Y\n\n7D\n\n1Y\n\n## Company Analysis and Financial Data Status\n\n|Data|Last Updated (UTC time)|\n|--|--|\n|Company Analysis|2026/06/22 06:34|\n|End of Day Share Price|2026/06/22 00:00|\n|Earnings|2026/04/26|\n|Annual Earnings|2026/01/25|\n\n### Data Sources\n\nThe data used in our company analysis is from S&P Global Market Intelligence LLC. The following data is used in our analysis model to generate this report. Data is normalised which can introduce a delay from the source being available.\n\n|Package|Data|Timeframe|Example US Source ^*^|\n|--|--|--|--|\n|Company Financials|10 years|- Income statement - Cash flow statement - Balance sheet|- SEC Form 10-K - SEC Form 10-Q|\n|Analyst Consensus Estimates|+3 years|- Forecast financials - Analyst price targets|- Analyst Research Reports - Blue Matrix|\n|Market Prices|30 years|- Stock prices - Dividends, Splits and Actions|- ICE Market Data - SEC Form S-1|\n|Ownership|10 years|- Top shareholders - Insider trading|- SEC Form 4 - SEC Form 13D|\n|Management|10 years|- Leadership team - Board of directors|- SEC Form 10-K - SEC Form DEF 14A|\n|Key Developments|10 years|- Company announcements|- SEC Form 8-K|\n\n^*^ Example for US securities, for non-US equivalent regulatory forms and sources are used.\n\nUnless specified all financial data is based on a yearly period but updated quarterly. This is known as Trailing Twelve Month (TTM) or Last Twelve Month (LTM) Data. Learn more.\n\n### Analysis Model and Snowflake\n\nDetails of the analysis model used to generate this report is available on our Github page, we also have guides on how to use our reports and tutorials on Youtube.\n\nLearn about the world class team who designed and built the Simply Wall St analysis model.\n\n### Industry and Sector Metrics\n\nOur industry and section metrics are calculated every 6 hours by Simply Wall St, details of our process are available on Github.\n\n### Analyst Sources\n\nNVIDIA Corporation is covered by 96 analysts. 55 of those analysts submitted the estimates of revenue or earnings used as inputs to our report. Analysts submissions are updated throughout the day.\n\n|Analyst|Institution|\n|--|--|\n|Qun Huang|ABCI Securities Company Limited|\n|Stefan Chang|Aletheia Analyst Network Limited|\n|Brett Simpson|Arete Research Services LLP|",
-                "title": "NVIDIA (NasdaqGS:NVDA) Stock Forecast & Analyst Predictions",
-                "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/future"
+                "snippet": "NVIDIA stock has already delivered very large gains over the past five years, yet current valuation checks suggest a more balanced picture, with the intrinsic value estimate from a Discounted Cash Flow (DCF) model sitting close to the share price while earnings based multiples still screen as supportive.\n\n- The share price return of about 9.9x over five years highlights how much future growth is already reflected in NVIDIA’s market value.\n- Extensive AI infrastructure projects and equity stakes in ecosystem partners can support long term cash flow expectations, although heavy capital commitments and execution risks around those projects may affect how much of that growth ultimately reaches shareholders.\n- NVIDIA scores 4 out of 6 on our valuation checks, which points to a mixed picture rather than a clear bargain or clear overvaluation.\n\nThe issue now is whether NVIDIA’s current price fairly reflects its intrinsic value given the recent run and the growth investors expect from its AI investments.\n\nFind out why NVIDIA's 24.9% return over the last year is lagging behind its peers.\n\nAdvertisement\n\n### Where Does NVIDIA Sit on Cash Flow?\n\nThe Discounted Cash Flow (DCF) method estimates what NVIDIA is worth based on the cash it can return to shareholders over time. For NVIDIA, the model uses latest twelve month free cash flow of about $119.4b and assumes cash flows continue to grow rather than shrink or stay flat. On that basis, the DCF points to an intrinsic value of about $233.92 per share.\n\nThat intrinsic value sits only slightly above the current share price, implying the stock is about 3.7% undervalued rather than obviously cheap or expensive. Despite headline grabbing AI deals and data center build outs, such as the planned Stargate project with Lancium, the market price is already broadly aligned with what the cash flow model supports.\n\n**Overall, the Discounted Cash Flow work suggests NVIDIA stock currently looks about fairly valued, with only a modest discount to intrinsic value.**\n\nNVIDIA is fairly valued according to our Discounted Cash Flow (DCF), but this can change at a moment's notice. Track the value in your watchlist or portfolio and be alerted on when to act.\n\nHead to the Valuation section of our Company Report for more details on how we arrive at this Fair Value for NVIDIA.\n\n### Is NVIDIA Still Cheap on Earnings?\n\nThe P/E ratio is a useful cross check for NVIDIA because earnings are a key focus for investors following its AI driven story. NVIDIA currently trades on a P/E of about 34.2x, which sits below the semiconductor industry average of around 53.1x and also below the peer group average of roughly 73.1x. That is a wide gap for a company that remains central to many AI infrastructure projects and data center builds.\n\nA P/E for NVIDIA, based on its growth profile, margins, size and risk, is estimated at about 47.4x. This is above the current 34.2x multiple, so the stock appears at a discount on this tailored yardstick even though the absolute P/E is not low in isolation. For investors, it suggests the market multiple is broadly consistent with the DCF work and indicates some valuation support.\n\n**On the P/E multiple, NVIDIA stock currently looks undervalued relative to both its sector and the fair ratio estimate.**\n\nSee what the numbers say about this price — find out in our valuation breakdown.\n\n### The NVIDIA Narrative: What Would Justify Today's Price?\n\nSimply Wall St Narratives picks up where the valuation work on NVIDIA leaves off and explains which combinations of future growth, margins and earnings would need to occur for the stock to be worth materially more or materially less than today’s price. Each narrative links a specific fair value to a clear story about NVIDIA’s potential catalysts and risks so you can track over time which version of events seems closest to reality on the Community page.\n\nThe community is split on NVIDIA, with some investors seeing a long runway for its AI plans while others think expectations already look stretched.\n\n**Bull case: 34% undervalued**\n\n> *\"Nvidia will hit $400b annual revenue in 5 years time, ~90% of revenue will come from data centre customers…\"*\n\n**Read the full Bull Case** to see why NVIDIA could be undervalued\n\n**Bear case: 116% overvalued**\n\n> *\"If training stalls and inference diversifies, NVDA could lose its “legendary” aura and re-rate back to more normal multiples…\"*\n\n**Read the full Bear Case** to see why NVIDIA could be overvalued\n\nDo you think there's more to the story for NVIDIA? Head over to our Community to see what others are saying!\n\n### The Bottom Line\n\nFor NVIDIA, the Discounted Cash Flow (DCF) work points to an intrinsic value that sits only slightly above the share price, so the cash flow view suggests the stock is now roughly in line with what the current fundamentals support. The P/E based view still screens NVIDIA as undervalued, which hints that the market may not be fully pricing in the earnings profile implied by its AI projects. After such a strong five year run, the central question is whether future cash flows from those AI infrastructure investments justify even richer earnings multiples or whether heavy capital needs and execution risks keep the current valuation about as full as it looks today.\n\n* This article by Simply Wall St is general in nature. **We provide commentary based on historical data\nand analyst forecasts only using an unbiased methodology and our articles are not intended to be financial advice.** It does not constitute a recommendation to buy or sell any stock, and does not take account of your objectives, or your financial situation. We aim to bring you long-term focused analysis driven by fundamental data. Note that our analysis may not factor in the latest price-sensitive company announcements or qualitative material. Simply Wall St has no position in any stocks mentioned.*\n\n### Valuation is complex, but we're here to simplify it.\n\nDiscover if NVIDIA might be undervalued or overvalued with our detailed analysis, featuring **fair value estimates, potential risks, dividends, insider trades, and its financial condition.**\n\nAccess Free Analysis\n\n**Have feedback on this article? Concerned about the content? Get in touch with us directly.** * Alternatively, email editorial-team@simplywallst.com*\n\nMI\n\nmitchell_lawler\n\nThe Foxhole\n\n### Druckenmiller says cheap money's days are numbered. Boring, self-funding companies could be the opportunity.\n\n1311\n\nDE\n\ndevon_jd150\n\nLeverage on its own is close to useless as a screen right now, because so much corporate debt was termed out at 2 to 3% and has not repriced. A business at three times leverage with nothing due until 2031 is in a completely different position from the same ratio rolling next year. Screen on weighted average maturity and the schedule behind it.\n\nLE\n\nLeverageIsLovely\n\nIn my view, Insurance companies are best positioned for this.\n\nMitchell Lawler\n\nMarket Insights\n\n### Which payment stocks actually get paid?\n\nEvery new payment app was supposed to kill Visa and Mastercard. Instead, they got bigger. So what does that mean for the payment stocks on your radar?\n\n32\n\n### About NasdaqGS:NVDA\n\n#### NVIDIA\n\nOperates as a data center scale AI infrastructure company in the United States, Taiwan, China, Hong Kong, Europe, and internationally.\n\nSee The Free Research Report\n\nExceptional growth potential with flawless balance sheet.\n\nSee The Free Research Report\n\n### Similar Companies\n- #### NasdaqGS:AVGO\n\n  #### Broadcom\n- #### NasdaqGS:AMD\n\n  #### Advanced Micro Devices\n\n### Market Insights\n\nWhich payment stocks actually get paid?\n\nMI\n\nMitchell Lawler\n\nPicking portfolio winners takes more than hot air\n\nAN\n\nAndrew Legget\n\nWhat Korea's market says about your index fund\n\nMI\n\nMitchell Lawler\n\nAdvertisement\n\n### Weekly Picks\n\nRI\n\nRick_Orford on Starfighters Space ·\n\n#### The 1960s Fighter Jet That Could Crack Open a $20 Billion Satellite Market\n\nFair Value:US$522.8% undervalued\n\n67 followersusers have followed this narrative\n\n·\n\n4 commentsusers have commented on this narrative\n\n·\n\n11 likesusers have liked this narrative\n\nTR\n\ntripledub on Meta Platforms ·\n\n#### The $135 Billion Bet That Should Make Every Shareholder Nervous\n\nFair Value:US$5862.7% undervalued\n\n47 followersusers have followed this narrative\n\n·\n\n3 commentsusers have commented on this narrative\n\n·\n\n34 likesusers have liked this narrative\n\nTA\n\nTalos on Voyager Technologies ·\n\n#### The \"Landlord of Orbit\" – A Deep Value Play Ahead of the Starlab Era\n\nFair Value:US$385.291.0% undervalued\n\n31 followersusers have followed this narrative\n\n·\n\n0 commentsusers have commented on this narrative\n\n·\n\n5 likesusers have liked this narrative\n\nIV\n\nIvoed on Uber Technologies ·\n\n#### Uber’s Valuation Depends On Who Captures The Economics Of Driverless Rides\n\nFair Value:US$11630.7% undervalued\n\n7 followersusers have followed this narrative\n\n·\n\n0 commentsusers have commented on this narrative\n\n·\n\n3 likesusers have liked this narrative\n\n### Recently Updated Narratives\n\nWO\n\nwoodworthfund on Kraft Heinz ·\n\n#### Kraft Heinz (KHC): Less Drama, More Ketchup\n\nFair Value:US$3527.7% undervalued\n\n27 followersusers have followed this narrative\n\n·\n\n0 commentsusers have commented on this narrative\n\n·\n\n0 likesusers have liked this narrative\n\nLU\n\nLunaRodas on DICK'S Sporting Goods ·\n\n#### DKS | DICK'S Sporting Goods: What They Said vs. What They Did\n\nFair Value:US$112.7710.2% overvalued\n\n1 followerusers have followed this narrative\n\n·\n\n0 commentsusers have commented on this narrative\n\n·\n\n0 likesusers have liked this narrative\n\nPR\n\nprajeeshprathap on Medpace Holdings ·\n\n#### Why Medpace Outperforms Competitors in the Mid-Sized Biotech Niche\n\nFair Value:US$53614.6% overvalued\n\n1 followerusers have followed this narrative\n\n·\n\n0 commentsusers have commented on this narrative\n\n·\n\n0 likesusers have liked this narrative\n\n### Popular Narratives\n\nOS\n\noscargarcia on NVIDIA ·\n\n#### The company that went from selling GPUs to gamers to becoming the AI arms dealer of the 21st century.\n\nFair Value:US$28023.9% undervalued\n\n354 followersusers have followed this narrative\n\n·\n\n9 commentsusers have commented on this narrative\n\n·\n\n16 likesusers have liked this narrative\n\nCU\n\nCubanEros on Microsoft ·\n\n#### A wonderful business at reasonable price.\n\nFair Value:US$419.9117.1% overvalued\n\n202 followersusers have followed this narrative\n\n·\n\n0 commentsusers have commented on this narrative\n\n·\n\n9 likesusers have liked this narrative\n\nKI\n\nKiwiInvest on Amazon.com ·\n\n#### Amazon's high growth, high tech segments propel its profits, while traditional segments plod along\n\nFair Value:US$475.0945.1% undervalued\n\n228 followersusers have followed this narrative\n\n·\n\n1 commentusers have commented on this narrative\n\n·\n\n8 likesusers have liked this narrative\n\n### Trending Discussion\n\nHA\n\nHarishPK on EverQuote ·\n\n### Feedback welcome!\n\n3\n|\n0\n\nMA\n\nMadave on Moderna ·\n\n### Aged like wine\n\n2\n|\n0\n\nJO\n\njohnk72 on Global X AI Infrastructure ETF ·\n\n### Great picks & shovels investment. I hold 3,000 units with a plan to hold until the end of 2028\n\n2\n|\n0",
+                "title": "Nvidia (NVDA) Stock Looks Fairly Valued Despite Strong AI ...",
+                "url": "https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/news/nvidia-nvda-stock-looks-fairly-valued-despite-strong-ai-expe"
               }
             ],
             "type": "fetch_url_results"
@@ -1004,11 +773,11 @@
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"A ten-year future value cannot be stated without applying assumptions, so the scenario calculator should use these retrieved inputs:\\n\\n| Input | Retrieved value | As of | Published by |\\n|---|---:|---|---|\\n| price | $218.29 | 2026-09-11 | NVIDIA market-data page |\\n| per_share | $7.91 | 2026-07-26 | NVIDIA financials page |\\n| growth_base_pct | 21.8% | 2026-06-19 | Simply Wall St |\\n| multiple_base | 24.2x | 2026-09-06 | The Motley Fool |\\n| multiple_low | 25.4x | 2026-09-04 | Stock Rover |\\n| multiple_high | 257.6x | 2026-09-04 | Stock Rover |\\n\\nNo retrieved page stated **growth_low_pct** or **growth_high_pct**. The published multiple bounds are a historical five-year P/E range, not a forecast of where NVIDIA’s valuation will be in ten years.\",\"rows\":[{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"price\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":218.29},{\"as_of\":\"2026-07-26\",\"kind\":\"currency\",\"label\":\"per_share\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA/financials\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":7.91},{\"as_of\":\"2026-06-19\",\"kind\":\"percent\",\"label\":\"growth_base_pct\",\"source_url\":\"https://simplywall.st/stocks/us/semiconductors/nasdaq-nvda/nvidia/future\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"%\",\"value\":21.8},{\"as_of\":\"2026-09-06\",\"kind\":\"multiple\",\"label\":\"multiple_base\",\"source_url\":\"https://www.fool.com/investing/2026/09/06/skyrocket-nvidia-stock-valuation-market-warning/\",\"subject\":\"Nvidia\",\"symbol\":\"NVDA\",\"unit\":\"x\",\"value\":24.2},{\"as_of\":\"2026-09-04\",\"kind\":\"multiple\",\"label\":\"multiple_low\",\"source_url\":\"https://www.stockrover.com/html_reports/NVDA/\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"x\",\"value\":25.4},{\"as_of\":\"2026-09-04\",\"kind\":\"multiple\",\"label\":\"multiple_high\",\"source_url\":\"https://www.stockrover.com/html_reports/NVDA/\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"x\",\"value\":257.6}]}",
+                "text": "{\"answer_markdown\":\"A future value is not presented here because it is calculated from the retrieved inputs. The available inputs are:\\n\\n| Input | Retrieved value | Date | Source context |\\n|---|---:|---|---|\\n| price | $218.29 | 2026-09-11 | Latest market quote |\\n| per_share | $5.84 | 2026-09-11 | Trailing earnings per share from the market quote |\\n| growth_base_pct | 44% | 2026-08-13 | Published consensus annual earnings-growth forecast for the next three years, from The Motley Fool |\\n| multiple_base | 24.9x | 2026-09-11 | Published forward P/E from MCH Advisory Research |\\n| multiple_low | 12x | 2026-09-11 | Lowest published scenario P/E from MCH Advisory Research |\\n| multiple_high | 32x | 2026-09-11 | Highest published scenario P/E from MCH Advisory Research |\\n\\nNo page retrieved stated **growth_low_pct** or **growth_high_pct** as the lowest and highest yearly earnings-growth forecasts. The published consensus growth period is also shorter than the requested holding period.\",\"rows\":[{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"price\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":218.29},{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"per_share\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":5.84},{\"as_of\":\"2026-08-13\",\"kind\":\"percent\",\"label\":\"growth_base_pct\",\"source_url\":\"https://www.fool.com/investing/2026/08/13/nvidia-stock-investors-good-news-from-wall-street/\",\"subject\":\"Nvidia\",\"symbol\":\"NVDA\",\"unit\":\"%\",\"value\":44},{\"as_of\":\"2026-09-11\",\"kind\":\"multiple\",\"label\":\"multiple_base\",\"source_url\":\"https://www.mchadvisoryservices.com/research/nvda-research-2026.html\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"x\",\"value\":24.9},{\"as_of\":\"2026-09-11\",\"kind\":\"multiple\",\"label\":\"multiple_low\",\"source_url\":\"https://www.mchadvisoryservices.com/research/nvda-research-2026.html\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"x\",\"value\":12},{\"as_of\":\"2026-09-11\",\"kind\":\"multiple\",\"label\":\"multiple_high\",\"source_url\":\"https://www.mchadvisoryservices.com/research/nvda-research-2026.html\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"x\",\"value\":32}]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_be07078b-9672-45ae-846b-c872a92f3dd9",
+            "id": "msg_dbcee83c-833c-4149-bcb3-2cb5899f4e5f",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -1053,28 +822,28 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.17432,
-            "cache_read_cost": 0.01582,
+            "cache_creation_cost": 0.1747,
+            "cache_read_cost": 0.00905,
             "currency": "USD",
-            "input_cost": 0.00036,
-            "output_cost": 0.0312,
-            "tool_calls_cost": 0.0185,
+            "input_cost": 5e-05,
+            "output_cost": 0.0404,
+            "tool_calls_cost": 0.011,
             "tool_calls_cost_details": {
               "fetch_url": 0.001,
-              "finance_search": 0.01,
-              "search_web": 0.0075
+              "finance_search": 0.005,
+              "search_web": 0.005
             },
-            "total_cost": 0.2402
+            "total_cost": 0.2352
           },
-          "input_tokens": 74494,
+          "input_tokens": 57566,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 34864,
-            "cache_read_input_tokens": 39540,
-            "cached_tokens": 39540
+            "cache_creation_input_tokens": 34940,
+            "cache_read_input_tokens": 22614,
+            "cached_tokens": 22614
           },
-          "output_tokens": 1560,
+          "output_tokens": 2020,
           "output_tokens_details": {
-            "reasoning_tokens": 425
+            "reasoning_tokens": 1034
           },
           "tool_calls_details": {
             "fetch_url": {
@@ -1082,15 +851,15 @@
               "invocation": 2
             },
             "finance_search": {
-              "cost_usd": 0.01,
-              "invocation": 2
+              "cost_usd": 0.005,
+              "invocation": 1
             },
             "search_web": {
-              "cost_usd": 0.0075,
-              "invocation": 3
+              "cost_usd": 0.005,
+              "invocation": 2
             }
           },
-          "total_tokens": 76054
+          "total_tokens": 59586
         },
         "user": null
       }
