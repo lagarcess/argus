@@ -51,10 +51,29 @@ Twelve route receipts came back without a price. They are not assumed to cost ze
 
 ## The 0 bps slippage read
 
-In the Part A live check, a Spanish card read the requested 10 bps slippage as 0 bps. That came from code, not model variance:
+In the Part A live check, a Spanish card read the requested 10 bps slippage as 0 bps. That came from code, not model variance. When the cost fidelity audit cannot ground a stated cost, it removes the value and owes a question (`execution_cost_evidence_unresolved`, missing `assumption`). Two stages dropped that question, and confirmation then defaulted the slippage to 0 bps:
 
-1. The cost fidelity audit could not ground the stated slippage, so it removed the value and owed a question (`execution_cost_evidence_unresolved`, missing `assumption`).
-2. The interpret stage kept only the strategy's required fields, so it dropped that question.
-3. Confirmation then defaulted the slippage to 0 bps.
+1. **The interpret stage** kept only the strategy's required fields. Fixed in `5d1105eb`.
+2. **The clarify stage** also asked only for the strategy's required fields on a new request. A live capture of the same Spanish message showed it: the first read gave 1 bp, the audit read 10 bps, the two disagreed, so the cost stayed unresolved as designed, and the clarify stage sent the turn to confirmation. Fixed in `7a00b8e9`: the clarify stage asks for a missing `assumption`.
 
-That turn's model outputs were not recorded. A capture of the same message on this branch read 10 bps. The fix is `5d1105eb`, with English and Spanish stage tests in `tests/agent_runtime/test_cost_fidelity_stage_clarification.py`. Running the same message on the integration branch was not needed, because the code dropped the value whatever the model read.
+English and Spanish tests in `tests/agent_runtime/test_cost_fidelity_stage_clarification.py` run the whole turn and check that Argus asks and shows no card.
+
+### The live recheck
+
+The one live recheck on `a344b489` took a different path ([card](spanish-card-recheck/card.png), [route receipts](spanish-card-recheck/receipts.json)):
+
+1. The first interpretation model timed out after 20 seconds.
+2. The fallback model's reply failed validation, because `response_profile_overrides` was null.
+3. The last-resort focused repair built the card.
+
+That card showed no fees, no slippage and $0 starting capital, and Argus asked nothing. No stated-field audit ran after the repair. The focused repair's schema has no fee or slippage fields.
+
+This branch does not change that path, so it is listed as a follow-up rather than fixed here. An offline replay of the repair, with a stub model that reads both costs, did reach the audit and kept 5 and 10 bps. The model read that skipped the audit live was not recorded. The final walk shows the Spanish card again.
+
+## Two tabs on one conversation
+
+The same new chat was open in a second tab while the first was answering ([branch report](two-tabs/branch-report.json), [integration report](two-tabs/integration-report.json)):
+
+- Tab B shows "Argus is working on New chat." when it opens, and the status clears once tab A's answer lands.
+- Tab B never shows the answer. Twenty seconds after it landed, tab A had 2 messages and tab B had 1 ([tab A](two-tabs/branch-tab-a.png), [tab B](two-tabs/branch-tab-b.png)).
+- `origin/codex/private-alpha-next` at `b0a7cf08` behaves the same ([tab A](two-tabs/integration-tab-a.png), [tab B](two-tabs/integration-tab-b.png)). This branch did not cause it, so it is left as is.
