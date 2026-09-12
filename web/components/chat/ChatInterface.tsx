@@ -121,7 +121,7 @@ import {
   nextExperimentRowsFromMetadata,
   nextExperimentsSourceRunIdFromMetadata,
 } from "@/lib/chat-next-experiments";
-import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
+import { nextStepsFromMetadata } from "@/lib/chat-next-steps";
 import {
   loadAllConversationMessagePages,
   resolveOrdinaryTransportAmbiguityView,
@@ -1344,6 +1344,7 @@ export default function ChatInterface() {
           nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
         const finalNextExperimentsSourceRunId =
           nextExperimentsSourceRunIdFromMetadata(finalPayload);
+        const finalNextSteps = nextStepsFromMetadata(finalPayload, finalNextExperiments);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1445,8 +1446,6 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {
-          const finalFactHeadingKey =
-            resultFactHeadingKeyFromMetadata(finalPayload);
           const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
           const finalResearchDegradedCode =
             researchDegradedCodeFromMetadata(finalPayload);
@@ -1472,8 +1471,8 @@ export default function ChatInterface() {
                   resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
                   resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                   nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
+                  nextSteps: finalNextSteps,
                   contentPresentation: finalTextPresentation,
-                  resultFactHeadingKey: finalFactHeadingKey,
                 }),
               ),
               assistantId,
@@ -1496,8 +1495,8 @@ export default function ChatInterface() {
                 resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
                 resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                 nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
+                nextSteps: finalNextSteps,
                 contentPresentation: finalTextPresentation,
-                resultFactHeadingKey: finalFactHeadingKey,
               },
             );
             if (

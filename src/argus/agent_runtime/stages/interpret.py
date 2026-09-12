@@ -10,6 +10,7 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import date
+from collections.abc import Sequence
 from typing import Any
 
 from argus.domain.market_data.new_york_clock import new_york_today
@@ -56,14 +57,9 @@ from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.result_followup_answers import (
-    composed_result_followup_patch,
-    next_experiment_followup_patch,
-    unavailable_result_followup_patch,
-)
+from argus.agent_runtime.result_followup_answers import answered_result_followup_patch
 from argus.agent_runtime.result_followups import (
     compose_private_alpha_save_response,
-    compose_result_followup_response,
     fallback_private_alpha_save_response,
 )
 from argus.agent_runtime.rule_specs import (
@@ -244,6 +240,7 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
     LatestResultFactComposerDeclined,
+    stored_fact_key,
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
     latest_result_answer_stage_result_if_applicable as _latest_result_answer_stage_result_if_applicable,
@@ -1154,6 +1151,7 @@ async def _stage_result_from_interpretation(
         snapshot=snapshot,
         current_user_message=state.current_user_message,
         language=user.language_preference,
+        recent_messages=state.recent_thread_history,
     )
     if isinstance(latest_result_fact_answer, LatestResultFactComposerDeclined):
         declined_edit_result = await _planned_edit_after_fact_composer_decline(
@@ -1188,6 +1186,7 @@ async def _stage_result_from_interpretation(
         snapshot=snapshot,
         current_user_message=state.current_user_message,
         language=user.language_preference,
+        recent_messages=state.recent_thread_history,
     )
     if followup_result is not None:
         return followup_result
@@ -1242,6 +1241,7 @@ async def _stage_result_from_interpretation(
         current_user_message=state.current_user_message,
         decision=decision,
         assistant_response=interpretation.assistant_response,
+        recent_messages=state.recent_thread_history,
     )
     if latest_result_recovery is not None:
         return latest_result_recovery
@@ -2435,6 +2435,7 @@ async def _interpreter_unavailable_result(
         user=user,
         snapshot=snapshot,
         current_user_message=current_user_message,
+        recent_messages=state.recent_thread_history,
     )
     if result_followup is not None:
         return result_followup
@@ -2766,24 +2767,21 @@ async def _latest_result_followup_when_interpreter_unavailable(
     user: UserState,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
+    recent_messages: Sequence[Any] = (),
 ) -> StageResult | None:
     if snapshot is None or snapshot.latest_backtest_result_reference is None:
         return None
     if not current_user_message.strip():
         return None
     reference = snapshot.latest_backtest_result_reference
-    metadata = dict(reference.metadata)
-    stage_patch = composed_result_followup_patch(
-        await compose_result_followup_response(
-            metadata=metadata,
-            focus="general",
-            user_message=current_user_message,
-            language=user.language_preference,
-        ),
+    stage_patch = await answered_result_followup_patch(
+        metadata=dict(reference.metadata),
         focus="general",
+        user_message=current_user_message,
+        language=user.language_preference,
+        recent_messages=recent_messages,
+        source_run_id=reference.artifact_id,
     )
-    if stage_patch is None:
-        stage_patch = unavailable_result_followup_patch(language=user.language_preference)
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -2823,6 +2821,7 @@ async def _latest_result_followup_recovery_if_applicable(
     current_user_message: str,
     decision: InterpretDecision,
     assistant_response: str | None,
+    recent_messages: Sequence[Any] = (),
 ) -> StageResult | None:
     unanchored_strategy_route = (
         "unanchored_strategy_route_suppressed" in decision.reason_codes
@@ -2841,7 +2840,7 @@ async def _latest_result_followup_recovery_if_applicable(
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     focus = decision.result_followup_focus or "general"
-    stage_patch: dict[str, Any] | None
+    stage_patch: dict[str, Any]
     if save_requested:
         response = await compose_private_alpha_save_response(
             metadata=metadata,
@@ -2853,24 +2852,16 @@ async def _latest_result_followup_recovery_if_applicable(
                 language=user.language_preference
             )
         stage_patch = {"assistant_response": response}
-    elif focus == "next_experiment":
-        stage_patch = next_experiment_followup_patch(
-            metadata,
-            language=user.language_preference,
-            source_run_id=reference.artifact_id,
-        )
     else:
-        stage_patch = composed_result_followup_patch(
-            await compose_result_followup_response(
-                metadata=metadata,
-                focus=focus,
-                user_message=current_user_message,
-                language=user.language_preference,
-            ),
+        stage_patch = await answered_result_followup_patch(
+            metadata=metadata,
             focus=focus,
+            user_message=current_user_message,
+            language=user.language_preference,
+            recent_messages=recent_messages,
+            source_run_id=reference.artifact_id,
+            stored_fact=stored_fact_key(decision=decision, snapshot=snapshot),
         )
-    if stage_patch is None:
-        stage_patch = unavailable_result_followup_patch(language=user.language_preference)
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,

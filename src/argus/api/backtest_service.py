@@ -119,8 +119,8 @@ def raise_backtest_problem(
         "provider_history_start_unavailable": (
             422,
             "History Unavailable",
-            "Equity launch history starts in 2016 for this path. Choose a start "
-            "date in 2016 or later.",
+            "The requested start date is earlier than the price history available "
+            "for this asset. Choose a later start date.",
         ),
         "stablecoin_not_supported": (
             422,

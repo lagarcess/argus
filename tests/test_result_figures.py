@@ -17,10 +17,15 @@ from argus.api.artifact_presentation import reader_payload, reader_run
 from argus.api.schemas import BacktestJob, BacktestJobResponse, BacktestRun
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
 from argus.domain.display_figure import display_figure
-from argus.domain.result_figures import result_display_figures
+from argus.domain.result_figures import (
+    result_display_figures,
+    shown_benchmark_gap,
+    shown_cost_drag,
+)
 from argus.domain.run_dossiers import project_run_dossier
 
-# The issue's own numbers: 53.44 - 7.1 prints 46.3, the engine gap 46.35 prints 46.4.
+# The issue's own numbers: the returns show as 53.4 and 7.1, so the figures state
+# a 46.3 gap, while the engine's stored 46.35 would print 46.4.
 PERFORMANCE = {
     "return_basis": "fixed_capital",
     "total_return_pct": 53.44,
@@ -39,7 +44,7 @@ METRICS = {
 FIGURES = {
     "total_return_pct": 53.4,
     "benchmark_return_pct": 7.1,
-    "delta_vs_benchmark_pct": 46.4,
+    "delta_vs_benchmark_pct": 46.3,
     "benchmark_comparison_claim": "beat_benchmark",
     "max_drawdown_pct": -18.4,
 }
@@ -91,17 +96,38 @@ def test_result_display_figures_keep_legacy_drawdown_and_modeled_costs() -> None
         "enabled": True,
         "gross_total_return_pct": 12.04,
         "net_total_return_pct": 11.75,
+        "return_drag_pct": 0.29,
     }
     figures = result_display_figures(metrics)
     assert figures is not None
     assert figures["max_drawdown_pct"] == -10.0
     assert figures["gross_total_return_pct"] == 12.0
     assert figures["net_total_return_pct"] == 11.8
+    # The drag is the shown 12.0 minus the shown 11.8, not the stored 0.29.
+    assert figures["return_drag_pct"] == 0.2
 
 
-def test_in_line_claim_is_the_gap_rounding_to_nothing() -> None:
+@pytest.mark.parametrize(
+    ("minuend", "subtrahend", "stored", "shown"),
+    [
+        (53.44, 7.1, 46.35, 46.3),
+        ("269.74", "269.16", 0.58, 0.5),
+        (None, 7.1, 46.35, 46.4),
+        (53.44, None, None, None),
+    ],
+)
+def test_a_stated_difference_prefers_the_shown_figures_over_the_stored_value(
+    minuend: object, subtrahend: object, stored: float | None, shown: float | None
+) -> None:
+    assert shown_benchmark_gap(minuend, subtrahend, stored) == shown
+    assert shown_cost_drag(minuend, subtrahend, stored) == shown
+
+
+def test_in_line_claim_is_the_shown_gap_rounding_to_nothing() -> None:
     metrics = deepcopy(METRICS)
-    metrics["aggregate"]["performance"]["delta_vs_benchmark_pct"] = 0.03
+    metrics["aggregate"]["performance"].update(
+        total_return_pct=7.14, delta_vs_benchmark_pct=0.04
+    )
     figures = result_display_figures(metrics)
     assert figures is not None
     assert figures["delta_vs_benchmark_pct"] == 0.0
@@ -169,7 +195,7 @@ def test_dossier_grid_and_bank_carry_the_same_figures() -> None:
     # The grid summary reads the performance block; drawdown lives under risk.
     assert grid["total_return_pct"] == 53.4
     assert grid["benchmark_return_pct"] == 7.1
-    assert grid["delta_vs_benchmark_pct"] == 46.4
+    assert grid["delta_vs_benchmark_pct"] == 46.3
     assert dossier.outcome.result_fact_bank is not None
     assert dossier.outcome.result_fact_bank["figures"] == FIGURES
     # The bank keeps the engine metrics untouched beside the figures.

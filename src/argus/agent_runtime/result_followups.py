@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -15,7 +15,6 @@ from argus.agent_runtime.result_fact_enrichment import (
     format_percent,
     metric_number,
 )
-from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
 from argus.domain.engine_launch.display import (
@@ -30,29 +29,20 @@ from argus.domain.engine_launch.result_facts import (
     runnable_next_tests,
     structured_next_experiments,
 )
+from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
 from argus.llm.openrouter import (
-    OpenRouterTask,
     invoke_openrouter_json_schema,
     log_openrouter_failure,
-    record_openrouter_route_receipt,
 )
-
-RelativePerformanceClaim = Literal[
-    "beat_benchmark",
-    "lagged_benchmark",
-    "matched_benchmark",
-    "not_applicable",
-    "unknown",
-]
-CausalAttributionClaim = Literal["none", "directly_supported", "unsupported"]
-
 
 INTERNAL_ONLY_FACT_IDS = frozenset({"benchmark_comparison_claim"})
-BENCHMARK_COMPARISON_CLAIMS = frozenset(
-    {"beat_benchmark", "lagged_benchmark", "matched_benchmark"}
-)
 # Engine metric paths every follow-up surface reads, so the Try next rows and
 # the fact bank compare against the same figures.
+TOTAL_RETURN_METRIC_PATHS = (("metrics", "aggregate", "performance", "total_return_pct"),)
+BENCHMARK_RETURN_METRIC_PATHS = (
+    ("metrics", "aggregate", "performance", "benchmark_return_pct"),
+    ("metrics", "benchmark_metrics", "aggregate", "total_return_pct"),
+)
 BENCHMARK_DELTA_METRIC_PATHS = (
     ("metrics", "aggregate", "performance", "delta_vs_benchmark_pct"),
 )
@@ -60,57 +50,6 @@ MAX_DRAWDOWN_METRIC_PATHS = (
     ("metrics", "aggregate", "risk", "max_drawdown_pct"),
     ("metrics", "aggregate", "max_drawdown_pct"),
 )
-
-
-class ResultFollowupDraft(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    relative_performance_claim: RelativePerformanceClaim = Field(
-        description=(
-            "Structured claim about strategy performance versus benchmark. Use the "
-            "supplied relative_performance_truth when it is known."
-        )
-    )
-    causal_attribution_claim: CausalAttributionClaim = Field(
-        default="none",
-        description=(
-            "Use unsupported if the answer claims or implies that a rule, macro "
-            "condition, news item, or context packet caused/helped/avoided the "
-            "performance without a directly supplied causal fact. Use directly_supported "
-            "only when fact_bank directly supports causality. Otherwise use none."
-        ),
-    )
-    answer: str = Field(
-        description=(
-            "Conversational interpretation using only fact_bank values. Include exact "
-            "run facts when they help answer the user. Do not mention software, "
-            "routing, provider paths, or implementation changes unless fact_bank "
-            "explicitly contains that fact."
-        )
-    )
-    answer_blocks: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Preferred user-visible response shape. Provide one to three concise "
-            "plain-language blocks, each short enough to read in chat. The runtime "
-            "joins these blocks with paragraph spacing. Keep facts grounded in "
-            "fact_ids and do not use this for extra ungrounded claims."
-        ),
-    )
-    fact_ids: list[str] = Field(
-        description=(
-            "Fact IDs from fact_bank that the renderer must attach. Include every "
-            "required_fact_id and do not invent IDs."
-        )
-    )
-    next_experiment_option_kinds: list[str] = Field(
-        default_factory=list,
-        description=(
-            "For next_experiment focus, optional supported option kinds copied from "
-            "next_experiment_options. The runtime renders option labels from the "
-            "structured fact bank, not from freeform text."
-        ),
-    )
 
 
 class PrivateAlphaSaveDraft(BaseModel):
@@ -151,112 +90,6 @@ class PrivateAlphaSaveDraft(BaseModel):
             "or another hidden private-alpha surface."
         )
     )
-
-
-async def compose_result_followup_response(
-    *,
-    metadata: dict[str, Any],
-    focus: ResultFollowupFocus,
-    user_message: str,
-    language: str = "en",
-    fact_key: str | None = None,
-    extra_facts: dict[str, str] | None = None,
-    extra_required_fact_ids: set[str] | None = None,
-    extra_appendable_fact_ids: set[str] | None = None,
-    invoke_json_schema_func=invoke_openrouter_json_schema,
-    log_openrouter_failure_func=log_openrouter_failure,
-) -> str | None:
-    fact_bank = result_followup_fact_bank(metadata, language=language)
-    if not fact_bank:
-        return None
-    if extra_facts:
-        fact_bank.update(extra_facts)
-    use_context_route = result_followup_uses_context_route(
-        fact_bank=fact_bank,
-        focus=focus,
-    )
-    required_fact_ids = required_result_followup_fact_ids(
-        fact_bank=fact_bank,
-        focus=focus,
-        include_context=use_context_route,
-        fact_key=fact_key,
-    )
-    if extra_required_fact_ids:
-        required_fact_ids |= {
-            fact_id for fact_id in extra_required_fact_ids if fact_id in fact_bank
-        }
-    context_packet_ids = context_packet_ids_from_fact_bank(fact_bank)
-    llm_task = result_followup_llm_task(
-        fact_bank=fact_bank,
-        focus=focus,
-    )
-    try:
-        raw_response = invoke_json_schema_func(
-            task=llm_task,
-            messages=result_followup_llm_messages(
-                fact_bank=fact_bank,
-                focus=focus,
-                user_message=user_message,
-                required_fact_ids=required_fact_ids,
-                language=language,
-            ),
-            schema_model=ResultFollowupDraft,
-            schema_name="ResultFollowupDraft",
-            context_packet_ids=context_packet_ids,
-        )
-        if inspect.isawaitable(raw_response):
-            raw_response = await raw_response
-    except Exception as exc:
-        log_openrouter_failure_func(
-            task=llm_task,
-            model_name=None,
-            exc=exc,
-            message="LLM result follow-up failed; deferring to localized recovery",
-        )
-        return None
-
-    draft = coerce_result_followup_draft(raw_response)
-    if draft is None:
-        record_result_followup_recovery_receipt(
-            task=llm_task,
-            failure_mode="invalid_result_followup_draft",
-            context_packet_ids=context_packet_ids,
-        )
-        return None
-    if draft.causal_attribution_claim == "unsupported":
-        record_result_followup_recovery_receipt(
-            task=llm_task,
-            failure_mode="unsupported_causal_attribution_claim",
-            context_packet_ids=context_packet_ids,
-        )
-        return None
-    rendered = render_result_followup_draft(
-        draft=draft,
-        fact_bank=fact_bank,
-        required_fact_ids=required_fact_ids,
-        focus=focus,
-        extra_appendable_fact_ids=extra_appendable_fact_ids,
-    )
-    if rendered is None:
-        record_result_followup_recovery_receipt(
-            task=llm_task,
-            failure_mode="result_followup_draft_rejected",
-            context_packet_ids=context_packet_ids,
-        )
-        return None
-    claim_failure = result_followup_claim_failure(
-        draft=draft,
-        fact_bank=fact_bank,
-        focus=focus,
-    )
-    if claim_failure:
-        record_result_followup_recovery_receipt(
-            task=llm_task,
-            failure_mode=claim_failure,
-            context_packet_ids=context_packet_ids,
-        )
-        return None
-    return rendered
 
 
 async def compose_private_alpha_save_response(
@@ -365,7 +198,7 @@ def render_private_alpha_save_draft(
 ) -> str | None:
     if draft.claims_strategy_was_saved or draft.points_to_hidden_surface:
         return None
-    body = render_result_followup_answer_body(draft)
+    body = _save_answer_body(draft)
     if not body or contains_user_visible_internal_fact_name(body):
         return None
     used_fact_ids: set[str] = set()
@@ -389,147 +222,6 @@ def fallback_private_alpha_save_response(*, language: str | None = None) -> str:
     )
 
 
-def result_followup_llm_task(
-    *,
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus,
-) -> OpenRouterTask:
-    if result_followup_uses_context_route(fact_bank=fact_bank, focus=focus):
-        return "result_breakdown"
-    return "result_summary"
-
-
-def result_followup_uses_context_route(
-    *,
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus,
-) -> bool:
-    return bool(
-        fact_bank.get("context_packet_facts")
-        and focus in {"general", "why_underperformed"}
-    )
-
-
-def record_result_followup_recovery_receipt(
-    *,
-    task: OpenRouterTask,
-    failure_mode: str,
-    context_packet_ids: list[str] | None = None,
-) -> None:
-    record_openrouter_route_receipt(
-        task=task,
-        model_name=None,
-        mode="json_schema",
-        schema_name="ResultFollowupDraft",
-        latency_ms=0,
-        outcome="failed",
-        failure_mode=failure_mode,
-        context_packet_ids=context_packet_ids,
-    )
-
-
-def result_followup_llm_messages(
-    *,
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus,
-    user_message: str,
-    required_fact_ids: set[str],
-    language: str = "en",
-) -> list[dict[str, str]]:
-    public_fact_bank = public_result_followup_fact_bank(fact_bank)
-    language_instruction = response_language_instruction(language)
-    return [
-        {
-            "role": "system",
-            "content": (
-                f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
-                "You are Argus, a chat-first investing backtest copilot. Answer the "
-                "user's follow-up using only the supplied fact_bank. "
-                f"{language_instruction} Be conversational, "
-                "specific, and useful; do not sound like a fixed template. Return a "
-                "short natural-language answer plus fact_ids. The answer should use "
-                "the supplied facts naturally, while answer_blocks gives the renderer "
-                "the same answer as one to three short readable blocks. The renderer "
-                "prefers answer_blocks over answer when present, so do not pack the "
-                "answer into a single dense paragraph. fact_ids tells the runtime which "
-                "symbols, dates, percentages, drawdowns, benchmarks, caveats, context "
-                "facts, and next-test options ground the answer. fact_ids must include every "
-                "fact_id in required_fact_ids; do not omit required fact ids even when "
-                "they feel repetitive. Do not invent fact ids. Do not expose fact_bank "
-                "keys or schema names in the answer, including benchmark_delta, "
-                "benchmark_comparison_claim, total_return, max_drawdown, "
-                "context_packet_facts, fact_ids, or "
-                "relative_performance_claim; translate them into plain language. Fact "
-                "IDs are grounding metadata; they do not mean every fact needs to be "
-                "recited in the user-visible answer. Choose the one or two numbers "
-                "that best answer the question unless the user explicitly asks for a "
-                "full breakdown. Set the first sentence as a plain takeaway, not a "
-                "metric recap. For "
-                "why/how follow-ups, use two short paragraphs or one short paragraph "
-                "plus one tiny caveat line: first say what the simulation shows, then "
-                "say what it cannot prove. Do not pack the whole answer into one "
-                "dense paragraph, and do not write like a report abstract. For "
-                "next-experiment follow-ups, use a short "
-                "lead-in and two or three bullets from the provided options. Set "
-                "relative_performance_claim to the supplied relative_performance_truth "
-                "when it is known, and keep the answer consistent with that claim. Set "
-                "causal_attribution_claim to unsupported if your answer claims or implies "
-                "that a strategy rule, macro backdrop, event, or context item caused, "
-                "helped, avoided, drove, or explained performance beyond the supplied "
-                "metrics. Correct "
-                "false premises directly. Explain what happened from metrics separately "
-                "from plausible non-causal market interpretation. Use context_packet_facts "
-                "only as possible backdrop, never as proof of causality unless the fact "
-                "directly says so. Disallowed topics unless fact_bank explicitly includes "
-                "them: software changes, runtime changes, routing fixes, provider paths, "
-                "implementation details, or app internals. Do not repeat, negate, or explain "
-                "those terms just because the user mentioned them; treat them as irrelevant "
-                "conversation context and answer the investing result. Suggest next tests "
-                "when focus is next_experiment, or when user_message also asks what to try, "
-                "compare, refine, or improve next. When you do, offer only tests listed in "
-                "runnable_next_tests or next_experiment_options, and format them as two "
-                "or three short, separate bullets or numbered lines. Do not invent trades, "
-                "prices, support, indicators, "
-                "predictions, investment advice, unsupported mechanics, or unsupported "
-                "causes."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "question": result_followup_focus_question(focus),
-                    "focus": focus,
-                    "user_message": user_message,
-                    "fact_bank": public_fact_bank,
-                    "required_fact_ids": sorted(required_fact_ids),
-                    "relative_performance_truth": relative_performance_truth(fact_bank),
-                },
-                default=str,
-            ),
-        },
-    ]
-
-
-def result_followup_focus_question(focus: ResultFollowupFocus) -> str:
-    questions: dict[ResultFollowupFocus, str] = {
-        "general": "Explain the latest run using the available grounded facts.",
-        "why_underperformed": (
-            "Explain the result versus the benchmark, correcting the premise if the "
-            "strategy did not underperform."
-        ),
-        "max_drawdown": "Explain the max drawdown for the latest run.",
-        "drawdown_date": "Explain when the largest drawdown bottomed for the latest run.",
-        "peak_date": "Explain when the latest run reached peak portfolio value.",
-        "peak_value": "Explain the peak portfolio value for the latest run.",
-        "result_card_fact": "Answer the requested factual result-card value.",
-        "what_tested": "Explain what was tested in the latest run.",
-        "next_experiment": "Suggest useful supported next experiments for this run.",
-        "assumptions": "Explain the assumptions used by the latest run.",
-    }
-    return questions.get(focus, questions["general"])
-
-
 def public_result_followup_fact_bank(fact_bank: dict[str, str]) -> dict[str, str]:
     return {
         fact_id: value
@@ -550,111 +242,10 @@ def context_packet_ids_from_fact_bank(fact_bank: dict[str, str]) -> list[str]:
     return packet_ids
 
 
-def coerce_result_followup_draft(value: Any) -> ResultFollowupDraft | None:
-    if isinstance(value, ResultFollowupDraft):
-        return value
-    try:
-        return ResultFollowupDraft.model_validate(value)
-    except (TypeError, ValidationError):
-        return None
+MAX_UNSTRUCTURED_SAVE_WORDS = 56
 
 
-def result_followup_claim_failure(
-    *,
-    draft: ResultFollowupDraft,
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus,
-) -> str | None:
-    if focus != "why_underperformed":
-        return None
-    truth = relative_performance_truth(fact_bank)
-    if truth in {"not_applicable", "unknown"}:
-        return None
-    if draft.relative_performance_claim in {"not_applicable", "unknown"}:
-        return "missing_relative_performance_claim"
-    if draft.relative_performance_claim != truth:
-        return "relative_performance_claim_contradiction"
-    return None
-
-
-def relative_performance_truth(
-    fact_bank: dict[str, str],
-) -> RelativePerformanceClaim:
-    claim = str(fact_bank.get("benchmark_comparison_claim") or "").strip()
-    if claim in BENCHMARK_COMPARISON_CLAIMS:
-        return claim  # type: ignore[return-value]
-    delta_number = as_float(fact_bank.get("benchmark_delta"))
-    if delta_number is None:
-        return "unknown"
-    if delta_number > 0:
-        return "beat_benchmark"
-    if delta_number < 0:
-        return "lagged_benchmark"
-    return "matched_benchmark"
-
-
-def render_result_followup_draft(
-    *,
-    draft: ResultFollowupDraft,
-    fact_bank: dict[str, str],
-    required_fact_ids: set[str],
-    focus: ResultFollowupFocus,
-    extra_appendable_fact_ids: set[str] | None = None,
-) -> str | None:
-    body = render_result_followup_answer_body(draft)
-    if not body:
-        return None
-    if draft.causal_attribution_claim == "unsupported":
-        return None
-    if contains_user_visible_internal_fact_name(body):
-        return None
-    if len(draft.fact_ids) > 36:
-        return None
-    used_fact_ids: set[str] = set()
-    ordered_fact_ids: list[str] = []
-    for fact_id_value in draft.fact_ids:
-        fact_id = str(fact_id_value or "").strip()
-        if fact_id not in fact_bank:
-            continue
-        if fact_id not in used_fact_ids:
-            ordered_fact_ids.append(fact_id)
-            used_fact_ids.add(fact_id)
-
-    appendable_missing_fact_ids = appendable_missing_required_fact_ids(
-        missing_fact_ids=required_fact_ids - used_fact_ids,
-        fact_bank=fact_bank,
-        focus=focus,
-        extra_appendable_fact_ids=extra_appendable_fact_ids,
-    )
-    ordered_fact_ids.extend(appendable_missing_fact_ids)
-    used_fact_ids.update(appendable_missing_fact_ids)
-    body = append_sentence_piece(
-        body,
-        render_result_followup_fact_line(
-            appendable_missing_fact_ids,
-            fact_bank=fact_bank,
-        ),
-    )
-    if not required_fact_ids.issubset(used_fact_ids):
-        return None
-    body = normalize_response_body(body)
-    if not body:
-        return None
-    if focus == "next_experiment":
-        # Deterministic next-experiment prose is retired; the
-        # argus_next_experiments rows sidecar owns this surface.
-        return None
-    rendered = body
-    max_words = 360 if fact_bank.get("context_packet_facts") else 240
-    if len(rendered.split()) > max_words:
-        return None
-    return rendered.strip()
-
-
-MAX_UNSTRUCTURED_FOLLOWUP_WORDS = 56
-
-
-def render_result_followup_answer_body(draft: ResultFollowupDraft) -> str | None:
+def _save_answer_body(draft: PrivateAlphaSaveDraft) -> str | None:
     blocks: list[str] = []
     for block in draft.answer_blocks:
         cleaned = normalize_text(block)
@@ -665,7 +256,7 @@ def render_result_followup_answer_body(draft: ResultFollowupDraft) -> str | None
     body = normalize_text(draft.answer)
     if not body:
         return None
-    if len(body.split()) > MAX_UNSTRUCTURED_FOLLOWUP_WORDS:
+    if len(body.split()) > MAX_UNSTRUCTURED_SAVE_WORDS:
         return None
     return body
 
@@ -699,110 +290,6 @@ def contains_user_visible_internal_fact_name(answer: str) -> bool:
     return any(name in normalized for name in INTERNAL_FACT_NAMES)
 
 
-def appendable_missing_required_fact_ids(
-    *,
-    missing_fact_ids: set[str],
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus,
-    extra_appendable_fact_ids: set[str] | None = None,
-) -> list[str]:
-    appendable_fact_ids = {
-        "context_packet_facts",
-        "context_packet_limitations",
-        "caveat",
-        "relative_performance",
-        "symbols",
-    }
-    if extra_appendable_fact_ids:
-        appendable_fact_ids.update(extra_appendable_fact_ids)
-    if result_followup_uses_context_route(fact_bank=fact_bank, focus=focus):
-        appendable_fact_ids.update(
-            {
-                "symbols",
-                "strategy",
-                "date_range",
-                "benchmark_symbol",
-                "total_return",
-                "benchmark_return",
-                "benchmark_comparison",
-                "benchmark_delta_magnitude",
-                "benchmark_delta",
-                "max_drawdown",
-                "trade_count",
-                "rule_summary",
-                "execution_note",
-                "starting_capital",
-                "assumptions",
-            }
-        )
-    return [
-        fact_id
-        for fact_id in fact_bank
-        if fact_id in missing_fact_ids and fact_id in appendable_fact_ids
-    ]
-
-
-def render_result_followup_fact_line(
-    fact_ids: list[str],
-    *,
-    fact_bank: dict[str, str],
-) -> str:
-    unique_fact_ids = list(dict.fromkeys(fact_ids))
-    if not unique_fact_ids:
-        return ""
-    if len(unique_fact_ids) == 1:
-        fact_id = unique_fact_ids[0]
-        value = clean_fragment(fact_bank.get(fact_id))
-        return value
-    fragments = [
-        clean_fragment(fact_bank[fact_id])
-        for fact_id in unique_fact_ids
-        if fact_bank.get(fact_id)
-    ]
-    if not fragments:
-        return ""
-    return "; ".join(fragments)
-
-
-def _labeled_fact_fragment(fact_id: str, value: str) -> str:
-    labels = {
-        "symbols": "Asset",
-        "strategy": "Strategy",
-        "date_range": "Period",
-        "benchmark_symbol": "Benchmark",
-        "total_return": "Strategy return",
-        "benchmark_return": "Benchmark return",
-        "benchmark_comparison": "Benchmark comparison",
-        "benchmark_delta_magnitude": "Benchmark gap",
-        "benchmark_delta": "Gap versus benchmark",
-        "relative_performance": "Relative performance",
-        "max_drawdown": "Max drawdown",
-        "trade_count": "Trades",
-        "starting_capital": "Starting capital",
-        "fee_bps": "Modeled fee",
-        "slippage_bps": "Modeled slippage",
-        "gross_total_return": "Gross return",
-        "net_total_return": "Net return",
-        "return_drag": "Cost drag",
-        "benchmark_cost_treatment": "Benchmark cost treatment",
-        "assumptions": "Assumptions",
-    }
-    label = labels.get(fact_id)
-    cleaned = clean_fragment(value)
-    return f"{label}: {cleaned}" if label else cleaned
-
-
-def result_followup_fact_bank_for_focus(
-    *,
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus,
-) -> dict[str, str]:
-    filtered = dict(fact_bank)
-    if focus == "why_underperformed" and filtered.get("strategy") == "buy and hold":
-        filtered.pop("trade_count", None)
-    return filtered
-
-
 def result_followup_fact_bank(
     metadata: dict[str, Any],
     *,
@@ -824,23 +311,14 @@ def result_followup_fact_bank(
     ).strip()
     if benchmark:
         fact_bank["benchmark_symbol"] = benchmark
-    total_return = metric_number(
-        metadata,
-        paths=(("metrics", "aggregate", "performance", "total_return_pct"),),
-    )
+    total_return = metric_number(metadata, paths=TOTAL_RETURN_METRIC_PATHS)
     if total_return is not None:
         fact_bank["total_return"] = format_percent(total_return)
-    benchmark_return = metric_number(
-        metadata,
-        paths=(
-            ("metrics", "aggregate", "performance", "benchmark_return_pct"),
-            ("metrics", "benchmark_metrics", "aggregate", "total_return_pct"),
-        ),
-    )
+    benchmark_return = metric_number(metadata, paths=BENCHMARK_RETURN_METRIC_PATHS)
     if benchmark_return is not None:
         fact_bank["benchmark_return"] = format_percent(benchmark_return)
     enriched_facts = enriched_result_fact_entries(metadata)
-    benchmark_delta = metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS)
+    benchmark_delta = benchmark_gap_metric(metadata)
     comparison = (
         benchmark_comparison_from_delta(benchmark_delta)
         if benchmark_delta is not None
@@ -922,6 +400,15 @@ def result_followup_fact_bank(
     return fact_bank
 
 
+def benchmark_gap_metric(metadata: dict[str, Any]) -> float | None:
+    """The shown benchmark gap, from the metric paths every follow-up reads."""
+    return shown_benchmark_gap(
+        metric_number(metadata, paths=TOTAL_RETURN_METRIC_PATHS),
+        metric_number(metadata, paths=BENCHMARK_RETURN_METRIC_PATHS),
+        metric_number(metadata, paths=BENCHMARK_DELTA_METRIC_PATHS),
+    )
+
+
 def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
     result_card = _mapping(
         metadata.get("result_card") or metadata.get("conversation_result_card")
@@ -943,7 +430,9 @@ def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
     net_return = as_float(costs.get("net_total_return_pct"))
     if net_return is not None:
         entries["net_total_return"] = format_percent(net_return)
-    return_drag = as_float(costs.get("return_drag_pct"))
+    return_drag = shown_cost_drag(
+        gross_return, net_return, as_float(costs.get("return_drag_pct"))
+    )
     if return_drag is not None:
         entries["return_drag"] = _format_percentage_points(abs(return_drag))
     benchmark_treatment = str(costs.get("benchmark_treatment") or "").strip()
@@ -967,89 +456,11 @@ def _format_percentage_points(value: float) -> str:
     return f"{float(value):.1f} percentage points"
 
 
-def required_result_followup_fact_ids(
-    *,
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus,
-    include_context: bool = False,
-    fact_key: str | None = None,
-) -> set[str]:
-    required: set[str] = {"caveat"}
-    has_context_facts = "context_packet_facts" in fact_bank
-    has_context_limitations = "context_packet_limitations" in fact_bank
-    if has_context_limitations:
-        required.add("context_packet_limitations")
-    if "symbols" in fact_bank:
-        required.add("symbols")
-    if focus == "max_drawdown":
-        required.update(fact_id for fact_id in ("max_drawdown",) if fact_id in fact_bank)
-    elif focus in {"peak_date", "peak_value"}:
-        # Pin the facts the question is about; the pair keeps date and value
-        # answers grounded on the same curve point.
-        for fact_id in ("peak_date", "peak_value"):
-            if fact_id in fact_bank:
-                required.add(fact_id)
-    elif focus == "drawdown_date":
-        # drawdown_depth is computed at the same trough as drawdown_date, so
-        # the stated magnitude always matches the stated date.
-        for fact_id in ("drawdown_date", "drawdown_depth"):
-            if fact_id in fact_bank:
-                required.add(fact_id)
-        if "drawdown_depth" not in fact_bank and "max_drawdown" in fact_bank:
-            required.add("max_drawdown")
-    elif focus == "what_tested":
-        for fact_id in (
-            "strategy",
-            "date_range",
-            "benchmark_symbol",
-            "rule_summary",
-            "execution_note",
-            "assumptions",
-        ):
-            if fact_id in fact_bank:
-                required.add(fact_id)
-    elif focus == "why_underperformed":
-        for fact_id in ("relative_performance", "execution_note"):
-            if fact_id in fact_bank:
-                required.add(fact_id)
-        if has_context_facts:
-            required.add("context_packet_facts")
-        if has_context_limitations:
-            required.add("context_packet_limitations")
-    elif focus == "general" and include_context:
-        for fact_id in ("context_packet_facts",):
-            if fact_id in fact_bank:
-                required.add(fact_id)
-        if has_context_limitations:
-            required.add("context_packet_limitations")
-    elif focus == "next_experiment":
-        required.add("runnable_next_tests")
-        required.add("next_experiment_options")
-    elif focus == "assumptions":
-        for fact_id in ("assumptions", "starting_capital", "benchmark_symbol"):
-            if fact_id in fact_bank:
-                required.add(fact_id)
-    if fact_key and fact_key in fact_bank:
-        required.add(fact_key)
-    return required
-
-
 def _context_packets_from_metadata(metadata: dict[str, Any]) -> list[dict[str, Any]]:
     packets = metadata.get("context_packets") or metadata.get("attached_context_packets")
     if not isinstance(packets, list):
         return []
     return [packet for packet in packets if isinstance(packet, dict)]
-
-
-def append_sentence_piece(current: str, piece: str) -> str:
-    cleaned = normalize_text(piece)
-    if not cleaned:
-        return current
-    if not current:
-        return cleaned
-    if cleaned[:1] in {".", ",", ";", ":", "!", "?", ")", "%"}:
-        return current.rstrip() + cleaned
-    return current.rstrip() + " " + cleaned
 
 
 def normalize_text(value: Any) -> str:

@@ -579,3 +579,38 @@ def test_fixed_capital_card_keeps_the_total_return_row() -> None:
     row_keys = [row["key"] for row in card["rows"]]
     assert "total_return_pct" in row_keys
     assert "contribution_return_pct" not in row_keys
+
+
+def test_the_worst_drop_is_dated_on_the_path_its_percentage_is_measured_on() -> None:
+    """The dates come from the flow-adjusted path, not from nominal equity."""
+    index = pd.bdate_range("2025-01-02", periods=5, tz="UTC")
+    # Flow-adjusted wealth: 1.0, 1.2, 0.9, 0.6, 0.8. The deposit on the third bar
+    # makes nominal equity peak there instead, at 190.
+    metrics = _run_dca(
+        _dca_config(index, contribution=100.0),
+        prices=[100.0, 120.0, 90.0, 60.0, 80.0],
+        benchmark_prices=[100.0] * 5,
+        entries=[True, False, True, False, False],
+        index=index,
+    )
+
+    risk = metrics["aggregate"]["risk"]
+    assert risk["max_drawdown_pct"] == pytest.approx(-50.0)
+    assert risk["max_drawdown_peak_date"] == index[1].date().isoformat()
+    assert risk["max_drawdown_trough_date"] == index[3].date().isoformat()
+
+
+def test_a_run_that_never_drops_has_no_worst_drop_dates() -> None:
+    index = pd.bdate_range("2025-01-02", periods=3, tz="UTC")
+    metrics = _run_dca(
+        _dca_config(index, contribution=100.0),
+        prices=[100.0, 110.0, 121.0],
+        benchmark_prices=[100.0] * 3,
+        entries=[True, False, False],
+        index=index,
+    )
+
+    risk = metrics["aggregate"]["risk"]
+    assert risk["max_drawdown_pct"] == pytest.approx(0.0)
+    assert risk["max_drawdown_peak_date"] is None
+    assert risk["max_drawdown_trough_date"] is None

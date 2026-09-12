@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from argus.agent_runtime.next_experiments import (
@@ -17,13 +18,16 @@ from argus.agent_runtime.next_experiments import (
     next_experiment_short_label_key,
     next_experiments_sidecar,
 )
+from argus.api import artifact_naming, naming
+from argus.api import state as api_state
+from argus.api.message_store import memory_conversation
 from argus.api.naming import (
     NARROW_TITLE_MAX_WORDS,
     WIDE_TITLE_MAX_WORDS,
-    constrain_to_word_budget,
+    NameSuggestion,
     title_word_budget,
 )
-from argus.api.schemas import ChatStreamRequest
+from argus.api.schemas import ChatStreamRequest, Conversation
 
 LANGUAGES = ("en", "es-419")
 _LABEL_PREFIX = "chat.next_experiments.labels."
@@ -32,8 +36,7 @@ _LOCALES = Path(__file__).resolve().parents[1] / "web" / "public" / "locales"
 
 def _kinds() -> set[str]:
     return {
-        key.removeprefix(_LABEL_PREFIX)
-        for key in NEXT_EXPERIMENT_ACTION_LABELS["en"]
+        key.removeprefix(_LABEL_PREFIX) for key in NEXT_EXPERIMENT_ACTION_LABELS["en"]
     }
 
 
@@ -45,9 +48,7 @@ def test_every_row_kind_has_a_short_form(language: str) -> None:
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_short_form_is_shorter_than_the_full_label(language: str) -> None:
     for kind, short in NEXT_EXPERIMENT_SHORT_LABELS[language].items():
-        full = NEXT_EXPERIMENT_ACTION_LABELS[language][
-            next_experiment_label_key(kind)
-        ]
+        full = NEXT_EXPERIMENT_ACTION_LABELS[language][next_experiment_label_key(kind)]
         assert len(short) < len(full), kind
         assert short.strip() == short
 
@@ -55,8 +56,7 @@ def test_short_form_is_shorter_than_the_full_label(language: str) -> None:
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_short_form_carries_no_em_dash(language: str) -> None:
     assert not [
-        value for value in NEXT_EXPERIMENT_SHORT_LABELS[language].values()
-        if "—" in value
+        value for value in NEXT_EXPERIMENT_SHORT_LABELS[language].values() if "—" in value
     ]
 
 
@@ -97,45 +97,114 @@ def test_narrow_titles_are_generated_short_not_clipped() -> None:
     assert NARROW_TITLE_MAX_WORDS < WIDE_TITLE_MAX_WORDS
 
 
-def test_the_budget_is_enforced_rather_than_only_requested() -> None:
-    """The prompt asks for a word limit; a model is free to ignore it.
+_DEV_USER_ID = "00000000-0000-0000-0000-000000000001"
+_OVERLONG = "Apple versus SPY across the last twelve months"
 
-    Without enforcement the overlong title is what gets persisted, and every
-    narrow client goes back to clipping it, which is the thing the viewport
-    contract exists to avoid.
-    """
 
-    overlong = "Apple versus SPY across the last twelve months"
-    assert (
-        constrain_to_word_budget(overlong, NARROW_TITLE_MAX_WORDS)
-        == "Apple versus SPY"
+def _fake_model_names(
+    monkeypatch: pytest.MonkeyPatch, *names: str
+) -> list[list[dict[str, str]]]:
+    requests: list[list[dict[str, str]]] = []
+    replies = iter(names)
+
+    def _invoke(**kwargs: Any) -> NameSuggestion:
+        requests.append(kwargs["messages"])
+        return NameSuggestion(name=next(replies))
+
+    monkeypatch.setattr(naming, "invoke_openrouter_json_schema_sync", _invoke)
+    return requests
+
+
+def _generate_title(
+    monkeypatch: pytest.MonkeyPatch, *, viewport: str, language: str = "en"
+) -> tuple[str | None, Conversation]:
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    api_state.store.reset()
+    api_state.store.get_or_create_dev_user()
+    conversation = memory_conversation(
+        title="New idea", title_source="system_default", language=language
     )
-    assert len(constrain_to_word_budget(overlong, WIDE_TITLE_MAX_WORDS).split()) == (
-        WIDE_TITLE_MAX_WORDS
+    title = artifact_naming.maybe_generate_conversation_title(
+        user_id=_DEV_USER_ID,
+        conversation_id=conversation.id,
+        language=language,
+        user_message="Compare Apple with SPY over the last twelve months.",
+        assistant_message="Apple returned 12% while SPY returned 18%.",
+        viewport=viewport,
+    )
+    return title, api_state.store.conversations[conversation.id]
+
+
+def test_a_title_inside_the_budget_is_saved_from_one_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests = _fake_model_names(monkeypatch, "Apple vs SPY")
+
+    title, saved = _generate_title(monkeypatch, viewport="narrow")
+
+    assert title == "Apple vs SPY"
+    assert (saved.title, saved.title_source) == ("Apple vs SPY", "ai_generated")
+    assert len(requests) == 1
+    assert [message["role"] for message in requests[0]] == ["system", "user"]
+    assert requests[0][0]["content"] == (
+        "Generate a concise user-facing name for Argus Alpha. "
+        f"Max {NARROW_TITLE_MAX_WORDS} words. "
+        "No punctuation-only output. "
+        "Entity type: conversation. Language: en."
     )
 
 
-def test_a_title_already_inside_the_budget_is_left_alone() -> None:
-    for title in ("Apple vs SPY", "Bitcoin", "Weekly Nvidia buys"):
-        assert constrain_to_word_budget(title, NARROW_TITLE_MAX_WORDS) == title
+@pytest.mark.parametrize(
+    ("viewport", "language", "overlong", "short"),
+    [
+        ("narrow", "en", _OVERLONG, "Apple versus SPY"),
+        (
+            "wide",
+            "es-419",
+            "Comparación de DOCN y SPY con compras semanales",
+            "Comparación de DOCN y SPY",
+        ),
+    ],
+)
+def test_an_overlong_title_is_requested_again_never_clipped(
+    monkeypatch: pytest.MonkeyPatch,
+    viewport: str,
+    language: str,
+    overlong: str,
+    short: str,
+) -> None:
+    """A model may ignore the word limit; clipping its title saved half a phrase."""
+
+    requests = _fake_model_names(monkeypatch, overlong, short)
+
+    title, saved = _generate_title(monkeypatch, viewport=viewport, language=language)
+
+    assert title == short
+    assert (saved.title, saved.title_source) == (short, "ai_generated")
+    assert len(requests) == 2
+    assert requests[1][: len(requests[0])] == requests[0]
+    assert overlong in requests[1][-2]["content"]
+    assert str(title_word_budget(viewport)) in requests[1][-1]["content"]
 
 
-def test_trimming_does_not_leave_a_dangling_separator() -> None:
-    # A cut mid-phrase reads as damage rather than as a short title.
-    assert (
-        constrain_to_word_budget("Apple, SPY, and gold over time", 2) == "Apple, SPY"
+def test_a_title_still_overlong_after_one_retry_saves_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests = _fake_model_names(
+        monkeypatch, _OVERLONG, "Apple versus SPY over twelve months"
     )
-    assert constrain_to_word_budget("Apple versus - the market", 3) == "Apple versus"
+
+    title, saved = _generate_title(monkeypatch, viewport="narrow")
+
+    assert title is None
+    assert (saved.title, saved.title_source) == ("New idea", "system_default")
+    assert len(requests) == 2
 
 
 def test_turn_request_carries_an_optional_viewport_band() -> None:
+    assert ChatStreamRequest(conversation_id="c1", message="hi").viewport is None
     assert (
-        ChatStreamRequest(conversation_id="c1", message="hi").viewport is None
-    )
-    assert (
-        ChatStreamRequest(
-            conversation_id="c1", message="hi", viewport="narrow"
-        ).viewport
+        ChatStreamRequest(conversation_id="c1", message="hi", viewport="narrow").viewport
         == "narrow"
     )
     with pytest.raises(ValueError):

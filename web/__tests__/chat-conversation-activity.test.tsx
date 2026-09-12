@@ -17,7 +17,13 @@ import {
   ConversationActivityLiveRegion,
   consumeConversationActivityAnnouncement,
   conversationActivityAnnouncementDescriptor,
+  conversationActivityAnnouncementMessage,
 } from "../components/chat/ConversationActivityAnnouncement";
+
+const interpolateDefault = (
+  _key: string,
+  options: Readonly<{ defaultValue: string; title: string }>,
+): string => options.defaultValue.replace("{{title}}", options.title);
 
 const chatInterfaceSource = readFileSync(
   join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
@@ -611,10 +617,6 @@ describe("active conversation activity announcements", () => {
       conversationId: "conversation-a",
       transition: transition!,
       title: null,
-      translate: (_key, options) => options.defaultValue.replace(
-        "{{title}}",
-        String(options.title),
-      ),
     });
     expect(beforeTitle).toBeNull();
     expect(harness.runtime.getAnnouncement("conversation-a")?.key).toBe(
@@ -626,16 +628,20 @@ describe("active conversation activity announcements", () => {
       conversationId: "conversation-a",
       transition: transition!,
       title: "Tesla dip idea",
-      translate: (_key, options) => options.defaultValue.replace(
-        "{{title}}",
-        String(options.title),
-      ),
     });
 
     expect(resolved).toMatchObject({
       conversationId: "conversation-a",
-      message: "Argus is working on Tesla dip idea.",
+      key: transition?.key,
+      presentation: "working",
     });
+    expect(
+      conversationActivityAnnouncementMessage(
+        resolved,
+        "Tesla dip idea",
+        interpolateDefault,
+      ),
+    ).toBe("Argus is working on Tesla dip idea.");
     expect(harness.runtime.getAnnouncement("conversation-a")).toBeNull();
   });
 
@@ -659,10 +665,6 @@ describe("active conversation activity announcements", () => {
         conversationId: "conversation-a",
         transition: captured!,
         title: "Tesla dip idea",
-        translate: (_key, options) => options.defaultValue.replace(
-          "{{title}}",
-          String(options.title),
-        ),
       });
       return () => undefined;
     };
@@ -673,7 +675,11 @@ describe("active conversation activity announcements", () => {
     const html = renderToStaticMarkup(
       <ConversationActivityLiveRegion
         announcementKey={mountedMessage?.key ?? "none"}
-        message={mountedMessage?.message ?? ""}
+        message={conversationActivityAnnouncementMessage(
+          mountedMessage,
+          "Tesla dip idea",
+          interpolateDefault,
+        )}
       />,
     );
 
@@ -698,5 +704,38 @@ describe("active conversation activity announcements", () => {
     expect(
       conversationActivityAnnouncementDescriptor("manual_unread", "Tesla dip idea"),
     ).toBeNull();
+  });
+
+  test("rebuilds the consumed status sentence when the placeholder title is replaced", () => {
+    const acknowledgments: string[] = [];
+    const consumed = consumeConversationActivityAnnouncement({
+      activity: {
+        acknowledgeAnnouncement: (conversationId, key) => {
+          acknowledgments.push(`${conversationId}|${key}`);
+        },
+      },
+      conversationId: "conversation-a",
+      transition: { key: "conversation-a:2:needs-input", presentation: "needs_input" },
+      title: "New chat",
+    });
+    const statusRegion = (title: string | null) =>
+      renderToStaticMarkup(
+        <ConversationActivityLiveRegion
+          announcementKey={consumed?.key ?? "none"}
+          message={conversationActivityAnnouncementMessage(
+            consumed,
+            title,
+            interpolateDefault,
+          )}
+        />,
+      );
+
+    expect(statusRegion("New chat")).toContain("New chat needs your input.");
+    const retitled = statusRegion("Tesla dip idea");
+    expect(retitled).toContain("Tesla dip idea needs your input.");
+    expect(retitled).not.toContain("New chat");
+    expect(acknowledgments).toEqual([
+      "conversation-a|conversation-a:2:needs-input",
+    ]);
   });
 });

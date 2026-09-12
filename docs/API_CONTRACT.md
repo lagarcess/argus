@@ -1087,9 +1087,12 @@ machine-readable fields alongside display labels:
   action always keeps its normal localized label. There is no second action,
   modal, toast, or client-owned execution state.
 - `period_adjustment`: optional typed sidecar with
-  `code = effective_window_adjusted`, `requested_date_range`, and
-  `effective_date_range`. The frontend renders one localized, provider-neutral
-  assistant lead-in directly above the corrected card. The backend emits this
+  `code = effective_window_adjusted`, `requested_date_range`,
+  `effective_date_range`, and optional `limited_by = { symbol,
+  first_available }`. The frontend renders one localized, provider-neutral
+  assistant lead-in directly above the corrected card. When `limited_by` is
+  present the lead-in names that symbol and its first available date; cards
+  without it keep the shared data window reason. The backend emits this
   sidecar only when `data_coverage.adjustment_reason =
   provider_coverage_adjustment`; ordinary calendar alignment, full coverage,
   and legacy coverage without a reason omit it. Clients must not infer the
@@ -1127,8 +1130,11 @@ run-derived context object for result follow-ups; it is not a second metrics
 source of truth. On every public read it also carries `figures`, the
 one-decimal display projection of its own `metrics` (`total_return_pct`,
 `benchmark_return_pct`, `delta_vs_benchmark_pct`, `benchmark_comparison_claim`,
-`max_drawdown_pct`, plus `gross_total_return_pct` and `net_total_return_pct`
-when costs were modeled). Public runs carry the same `figures` beside their
+`max_drawdown_pct`, plus `gross_total_return_pct`, `net_total_return_pct` and
+`return_drag_pct` when costs were modeled). `delta_vs_benchmark_pct` is the shown
+return minus the shown benchmark return, and `return_drag_pct` is the shown gross
+return minus the shown net return; the stored engine value is quoted only when a
+return is missing. Public runs carry the same `figures` beside their
 `metrics`. The backend rounds once, with the same rounding its own prose uses;
 clients print those digits verbatim with locale separators and grouping and
 never round `metrics` for display. Legacy `saved_strategy_id` metadata remains
@@ -1288,12 +1294,12 @@ request. Missing dated evidence remains unavailable.
 Template readouts and dossier outcomes render from the same typed run facts
 in the current workspace language. The figures those
 surfaces share with the result card (returns, the benchmark gap, worst drop)
-are the backend's `figures`: rounded once, from the engine's own
-`delta_vs_benchmark_pct` and returns, and printed verbatim in the workspace
-locale. No reader subtracts two rounded returns or rounds a figure a second
-time, so the card, the prose beside it, and the dossier cannot show two numbers
-for one fact. Original LLM result prose remains immutable audit/model context,
-not a presentation fallback. Only the versioned, creation-time envelope above
+are the backend's `figures`: rounded once from the engine's returns, with the
+gap stated as the difference of the two returns as shown, and printed verbatim
+in the workspace locale. Only the backend owner states that difference and no
+reader rounds a figure a second time, so the card, the prose beside it, and the
+dossier cannot show two numbers for one fact. Original LLM result prose remains
+immutable audit/model context, not a presentation fallback. Only the versioned, creation-time envelope above
 authorizes visible model readout text.
 Public result messages carry empty `content`; live result finals carry empty
 `assistant_response`. Public run/card payloads omit stored `quick_take`,
@@ -1619,6 +1625,13 @@ optional when reading older records. Requested and effective ranges remain
 independent provenance; consumers must not classify their difference with
 fixed day thresholds.
 
+When one series' own history sets a start later than the request and the first
+session the window could open, new coverage records also carry
+`limited_by = { symbol, first_available }`: the series whose first bar is the
+effective start, and that bar's ISO date. Calendar alignment, full coverage,
+starts set by interleaved gaps, and older records omit it. Like
+`adjustment_reason`, it is provenance and is not part of the launch identity.
+
 `save_strategy` is accepted only as a stale-action compatibility request. It
 never mutates Strategy records; Argus responds that the completed run remains
 available in conversation/history. Completed runs are captured automatically as
@@ -1814,6 +1827,8 @@ across symbols.
 ```json
 {
   "max_drawdown_pct": -9.2,
+  "max_drawdown_peak_date": "2025-02-18",
+  "max_drawdown_trough_date": "2025-08-01",
   "volatility_pct": 18.6,
   "downside_deviation_pct": 11.4,
   "worst_trade_pct": -4.1,
@@ -1826,6 +1841,8 @@ across symbols.
 {
   "win_rate": 0.57,
   "total_trades": 42,
+  "buy_fills": 21,
+  "sell_fills": 21,
   "profit_factor": 1.6,
   "sharpe_ratio": 1.15,
   "sortino_ratio": 1.42,
@@ -1844,7 +1861,10 @@ divided by absolute gross negative realized P&L after modeled fees and
 slippage. It is `null` when there are no completed trades or no losing trade,
 and it is `0.0` when completed trades lose money without any winning trade.
 `total_trades` retains its existing executed-fill meaning; it is not a count of
-completed positions. If a close and a new open share one timestamp, the
+completed positions. `buy_fills` and `sell_fills` count executed buy and sell
+fills. A fixed-capital run's `total_trades` is their sum; a contributions run's
+`total_trades` equals `buy_fills`, and its `sell_fills` is `0` because a
+recurring plan only buys. If a close and a new open share one timestamp, the
 canonical ledger applies the close before the open. The same ordered fills own
 both portfolio equity and closed-trade P&L.
 
@@ -1854,6 +1874,8 @@ For example, an open buy-and-hold position persists:
 {
   "win_rate": null,
   "total_trades": 1,
+  "buy_fills": 1,
+  "sell_fills": 0,
   "profit_factor": null
 }
 ```
@@ -1877,7 +1899,11 @@ the run, meaning the fixed bankroll at the first bar, or the first funded
 bar's deposits on a contributions run. `max_drawdown_pct` reads the wealth
 path from that baseline, so a first-bar execution cost (fees plus slippage)
 is itself a fall from the baseline and can never hide behind a flat
-post-entry price. `volatility_pct` and `sharpe_ratio` use exactly one return
+post-entry price. `max_drawdown_peak_date` and `max_drawdown_trough_date`
+date that drop on the same path: the first close at its high and the close at
+its low. The start is `null` when the drop begins at the baseline, both are
+`null` when the path never drops, and runs stored before these keys have
+neither. `volatility_pct` and `sharpe_ratio` use exactly one return
 per real bar interval, with the funding bar's execution jump compounded into
 the first funded interval; no fabricated zero observation joins the sample.
 A window with fewer than two real return intervals reports `volatility_pct`
@@ -1969,6 +1995,7 @@ because an accumulation plan never closes a position.
 - Ratio fields are decimal ratios (e.g., `win_rate: 0.57`).
 - Currency-like `profit` depends on configured starting capital.
 - `metrics.aggregate.performance.portfolio_value_range` stores the aggregate strategy portfolio equity close peak/lowest values during the run period. These values must match `chart.value_summary` when chart data is available.
+- `metrics.aggregate.performance.execution_realism` appears only when the run modeled nonzero fees or slippage. Beside `fee_bps`, `slippage_bps`, `gross_total_return_pct`, `net_total_return_pct`, and `return_drag_pct`, it stores `modeled_fee_cost` and `modeled_slippage_cost`: the dollars the strategy's own fills paid, summed over symbols and rounded to cents. A buy spends its market value plus both costs, and a sell returns its market value minus both. `modeled_cost_total` is the sum of the two rounded amounts. Benchmark fills and the zero-cost gross comparison never add to these amounts. Runs stored before these keys existed omit them.
 - Conversation result cards use fixed beginner-friendly defaults.
 - All supported engine metrics are persisted in `metrics`.
 - AI may answer follow-up questions using `metrics.aggregate` and `metrics.by_symbol`.
@@ -4276,7 +4303,9 @@ Contract rules:
   or more subjects were compared, peer suggestions, and the open thread, in
   a consumable shape. It is not a memory record and carries none of the four
   memory categories. The rail only emits; nothing reads or writes memory
-  here, and consumption ships in the memory lane.
+  here, and consumption ships in the memory lane. The app does not render
+  `follow_up`; a research answer that later offers next steps adopts the
+  `next_steps` list instead of a new shape.
 - `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
   ground through the balanced shape; the provider's `etf_holdings` table is
   parsed deterministically, weight order preserved, and each named holding
@@ -4722,26 +4751,47 @@ localized row label, `why` is a typed reason (`code` + `params`, e.g.
 suffix such as the pre-resolved peer symbol) plus `send_text` (the exact
 localized sentence a tap submits as an ordinary user turn). Reason params are
 one-decimal display figures the backend rounded: `points` is the magnitude of
-the run's `delta_vs_benchmark_pct` and `drawdown` is its `max_drawdown_pct`; a
+the run's shown benchmark gap (the `figures` `delta_vs_benchmark_pct`) and
+`drawdown` is its `max_drawdown_pct`; a
 gap inside the in-line cut carries no benchmark reason. The client prints them
 verbatim in the workspace locale, so the reason never quotes a different
 number than the card above it. The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
 
-A result follow-up that asks what to try next (`semantic_turn_act:
-"result_followup"`, `result_followup_focus: "next_experiment"`) answers with
-this same sidecar on a plain assistant message: `assistant_response` is a
-one-sentence lead-in in the workspace language, `next_experiments` carries the
-latest result's rows (the same offer the result made when it was first
-explained), and no `response_intent` heading is attached because the Try next
-section is the heading. No composer call is spent on that turn. Because the
-message carries no result card, the sidecar names its run as `source_run_id`
-(the latest result's run id), and the client submits the same
-`refine_strategy` action for `change_date_range` and `compare_buy_and_hold`
-rows that it submits under a card, with that `run_id`. The retryable
-`recovery.code = "latest_result_followup_unavailable"` appears only when no
-row can be built for the latest result (#590).
+A result follow-up (`semantic_turn_act: "result_followup"`) is answered by the
+model on a plain assistant message: `assistant_response` is the answer in the
+workspace language, and no `response_intent` heading is attached. Under the
+answer, `next_steps` carries one ordered list of three to five steps
+(`version: "argus_next_steps/v1"`) in the order the answer recommends them. Each
+item is either `{type: "test", kind}`, a runnable test Argus attaches from the
+latest result's Try next offer, or `{type: "question", text}`, a question the
+reader could ask next. The same message's `next_experiments` carries exactly the
+listed tests' rows, in list order and without `why` (the answer gives the
+reasons), and names its run as `source_run_id`. A tapped test submits what its
+row submits under a card, including the `refine_strategy` action with that
+`run_id` for `change_date_range` and `compare_buy_and_hold`; a tapped question
+sends its text as an ordinary user turn. The frontend renders one Try next
+section from `next_steps`, resolving each test to its row and dropping items it
+cannot resolve. A message without `next_steps` shows its `next_experiments` rows
+alone, which is the shape under a result card before any follow-up answer. When
+the reader asked what to try next (`result_followup_focus: "next_experiment"`)
+and the answer lists no steps, or no model answered and the retryable
+`recovery.code = "latest_result_followup_unavailable"` is shown, the list holds
+the result's tests alone (#590). `next_steps` is not specific to results: a
+research answer can adopt it later without a new shape, and research answers
+carry only `next_experiments` today.
+
+```json
+"next_steps": {
+  "version": "argus_next_steps/v1",
+  "items": [
+    {"type": "test", "kind": "recurring_monthly_buys"},
+    {"type": "question", "text": "What drove DOCN's drop between February and August 2025?"},
+    {"type": "test", "kind": "change_date_range"}
+  ]
+}
+```
 
 When the user selects `change_date_range` or `compare_buy_and_hold`, the web
 client submits a result-presented `refine_strategy` action whose payload carries

@@ -849,9 +849,10 @@ def test_post_result_readiness_prose_materializes_confirmation_payload(
     state to launch.
     """
 
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
     from argus.agent_runtime.stages import confirm as confirm_module
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions
     from argus.agent_runtime.stages.confirm import confirm_stage
     from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
     from argus.agent_runtime.state.models import ConfirmationPayload
@@ -866,11 +867,11 @@ def test_post_result_readiness_prose_materializes_confirmation_payload(
 
     async def compose_result_followup_stub(**kwargs):
         del kwargs
-        return None
+        return ResultConversationAnswer(text=None)
 
     monkeypatch.setattr(
-        interpret_actions,
-        "_compose_result_followup_with_timeout",
+        answers_module,
+        "compose_result_conversation_answer",
         compose_result_followup_stub,
     )
 

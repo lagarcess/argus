@@ -1,0 +1,353 @@
+{
+  "reruns": [
+    {
+      "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "category": "asset_discovery_routing",
+      "reason": "One retry of a case that passed in the baseline and failed in the full run.",
+      "commit": "9eddf710",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": [],
+      "prose_judge_text": "Aquí tienes los candidatos verificados dentro de la categoría de acciones farmacéuticas.",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 5,
+        "reported_cost_receipt_count": 5,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.020554468
+      }
+    },
+    {
+      "id": "capability_honesty_future_performance_btc_regression",
+      "category": "capability_honesty",
+      "reason": "One retry of a case that passed in the baseline and failed in the full run.",
+      "commit": "9eddf710",
+      "status": "failed",
+      "failed_checks": [
+        "research.published: expected True, got False"
+      ],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": "research_unavailable_http_error",
+      "prose_judge_failed_criteria": [],
+      "prose_judge_text": "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0171611224
+      }
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "category": "dca_capital_semantics",
+      "reason": "One retry of a case that passed in the baseline and failed in the full run.",
+      "commit": "9eddf710",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [
+        {
+          "task": "interpretation",
+          "schema_name": "LLMInterpretationResponse",
+          "model": "x-ai/grok-4.3",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError"
+        }
+      ],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 11,
+        "reported_cost_receipt_count": 10,
+        "unreported_cost_receipt_count": 1,
+        "reported_cost_usd": 0.0559951884
+      }
+    },
+    {
+      "id": "natural_language_establishes_modeled_costs_issue_271",
+      "category": "action_chip_semantics",
+      "reason": "A case with stated execution costs, run at head because the ungrounded-cost fix (5d1105eb) came after the measured head.",
+      "commit": "9eddf710",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 4,
+        "reported_cost_receipt_count": 4,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.024458
+      }
+    },
+    {
+      "id": "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "category": "action_chip_semantics",
+      "reason": "A case with stated execution costs, run at head because the ungrounded-cost fix (5d1105eb) came after the measured head.",
+      "commit": "9eddf710",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 4,
+        "reported_cost_receipt_count": 4,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.02452624
+      }
+    },
+    {
+      "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+      "category": "dca_capital_semantics",
+      "reason": "A case with stated execution costs, run at head because the ungrounded-cost fix (5d1105eb) came after the measured head.",
+      "commit": "9eddf710",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 5,
+        "reported_cost_receipt_count": 5,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.02943515
+      }
+    },
+    {
+      "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+      "category": "dca_capital_semantics",
+      "reason": "A case with stated execution costs, run at head because the ungrounded-cost fix (5d1105eb) came after the measured head.",
+      "commit": "9eddf710",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [
+        {
+          "task": "interpretation",
+          "schema_name": "LLMInterpretationResponse",
+          "model": "x-ai/grok-4.3",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError"
+        }
+      ],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 6,
+        "reported_cost_receipt_count": 5,
+        "unreported_cost_receipt_count": 1,
+        "reported_cost_usd": 0.0284718
+      }
+    },
+    {
+      "id": "capability_honesty_future_performance_btc_regression",
+      "category": "capability_honesty",
+      "reason": "The case that failed in both lane runs, run once on origin/codex/private-alpha-next to see whether the integration branch fails the same way.",
+      "commit": "509b7d03",
+      "status": "failed",
+      "failed_checks": [
+        "research.published: expected True, got False",
+        "prose_judge:scenario_framing"
+      ],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": "research_unavailable_timeout",
+      "prose_judge_failed_criteria": [
+        "scenario_framing"
+      ],
+      "prose_judge_text": "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.01729405
+      }
+    },
+    {
+      "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "category": "action_chip_semantics",
+      "reason": "A case whose snapshot holds a completed result, run at the head of the Codex review fixes, because those fixes change how a result follow-up resolved to a stored fact is answered.",
+      "commit": "4248fdd4",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.02614615
+      }
+    },
+    {
+      "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "category": "action_chip_semantics",
+      "reason": "A case whose snapshot holds a completed result, run at the head of the Codex review fixes, because those fixes change how a result follow-up resolved to a stored fact is answered.",
+      "commit": "4248fdd4",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [
+        {
+          "task": "interpretation",
+          "schema_name": "LLMInterpretationResponse",
+          "model": "x-ai/grok-4.3",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError"
+        }
+      ],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 4,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 1,
+        "reported_cost_usd": 0.0311956
+      }
+    },
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "category": "asset_discovery_routing",
+      "reason": "A case whose snapshot holds a completed result, run at the head of the Codex review fixes, because those fixes change how a result follow-up resolved to a stored fact is answered.",
+      "commit": "4248fdd4",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 4,
+        "reported_cost_receipt_count": 4,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0208005
+      }
+    },
+    {
+      "id": "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "category": "messy_english",
+      "reason": "A case whose snapshot holds a completed result, run at the head of the Codex review fixes, because those fixes change how a result follow-up resolved to a stored fact is answered.",
+      "commit": "4248fdd4",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.02140615
+      }
+    },
+    {
+      "id": "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "category": "messy_spanish",
+      "reason": "A case whose snapshot holds a completed result, run at the head of the Codex review fixes, because those fixes change how a result follow-up resolved to a stored fact is answered.",
+      "commit": "4248fdd4",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": null,
+      "prose_judge_text": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0235199
+      }
+    }
+  ],
+  "provider_usage": {
+    "route_receipt_count": 58,
+    "reported_cost_receipt_count": 55,
+    "unreported_cost_receipt_count": 3,
+    "reported_cost_usd": 0.3409643188
+  }
+}

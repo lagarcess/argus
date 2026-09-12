@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
+from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
 from argus.domain.result_readout_content import (
     ReadoutLanguage,
     normalize_readout_language,
@@ -19,6 +21,14 @@ from argus.domain.result_readout_facts import (
 )
 from argus.domain.result_readout_quotes import validate_figure_references
 from argus.domain.visible_reply import rewrite_visible_reply
+
+# Every model-written text about a run declares its figures the same way.
+READOUT_FIGURE_REFERENCE_INSTRUCTIONS = (
+    "Put complete prose in text; keep fact names private in figures. For each run "
+    "figure used, give its exact fact_key. In figures.value use a JSON number "
+    "without currency symbols, percent signs or separators; only dates use an ISO "
+    "string. One reference per fact is enough; no figures used means an empty list."
+)
 
 READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "Tell the story of this historical experience in plain language: what staying "
@@ -34,13 +44,11 @@ READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "regularly, or buying and selling, as appropriate. Tell the holding "
     "experience without narrating record keeping. Stay within the evidence, "
     "without inventing a holder's feelings or decisions. Any next step is a "
-    "question for another supported historical test, never a prediction or "
+    "question for another historical test Argus can run, never a prediction or "
     "recommendation to trade. No forecasts, investment advice or em dashes. "
-    "Write in product_language and report the language actually written. Put "
-    "complete prose in text; keep fact names private in figures. For each run "
-    "figure used, give its exact fact_key. In figures.value use a JSON number "
-    "without currency symbols, percent signs or separators; only dates use an ISO "
-    "string. One reference per fact is enough; no figures used means an empty list."
+    "Refer to the benchmark only by its ticker. "
+    "Write in product_language and report the language actually written. "
+    + READOUT_FIGURE_REFERENCE_INSTRUCTIONS
 )
 
 
@@ -128,20 +136,27 @@ def stored_readout_facts(
         }
     }
     facts: dict[str, Any] = {
-        "metrics": metrics if isinstance(metrics, dict) else {},
+        "metrics": _with_shown_differences(metrics),
         "configuration": config,
         "symbols": symbols,
         "benchmark_symbol": benchmark_symbol,
         "date_range": date_range,
     }
     performance = _mapping(_mapping(facts["metrics"].get("aggregate")).get("performance"))
-    facts["comparison"] = {
+    comparison = {
         key: value
         for key, value in {**(comparison_metrics or {}), **performance}.items()
         if key in {"total_return_pct", "benchmark_return_pct", "delta_vs_benchmark_pct"}
     }
-    delta = facts["comparison"].get("delta_vs_benchmark_pct")
-    facts["benchmark_comparison_claim"] = benchmark_comparison_from_delta(delta).claim
+    gap = shown_benchmark_gap(
+        comparison.get("total_return_pct"),
+        comparison.get("benchmark_return_pct"),
+        comparison.get("delta_vs_benchmark_pct"),
+    )
+    if gap is not None or "delta_vs_benchmark_pct" in comparison:
+        comparison["delta_vs_benchmark_pct"] = gap
+    facts["comparison"] = comparison
+    facts["benchmark_comparison_claim"] = benchmark_comparison_from_delta(gap).claim
     if isinstance(chart, dict):
         facts["chart"] = {
             key: value for key, value in chart.items() if key != "attribution"
@@ -193,6 +208,29 @@ def accepted_readout_text(
     if figure_failure:
         return None, figure_failure
     return rewrite_visible_reply(text.strip(), surface="result_readout").text, None
+
+
+def _with_shown_differences(metrics: object) -> dict[str, Any]:
+    """A copy whose stored benchmark gaps and cost drags read as the owner states them."""
+    if not isinstance(metrics, dict):
+        return {}
+    shown = deepcopy(metrics)
+    for block in (shown.get("aggregate"), *_mapping(shown.get("by_symbol")).values()):
+        performance = _mapping(_mapping(block).get("performance"))
+        if "delta_vs_benchmark_pct" in performance:
+            performance["delta_vs_benchmark_pct"] = shown_benchmark_gap(
+                performance.get("total_return_pct"),
+                performance.get("benchmark_return_pct"),
+                performance["delta_vs_benchmark_pct"],
+            )
+        realism = _mapping(performance.get("execution_realism"))
+        if "return_drag_pct" in realism:
+            realism["return_drag_pct"] = shown_cost_drag(
+                realism.get("gross_total_return_pct"),
+                realism.get("net_total_return_pct"),
+                realism["return_drag_pct"],
+            )
+    return shown
 
 
 def _mapping(value: object) -> dict[str, Any]:

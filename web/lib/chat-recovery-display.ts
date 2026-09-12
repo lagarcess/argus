@@ -151,6 +151,10 @@ export function recoveryDisplayFromRecoveryState(
   };
 }
 
+// A result fact the run does not store. Its answer is the message text; the
+// unsupported-recovery copy belongs to rules Argus cannot run.
+const RESULT_FACT_LIMITATION_CODE = "latest_result_metric_unavailable";
+
 export function recoveryDisplayFromResponseIntent(
   value: unknown,
 ): RecoveryDisplay | null {
@@ -166,6 +170,12 @@ export function recoveryDisplayFromResponseIntent(
     return { kind, facts: resultReadoutFacts(recordOrNull(intent.facts)?.result_fact_bank) };
   }
   if (kind === "unsupported_recovery") {
+    if (
+      stringOrNull(recordOrNull(intent.facts)?.limitation_code) ===
+      RESULT_FACT_LIMITATION_CODE
+    ) {
+      return null;
+    }
     return unsupportedRecoveryDisplay(intent);
   }
   if (kind === "artifact_action_recovery") {

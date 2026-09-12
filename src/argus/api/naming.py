@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import Literal
 
+from loguru import logger
 from pydantic import BaseModel
 
 from argus.llm.openrouter import (
@@ -49,25 +51,8 @@ def title_word_budget(viewport: str | None) -> int:
     return NARROW_TITLE_MAX_WORDS if viewport == "narrow" else WIDE_TITLE_MAX_WORDS
 
 
-def constrain_to_word_budget(candidate: str, budget: int) -> str:
-    """Hold a generated title to the budget the prompt asked for.
-
-    A prompt is a request, not a guarantee. The contract says the backend owns
-    the short form so a narrow header shows a title composed short rather than
-    one the client clips, and that only holds if something here enforces it.
-
-    Trimming is structural on purpose: taking the first words and dropping
-    trailing punctuation, with no notion of which words matter. Anything
-    smarter would need to know the language, and choosing behaviour by language
-    is what this codebase does not do.
-    """
-
-    words = candidate.split()
-    if budget <= 0 or len(words) <= budget:
-        return candidate.strip()
-    kept = " ".join(words[:budget])
-    # A cut mid-phrase can leave a dangling comma or dash that reads as damage.
-    return kept.rstrip(" ,;:-–—/&").strip()
+def _fits_word_budget(candidate: str, budget: int) -> bool:
+    return len(candidate.split()) <= budget
 
 
 def suggest_entity_name(
@@ -80,27 +65,51 @@ def suggest_entity_name(
     try:
         resolved = resolve_language(language)
         budget = title_word_budget(viewport)
-        response = invoke_openrouter_json_schema_sync(
-            task="name_suggestion",
-            schema_model=NameSuggestion,
-            schema_name="name_suggestion",
-            messages=[
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Generate a concise user-facing name for Argus Alpha. "
+                    f"Max {budget} words. "
+                    "No punctuation-only output. "
+                    f"Entity type: {entity_type}. Language: {resolved}."
+                ),
+            },
+            {"role": "user", "content": context},
+        ]
+        candidate = _request_name(messages)
+        if candidate is None or _fits_word_budget(candidate, budget):
+            return candidate
+        # A title is never clipped mid-phrase: one shorter request, else no title so
+        # the default stays and a later turn retries.
+        logger.info(
+            "Name suggestion over word budget; requesting a shorter name "
+            f"budget={budget} words={len(candidate.split())}"
+        )
+        shorter = _request_name(
+            [
+                *messages,
                 {
-                    "role": "system",
+                    "role": "assistant",
+                    "content": json.dumps({"name": candidate}, ensure_ascii=False),
+                },
+                {
+                    "role": "user",
                     "content": (
-                        "Generate a concise user-facing name for Argus Alpha. "
-                        f"Max {budget} words. "
-                        "No punctuation-only output. "
-                        f"Entity type: {entity_type}. Language: {resolved}."
+                        f"That name has more than {budget} words. "
+                        f"Give a complete name of at most {budget} words."
                     ),
                 },
-                {"role": "user", "content": context},
-            ],
+            ]
         )
-        if response is None:
-            return None
-        candidate = constrain_to_word_budget(response.name.strip(), budget)
-        return candidate if candidate else None
+        if shorter is not None and _fits_word_budget(shorter, budget):
+            return shorter
+        words = None if shorter is None else len(shorter.split())
+        logger.info(
+            "Shorter name suggestion unusable; keeping the default title "
+            f"budget={budget} words={words}"
+        )
+        return None
     except Exception as exc:
         log_openrouter_failure(
             task="name_suggestion",
@@ -109,3 +118,15 @@ def suggest_entity_name(
             message="Name suggestion failed",
         )
         return None
+
+
+def _request_name(messages: list[dict[str, str]]) -> str | None:
+    response = invoke_openrouter_json_schema_sync(
+        task="name_suggestion",
+        schema_model=NameSuggestion,
+        schema_name="name_suggestion",
+        messages=messages,
+    )
+    if response is None:
+        return None
+    return response.name.strip() or None

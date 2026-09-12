@@ -22,10 +22,8 @@ import NextMoveRow, {
   NextMoveTicker,
   NextMoveTitle,
 } from "./NextMoveRow";
-import {
-  nextExperimentAction,
-  nextExperimentReasonText,
-} from "@/lib/chat-next-experiments";
+import NextStepsSection from "./NextStepsSection";
+import { messageNextSteps } from "@/lib/chat-next-steps";
 import {
   type ChatActionOption,
   type ChatMention,
@@ -254,11 +252,6 @@ export default function ChatMessage({
       : t("chat.discovery_results.unsourced_line", {
           defaultValue: "From general knowledge, not a current search",
         });
-  // Localized heading chrome for latest-result fact answers, driven by the
-  // typed fact key. Unknown keys render no heading.
-  const factHeadingLabel = message.resultFactHeadingKey
-    ? t(`chat.result_followup.headings.${message.resultFactHeadingKey}`, "")
-    : "";
   const confirmationPeriodLeadIn = confirmationPeriodAdjustmentText(
     confirmation?.period_adjustment,
     (key, options) => t(key, options),
@@ -452,9 +445,6 @@ export default function ChatMessage({
             </FailureNotice>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
-              {factHeadingLabel && (
-                <div className="argus-result-section-label">{factHeadingLabel}</div>
-              )}
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}
               </ReactMarkdown>
@@ -692,81 +682,24 @@ export default function ChatMessage({
             />
           ) : null}
 
-          {/* Try next rows are the sanctioned next-move surface for any
-              message that carries them (results, grounded knowledge answers);
-              only mid-turn composition suppresses them. */}
-          {shouldShowAssistantFooter &&
-            Boolean(isLatest) &&
-            !turnInFlight &&
-            (message.nextExperiments?.length ?? 0) > 0 && (
-              <section
-                aria-label={t("chat.next_experiments.section", "Try next")}
-                className="mt-5 flex w-full max-w-[min(100%,660px)] flex-col"
-              >
-                <div className="argus-result-section-label">
-                  {t("chat.next_experiments.section", "Try next")}
-                </div>
-                <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
-                  {(message.nextExperiments ?? []).map((row, rowIndex) => {
-                    const rowLabel = t(row.labelKey, row.label);
-                    // Narrow screens read the backend's short form; the clamp
-                    // below is only a safety net, never a single-line ellipsis.
-                    const narrowLabel =
-                      isBelowTablet && row.labelShortKey
-                        ? t(row.labelShortKey, row.labelShort ?? row.label)
-                        : rowLabel;
-                    // One result-level reason; captioning every row repeats it.
-                    const whyText =
-                      rowIndex === 0 ? nextExperimentReasonText(row.why, t, locale) : "";
-                    return (
-                      <NextMoveRow
-                        key={row.kind}
-                        ariaLabel={rowLabel}
-                        disabled={turnInFlight}
-                        onClick={() =>
-                          onAction?.(
-                            nextExperimentAction(
-                              row,
-                              rowLabel,
-                              message.result?.runId ??
-                                message.nextExperimentsSourceRunId ??
-                                undefined,
-                            ),
-                          )
-                        }
-                      >
-                        <NextMoveTitle>
-                          {row.labelParts
-                            ? row.labelParts.map((part, partIndex) =>
-                                part.type === "ticker" ? (
-                                  <span key={partIndex}>
-                                    {" "}
-                                    <NextMoveTicker>{part.value}</NextMoveTicker>
-                                  </span>
-                                ) : (
-                                  <span key={partIndex}>{part.value}</span>
-                                ),
-                              )
-                            : narrowLabel}
-                        </NextMoveTitle>
-                        {row.detail ? (
-                          <>
-                            <NextMoveSeparator>·</NextMoveSeparator>
-                            <NextMoveDetail>{row.detail}</NextMoveDetail>
-                          </>
-                        ) : null}
-                        {whyText ? (
-                          <>
-                            <NextMoveSeparator>·</NextMoveSeparator>
-                            <NextMoveDetail>{whyText}</NextMoveDetail>
-                          </>
-                        ) : null}
-                      </NextMoveRow>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+          {/* One next-move list is the sanctioned surface for any message that
+              carries one (results, answers about them, grounded knowledge
+              answers); only mid-turn composition suppresses it. */}
+          {shouldShowAssistantFooter && Boolean(isLatest) && !turnInFlight && (
+            <NextStepsSection
+              steps={messageNextSteps(message)}
+              disabled={turnInFlight}
+              isBelowTablet={isBelowTablet}
+              locale={locale}
+              onAction={onAction}
+              sourceRunId={
+                message.result?.runId ??
+                message.nextExperimentsSourceRunId ??
+                undefined
+              }
+              t={t}
+            />
+          )}
 
           {showNextMoveRows && (
             <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col divide-y divide-black/8 dark:divide-white/8">

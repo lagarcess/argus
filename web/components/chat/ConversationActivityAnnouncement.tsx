@@ -25,14 +25,19 @@ type ActivityAnnouncementOwner = Pick<
   "acknowledgeAnnouncement" | "getAnnouncement" | "selectPresentation"
 >;
 
+type AnnouncedPresentation = Exclude<
+  ConversationActivityPresentation,
+  "manual_unread" | "none"
+>;
+
 type ConsumedActivityAnnouncement = Readonly<{
   conversationId: string;
   key: string;
-  message: string;
+  presentation: AnnouncedPresentation;
 }>;
 
 const ANNOUNCEMENT_COPY: Record<
-  Exclude<ConversationActivityPresentation, "manual_unread" | "none">,
+  AnnouncedPresentation,
   Readonly<{ key: string; defaultValue: string }>
 > = {
   working: {
@@ -66,7 +71,6 @@ export const consumeConversationActivityAnnouncement = ({
   conversationId,
   transition,
   title,
-  translate,
 }: Readonly<{
   activity: Pick<
     ActivityAnnouncementOwner,
@@ -75,20 +79,30 @@ export const consumeConversationActivityAnnouncement = ({
   conversationId: string;
   transition: ActivityTransition;
   title: string | null;
-  translate: ActivityTranslation;
 }>): ConsumedActivityAnnouncement | null => {
   if (!title) return null;
-  const descriptor = conversationActivityAnnouncementDescriptor(
-    transition.presentation,
-    title,
-  );
   activity.acknowledgeAnnouncement(conversationId, transition.key);
-  if (!descriptor) return null;
+  if (transition.presentation === "manual_unread") return null;
   return {
     conversationId,
     key: transition.key,
-    message: translate(descriptor.key, descriptor),
+    presentation: transition.presentation,
   };
+};
+
+// The sentence reads the current title, so a real title replaces a placeholder
+// that was showing when the announcement was consumed.
+export const conversationActivityAnnouncementMessage = (
+  consumed: Pick<ConsumedActivityAnnouncement, "presentation"> | null,
+  title: string | null,
+  translate: ActivityTranslation,
+): string => {
+  if (!consumed || !title) return "";
+  const descriptor = conversationActivityAnnouncementDescriptor(
+    consumed.presentation,
+    title,
+  );
+  return descriptor ? translate(descriptor.key, descriptor) : "";
 };
 
 export function ConversationActivityLiveRegion({
@@ -141,7 +155,6 @@ export default function ConversationActivityAnnouncement({
           conversationId,
           transition,
           title,
-          translate: t,
         }),
       );
       return;
@@ -152,12 +165,15 @@ export default function ConversationActivityAnnouncement({
     ) {
       setConsumed(null);
     }
-  }, [activity, consumed?.conversationId, conversationId, enabled, presentation, t, title, transition]);
+  }, [activity, consumed?.conversationId, conversationId, enabled, presentation, title, transition]);
+
+  const announced =
+    enabled && consumed?.conversationId === conversationId ? consumed : null;
 
   return (
     <ConversationActivityLiveRegion
-      announcementKey={consumed?.key ?? "none"}
-      message={consumed?.message ?? ""}
+      announcementKey={announced?.key ?? "none"}
+      message={conversationActivityAnnouncementMessage(announced, title, t)}
     />
   );
 }

@@ -176,6 +176,9 @@ def test_approved_launch_preserves_explicit_or_absent_coverage_reason(
     }
     if approved_adjustment_reason is not None:
         coverage_preflight["adjustment_reason"] = approved_adjustment_reason
+    limited_by = {"symbol": "AAPL", "first_available": "2024-01-03"}
+    if approved_adjustment_reason == "provider_coverage_adjustment":
+        coverage_preflight["limited_by"] = limited_by
 
     request = LaunchBacktestRequest(
         strategy_type="buy_and_hold",
@@ -220,6 +223,7 @@ def test_approved_launch_preserves_explicit_or_absent_coverage_reason(
         assert "adjustment_reason" not in resolved_coverage
     else:
         assert resolved_coverage["adjustment_reason"] == expected_adjustment_reason
+    assert resolved_coverage.get("limited_by") == coverage_preflight.get("limited_by")
     assert result.result_card is not None
     assert result.result_card["chart"]["series"][0]["time"] == "2024-01-03"
     assert result.result_card["chart"]["series"][-1]["time"] == "2024-01-05"

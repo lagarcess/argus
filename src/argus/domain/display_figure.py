@@ -20,3 +20,11 @@ def display_figure(value: object) -> float | None:
         return round(float(value), DISPLAY_DECIMALS)
     except (TypeError, ValueError):
         return None
+
+
+def display_difference(minuend: object, subtrahend: object) -> float | None:
+    """The gap between two shown figures: what a reader gets subtracting them."""
+    left, right = display_figure(minuend), display_figure(subtrahend)
+    if left is None or right is None:
+        return None
+    return display_figure(left - right)

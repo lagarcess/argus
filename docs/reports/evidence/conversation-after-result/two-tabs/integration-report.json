@@ -1,0 +1,82 @@
+{
+  "label": "integration",
+  "message": "Buy and hold SPY for 2024 with $1,000.",
+  "samples": [
+    {
+      "at_s": 3.637,
+      "when": "B opened",
+      "a": {
+        "composer_disabled": true,
+        "busy_sections": 0,
+        "status_nodes": [],
+        "messages": 2,
+        "text_tail": "argusNew chatSearchRecentsSettingsNew chatBuy and hold SPY for 2024 with $1,000.Working...Add a follow-upArgus can make mistakes. For education only. Not financial advice."
+      },
+      "b": {
+        "composer_disabled": true,
+        "busy_sections": 0,
+        "status_nodes": [
+          "Argus is working on New chat."
+        ],
+        "messages": 1,
+        "text_tail": "argusNew chatSearchRecentsSettingsNew chatArgus is working on New chat.Buy and hold SPY for 2024 with $1,000.Add a follow-upArgus can make mistakes. For education only. Not financial advice."
+      }
+    },
+    {
+      "at_s": 19.036,
+      "when": "after answer +2000ms",
+      "a": {
+        "composer_disabled": false,
+        "busy_sections": 0,
+        "status_nodes": [],
+        "messages": 2,
+        "text_tail": " for 2024 with $1,000.SPYBuy and HoldReady to runStarting capital$1,000PeriodJan 2, 2024 → Dec 31, 2024StocksDaily dataNo feesNo slippageBenchmark: SPYEdit capitalEdit datesEdit costsRun backtestChange assumptionsCancelAdd a follow-upArgus can make mistakes. For education only. Not financial advice."
+      },
+      "b": {
+        "composer_disabled": false,
+        "busy_sections": 0,
+        "status_nodes": [],
+        "messages": 1,
+        "text_tail": "argusNew chatSearchRecentsSettingsBuy and hold SPY for 2024Buy and hold SPY for 2024 with $1,000.Add a follow-upArgus can make mistakes. For education only. Not financial advice."
+      }
+    },
+    {
+      "at_s": 29.039,
+      "when": "after answer +10000ms",
+      "a": {
+        "composer_disabled": false,
+        "busy_sections": 0,
+        "status_nodes": [],
+        "messages": 2,
+        "text_tail": " for 2024 with $1,000.SPYBuy and HoldReady to runStarting capital$1,000PeriodJan 2, 2024 → Dec 31, 2024StocksDaily dataNo feesNo slippageBenchmark: SPYEdit capitalEdit datesEdit costsRun backtestChange assumptionsCancelAdd a follow-upArgus can make mistakes. For education only. Not financial advice."
+      },
+      "b": {
+        "composer_disabled": false,
+        "busy_sections": 0,
+        "status_nodes": [],
+        "messages": 1,
+        "text_tail": "argusNew chatSearchRecentsSettingsBuy and hold SPY for 2024Buy and hold SPY for 2024 with $1,000.Add a follow-upArgus can make mistakes. For education only. Not financial advice."
+      }
+    },
+    {
+      "at_s": 49.044,
+      "when": "after answer +20000ms",
+      "a": {
+        "composer_disabled": false,
+        "busy_sections": 0,
+        "status_nodes": [],
+        "messages": 2,
+        "text_tail": " for 2024 with $1,000.SPYBuy and HoldReady to runStarting capital$1,000PeriodJan 2, 2024 → Dec 31, 2024StocksDaily dataNo feesNo slippageBenchmark: SPYEdit capitalEdit datesEdit costsRun backtestChange assumptionsCancelAdd a follow-upArgus can make mistakes. For education only. Not financial advice."
+      },
+      "b": {
+        "composer_disabled": false,
+        "busy_sections": 0,
+        "status_nodes": [],
+        "messages": 1,
+        "text_tail": "argusNew chatSearchRecentsSettingsBuy and hold SPY for 2024Buy and hold SPY for 2024 with $1,000.Add a follow-upArgus can make mistakes. For education only. Not financial advice."
+      }
+    }
+  ],
+  "conversation_url": "http://127.0.0.1:3596/chat?conversation=6a3b479d-0066-4ac0-9aba-89a95dc5c96e",
+  "answer_landed_s": 17.034
+}

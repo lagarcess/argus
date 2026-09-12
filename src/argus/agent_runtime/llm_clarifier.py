@@ -45,6 +45,9 @@ class ClarificationRequest(BaseModel):
     optional_parameter_choices: list[str] = Field(default_factory=list)
     response_intent: dict[str, Any] = Field(default_factory=dict)
     language: str = "en"
+    # Symbol to ISO date of its first daily bar, only for assets whose start
+    # market data established.
+    asset_history_starts: dict[str, str] = Field(default_factory=dict)
 
 
 class ClarificationResponse(BaseModel):
@@ -199,6 +202,8 @@ class OpenRouterClarificationGenerator:
             "expected_question_targets": sorted(_expected_question_targets(request)),
             "expected_detail_targets": sorted(_expected_detail_targets(request)),
         }
+        if request.asset_history_starts:
+            context["asset_history_starts"] = request.asset_history_starts
         return [
             SystemMessage(
                 content=(
@@ -259,8 +264,10 @@ class OpenRouterClarificationGenerator:
                     "expected target is sizing_amount, ask for the recurring purchase "
                     "amount; if cadence is still missing, ask how often purchases "
                     "should happen too. Keep date guidance aligned with data "
-                    "availability truth: equity launch history starts in 2016, and "
-                    "currency-pair intraday history has a bounded recent-data window. "
+                    "availability truth: say when an asset's price history starts "
+                    "only from asset_history_starts in the context, and name no start "
+                    "date or year for an asset without one; currency-pair intraday "
+                    "history has a bounded recent-data window. "
                     "For date-window clarifications, avoid arbitrary fixed calendar "
                     "examples or stale years; prefer relative or rolling windows in "
                     "the requested language unless the user already gave fixed dates. "

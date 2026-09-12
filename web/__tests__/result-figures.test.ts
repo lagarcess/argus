@@ -33,8 +33,9 @@ function bank(figures: Record<string, unknown>) {
   };
 }
 
+/** The backend's figures for those metrics: the gap is 53.4 minus 7.1 as shown. */
 const ISSUE_FIGURES = {
-  total_return_pct: 53.4, benchmark_return_pct: 7.1, delta_vs_benchmark_pct: 46.4,
+  total_return_pct: 53.4, benchmark_return_pct: 7.1, delta_vs_benchmark_pct: 46.3,
   benchmark_comparison_claim: "beat_benchmark", max_drawdown_pct: -18.4,
 };
 
@@ -59,12 +60,13 @@ describe("result figures are rounded once, by the backend (#533)", () => {
     const view = resultCardViewModel({ ...resultCardPlaygroundFixtures[0].result, readoutFacts: facts }, { t, locale: "en" });
     expect(view.evidence.benchmark.value).toBe(t("chat.result_card.benchmark_unavailable"));
     expect(JSON.stringify(view)).not.toContain("46.3");
+    expect(JSON.stringify(view)).not.toContain("46.4");
     expect(JSON.stringify(view)).not.toContain("53.44");
   });
 
   test.each(LANGUAGES)("the card, the Quick Take, the breakdown, and the Try next reason quote the backend gap in %s", async (language) => {
     const t = await translator(language);
-    for (const [delta, claim] of [[46.4, "beat_benchmark"], [315.6, "beat_benchmark"], [9.4, "lagged_benchmark"], [1234.6, "beat_benchmark"]] as const) {
+    for (const [delta, claim] of [[46.3, "beat_benchmark"], [315.6, "beat_benchmark"], [9.4, "lagged_benchmark"], [1234.6, "beat_benchmark"]] as const) {
       const signed = claim === "lagged_benchmark" ? -delta : delta;
       const facts = resultReadoutFacts(bank({ ...ISSUE_FIGURES, delta_vs_benchmark_pct: signed, benchmark_comparison_claim: claim }))!;
       const view = resultCardViewModel({ ...resultCardPlaygroundFixtures[0].result, symbols: ["AAPL"], readoutFacts: facts }, { t, locale: language });

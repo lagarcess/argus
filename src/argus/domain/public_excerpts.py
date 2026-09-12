@@ -40,6 +40,7 @@ from argus.domain.backtesting.rules.signals import (
     _opposite_moving_average_crossover_rule as engine_mirrored_exit_rule,
 )
 from argus.domain.credential_shapes import credential_shape_in
+from argus.domain.result_figures import shown_benchmark_gap
 from argus.domain.result_readout_facts import (
     engine_config_from_snapshot as _engine_config,
 )
@@ -597,8 +598,9 @@ def _benchmark_metrics(performance: dict[str, Any]) -> list[PublicExcerptMetric]
     The card renders this one as a sentence, in English in both languages (see the
     issue filed against ``benchmark_comparison_from_delta``), so the numbers behind
     it are taken from where the engine put them. Both are frozen: the benchmark's
-    return so the page can show what it did, and the engine's own delta so the
-    comparison is not re-derived by subtracting two already rounded strings.
+    return so the page can show what it did, and the gap ``shown_benchmark_gap``
+    states, the difference of the two returns as shown, so the frozen comparison
+    matches the figures beside it.
     """
     metrics: list[PublicExcerptMetric] = []
     benchmark_return = _amount(performance.get("benchmark_return_pct"))
@@ -609,7 +611,11 @@ def _benchmark_metrics(performance: dict[str, Any]) -> list[PublicExcerptMetric]
                 value=f"{benchmark_return:+.1f}%",
             )
         )
-    delta = _amount(performance.get("delta_vs_benchmark_pct"))
+    delta = shown_benchmark_gap(
+        _amount(performance.get("total_return_pct")),
+        benchmark_return,
+        _amount(performance.get("delta_vs_benchmark_pct")),
+    )
     if delta is not None:
         # Bare, because its unit is percentage points and that unit is a word.
         metrics.append(

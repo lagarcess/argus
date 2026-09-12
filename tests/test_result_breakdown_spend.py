@@ -11,6 +11,7 @@ from argus.domain.research.admission import (
 )
 from argus.domain.research.contracts import ResearchUnavailableError, ResearchUsage
 from argus.domain.research.perplexity_agent import StructuredAgentResult
+from argus.domain.result_readout_research import RESULT_RESEARCH_MODEL
 
 from tests.test_backtest_message_projection import _completed_run
 
@@ -39,7 +40,7 @@ async def test_breakdown_claims_shared_capacity_before_provider_work(
                     "language": "en",
                     "figures": [],
                 },
-                usage=ResearchUsage(model=breakdown.RESULT_BREAKDOWN_MODEL),
+                usage=ResearchUsage(model=RESULT_RESEARCH_MODEL),
                 sources=(),
                 tool_results=(),
                 provider_response_id=None,
@@ -85,7 +86,7 @@ def test_every_received_breakdown_invoice_reaches_shared_ledger(
     monkeypatch, outcome, cost
 ):
     usage = ResearchUsage(
-        model=breakdown.RESULT_BREAKDOWN_MODEL,
+        model=RESULT_RESEARCH_MODEL,
         cost_usd=cost,
         input_tokens=120,
         output_tokens=90,
@@ -150,7 +151,7 @@ def test_every_received_breakdown_invoice_reaches_shared_ledger(
 @pytest.mark.asyncio
 async def test_stream_disconnect_does_not_drop_received_breakdown_spend(monkeypatch):
     started, release, recorded = threading.Event(), threading.Event(), threading.Event()
-    usage = ResearchUsage(model=breakdown.RESULT_BREAKDOWN_MODEL, cost_usd=0.01)
+    usage = ResearchUsage(model=RESULT_RESEARCH_MODEL, cost_usd=0.01)
 
     def compose(*args, **kwargs):
         started.set()

@@ -807,6 +807,7 @@
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
       "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
+      "period_adjustment_limited_by": "Ajusté el período de la prueba a {{period}} porque Argus solo tiene precios de {{symbol}} desde el {{date}}.",
       "undo": "Deshacer",
       "peer_add_failed": "No se pudo cambiar esa prueba. La tarjeta no cambió.",
       "status": {
@@ -913,9 +914,9 @@
         "change_date_range": "Probar otro rango de fechas",
         "same_setup_peer_asset": "Probar el mismo enfoque en un activo similar",
         "same_rule_peer_asset": "Probar la misma regla en un activo similar",
-        "supported_rsi_threshold": "Probar una regla RSI compatible",
-        "supported_ma_crossover": "Probar un cruce SMA/EMA compatible",
-        "supported_rsi_or_ma_rule": "Simplificar a una regla RSI o SMA/EMA compatible",
+        "supported_rsi_threshold": "Probar una regla de umbral RSI",
+        "supported_ma_crossover": "Probar un cruce de medias móviles",
+        "supported_rsi_or_ma_rule": "Simplificar a una regla RSI o de medias móviles",
         "adjust_indicator_thresholds": "Probar otros umbrales del indicador",
         "adjust_signal_periods": "Probar otros períodos de la señal",
         "adjust_contribution_cadence": "Probar otro calendario de aportes",
@@ -936,9 +937,9 @@
         "recurring_monthly_buys": "Compras mensuales",
         "same_rule_peer_asset": "Misma regla, activo similar",
         "same_setup_peer_asset": "Activo similar",
-        "supported_ma_crossover": "Cruce SMA/EMA",
+        "supported_ma_crossover": "Cruce de medias móviles",
         "supported_rsi_or_ma_rule": "Simplificar la regla",
-        "supported_rsi_threshold": "Regla RSI compatible"
+        "supported_rsi_threshold": "Regla RSI"
       },
       "test_verb": "Probar"
     },

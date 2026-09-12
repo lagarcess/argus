@@ -640,6 +640,11 @@ def test_buy_and_hold_execution_realism_reduces_net_return_and_profit(
             gross_performance["total_return_pct"] - net_performance["total_return_pct"],
             abs=0.01,
         ),
+        # $10,000 buys at 100: market value 10,000 / (1.0005 * 1.001) = 9,985.02,
+        # slippage 0.05% of it, fee 0.1% of it after slippage.
+        "modeled_fee_cost": 9.99,
+        "modeled_slippage_cost": 4.99,
+        "modeled_cost_total": 14.98,
     }
     assert (
         net_performance["benchmark_return_pct"]
@@ -1258,7 +1263,8 @@ def test_build_result_card_shows_execution_realism_cost_and_effect(
         "slippage_bps": 5.0,
         "gross_total_return_pct": 12.0,
         "net_total_return_pct": 11.83,
-        "return_drag_pct": 0.17,
+        # The shown 12.0 minus the shown 11.8, not the stored engine 0.17.
+        "return_drag_pct": 0.2,
         "benchmark_treatment": "same_modeled_costs",
     }
 

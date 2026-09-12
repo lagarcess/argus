@@ -162,8 +162,10 @@ def test_invalid_or_excess_actual_cost_stops_before_another_request(
 
 @pytest.fixture
 def probe_request(monkeypatch, provider_rates):
-    from argus.api.chat.breakdown import RESULT_BREAKDOWN_MODEL
     from argus.domain.research import credentials
+    from argus.domain.result_readout_research import (
+        RESULT_RESEARCH_MODEL as RESULT_BREAKDOWN_MODEL,
+    )
     from argus.llm import openrouter, openrouter_key_policy
 
     monkeypatch.setattr(openrouter, "resolve_openrouter_api_key", lambda: "test-only")
@@ -231,7 +233,9 @@ def draft(*, deeper=False):
 def test_real_composer_paths_dispatch_once_each_and_preserve_raw_invoice(
     probe_request, failure
 ):
-    from argus.api.chat.breakdown import RESULT_BREAKDOWN_MODEL
+    from argus.domain.result_readout_research import (
+        RESULT_RESEARCH_MODEL as RESULT_BREAKDOWN_MODEL,
+    )
 
     free = run_probe(probe_request)
     quick_text = json.dumps(draft()) if failure != "quick_schema" else "{bad json"

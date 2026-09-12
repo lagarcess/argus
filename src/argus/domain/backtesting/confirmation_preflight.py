@@ -38,6 +38,26 @@ def materialize_confirmation_strategy(
     }
 
 
+def restore_coverage_limited_by(
+    launch_payload: dict[str, Any],
+    *,
+    preflight_launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Validation drops coverage provenance; the preflight's limiting series rides back."""
+    source = preflight_launch_payload.get("coverage_preflight")
+    coverage = launch_payload.get("coverage_preflight")
+    if (
+        not isinstance(source, dict)
+        or not isinstance(coverage, dict)
+        or not isinstance(source.get("limited_by"), dict)
+    ):
+        return launch_payload
+    return {
+        **launch_payload,
+        "coverage_preflight": {**coverage, "limited_by": dict(source["limited_by"])},
+    }
+
+
 def prepare_confirmation_launch(
     launch_payload: dict[str, Any],
 ) -> ConfirmationLaunchPreflight:

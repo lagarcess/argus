@@ -51,8 +51,38 @@ METRIC_DEFINITIONS = {
     "total_trades": (
         "executed_fills",
         "count",
-        "Purchases and sales executed during the test",
+        "Executions during the test; purchases and sales are counted separately when recorded",
         "execution_fills",
+    ),
+    "buy_fills": (
+        "purchase_fills",
+        "count",
+        "Purchases executed during the test",
+        "execution_fills",
+    ),
+    "sell_fills": (
+        "sale_fills",
+        "count",
+        "Sales executed during the test",
+        "execution_fills",
+    ),
+    "modeled_fee_cost": (
+        "fee_cost",
+        "currency",
+        "Modeled fees on the strategy's executions, in money",
+        "modeled_execution_cost",
+    ),
+    "modeled_slippage_cost": (
+        "slippage_cost",
+        "currency",
+        "Modeled slippage on the strategy's executions, in money",
+        "modeled_execution_cost",
+    ),
+    "modeled_cost_total": (
+        "cost_total",
+        "currency",
+        "Modeled fees plus slippage on the strategy's executions, in money",
+        "modeled_execution_cost",
     ),
     "completed_trades": (
         "completed_trades",
@@ -297,6 +327,9 @@ FACT_PRESENTATIONS = {
     "observed_ratio": ["fraction_as_percent"],
     "max_drawdown_pct": ["absolute_magnitude"],
     "delta_vs_benchmark_pct": ["absolute_magnitude"],
+    "modeled_fee_cost": ["currency_cents"],
+    "modeled_slippage_cost": ["currency_cents"],
+    "modeled_cost_total": ["currency_cents"],
     "fee_bps": ["basis_points_as_percentage_points"],
     "slippage_bps": ["basis_points_as_percentage_points"],
 }

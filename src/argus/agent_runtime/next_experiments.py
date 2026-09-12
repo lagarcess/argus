@@ -47,7 +47,6 @@ __all__ = [
     "detect_next_experiment_acceptance",
     "next_experiment_label_key",
     "next_experiment_short_label_key",
-    "next_experiments_lead_in",
     "next_experiments_sidecar",
     "offered_kinds_from_thread_metadata",
 ]
@@ -111,17 +110,6 @@ _SEND_TEMPLATES: dict[str, dict[str, str]] = {
     },
 }
 
-# The one sentence above the rows when the user asks what to try next (#590).
-# It carries no figures; the first row's `why` does.
-NEXT_EXPERIMENTS_LEAD_IN: dict[str, str] = {
-    "en": "Here is what you can try next from this result.",
-    "es-419": "Esto es lo que puedes probar después a partir de este resultado.",
-}
-
-
-def next_experiments_lead_in(language: str | None) -> str:
-    return NEXT_EXPERIMENTS_LEAD_IN[runtime_locale(language)]
-
 
 def next_experiments_sidecar(
     result_facts: dict[str, Any],
@@ -142,8 +130,8 @@ def next_experiments_sidecar(
     already_asked = _kinds_already_asked(recent_user_messages) | set(
         previously_offered_kinds or []
     )
-    # benchmark_delta is the engine's own comparison (delta_vs_benchmark_pct);
-    # the sidecar never subtracts two rounded returns to rebuild it.
+    # benchmark_delta is the gap shown_benchmark_gap states; the sidecar never
+    # derives a comparison of its own.
     comparison = benchmark_comparison_from_delta(benchmark_delta)
     why = _row_reason(
         comparison=comparison,

@@ -13,6 +13,7 @@ from argus.api.schemas import (
     Idea,
     IdeaVersion,
 )
+from argus.domain.result_figures import shown_benchmark_gap
 
 _MARKDOWN_HEADING_PREFIX_RE = re.compile(r"(?m)^\s{0,3}#{1,6}\s+")
 _MARKDOWN_BULLET_PREFIX_RE = re.compile(r"(?m)^\s*[-*]\s+")
@@ -407,7 +408,15 @@ def result_metrics_summary(value: object) -> dict[str, object]:
         "max_drawdown_pct",
         "sharpe_ratio",
     ):
-        metric = performance.get(key)
+        metric = (
+            shown_benchmark_gap(
+                performance.get("total_return_pct"),
+                performance.get("benchmark_return_pct"),
+                performance.get(key),
+            )
+            if key == "delta_vs_benchmark_pct"
+            else performance.get(key)
+        )
         if isinstance(metric, int | float | str) and metric != "":
             summary[key] = metric
     return summary

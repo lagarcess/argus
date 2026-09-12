@@ -32,6 +32,7 @@ from argus.domain.market_data import clear_asset_cache
 from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.research.contracts import ResearchUsage
 from argus.domain.research.perplexity_agent import StructuredAgentResult
+from argus.domain.result_readout_research import RESULT_RESEARCH_LIMITS
 from argus.llm import openrouter
 from argus.llm.openrouter import (
     log_openrouter_failure,
@@ -675,7 +676,7 @@ def test_result_breakdown_uses_structured_agent_with_only_web_tools(monkeypatch)
     assert spec.models == ("openai/gpt-5.6-luna",)
     assert set(spec.tools) == {"web_search", "fetch_url"}
     assert spec.timeout_seconds > 0
-    assert fake_schema.calls[0]["limits"] == chat_service.RESULT_BREAKDOWN_LIMITS
+    assert fake_schema.calls[0]["limits"] == RESULT_RESEARCH_LIMITS
     assert "AAPL" in fake_schema.calls[0]["prompt"]
     assert "sources" in fake_schema.calls[0]["instructions"].lower()
 
