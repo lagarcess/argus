@@ -3,6 +3,21 @@
 - [Interpreter payload](interpreter-payload/): the payload fix that shrank the interpreter prompt.
 - [Part A live check](part-a/README.md): screenshots of the founder's ten fixes in the real web app.
 
+## Final Codex review
+
+Codex reviewed `f948a5de` and raised two P1 findings and one P2. All three are fixed in `500c23ea`, with no instructions, prompt text or Field descriptions changed:
+
+- **Local follow-ups never claim research.** Questions typed `what_tested`, `next_experiment` or `assumptions` reach the no-search composer and claim no research attempt.
+- **A stored dollar cost is answered.** The stored-fact gate reads the typed fact sheet, which now maps the three dollar cost rows.
+- **History-start guidance counts the benchmark.** The offered start waits for the launch benchmark's history too.
+
+[Reruns](final-codex-review/reruns.json) ran each case once at `500c23ea`, and all three passed, billed $0.049:
+
+- `asset_discovery_not_result_followup_issue_244` ("ok what should I try next?");
+- the English and Spanish `messy_*_post_result_fact_then_capital_edit_issue_160`.
+
+No eval case covers the history-start recovery. The interpreter's context still does not list the dollar cost facts; adding them changes what it reads after every cost-enabled result and waits for a measurement.
+
 ## Final walk
 
 [Screenshots and reports](final-walk/) from the web app on `23dbe692`, with the API restarted on that commit and automatic sign-in. Billed $0.259 of the $0.50 cap, with no page errors. The app is left running.
