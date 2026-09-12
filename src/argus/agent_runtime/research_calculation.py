@@ -60,6 +60,7 @@ def packet_answer(
     when it returned no calculation and its prose stands on its own."""
     if packet.calculation is None:
         if "{{" in packet.answer_markdown:
+            _note(notes, MALFORMED_CALCULATION_REASON_CODE)
             return NotComputed(CALCULATION_NOT_COMPUTED_CODE, ())
         return None
     try:
@@ -119,6 +120,7 @@ def answer_without_lookup(
         market_facts=facts,
         not_looked_up=not_looked_up,
         subject_symbol=_first_symbol(subjects),
+        lookup_failed=True,
     )
     if answered is not None:
         logger.info(

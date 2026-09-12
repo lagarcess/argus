@@ -135,6 +135,7 @@ def apply_research_job_request(
             runtime_result["next_experiments"] = composed["next_experiments"]
         _attach_completed_tool_card(runtime_result, job_request)
         _attach_computed_answer(runtime_result, composed.get("computed"))
+        _attach_pending_question(runtime_result, composed.get("question"))
         return None
     runtime_result["assistant_response"] = research_failure_note(
         str(job_request.get("language") or "en")
@@ -173,6 +174,17 @@ def _attach_computed_answer(patch: dict[str, Any], computed: Any) -> None:
         patch["computation"] = marker
     if computed.get(ANSWER_TEMPLATE_KEY) is not None:
         patch[ANSWER_TEMPLATE_KEY] = computed[ANSWER_TEMPLATE_KEY]
+
+
+def _attach_pending_question(patch: dict[str, Any], question: Any) -> None:
+    """A thorough answer that asks for a figure only the user knows waits for
+    the reply that completes its calculation."""
+    if not isinstance(question, dict):
+        return
+    for key in ("requested_field", "clarification"):
+        if question.get(key) is not None:
+            patch[key] = question[key]
+    patch["last_stage_outcome"] = "await_user_reply"
 
 
 def start_research_job(
@@ -456,6 +468,7 @@ async def _finalize_success(
     if card is not None:
         metadata["tool_result_cards"] = [card]
     _attach_computed_answer(metadata, composed.get("computed"))
+    _attach_pending_question(metadata, composed.get("question"))
     if composed.get("next_experiments") is not None:
         metadata["next_experiments"] = composed["next_experiments"]
     message = await persist_research_job_answer(

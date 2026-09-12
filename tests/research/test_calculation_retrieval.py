@@ -128,3 +128,19 @@ def test_a_price_in_another_currency_is_not_computed_and_no_blank_card_renders(
     assert ac.CURRENCY_MISMATCH_REASON_CODE in interpretation.reason_codes
     answer = result.stage_patch["assistant_response"]
     assert "{{" not in answer and "DOP" not in answer
+
+
+def test_an_answer_that_needs_a_figure_only_the_user_knows_asks_and_keeps_its_research(
+    monkeypatch,
+) -> None:
+    goal = _goal("DOP")
+    goal["inputs"][1] = {"name": "present_value", "value": None, "source": "user"}
+    result, _, _ = _turn(monkeypatch, goal)
+    assert result is not None and result.outcome == "await_user_reply"
+    assert result.stage_patch["requested_field"] == "present_value"
+    assert result.stage_patch["clarification"]["payload"]["retrieved"][0]["url"] == (
+        PRICE_PAGE
+    )
+    research = result.stage_patch["research"]
+    assert research["usage"]["cache_status"] == "miss"
+    assert "degraded" not in research

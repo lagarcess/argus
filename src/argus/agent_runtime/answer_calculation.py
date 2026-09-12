@@ -135,7 +135,15 @@ def publish_calculation(
     if succeeded and failure is None:
         stored = {"artifact_id": card.artifact_id, "text": template, "language": language}
         return PublishedCalculation(patch, text, stored, None, ())
-    _note(notes, FIGURE_CHECK_REASON_CODE, failure=failure, status=card.outcome.status)
+    _note(
+        notes,
+        FIGURE_CHECK_REASON_CODE,
+        failure=failure,
+        status=card.outcome.status,
+        unresolved=unresolved_references(template, card),
+        references=sorted(set(_REFERENCE.findall(template))),
+        card_facts=sorted(_reference_facts(card)),
+    )
     return PublishedCalculation(
         patch, fallback_answer_lead(language, succeeded=succeeded), None, None, ()
     )
@@ -254,6 +262,12 @@ def render_answer_text(
     if any(name not in referenced for name in assumed):
         return text, "assumption_not_stated"
     return text, None
+
+
+def unresolved_references(template: str, card: ToolResultCard) -> list[str]:
+    """The ``{{name}}`` references a card cannot fill, for the guard's record."""
+    facts = _reference_facts(card)
+    return sorted({name for name in _REFERENCE.findall(template) if name not in facts})
 
 
 def figure_text(fact: ToolFact) -> str:

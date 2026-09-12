@@ -3338,12 +3338,13 @@ supports different tools and repeated calls; a local call bypasses backtest
 launch preparation. The existing validated Run action enters this dispatcher
 with its confirmed canonical strategy.
 
-The interpreter retains its seven intents. Since Any grounded math it also
-reads one typed `calculation` payload beside every turn (see Calculation turns);
-the kinds and argument names it reads are generated from the declarations, so
-the catalogue the model sees and the math that runs share one owner. The model
-never emits a `ToolCall` itself: the runtime validates the read against the
-declaration and dispatches the call.
+The interpreter retains its seven intents and reads no calculation. Since Any
+grounded math the answering step returns one typed `calculation` beside its
+prose (see Calculation turns); the kinds and argument names it reads are
+generated from the declarations, so the catalogue the model sees and the math
+that runs share one owner. The model never emits a `ToolCall` itself: the
+runtime validates the calculation against the declaration and dispatches the
+call.
 
 An actual invocation emits `stage_start.tool_progress` containing
 `{locale_key, interpolation_args, call_id, tool_name}`. Interpolation values are
@@ -5271,7 +5272,10 @@ as `assistant_prompt`, `requested_field` naming the argument, no card, and
 "calculation_input_missing", prompt_source, requested_field, requested_fields,
 semantic_needs: [], payload: {calculation, requested_field, retrieved}, options:
 []}`, where `retrieved` keeps the pages the answer read so the reply may still
-cite them (`calculation_pending_reply`).
+cite them (`calculation_pending_reply`). A research answer that asks keeps its
+`research` sidecar, so the packet it read reaches the ledger; a background
+answer that asks stores the same `clarification` and `requested_field` on its
+message with `last_stage_outcome = "await_user_reply"`.
 
 A failed lookup never becomes the answer and never names the conversation.
 When research is unavailable, retrieves nothing (`research_not_grounded`),

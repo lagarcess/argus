@@ -203,3 +203,30 @@ def test_the_primary_prompt_computes_money_questions_and_keeps_products_off_the_
     assert "set question_kind=current_external" in clause
     assert "never an asset_universe entry, a strategy or an unsupported symbol" in clause
     assert "answer it in assistant_response with the formula" not in clause
+
+
+def test_an_answer_after_a_failed_lookup_says_so_when_nothing_is_named(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import research_calculation
+
+    seen = _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "How many months are left on the loan?",
+                [*LOAN, {"name": "periods", "value": None, "source": "user"}],
+            )
+        ],
+    )
+    monkeypatch.setattr(research_calculation, "resolve_openrouter_api_key", lambda: "k")
+    answered = research_calculation.answer_without_lookup(
+        message="Is paying extra on my car loan worth it?",
+        language="en",
+        user=USER,
+        subjects=[],
+        not_looked_up=(),
+        notes=[],
+    )
+    assert answered is not None and answered.question_field == "periods"
+    assert "The lookup for this answer found nothing" in seen[0][0]["content"]

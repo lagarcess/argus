@@ -575,7 +575,7 @@ def _packet_stage_result(
         if survey:
             subjects = []
     if answered is not None and answered.question_field is not None:
-        return question_stage_result(
+        question = question_stage_result(
             answered,
             decision=carried_decision(
                 decision,
@@ -584,6 +584,22 @@ def _packet_stage_result(
                 reason_code=INPUT_MISSING_REASON_CODE,
             ),
         )
+        question.stage_patch["research"] = build_research_sidecar(
+            **_packet_sidecar_fields(
+                packet,
+                capability_class=capability_class,
+                shape=shape,
+                subjects=subjects,
+                peers=[],
+                cache_status=cache_status,
+                degraded_code=degraded_code,
+                period_of_interest=period_of_interest,
+                question_kind=freshness_kind(question_kind, survey=survey),
+                period_start_date=period_start_date,
+                question_as_of_date=question_as_of_date,
+            )
+        )
+        return question
     if not subjects and peers:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the
@@ -932,7 +948,7 @@ def unavailable_result(
         )
     )
     if answered is not None and answered.question_field is not None:
-        return question_stage_result(
+        question = question_stage_result(
             answered,
             decision=carried_decision(
                 decision,
@@ -941,6 +957,22 @@ def unavailable_result(
                 reason_code=INPUT_MISSING_REASON_CODE,
             ),
         )
+        question.stage_patch["research"] = build_research_sidecar(
+            **_packet_sidecar_fields(
+                ResearchPacket(
+                    answer_markdown=answered.answer_text,
+                    usage=usage if usage is not None else ResearchUsage(),
+                ),
+                capability_class=capability_class_for_shape(shape, screening=survey),
+                shape=shape,
+                subjects=subjects,
+                peers=[],
+                cache_status="bypass" if usage is None else "miss",
+                degraded_code=f"research_unavailable_{reason}",
+                period_of_interest=query.period_of_interest,
+            )
+        )
+        return question
     note = answered.answer_text if answered is not None else _unavailable_note(language)
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     suffix = f"\n\n{honest_no_next_line(language)}" if not rows and subjects else ""
@@ -1694,6 +1726,7 @@ def compose_completed_research(
         or _scenario_inputs_code(packet, scenario=scenario)
     )
     from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
+    from argus.agent_runtime.calculated_answer import question_stage_result
     from argus.agent_runtime.research_calculation import (
         LOOKUP_FAILURE_CODES,
         NotComputed,
@@ -1728,6 +1761,23 @@ def compose_completed_research(
             not_looked_up=not_found,
             notes=notes,
         )
+    if answered is not None and answered.question_field is not None:
+        return {
+            "answer": answered.answer_text,
+            "research": build_research_sidecar(
+                **_job_sidecar_fields(
+                    job_request,
+                    packet,
+                    sources=sources,
+                    subjects=subjects,
+                    peers=[],
+                    degraded_code=degraded_code,
+                )
+            ),
+            "next_experiments": None,
+            "computed": None,
+            "question": question_stage_result(answered, decision=None).stage_patch,
+        }
     peers = (
         []
         if degraded_code is not None
@@ -1761,35 +1811,56 @@ def compose_completed_research(
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )
-    capability_class = str(job_request.get("capability_class") or "thorough_research")
     return {
         "answer": answer,
         "research": build_research_sidecar(
-            capability_class=capability_class,
-            shape="thorough",
-            sources=sources,
-            retrieved_rows=typed_rows(packet),
-            retrieved_at=packet.retrieved_at.isoformat(),
-            subjects=subjects,
-            peers=peers,
-            usage={
-                "invocations": packet.usage.invocations,
-                "latency_ms": packet.usage.latency_ms,
-                "cost_usd": packet.usage.cost_usd,
-                # Composition only ever runs on a packet a provider run produced;
-                # cache hits answer inline and never reach a job.
-                "cache_status": "miss",
-            },
-            period_of_interest=(
-                str(job_request.get("period_of_interest"))
-                if job_request.get("period_of_interest")
-                else None
-            ),
-            degraded_code=degraded_code,
+            **_job_sidecar_fields(
+                job_request,
+                packet,
+                sources=sources,
+                subjects=subjects,
+                peers=peers,
+                degraded_code=degraded_code,
+            )
         ),
         "next_experiments": rows,
         "computed": computed,
     }
+
+
+def _job_sidecar_fields(
+    job_request: dict[str, Any],
+    packet: ResearchPacket,
+    *,
+    sources: list[dict[str, Any]],
+    subjects: list[dict[str, str]],
+    peers: list[dict[str, str]],
+    degraded_code: str | None,
+) -> dict[str, Any]:
+    """The shared builder's arguments for a finished background packet."""
+    return dict(
+        capability_class=str(job_request.get("capability_class") or "thorough_research"),
+        shape="thorough",
+        sources=sources,
+        retrieved_rows=typed_rows(packet),
+        retrieved_at=packet.retrieved_at.isoformat(),
+        subjects=subjects,
+        peers=peers,
+        usage={
+            "invocations": packet.usage.invocations,
+            "latency_ms": packet.usage.latency_ms,
+            "cost_usd": packet.usage.cost_usd,
+            # Composition only ever runs on a packet a provider run produced;
+            # cache hits answer inline and never reach a job.
+            "cache_status": "miss",
+        },
+        period_of_interest=(
+            str(job_request.get("period_of_interest"))
+            if job_request.get("period_of_interest")
+            else None
+        ),
+        degraded_code=degraded_code,
+    )
 
 
 def research_failure_note(language: str) -> str:
@@ -2099,6 +2170,46 @@ def returned_sources_research_sidecar(
     )
 
 
+def _packet_sidecar_fields(
+    packet: ResearchPacket,
+    *,
+    capability_class: str,
+    shape: str,
+    subjects: list[dict[str, str]],
+    peers: list[dict[str, str]],
+    cache_status: str,
+    degraded_code: str | None,
+    period_of_interest: str | None,
+    question_kind: str | None = None,
+    period_start_date: date | str | None = None,
+    question_as_of_date: date | str | None = None,
+) -> dict[str, Any]:
+    """The shared builder's arguments for an inline packet. An answer and a
+    question both carry its sidecar, so every packet a turn read reaches the ledger."""
+    return dict(
+        capability_class=capability_class,
+        shape=shape,
+        sources=typed_sources(
+            packet,
+            question_kind=question_kind,
+            period_start_date=period_start_date,
+            question_as_of_date=question_as_of_date,
+        ),
+        retrieved_rows=typed_rows(packet),
+        retrieved_at=packet.retrieved_at.isoformat(),
+        subjects=subjects,
+        peers=peers,
+        usage={
+            "invocations": packet.usage.invocations,
+            "latency_ms": packet.usage.latency_ms,
+            "cost_usd": packet.usage.cost_usd,
+            "cache_status": cache_status,
+        },
+        period_of_interest=period_of_interest,
+        degraded_code=degraded_code,
+    )
+
+
 def research_stage_result(
     *,
     answer: str,
@@ -2129,26 +2240,19 @@ def research_stage_result(
         **(computed or {}),
         "assistant_response": answer,
         "research": build_research_sidecar(
-            capability_class=capability_class,
-            shape=shape,
-            sources=typed_sources(
+            **_packet_sidecar_fields(
                 packet,
+                capability_class=capability_class,
+                shape=shape,
+                subjects=subjects,
+                peers=peers,
+                cache_status=cache_status,
+                degraded_code=degraded_code,
+                period_of_interest=period_of_interest,
                 question_kind=question_kind,
                 period_start_date=period_start_date,
                 question_as_of_date=question_as_of_date,
-            ),
-            retrieved_rows=typed_rows(packet),
-            retrieved_at=packet.retrieved_at.isoformat(),
-            subjects=subjects,
-            peers=peers,
-            usage={
-                "invocations": packet.usage.invocations,
-                "latency_ms": packet.usage.latency_ms,
-                "cost_usd": packet.usage.cost_usd,
-                "cache_status": cache_status,
-            },
-            period_of_interest=period_of_interest,
-            degraded_code=degraded_code,
+            )
         ),
     }
     if rows is not None:

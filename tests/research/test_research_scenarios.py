@@ -841,3 +841,39 @@ def test_a_scenario_with_the_users_amount_offers_that_amount_in_the_asset_first(
     assert [
         record["tool_name"] for record in result.stage_patch["tool_call_records"]
     ] == ["valuation_scenarios"]
+
+
+def test_a_background_answer_that_needs_the_users_amount_waits_for_the_reply() -> None:
+    from argus.agent_runtime.calculated_answer import pending_calculation
+    from argus.api.chat.research_jobs import _attach_pending_question
+    from argus.domain.research.contracts import (
+        ResearchPacket,
+        ResearchSource,
+        ResearchUsage,
+    )
+
+    calculation = _scenario_calculation(cited=True)
+    calculation["inputs"][4] = {"name": "amount", "value": None, "source": "user"}
+    packet = ResearchPacket(
+        answer_markdown="How much would you put into NVIDIA?",
+        sources=(ResearchSource(url=OUTLOOK_PAGE),),
+        usage=ResearchUsage(web_search_invocations=1),
+        calculation=calculation,
+    )
+    job_request = {
+        "capability_class": "thorough_research",
+        "language": "en",
+        "question_kind": "cross_company",
+        "scenario_question": True,
+        "subjects": [{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
+        "currency": "USD",
+    }
+    composed = grounded.compose_completed_research(job_request=job_request, packet=packet)
+    assert composed["answer"] == "How much would you put into NVIDIA?"
+    assert composed["computed"] is None and composed["next_experiments"] is None
+    assert "degraded" not in composed["research"]
+    metadata: dict = {}
+    _attach_pending_question(metadata, composed["question"])
+    pending = pending_calculation(metadata)
+    assert pending is not None and pending["requested_field"] == "amount"
+    assert pending["calculation"]["kind"] == "valuation_scenarios"

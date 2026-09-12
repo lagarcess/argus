@@ -57,13 +57,23 @@ _HISTORY_TURNS = 4
 
 # Model-facing contract for the one no-search answer that computes.
 NO_SEARCH_ANSWER_GUIDANCE = (
-    "Answer the user's money question in their language. Nothing was looked up "
-    "for this answer: use only the user's own figures, the Argus market data "
-    "listed below and assumptions you state plainly. No advice, no forecast "
-    "stated as fact, no em dashes, no headings, no tables. Compose lead "
-    "(required), one short sentence that answers the question; bullets "
-    "(optional, up to 4), short plain phrases; note (optional), one closing "
-    "sentence such as what could not be looked up. "
+    "Answer the user's money question in their language. Nothing was looked "
+    "up for this answer: use the user's own figures, the Argus market data "
+    "listed below and assumptions you state plainly. When a figure computed "
+    "from inputs answers or decides the question, always return calculation; "
+    "never answer such a question with prose alone. A figure a page would "
+    "publish that is not listed here, such as a product's price or a bank's "
+    "rate, becomes an assumption: choose a typical value, mark it assumption "
+    "and say plainly in the answer that you assumed it and that the user can "
+    "change it. A figure only the user knows, such as their balance, payment, "
+    "term, income or horizon, is never assumed: list it with source user and "
+    "a null value, and write the answer as one plain question asking for it. "
+    "State no figure the calculation does not use or produce. "
+    "No advice, no forecast stated as fact, no em dashes, no headings, no "
+    "tables. Compose lead (required), one short sentence that answers the "
+    "question or asks the one question; bullets (optional, up to 4), short "
+    "plain phrases; note (optional), one closing sentence such as what could "
+    "not be looked up. "
 )
 
 
@@ -99,6 +109,7 @@ def calculated_answer(
     subject_symbol: str | None = None,
     retrieved: Sequence[ResearchSource] = (),
     market_close: MarketClose = latest_market_close,
+    lookup_failed: bool = False,
 ) -> CalculatedAnswer | None:
     """One voicing call and its computed calculation, or None when voicing failed."""
     if not resolve_openrouter_api_key():
@@ -111,6 +122,7 @@ def calculated_answer(
             market_facts=market_facts or {},
             not_looked_up=not_looked_up,
             pending=pending,
+            lookup_failed=lookup_failed,
         )
     )
     if voiced is None:
@@ -298,6 +310,7 @@ def _messages(
     market_facts: dict[str, str],
     not_looked_up: Sequence[str],
     pending: dict[str, Any] | None,
+    lookup_failed: bool = False,
 ) -> list[dict[str, str]]:
     context = [
         NO_SEARCH_ANSWER_GUIDANCE,
@@ -330,6 +343,11 @@ def _messages(
             "Could not be looked up for this answer, so say so plainly: "
             + ", ".join(not_looked_up)
             + ".\n"
+        )
+    elif lookup_failed:
+        context.append(
+            "The lookup for this answer found nothing, so say plainly that "
+            "published figures could not be looked up.\n"
         )
     if pending:
         calculation = pending.get(PENDING_PAYLOAD_KEY) or {}

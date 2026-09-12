@@ -59,9 +59,7 @@ RETRIEVAL_INSTRUCTIONS = (
     "answer_markdown is the prose for the reader: no links, no list of sources, "
     "no mention of tools, providers or models. Every figure answer_markdown "
     "states in digits appears once in rows, with the URL of the retrieved page "
-    "it was read from. "
-    + ANSWER_CALCULATION_INSTRUCTIONS
-    + calculation_kinds_clause()
+    "it was read from. " + ANSWER_CALCULATION_INSTRUCTIONS + calculation_kinds_clause()
 )
 
 # The same contract for a question whose answer is computed (decision 10):
@@ -74,7 +72,11 @@ SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
     "with the current price from market_data and every other input from a page "
     "or a stated assumption. Never compute the answer, scenario values, ranges "
     "or future figures yourself, never present one number as the future, and "
-    "never say what the reader should do."
+    "never say what the reader should do. A figure a page publishes, such as a "
+    "product's price, a rate, a fee or local inflation, is retrieved and cited, "
+    "never asked of the user; when the user named no exact product, retrieve a "
+    "typical one and say which. State no figure the calculation does not use or "
+    "produce, and write dates as dates, not in words."
 )
 
 
