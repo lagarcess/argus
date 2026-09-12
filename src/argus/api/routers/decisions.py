@@ -10,11 +10,13 @@ from argus.api.chat.decisions import (
     DecisionRerunInputsError,
     create_decision_for_message,
     open_decision,
+    rerun_message_computation,
 )
 from argus.api.decision_contract import (
     DecisionNoteCreate,
     DecisionOpenResponse,
     DecisionRerunRequest,
+    MessageComputationRerunResponse,
     MessageDecisionResponse,
 )
 from argus.api.dependencies import current_user, problem, require_account_capability
@@ -127,3 +129,49 @@ def rerun_decision_route(
             context={"errors": exc.errors},
         ) from exc
     return DecisionOpenResponse(decision=decision, computation=computation, rerun=rerun)
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages/{message_id}/computation/rerun",
+    response_model=MessageComputationRerunResponse,
+)
+def rerun_message_computation_route(
+    conversation_id: str,
+    message_id: str,
+    payload: DecisionRerunRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> MessageComputationRerunResponse:
+    try:
+        computation, rerun = rerun_message_computation(
+            user=user,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            overrides=payload.inputs,
+        )
+    except DecisionMessageNotFoundError as exc:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail=str(exc),
+        ) from exc
+    except DecisionAttachmentUnsupportedError as exc:
+        raise problem(
+            request,
+            status_code=409,
+            code="decision_attachment_unsupported",
+            title="Decision Attachment Unsupported",
+            detail=str(exc),
+        ) from exc
+    except DecisionRerunInputsError as exc:
+        raise problem(
+            request,
+            status_code=422,
+            code="validation_error",
+            title="Validation Error",
+            detail="Re-run inputs are invalid.",
+            context={"errors": exc.errors},
+        ) from exc
+    return MessageComputationRerunResponse(computation=computation, rerun=rerun)

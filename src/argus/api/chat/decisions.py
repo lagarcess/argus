@@ -158,6 +158,41 @@ def open_decision(
     return decision, computation, rerun
 
 
+def rerun_message_computation(
+    *,
+    user: User,
+    conversation_id: str,
+    message_id: str,
+    overrides: Mapping[str, Any] | None = None,
+) -> tuple[DecisionComputation, DecisionRerun]:
+    """Re-run an owned computed answer from Search, decided or not.
+
+    The stored answer is never rewritten: the result comes back beside it.
+    Invalid overrides are the client's error; stored inputs that drifted are
+    a typed unavailable state.
+    """
+    message = owned_conversation_message(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+    )
+    if message is None or message.role != "assistant":
+        raise DecisionMessageNotFoundError("Message not found or not owned by user.")
+    computation = computation_from_message_metadata(message.metadata)
+    if computation is None:
+        raise DecisionAttachmentUnsupportedError(
+            "This answer carries no computation to re-run."
+        )
+    context = RerunContext(load_run=_run_loader(user.id), today=new_york_today())
+    try:
+        rerun = rerun_computation(computation, overrides=overrides, context=context)
+    except InvalidComputationInputs as exc:
+        if overrides:
+            raise DecisionRerunInputsError(exc.errors) from exc
+        rerun = unavailable_rerun(computation, reason_code="invalid_inputs")
+    return computation, rerun
+
+
 def _decision_by_id(*, user_id: str, decision_id: str) -> DecisionNote | None:
     decision = api_state.store.decision_notes.get(decision_id)
     if (

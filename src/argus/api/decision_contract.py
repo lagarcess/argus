@@ -265,3 +265,10 @@ class DecisionOpenResponse(BaseModel):
     decision: DecisionNote
     computation: DecisionComputation
     rerun: DecisionRerun
+
+
+class MessageComputationRerunResponse(BaseModel):
+    """A computed answer re-run from Search; the stored answer is untouched."""
+
+    computation: DecisionComputation
+    rerun: DecisionRerun

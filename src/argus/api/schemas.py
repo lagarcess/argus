@@ -637,6 +637,36 @@ class SearchMatch(BaseModel):
         return data
 
 
+class AnswerDecisionAction(BaseModel):
+    """The decision a computed answer offers; it posts to the message route."""
+
+    type: Literal["answer_decision"] = "answer_decision"
+    availability: DecisionActionAvailability
+    message_id: str
+    decision_state: DecisionState | None = None
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class AnswerDossier(BaseModel):
+    """A computed answer beside the run dossier: asked, used, came out, decided.
+
+    The card carries what Argus used with its sources and what came out;
+    recompute goes through the message computation route and never rewrites
+    the stored answer. The run dossier is unchanged.
+    """
+
+    message_id: str
+    conversation_id: str
+    asked: str | None = Field(default=None, max_length=500)
+    computed_at: datetime
+    kind: str = Field(max_length=80)
+    symbols: list[str] = Field(default_factory=list, max_length=5)
+    card: dict[str, Any]
+    decision: SearchDossierDecision | None = None
+    decision_id: str | None = None
+    actions: list[AnswerDecisionAction] = Field(default_factory=list, max_length=1)
+
+
 class SearchItem(BaseModel):
     type: Literal["conversation"]
     id: str
@@ -648,6 +678,8 @@ class SearchItem(BaseModel):
     conversation_id: str
     match: SearchMatch
     dossier: RunDossier | None
+    # Additive: the latest computed answer in the conversation, or null.
+    answer_dossier: AnswerDossier | None = None
     total_runs: int = Field(ge=0)
     decided_runs: int = Field(ge=0)
     # Bounded conversation aggregate used for decision filters and counts.
@@ -665,9 +697,20 @@ class SearchAssetDecisionCounts(BaseModel):
 class SearchAssetRollup(BaseModel):
     type: Literal["asset_rollup"] = "asset_rollup"
     symbol: str = Field(min_length=1, max_length=24)
-    run_count: int = Field(ge=1)
+    # Runs alone may be zero once computed results also count under an asset.
+    run_count: int = Field(ge=0)
+    # Every result involving the asset: completed runs plus computed answers.
+    result_count: int = Field(default=0, ge=0)
     decision_counts: SearchAssetDecisionCounts
     last_touched_at: datetime
+
+    @model_validator(mode="after")
+    def results_cover_runs(self) -> SearchAssetRollup:
+        if self.result_count < self.run_count:
+            object.__setattr__(self, "result_count", self.run_count)
+        if self.result_count < 1:
+            raise ValueError("An asset rollup names at least one result")
+        return self
 
 
 SearchResultItem = Annotated[
