@@ -594,6 +594,9 @@ def _packet_stage_result(
             user=user,
             withheld=degraded_code is not None,
         )
+        rows = _with_market_counterfactual(
+            computed, rows, subjects=subjects, language=language
+        )
     return research_stage_result(
         answer=answer,
         interpretation=interpretation,
@@ -642,6 +645,37 @@ def _computed_scenario(
         symbol=subjects[0]["symbol"] if subjects else None,
     )
     return computed_scenario_patch(declaration, arguments)
+
+
+def _with_market_counterfactual(
+    computed: dict[str, Any],
+    rows: dict[str, Any] | None,
+    *,
+    subjects: list[dict[str, str]],
+    language: str,
+) -> dict[str, Any] | None:
+    """A computed scenario with the user's amount offers what that amount did
+    in the same asset over the same years, first among the rows; never run."""
+    from argus.agent_runtime.calculation_rows import market_counterfactual_rows
+    from argus.agent_runtime.next_experiments import NEXT_EXPERIMENTS_ROW_CAP
+    from argus.agent_runtime.result_next_steps import (
+        next_steps_patch,
+        offered_test_steps,
+    )
+
+    final = computed.get("final_response_payload") or {}
+    cards = final.get("tool_result_cards") or []
+    if not subjects or not cards or cards[0]["outcome"]["status"] != "succeeded":
+        return rows
+    counterfactual = market_counterfactual_rows(
+        cards[0]["arguments"], language=language, subject=subjects[0]
+    )
+    if counterfactual is None:
+        return rows
+    offered = [*counterfactual["rows"], *((rows or {}).get("rows") or [])]
+    merged = {**(rows or counterfactual), "rows": offered[:NEXT_EXPERIMENTS_ROW_CAP]}
+    computed.update(next_steps_patch(merged, offered_test_steps(merged)))
+    return merged
 
 
 def thorough_job_result(

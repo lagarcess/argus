@@ -1,9 +1,10 @@
 """The market counterfactual offered under a computed answer, never run by itself.
 
 A plan computed at a stated rate invites one honest comparison: what the same
-amount did in the broad market over the same number of years. The row carries
-the user's own amount and horizon into a runnable buy-and-hold test of the
-S&P 500 proxy, in the shape every Try next row has, and runs only when tapped.
+amount did in the market over the same number of years. The row carries the
+user's own amount and horizon into a runnable test of the calculation's asset,
+or the S&P 500 proxy when it names none, in the shape every Try next row has,
+and runs only when tapped.
 """
 
 from __future__ import annotations
@@ -24,12 +25,16 @@ MAX_COUNTERFACTUAL_YEARS = 30
 
 
 def market_counterfactual_rows(
-    arguments: Mapping[str, Any], *, language: str
+    arguments: Mapping[str, Any],
+    *,
+    language: str,
+    subject: Mapping[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """One row when the calculation states an amount and a horizon in whole years.
 
     A starting amount becomes a buy-and-hold test; a periodic payment with
-    no starting amount becomes a monthly-buy test of the same payment."""
+    no starting amount becomes a monthly-buy test of the same payment. The
+    asset is the calculation's own subject when it has one, else the market."""
     years = _years(arguments)
     amount = _amount(arguments)
     payment = _monthly_payment(arguments)
@@ -37,7 +42,8 @@ def market_counterfactual_rows(
         return None
     currency = str(arguments.get("currency") or "")
     spanish = language.startswith("es")
-    symbol = MARKET_PROXY["symbol"]
+    asset = dict(subject) if subject else MARKET_PROXY
+    symbol = asset["symbol"]
     if amount is not None:
         stated = _money(amount, currency, grouped=True)
         plain = _money(amount, currency, grouped=False)
@@ -67,7 +73,7 @@ def market_counterfactual_rows(
         )
     parts = [
         {"type": "text", "value": "Probar " if spanish else "Test "},
-        *asset_label_parts([MARKET_PROXY]),
+        *asset_label_parts([asset]),
         {"type": "text", "value": tail},
     ]
     return {

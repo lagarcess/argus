@@ -784,3 +784,67 @@ def test_a_survey_typed_scenario_keeps_a_dated_analyst_page(monkeypatch) -> None
 
     assert survey is not None
     assert survey.stage_patch["research"]["sources"] == []
+
+
+def test_a_scenario_with_the_users_amount_offers_that_amount_in_the_asset_first(
+    monkeypatch,
+) -> None:
+    """The counterfactual goes through the one owner of rows after an answer:
+    what the user's own amount did in the same asset over the same years,
+    offered first and never run."""
+    from argus.agent_runtime.calculation_rows import MARKET_COUNTERFACTUAL_KIND
+    from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
+
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="company_lookup",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "NVIDIA trades at $218.36; consensus growth is 25% a year.",
+                    _scenario_rows(cited=True),
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA"],
+            )
+        ],
+    )
+    interpretation = _interpretation().model_copy(
+        update={
+            "calculation": CalculationRequest(
+                kind="valuation_scenarios",
+                inputs={"amount": 10000, "horizon_years": 10},
+            )
+        }
+    )
+    result = asyncio.run(
+        ra.research_answer_stage_result(
+            interpretation=interpretation,
+            state=_state("what will $10,000 in NVDA be worth in ten years?"),
+            user=USER,
+        )
+    )
+    assert result is not None
+    assert len(transport.requests) == 1
+    card = _scenario_card(result)
+    assert card["arguments"]["amount"] == 10000
+    rows = result.stage_patch["next_experiments"]["rows"]
+    assert rows[0]["kind"] == MARKET_COUNTERFACTUAL_KIND
+    assert rows[0]["send_text"] == (
+        "Test buying and holding NVDA with 10000 USD over the last 10 years"
+    )
+    assert len(rows) <= 3
+    assert result.stage_patch["next_steps"]["items"][0] == {
+        "type": "test",
+        "kind": MARKET_COUNTERFACTUAL_KIND,
+    }
+    assert [record["tool_name"] for record in result.stage_patch["tool_call_records"]] == [
+        "valuation_scenarios"
+    ]

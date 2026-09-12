@@ -83,3 +83,39 @@ class SupabaseComputedAnswerReadMixin:
             .execute()
         )
         return [dict(row) for row in getattr(rows, "data", None) or []]
+
+    def computed_answers_of_kind(
+        self, *, user_id: str, kind: str, limit: int
+    ) -> list[dict[str, Any]]:
+        """The owner's newest computed answers of one kind, in live conversations."""
+        rows = (
+            self.client.table("messages")
+            .select(_MESSAGE_SELECT)
+            .eq("user_id", user_id)
+            .eq("role", "assistant")
+            .eq("metadata->computation->>kind", kind)
+            .order("created_at", desc=True)
+            .order("id", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        found = [dict(row) for row in getattr(rows, "data", None) or []]
+        conversation_ids = list(
+            dict.fromkeys(
+                str(row.get("conversation_id"))
+                for row in found
+                if row.get("conversation_id")
+            )
+        )
+        if not conversation_ids:
+            return []
+        live = (
+            self.client.table("conversations")
+            .select("id")
+            .eq("user_id", user_id)
+            .in_("id", conversation_ids)
+            .is_("deleted_at", "null")
+            .execute()
+        )
+        live_ids = {str(row.get("id")) for row in getattr(live, "data", None) or []}
+        return [row for row in found if str(row.get("conversation_id")) in live_ids]

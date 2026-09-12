@@ -57,7 +57,7 @@ def attach_answer_dossiers(
         dossier = project_answer_dossier(
             message=message,
             card=card,
-            asked=_question_for(user, message),
+            asked=question_for_answer(user, message),
             decision=decision.model_dump(mode="python") if decision else None,
             decision_action_availability=decision_action_availability,
         )
@@ -154,7 +154,7 @@ def _latest_answers(
     return found
 
 
-def _question_for(user: User, message: Mapping[str, Any]) -> str | None:
+def question_for_answer(user: User, message: Mapping[str, Any]) -> str | None:
     conversation_id = str(message.get("conversation_id") or "")
     if api_state.supabase_gateway is not None:
         created_at = message.get("created_at")
