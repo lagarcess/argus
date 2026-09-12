@@ -134,7 +134,12 @@ def publish_calculation(
     patch = computed_answer_patch(resolved)
     card = card_in(patch)
     succeeded = card.outcome.status == "succeeded"
-    text, failure = render_answer_text(template, card, assumed=resolved.assumed)
+    driving = {fact.name for fact in card.presentation.inputs if fact.driving}
+    text, failure = render_answer_text(
+        template,
+        card,
+        assumed=[name for name in resolved.assumed if name in driving],
+    )
     if succeeded and failure is None:
         stored = {"artifact_id": card.artifact_id, "text": template, "language": language}
         return PublishedCalculation(patch, text, stored, None, ())

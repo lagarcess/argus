@@ -280,3 +280,18 @@ def test_a_currency_written_before_a_money_reference_is_not_stated_twice() -> No
         "For DOP 180,000 or DOP 180,000 at 14% over 48 months, the payment is "
         f"{payment}."
     )
+
+
+def test_only_an_assumption_that_drives_the_result_must_be_stated() -> None:
+    stated = (
+        "Paying {{present_value}} at {{annual_rate_pct}} over {{periods}} months "
+        "costs {{payment}} a month."
+    )
+    detail = {"name": "periods_per_year", "value": 12, "source": "assumption"}
+    assert _published(stated, inputs=[*LOAN, detail]).template is not None
+    rate = {"name": "annual_rate_pct", "value": 14, "source": "assumption"}
+    unstated = (
+        "Paying {{present_value}} over {{periods}} months costs {{payment}} a month."
+    )
+    loan = [item for item in LOAN if item["name"] != "annual_rate_pct"]
+    assert _published(unstated, inputs=[*loan, rate]).template is None
