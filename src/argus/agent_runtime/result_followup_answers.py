@@ -40,18 +40,27 @@ async def answered_result_followup_patch(
     language: str,
     recent_messages: Sequence[Any] = (),
     source_run_id: str | None = None,
+    stored_fact: str | None = None,
 ) -> dict[str, Any]:
-    """Stage patch answering the reader's message about the latest result."""
+    """Stage patch answering the reader's message about the latest result.
+
+    A turn resolved to a stored run fact already had its fact answer, so here it
+    keeps the recovery and never gets an answer that researches.
+    """
     rows = result_next_experiments(
         metadata, language=language, source_run_id=source_run_id
     )
-    answer = await compose_result_conversation_answer(
-        metadata=metadata,
-        user_message=user_message,
-        language=language,
-        recent_messages=recent_messages,
-        next_test_rows=rows["rows"] if rows is not None else (),
-    )
+    if stored_fact is not None:
+        logger.info(f"Result fact question kept the recovery fact_key={stored_fact}")
+        answer = ResultConversationAnswer(text=None, failure_mode="stored_fact_declined")
+    else:
+        answer = await compose_result_conversation_answer(
+            metadata=metadata,
+            user_message=user_message,
+            language=language,
+            recent_messages=recent_messages,
+            next_test_rows=rows["rows"] if rows is not None else (),
+        )
     patch = (
         unavailable_result_followup_patch(language=language)
         if answer.text is None

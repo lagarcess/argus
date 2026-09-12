@@ -1,7 +1,7 @@
 """Typed routing for factual latest-result questions.
 
-The runtime resolves which fact was asked for and whether it exists in the
-shared result fact bank; ``compose_result_conversation_answer`` writes the
+The runtime resolves which fact was asked for and whether the shared result
+fact bank and the run's typed fact sheet state it; ``compose_result_conversation_answer`` writes the
 user-visible answer in the detected turn language. Keep this module free of
 user-visible copy, language gates, and fact-key synonym tables; unknown or
 unavailable keys route to the typed limitation path.
@@ -12,8 +12,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from argus.agent_runtime.result_conversation import compose_result_conversation_answer
+from argus.agent_runtime.result_conversation import (
+    compose_result_conversation_answer,
+    stored_fact_is_stated,
+)
 from argus.agent_runtime.result_fact_enrichment import normalize_fact_key
+from argus.agent_runtime.result_fact_figures import PAIRED_FACT_IDS
 from argus.agent_runtime.result_followup_answers import (
     result_answer_sidecars,
     result_next_experiments,
@@ -71,35 +75,6 @@ _NON_ANSWERABLE_FACT_IDS: frozenset[str] = frozenset(
     }
 )
 
-# Companion facts pinned alongside the asked fact so date/value pairs stay
-# grounded on the same curve point.
-_PAIRED_FACT_IDS: dict[str, tuple[str, ...]] = {
-    "peak_date": ("peak_date", "peak_value"),
-    "peak_value": ("peak_value", "peak_date"),
-    "drawdown_date": ("drawdown_date", "drawdown_depth", "max_drawdown"),
-    "max_drawdown": ("max_drawdown", "drawdown_date"),
-    "lowest_date": ("lowest_date", "lowest_value"),
-    "lowest_value": ("lowest_value", "lowest_date"),
-    "final_value": ("final_value", "final_date"),
-    "fee_bps": ("fee_bps", "slippage_bps"),
-    "slippage_bps": ("slippage_bps", "fee_bps"),
-    "gross_total_return": (
-        "gross_total_return",
-        "net_total_return",
-        "return_drag",
-    ),
-    "net_total_return": (
-        "net_total_return",
-        "gross_total_return",
-        "return_drag",
-    ),
-    "return_drag": (
-        "return_drag",
-        "gross_total_return",
-        "net_total_return",
-    ),
-}
-
 
 def overrides_refinement(
     interpretation: StructuredInterpretation,
@@ -123,6 +98,17 @@ def overrides_refinement(
     return True
 
 
+def stored_fact_key(
+    *, decision: InterpretDecision, snapshot: TaskSnapshot | None
+) -> str | None:
+    """The stored run fact a result follow-up asked for, when the fact answer owns it."""
+    if decision.semantic_turn_act != "result_followup":
+        return None
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return None
+    return _requested_fact_key(decision)
+
+
 async def latest_result_answer_stage_result_if_applicable(
     *,
     decision: InterpretDecision,
@@ -134,24 +120,22 @@ async def latest_result_answer_stage_result_if_applicable(
 ) -> StageResult | LatestResultFactComposerDeclined | None:
     """Answer factual latest-result questions from typed intent and run facts."""
 
-    if decision.semantic_turn_act != "result_followup":
-        return None
-    if snapshot is None or snapshot.latest_backtest_result_reference is None:
-        return None
-    requested_fact_key = _requested_fact_key(decision)
-    if requested_fact_key is None:
+    requested_fact_key = stored_fact_key(decision=decision, snapshot=snapshot)
+    reference = snapshot.latest_backtest_result_reference if snapshot else None
+    if requested_fact_key is None or reference is None:
         return None
     if compose_response_func is None:
         compose_response_func = compose_result_conversation_answer
 
-    reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     answer_language = _answer_language(decision=decision, fallback=language)
     fact_bank = result_followup_fact_bank(metadata, language=answer_language)
     focus = _focus_for_answer(decision.result_followup_focus, requested_fact_key)
+    # A stored value is answered only when the typed fact sheet states it.
     answerable = (
         requested_fact_key in fact_bank
         and requested_fact_key not in _NON_ANSWERABLE_FACT_IDS
+        and stored_fact_is_stated(metadata, requested_fact_key)
     )
     rows = result_next_experiments(
         metadata, language=answer_language, source_run_id=reference.artifact_id
@@ -174,7 +158,7 @@ async def latest_result_answer_stage_result_if_applicable(
     if answerable:
         facts: dict[str, Any] = {
             fact_id: fact_bank[fact_id]
-            for fact_id in _PAIRED_FACT_IDS.get(requested_fact_key, (requested_fact_key,))
+            for fact_id in PAIRED_FACT_IDS.get(requested_fact_key, (requested_fact_key,))
             if fact_id in fact_bank
         }
         facts["fact_key"] = requested_fact_key

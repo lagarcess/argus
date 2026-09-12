@@ -240,6 +240,7 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
     LatestResultFactComposerDeclined,
+    stored_fact_key,
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
     latest_result_answer_stage_result_if_applicable as _latest_result_answer_stage_result_if_applicable,
@@ -2859,6 +2860,7 @@ async def _latest_result_followup_recovery_if_applicable(
             language=user.language_preference,
             recent_messages=recent_messages,
             source_run_id=reference.artifact_id,
+            stored_fact=stored_fact_key(decision=decision, snapshot=snapshot),
         )
     effective_profile = resolve_effective_response_profile(
         user=user,

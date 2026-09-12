@@ -287,6 +287,43 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
     assert "latest_result_fact_answer" in result.decision.reason_codes
 
 
+def _costed_snapshot() -> TaskSnapshot:
+    """Modeled costs stored the way a run records them: configuration and metrics."""
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    reference.metadata["config_snapshot"].update({"fee_bps": 10.0, "slippage_bps": 5.0})
+    reference.metadata["metrics"]["aggregate"]["performance"]["execution_realism"] = {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "gross_total_return_pct": 28.9,
+        "net_total_return_pct": 28.4,
+        "return_drag_pct": 0.5,
+    }
+    return snapshot
+
+
+@pytest.mark.asyncio
+async def test_a_text_cost_fact_the_answer_is_not_given_is_a_limitation() -> None:
+    composer = _RecordingComposer()
+    decision = _decision("result_card_fact").model_copy(
+        update={"result_followup_fact_key": "benchmark_cost_treatment"}
+    )
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=_costed_snapshot(),
+        current_user_message="did the benchmark pay the same costs?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    assert composer.calls[0]["unavailable_fact"] == "benchmark_cost_treatment"
+    assert "latest_result_fact_limitation" in result.decision.reason_codes
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("fact_key", "expected_fact"),
@@ -304,10 +341,6 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
             "return_drag",
             {"return_drag": "0.5 percentage points"},
         ),
-        (
-            "benchmark_cost_treatment",
-            {"benchmark_cost_treatment": ("Benchmark used the same modeled costs")},
-        ),
     ],
 )
 async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
@@ -321,7 +354,7 @@ async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
 
     result = await latest_result_answer_stage_result_if_applicable(
         decision=decision,
-        snapshot=_snapshot(),
+        snapshot=_costed_snapshot(),
         current_user_message="what execution costs did this use?",
         language="en",
         compose_response_func=composer,
@@ -395,8 +428,47 @@ async def test_stage_declines_untyped_focus_without_fact_key() -> None:
     assert composer.calls == []
 
 
+def _fixed_capital_snapshot() -> TaskSnapshot:
+    """One asset with fixed capital, where the fact sheet states the worst drop's dates."""
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    reference.metadata["symbols"] = ["COST"]
+    reference.metadata["config_snapshot"] = {
+        "template": "buy_and_hold",
+        "symbols": ["COST"],
+        "start_date": "2020-02-01",
+        "end_date": "2026-07-02",
+        "starting_capital": 10000,
+        "date_range": {"start": "2020-02-01", "end": "2026-07-02"},
+    }
+    performance = reference.metadata["metrics"]["aggregate"]["performance"]
+    performance["benchmark_coverage"] = {"target_points": 4}
+    return snapshot
+
+
 @pytest.mark.asyncio
 async def test_latest_result_drawdown_date_pairs_depth_with_trough_date() -> None:
+    composer = _RecordingComposer()
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=_decision("drawdown_date"),
+        snapshot=_fixed_capital_snapshot(),
+        current_user_message="when was the worst drawdown?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    facts = result.patch["response_intent"]["facts"]
+    assert facts["drawdown_date"] == "2022-06-16"
+    # Depth is computed at the same trough as the date.
+    assert facts["drawdown_depth"] == "12.3%"
+
+
+@pytest.mark.asyncio
+async def test_a_drawdown_date_the_fact_sheet_withholds_is_a_limitation() -> None:
+    # Deposits move a monthly-buy run's balance, so its sheet states no drop dates.
     composer = _RecordingComposer()
 
     result = await latest_result_answer_stage_result_if_applicable(
@@ -408,10 +480,8 @@ async def test_latest_result_drawdown_date_pairs_depth_with_trough_date() -> Non
     )
 
     assert result is not None
-    facts = result.patch["response_intent"]["facts"]
-    assert facts["drawdown_date"] == "2022-06-16"
-    # Depth is computed at the same trough as the date.
-    assert facts["drawdown_depth"] == "12.3%"
+    assert composer.calls[0]["unavailable_fact"] == "drawdown_date"
+    assert "latest_result_fact_limitation" in result.decision.reason_codes
 
 
 @pytest.mark.asyncio

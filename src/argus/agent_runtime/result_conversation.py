@@ -23,6 +23,11 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from argus.agent_runtime.next_experiments_contract import NEXT_EXPERIMENT_ACTION_LABELS
 from argus.agent_runtime.response_language import response_language_instruction
+from argus.agent_runtime.result_fact_figures import (
+    FIGURELESS_FACT_IDS,
+    PAIRED_FACT_IDS,
+    stated_fact_rows,
+)
 from argus.agent_runtime.result_followups import symbols_list
 from argus.agent_runtime.result_next_steps import (
     MAX_NEXT_STEPS,
@@ -223,10 +228,19 @@ async def compose_result_conversation_answer(
     client: PerplexityAgentClient | None = None,
     invoke_json_schema_func: Any = invoke_openrouter_json_schema,
 ) -> ResultConversationAnswer:
-    """Answer with the research Agent, or without search when it cannot serve."""
+    """Answer with the research Agent, or without search when it cannot serve.
+
+    A question resolved to a stored run fact is answered without search, and its
+    reply is accepted only when it declares the requested fact."""
     # Argus writes in English and Spanish; any other reader language gets English.
     resolved = normalize_readout_language(language) or "en"
-    facts = run_headline_facts(metadata)
+    facts, declared = _run_facts(metadata, requested_fact)
+    if requested_fact and requested_fact not in FIGURELESS_FACT_IDS and not declared:
+        logger.info(
+            f"Result fact reply declined fact_key={requested_fact}"
+            " reason=requested_fact_not_stated"
+        )
+        return ResultConversationAnswer(text=None, failure_mode="requested_fact_not_stated")
     test_kinds = tuple(
         dict.fromkeys(str(row["kind"]) for row in next_test_rows if row.get("kind"))
     )
@@ -241,16 +255,19 @@ async def compose_result_conversation_answer(
         requested_fact=requested_fact,
         unavailable_fact=unavailable_fact,
     )
-    researched = await _research_answer(
-        prompt,
-        schema=schema,
-        facts=facts,
-        language=resolved,
-        test_kinds=test_kinds,
-        client=client,
-    )
-    if researched.text is not None:
-        return researched
+    # A question the interpreter resolved to a run fact never searches or claims research.
+    researched = ResultConversationAnswer(text=None, failure_mode="stored_run_fact")
+    if requested_fact is None and unavailable_fact is None:
+        researched = await _research_answer(
+            prompt,
+            schema=schema,
+            facts=facts,
+            language=resolved,
+            test_kinds=test_kinds,
+            client=client,
+        )
+        if researched.text is not None:
+            return researched
     answered = await _no_search_answer(
         prompt,
         schema=schema,
@@ -258,7 +275,13 @@ async def compose_result_conversation_answer(
         language=resolved,
         test_kinds=test_kinds,
         invoke_json_schema_func=invoke_json_schema_func,
+        declared=declared,
     )
+    if requested_fact and answered.text is None:
+        logger.info(
+            f"Result fact reply declined fact_key={requested_fact}"
+            f" reason={answered.failure_mode}"
+        )
     logger.info(
         "Result follow-up answered without search"
         f" research={researched.failure_mode} answer={answered.failure_mode or 'ok'}"
@@ -273,9 +296,20 @@ async def compose_result_conversation_answer(
 def run_headline_facts(metadata: dict[str, Any]) -> dict[str, Any]:
     """The run's labeled headline facts from the sheet the Breakdown reads, plus
     its modeled cost rows."""
+    return _run_facts(metadata)[0]
+
+
+def stored_fact_is_stated(metadata: dict[str, Any], fact_key: str) -> bool:
+    """Whether the run's typed fact sheet states a stored fact a reply can declare."""
+    return fact_key in FIGURELESS_FACT_IDS or bool(
+        stated_fact_rows(_run_sheet(metadata), fact_key)
+    )
+
+
+def _run_sheet(metadata: dict[str, Any]) -> dict[str, Any]:
     card = _mapping(metadata.get("result_card"))
     config = _mapping(metadata.get("config_snapshot"))
-    sheet = stored_readout_facts(
+    return stored_readout_facts(
         metrics=metadata.get("metrics"),
         config_snapshot=config,
         symbols=metadata.get("symbols") or config.get("symbols"),
@@ -284,16 +318,47 @@ def run_headline_facts(metadata: dict[str, Any]) -> dict[str, Any]:
         date_range=card.get("date_range") or config.get("date_range"),
         chart=metadata.get("chart"),
     )
+
+
+def _run_facts(
+    metadata: dict[str, Any], requested_fact: str | None = None
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Headline and cost facts plus the rows stating a requested fact and its pairs,
+    and the labels a reply must declare for the requested fact."""
+    sheet = _run_sheet(metadata)
     rows = _mapping(sheet.get("facts"))
     headline = headline_readout_facts(sheet)
-    headline["facts"].update(
+    offered = headline["facts"]
+    offered.update(
         {
             label: rows[key]
             for key, label in _COST_FACT_LABELS.items()
             if isinstance(rows.get(key), dict)
         }
     )
-    return headline
+    declared: tuple[str, ...] = ()
+    paired = PAIRED_FACT_IDS.get(requested_fact, (requested_fact,)) if requested_fact else ()
+    for fact in paired:
+        labels = [
+            _offered_label(offered, shown=rows.get(key), row=row)
+            for key, row in stated_fact_rows(sheet, fact).items()
+        ]
+        if fact == requested_fact and labels and None not in labels:
+            declared = tuple(label for label in labels if label is not None)
+    return headline, declared
+
+
+def _offered_label(
+    offered: dict[str, Any], *, shown: object, row: dict[str, Any]
+) -> str | None:
+    """The label a reply cites for a row: the headline's own, else the row's meaning."""
+    for label, existing in offered.items():
+        if shown is not None and existing is shown:
+            return label
+    label = str(row.get("meaning") or "")
+    if not label or offered.setdefault(label, row) is not row:
+        return None
+    return label
 
 
 def accepted_conversation_answer(
@@ -304,8 +369,11 @@ def accepted_conversation_answer(
     test_kinds: tuple[str, ...],
     sources: Sequence[ResearchSource],
     source: AnswerSource,
+    declared: tuple[str, ...] = (),
 ) -> ResultConversationAnswer:
-    """The readout's light guard, then returned-source links and clean steps."""
+    """The readout's light guard, then returned-source links and clean steps.
+
+    Every fact named in ``declared`` must be among the reply's validated figures."""
     if not isinstance(draft, dict):
         return ResultConversationAnswer(text=None, failure_mode="invalid_draft")
     text, failure = accepted_readout_text(
@@ -315,6 +383,13 @@ def accepted_conversation_answer(
     )
     if text is None:
         return ResultConversationAnswer(text=None, failure_mode=failure)
+    cited = {
+        figure.get("fact_key")
+        for figure in draft.get("figures") or []
+        if isinstance(figure, dict)
+    }
+    if not set(declared) <= cited:
+        return ResultConversationAnswer(text=None, failure_mode="requested_fact_undeclared")
     return ResultConversationAnswer(
         text=returned_source_links(text, sources),
         source=source,
@@ -381,6 +456,7 @@ async def _no_search_answer(
     language: str,
     test_kinds: tuple[str, ...],
     invoke_json_schema_func: Any,
+    declared: tuple[str, ...] = (),
 ) -> ResultConversationAnswer:
     messages = [
         {
@@ -420,6 +496,7 @@ async def _no_search_answer(
         test_kinds=test_kinds,
         sources=(),
         source="chat_model",
+        declared=declared,
     )
 
 

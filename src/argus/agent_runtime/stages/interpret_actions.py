@@ -44,6 +44,9 @@ from argus.agent_runtime.stages.artifact_context import (
     validated_approval_confirmation_payload_from_snapshot,
     validated_approval_confirmation_payload_from_state,
 )
+from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+    stored_fact_key,
+)
 from argus.agent_runtime.stages.interpret_internal.result_action_routing import (
     typed_result_action_stage_result_if_applicable,
 )
@@ -1074,5 +1077,6 @@ async def artifact_followup_stage_result_if_applicable(
             language=language,
             recent_messages=recent_messages,
             source_run_id=reference.artifact_id,
+            stored_fact=stored_fact_key(decision=decision, snapshot=snapshot),
         ),
     )

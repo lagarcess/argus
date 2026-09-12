@@ -3043,10 +3043,15 @@ def test_result_followup_uses_latest_result_fact_bank(
         assert kwargs["language"] == "en"
         return "MSFT's max drawdown was 34.2% in the latest run."
 
-    monkeypatch.setattr(
-        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
-        _answering(fake_compose_result_followup_response),
-    )
+    # A question typed to a stored fact is answered by the fact stage's composer.
+    for owner in (
+        "argus.agent_runtime.result_followup_answers",
+        "argus.agent_runtime.stages.interpret_internal.latest_result_answer",
+    ):
+        monkeypatch.setattr(
+            f"{owner}.compose_result_conversation_answer",
+            _answering(fake_compose_result_followup_response),
+        )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
             artifact_kind="backtest_result",
@@ -3817,10 +3822,15 @@ def test_result_followup_uses_composer_question_when_llm_focus_is_wrong(
             "and exited on the opposite 20/50 SMA cross."
         )
 
-    monkeypatch.setattr(
-        "argus.agent_runtime.result_followup_answers.compose_result_conversation_answer",
-        _answering(fake_compose_result_followup_response),
-    )
+    # The typed max_drawdown focus reaches the fact stage's composer with the real question.
+    for owner in (
+        "argus.agent_runtime.result_followup_answers",
+        "argus.agent_runtime.stages.interpret_internal.latest_result_answer",
+    ):
+        monkeypatch.setattr(
+            f"{owner}.compose_result_conversation_answer",
+            _answering(fake_compose_result_followup_response),
+        )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
             artifact_kind="backtest_result",

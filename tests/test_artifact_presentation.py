@@ -124,13 +124,14 @@ async def test_factual_followup_survives_live_and_persisted_readers(
     from argus.domain.conversation_previews import project_conversation_preview
 
     from tests.agent_runtime.test_latest_result_fact_answers import (
+        _costed_snapshot,
         _decision,
-        _latest_result_reference,
         _RecordingComposer,
-        _snapshot,
     )
 
-    reference = _latest_result_reference()
+    snapshot = _costed_snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
     fact = result_followup_fact_bank(dict(reference.metadata))[fact_key]
     answer = f"{faker.sentence()} {fact}"
     composer = _RecordingComposer(response=answer)
@@ -139,7 +140,7 @@ async def test_factual_followup_survives_live_and_persisted_readers(
     )
     result = await latest_result_answer_stage_result_if_applicable(
         decision=decision,
-        snapshot=_snapshot(),
+        snapshot=snapshot,
         current_user_message=faker.sentence(),
         language=language,
         compose_response_func=composer,
