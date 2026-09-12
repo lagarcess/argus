@@ -85,12 +85,18 @@ class ExactlyOneUnknown:
 PublicReceiptPolicy = Literal["disabled", "typed_facts", "cited_facts"]
 
 
+MAX_DRIVING_INPUTS = 5
+
+
 @dataclass(frozen=True)
 class ToolPolicy:
     execution: Literal["local", "workflow", "provider"] = "local"
     external_calls: int = 0
     confirmation: Literal["never", "required"] = "never"
     editable_fields: tuple[str, ...] = ()
+    # The inputs that drive the result, most telling first; a card shows at most
+    # MAX_DRIVING_INPUTS of them that carry a value.
+    driving_fields: tuple[str, ...] = ()
     retain_unknown: bool = True
     public_receipt: PublicReceiptPolicy = "disabled"
 
@@ -107,6 +113,8 @@ class ToolPolicy:
             self.execution != "local" or self.confirmation != "never"
         ):
             raise ValueError("Instant recompute is reserved for free local tools")
+        if set(self.driving_fields) - set(self.editable_fields):
+            raise ValueError("A driving input must be editable")
 
 
 @dataclass(frozen=True)
@@ -518,6 +526,11 @@ class ToolDeclaration:
                 unit.field: unit.unit for unit in self.units if unit.source == "result"
             }
             input_sources = _input_sources(original)
+            driving = [
+                name
+                for name in self.policy.driving_fields
+                if original.get(name) is not None
+            ][:MAX_DRIVING_INPUTS]
             presentation = presentation.model_copy(
                 update={
                     "answer": _computed(_with_unit(presentation.answer, result_units))
@@ -538,6 +551,7 @@ class ToolDeclaration:
                                 and original[fact.name] is None,
                                 "editable": fact.name in self.policy.editable_fields
                                 and original[fact.name] is not None,
+                                "driving": fact.name in driving,
                                 "unit": input_units.get(fact.name, fact.unit),
                                 "source": ToolFactSource(kind="computed")
                                 if any(fact.name in rule.fields for rule in self.rules)

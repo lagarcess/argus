@@ -29,8 +29,11 @@ ToolFailureStatus = Literal["invalid", "ambiguous", "bounded", "unavailable"]
 ToolStatus = Literal["succeeded", ToolFailureStatus]
 MAX_TOOL_CALLS = 8
 # Where an input fact came from: the user stated it, a dated page supplied it,
-# the calculation derived it, or no source gave it and it still needs a value.
-ToolFactSourceKind = Literal["user", "page", "computed", "not_found"]
+# Argus's own market data supplied it, the answer assumed it and says so, or the
+# calculation derived it. ``not_found`` stays readable on older cards.
+ToolFactSourceKind = Literal[
+    "user", "page", "market_data", "assumption", "computed", "not_found"
+]
 # An argument model may carry its inputs' provenance under this one field name;
 # the declaration projects it onto the card and marks an edited input as stated.
 TOOL_INPUT_SOURCES_FIELD = "sources"
@@ -86,7 +89,8 @@ class ToolProgress(LocalizedText):
 
 
 class ToolFactSource(ToolContract):
-    """Where a fact came from. A page names its title and date; nothing else does."""
+    """Where a fact came from. A page names its title and date, market data names
+    the date of its bar, and nothing else carries a citation."""
 
     kind: ToolFactSourceKind
     title: str | None = Field(default=None, max_length=300)
@@ -95,8 +99,12 @@ class ToolFactSource(ToolContract):
 
     @model_validator(mode="after")
     def only_a_page_is_cited(self) -> ToolFactSource:
-        if self.kind != "page" and (self.title or self.url or self.date):
-            raise ValueError("Only a page source carries a title, url or date")
+        if self.kind == "page":
+            return self
+        if self.title or self.url:
+            raise ValueError("Only a page source carries a title or url")
+        if self.date and self.kind != "market_data":
+            raise ValueError("Only a page or market data source carries a date")
         return self
 
     @model_serializer(mode="wrap")
@@ -118,12 +126,16 @@ class ToolFact(ToolContract):
 class ToolInputFact(ToolFact):
     editable: bool = False
     unknown: bool = False
+    # One of the few inputs that drive the result, shown under the answer.
+    driving: bool = False
     visibility: Literal["public", "private"] = "private"
 
     @model_validator(mode="after")
     def unknown_is_blank_and_read_only(self) -> ToolInputFact:
         if self.unknown and (self.value is not None or self.editable):
             raise ValueError("The retained unknown must be blank and read-only")
+        if self.driving and self.value is None:
+            raise ValueError("A driving input always carries a value")
         return self
 
 

@@ -141,7 +141,12 @@ def get_bond_value_declaration() -> ToolDeclaration:
         ),
         handler=compute_bond_value,
         policy=free_policy(
-            *UNKNOWN_FIELDS, "face_value", "coupon_rate_pct", "years", "coupons_per_year"
+            *UNKNOWN_FIELDS,
+            "face_value",
+            "coupon_rate_pct",
+            "years",
+            "coupons_per_year",
+            driving=("face_value", "coupon_rate_pct", "years", *UNKNOWN_FIELDS),
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.bond_value.progress"),
         card=ToolCardBinding(

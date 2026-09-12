@@ -253,7 +253,11 @@ def get_time_value_declaration() -> ToolDeclaration:
         ),
         handler=compute_time_value,
         policy=free_policy(
-            *UNKNOWN_FIELDS, "periods_per_year", "payment_timing", "direction"
+            *UNKNOWN_FIELDS,
+            "periods_per_year",
+            "payment_timing",
+            "direction",
+            driving=UNKNOWN_FIELDS,
         ),
         progress=ToolProgressTemplate(
             locale_key="tools.calc.time_value.progress", argument_fields=("direction",)

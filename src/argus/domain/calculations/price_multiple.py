@@ -112,7 +112,7 @@ def get_price_multiple_declaration() -> ToolDeclaration:
             "of price, per-share figure and multiple and the third is solved."
         ),
         handler=compute_price_multiple,
-        policy=free_policy(*UNKNOWN_FIELDS),
+        policy=free_policy(*UNKNOWN_FIELDS, driving=UNKNOWN_FIELDS),
         progress=ToolProgressTemplate(locale_key="tools.calc.price_multiple.progress"),
         card=ToolCardBinding(
             card_type="price_multiple", version=1, presenter=present_price_multiple

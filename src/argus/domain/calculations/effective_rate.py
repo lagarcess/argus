@@ -127,7 +127,12 @@ def get_effective_rate_declaration() -> ToolDeclaration:
         ),
         handler=compute_effective_rate,
         policy=free_policy(
-            "nominal_rate_pct", "compounding_per_year", "amount", "fees", "periods"
+            "nominal_rate_pct",
+            "compounding_per_year",
+            "amount",
+            "fees",
+            "periods",
+            driving=("nominal_rate_pct", "amount", "fees", "periods"),
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.effective_rate.progress"),
         card=ToolCardBinding(

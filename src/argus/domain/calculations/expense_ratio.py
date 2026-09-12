@@ -116,7 +116,13 @@ def get_expense_ratio_declaration() -> ToolDeclaration:
             "one of the yearly fee and the ratio is blank."
         ),
         handler=compute_expense_ratio,
-        policy=free_policy(*UNKNOWN_FIELDS, "assets", "years", "growth_rate_pct"),
+        policy=free_policy(
+            *UNKNOWN_FIELDS,
+            "assets",
+            "years",
+            "growth_rate_pct",
+            driving=("assets", *UNKNOWN_FIELDS, "years", "growth_rate_pct"),
+        ),
         progress=ToolProgressTemplate(locale_key="tools.calc.expense_ratio.progress"),
         card=ToolCardBinding(
             card_type="expense_ratio", version=1, presenter=present_expense_ratio

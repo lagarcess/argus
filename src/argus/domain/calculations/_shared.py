@@ -68,13 +68,15 @@ class CalculationResult(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
-def free_policy(*editable: str) -> ToolPolicy:
-    """A free calculation: local, never confirmed, instantly recomputed."""
+def free_policy(*editable: str, driving: Sequence[str] = ()) -> ToolPolicy:
+    """A free calculation: local, never confirmed, instantly recomputed, with the
+    inputs that drive its result named most telling first."""
     return ToolPolicy(
         execution="local",
         external_calls=0,
         confirmation="never",
         editable_fields=tuple(editable),
+        driving_fields=tuple(driving),
         retain_unknown=True,
         public_receipt="typed_facts",
     )

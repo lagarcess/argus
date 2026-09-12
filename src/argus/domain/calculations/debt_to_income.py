@@ -124,7 +124,7 @@ def get_debt_to_income_declaration() -> ToolDeclaration:
             "monthly debt payments, monthly income and the ratio."
         ),
         handler=compute_debt_to_income,
-        policy=free_policy(*UNKNOWN_FIELDS),
+        policy=free_policy(*UNKNOWN_FIELDS, driving=UNKNOWN_FIELDS),
         progress=ToolProgressTemplate(locale_key="tools.calc.debt_to_income.progress"),
         card=ToolCardBinding(
             card_type="debt_to_income", version=1, presenter=present_debt_to_income

@@ -163,7 +163,11 @@ def get_growth_projection_declaration() -> ToolDeclaration:
         ),
         handler=compute_growth,
         policy=free_policy(
-            *UNKNOWN_FIELDS, "contribution", "periods_per_year", "inflation_rate_pct"
+            *UNKNOWN_FIELDS,
+            "contribution",
+            "periods_per_year",
+            "inflation_rate_pct",
+            driving=(*UNKNOWN_FIELDS, "contribution", "inflation_rate_pct"),
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.growth_projection.progress"),
         card=ToolCardBinding(

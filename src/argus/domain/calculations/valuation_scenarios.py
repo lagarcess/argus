@@ -246,6 +246,18 @@ def get_valuation_scenarios_declaration() -> ToolDeclaration:
             "multiple_high",
             "horizon_years",
             "amount",
+            driving=(
+                "price",
+                "per_share",
+                "growth_base_pct",
+                "horizon_years",
+                "amount",
+                "multiple_base",
+                "growth_low_pct",
+                "growth_high_pct",
+                "multiple_low",
+                "multiple_high",
+            ),
         ),
         progress=ToolProgressTemplate(
             locale_key="tools.calc.valuation_scenarios.progress"

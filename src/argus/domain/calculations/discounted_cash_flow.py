@@ -128,6 +128,13 @@ def get_discounted_cash_flow_declaration() -> ToolDeclaration:
             "discount_rate_pct",
             "years",
             "terminal_growth_rate_pct",
+            driving=(
+                "cash_flow",
+                "discount_rate_pct",
+                "years",
+                *UNKNOWN_FIELDS,
+                "terminal_growth_rate_pct",
+            ),
         ),
         progress=ToolProgressTemplate(
             locale_key="tools.calc.discounted_cash_flow.progress"

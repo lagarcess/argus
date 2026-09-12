@@ -116,7 +116,7 @@ def get_income_yield_declaration() -> ToolDeclaration:
             "interest or coupons: give any two of yearly income, price and yield."
         ),
         handler=compute_income_yield,
-        policy=free_policy(*UNKNOWN_FIELDS),
+        policy=free_policy(*UNKNOWN_FIELDS, driving=UNKNOWN_FIELDS),
         progress=ToolProgressTemplate(locale_key="tools.calc.income_yield.progress"),
         card=ToolCardBinding(
             card_type="income_yield", version=1, presenter=present_income_yield
