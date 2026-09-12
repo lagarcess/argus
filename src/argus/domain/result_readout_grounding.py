@@ -42,8 +42,10 @@ READOUT_RUN_GROUNDING_INSTRUCTIONS = (
     "regularly, or buying and selling, as appropriate. Tell the holding "
     "experience without narrating record keeping. Stay within the evidence, "
     "without inventing a holder's feelings or decisions. Any next step is a "
-    "question for another supported historical test, never a prediction or "
+    "question for another historical test Argus can run, never a prediction or "
     "recommendation to trade. No forecasts, investment advice or em dashes. "
+    "Name the benchmark by its ticker and write finance terms such as benchmark "
+    "in product_language too. "
     "Write in product_language and report the language actually written. "
     + READOUT_FIGURE_REFERENCE_INSTRUCTIONS
 )

@@ -72,13 +72,15 @@ def readout_display_value(
         # a future account currency as dollars.
         if row.get("currency", "USD") != "USD":
             return None
+        # Modeled costs are small amounts whose parts must add up, so they keep cents.
+        digits = 2 if "currency_cents" in presentation else _CURRENCY_DIGITS
         try:
             amount = Decimal(str(value)).quantize(
-                Decimal(1).scaleb(-_CURRENCY_DIGITS), rounding=_CURRENCY_ROUNDING
+                Decimal(1).scaleb(-digits), rounding=_CURRENCY_ROUNDING
             )
         except InvalidOperation:
             return None
-        pattern = "#,##0" + ("." + "0" * _CURRENCY_DIGITS if _CURRENCY_DIGITS else "")
+        pattern = "#,##0" + ("." + "0" * digits if digits else "")
         number = format_decimal(abs(amount), format=pattern, locale=locale)
         return {
             "value": float(amount),

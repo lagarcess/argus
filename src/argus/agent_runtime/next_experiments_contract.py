@@ -15,7 +15,7 @@ NEXT_EXPERIMENTS_ROW_CAP = 3
 _LABEL_KEY_PREFIX = "chat.next_experiments.labels."
 
 # The tapped row sends this localized text as an ordinary conversational
-# turn; every label must read as a supported ask for its family.
+# turn; every label must read, in everyday words, as an ask Argus can run.
 NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
     "en": {
         f"{_LABEL_KEY_PREFIX}change_date_range": "Test a different date range",
@@ -25,15 +25,11 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
         f"{_LABEL_KEY_PREFIX}same_rule_peer_asset": (
             "Test the same rule on a similar asset"
         ),
-        f"{_LABEL_KEY_PREFIX}supported_rsi_threshold": (
-            "Try a supported RSI threshold rule"
-        ),
+        f"{_LABEL_KEY_PREFIX}supported_rsi_threshold": "Try an RSI threshold rule",
         f"{_LABEL_KEY_PREFIX}recurring_monthly_buys": "Try monthly recurring buys",
-        f"{_LABEL_KEY_PREFIX}supported_ma_crossover": (
-            "Try a supported SMA/EMA crossover"
-        ),
+        f"{_LABEL_KEY_PREFIX}supported_ma_crossover": ("Try a moving average crossover"),
         f"{_LABEL_KEY_PREFIX}supported_rsi_or_ma_rule": (
-            "Simplify into a supported RSI or SMA/EMA rule"
+            "Simplify into an RSI or moving average rule"
         ),
         f"{_LABEL_KEY_PREFIX}adjust_indicator_thresholds": (
             "Test different indicator thresholds"
@@ -52,17 +48,15 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
         f"{_LABEL_KEY_PREFIX}same_rule_peer_asset": (
             "Probar la misma regla en un activo similar"
         ),
-        f"{_LABEL_KEY_PREFIX}supported_rsi_threshold": (
-            "Probar una regla RSI compatible"
-        ),
+        f"{_LABEL_KEY_PREFIX}supported_rsi_threshold": ("Probar una regla de umbral RSI"),
         f"{_LABEL_KEY_PREFIX}recurring_monthly_buys": (
             "Probar compras mensuales recurrentes"
         ),
         f"{_LABEL_KEY_PREFIX}supported_ma_crossover": (
-            "Probar un cruce SMA/EMA compatible"
+            "Probar un cruce de medias móviles"
         ),
         f"{_LABEL_KEY_PREFIX}supported_rsi_or_ma_rule": (
-            "Simplificar a una regla RSI o SMA/EMA compatible"
+            "Simplificar a una regla RSI o de medias móviles"
         ),
         f"{_LABEL_KEY_PREFIX}adjust_indicator_thresholds": (
             "Probar otros umbrales del indicador"
@@ -79,15 +73,15 @@ _SHORT_LABEL_KEY_PREFIX = "chat.next_experiments.labels_short."
 
 # Narrow screens get a shorter form of the same ask. The backend owns
 # user-facing copy, so the short form is composed here rather than clipped in
-# the client. Every entry must still read as a supported ask on its own.
+# the client. Every entry must still read as an ask Argus can run on its own.
 NEXT_EXPERIMENT_SHORT_LABELS: dict[str, dict[str, str]] = {
     "en": {
         "change_date_range": "Different dates",
         "same_setup_peer_asset": "Similar asset",
         "same_rule_peer_asset": "Same rule, similar asset",
-        "supported_rsi_threshold": "Supported RSI rule",
+        "supported_rsi_threshold": "RSI rule",
         "recurring_monthly_buys": "Monthly buys",
-        "supported_ma_crossover": "SMA/EMA crossover",
+        "supported_ma_crossover": "Moving average crossover",
         "supported_rsi_or_ma_rule": "Simplify the rule",
         "adjust_indicator_thresholds": "Other thresholds",
         "adjust_signal_periods": "Other signal periods",
@@ -98,9 +92,9 @@ NEXT_EXPERIMENT_SHORT_LABELS: dict[str, dict[str, str]] = {
         "change_date_range": "Otras fechas",
         "same_setup_peer_asset": "Activo similar",
         "same_rule_peer_asset": "Misma regla, activo similar",
-        "supported_rsi_threshold": "Regla RSI compatible",
+        "supported_rsi_threshold": "Regla RSI",
         "recurring_monthly_buys": "Compras mensuales",
-        "supported_ma_crossover": "Cruce SMA/EMA",
+        "supported_ma_crossover": "Cruce de medias móviles",
         "supported_rsi_or_ma_rule": "Simplificar la regla",
         "adjust_indicator_thresholds": "Otros umbrales",
         "adjust_signal_periods": "Otros períodos",
