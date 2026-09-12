@@ -24,6 +24,8 @@ import {
   railTickStackOffsetPx,
 } from "@/lib/conversation-rail";
 import { recoveryDisplayText } from "@/lib/chat-recovery-display";
+import { toolOutcomeTreatment } from "@/lib/tool-outcome-treatment";
+import { localizedToolText, toolFactValue } from "@/lib/tool-result-card";
 import type { Message } from "@/components/chat/types";
 
 type ConversationActivityRailProps = {
@@ -32,13 +34,13 @@ type ConversationActivityRailProps = {
 };
 
 const TICK_BAR_KIND_CLASSES: Record<ConversationRailTickKind, string> = {
-  backtest_completed: "bg-[#5ba897]",
+  result: "bg-[#5ba897]",
   decision_saved: "bg-[#6f8fb8]",
   error_recovery: "bg-[#d66d75]",
 };
 
 const KIND_LABEL_CLASSES: Record<ConversationRailTickKind, string> = {
-  backtest_completed: "text-[#3f816f] dark:text-[#7bc1ad]",
+  result: "text-[#3f816f] dark:text-[#7bc1ad]",
   decision_saved: "text-[#4f6f98] dark:text-[#91afd1]",
   error_recovery: "text-[#ad4e56] dark:text-[#e58c93]",
 };
@@ -47,7 +49,8 @@ export default function ConversationActivityRail({
   messages,
   onSelectTick,
 }: ConversationActivityRailProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const ticks = useMemo(() => deriveConversationRailTicks(messages), [messages]);
   const totalMessages = messages.length;
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -170,18 +173,26 @@ export default function ConversationActivityRail({
     if (kind === "error_recovery") {
       return t("chat.activity_rail.needs_attention", "Needed attention");
     }
-    return t("chat.activity_rail.backtest_completed", "Backtest finished");
+    return t("chat.activity_rail.result", "Result");
   };
+
+  // A computed answer's identity is its card title; a run's is its strategy.
+  const tickTitle = (tick: ConversationRailTick): string | null =>
+    tick.calculation ? localizedToolText(tick.calculation.title, t) : tick.strategyTitle;
 
   const tickAriaLabel = (tick: ConversationRailTick): string => {
     const label = kindLabel(tick.kind);
-    const identity = [tick.symbols[0], tick.strategyTitle]
+    const identity = [tick.symbols[0], tickTitle(tick)]
       .filter(Boolean)
       .join(" · ");
     return identity ? `${label}: ${identity}` : label;
   };
 
   const errorBody = (tick: ConversationRailTick): string => {
+    if (tick.toolOutcome) {
+      const treatment = toolOutcomeTreatment(tick.toolOutcome, t);
+      if (treatment) return treatment.message;
+    }
     if (tick.recovery) {
       const text = recoveryDisplayText(tick.recovery, t).trim();
       if (text) {
@@ -263,9 +274,9 @@ export default function ConversationActivityRail({
             >
               {kindLabel(openTick.kind)}
             </div>
-            {openTick.strategyTitle && (
+            {tickTitle(openTick) && (
               <div className="mt-1 truncate text-[13px] font-medium text-black/80 dark:text-white/80">
-                {openTick.strategyTitle}
+                {tickTitle(openTick)}
               </div>
             )}
             {openTick.symbols.length > 0 && (
@@ -284,6 +295,19 @@ export default function ConversationActivityRail({
                   `chat.result_card.decision_states.${openTick.decisionState}`,
                   openTick.decisionState,
                 )}
+              </div>
+            )}
+            {openTick.kind !== "error_recovery" && openTick.calculation?.headline && (
+              <div
+                data-testid="conversation-activity-rail-headline"
+                className="mt-2 flex items-baseline justify-between gap-3 border-t border-black/8 pt-1.5 text-[12px] dark:border-white/8"
+              >
+                <span className="text-black/50 dark:text-white/50">
+                  {localizedToolText(openTick.calculation.headline.label, t)}
+                </span>
+                <span className="font-medium text-black/80 dark:text-white/80">
+                  {toolFactValue(openTick.calculation.headline, t, locale)}
+                </span>
               </div>
             )}
             {openTick.kind !== "error_recovery" &&

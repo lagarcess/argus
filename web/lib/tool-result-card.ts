@@ -6,7 +6,9 @@ import type { ApiMessage } from "./argus-api";
 export type ToolScalar = string | number | boolean | null;
 export type LocalizedToolText = { locale_key: string; interpolation_args: Record<string, ToolScalar> };
 export type ToolProgress = LocalizedToolText & { call_id: string; tool_name: string };
-export type ToolFact = { name: string; label: LocalizedToolText; value: ToolScalar; unit: LocalizedToolText | null; value_text?: LocalizedToolText | null };
+/** Where a fact came from; older cards carry none and stay readable. */
+export type ToolFactSource = { kind: "user" | "page" | "computed" | "not_found"; title?: string | null; url?: string | null; date?: string | null };
+export type ToolFact = { name: string; label: LocalizedToolText; value: ToolScalar; unit: LocalizedToolText | null; value_text?: LocalizedToolText | null; source?: ToolFactSource | null };
 export type ToolInputFact = ToolFact & { editable: boolean; unknown: boolean; visibility?: "public" | "private" };
 export type ToolResearchSource = { url: string; title: string; source_date?: string | null };
 export type ToolCardPresentation = {
@@ -15,10 +17,13 @@ export type ToolCardPresentation = {
   narrative?: string | null; sources?: ToolResearchSource[];
   visual?: EvidenceVisual | null;
 };
+/** A typed fix the user can tap: an argument edit the recompute route accepts. */
+export type ToolRepair = { kind: "set_inputs"; label: LocalizedToolText; changes: Record<string, ToolScalar> };
+export type ToolFailure = { code: string; fields: string[]; repair?: ToolRepair | null };
 export type ToolOutcome = {
   status: "succeeded" | "invalid" | "ambiguous" | "bounded" | "unavailable";
   result: Record<string, unknown> | null;
-  failure: { code: string; fields: string[] } | null;
+  failure: ToolFailure | null;
 };
 export type ToolResultCard = {
   kind: "tool_result"; schema_version: 1; tool_name: string; call_id: string;
@@ -40,9 +45,19 @@ function localized(value: unknown): value is LocalizedToolText {
   return record(value) && text(value.locale_key) && record(value.interpolation_args) &&
     Object.values(value.interpolation_args).every(scalar);
 }
+const SOURCE_KINDS = new Set(["user", "page", "computed", "not_found"]);
+function source(value: unknown): value is ToolFactSource {
+  if (!record(value) || !SOURCE_KINDS.has(String(value.kind))) return false;
+  return ["title", "url", "date"].every((key) => value[key] == null || typeof value[key] === "string");
+}
+function repair(value: unknown): value is ToolRepair {
+  return record(value) && value.kind === "set_inputs" && localized(value.label) && record(value.changes) &&
+    Object.keys(value.changes).length > 0 && Object.values(value.changes).every(scalar);
+}
 function fact(value: unknown): value is ToolFact {
   return record(value) && text(value.name) && localized(value.label) && scalar(value.value) &&
-    (value.unit === null || localized(value.unit)) && (value.value_text == null || localized(value.value_text));
+    (value.unit === null || localized(value.unit)) && (value.value_text == null || localized(value.value_text)) &&
+    (value.source == null || source(value.source));
 }
 export function parseToolPresentation(value: unknown): ToolCardPresentation | null {
   if (!record(value) || !localized(value.title) || !(value.answer === null || fact(value.answer)) ||
@@ -77,7 +92,9 @@ export function parseToolResultCard(value: unknown): ToolResultCard | null {
     if (!record(outcome.result) || outcome.failure !== null) return null;
   } else if (!["invalid", "ambiguous", "bounded", "unavailable"].includes(String(outcome.status)) ||
     outcome.result !== null || !record(outcome.failure) || !text(outcome.failure.code) ||
-    !Array.isArray(outcome.failure.fields) || !outcome.failure.fields.every(text) || presentation.answer !== null || presentation.narrative != null || presentation.visual != null) return null;
+    !Array.isArray(outcome.failure.fields) || !outcome.failure.fields.every(text) ||
+    (outcome.failure.repair != null && !repair(outcome.failure.repair)) ||
+    presentation.answer !== null || presentation.narrative != null || presentation.visual != null) return null;
   return value as ToolResultCard;
 }
 
@@ -122,12 +139,31 @@ export function toolFactValue(value: ToolFact, t: ToolTranslator, locale: string
   return value.unit ? `${content} ${localizedToolText(value.unit, t)}` : content;
 }
 
+/** The provenance line under an input: stated, cited with its date, or computed. */
+export function toolFactSourceText(fact: ToolFact, t: ToolTranslator, locale: string): string | null {
+  const provenance = fact.source;
+  if (!provenance) return null;
+  if (provenance.kind === "page") {
+    const date = provenance.date ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${provenance.date}T00:00:00Z`)) : "";
+    const title = provenance.title?.trim() || (provenance.url ? safeHost(provenance.url) : "");
+    return title && date ? t("tools.card.source.page_dated", { title, date }) : t("tools.card.source.page", { title: title || date });
+  }
+  return t(`tools.card.source.${provenance.kind}`, { defaultValue: "" }) || null;
+}
+function safeHost(url: string): string {
+  try { return new URL(url).hostname; } catch { return ""; }
+}
+/** A blank the user can fill: an input no source supplied, never the retained unknown. */
+export function toolInputAwaitsValue(input: ToolInputFact): boolean {
+  return input.editable && !input.unknown && input.value === null;
+}
+
 /** Transport conversion only. Domain validation and every calculation stay in Python. */
 export function toolInputChange(card: ToolResultCard, name: string, raw: string): Record<string, ToolScalar> | null {
   const input = card.presentation.inputs.find((candidate) => candidate.name === name);
   if (card.artifact_state !== "active" || !input?.editable || input.unknown || raw.trim() === "") return null;
   let value: ToolScalar = raw;
-  if (typeof input.value === "number") {
+  if (typeof input.value === "number" || (input.value === null && Number.isFinite(Number(raw)) && raw.trim() !== "")) {
     value = Number(raw);
     if (!Number.isFinite(value)) return null;
   } else if (typeof input.value === "boolean") {

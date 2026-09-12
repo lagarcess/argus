@@ -641,6 +641,7 @@
     "rename_failed": "Could not rename this chat. Try again.",
     "simulation_complete": "Simulation Complete",
     "activity_rail": {
+      "result": "Result",
       "aria_label": "Conversation activity",
       "backtest_completed": "Backtest finished",
       "needs_attention": "Needed attention",
@@ -1246,10 +1247,20 @@
     "empty": "No recent chats yet."
   },
   "command_palette": {
+    "answer_dossier": {
+      "type": "Calculation",
+      "asked": "You asked",
+      "stored": "Saved answer",
+      "latest": "With your changes",
+      "recompute_failed": "Could not recompute. Try again.",
+      "decision_saved_on": "Decided {{date}}"
+    },
     "add_decision": "Add decision · {{run}}",
     "add_decision_short": "Add decision",
     "archive_conversation": "Archive conversation",
     "asset_rollup": {
+      "results_involving_one": "{{count}} result involving {{symbol}}",
+      "results_involving_other": "{{count}} results involving {{symbol}}",
       "heading": "Your Argus history",
       "scope_registered": "Across your conversations",
       "scope_guest": "In this temporary conversation",
@@ -1855,11 +1866,188 @@
     }
   },
   "tools": {
+    "decision": {
+      "stored": "Saved result",
+      "today": "Today's result",
+      "open": "Open decision",
+      "close": "Close decision",
+      "loading": "Opening the decision...",
+      "load_failed": "Could not open this decision. Try again.",
+      "reason": {
+        "kernel_unavailable": "This kind of calculation cannot be re-run by this build.",
+        "invalid_inputs": "The saved inputs no longer fit this calculation.",
+        "inputs_not_editable": "These inputs cannot be edited; a new test is needed.",
+        "run_unavailable": "The saved run is no longer available.",
+        "retest_unavailable": "A retest is not available for this run."
+      }
+    },
+    "calc": {
+      "units": {
+        "currency": "{{code}}",
+        "months": "months",
+        "years": "years",
+        "multiple": "x"
+      },
+      "fields": {
+        "direction": "Plan",
+        "present_value": "Starting amount",
+        "payment": "Payment per period",
+        "future_value": "Ending amount",
+        "annual_rate_pct": "Annual rate",
+        "periods": "Periods",
+        "periods_per_year": "Periods per year",
+        "payment_timing": "Payment timing",
+        "total_payments": "Total paid in",
+        "total_interest": "Total interest",
+        "total_growth": "Total growth",
+        "start_value": "Starting value",
+        "contribution": "Contribution per period",
+        "end_value": "Ending value",
+        "inflation_rate_pct": "Inflation rate",
+        "total_contributed": "Total contributed",
+        "growth": "Growth",
+        "real_end_value": "Ending value in today's money",
+        "real_annual_rate_pct": "Real annual rate",
+        "symbol": "Asset",
+        "face_value": "Face value",
+        "coupon_rate_pct": "Coupon rate",
+        "years": "Years",
+        "coupons_per_year": "Coupons per year",
+        "price": "Price",
+        "yield_to_maturity_pct": "Yield to maturity",
+        "current_yield_pct": "Current yield",
+        "annual_coupon": "Yearly coupon",
+        "total_coupons": "Total coupons",
+        "total_return": "Total return at maturity",
+        "cash_flow": "Cash flow",
+        "growth_rate_pct": "Growth rate",
+        "discount_rate_pct": "Discount rate",
+        "terminal_growth_rate_pct": "Terminal growth rate",
+        "value": "Value",
+        "cash_flow_at_horizon": "Cash flow at the horizon",
+        "per_share": "Per share",
+        "multiple": "Multiple",
+        "earnings_yield_pct": "Earnings yield",
+        "annual_income": "Yearly income",
+        "yield_pct": "Yield",
+        "monthly_income": "Monthly income",
+        "nominal_rate_pct": "Nominal rate",
+        "compounding_per_year": "Compounding per year",
+        "amount": "Amount",
+        "fees": "Fees",
+        "effective_rate_pct": "Effective annual rate",
+        "total_paid": "Total paid",
+        "total_cost": "Total cost",
+        "monthly_debt_payments": "Monthly debt payments",
+        "ratio_pct": "Ratio",
+        "income_after_debt": "Income after debt",
+        "assets": "Assets",
+        "annual_fee": "Yearly fee",
+        "cost_over_years": "Cost over the years",
+        "ending_with_fee": "Ending value with the fee",
+        "ending_without_fee": "Ending value without the fee",
+        "key_label": "Ranked by",
+        "prefer": "Prefer",
+        "growth_low_pct": "Growth, low case",
+        "growth_base_pct": "Growth, base case",
+        "growth_high_pct": "Growth, high case",
+        "multiple_low": "Multiple, low case",
+        "multiple_base": "Multiple, base case",
+        "multiple_high": "Multiple, high case",
+        "horizon_years": "Horizon"
+      },
+      "notes": {
+        "already_covered": "The other inputs already cover this, so nothing more is needed.",
+        "includes_fees": "The effective rate includes the fees.",
+        "ranked_not_recommended": "Ranked by the stated figure only. Nothing here is a recommendation.",
+        "scenarios_not_forecasts": "Scenarios are arithmetic on the stated inputs, not forecasts."
+      },
+      "repairs": {
+        "payment_below_interest": "Use a payment that clears the balance"
+      },
+      "time_value": {
+        "title_save": "Savings plan",
+        "title_borrow": "Loan",
+        "progress": "Working out the {{direction}} plan"
+      },
+      "growth_projection": {
+        "title": "Growth projection",
+        "progress": "Projecting the growth"
+      },
+      "bond_value": {
+        "title": "Bond value",
+        "progress": "Pricing the bond"
+      },
+      "discounted_cash_flow": {
+        "title": "Discounted cash flow",
+        "progress": "Discounting the cash flows"
+      },
+      "price_multiple": {
+        "title": "Price multiple",
+        "progress": "Working out the multiple"
+      },
+      "income_yield": {
+        "title": "Income yield",
+        "progress": "Working out the yield"
+      },
+      "effective_rate": {
+        "title": "Effective rate",
+        "progress": "Working out the effective rate"
+      },
+      "debt_to_income": {
+        "title": "Debt to income",
+        "progress": "Working out debt to income"
+      },
+      "expense_ratio": {
+        "title": "Expense ratio",
+        "progress": "Working out the fee"
+      },
+      "ranked_comparison": {
+        "title": "Ranked by {{key}}",
+        "progress": "Ranking by {{key_label}}",
+        "row": "{{rank}}. {{label}}"
+      },
+      "valuation_scenarios": {
+        "title": "Valuation scenarios",
+        "progress": "Building the scenarios",
+        "price_at_horizon_low": "Price at the horizon, low case",
+        "price_at_horizon_base": "Price at the horizon, base case",
+        "price_at_horizon_high": "Price at the horizon, high case",
+        "annual_return_low": "Annual return, low case",
+        "annual_return_base": "Annual return, base case",
+        "annual_return_high": "Annual return, high case"
+      }
+    },
     "progress": {
       "call": "Running {{tool_name}}",
       "value": "Checking {{known}}"
     },
     "card": {
+      "retry": "Retry",
+      "source": {
+        "user": "You said it",
+        "page": "{{title}}",
+        "page_dated": "{{title}}, {{date}}",
+        "computed": "Computed from the other inputs",
+        "not_found": "Not found"
+      },
+      "failure": {
+        "exactly_one_unknown": "Leave exactly one input blank to solve for it.",
+        "unknown_argument": "One of these inputs is not part of this calculation.",
+        "invalid_arguments": "These inputs could not produce a result.",
+        "tool_execution_failed": "This result is unavailable right now.",
+        "no_solution": "No {{field}} fits these inputs.",
+        "payment_never_balances": "With this {{field}}, no number of periods balances the plan.",
+        "payment_below_interest": "The {{field}} is below the interest each period, so the balance never falls.",
+        "no_rate_fits": "No {{field}} fits these inputs.",
+        "rate_out_of_range": "The {{field}} is out of range.",
+        "division_by_zero": "The {{field}} cannot be zero here.",
+        "growth_needs_positive_values": "The {{field}} must be above zero.",
+        "rate_never_reaches_target": "At this {{field}}, the target is never reached.",
+        "discount_below_terminal_growth": "The {{field}} must be above the terminal growth rate.",
+        "fees_exceed_amount": "The {{field}} exceed the amount received.",
+        "no_periods": "The {{field}} must be at least one."
+      },
       "title": "Result",
       "solved_value": "Solved value",
       "input": "Input",

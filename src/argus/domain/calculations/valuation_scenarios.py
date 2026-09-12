@@ -112,7 +112,7 @@ def present_valuation_scenarios(
     base = next(row for row in result.scenarios if row.label == "base")
     answer = ToolFact(
         name="base_annual_return_pct",
-        label=text("tools.calc.valuation_scenarios.annual_return", scenario="base"),
+        label=text("tools.calc.valuation_scenarios.annual_return_base"),
         value=round(base.annual_return_pct, 2),
         unit=text("chat.tools.units.percent"),
     )
@@ -128,9 +128,7 @@ def present_valuation_scenarios(
         rows.append(
             ToolFact(
                 name=f"price_at_horizon_{row.label}",
-                label=text(
-                    "tools.calc.valuation_scenarios.price_at_horizon", scenario=row.label
-                ),
+                label=text(f"tools.calc.valuation_scenarios.price_at_horizon_{row.label}"),
                 value=round(row.price_at_horizon, 2),
                 unit=text("tools.calc.units.currency", code=currency),
             )
@@ -138,7 +136,7 @@ def present_valuation_scenarios(
         rows.append(
             percent_fact_named(
                 f"annual_return_pct_{row.label}",
-                text("tools.calc.valuation_scenarios.annual_return", scenario=row.label),
+                text(f"tools.calc.valuation_scenarios.annual_return_{row.label}"),
                 row.annual_return_pct,
             )
         )

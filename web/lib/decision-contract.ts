@@ -1,9 +1,14 @@
 import type { DecisionState, SearchRetestAction } from "./run-dossier-contract";
 
-/** What a decision can re-run: a registered kind and its typed inputs. */
+/**
+ * What a decision can re-run: a registered kind and its typed inputs. The
+ * backend derives `symbols` from the typed inputs; a computation about no
+ * asset omits it.
+ */
 export type DecisionComputation = {
   kind: string;
   inputs: Record<string, unknown>;
+  symbols?: string[];
 };
 
 export type DecisionRerunStatus =
@@ -69,14 +74,18 @@ export function decisionComputationFromMetadata(
 ): DecisionComputation | null {
   const raw = metadata?.computation;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const { kind, inputs } = raw as { kind?: unknown; inputs?: unknown };
+  const { kind, inputs, symbols } = raw as { kind?: unknown; inputs?: unknown; symbols?: unknown };
   if (typeof kind !== "string" || !COMPUTATION_KIND.test(kind)) return null;
   if (inputs !== undefined && (typeof inputs !== "object" || inputs === null || Array.isArray(inputs))) {
     return null;
   }
+  const typedSymbols = Array.isArray(symbols)
+    ? symbols.filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
+    : [];
   return {
     kind,
     inputs: (inputs as Record<string, unknown> | undefined) ?? {},
+    ...(typedSymbols.length > 0 ? { symbols: typedSymbols } : {}),
   };
 }
 

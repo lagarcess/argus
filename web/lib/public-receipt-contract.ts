@@ -93,7 +93,7 @@ export type PublicReceiptVisualPoint = {
 };
 
 export type PublicReceiptVisual = {
-  kind: "portfolio_equity";
+  kind: "portfolio_equity" | "value_path";
   currency?: string | null;
   base_value?: number | null;
   series: PublicReceiptVisualPoint[];

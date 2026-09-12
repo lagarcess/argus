@@ -6,7 +6,7 @@ import ReceiptChart from "@/components/receipt/ReceiptChart";
 import { researchSourcesFromFacts } from "@/lib/chat-discovery-sidecar";
 import { researchSourcesDisplay } from "@/lib/research-sources-display";
 import {
-  localizedToolText, toolFactValue, type ToolCardPresentation as Presentation,
+  localizedToolText, toolFactSourceText, toolFactValue, type ToolCardPresentation as Presentation,
   type ToolTranslator,
 } from "@/lib/tool-result-card";
 
@@ -29,7 +29,10 @@ export default function ToolCardPresentation({ presentation, t, locale, inputs, 
     </dl> : null}
     {presentation.inputs.length > 0 ? <section data-tool-inputs className="mt-5 border-t border-black/10 pt-3 dark:border-white/10">
       <h3 className="mb-2 text-xs font-medium text-black/50 dark:text-white/50">{t("tools.card.inputs")}</h3>
-      {inputs ?? <dl className="space-y-2">{presentation.inputs.map((input) => <div key={input.name} className="flex justify-between gap-4 text-sm"><dt className="text-black/60 dark:text-white/60">{localizedToolText(input.label, t)}</dt><dd className="tabular-nums">{toolFactValue(input, t, locale)}</dd></div>)}</dl>}
+      {inputs ?? <dl className="space-y-2">{presentation.inputs.map((input) => {
+        const provenance = toolFactSourceText(input, t, locale);
+        return <div key={input.name} data-tool-input={input.name} data-tool-input-source={input.source?.kind} className="flex justify-between gap-4 text-sm"><dt className="text-black/60 dark:text-white/60">{localizedToolText(input.label, t)}{provenance ? <span data-tool-input-provenance className="block text-[11px] text-black/40 dark:text-white/40">{provenance}</span> : null}</dt><dd className="tabular-nums">{toolFactValue(input, t, locale)}</dd></div>;
+      })}</dl>}
     </section> : null}
     {sources.length > 0 ? <details className="mt-4">
       <summary className="min-h-11 cursor-pointer py-3 text-sm text-black/60 dark:text-white/60">{t(sourceCopy.openKey, { count: sources.length })}</summary>
