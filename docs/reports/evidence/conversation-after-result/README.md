@@ -20,18 +20,23 @@
   - `natural_language_establishes_modeled_costs_issue_271`
   - `action_chip_add_asset_preserves_modeled_costs_issue_271`
   - the English and Spanish `dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10`
+- **Cases whose snapshot holds a completed result, at `4248fdd4`.** The Codex review fixes change how a follow-up resolved to a stored fact is answered, so these ran again, and all five passed:
+  - the English and Spanish `post_result_fact_then_capital_edit_issue_160`
+  - `asset_discovery_not_result_followup_issue_244`
+  - the English and Spanish `ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272`
 
 NVDA golden cross failed in both scorecards, for different reasons. In the baseline its research timed out. Here the publisher withheld a scenario whose inputs had no citation, and the reply said so.
 
-Model-facing text is identical at the measured head `aef7d1c2` and at `9eddf710`, across the 23 files the fingerprint covers. The commits after the measured head change deterministic code only:
+Model-facing text is identical at the measured head `aef7d1c2`, at `9eddf710` and at `4248fdd4`, across the 23 files the fingerprint covers. The commits after the measured head change deterministic code only:
 
 - one owner for the benchmark gap and cost drag;
 - a stated cost the audit cannot ground is asked about, never confirmed at 0 bps;
-- a refactor to stay within the line budget.
+- a refactor to stay within the line budget;
+- a follow-up resolved to a stored fact is answered from the run without research, and its reply must declare the fact.
 
 The fingerprint's `last_measured` points at this scorecard.
 
-Billed spend was $1.647 in total:
+Billed spend was $1.770 in total:
 
 | Run | Billed |
 | --- | --- |
@@ -40,8 +45,9 @@ Billed spend was $1.647 in total:
 | Cost cases | $0.107 |
 | Integration BTC run | $0.017 |
 | Slippage capture | $0.024 |
+| Stored-fact cases | $0.123 |
 
-Eleven route receipts came back without a price. They are not assumed to cost zero.
+Twelve route receipts came back without a price. They are not assumed to cost zero.
 
 ## The 0 bps slippage read
 

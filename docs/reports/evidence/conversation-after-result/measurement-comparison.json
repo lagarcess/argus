@@ -1722,7 +1722,8 @@
     ],
     "integration_check": "capability_honesty_future_performance_btc_regression on origin/codex/private-alpha-next (509b7d03) failed the same checks, with a research provider timeout, so its repeat is not caused by this branch.",
     "cost_cases_at_head": "4 of 4 cases with stated execution costs passed at 9eddf710, after the ungrounded-cost fix.",
-    "model_facing_surface": "Identical at the measured head aef7d1c2 and at 9eddf710 across the 23 fingerprinted files.",
+    "stored_fact_cases_at_head": "5 of 5 cases whose snapshot holds a completed result passed at 4248fdd4, after the Codex review fixes.",
+    "model_facing_surface": "Identical at the measured head aef7d1c2, at 9eddf710 and at 4248fdd4 across the 23 fingerprinted files.",
     "unresolved_repeatable_regressions": [],
     "limits": "The full scorecard remains 67 passed and 4 failed. Each retry ran once and does not replace the first result, and a pass in a single retry does not show that a case never fails. The BTC case depends on a live research provider that failed in all three attempts, so until that provider answers it says nothing about this branch."
   }
