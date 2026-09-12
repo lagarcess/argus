@@ -618,10 +618,13 @@ def _requested_fields(
     )
     if first_missing is not None and len(state.missing_required_fields) == 1:
         return [first_missing]
+    # Only an owner marks an assumption missing (an unresolved stated cost or an
+    # assumption edit), so it is asked, never confirmed at a default (#271).
     return [
         field
         for field in state.missing_required_fields
-        if field in contract.required_fields or field in {"capital_amount", "cadence"}
+        if field in contract.required_fields
+        or field in {"capital_amount", "cadence", "assumption"}
     ]
 
 

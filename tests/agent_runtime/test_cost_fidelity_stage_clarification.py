@@ -136,3 +136,65 @@ def test_grounded_costs_still_reach_confirmation(
 
     assert result.outcome == "ready_for_confirmation"
     assert result.decision.requires_clarification is False
+
+
+@pytest.mark.parametrize(("language", "message", "fee_span"), _STAGE_COST_CASES)
+@pytest.mark.asyncio
+async def test_an_owed_cost_question_is_asked_through_the_whole_turn(
+    monkeypatch: pytest.MonkeyPatch, language: str, message: str, fee_span: str
+) -> None:
+    # The interpret stage owes the question; the clarify stage must ask it rather
+    # than fall through to a confirmation card at the default rate.
+    from argus.agent_runtime.graph.workflow import build_workflow
+    from argus.agent_runtime.runtime import run_agent_turn
+    from langgraph.checkpoint.memory import MemorySaver
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol, **_: ResolvedAssetStub(symbol.strip().upper(), "equity"),
+    )
+    workflow = build_workflow(
+        structured_interpreter=_ScriptedInterpretation(
+            _fee_only_interpretation(message, fee_span, unresolved=True)
+        ),
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u-271", language_preference=language),
+        thread_id=f"thread-owed-cost-{language}",
+        message=message,
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert result["response_intent"]["requested_fields"] == ["assumption"]
+    assert not result.get("confirmation_payload")
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+def test_the_clarify_stage_asks_for_a_missing_assumption_on_a_new_request(
+    language: str,
+) -> None:
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.clarify import clarify_stage
+    from argus.agent_runtime.state.models import StrategySummary
+
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        date_range={"start": "2022-01-01", "end": "2022-12-31"},
+    )
+    state.missing_required_fields = ["assumption"]
+
+    result = clarify_stage(
+        state=state, contract=build_default_capability_contract(), language=language
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "assumption"
