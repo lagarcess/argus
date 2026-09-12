@@ -518,8 +518,13 @@ Represents individual messages within a conversation.
 - A computed answer is an artifact without a run. Its card lives in
   `metadata.tool_result_cards` and its marker in `metadata.computation`, which
   the chat turn, the recompute route and the continue route all write from the
-  card; nothing else is stored. A research answer that computed scenarios
-  carries the same pair beside its `research` sidecar.
+  card; nothing else is stored. A research or no-search answer that computed
+  its calculation carries the same pair, beside its `research` sidecar when it
+  retrieved, and `metadata.answer_text_template` (`{artifact_id, text,
+  language}`), the prose with its `{{name}}` figure references, which the
+  recompute route re-renders into `content` from the recomputed card. A pending
+  calculation question keeps `{calculation, requested_field, retrieved}` in its
+  clarification payload until the reply completes it.
   `metadata.continued_from` (`{conversation_id, message_id}`) marks a result
   continued in a new chat; the source message is never changed. Comparing,
   refreshing and re-running a computed answer store nothing: the stored card

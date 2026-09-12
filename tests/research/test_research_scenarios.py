@@ -622,10 +622,20 @@ def test_a_scenario_typed_as_a_survey_is_not_handled_as_one(monkeypatch) -> None
     assert "Bear" in result.stage_patch["assistant_response"]
 
 
-def test_a_subjectless_scenario_stays_arithmetic_whatever_its_kind(monkeypatch) -> None:
-    """A projection on the user's own numbers misread as market_stats with the
-    scenario bit set is not a research turn: it keeps the interpreter's
-    arithmetic answer."""
+def test_a_subjectless_scenario_reaches_research_only_when_a_page_supplies_a_figure(
+    monkeypatch,
+) -> None:
+    """A scenario with no subject typed with nothing to look up is the user's
+    own numbers: the no-search answer computes it and no retrieval runs. Typed
+    with a kind that names a published figure, it is a research question."""
+    message = "If I save $500 a month at 5%, how much will I have in 20 years?"
+    set_research_query(
+        monkeypatch, globals(), question_kind="none", symbols=[], scenario_question=True
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+    assert _run(message) is None
+    assert transport.requests == []
+
     set_research_query(
         monkeypatch,
         globals(),
@@ -634,8 +644,9 @@ def test_a_subjectless_scenario_stays_arithmetic_whatever_its_kind(monkeypatch) 
         scenario_question=True,
     )
     transport = _wire_client(monkeypatch, [agent_response()])
-    assert _run("If I save $500 a month at 5%, how much will I have in 20 years?") is None
-    assert transport.requests == []
+    assert _run(message) is not None
+    # Reached research: the scenario's publisher retry may follow the first ask.
+    assert transport.requests
 
 
 def test_a_failed_survey_typed_scenario_is_not_filed_as_screening(monkeypatch) -> None:

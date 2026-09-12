@@ -80,22 +80,39 @@ def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
 
     A read that says the answer is a computed scenario about named subjects is
     a fact question whatever kind it left (decision 10): the scenario owner
-    must see it. A scenario bit with no subject is a projection on the user's
-    own numbers and stays arithmetic; a typed horizon alone never admits, so a
-    test asked over a future window keeps its recovery."""
+    must see it. A scenario bit with no subject is research only when a page
+    must supply a figure; on the user's own numbers it is arithmetic for the
+    no-search answer, and a typed horizon alone never admits, so a test asked
+    over a future window keeps its recovery."""
     query = getattr(interpretation, "research_query", None)
     if query is None:
         return False
     if scenario_is_typed(query, interpretation) and not query.symbols:
-        # A scenario with no subject, by either typed fact, is the user's own
-        # numbers or a forward question with nothing to research: arithmetic
-        # or the future test-window recovery, never a research turn.
-        return False
+        # A scenario with no subject is research only when its bit names a
+        # published figure to look up (a product's price, a bank's rate, local
+        # inflation); on the user's own numbers it is arithmetic, and a typed
+        # horizon alone keeps a future test on its recovery.
+        return bool(getattr(query, "scenario_question", False)) and (
+            query.question_kind not in ("concept", "none")
+        )
     if query.question_kind not in ("concept", "none"):
         return True
     # A kind-none read is admitted only by the scenario bit with subjects; a
     # horizon alone keeps a test asked over a future window on its recovery.
     return bool(getattr(query, "scenario_question", False))
+
+
+def primary_read_is_arithmetic(interpretation: Any) -> bool:
+    """The primary read typed a computed answer on the user's own numbers: the
+    scenario bit, no subject, nothing a page must supply, and no other owner."""
+    query = getattr(interpretation, "research_query", None)
+    return bool(
+        query is not None
+        and getattr(query, "scenario_question", False)
+        and not query.symbols
+        and query.question_kind in ("concept", "none")
+        and not research_turn_has_conflicting_owner(interpretation)
+    )
 
 
 def primary_research_query(interpretation: Any) -> ResearchQueryExtraction | None:

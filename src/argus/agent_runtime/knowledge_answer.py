@@ -19,7 +19,10 @@ from pydantic import BaseModel, Field
 from argus.agent_runtime.interpreter.draft_shape import (
     strategy_has_execution_evidence,
 )
-from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.agent_runtime.interpreter.research_routing import (
+    primary_read_is_arithmetic,
+    primary_research_query,
+)
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENT_ACTION_LABELS,
     NEXT_EXPERIMENTS_VERSION,
@@ -200,6 +203,15 @@ async def knowledge_answer_stage_result(
             categories=[item.category for item in interpretation.unsupported_constraints],
         )
         return None
+    if primary_read_is_arithmetic(interpretation):
+        # The user's own numbers are enough: the no-search answer computes it.
+        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
+
+        computed = await calculated_answer_stage_result(
+            interpretation=interpretation, state=state, user=user
+        )
+        if computed is not None:
+            return computed
     rail_claim = (
         research_rail_enabled() and primary_research_query(interpretation) is not None
     )

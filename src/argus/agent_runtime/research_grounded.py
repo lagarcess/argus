@@ -526,13 +526,15 @@ def _packet_stage_result(
         else:
             degraded_code = "survey_synthesis_incomplete"
     from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
-    from argus.agent_runtime.research_calculation import (
+    from argus.agent_runtime.calculated_answer import (
         INPUT_MISSING_REASON_CODE,
+        question_stage_result,
+    )
+    from argus.agent_runtime.research_calculation import (
         LOOKUP_FAILURE_CODES,
         NotComputed,
         answer_without_lookup,
         packet_answer,
-        question_stage_result,
     )
 
     answered = None
@@ -907,11 +909,11 @@ def unavailable_result(
     that reached the provider is a miss that cost what it cost, and only a
     turn that never called one bypasses the meter."""
     from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
-    from argus.agent_runtime.research_calculation import (
+    from argus.agent_runtime.calculated_answer import (
         INPUT_MISSING_REASON_CODE,
-        answer_without_lookup,
         question_stage_result,
     )
+    from argus.agent_runtime.research_calculation import answer_without_lookup
 
     language = language_tag(user.language_preference)
     # A failed lookup never becomes the answer: the no-search step answers from

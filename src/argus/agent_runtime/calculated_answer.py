@@ -10,6 +10,7 @@ from it. A figure only the user knows becomes one plain question.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -19,14 +20,22 @@ from loguru import logger
 from pydantic import ConfigDict
 
 from argus.agent_runtime.answer_calculation import (
+    ANSWER_TEMPLATE_KEY,
     MarketClose,
     PublishedCalculation,
     latest_market_close,
     publish_calculation,
     states_a_figure,
 )
+from argus.agent_runtime.calculation_rows import market_counterfactual_rows
 from argus.agent_runtime.knowledge_answer import VoicedAnswer
-from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.result_next_steps import next_steps_patch, offered_test_steps
+from argus.agent_runtime.stages.interpret_types import (
+    InterpretDecision,
+    StageResult,
+    StructuredInterpretation,
+)
+from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.calculations.answer_request import (
     ANSWER_CALCULATION_INSTRUCTIONS,
     AnswerCalculation,
@@ -41,6 +50,9 @@ from argus.llm.openrouter import (
 )
 
 PENDING_PAYLOAD_KEY = "calculation"
+CALCULATED_ANSWER_REASON_CODE = "calculated_answer"
+PENDING_REPLY_REASON_CODE = "calculation_pending_reply"
+INPUT_MISSING_REASON_CODE = "calculation_input_missing"
 _HISTORY_TURNS = 4
 
 # Model-facing contract for the one no-search answer that computes.
@@ -160,6 +172,95 @@ def answer_from_published(
         template=published.template,
         question_field=None,
         pending=None,
+    )
+
+
+async def calculated_answer_stage_result(
+    *,
+    interpretation: StructuredInterpretation,
+    state: RunState,
+    user: UserState,
+    pending: dict[str, Any] | None = None,
+) -> StageResult | None:
+    """The no-search answer as a turn: its computed card under the prose, or one
+    plain question for the figure only the user knows."""
+    retrieved = [
+        ResearchSource.model_validate(page)
+        for page in ((pending or {}).get("retrieved") or [])
+        if isinstance(page, dict) and page.get("url")
+    ]
+    answered = await asyncio.to_thread(
+        calculated_answer,
+        message=state.current_user_message,
+        language=user.language_preference,
+        user=user,
+        notes=interpretation.reason_codes,
+        history=state.recent_thread_history,
+        pending=pending,
+        retrieved=retrieved,
+    )
+    if answered is None:
+        return None
+    from argus.agent_runtime.research_grounded import research_decision
+
+    code = PENDING_REPLY_REASON_CODE if pending else CALCULATED_ANSWER_REASON_CODE
+    if answered.question_field is not None:
+        return question_stage_result(
+            answered,
+            decision=research_decision(interpretation, user, INPUT_MISSING_REASON_CODE),
+        )
+    patch: dict[str, Any] = {**answered.patch, "assistant_response": answered.answer_text}
+    if answered.template is not None:
+        patch[ANSWER_TEMPLATE_KEY] = answered.template
+    cards = (answered.patch.get("final_response_payload") or {}).get("tool_result_cards")
+    if cards and cards[0].get("outcome", {}).get("status") == "succeeded":
+        rows = market_counterfactual_rows(
+            cards[0].get("arguments") or {}, language=user.language_preference
+        )
+        patch.update(next_steps_patch(rows, offered_test_steps(rows)))
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=research_decision(interpretation, user, code),
+        stage_patch=patch,
+    )
+
+
+def pending_calculation(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    """The calculation a reply completes: the answer asked the user for one
+    figure and is waiting for it."""
+    if metadata.get("last_stage_outcome") != "await_user_reply":
+        return None
+    clarification = metadata.get("clarification")
+    payload = clarification.get("payload") if isinstance(clarification, dict) else None
+    if isinstance(payload, dict) and isinstance(payload.get(PENDING_PAYLOAD_KEY), dict):
+        return payload
+    return None
+
+
+def question_stage_result(
+    answered: CalculatedAnswer, *, decision: InterpretDecision | None
+) -> StageResult:
+    """One plain question for the figure only the user knows, with the pending
+    calculation the reply completes."""
+    field = str(answered.question_field)
+    return StageResult(
+        outcome="await_user_reply",
+        decision=decision,
+        stage_patch={
+            "assistant_prompt": answered.answer_text,
+            "requested_field": field,
+            "missing_required_fields": [field],
+            "clarification": {
+                "kind": "clarification",
+                "reason_code": INPUT_MISSING_REASON_CODE,
+                "prompt_source": "llm_generated",
+                "requested_field": field,
+                "requested_fields": [field],
+                "semantic_needs": [],
+                "payload": answered.pending or {},
+                "options": [],
+            },
+        },
     )
 
 

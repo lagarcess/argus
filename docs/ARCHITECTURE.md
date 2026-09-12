@@ -512,9 +512,11 @@ stays blank and the input revision advances with the result. Public sharing
 freezes a computed answer's card as its own `calculation` leaf through the
 shipped selected-turn contract.
 
-A computed answer is an artifact without a run. The answer step maps a money
-question to a declared calculation; the runtime validates the read, computes in
-process and publishes the card, and the one marker owner
+A computed answer is an artifact without a run. The answering model, the
+research provider or the no-search voicing answer, returns its prose and one
+typed calculation request with each input's source; the runtime holds every
+input to that source, computes in process, fills the prose's figures from the
+card and publishes it, and the one marker owner
 (`argus.domain.computation_marker`) writes `metadata.computation` from it. Every
 later reader derives from that pair and nothing else: a decision stores its
 inputs and re-runs the declaration's one compute function, Search projects an

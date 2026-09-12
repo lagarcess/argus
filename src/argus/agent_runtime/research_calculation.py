@@ -25,7 +25,6 @@ from argus.agent_runtime.calculated_answer import (
     answer_from_published,
     calculated_answer,
 )
-from argus.agent_runtime.stages.interpret_types import InterpretDecision, StageResult
 from argus.agent_runtime.state.models import UserState
 from argus.domain.calculations.answer_request import AnswerCalculation
 from argus.domain.research.contracts import ResearchPacket, ResearchSource
@@ -33,7 +32,6 @@ from argus.llm.openrouter import resolve_openrouter_api_key
 
 CALCULATION_NOT_COMPUTED_CODE = "calculation_inputs_not_found"
 MALFORMED_CALCULATION_REASON_CODE = "answer_calculation_malformed"
-INPUT_MISSING_REASON_CODE = "calculation_input_missing"
 # Degraded research an answer without a lookup may replace; a survey or a claim
 # withheld for want of a publisher keeps its own honest note.
 LOOKUP_FAILURE_CODES = frozenset(
@@ -129,33 +127,6 @@ def answer_without_lookup(
             computed=bool(answered.patch),
         )
     return answered
-
-
-def question_stage_result(
-    answered: CalculatedAnswer, *, decision: InterpretDecision | None
-) -> StageResult:
-    """One plain question for the figure only the user knows, with the pending
-    calculation the reply completes."""
-    field = str(answered.question_field)
-    return StageResult(
-        outcome="await_user_reply",
-        decision=decision,
-        stage_patch={
-            "assistant_prompt": answered.answer_text,
-            "requested_field": field,
-            "missing_required_fields": [field],
-            "clarification": {
-                "kind": "clarification",
-                "reason_code": INPUT_MISSING_REASON_CODE,
-                "prompt_source": "llm_generated",
-                "requested_field": field,
-                "requested_fields": [field],
-                "semantic_needs": [],
-                "payload": answered.pending or {},
-                "options": [],
-            },
-        },
-    )
 
 
 def retrieved_pages(packet: ResearchPacket) -> list[ResearchSource]:

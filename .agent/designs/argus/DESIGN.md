@@ -285,11 +285,11 @@ Result cards are the primary unit of "validation." They must be glanceable and h
 ### Computed answers: answer first, editable inputs
 
 A computed answer (a loan payment, a savings goal, a yield, valuation scenarios) uses one card pattern in chat, Search, decisions and shared pages.
-- **Answer first**: The headline figure and its label lead the card; supporting rows follow. The prose lead above the card states no figure.
-- **Inputs under the answer**: Every input the math used sits below, each with one quiet provenance line: stated by you, the page title and date it was read from, or computed. A blank that still needs a value reads as blank, never as zero.
-- **Edit in place**: Typing a new input recomputes instantly with no model call; the previous result is labeled until the new one lands. The solved unknown stays blank and read-only.
+- **Answer first**: The prose answers the question and states each computed figure from the card. The card sits under it, collapsed to the result and a toggle.
+- **Inputs that drive the result**: Opened, the card shows the three to five inputs that drive the result, each with one quiet provenance line: stated by you, the page title and date it was read from, Argus market data on its date, or an assumption the answer states. A blank input or the solved unknown never shows; a figure only you know is asked as one plain question instead.
+- **Edit in place**: Typing a new input recomputes instantly with no model call, and the prose's figures follow the card; the previous result is labeled until the new one lands.
 - **Stored beside today**: A reopened decision and the Search dossier show the stored result and today's side by side; the stored result never moves.
-- **Honest failure**: Inputs that do not solve keep the card and its inputs, name the one field, and offer the backend's typed fix as a tap, through the one failure treatment.
+- **Honest failure**: Inputs that do not solve keep the card open, name the one field, and offer the backend's typed fix as a tap, through the one failure treatment. A lookup that fails answers from Argus market data and stated assumptions and says what it could not look up; it never becomes the answer or the conversation title.
 - **Compare and continue**: Two results of one kind sit side by side with signed differences in each fact's own unit. Continuing opens a new chat that links back to the unchanged source.
 - **Frozen receipts**: A shared calculation is read-only, lists what Argus used with each page, and offers no recompute.
 - **Width**: At 390px the card, the comparison and the dossier stack in one column; from 768px the comparison sits in two.

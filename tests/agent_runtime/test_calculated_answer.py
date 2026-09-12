@@ -1,0 +1,205 @@
+"""The no-search answer owns its math: a money question on the user's own
+numbers reaches it, its calculation computes the card under the prose, a figure
+only the user knows is one plain question, and the reply completes it."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+import pytest
+from argus.agent_runtime import calculated_answer as ca
+from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.interpreter.research_routing import (
+    primary_read_asks_a_fact_question,
+    primary_read_is_arithmetic,
+)
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    future_test_window_capability_clause,
+)
+from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
+from argus.agent_runtime.research_query import ResearchQueryExtraction
+from argus.agent_runtime.stages.interpret import interpret_stage_async
+from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
+from argus.domain.calculations.answer_request import AnswerCalculation
+
+USER = UserState(user_id="u1", language_preference="en", currency="DOP")
+LOAN = [
+    {"name": "direction", "value": "borrow", "source": "user"},
+    {"name": "present_value", "value": 180000, "source": "user", "currency": "DOP"},
+    {"name": "annual_rate_pct", "value": 14, "source": "user"},
+    {"name": "future_value", "value": 0, "source": "user"},
+]
+
+
+def _read(**query: Any) -> StructuredInterpretation:
+    return StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="new_task",
+        user_goal_summary="money question",
+        semantic_turn_act="educational_question",
+        candidate_strategy_draft=StrategySummary(),
+        research_query=ResearchQueryExtraction(**query) if query else None,
+    )
+
+
+def _voice(monkeypatch: pytest.MonkeyPatch, answers: list[ca.CalculatedVoicedAnswer]):
+    seen: list[list[dict[str, str]]] = []
+
+    def invoke(**kwargs):
+        assert kwargs["schema_model"] is ca.CalculatedVoicedAnswer
+        seen.append(kwargs["messages"])
+        return answers.pop(0)
+
+    monkeypatch.setattr(ca, "resolve_openrouter_api_key", lambda: "k")
+    monkeypatch.setattr(ca, "openrouter_structured_model_candidates", lambda: ["model"])
+    monkeypatch.setattr(ca, "invoke_openrouter_json_schema_sync", invoke)
+    return seen
+
+
+def _voiced(lead: str, inputs: list[dict[str, Any]], solve_for: str = "payment"):
+    return ca.CalculatedVoicedAnswer(
+        lead=lead,
+        calculation=AnswerCalculation.model_validate(
+            {"kind": "time_value", "solve_for": solve_for, "inputs": inputs}
+        ),
+    )
+
+
+def test_the_users_own_numbers_reach_the_no_search_answer_and_a_published_figure_reaches_research() -> (
+    None
+):
+    arithmetic = _read(question_kind="none", scenario_question=True)
+    assert primary_read_is_arithmetic(arithmetic)
+    assert not primary_read_asks_a_fact_question(arithmetic)
+    needs_a_page = _read(question_kind="current_external", scenario_question=True)
+    assert not primary_read_is_arithmetic(needs_a_page)
+    assert primary_read_asks_a_fact_question(needs_a_page)
+    named = _read(question_kind="none", scenario_question=True, symbols=["AAPL"])
+    assert not primary_read_is_arithmetic(named)
+    assert not primary_read_is_arithmetic(_read(question_kind="concept"))
+    assert not primary_read_is_arithmetic(_read())
+
+
+def test_a_calculated_answer_computes_its_card_under_the_prose(monkeypatch) -> None:
+    _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "Over {{periods}} months at {{annual_rate_pct}}, the payment is **{{payment}}**.",
+                [*LOAN, {"name": "periods", "value": 48, "source": "user"}],
+            )
+        ],
+    )
+    interpretation = _read(question_kind="none", scenario_question=True)
+    result = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=interpretation,
+            state=RunState.new(
+                current_user_message="I owe 180,000 at 14% over 48 months; what's the payment?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert result is not None and result.outcome == "ready_to_respond"
+    card = result.patch["final_response_payload"]["tool_result_cards"][0]
+    assert card["tool_name"] == "time_value" and card["outcome"]["status"] == "succeeded"
+    assert (
+        "Over 48 months at 14%, the payment is **DOP "
+        in result.patch["assistant_response"]
+    )
+    assert result.patch[ANSWER_TEMPLATE_KEY]["artifact_id"] == card["artifact_id"]
+    assert ca.CALCULATED_ANSWER_REASON_CODE in result.decision.reason_codes
+
+
+def test_a_figure_only_the_user_knows_is_one_question_and_the_reply_computes(
+    monkeypatch,
+) -> None:
+    seen = _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "How many months are left on the loan?",
+                [*LOAN, {"name": "periods", "value": None, "source": "user"}],
+            ),
+            _voiced(
+                "With {{periods}} months left, the payment is {{payment}}.",
+                [*LOAN, {"name": "periods", "value": 48, "source": "user"}],
+            ),
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="I owe 180,000 on the car at 14 percent. Is paying extra worth it?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.outcome == "await_user_reply"
+    assert asked.patch["assistant_prompt"] == "How many months are left on the loan?"
+    assert asked.patch["requested_field"] == "periods"
+    pending = asked.patch["clarification"]["payload"]
+    assert pending["calculation"]["kind"] == "time_value"
+
+    class _Interpreter:
+        async def ainvoke(self, request):
+            return _read()
+
+    reply = asyncio.run(
+        interpret_stage_async(
+            state=RunState.new(current_user_message="48", recent_thread_history=[]),
+            user=USER,
+            latest_task_snapshot=None,
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "clarification": asked.patch["clarification"],
+            },
+            structured_interpreter=_Interpreter(),
+        )
+    )
+    assert reply.outcome == "ready_to_respond"
+    card = reply.patch["final_response_payload"]["tool_result_cards"][0]
+    assert card["arguments"]["periods"] == 48
+    assert reply.patch["assistant_response"].startswith(
+        "With 48 months left, the payment is DOP "
+    )
+    assert (
+        "Argus asked the user for periods of a time_value calculation"
+        in seen[1][0]["content"]
+    )
+    assert ca.PENDING_REPLY_REASON_CODE in reply.decision.reason_codes
+
+
+def test_without_voicing_the_turn_stays_with_its_other_owners(monkeypatch) -> None:
+    monkeypatch.setattr(ca, "resolve_openrouter_api_key", lambda: None)
+    result = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="2+2 savings?", recent_thread_history=[]
+            ),
+            user=USER,
+        )
+    )
+    assert result is None
+
+
+def test_the_primary_prompt_computes_money_questions_and_keeps_products_off_the_strategy_route() -> (
+    None
+):
+    clause = future_test_window_capability_clause()
+    prompt = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._system_prompt()
+    assert clause in prompt
+    assert "arithmetic, not a" in clause
+    assert "scenario_question=true with no symbols" in clause
+    assert "set question_kind=current_external" in clause
+    assert "never an asset_universe entry, a strategy or an unsupported symbol" in clause
+    assert "answer it in assistant_response with the formula" not in clause

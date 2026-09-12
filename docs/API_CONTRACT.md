@@ -3369,9 +3369,15 @@ replace any tool's argument or result model.
 Additive since the calculations lane (2026-09-11): every fact may carry a
 `source`, `{kind, title?, url?, date?}`, where `kind` is `user` (the user
 stated it), `page` (a retrieved page, which alone carries its title, url and
-`YYYY-MM-DD` date), `computed` (derived from the other inputs; every answer and
-row) or `not_found` (no source supplied it and it still needs a value). Cards
-written before this lane carry no source and remain readable. An unsuccessful
+`YYYY-MM-DD` date), `market_data` (Argus's own market data, carrying only the
+date of its bar), `assumption` (a figure the answer states as an assumption,
+carrying no citation), `computed` (derived from the other inputs; every answer
+and row) or `not_found` (readable on older cards, no longer produced). Cards
+written before this lane carry no source and remain readable. An input fact
+also carries `driving`: the declaration names the inputs that drive its result,
+most telling first, and a card marks at most five of them that carry a value,
+never the retained unknown; a computed answer's card starts collapsed under the
+prose and shows only those inputs, never a blank one. An unsuccessful
 outcome's `failure` may carry a typed `repair`, `{kind: "set_inputs", label,
 changes}`, an argument edit the recompute route accepts that the client offers
 as a tap; the backend computed it, the client never invents one. `visual.kind`
@@ -5209,57 +5215,74 @@ provider call.
 
 ### Calculation turns
 
-A calculation request is `{kind, inputs, solve_for, retrieve,
-follow_up_questions}`. `kind` is a registered calculation kind or null;
-`inputs` holds the values the user stated under the declaration's argument
-names; `solve_for` names the one blank for a kind with an unknown rule;
-`retrieve` names inputs a published page supplies for a named asset; and
-`follow_up_questions` holds up to three specific questions, in the user's words
-and language, when the question is too broad to compute. No phrase, pattern or
-language check runs before the read. Each guard after it records a reason code
-on the turn: `calculation_inputs_dropped`, `calculation_solve_for_cleared`,
-`calculation_currency_defaulted`, `calculation_kind_unknown`, `calculation_nothing_to_solve`,
-`calculation_pending_merged`, `calculation_retrieval_needed` and
-`scenario_calculation_defaulted`.
+The answer step owns the math. Where Argus already answers, the answering model
+returns its prose and at most one typed calculation request, and Argus computes
+it: the research provider under the strict answer schema `argus_typed_answer`
+for a question that needs published figures, and the no-search voicing answer
+(`CalculatedVoicedAnswer`) when the user's own figures are enough. The request
+is `{kind, solve_for, inputs: [{name, value, source, source_url, as_of,
+currency}]}`: `kind` is a registered calculation, `solve_for` names the one
+blank for a kind with an unknown rule, and each input's `source` is `page` (read
+from a page retrieved for this answer, with its URL and date), `market_data` (a
+current price Argus fills from its own market data), `user` (the user's words)
+or `assumption` (a figure the answer states plainly as an assumption). The
+interpreter maps no calculation and its response schema carries none; no
+phrase, pattern or language check runs before either answering model.
 
-A computed turn answers `ready_to_respond` with no provider call.
-`final_response_payload.tool_result_cards` holds the declaration's card, the
-stored assistant message carries `tool_result_cards` and the
-`metadata.computation` derived from that card, and the prose lead states no
-figure. Money counts in the profile's resolved currency (`User.currency`)
-unless the user named one; with neither it counts in `USD` and records
-`calculation_currency_defaulted`. When the inputs state an amount and a
-whole-year horizon, `next_experiments` offers one
-`calculation_market_counterfactual` row, a buy-and-hold test of the
-calculation's asset (the S&P 500 proxy when it names none) with that amount
-over those years, or monthly buys of a stated payment, and `next_steps` lists
-it. The row runs only when tapped.
+Routing uses the primary read's existing research query. A question whose
+figure a page must supply (a product's price, a lender's or bank's rate or
+fees, local inflation or exchange rates, an asset's price or earnings) is a
+research turn, including a scenario with no subject when its kind names a
+published figure. A computed answer on the user's own numbers (the scenario bit,
+no subject, kind `none` or `concept`, no other owner) is the no-search answer.
+A reply to the answer's one question completes its pending calculation through
+the no-search answer unless the primary read routed the reply to an action of
+its own. An ordinary concept or capability turn spends no extra call.
 
-A missing input only the user can supply answers `await_user_reply` with the
-read's question as `assistant_prompt`, `requested_field` naming the argument,
-and `clarification = {kind: "clarification", reason_code:
+Each input is held to its source before the declaration computes, and every
+guard records a reason code on the turn: a page this answer did not retrieve
+feeds nothing (`answer_input_page_uncited`); `market_data` fills only a price,
+from Argus's own latest close (`answer_market_price_unavailable`,
+`answer_market_data_not_a_price`); a money input in another currency than the
+calculation feeds nothing (`calculation_input_currency_mismatch`); an
+undeclared name is dropped (`answer_input_undeclared`); an unknown kind or a
+malformed request computes nothing (`answer_calculation_kind_unknown`,
+`answer_calculation_malformed`); and money counts in the currency the request
+names, else the profile's resolved currency, else `USD`
+(`calculation_currency_defaulted`).
+
+The prose states figures only as `{{name}}` references to the card's answer,
+rows and inputs, filled from the computed card. A reference that does not
+resolve, a money or percent figure written as digits, or an assumption the prose
+never references replaces the prose with Argus's own lead
+(`answer_figures_replaced`); a plan that does not solve keeps its card under
+that lead. A computed answer answers `ready_to_respond`:
+`final_response_payload.tool_result_cards` holds the card, the stored message
+carries `tool_result_cards`, the `metadata.computation` derived from it and
+`metadata.answer_text_template = {artifact_id, text, language}`, the prose with
+its references, which the recompute route re-renders into `content` from the
+recomputed card. When the inputs state an amount and a whole-year horizon,
+`next_experiments` offers one `calculation_market_counterfactual` row that runs
+only when tapped, and `next_steps` lists it.
+
+A figure only the user knows answers `await_user_reply` with one plain question
+as `assistant_prompt`, `requested_field` naming the argument, no card, and
+`clarification = {kind: "clarification", reason_code:
 "calculation_input_missing", prompt_source, requested_field, requested_fields,
-semantic_needs: [], payload: {calculation: <the pending read with the inputs so
-far>}, options: []}`. The next reply merges over the pending read; a reply that
-names a different kind starts that kind instead, and a reply the read does not
-map leaves the turn to the primary route. A broad question answers with
-Argus's own lead and `next_steps` items of type `question`, one per follow-up, and
-stores no card.
+semantic_needs: [], payload: {calculation, requested_field, retrieved}, options:
+[]}`, where `retrieved` keeps the pages the answer read so the reply may still
+cite them (`calculation_pending_reply`).
 
-A calculation read that names inputs a published page supplies, and every
-forward-looking or valuation research answer (decision 10), computes the same
-way after retrieval; with the research rail off, the user is asked for those
-inputs instead. `SCENARIO_RETRIEVAL_INSTRUCTIONS` asks the provider to
-retrieve inputs and never to compute scenario values; the prompt names each
-input by its argument name with its meaning, and a typed row feeds an input
-only when its `label` is that name. The research turn then carries the
-declaration's card, `valuation_scenarios` unless the read chose another kind,
-with each retrieved input's `source` `{kind: "page", title, url, date}` and
-every computed figure `computed`, beside the unchanged `research` sidecar. A
-withheld retrieval keeps its degraded code (`scenario_inputs_uncited`,
-`research_not_grounded`) and a card whose outcome is `invalid` with
-`missing_input` naming the first blank, so its inputs stay typeable. The
-contract is frozen by
+A failed lookup never becomes the answer and never names the conversation.
+When research is unavailable, retrieves nothing (`research_not_grounded`),
+returns a scenario without a calculation (`scenario_inputs_uncited`) or a
+calculation whose inputs were not found (`calculation_inputs_not_found`), the
+no-search answer replies from Argus market data for the named subjects and
+stated assumptions and says what could not be looked up; the degraded code stays
+on the `research` sidecar. Only when that answer cannot run does the honest
+note stand in, and no card with blank inputs ever renders. Thorough runs compute
+and attach the same card. The research contract is frozen by the recordings
+under `docs/reports/evidence/545/probes` and
 `docs/reports/evidence/grounded-math/probes/scenario_inputs_balanced.json`.
 
 ### Computed answers outside a turn

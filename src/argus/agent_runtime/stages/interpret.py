@@ -428,6 +428,15 @@ async def interpret_stage_async(
     )
     if pending_response_option_interpretation is not None:
         interpretation = pending_response_option_interpretation
+    pending = _pending_calculation_reply(interpretation, selected_metadata)
+    if pending is not None:
+        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
+
+        completed = await calculated_answer_stage_result(
+            interpretation=interpretation, state=state, user=user, pending=pending
+        )
+        if completed is not None:
+            return completed
     knowledge_result = await knowledge_answer_stage_result(
         interpretation=interpretation,
         state=state,
@@ -452,6 +461,22 @@ async def interpret_stage_async(
         capability_contract=capability_contract,
         selected_thread_metadata=selected_metadata,
     )
+
+
+def _pending_calculation_reply(
+    interpretation: StructuredInterpretation, metadata: dict[str, Any]
+) -> dict[str, Any] | None:
+    """A reply to the answer's one question completes its calculation, unless
+    the primary read routed the reply to an action of its own."""
+    from argus.agent_runtime.calculated_answer import pending_calculation
+    from argus.agent_runtime.interpreter.research_routing import (
+        research_turn_has_conflicting_owner,
+    )
+
+    pending = pending_calculation(metadata)
+    if pending is None or interpretation.asset_discovery is not None:
+        return None
+    return None if research_turn_has_conflicting_owner(interpretation) else pending
 
 
 async def _call_structured_interpreter(
