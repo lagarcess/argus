@@ -1968,7 +1968,7 @@
       "time_value": {
         "title_save": "Savings plan",
         "title_borrow": "Loan",
-        "progress": "Working out the {{direction}} plan"
+        "progress": "Working out the plan"
       },
       "growth_projection": {
         "title": "Growth projection",

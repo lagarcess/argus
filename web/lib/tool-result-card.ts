@@ -132,7 +132,17 @@ export function toolProgressText(value: ToolProgress | null, t: ToolTranslator):
   const rendered = t(value.locale_key, { ...value.interpolation_args, defaultValue: "" });
   return rendered && rendered !== value.locale_key ? rendered : t("chat.status.working");
 }
+const CURRENCY_UNIT_KEY = "tools.calc.units.currency";
+/** A money fact prints as currency in the workspace locale; the code is its unit. */
+function currencyText(value: ToolFact, locale: string): string | null {
+  const code = value.unit?.locale_key === CURRENCY_UNIT_KEY ? value.unit.interpolation_args.code : null;
+  if (typeof code !== "string" || typeof value.value !== "number") return null;
+  try { return new Intl.NumberFormat(locale, { style: "currency", currency: code, currencyDisplay: "code" }).format(value.value); }
+  catch { return null; }
+}
 export function toolFactValue(value: ToolFact, t: ToolTranslator, locale: string): string {
+  const currency = value.value_text ? null : currencyText(value, locale);
+  if (currency) return currency;
   const content = value.value_text ? localizedToolText(value.value_text, t) : value.value === null ? t("tools.card.unknown") :
     typeof value.value === "number" ? new Intl.NumberFormat(locale, { maximumFractionDigits: 20 }).format(value.value) :
     typeof value.value === "boolean" ? t(value.value ? "tools.card.yes" : "tools.card.no") : value.value;

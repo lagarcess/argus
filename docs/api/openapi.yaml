@@ -976,6 +976,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/messages/{message_id}/computation/rerun:
+    post:
+      tags:
+      - decisions
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRerunRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageComputationRerunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/messages/{message_id}/decision:
     post:
       tags:
@@ -2371,6 +2413,91 @@ components:
       - can_search_current_workspace
       - can_use_grounded_discovery
       - can_submit_feedback
+    AnswerDecisionAction:
+      properties:
+        type:
+          type: string
+          const: answer_decision
+          default: answer_decision
+        availability:
+          type: string
+          enum:
+          - available
+          - account_conversion_required
+        message_id:
+          type: string
+        decision_state:
+          anyOf:
+          - type: string
+            enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+          - type: 'null'
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+      type: object
+      required:
+      - availability
+      - message_id
+      description: The decision a computed answer offers; it posts to the message route.
+    AnswerDossier:
+      properties:
+        message_id:
+          type: string
+        conversation_id:
+          type: string
+        asked:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        computed_at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          maxLength: 80
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        card:
+          additionalProperties: true
+          type: object
+        decision:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierDecision'
+          - type: 'null'
+        decision_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        actions:
+          items:
+            $ref: '#/components/schemas/AnswerDecisionAction'
+          type: array
+          maxItems: 1
+      type: object
+      required:
+      - message_id
+      - conversation_id
+      - computed_at
+      - kind
+      - card
+      description: 'A computed answer beside the run dossier: asked, used, came out, decided.
+
+
+        The card carries what Argus used with its sources and what came out;
+
+        recompute goes through the message computation route and never rewrites
+
+        the stored answer. The run dossier is unchanged.'
     BacktestJob:
       properties:
         id:
@@ -3118,10 +3245,22 @@ components:
         inputs:
           additionalProperties: true
           type: object
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
       type: object
       required:
       - kind
-      description: 'What a decision can re-run: a registered kind and its typed inputs.'
+      description: 'What a decision can re-run: a registered kind and its typed inputs.
+
+
+        ``symbols`` names the assets the computation is about, derived from its
+
+        typed inputs by the marker owner, so Search can count a computed answer
+
+        under an asset without reading its card.'
     DecisionNote:
       properties:
         id:
@@ -4264,6 +4403,17 @@ components:
       - role
       - content
       - created_at
+    MessageComputationRerunResponse:
+      properties:
+        computation:
+          $ref: '#/components/schemas/DecisionComputation'
+        rerun:
+          $ref: '#/components/schemas/DecisionRerun'
+      type: object
+      required:
+      - computation
+      - rerun
+      description: A computed answer re-run from Search; the stored answer is untouched.
     MessageDecisionResponse:
       properties:
         decision:
@@ -5662,7 +5812,11 @@ components:
           minLength: 1
         run_count:
           type: integer
-          minimum: 1.0
+          minimum: 0.0
+        result_count:
+          type: integer
+          minimum: 0.0
+          default: 0
         decision_counts:
           $ref: '#/components/schemas/SearchAssetDecisionCounts'
         last_touched_at:
@@ -5799,6 +5953,10 @@ components:
         dossier:
           anyOf:
           - $ref: '#/components/schemas/RunDossier'
+          - type: 'null'
+        answer_dossier:
+          anyOf:
+          - $ref: '#/components/schemas/AnswerDossier'
           - type: 'null'
         total_runs:
           type: integer

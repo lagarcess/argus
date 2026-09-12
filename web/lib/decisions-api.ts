@@ -1,8 +1,10 @@
 import { apiFetch } from "./argus-api-transport";
 import type {
   DecisionAttachment,
+  DecisionComputation,
   DecisionNote,
   DecisionOpenResponse,
+  DecisionRerun,
 } from "./decision-contract";
 import type { DecisionState } from "./run-dossier-contract";
 
@@ -60,6 +62,26 @@ export async function rerunDecision(
 ): Promise<DecisionOpenResponse> {
   return apiFetch<DecisionOpenResponse>(
     `/decisions/${encodeURIComponent(decisionId)}/rerun`,
+    { method: "POST", body: JSON.stringify({ inputs }) },
+  );
+}
+
+export type MessageComputationRerunResponse = {
+  computation: DecisionComputation;
+  rerun: DecisionRerun;
+};
+
+/**
+ * Re-run an owned computed answer from Search, decided or not. The result
+ * comes back beside the stored answer, which is never rewritten.
+ */
+export async function rerunMessageComputation(
+  conversationId: string,
+  messageId: string,
+  inputs: Record<string, unknown>,
+): Promise<MessageComputationRerunResponse> {
+  return apiFetch<MessageComputationRerunResponse>(
+    `/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/computation/rerun`,
     { method: "POST", body: JSON.stringify({ inputs }) },
   );
 }

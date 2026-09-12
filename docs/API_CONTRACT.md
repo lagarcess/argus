@@ -3316,6 +3316,21 @@ unknown. Their `visibility` defaults to `private`; a declaration explicitly
 marks shareable input facts `public`. This display contract does not
 replace any tool's argument or result model.
 
+Additive since the calculations lane (2026-09-11): every fact may carry a
+`source`, `{kind, title?, url?, date?}`, where `kind` is `user` (the user
+stated it), `page` (a retrieved page, which alone carries its title, url and
+`YYYY-MM-DD` date), `computed` (derived from the other inputs; every answer and
+row) or `not_found` (no source supplied it and it still needs a value). Cards
+written before this lane carry no source and remain readable. An unsuccessful
+outcome's `failure` may carry a typed `repair`, `{kind: "set_inputs", label,
+changes}`, an argument edit the recompute route accepts that the client offers
+as a tap; the backend computed it, the client never invents one. `visual.kind`
+also admits `value_path`, a computed path over dated periods such as a balance
+paid down. An argument model may carry its inputs' provenance under the one
+field `sources`, keyed by field name; the declaration projects it onto the
+card, the retained unknown reads as `computed`, and an edited input is marked
+`user` by the recompute path.
+
 `tool_jobs` retains asynchronous work as
 `[{call_id, tool_name, artifact_id, job}]`. Existing job polling and result-message
 publication resolve each entry independently, including repeated calls and
@@ -3334,6 +3349,11 @@ Missing/foreign results return 404, dead artifacts return
 `409 tool_result_changed`, and rejected inputs return
 `422 tool_arguments_invalid`. A missing or incompatible declaration binding
 returns `422 tool_inputs_not_editable`.
+
+When the recomputed card belongs to a free calculation, the same write stores
+`metadata.computation` derived from that card by its one owner
+(`argus.domain.computation_marker`), so the marker and the card never
+disagree and a decision saved afterward stores the recomputed inputs.
 
 ### Structured Action Semantics
 
@@ -5073,6 +5093,90 @@ attaches to; the conversation carries its state in `decision_states`; the
 unless the conversation also has an evidence-backed run, and
 `GET /conversations/{conversation_id}/run-dossiers` is unchanged: it projects
 runs, so only backtest decisions appear there.
+
+### Free calculations
+
+A free calculation is a declared tool that is local, never confirmed, makes no
+external call and has editable fields (`argus.domain.calculations`). Each is
+exactly four artifacts: its `ToolDeclaration`, its compute function, its tests
+and its presenter, and each registers a decision kernel of the same name in
+`argus.domain.computations` that calls the declaration's one compute function.
+Its computed answer declares `metadata.computation = {"kind": <tool name>,
+"inputs": <the card's arguments>}`, derived from the card by the marker owner.
+The computation may carry `symbols`, at most five upper-case asset identities
+derived from typed `symbol` inputs; a computation about no asset omits the key,
+so earlier computations serialize unchanged.
+
+For a calculation kind, `rerun.status` is `computed` and `rerun.result` is the
+declaration's tool result card (`kind: "tool_result"`, identity
+`decision_rerun`), including its `outcome`: inputs with no solution are a
+computed card whose outcome is `invalid` with the field and any typed repair,
+never a `500` and never a guess. Overrides merge through the declaration's
+recompute rules: the retained unknown stays blank, an edited input is marked as
+stated by the user, and an override that changes the unknown or fails the typed
+model answers `422 validation_error`. The registered kinds are `time_value`,
+`growth_projection`, `bond_value`, `discounted_cash_flow`, `price_multiple`,
+`income_yield`, `effective_rate`, `debt_to_income`, `expense_ratio`,
+`ranked_comparison` and `valuation_scenarios`. Money inputs and outputs carry
+the calculation's `currency`, an ISO 4217 code in use; zero is a known input.
+
+### `POST /conversations/{conversation_id}/messages/{message_id}/computation/rerun`
+
+Re-run an owned computed answer from Search, decided or not, without touching
+it. Body: `{"inputs": {...}}`, overrides merged over the answer's declared
+computation under the same rules as a decision re-run; an empty object re-runs
+the stored inputs. Returns `{"computation": DecisionComputation, "rerun":
+DecisionRerun}` and stores nothing: the answer, its card and its marker are
+never rewritten. In-chat edits of the latest answer keep the tool-results
+recompute route, which does rewrite the card. `404 not_found` when the message
+is missing, not owned, not in the conversation or not an assistant message;
+`409 decision_attachment_unsupported` when the message declares no computation;
+`422 validation_error` when overrides fail the kind. No model, retrieval or
+provider call.
+
+### Answer dossiers in Search
+
+A computed answer gets a dossier beside the run dossier, which is unchanged. A
+`conversation` search row carries `answer_dossier`, `null` or the newest
+assistant message in the conversation whose marker and card agree:
+
+```json
+{
+  "message_id": "uuid",
+  "conversation_id": "uuid",
+  "asked": "Is Apple expensive at this P/E?",
+  "computed_at": "timestamp",
+  "kind": "price_multiple",
+  "symbols": ["AAPL"],
+  "card": { "kind": "tool_result", "...": "..." },
+  "decision": { "state": "watching", "note": "Wait for earnings.", "run_label": null },
+  "decision_id": "uuid",
+  "actions": [
+    { "type": "answer_decision", "availability": "available", "message_id": "uuid",
+      "decision_state": "watching", "note": "Wait for earnings." }
+  ]
+}
+```
+
+`asked` is the owner's own user message just before the answer, bounded to 500
+characters, and the only prose in the dossier. `card` is the answer's tool
+result card: what Argus used, each input with its source, and what came out.
+`decision` and `decision_id` come from `decision_notes`; `actions` carries at
+most one `answer_decision` whose `availability` follows the same client
+capability negotiation as the run dossier's decision action and which posts to
+the message decision route. Recompute from the dossier goes through the message
+computation rerun route and never rewrites the stored answer. The dossier is
+hydrated after the search read in both persistence modes from the message's
+marker alone; the preview and opening a dossier make no model or retrieval
+call. When a conversation has both, the run dossier keeps precedence in the
+palette and the answer dossier still travels on the row.
+
+The asset row counts computed results involving the asset, not only runs:
+`asset_rollup.result_count` is completed runs plus computed answers whose
+computation names the symbol, `run_count` may now be `0`, `decision_counts`
+adds the current decisions on those answers, and a symbol known only from
+computed answers still resolves by exact match or unique prefix. Its copy says
+results in both languages.
 
 ---
 

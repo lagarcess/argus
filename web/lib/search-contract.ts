@@ -1,5 +1,6 @@
 import type { DecisionState, RunDossier } from "./run-dossier-contract";
 import type { ConversationPreview } from "./conversation-preview-display";
+import type { AnswerDossier } from "./answer-dossier-contract";
 
 export type SearchConversationItem = {
   type: "conversation";
@@ -18,6 +19,8 @@ export type SearchConversationItem = {
     message_id?: string;
   };
   dossier: RunDossier | null;
+  /** Additive: the latest computed answer in the conversation, or absent. */
+  answer_dossier?: AnswerDossier | null;
   total_runs: number;
   decided_runs: number;
   decision_states: DecisionState[];

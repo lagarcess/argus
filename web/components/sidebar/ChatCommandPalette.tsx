@@ -88,6 +88,7 @@ import {
   retainRecalledRecentItems,
 } from "@/lib/command-palette-recent-recall";
 import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
+import { AnswerDossierView } from "./command-palette/AnswerDossierView";
 import { useDossierDecisionResumeRefresh } from "./command-palette/useDossierDecisionResumeRefresh";
 import { useCommandPaletteKeys } from "./command-palette/useCommandPaletteKeys";
 import {
@@ -539,12 +540,12 @@ export default function ChatCommandPalette({
                   "command_palette.asset_rollup.scope_registered",
                   "Across your conversations",
                 ),
-            runsInvolving: (count, symbol) =>
-              t("command_palette.asset_rollup.runs_involving", {
+            resultsInvolving: (count, symbol) =>
+              t("command_palette.asset_rollup.results_involving", {
                 count,
                 symbol,
                 defaultValue: `${count} ${
-                  count === 1 ? "run" : "runs"
+                  count === 1 ? "result" : "results"
                 } involving ${symbol}`,
               }),
             decisionStateLabel: (state) =>
@@ -1125,7 +1126,7 @@ export default function ChatCommandPalette({
               selectedPreview ? (
                 <div
                   className="flex h-full flex-col"
-                  data-dossier-pane={selectedPreview.dossier ? "true" : undefined}
+                  data-dossier-pane={selectedPreview.dossier || selectedPreview.answerDossier ? "true" : undefined}
                 >
                   <div className="mb-6">
                     <div className="mb-3 flex flex-wrap gap-2">
@@ -1243,6 +1244,19 @@ export default function ChatCommandPalette({
                         onDecisionResumeHandled={onDecisionResumeHandled}
                       />
                     )
+                  ) : selectedPreview.answerDossier ? (
+                    // A computed answer's dossier beside the run dossier; the
+                    // run dossier keeps precedence when the conversation has one.
+                    <AnswerDossierView
+                      key={selectedPreview.answerDossier.message_id}
+                      dossier={selectedPreview.answerDossier}
+                      openConversationDisabled={!selectedPreview.conversationId || selectedNavigationDisabled}
+                      onOpenConversation={isBelowDesktop || !selectedPreview.conversationId ? undefined : () => {
+                        onOpenConversation(selectedPreview.conversationId!, selectedPreview.answerDossier!.message_id);
+                        onClose();
+                      }}
+                      onDecisionSaved={() => { onMutated?.(); void refreshAfterCanonicalMutation(); }}
+                    />
                   ) : (
                     <>
                       <div

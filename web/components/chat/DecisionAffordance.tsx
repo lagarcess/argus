@@ -14,6 +14,7 @@ import {
 import { saveDecision } from "@/lib/decisions-api";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import type { DecisionState } from "@/lib/run-dossier-contract";
+import DecisionRerunView from "./DecisionRerunView";
 import type { Message } from "./types";
 
 /**
@@ -160,13 +161,25 @@ export function useDecisionDraft({
   };
 }
 
-export function CurrentDecisionChip({ state }: { state: DecisionState }) {
+export function CurrentDecisionChip({ state, onOpen, open = false }: { state: DecisionState; onOpen?: () => void; open?: boolean }) {
   const { t } = useTranslation();
+  const label = t("chat.result_card.decision", { state: decisionStateLabel(state, t) });
+  const chipClass = "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.02] px-3 py-1.5 text-[12px] font-medium tracking-tight text-[#505a63] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#8d969e]";
+  if (!onOpen) {
+    return (
+      <span className={chipClass}>
+        <FileText className="h-3.5 w-3.5" />
+        {label}
+      </span>
+    );
+  }
+  // A saved decision opens: the backend re-runs it, and a changed input re-runs it again.
   return (
-    <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.02] px-3 py-1.5 text-[12px] font-medium tracking-tight text-[#505a63] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#8d969e]">
+    <button type="button" data-testid="open-decision" aria-expanded={open} onClick={onOpen} className={`${chipClass} cursor-pointer hover:border-black/18 dark:hover:border-white/18`}>
       <FileText className="h-3.5 w-3.5" />
-      {t("chat.result_card.decision", { state: decisionStateLabel(state, t) })}
-    </span>
+      {label}
+      <span className="sr-only">{t(open ? "tools.decision.close" : "tools.decision.open")}</span>
+    </button>
   );
 }
 
@@ -265,7 +278,7 @@ export function computedAnswerAttachment(
 }
 
 type ComputedAnswerDecisionProps = {
-  message: Pick<Message, "id" | "computation" | "decisionState">;
+  message: Pick<Message, "id" | "computation" | "decisionState" | "decisionNoteId">;
   conversationId: string | null | undefined;
   onSaved?: (decision: DecisionNote) => void;
 };
@@ -286,6 +299,7 @@ export function ComputedAnswerDecision({
   const [savedState, setSavedState] = useState<DecisionState | null>(
     message.decisionState ?? null,
   );
+  const [savedDecisionId, setSavedDecisionId] = useState<string | null>(null);
   useEffect(() => {
     setSavedState(message.decisionState ?? null);
   }, [message.decisionState]);
@@ -294,11 +308,14 @@ export function ComputedAnswerDecision({
     initialState: message.decisionState,
     onSaved: (decision) => {
       setSavedState(decision.decision_state);
+      setSavedDecisionId(decision.id);
       onSaved?.(decision);
     },
   });
+  const [rerunOpen, setRerunOpen] = useState(false);
   if (!attachment) return null;
   const visibleState = visibleDecisionState(message.decisionState, savedState);
+  const decisionId = message.decisionNoteId ?? savedDecisionId;
   return (
     <div
       data-testid="computed-answer-decision"
@@ -306,12 +323,17 @@ export function ComputedAnswerDecision({
     >
       <div className="flex flex-wrap gap-2 px-4 py-3.5 sm:px-5">
         {visibleState ? (
-          <CurrentDecisionChip state={visibleState} />
+          <CurrentDecisionChip state={visibleState} open={rerunOpen} onOpen={decisionId ? () => setRerunOpen((current) => !current) : undefined} />
         ) : (
           <AddDecisionButton onClick={() => draft.setOpen(!draft.open)} />
         )}
       </div>
       {!visibleState && draft.open ? <DecisionEditorPanel draft={draft} /> : null}
+      {visibleState && rerunOpen && decisionId ? (
+        <div className="border-t border-[#c9c9cd]/30 px-4 py-4 dark:border-white/[0.06] sm:px-5">
+          <DecisionRerunView decisionId={decisionId} />
+        </div>
+      ) : null}
     </div>
   );
 }

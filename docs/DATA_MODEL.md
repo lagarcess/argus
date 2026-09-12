@@ -1107,6 +1107,14 @@ Constraints:
 - The public decision write contract accepts at most 500 note characters. The
   durable column remains nullable `text` so previously accepted longer notes
   stay readable; no migration or destructive truncation is introduced.
+- A stored `computation` may carry `symbols`, at most five asset identities the
+  marker owner derives from the computation's typed `symbol` inputs; a
+  computation about no asset omits the key. Search counts a computed answer
+  under an asset from `messages.metadata->'computation'->'symbols'` on the
+  owner's assistant messages, bounded and owner-scoped, with no new table,
+  index or migration. The message marker itself is written from the answer's
+  tool result card by one owner (`argus.domain.computation_marker`), on the
+  chat turn and on the recompute route alike.
 
 ### Run dossier read projection
 

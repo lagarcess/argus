@@ -391,8 +391,10 @@ Search should reduce friction and help users resume intent instantly.
 
 ## Global Search
 
-Omnisearch covers the current Conversation, Backtest, Evidence, Decision, and
-Idea record types. Search must not expose legacy Strategy or Collection rows as
+Omnisearch covers the current Conversation, Backtest, Computed answer,
+Evidence, Decision, and Idea record types. A computed answer is an assistant
+message with a backend-declared computation; its dossier sits beside the run
+dossier and its asset counts under the same row as runs. Search must not expose legacy Strategy or Collection rows as
 current product surfaces. Alpha uses typed and text search; vector or semantic
 search remains deferred until a concrete later need exists.
 

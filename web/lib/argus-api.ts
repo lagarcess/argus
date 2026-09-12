@@ -316,6 +316,8 @@ export type SearchAssetRollupItem = {
   type: "asset_rollup";
   symbol: string;
   run_count: number;
+  /** Every result involving the asset: runs plus computed answers; absent on older builds. */
+  result_count?: number;
   decision_counts: Record<DecisionState, number>;
   last_touched_at: string;
 };
