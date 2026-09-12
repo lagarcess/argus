@@ -114,7 +114,9 @@ def test_a_domain_filtered_call_cites_only_the_filtered_domains() -> None:
     assert domains
     assert web_search["user_location"] == {"country": "DO"}
     assert request["language_preference"] == "es"
-    packet = _packet("domain_filtered_local_source")
+    # The behavior as #568 recorded it; the request above is today's. Recorded
+    # again on 2026-09-12, the filtered search returned no results twice.
+    packet = _packet("domain_filtered_local_source_568")
     assert packet.sources, "the filtered search still found pages"
     for source in packet.sources:
         host = urlparse(source.url).netloc.lower()

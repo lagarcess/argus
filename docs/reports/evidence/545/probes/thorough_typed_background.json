@@ -1,9 +1,9 @@
 {
   "probe": "thorough_typed_background",
   "purpose": "thorough background run on the Anthropic path under the schema",
-  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
-  "captured_at": "2026-09-09T01:24:01.984013+00:00",
-  "elapsed_s": 26.33,
+  "candidate_sha": "eb5d7daf3efbea17ed0d5414850650497a552111",
+  "captured_at": "2026-09-12T21:47:23.645431+00:00",
+  "elapsed_s": 42.48,
   "request_overrides": {},
   "exchanges": [
     {
@@ -33,21 +33,21 @@
         "max_steps": 10,
         "max_output_tokens": 4096,
         "language_preference": "en",
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "response_format": {
           "type": "json_schema",
           "json_schema": {
-            "name": "argus_typed_retrieval",
+            "name": "argus_typed_answer",
             "strict": true,
             "schema": {
-              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, and at most one calculation Argus computes.",
               "properties": {
                 "answer_markdown": {
-                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models. Every figure the calculation uses or produces is written as its {{name}} reference.",
                   "type": "string"
                 },
                 "rows": {
-                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "description": "Every figure answer_markdown states in digits, one row each, with the retrieved page it was read from.",
                   "items": {
                     "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
@@ -125,11 +125,277 @@
                     "additionalProperties": false
                   },
                   "type": "array"
+                },
+                "calculation": {
+                  "anyOf": [
+                    {
+                      "description": "The one calculation Argus computes for this answer.",
+                      "properties": {
+                        "kind": {
+                          "description": "The listed calculation that computes the figure the answer turns on.",
+                          "enum": [
+                            "bond_value",
+                            "debt_to_income",
+                            "discounted_cash_flow",
+                            "effective_rate",
+                            "expense_ratio",
+                            "growth_projection",
+                            "income_yield",
+                            "price_multiple",
+                            "ranked_comparison",
+                            "time_value",
+                            "valuation_scenarios"
+                          ],
+                          "type": "string"
+                        },
+                        "solve_for": {
+                          "anyOf": [
+                            {
+                              "enum": [
+                                "amount",
+                                "annual_fee",
+                                "annual_income",
+                                "annual_rate_pct",
+                                "assets",
+                                "cash_flow",
+                                "compounding_per_year",
+                                "contribution",
+                                "coupon_rate_pct",
+                                "coupons_per_year",
+                                "currency",
+                                "direction",
+                                "discount_rate_pct",
+                                "end_value",
+                                "face_value",
+                                "fees",
+                                "future_value",
+                                "growth_base_pct",
+                                "growth_high_pct",
+                                "growth_low_pct",
+                                "growth_rate_pct",
+                                "horizon_years",
+                                "inflation_rate_pct",
+                                "items",
+                                "key_kind",
+                                "key_label",
+                                "monthly_debt_payments",
+                                "monthly_income",
+                                "multiple",
+                                "multiple_base",
+                                "multiple_high",
+                                "multiple_low",
+                                "nominal_rate_pct",
+                                "payment",
+                                "payment_timing",
+                                "per_share",
+                                "periods",
+                                "periods_per_year",
+                                "prefer",
+                                "present_value",
+                                "price",
+                                "ratio_pct",
+                                "start_date",
+                                "start_value",
+                                "symbol",
+                                "terminal_growth_rate_pct",
+                                "value",
+                                "years",
+                                "yield_pct",
+                                "yield_to_maturity_pct"
+                              ],
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "For a kind that lists blanks, the name of the one blank to solve, left out of inputs; null otherwise."
+                        },
+                        "inputs": {
+                          "description": "Every input the kind needs, one entry each, with its source.",
+                          "items": {
+                            "description": "One input the calculation uses, with where its value came from.",
+                            "properties": {
+                              "name": {
+                                "description": "The input's name, exactly as the calculation list writes it.",
+                                "enum": [
+                                  "amount",
+                                  "annual_fee",
+                                  "annual_income",
+                                  "annual_rate_pct",
+                                  "assets",
+                                  "cash_flow",
+                                  "compounding_per_year",
+                                  "contribution",
+                                  "coupon_rate_pct",
+                                  "coupons_per_year",
+                                  "currency",
+                                  "direction",
+                                  "discount_rate_pct",
+                                  "end_value",
+                                  "face_value",
+                                  "fees",
+                                  "future_value",
+                                  "growth_base_pct",
+                                  "growth_high_pct",
+                                  "growth_low_pct",
+                                  "growth_rate_pct",
+                                  "horizon_years",
+                                  "inflation_rate_pct",
+                                  "items",
+                                  "key_kind",
+                                  "key_label",
+                                  "monthly_debt_payments",
+                                  "monthly_income",
+                                  "multiple",
+                                  "multiple_base",
+                                  "multiple_high",
+                                  "multiple_low",
+                                  "nominal_rate_pct",
+                                  "payment",
+                                  "payment_timing",
+                                  "per_share",
+                                  "periods",
+                                  "periods_per_year",
+                                  "prefer",
+                                  "present_value",
+                                  "price",
+                                  "ratio_pct",
+                                  "start_date",
+                                  "start_value",
+                                  "symbol",
+                                  "terminal_growth_rate_pct",
+                                  "value",
+                                  "years",
+                                  "yield_pct",
+                                  "yield_to_maturity_pct"
+                                ],
+                                "type": "string"
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "label": {
+                                          "type": "string"
+                                        },
+                                        "symbol": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "value": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "label",
+                                        "symbol",
+                                        "value"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The value: a plain number (7 for 7 percent, 1250000 for 1.25 million), one of the listed options, a list of offers, or null for a figure only the user knows and has not said."
+                              },
+                              "source": {
+                                "description": "page: read from a page retrieved for this answer. market_data: the current price of the named asset, which Argus fills from its own market data. user: stated by the user. assumption: a figure you chose, which the answer states plainly as an assumption.",
+                                "enum": [
+                                  "page",
+                                  "market_data",
+                                  "user",
+                                  "assumption"
+                                ],
+                                "type": "string"
+                              },
+                              "source_url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "For page, the URL of the retrieved page the value was read from; otherwise null."
+                              },
+                              "as_of": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "For page, the date the page gives for the value as YYYY-MM-DD; otherwise null."
+                              },
+                              "currency": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "For a money amount, its ISO 4217 code; otherwise null."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "value",
+                              "source",
+                              "source_url",
+                              "as_of",
+                              "currency"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "solve_for",
+                        "inputs"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The one calculation Argus computes for this answer, with every input and its source, or null when no computed figure is needed."
                 }
               },
               "required": [
                 "answer_markdown",
-                "rows"
+                "rows",
+                "calculation"
               ],
               "type": "object",
               "additionalProperties": false
@@ -142,12 +408,12 @@
       "response": {
         "background": true,
         "completed_at": null,
-        "created_at": 1788917015,
+        "created_at": 1789249601,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_f247f31c-bff8-49cf-964d-905da29c733f",
+        "id": "resp_29901e42-a1db-420b-8ffd-fd0c27b1d8f2",
         "incomplete_details": null,
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "max_output_tokens": 4096,
         "max_tool_calls": null,
         "metadata": {},
@@ -194,18 +460,18 @@
     },
     {
       "method": "GET",
-      "url": "https://api.perplexity.ai/v1/agent/resp_f247f31c-bff8-49cf-964d-905da29c733f",
+      "url": "https://api.perplexity.ai/v1/agent/resp_29901e42-a1db-420b-8ffd-fd0c27b1d8f2",
       "request": null,
       "http_status": 200,
       "response": {
         "background": true,
-        "completed_at": 1788917041,
-        "created_at": 1788917041,
+        "completed_at": 1789249643,
+        "created_at": 1789249643,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_f247f31c-bff8-49cf-964d-905da29c733f",
+        "id": "resp_29901e42-a1db-420b-8ffd-fd0c27b1d8f2",
         "incomplete_details": null,
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "max_output_tokens": 4096,
         "max_tool_calls": null,
         "metadata": {},
@@ -240,11 +506,11 @@
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"**Bottom line:** Netflix has been growing revenue far faster than Disney over the last two fiscal years. Netflix's top line jumped roughly **15.6% in FY2024** and **15.9% in FY2025**, while Disney grew about **2.8% in FY2024** and **3.4% in FY2025**.\\n\\n### Annual revenue and growth\\n\\n| Company | FY2023 revenue | FY2024 revenue | FY2024 growth | FY2025 revenue | FY2025 growth |\\n|---|---|---|---|---|---|\\n| Netflix (NFLX) | $33.72B | $39.00B | +15.6% | $45.18B | +15.9% |\\n| Walt Disney (DIS) | $88.90B | $91.36B | +2.8% | $94.43B | +3.4% |\\n\\nA couple of things worth noting for context:\\n- Disney is still much larger in absolute dollars — its FY2025 revenue of about $94.4B is more than double Netflix's $45.2B — but its growth rate is a fraction of Netflix's.\\n- The fiscal years don't line up perfectly. Netflix's fiscal year matches the calendar year (ending December), while Disney's fiscal year ends in late September.\\n\\nOver the two-year span, Netflix's revenue expanded by about **34%**, versus roughly **6%** for Disney.\",\"rows\":[{\"as_of\":\"2023-12-31\",\"kind\":\"currency\",\"label\":\"Netflix FY2023 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":33723297000},{\"as_of\":\"2024-12-31\",\"kind\":\"currency\",\"label\":\"Netflix FY2024 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":39000966000},{\"as_of\":\"2025-12-31\",\"kind\":\"currency\",\"label\":\"Netflix FY2025 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":45183036000},{\"as_of\":\"2024-12-31\",\"kind\":\"percent\",\"label\":\"Netflix FY2024 revenue growth\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"%\",\"value\":15.6},{\"as_of\":\"2025-12-31\",\"kind\":\"percent\",\"label\":\"Netflix FY2025 revenue growth\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"%\",\"value\":15.9},{\"as_of\":\"2023-09-30\",\"kind\":\"currency\",\"label\":\"Disney FY2023 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":88898000000},{\"as_of\":\"2024-09-28\",\"kind\":\"currency\",\"label\":\"Disney FY2024 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":91361000000},{\"as_of\":\"2025-09-27\",\"kind\":\"currency\",\"label\":\"Disney FY2025 total revenue\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":94425000000},{\"as_of\":\"2024-09-28\",\"kind\":\"percent\",\"label\":\"Disney FY2024 revenue growth\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"%\",\"value\":2.8},{\"as_of\":\"2025-09-27\",\"kind\":\"percent\",\"label\":\"Disney FY2025 revenue growth\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"%\",\"value\":3.4}]}",
+                "text": "{\"answer_markdown\":\"**Netflix has been growing revenue far faster than Disney over the last two fiscal years.**\\n\\nNetflix's revenue climbed from about 33.72 billion dollars in FY2023 to 39.00 billion in FY2024 (roughly +15.7%), then to 45.18 billion in FY2025 (roughly +15.9%). Disney's revenue rose from 88.90 billion dollars in FY2023 (fiscal year ended Sept 30, 2023) to 91.36 billion in FY2024 (+2.8%), then to 94.43 billion in FY2025 (+3.4%).\\n\\n| Company | FY2023 revenue | FY2024 revenue | FY2025 revenue | FY24 growth | FY25 growth |\\n|---|---|---|---|---|---|\\n| Netflix | 33,723,297,000 | 39,000,966,000 | 45,183,036,000 | ~15.7% | ~15.9% |\\n| Disney | 88,898,000,000 | 91,361,000,000 | 94,425,000,000 | ~2.8% | ~3.4% |\\n\\nSo while Disney remains roughly twice Netflix's size in absolute revenue, Netflix has been expanding its top line roughly four to five times faster on a percentage basis over the past two fiscal years. Note the fiscal calendars differ: Netflix's fiscal year ends in December, while Disney's ends in late September.\",\"calculation\":null,\"rows\":[{\"as_of\":\"2023-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2023\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":33723297000},{\"as_of\":\"2024-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2024\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":39000966000},{\"as_of\":\"2025-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2025\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":45183036000},{\"as_of\":\"2023-09-30\",\"kind\":\"currency\",\"label\":\"Total revenue FY2023\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":88898000000},{\"as_of\":\"2024-09-28\",\"kind\":\"currency\",\"label\":\"Total revenue FY2024\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":91361000000},{\"as_of\":\"2025-09-27\",\"kind\":\"currency\",\"label\":\"Total revenue FY2025\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":94425000000}]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_12f53353-dabe-4e60-ad8e-e5dc4bf43296",
+            "id": "msg_3edb50f8-f7f7-47c6-9da8-7e941f161e0e",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -272,23 +538,23 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.13888,
+            "cache_creation_cost": 0.19698,
             "currency": "USD",
-            "input_cost": 3e-05,
-            "output_cost": 0.04068,
+            "input_cost": 5e-05,
+            "output_cost": 0.0308,
             "tool_calls_cost": 0.005,
             "tool_calls_cost_details": {
               "finance_search": 0.005
             },
-            "total_cost": 0.18459
+            "total_cost": 0.23283
           },
-          "input_tokens": 22227,
+          "input_tokens": 31528,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 22221,
+            "cache_creation_input_tokens": 31517,
             "cache_read_input_tokens": 0,
             "cached_tokens": 0
           },
-          "output_tokens": 1627,
+          "output_tokens": 1232,
           "output_tokens_details": {
             "reasoning_tokens": 0
           },
@@ -298,7 +564,7 @@
               "invocation": 1
             }
           },
-          "total_tokens": 23854
+          "total_tokens": 32760
         },
         "user": null
       }
@@ -306,12 +572,12 @@
   ],
   "packet": {
     "typed_answer": true,
-    "uncited_rows": 0,
+    "unsourced_rows": [],
     "rows": [
       {
         "subject": "Netflix",
         "symbol": "NFLX",
-        "label": "Netflix FY2023 total revenue",
+        "label": "Total revenue FY2023",
         "value": 33723297000.0,
         "kind": "currency",
         "unit": "USD",
@@ -321,7 +587,7 @@
       {
         "subject": "Netflix",
         "symbol": "NFLX",
-        "label": "Netflix FY2024 total revenue",
+        "label": "Total revenue FY2024",
         "value": 39000966000.0,
         "kind": "currency",
         "unit": "USD",
@@ -331,7 +597,7 @@
       {
         "subject": "Netflix",
         "symbol": "NFLX",
-        "label": "Netflix FY2025 total revenue",
+        "label": "Total revenue FY2025",
         "value": 45183036000.0,
         "kind": "currency",
         "unit": "USD",
@@ -339,29 +605,9 @@
         "source_url": null
       },
       {
-        "subject": "Netflix",
-        "symbol": "NFLX",
-        "label": "Netflix FY2024 revenue growth",
-        "value": 15.6,
-        "kind": "percent",
-        "unit": "%",
-        "as_of": "2024-12-31",
-        "source_url": null
-      },
-      {
-        "subject": "Netflix",
-        "symbol": "NFLX",
-        "label": "Netflix FY2025 revenue growth",
-        "value": 15.9,
-        "kind": "percent",
-        "unit": "%",
-        "as_of": "2025-12-31",
-        "source_url": null
-      },
-      {
-        "subject": "Walt Disney",
+        "subject": "Disney",
         "symbol": "DIS",
-        "label": "Disney FY2023 total revenue",
+        "label": "Total revenue FY2023",
         "value": 88898000000.0,
         "kind": "currency",
         "unit": "USD",
@@ -369,9 +615,9 @@
         "source_url": null
       },
       {
-        "subject": "Walt Disney",
+        "subject": "Disney",
         "symbol": "DIS",
-        "label": "Disney FY2024 total revenue",
+        "label": "Total revenue FY2024",
         "value": 91361000000.0,
         "kind": "currency",
         "unit": "USD",
@@ -379,32 +625,12 @@
         "source_url": null
       },
       {
-        "subject": "Walt Disney",
+        "subject": "Disney",
         "symbol": "DIS",
-        "label": "Disney FY2025 total revenue",
+        "label": "Total revenue FY2025",
         "value": 94425000000.0,
         "kind": "currency",
         "unit": "USD",
-        "as_of": "2025-09-27",
-        "source_url": null
-      },
-      {
-        "subject": "Walt Disney",
-        "symbol": "DIS",
-        "label": "Disney FY2024 revenue growth",
-        "value": 2.8,
-        "kind": "percent",
-        "unit": "%",
-        "as_of": "2024-09-28",
-        "source_url": null
-      },
-      {
-        "subject": "Walt Disney",
-        "symbol": "DIS",
-        "label": "Disney FY2025 revenue growth",
-        "value": 3.4,
-        "kind": "percent",
-        "unit": "%",
         "as_of": "2025-09-27",
         "source_url": null
       }
@@ -423,14 +649,14 @@
       "web_search_invocations": 0,
       "fetch_url_invocations": 0,
       "model": "anthropic/claude-opus-4-7",
-      "latency_ms": 247,
-      "cost_usd": null,
-      "input_tokens": 22227,
-      "output_tokens": 1627,
-      "cache_creation_input_tokens": 22221,
+      "latency_ms": 272,
+      "cost_usd": 0.23283,
+      "input_tokens": 31528,
+      "output_tokens": 1232,
+      "cache_creation_input_tokens": 31517,
       "cache_read_input_tokens": 0
     },
-    "answer_markdown": "**Bottom line:** Netflix has been growing revenue far faster than Disney over the last two fiscal years. Netflix's top line jumped roughly **15.6% in FY2024** and **15.9% in FY2025**, while Disney grew about **2.8% in FY2024** and **3.4% in FY2025**.\n\n### Annual revenue and growth\n\n| Company | FY2023 revenue | FY2024 revenue | FY2024 growth | FY2025 revenue | FY2025 growth |\n|---|---|---|---|---|---|\n| Netflix (NFLX) | $33.72B | $39.00B | +15.6% | $45.18B | +15.9% |\n| Walt Disney (DIS) | $88.90B | $91.36B | +2.8% | $94.43B | +3.4% |\n\nA couple of things worth noting for context:\n- Disney is still much larger in absolute dollars, its FY2025 revenue of about $94.4B is more than double Netflix's $45.2B, but its growth rate is a fraction of Netflix's.\n- The fiscal years don't line up perfectly. Netflix's fiscal year matches the calendar year (ending December), while Disney's fiscal year ends in late September.\n\nOver the two-year span, Netflix's revenue expanded by about **34%**, versus roughly **6%** for Disney."
+    "answer_markdown": "**Netflix has been growing revenue far faster than Disney over the last two fiscal years.**\n\nNetflix's revenue climbed from about 33.72 billion dollars in FY2023 to 39.00 billion in FY2024 (roughly +15.7%), then to 45.18 billion in FY2025 (roughly +15.9%). Disney's revenue rose from 88.90 billion dollars in FY2023 (fiscal year ended Sept 30, 2023) to 91.36 billion in FY2024 (+2.8%), then to 94.43 billion in FY2025 (+3.4%).\n\n| Company | FY2023 revenue | FY2024 revenue | FY2025 revenue | FY24 growth | FY25 growth |\n|---|---|---|---|---|---|\n| Netflix | 33,723,297,000 | 39,000,966,000 | 45,183,036,000 | ~15.7% | ~15.9% |\n| Disney | 88,898,000,000 | 91,361,000,000 | 94,425,000,000 | ~2.8% | ~3.4% |\n\nSo while Disney remains roughly twice Netflix's size in absolute revenue, Netflix has been expanding its top line roughly four to five times faster on a percentage basis over the past two fiscal years. Note the fiscal calendars differ: Netflix's fiscal year ends in December, while Disney's ends in late September."
   },
   "error": null
 }

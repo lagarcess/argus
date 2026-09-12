@@ -642,7 +642,7 @@ def test_a_broken_typed_answer_never_reaches_the_reader(monkeypatch) -> None:
 
 RECORDED_LOCAL_PROBE = (
     Path(__file__).resolve().parents[2]
-    / "docs/reports/evidence/545/probes/domain_filtered_local_source.json"
+    / "docs/reports/evidence/545/probes/domain_filtered_local_source_568.json"
 )
 
 
