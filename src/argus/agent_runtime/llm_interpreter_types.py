@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, PrivateAttr
 
+from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
@@ -375,6 +376,14 @@ class LLMInterpretationResponse(BaseModel):
             "turns. Leave this null for ordinary 'what should I try next?' "
             "follow-ups, for questions about whether Argus supports finding "
             "assets, and for direct requests to test a named asset."
+        ),
+    )
+    calculation: CalculationRequest | None = Field(
+        default=None,
+        description=(
+            "A money question Argus computes from the user's stated numbers or "
+            "from published inputs about a named asset, read independently of "
+            "the act as the instructions describe; null otherwise."
         ),
     )
     result_followup_focus: ResultFollowupFocus | None = None

@@ -21,6 +21,7 @@ from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
     plan_artifact_assumption_edit,
 )
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
+from argus.agent_runtime.interpreter import calculation_request
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     discovery_response_ready_for_runtime,
     preserve_typed_discovery_act,
@@ -1119,7 +1120,9 @@ class OpenRouterStructuredInterpreter:
             "about the latest run/result, such as metrics, return, benchmark, drawdown, assumptions "
             "in the backtest, underperformance, or what exactly was tested. If the user asks for "
             "beginner onboarding, product help, a concept explanation, or a new idea, set it false "
-            "and do not classify as results_explanation just because a completed run exists."
+            "and do not classify as results_explanation just because a completed run exists.\n\n"
+            + calculation_request.CALCULATION_GUIDANCE
+            + calculation_request.calculation_kinds_clause()
         )
 
     def _to_runtime_interpretation(
@@ -1165,6 +1168,7 @@ class OpenRouterStructuredInterpreter:
             artifact_target=_artifact_target_from_response(response),
             asset_discovery=response.asset_discovery,
             research_query=response.research_query,
+            calculation=response.calculation,
         )
 
 
