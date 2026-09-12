@@ -341,8 +341,6 @@ export type Message = {
   artifactType?: ArtifactType;
   artifactStatus?: string;
   savedStrategyId?: string | null;
-  /** Canonical fact key for a latest-result fact answer; localized heading chrome. */
-  resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
   /** Existing backend-owned strategy facts used to prove turn continuity. */

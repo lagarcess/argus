@@ -17,7 +17,6 @@ type MergeFinalTextOptions = {
   toolResultCards?: Message["toolResultCards"];
   finalActions: ChatActionOption[];
   contentPresentation?: Message["contentPresentation"];
-  resultFactHeadingKey?: string | null;
   recoveryDisplay?: RecoveryDisplay | null;
   strategyPathContext?: Message["strategyPathContext"];
   assistantRecoveryCode?: string | null;
@@ -42,7 +41,6 @@ export function mergeFinalTextMessage(
     toolResultCards,
     finalActions,
     contentPresentation,
-    resultFactHeadingKey,
     recoveryDisplay,
     strategyPathContext,
     assistantRecoveryCode,
@@ -67,7 +65,6 @@ export function mergeFinalTextMessage(
     contentPresentation: contentPresentation ?? message.contentPresentation,
     resultReadoutContent,
     resultReadoutFacts,
-    resultFactHeadingKey: resultFactHeadingKey ?? message.resultFactHeadingKey,
     recoveryDisplay: recoveryDisplay ?? message.recoveryDisplay,
     strategyPathContext:
       strategyPathContext ?? message.strategyPathContext,

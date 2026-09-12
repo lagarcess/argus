@@ -122,7 +122,6 @@ import {
   nextExperimentsSourceRunIdFromMetadata,
 } from "@/lib/chat-next-experiments";
 import { nextStepsFromMetadata } from "@/lib/chat-next-steps";
-import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
   loadAllConversationMessagePages,
   resolveOrdinaryTransportAmbiguityView,
@@ -1447,8 +1446,6 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {
-          const finalFactHeadingKey =
-            resultFactHeadingKeyFromMetadata(finalPayload);
           const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
           const finalResearchDegradedCode =
             researchDegradedCodeFromMetadata(finalPayload);
@@ -1476,7 +1473,6 @@ export default function ChatInterface() {
                   nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                   nextSteps: finalNextSteps,
                   contentPresentation: finalTextPresentation,
-                  resultFactHeadingKey: finalFactHeadingKey,
                 }),
               ),
               assistantId,
@@ -1501,7 +1497,6 @@ export default function ChatInterface() {
                 nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                 nextSteps: finalNextSteps,
                 contentPresentation: finalTextPresentation,
-                resultFactHeadingKey: finalFactHeadingKey,
               },
             );
             if (

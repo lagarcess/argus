@@ -252,11 +252,6 @@ export default function ChatMessage({
       : t("chat.discovery_results.unsourced_line", {
           defaultValue: "From general knowledge, not a current search",
         });
-  // Localized heading chrome for latest-result fact answers, driven by the
-  // typed fact key. Unknown keys render no heading.
-  const factHeadingLabel = message.resultFactHeadingKey
-    ? t(`chat.result_followup.headings.${message.resultFactHeadingKey}`, "")
-    : "";
   const confirmationPeriodLeadIn = confirmationPeriodAdjustmentText(
     confirmation?.period_adjustment,
     (key, options) => t(key, options),
@@ -450,9 +445,6 @@ export default function ChatMessage({
             </FailureNotice>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
-              {factHeadingLabel && (
-                <div className="argus-result-section-label">{factHeadingLabel}</div>
-              )}
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}
               </ReactMarkdown>
