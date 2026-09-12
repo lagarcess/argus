@@ -59,7 +59,15 @@ RETRIEVAL_INSTRUCTIONS = (
     "answer_markdown is the prose for the reader: no links, no list of sources, "
     "no mention of tools, providers or models. Every figure answer_markdown "
     "states in digits appears once in rows, with the URL of the retrieved page "
-    "it was read from. " + ANSWER_CALCULATION_INSTRUCTIONS + calculation_kinds_clause()
+    "it was read from. Never say what the reader should do or which product to "
+    "choose; show what the figures say. A figure a page publishes, such as a "
+    "product's price, a rate, a fee or local inflation, is retrieved and cited, "
+    "never asked of the user; when the user named no exact product, retrieve "
+    "typical examples and say which. Which product, account or currency costs "
+    "less or keeps more, and whether a price is high for its earnings, is "
+    "answered through calculation, never with prose alone. When calculation is "
+    "filled, state no figure it does not use or produce. Write dates as dates, "
+    "not in words. " + ANSWER_CALCULATION_INSTRUCTIONS + calculation_kinds_clause()
 )
 
 # The same contract for a question whose answer is computed (decision 10):
@@ -71,12 +79,7 @@ SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
     "valuation_scenarios unless another listed kind fits the question better, "
     "with the current price from market_data and every other input from a page "
     "or a stated assumption. Never compute the answer, scenario values, ranges "
-    "or future figures yourself, never present one number as the future, and "
-    "never say what the reader should do. A figure a page publishes, such as a "
-    "product's price, a rate, a fee or local inflation, is retrieved and cited, "
-    "never asked of the user; when the user named no exact product, retrieve a "
-    "typical one and say which. State no figure the calculation does not use or "
-    "produce, and write dates as dates, not in words."
+    "or future figures yourself, and never present one number as the future."
 )
 
 
