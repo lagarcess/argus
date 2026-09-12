@@ -269,6 +269,8 @@ Canonical state store.
 - Legacy Strategy and Collection rows (read compatibility only)
 - Backtest jobs
 - Backtest history
+- Computed answers (a tool result card and its computation marker on an
+  assistant message; no run)
 - Archived / deleted records
 - Feedback records
 
@@ -507,8 +509,21 @@ cost ledger and persistence owners remain authoritative. The card presenter owns
 display facts while the callable owns the typed result. Local editable tools
 recompute through the guarded message-artifact writer: the original unknown
 stays blank and the input revision advances with the result. Public sharing
-continues to use its shipped selected-turn contract; connecting general tool
-results to sharing remains a separate change.
+freezes a computed answer's card as its own `calculation` leaf through the
+shipped selected-turn contract.
+
+A computed answer is an artifact without a run. The interpreter maps a money
+question to a declared calculation; the runtime validates the read, computes in
+process and publishes the card, and the one marker owner
+(`argus.domain.computation_marker`) writes `metadata.computation` from it. Every
+later reader derives from that pair and nothing else: a decision stores its
+inputs and re-runs the declaration's one compute function, Search projects an
+answer dossier and counts results under an asset, the conversation rail ticks a
+result, comparison lines up two cards' typed facts in Python, continuing copies
+the card into a new chat, and sharing freezes it. None of these creates a
+backtest run, a job, an evidence artifact or a strategy. The only paid read is
+a refresh of cited inputs the user starts, which goes through the research
+allowance and the cost ledger like a turn.
 
 Progress is a declaration locale key with typed arguments, emitted when that
 call executes. Graph-stage events retain operational meaning and cannot select

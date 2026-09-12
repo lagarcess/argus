@@ -638,7 +638,13 @@ system. Version 1 receipts retain their payload and rendering. Version 2 introdu
 typed receipt kinds and a closed `turns` wrapper, with one or more turns from
 one owned conversation in conversation order; nothing bounds the count but the
 conversation itself. The research payload is exactly the
-closed field list in that spec's section 4.2.
+closed field list in that spec's section 4.2. Any grounded math adds the
+`calculation` kind: a computed answer (`metadata.computation` with its card) is
+its own closed leaf, whatever else the turn carries (`docs/DATA_MODEL.md`
+section 12.1.3). A declaration whose rows restate its inputs
+(`ranked_comparison`, receipt policy `cited_facts`) is eligible only when every
+input it holds was cited; otherwise the candidate's reason is
+`private_inputs`.
 
 The owner can read share candidates, preview a selection, and create its receipt
 under `/conversations/{conversation_id}/public-excerpt-candidates`,
@@ -723,8 +729,8 @@ acquisition funnel's creation stage.
 
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
 created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
-as ISO dates or null for research. `kind` is `backtest`, `research_answer`, or
-`mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
+as ISO dates or null for research and calculations. `kind` is `backtest`,
+`research_answer`, `calculation`, or `mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
 `removed_by_argus`. It carries no source conversation, message, run, or artifact id. Clients
 compose the shareable url as `origin + path`, so the backend owns no origin
 configuration.
@@ -759,7 +765,7 @@ timestamps cannot drop or repeat a row across pages.
   from a message.
 
 `POST /public/receipt-funnel` takes
-`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "mixed"}`
+`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "calculation" | "mixed"}`
 (kind defaults to `backtest` for compatible callers) and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
 rendered page rather than counted when the receipt is read, because that read also
@@ -3332,9 +3338,12 @@ supports different tools and repeated calls; a local call bypasses backtest
 launch preparation. The existing validated Run action enters this dispatcher
 with its confirmed canonical strategy.
 
-The interpreter retains its seven intents, system prompt and response schema.
-It does not select calls from this catalog in this lane. The declaration-derived
-catalog is available to runtime consumers without changing the model contract.
+The interpreter retains its seven intents. Since Any grounded math it also
+reads one typed `calculation` payload beside every turn (see Calculation turns);
+the kinds and argument names it reads are generated from the declarations, so
+the catalogue the model sees and the math that runs share one owner. The model
+never emits a `ToolCall` itself: the runtime validates the read against the
+declaration and dispatches the call.
 
 An actual invocation emits `stage_start.tool_progress` containing
 `{locale_key, interpolation_args, call_id, tool_name}`. Interpolation values are
@@ -5197,6 +5206,104 @@ is missing, not owned, not in the conversation or not an assistant message;
 `409 decision_attachment_unsupported` when the message declares no computation;
 `422 validation_error` when overrides fail the kind. No model, retrieval or
 provider call.
+
+### Calculation turns
+
+The interpreter's `calculation` read is `{kind, inputs, solve_for, retrieve,
+follow_up_questions}`. `kind` is a registered calculation kind or null;
+`inputs` holds the values the user stated under the declaration's argument
+names; `solve_for` names the one blank for a kind with an unknown rule;
+`retrieve` names inputs a published page supplies for a named asset; and
+`follow_up_questions` holds up to three specific questions, in the user's words
+and language, when the question is too broad to compute. No phrase, pattern or
+language check runs before the read. Each guard after it records a reason code
+on the turn: `calculation_inputs_dropped`, `calculation_solve_for_cleared`,
+`calculation_currency_defaulted`, `calculation_lead_replaced`,
+`calculation_kind_unknown`, `calculation_nothing_to_solve`,
+`calculation_pending_merged`, `calculation_retrieval_needed` and
+`scenario_calculation_defaulted`.
+
+A computed turn answers `ready_to_respond` with no provider call.
+`final_response_payload.tool_result_cards` holds the declaration's card, the
+stored assistant message carries `tool_result_cards` and the
+`metadata.computation` derived from that card, and the prose lead states no
+figure. Money counts in the profile's resolved currency (`User.currency`)
+unless the user named one; with neither it counts in `USD` and records
+`calculation_currency_defaulted`. When the inputs state an amount and a
+whole-year horizon, `next_experiments` offers one
+`calculation_market_counterfactual` row, a buy-and-hold test of the
+calculation's asset (the S&P 500 proxy when it names none) with that amount
+over those years, or monthly buys of a stated payment, and `next_steps` lists
+it. The row runs only when tapped.
+
+A missing input only the user can supply answers `await_user_reply` with the
+model's question as `assistant_prompt`, `requested_field` naming the argument,
+and `clarification = {kind: "clarification", reason_code:
+"calculation_input_missing", prompt_source, requested_field, requested_fields,
+semantic_needs: [], payload: {calculation: <the pending read with the inputs so
+far>}, options: []}`. The next reply merges over the pending read; a reply that
+names a different kind starts that kind instead. A broad question answers with
+the lead and `next_steps` items of type `question`, one per follow-up, and
+stores no card.
+
+A forward-looking or valuation research answer (decision 10) computes the same
+way after retrieval. `SCENARIO_RETRIEVAL_INSTRUCTIONS` asks the provider to
+retrieve inputs and never to compute scenario values; the prompt names each
+input by its argument name with its meaning, and a typed row feeds an input
+only when its `label` is that name. The research turn then carries the
+declaration's card, `valuation_scenarios` unless the read chose another kind,
+with each retrieved input's `source` `{kind: "page", title, url, date}` and
+every computed figure `computed`, beside the unchanged `research` sidecar. A
+withheld retrieval keeps its degraded code (`scenario_inputs_uncited`,
+`research_not_grounded`) and a card whose outcome is `invalid` with
+`missing_input` naming the first blank, so its inputs stay typeable. The
+contract is frozen by
+`docs/reports/evidence/grounded-math/probes/scenario_inputs_balanced.json`.
+
+### Computed answers outside a turn
+
+Every route is owner-scoped. Listing, comparing and continuing call no model,
+retrieval or provider.
+
+| Method | Path | Purpose |
+| :----- | :--- | :------ |
+| `GET`  | `/computations/answers?kind=&exclude_message_id=` | The owner's newest computed answers of one kind in live conversations, at most 10 |
+| `POST` | `/computations/compare` | Two answers of one kind side by side |
+| `POST` | `/conversations/{conversation_id}/messages/{message_id}/continue` | A new chat carrying only this result |
+| `POST` | `/conversations/{conversation_id}/messages/{message_id}/computation/refresh` | Look the answer's cited inputs up again |
+
+Listing returns `{items: [{conversation_id, message_id, kind, asked,
+computed_at, symbols}]}`.
+
+Compare takes `{left, right}`, each `{conversation_id, message_id}`, and
+returns `{kind, left, right, differences}`. Each side is `{conversation_id,
+message_id, asked, computed_at, card}`; each difference is `{section: "answer"
+| "row" | "input", name, label, unit, left, right, difference}`. A difference
+exists only for a fact both cards state as a number in the same section and
+unit, so money in another currency has none. `difference` is right minus left,
+computed once in Python and rounded as the card rounds that unit; the client
+only formats it. The same answer twice or two kinds answer `422
+invalid_selection`; a missing or foreign answer answers `404 not_found`; a
+message with no computation answers `409 decision_attachment_unsupported`.
+
+Continue creates a conversation and one assistant message whose metadata
+carries the card under a new `artifact_id` at input revision 0, the same
+`computation`, and `continued_from: {conversation_id, message_id}`. The source
+conversation is unchanged. It returns `{conversation, message_id}` and is for
+registered accounts only (`can_create_additional_conversation`); a guest
+answers `403 account_conversion_required`.
+
+Refresh looks up again only the inputs whose `source.kind` is `page`, on the
+balanced research configuration under the scenario contract. It is claimed
+under the research allowance before any provider work and recorded in the cost
+ledger. Stated inputs keep their values, and a cited input no page states today
+keeps its stored value and date. It returns `{computation, status, rerun,
+sources}`: `refreshed` carries the recomputed card in `rerun.result` (identity
+`decision_rerun`), and `inputs_not_found` carries none. The stored answer, its
+card and its marker are never rewritten. It answers `409 nothing_to_refresh`
+when no input is cited, `429 research_capacity_exhausted` (context
+`guest_exhausted`) when the allowance refuses, and `503 research_unavailable`
+(context `reason`) when the provider cannot answer.
 
 ### Answer dossiers in Search
 

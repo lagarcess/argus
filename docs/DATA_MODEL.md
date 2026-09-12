@@ -515,6 +515,15 @@ Represents individual messages within a conversation.
   artifact identity; repeated calls remain independent through completion and
   reload. The message remains the durable owner after direct edits, rather than
   writing a competing checkpoint copy.
+- A computed answer is an artifact without a run. Its card lives in
+  `metadata.tool_result_cards` and its marker in `metadata.computation`, which
+  the chat turn, the recompute route and the continue route all write from the
+  card; nothing else is stored. A research answer that computed scenarios
+  carries the same pair beside its `research` sidecar.
+  `metadata.continued_from` (`{conversation_id, message_id}`) marks a result
+  continued in a new chat; the source message is never changed. Comparing,
+  refreshing and re-running a computed answer store nothing: the stored card
+  stays the durable truth and each read's result comes back beside it.
 - A confirmation card's liveness truth lives on its own row:
   `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
   `cancelled`, `superseded`). Run admission stamps `consumed` through the
@@ -1398,8 +1407,10 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
-- `kind`: `text` (`backtest`, `research_answer`, or `mixed`; existing rows default
-  to `backtest`)
+- `kind`: `text` (`backtest`, `research_answer`, `calculation`, or `mixed`;
+  existing rows default to `backtest`; migration
+  `20260912190000_share_calculation_receipts.sql` added `calculation` to the
+  check additively)
 - `source_message_ids`: `uuid[]` (Private selected assistant messages; one or more
   for new receipts, empty for legacy rows)
 - `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
@@ -1435,6 +1446,16 @@ The backtest leaf freezes the card's closed typed fact bank, title, visual, note
 content language, framing and provenance. `public_excerpt_fact_schemas.py` closes
 every nested config, rule, figure and cost field. The public renderer reads the
 same result fact and display owners as the result card.
+
+The calculation leaf is `{kind: "calculation", question, title, answer, rows,
+inputs, notes, computed_at, owner_note, content_language, framing:
+"calculation_not_advice", provenance_mark}`. The title and every label, unit,
+`value_text` and note is `{locale_key, interpolation_args}`. A fact is `{label,
+value, value_text, unit, source}`, where `source` is `{title, url, date}` and
+exists only for a page. `inputs` holds only the inputs a public page stated or a
+declaration marked `public`; an input the user typed, the card's `arguments` and
+its visual never enter the payload. The receipt freezes those facts at creation
+and never recomputes.
 
 Every selected turn independently passes the shared eligibility and privacy audit
 at preview and creation. A refusal refuses the entire selection. The owner sees
