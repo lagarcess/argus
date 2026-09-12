@@ -1826,6 +1826,8 @@ across symbols.
 {
   "win_rate": 0.57,
   "total_trades": 42,
+  "buy_fills": 21,
+  "sell_fills": 21,
   "profit_factor": 1.6,
   "sharpe_ratio": 1.15,
   "sortino_ratio": 1.42,
@@ -1844,7 +1846,10 @@ divided by absolute gross negative realized P&L after modeled fees and
 slippage. It is `null` when there are no completed trades or no losing trade,
 and it is `0.0` when completed trades lose money without any winning trade.
 `total_trades` retains its existing executed-fill meaning; it is not a count of
-completed positions. If a close and a new open share one timestamp, the
+completed positions. `buy_fills` and `sell_fills` count executed buy and sell
+fills. A fixed-capital run's `total_trades` is their sum; a contributions run's
+`total_trades` equals `buy_fills`, and its `sell_fills` is `0` because a
+recurring plan only buys. If a close and a new open share one timestamp, the
 canonical ledger applies the close before the open. The same ordered fills own
 both portfolio equity and closed-trade P&L.
 
@@ -1854,6 +1859,8 @@ For example, an open buy-and-hold position persists:
 {
   "win_rate": null,
   "total_trades": 1,
+  "buy_fills": 1,
+  "sell_fills": 0,
   "profit_factor": null
 }
 ```
@@ -1969,6 +1976,7 @@ because an accumulation plan never closes a position.
 - Ratio fields are decimal ratios (e.g., `win_rate: 0.57`).
 - Currency-like `profit` depends on configured starting capital.
 - `metrics.aggregate.performance.portfolio_value_range` stores the aggregate strategy portfolio equity close peak/lowest values during the run period. These values must match `chart.value_summary` when chart data is available.
+- `metrics.aggregate.performance.execution_realism` appears only when the run modeled nonzero fees or slippage. Beside `fee_bps`, `slippage_bps`, `gross_total_return_pct`, `net_total_return_pct`, and `return_drag_pct`, it stores `modeled_fee_cost` and `modeled_slippage_cost`: the dollars the strategy's own fills paid, summed over symbols and rounded to cents. A buy spends its market value plus both costs, and a sell returns its market value minus both. `modeled_cost_total` is the sum of the two rounded amounts. Benchmark fills and the zero-cost gross comparison never add to these amounts. Runs stored before these keys existed omit them.
 - Conversation result cards use fixed beginner-friendly defaults.
 - All supported engine metrics are persisted in `metrics`.
 - AI may answer follow-up questions using `metrics.aggregate` and `metrics.by_symbol`.

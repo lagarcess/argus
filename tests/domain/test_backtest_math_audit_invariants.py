@@ -163,6 +163,8 @@ def test_strategy_that_never_enters_preserves_cash_and_reports_zero_fills(
     assert aggregate["efficiency"] == {
         "win_rate": None,
         "total_trades": 0,
+        "buy_fills": 0,
+        "sell_fills": 0,
         "profit_factor": None,
         "sharpe_ratio": 0.0,
     }
@@ -628,6 +630,8 @@ def test_total_loss_annualizes_to_negative_one_hundred() -> None:
         invested_capital=1_000.0,
         time_basis=time_basis,
         trade_count=2,
+        buy_fills=1,
+        sell_fills=1,
         closed_trade_pnls=[-1_000.0],
     )
 

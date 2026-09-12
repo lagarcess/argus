@@ -640,6 +640,11 @@ def test_buy_and_hold_execution_realism_reduces_net_return_and_profit(
             gross_performance["total_return_pct"] - net_performance["total_return_pct"],
             abs=0.01,
         ),
+        # $10,000 buys at 100: market value 10,000 / (1.0005 * 1.001) = 9,985.02,
+        # slippage 0.05% of it, fee 0.1% of it after slippage.
+        "modeled_fee_cost": 9.99,
+        "modeled_slippage_cost": 4.99,
+        "modeled_cost_total": 14.98,
     }
     assert (
         net_performance["benchmark_return_pct"]

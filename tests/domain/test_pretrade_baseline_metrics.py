@@ -295,6 +295,8 @@ def test_dca_funded_after_the_first_bar_anchors_at_the_first_deposit() -> None:
             effective_index=index,
         ),
         trade_count=1,
+        buy_fills=1,
+        sell_fills=0,
     )
 
     # One real interval after funding: dispersion undefined, drawdown real.

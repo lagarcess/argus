@@ -234,6 +234,8 @@ def _compute_dca_metrics(
     invested_capital: float,
     time_basis: MetricTimeBasis,
     trade_count: int,
+    buy_fills: int,
+    sell_fills: int,
 ) -> dict[str, Any]:
     """Metrics for a run funded by dated deposits rather than one bankroll.
 
@@ -274,6 +276,8 @@ def _compute_dca_metrics(
             anchored,
             time_basis=time_basis,
             trade_count=trade_count,
+            buy_fills=buy_fills,
+            sell_fills=sell_fills,
             closed_trade_pnls=(),
         ),
     }
@@ -286,6 +290,8 @@ def _compute_metrics_from_equity(
     invested_capital: float,
     time_basis: MetricTimeBasis,
     trade_count: int,
+    buy_fills: int,
+    sell_fills: int,
     closed_trade_pnls: Sequence[float],
 ) -> dict[str, Any]:
     """Metrics for a run funded by one bankroll on the first bar.
@@ -320,6 +326,8 @@ def _compute_metrics_from_equity(
             anchored,
             time_basis=time_basis,
             trade_count=trade_count,
+            buy_fills=buy_fills,
+            sell_fills=sell_fills,
             closed_trade_pnls=closed_trade_pnls,
         ),
     }
@@ -330,6 +338,8 @@ def _risk_and_efficiency_blocks(
     *,
     time_basis: MetricTimeBasis,
     trade_count: int,
+    buy_fills: int,
+    sell_fills: int,
     closed_trade_pnls: Sequence[float],
 ) -> dict[str, Any]:
     """The risk and efficiency blocks every return basis shares.
@@ -353,6 +363,8 @@ def _risk_and_efficiency_blocks(
         "efficiency": {
             "win_rate": round(win_rate, 2) if win_rate is not None else None,
             "total_trades": trade_count,
+            "buy_fills": buy_fills,
+            "sell_fills": sell_fills,
             "profit_factor": (
                 round(profit_factor, 2) if profit_factor is not None else None
             ),
