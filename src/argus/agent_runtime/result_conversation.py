@@ -205,7 +205,8 @@ def result_conversation_instructions(*, language: str, can_search: bool) -> str:
         "figures and this conversation: answerable from the run facts or public "
         "sources, not already answered in the conversation, not asking what a listed "
         "test would show, never asking which trade or position to take, and never "
-        "asking for a prediction. "
+        "asking for a prediction. Include at least one question unless nothing is "
+        "worth asking next. "
         "Write in product_language and report the language actually written. "
         f"{READOUT_FIGURE_REFERENCE_INSTRUCTIONS}"
     )
