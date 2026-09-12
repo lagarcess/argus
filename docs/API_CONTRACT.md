@@ -1827,6 +1827,8 @@ across symbols.
 ```json
 {
   "max_drawdown_pct": -9.2,
+  "max_drawdown_peak_date": "2025-02-18",
+  "max_drawdown_trough_date": "2025-08-01",
   "volatility_pct": 18.6,
   "downside_deviation_pct": 11.4,
   "worst_trade_pct": -4.1,
@@ -1897,7 +1899,11 @@ the run, meaning the fixed bankroll at the first bar, or the first funded
 bar's deposits on a contributions run. `max_drawdown_pct` reads the wealth
 path from that baseline, so a first-bar execution cost (fees plus slippage)
 is itself a fall from the baseline and can never hide behind a flat
-post-entry price. `volatility_pct` and `sharpe_ratio` use exactly one return
+post-entry price. `max_drawdown_peak_date` and `max_drawdown_trough_date`
+date that drop on the same path: the first close at its high and the close at
+its low. The start is `null` when the drop begins at the baseline, both are
+`null` when the path never drops, and runs stored before these keys have
+neither. `volatility_pct` and `sharpe_ratio` use exactly one return
 per real bar interval, with the funding bar's execution jump compounded into
 the first funded interval; no fabricated zero observation joins the sample.
 A window with fewer than two real return intervals reports `volatility_pct`

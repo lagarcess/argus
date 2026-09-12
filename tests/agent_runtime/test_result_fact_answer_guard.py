@@ -393,3 +393,72 @@ def test_a_strategy_reply_is_not_checked(language: str, message: str) -> None:
     result = _fact_answer(language, message, _composer(_Agent(), chat), fact="strategy")
 
     assert result.patch["assistant_response"] == chat.draft["text"]
+
+
+WORST_DROP_ENDED = "Worst drop ended"
+WORST_DROP_BEGAN = "Worst drop began"
+WORST_DROP_QUESTIONS = [
+    pytest.param("en", "When was the worst drop?", id="english"),
+    pytest.param("es-419", "¿Cuándo fue la peor caída?", id="spanish"),
+]
+
+
+def _monthly_buy_snapshot(*, stored_dates: bool) -> TaskSnapshot:
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    if stored_dates:
+        reference.metadata["metrics"]["aggregate"]["risk"].update(
+            {
+                "max_drawdown_peak_date": "2021-11-09",
+                "max_drawdown_trough_date": "2022-06-16",
+            }
+        )
+    return snapshot
+
+
+@pytest.mark.parametrize(("language", "message"), WORST_DROP_QUESTIONS)
+def test_a_new_monthly_buy_run_answers_the_worst_drop_with_its_stored_dates(
+    language: str, message: str
+) -> None:
+    reply = {
+        "language": language,
+        "text": "2021-11-09 / 2022-06-16",
+        "figures": [{"fact_key": WORST_DROP_ENDED, "value": "2022-06-16"}],
+        "next_steps": [],
+    }
+    chat = _ChatModel(reply)
+
+    result = _fact_answer(
+        language,
+        message,
+        _composer(_Agent(), chat),
+        fact="drawdown_date",
+        snapshot=_monthly_buy_snapshot(stored_dates=True),
+    )
+
+    assert result.patch["assistant_response"] == reply["text"]
+    assert result.patch["response_intent"]["facts"]["drawdown_date"] == "2022-06-16"
+    prompt = chat.calls[0]["messages"][1]["content"]
+    assert f"{WORST_DROP_BEGAN}: " in prompt
+    assert f"{WORST_DROP_ENDED}: " in prompt
+    # Deposits move the balance, so no dollar endpoint is stated on this path.
+    assert "Portfolio value at the bottom of the worst drop" not in prompt
+
+
+@pytest.mark.parametrize(("language", "message"), WORST_DROP_QUESTIONS)
+def test_a_monthly_buy_run_stored_before_the_dates_says_not_stored(
+    language: str, message: str
+) -> None:
+    chat = _ChatModel(_reply(language, []))
+
+    result = _fact_answer(
+        language,
+        message,
+        _composer(_Agent(), chat),
+        fact="drawdown_date",
+        snapshot=_monthly_buy_snapshot(stored_dates=False),
+    )
+
+    assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
+    assert "latest_result_fact_limitation" in result.decision.reason_codes

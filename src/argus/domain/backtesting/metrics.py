@@ -121,10 +121,12 @@ class BaselineAnchoredSeries:
     compounded into the first interval, so entry costs count exactly once
     at bar-interval duration. ``drawdown_path`` is the wealth path anchored
     at the 1.0 pre-trade baseline and keeps the funded bar's post-fill mark.
+    ``drawdown_dates`` dates each point of that path; the baseline has none.
     """
 
     period_returns: pd.Series
     drawdown_path: pd.Series
+    drawdown_dates: tuple[str | None, ...] = ()
 
 
 def _baseline_anchored_series(
@@ -138,6 +140,7 @@ def _baseline_anchored_series(
         return BaselineAnchoredSeries(
             period_returns=pd.Series(dtype=float),
             drawdown_path=pd.Series([1.0], dtype=float),
+            drawdown_dates=(None,),
         )
     first_funded = int(funded.argmax())
     jump = float(adjusted.iloc[first_funded])
@@ -154,7 +157,27 @@ def _baseline_anchored_series(
     return BaselineAnchoredSeries(
         period_returns=period_returns,
         drawdown_path=drawdown_path,
+        drawdown_dates=(None, *(str(stamp)[:10] for stamp in wealth.index)),
     )
+
+
+def _max_drawdown_window(
+    anchored: BaselineAnchoredSeries,
+) -> tuple[str | None, str | None]:
+    """Dates the worst drop began and ended on the path its percentage is measured on.
+
+    The start is the first close at the high before the low; a start at the
+    pre-trade baseline has no date, and a path that never drops has neither.
+    """
+    values = anchored.drawdown_path.to_numpy(dtype=float)
+    if len(values) < 2 or len(anchored.drawdown_dates) != len(values):
+        return None, None
+    drawdown = values / np.maximum.accumulate(values) - 1.0
+    trough = int(np.argmin(drawdown))
+    if drawdown[trough] >= 0.0:
+        return None, None
+    peak = int(np.argmax(values[: trough + 1]))
+    return anchored.drawdown_dates[peak], anchored.drawdown_dates[trough]
 
 
 def _dispersion_metrics(
@@ -353,9 +376,12 @@ def _risk_and_efficiency_blocks(
     )
     win_rate = _closed_trade_win_rate(closed_trade_pnls)
     profit_factor = _compute_profit_factor(closed_trade_pnls)
+    peak_date, trough_date = _max_drawdown_window(anchored)
     return {
         "risk": {
             "max_drawdown_pct": round(_max_drawdown_pct(anchored.drawdown_path), 2),
+            "max_drawdown_peak_date": peak_date,
+            "max_drawdown_trough_date": trough_date,
             "volatility_pct": (
                 round(volatility_pct, 2) if volatility_pct is not None else None
             ),

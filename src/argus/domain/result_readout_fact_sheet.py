@@ -620,6 +620,25 @@ def _ordered_points(points: object) -> list[dict[str, Any]] | None:
     return points
 
 
+def _flow_adjusted_drawdown_dates(rows: dict[str, Any], raw: dict[str, Any]) -> None:
+    """A contribution run's worst drop, dated on the path its percentage is measured on.
+
+    Dollar endpoints stay unavailable; a run stored before the dates keeps both.
+    """
+    risk = _mapping(_mapping(_mapping(raw.get("metrics")).get("aggregate")).get("risk"))
+    for key in ("peak_date", "trough_date"):
+        stored = risk.get(f"max_drawdown_{key}")
+        if not isinstance(stored, str) or not stored:
+            continue
+        row = rows[f"portfolio.drawdown.{key}"]
+        row["value"] = stored
+        row["basis"] = "flow_adjusted_wealth_path"
+        row["provenance"] = {
+            "kind": "stored",
+            "path": f"metrics.aggregate.risk.max_drawdown_{key}",
+        }
+
+
 def _drawdown_facts(
     sheet: dict[str, Any],
     raw: dict[str, Any],
@@ -633,7 +652,7 @@ def _drawdown_facts(
     reason = "Complete ordered fixed-capital chart evidence, its observation count and matching metric are required."
     return_basis = _return_basis(performance, _mapping(raw.get("configuration")))
     if return_basis == "contributions":
-        reason = "The DCA flow-adjusted risk path and dated flows were not retained; nominal equity cannot establish these endpoints."
+        reason = "Deposits move nominal equity, so dollar endpoints are not stated; a run stored before its flow-adjusted drop dates has no dates either."
     elif return_basis != "fixed_capital":
         reason = "The funding basis is unavailable; nominal equity cannot establish fixed-capital drawdown endpoints."
     for key, unit in (
@@ -649,6 +668,9 @@ def _drawdown_facts(
             "chronological_fixed_capital_drawdown",
             reason,
         )
+    if return_basis == "contributions":
+        _flow_adjusted_drawdown_dates(rows, raw)
+        return
     points = _ordered_points(chart.get("series"))
     capital = _mapping(rows.get("configuration.starting_capital")).get("value")
     target = _mapping(performance.get("benchmark_coverage")).get("target_points")

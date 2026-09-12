@@ -168,7 +168,12 @@ def test_strategy_that_never_enters_preserves_cash_and_reports_zero_fills(
         "profit_factor": None,
         "sharpe_ratio": 0.0,
     }
-    assert aggregate["risk"] == {"max_drawdown_pct": 0.0, "volatility_pct": 0.0}
+    assert aggregate["risk"] == {
+        "max_drawdown_pct": 0.0,
+        "max_drawdown_peak_date": None,
+        "max_drawdown_trough_date": None,
+        "volatility_pct": 0.0,
+    }
     assert aggregate["performance"]["portfolio_value_range"] == {
         "peak_value": 1_000.0,
         "lowest_value": 1_000.0,
