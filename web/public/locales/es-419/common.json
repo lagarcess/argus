@@ -1242,13 +1242,24 @@
     "empty": "Aún no hay chats recientes."
   },
   "command_palette": {
+    "ask_argus": {
+      "label": "Preguntarle a Argus",
+      "hint": "Presiona Enter para iniciar un chat nuevo con esto"
+    },
     "answer_dossier": {
       "type": "Cálculo",
       "asked": "Preguntaste",
       "stored": "Respuesta guardada",
       "latest": "Con tus cambios",
       "recompute_failed": "No se pudo recalcular. Inténtalo de nuevo.",
-      "decision_saved_on": "Decidido el {{date}}"
+      "decision_saved_on": "Decidido el {{date}}",
+      "refresh": "Volver a buscar los datos citados",
+      "refresh_note": "Esto vuelve a leer las páginas y cuenta para tu uso de investigación.",
+      "refreshing": "Buscando los datos...",
+      "refreshed": "Buscado de nuevo",
+      "refresh_not_found": "Ninguna página indica estos datos hoy, así que no se recalculó nada.",
+      "refresh_limit": "La investigación llegó a su límite por ahora. Inténtalo más tarde.",
+      "refresh_failed": "No se pudieron buscar los datos ahora. Inténtalo de nuevo."
     },
     "add_decision": "Agregar decisión · {{run}}",
     "add_decision_short": "Agregar decisión",
@@ -1631,6 +1642,13 @@
     }
   },
   "receipt": {
+    "calculation": {
+      "stamp": "Argus calculó esto el {{date}}",
+      "used": "Lo que usó Argus",
+      "framing": "Es aritmética sobre los datos que se muestran, congelada en esa fecha. No es un consejo ni un pronóstico, y no cambia si esos datos cambian.",
+      "short": "Aritmética sobre datos indicados. No es una recomendación.",
+      "headline": "Aritmética, no un consejo."
+    },
     "page_title": "Probado con Argus",
     "eyebrow": "Compartido contigo",
     "provenance": "Probado con Argus",
@@ -1804,6 +1822,7 @@
       "exit_threshold": "Vende en"
     },
     "kinds": {
+      "calculation": "Cálculo",
       "backtest": "Prueba histórica",
       "research_answer": "Respuesta investigada",
       "mixed": "Respuestas y pruebas"
@@ -1856,11 +1875,30 @@
         "invalid_selection": "Elige respuestas elegibles de esta conversación.",
         "preview_changed": "El contenido cambió. Revisa otra vista previa antes de crear el enlace.",
         "invalid_source": "El contenido original no está disponible o no se puede verificar.",
-        "unsupported_backtest": "Esta prueba no tiene todos los datos necesarios para compartirla."
+        "unsupported_backtest": "Esta prueba no tiene todos los datos necesarios para compartirla.",
+        "private_inputs": "Este resultado muestra cifras que escribiste, así que se queda privado."
       }
     }
   },
   "tools": {
+    "compute": {
+      "compare": "Comparar con otro resultado",
+      "compare_close": "Cerrar comparación",
+      "compare_loading": "Buscando tus otros resultados...",
+      "compare_empty": "Todavía no hay otro resultado de este tipo.",
+      "compare_pick": "Elige un resultado para comparar",
+      "compare_failed": "La comparación no cargó. Inténtalo de nuevo.",
+      "left": "Este resultado",
+      "right": "Resultado comparado",
+      "differences": "Diferencias",
+      "no_differences": "Estos resultados no comparten cifras para comparar.",
+      "from_to": "{{left}} a {{right}}",
+      "continue": "Continuar en un chat nuevo",
+      "continuing": "Iniciando un chat nuevo...",
+      "continue_failed": "El chat nuevo no se inició. Inténtalo de nuevo.",
+      "continued_from": "Continúa un resultado guardado. Abrir el chat original",
+      "computed_on": "Calculado el {{date}}"
+    },
     "decision": {
       "stored": "Resultado guardado",
       "today": "Resultado de hoy",

@@ -360,6 +360,8 @@ export type Message = {
   memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-declared computation behind a computed answer; it offers a decision. */
   computation?: import("@/lib/decision-contract").DecisionComputation | null;
+  /** A result continued from another chat; the source is linked and never changed. */
+  continuedFrom?: import("@/lib/computation-contract").ContinuedFrom | null;
   /** Current decision stamped on a computed answer by the backend. */
   decisionNoteId?: string | null;
   decisionState?: DecisionState | null;

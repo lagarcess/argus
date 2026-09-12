@@ -14,6 +14,7 @@ import {
 import { saveDecision } from "@/lib/decisions-api";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import type { DecisionState } from "@/lib/run-dossier-contract";
+import ComputedAnswerActions from "./ComputedAnswerActions";
 import DecisionRerunView from "./DecisionRerunView";
 import type { Message } from "./types";
 
@@ -281,6 +282,8 @@ type ComputedAnswerDecisionProps = {
   message: Pick<Message, "id" | "computation" | "decisionState" | "decisionNoteId">;
   conversationId: string | null | undefined;
   onSaved?: (decision: DecisionNote) => void;
+  /** Opens another conversation, such as this result continued in a new chat. */
+  onOpenConversation?: (conversationId: string) => void;
 };
 
 /**
@@ -294,8 +297,10 @@ export function ComputedAnswerDecision({
   message,
   conversationId,
   onSaved,
+  onOpenConversation,
 }: ComputedAnswerDecisionProps) {
   const attachment = computedAnswerAttachment(message, conversationId);
+  const { t, i18n } = useTranslation();
   const [savedState, setSavedState] = useState<DecisionState | null>(
     message.decisionState ?? null,
   );
@@ -329,6 +334,12 @@ export function ComputedAnswerDecision({
         )}
       </div>
       {!visibleState && draft.open ? <DecisionEditorPanel draft={draft} /> : null}
+      {attachment.kind === "message" && message.computation ? (
+        <div className="border-t border-[#c9c9cd]/30 px-4 py-3.5 dark:border-white/[0.06] sm:px-5">
+          <ComputedAnswerActions conversationId={attachment.conversationId} messageId={attachment.messageId} kind={message.computation.kind}
+            onOpenConversation={onOpenConversation} t={t} locale={i18n.resolvedLanguage ?? i18n.language ?? "en"} />
+        </div>
+      ) : null}
       {visibleState && rerunOpen && decisionId ? (
         <div className="border-t border-[#c9c9cd]/30 px-4 py-4 dark:border-white/[0.06] sm:px-5">
           <DecisionRerunView decisionId={decisionId} />

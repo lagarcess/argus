@@ -5133,5 +5133,457 @@
       }
     }
   },
-  "generated_by": "scripts/dump_calculation_fixtures.py"
+  "comparison": {
+    "differences": [
+      {
+        "difference": 4.8,
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.multiple"
+        },
+        "left": 24.0,
+        "name": "multiple",
+        "right": 28.8,
+        "section": "answer",
+        "unit": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.units.multiple"
+        }
+      },
+      {
+        "difference": -0.7,
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.earnings_yield_pct"
+        },
+        "left": 4.17,
+        "name": "earnings_yield_pct",
+        "right": 3.47,
+        "section": "row",
+        "unit": {
+          "interpolation_args": {},
+          "locale_key": "chat.tools.units.percent"
+        }
+      },
+      {
+        "difference": 30.0,
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.price"
+        },
+        "left": 150.0,
+        "name": "price",
+        "right": 180.0,
+        "section": "input",
+        "unit": {
+          "interpolation_args": {
+            "code": "USD"
+          },
+          "locale_key": "tools.calc.units.currency"
+        }
+      },
+      {
+        "difference": 0.0,
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.per_share"
+        },
+        "left": 6.25,
+        "name": "per_share",
+        "right": 6.25,
+        "section": "input",
+        "unit": {
+          "interpolation_args": {
+            "code": "USD"
+          },
+          "locale_key": "tools.calc.units.currency"
+        }
+      }
+    ],
+    "kind": "price_multiple",
+    "left": {
+      "asked": "Apple at 150?",
+      "card": {
+        "arguments": {
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 6.25,
+          "price": 150.0,
+          "sources": {},
+          "symbol": "AAPL"
+        },
+        "artifact_id": "artifact-price_multiple",
+        "artifact_state": "active",
+        "call_id": "call-price_multiple",
+        "card_type": "price_multiple",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "earnings_yield_pct": 4.166666666666666,
+            "multiple": 24.0,
+            "per_share": 6.25,
+            "price": 150.0,
+            "solved_field": "multiple",
+            "solved_value": 24.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.multiple"
+            },
+            "name": "multiple",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.units.multiple"
+            },
+            "value": 24.0,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "AAPL",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.price"
+              },
+              "name": "price",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 150.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.per_share"
+              },
+              "name": "per_share",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 6.25,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple"
+              },
+              "name": "multiple",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.earnings_yield_pct"
+              },
+              "name": "earnings_yield_pct",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 4.17,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.price_multiple.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "price_multiple"
+      },
+      "computed_at": "2026-09-11T12:00:00Z",
+      "conversation_id": "c-left",
+      "message_id": "m-left"
+    },
+    "right": {
+      "asked": "Apple at 180?",
+      "card": {
+        "arguments": {
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 6.25,
+          "price": 180.0,
+          "sources": {},
+          "symbol": "AAPL"
+        },
+        "artifact_id": "artifact-price_multiple",
+        "artifact_state": "active",
+        "call_id": "call-price_multiple",
+        "card_type": "price_multiple",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "earnings_yield_pct": 3.4722222222222223,
+            "multiple": 28.8,
+            "per_share": 6.25,
+            "price": 180.0,
+            "solved_field": "multiple",
+            "solved_value": 28.8
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.multiple"
+            },
+            "name": "multiple",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.units.multiple"
+            },
+            "value": 28.8,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.symbol"
+              },
+              "name": "symbol",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "AAPL",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.price"
+              },
+              "name": "price",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 180.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.per_share"
+              },
+              "name": "per_share",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 6.25,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.multiple"
+              },
+              "name": "multiple",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.units.multiple"
+              },
+              "unknown": true,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [],
+          "rows": [
+            {
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.earnings_yield_pct"
+              },
+              "name": "earnings_yield_pct",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 3.47,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.price_multiple.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "price_multiple"
+      },
+      "computed_at": "2026-09-11T12:00:00Z",
+      "conversation_id": "c-right",
+      "message_id": "m-right"
+    }
+  },
+  "generated_by": "scripts/dump_calculation_fixtures.py",
+  "receipt_turn": {
+    "answer": {
+      "label": {
+        "interpolation_args": {},
+        "locale_key": "tools.calc.fields.multiple"
+      },
+      "source": null,
+      "unit": {
+        "interpolation_args": {},
+        "locale_key": "tools.calc.units.multiple"
+      },
+      "value": 24.0,
+      "value_text": null
+    },
+    "computed_at": "2026-09-11T12:00:00Z",
+    "content_language": "en",
+    "framing": "calculation_not_advice",
+    "inputs": [
+      {
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.price"
+        },
+        "source": {
+          "date": "2026-09-10",
+          "title": "Apple quote",
+          "url": "https://www.nasdaq.com/market-activity/stocks/aapl"
+        },
+        "unit": {
+          "interpolation_args": {
+            "code": "USD"
+          },
+          "locale_key": "tools.calc.units.currency"
+        },
+        "value": 150.0,
+        "value_text": null
+      }
+    ],
+    "kind": "calculation",
+    "notes": [],
+    "owner_note": null,
+    "provenance_mark": "tested_with_argus",
+    "question": "Is Apple expensive at this P/E?",
+    "rows": [
+      {
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.earnings_yield_pct"
+        },
+        "source": null,
+        "unit": {
+          "interpolation_args": {},
+          "locale_key": "chat.tools.units.percent"
+        },
+        "value": 4.17,
+        "value_text": null
+      }
+    ],
+    "title": {
+      "interpolation_args": {},
+      "locale_key": "tools.calc.price_multiple.title"
+    }
+  }
 }

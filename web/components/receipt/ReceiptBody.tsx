@@ -54,7 +54,7 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
               <Heading lang={entry.language} className="font-display mt-4 text-[23px] font-medium leading-[1.16] tracking-[-0.5px] text-white sm:text-[30px] sm:tracking-[-0.8px]">{entry.title}</Heading>
               {!entry.research && (
                 <div className={`mt-4 pt-5 ${RULE}`}>
-                  <div className={`font-display text-[52px] font-medium leading-[0.98] tracking-[-1.9px] tabular-nums sm:text-[62px] sm:tracking-[-2.4px] ${isNegative ? "text-[#d66d75]" : "text-[#5ba897]"}`}>{entry.headline}</div>
+                  <div className={`font-display text-[52px] font-medium leading-[0.98] tracking-[-1.9px] tabular-nums sm:text-[62px] sm:tracking-[-2.4px] ${entry.neutralHeadline ? "break-words text-white" : isNegative ? "text-[#d66d75]" : "text-[#5ba897]"}`}>{entry.headline}</div>
                   {entry.verdict && (
                     <p className="font-display mt-2.5 text-[15px] font-medium tabular-nums text-white">
                       {entry.verdict}
@@ -104,7 +104,7 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
           );
         })}
       </main>
-      {!preview && <ReceiptActionBar kind={kind} framing={kind === "backtest" ? copy.framing.headline : copy.research.headline} action={copy.cta.action} />}
+      {!preview && <ReceiptActionBar kind={kind} framing={kind === "backtest" ? copy.framing.headline : kind === "calculation" ? copy.calculation.headline : copy.research.headline} action={copy.cta.action} />}
     </>
   );
 }

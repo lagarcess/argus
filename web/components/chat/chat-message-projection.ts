@@ -19,6 +19,7 @@ import {
   decisionComputationFromMetadata,
   decisionStateFromValue,
 } from "@/lib/decision-contract";
+import { continuedFromMetadata } from "@/lib/computation-contract";
 import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
@@ -484,6 +485,7 @@ export function hydrateMessagesFromApi(
         // A computed answer declares its computation; the backend stamps
         // the current decision beside it. Both are rendered, never inferred.
         const computation = decisionComputationFromMetadata(metadata);
+        const continuedFrom = continuedFromMetadata(metadata);
         if (
           discovery ||
           nextExperiments ||
@@ -494,6 +496,7 @@ export function hydrateMessagesFromApi(
         ) {
           return {
             ...hydratedText,
+            ...(continuedFrom ? { continuedFrom } : {}),
             ...(computation
               ? {
                   computation,

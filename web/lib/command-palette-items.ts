@@ -249,7 +249,8 @@ export type CommandPaletteKeyboardAction =
   | { type: "open"; openAtLeftOff: boolean }
   | { type: "rename" }
   | { type: "archive" }
-  | { type: "delete" };
+  | { type: "delete" }
+  | { type: "ask" };
 
 export function isEditableKeyboardTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -277,6 +278,7 @@ export function commandPaletteKeyboardAction({
   repeat = false,
   focusedRowIndex = -1,
   usesCommandKey = false,
+  canAsk = false,
 }: {
   key: string;
   itemCount: number;
@@ -293,6 +295,8 @@ export function commandPaletteKeyboardAction({
   repeat?: boolean;
   focusedRowIndex?: number;
   usesCommandKey?: boolean;
+  /** A typed query that matched nothing can start a new chat on Enter. */
+  canAsk?: boolean;
 }): CommandPaletteKeyboardAction {
   if (isEditing || (targetIsEditable && !targetIsSearchInput)) {
     return { type: "none" };
@@ -310,6 +314,9 @@ export function commandPaletteKeyboardAction({
     return focusedRowIndex === 0
       ? { type: "focus_search" }
       : { type: "select", index: focusedRowIndex - 1 };
+  }
+  if (key === "Enter" && !hasSelection && canAsk && targetIsSearchInput && !metaKey && !ctrlKey) {
+    return { type: "ask" };
   }
   if (key === "Enter" && hasSelection && focusedRowIndex < 0) {
     return { type: "open", openAtLeftOff: metaKey || ctrlKey };

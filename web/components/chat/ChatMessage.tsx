@@ -64,6 +64,8 @@ type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
   onToolRecompute?: ToolRecompute;
+  /** Opens another conversation: a continued result, or the chat it came from. */
+  onOpenConversation?: (conversationId: string) => void;
   onDirectEdit?: (
     confirmationId: string,
     edit: ConfirmationDirectEditPayload,
@@ -94,6 +96,7 @@ export default function ChatMessage({
   onAction,
   onDirectEdit,
   onToolRecompute,
+  onOpenConversation,
   onFeedback,
   onToast,
   isLatest,
@@ -451,6 +454,13 @@ export default function ChatMessage({
             </div>
           )}
 
+          {!isUser && message.continuedFrom && onOpenConversation ? (
+            <button type="button" data-continued-from={message.continuedFrom.conversationId}
+              onClick={() => { if (message.continuedFrom) onOpenConversation(message.continuedFrom.conversationId); }}
+              className="mt-3 inline-flex min-h-11 items-center text-left text-[13px] text-black/50 underline decoration-black/20 underline-offset-4 transition-colors hover:text-black dark:text-white/50 dark:decoration-white/20 dark:hover:text-white">
+              {t("tools.compute.continued_from")}
+            </button>
+          ) : null}
           {!isUser && message.toolJobs?.map((pending) => <div key={pending.call_id} className="mt-3 w-full max-w-[min(100%,660px)]">
             <BacktestJobCard job={pending.job} canRetry={false} />
           </div>)}
@@ -469,6 +479,7 @@ export default function ChatMessage({
             <ComputedAnswerDecision
               message={message}
               conversationId={conversationId}
+              onOpenConversation={onOpenConversation}
               onSaved={(decision) => onDecisionSaved?.(decision.decision_state)}
             />
           ) : null}

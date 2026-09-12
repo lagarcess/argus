@@ -1242,13 +1242,24 @@
     "empty": "No recent chats yet."
   },
   "command_palette": {
+    "ask_argus": {
+      "label": "Ask Argus",
+      "hint": "Press Enter to start a new chat with this"
+    },
     "answer_dossier": {
       "type": "Calculation",
       "asked": "You asked",
       "stored": "Saved answer",
       "latest": "With your changes",
       "recompute_failed": "Could not recompute. Try again.",
-      "decision_saved_on": "Decided {{date}}"
+      "decision_saved_on": "Decided {{date}}",
+      "refresh": "Look up the cited inputs again",
+      "refresh_note": "This reads the pages again and counts toward your research use.",
+      "refreshing": "Looking up the inputs...",
+      "refreshed": "Looked up again",
+      "refresh_not_found": "No page states these inputs today, so nothing was recomputed.",
+      "refresh_limit": "Research is at its limit for now. Try again later.",
+      "refresh_failed": "The inputs could not be looked up right now. Try again."
     },
     "add_decision": "Add decision · {{run}}",
     "add_decision_short": "Add decision",
@@ -1631,6 +1642,13 @@
     }
   },
   "receipt": {
+    "calculation": {
+      "stamp": "Argus computed this on {{date}}",
+      "used": "What Argus used",
+      "framing": "This is arithmetic on the inputs shown, frozen on that date. It is not advice or a forecast, and it does not change if those inputs change.",
+      "short": "Arithmetic on stated inputs. Not a tip.",
+      "headline": "Arithmetic, not advice."
+    },
     "page_title": "Tested with Argus",
     "eyebrow": "Shared with you",
     "provenance": "Tested with Argus",
@@ -1804,6 +1822,7 @@
       "exit_threshold": "Sells at"
     },
     "kinds": {
+      "calculation": "Calculation",
       "backtest": "Historical test",
       "research_answer": "Research answer",
       "mixed": "Answers and tests"
@@ -1856,11 +1875,30 @@
         "invalid_selection": "Choose eligible answers from this conversation.",
         "preview_changed": "The content changed. Preview it again before making the link.",
         "invalid_source": "The source content is unavailable or cannot be verified.",
-        "unsupported_backtest": "This test does not have all the facts needed for sharing."
+        "unsupported_backtest": "This test does not have all the facts needed for sharing.",
+        "private_inputs": "This result shows figures you typed, so it stays private."
       }
     }
   },
   "tools": {
+    "compute": {
+      "compare": "Compare with another result",
+      "compare_close": "Close comparison",
+      "compare_loading": "Finding your other results...",
+      "compare_empty": "There is no other result of this kind yet.",
+      "compare_pick": "Pick a result to compare",
+      "compare_failed": "The comparison did not load. Try again.",
+      "left": "This result",
+      "right": "Compared result",
+      "differences": "Differences",
+      "no_differences": "These results share no figure to compare.",
+      "from_to": "{{left}} to {{right}}",
+      "continue": "Continue in a new chat",
+      "continuing": "Starting a new chat...",
+      "continue_failed": "The new chat did not start. Try again.",
+      "continued_from": "Continued from a saved result. Open the original chat",
+      "computed_on": "Computed {{date}}"
+    },
     "decision": {
       "stored": "Saved result",
       "today": "Today's result",

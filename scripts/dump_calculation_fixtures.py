@@ -42,7 +42,111 @@ def build_fixture() -> dict[str, object]:
             "card": card.model_dump(mode="json"),
             "computation": computation.model_dump(mode="json") if computation else None,
         }
-    return {"generated_by": "scripts/dump_calculation_fixtures.py", "cards": cards}
+    return {
+        "generated_by": "scripts/dump_calculation_fixtures.py",
+        "cards": cards,
+        "receipt_turn": _receipt_turn(),
+        "comparison": _comparison(),
+    }
+
+
+# A fixed stamp and identities keep the generated fixture byte-stable.
+_STAMP = "2026-09-11T12:00:00+00:00"
+_RECEIPT_ARGUMENTS = {
+    "currency": "USD",
+    "symbol": "AAPL",
+    "price": 150,
+    "per_share": 6.25,
+    "multiple": None,
+    "sources": {
+        "price": {
+            "kind": "page",
+            "title": "Apple quote",
+            "url": "https://www.nasdaq.com/market-activity/stocks/aapl",
+            "date": "2026-09-10",
+        }
+    },
+}
+
+
+def _receipt_turn() -> dict[str, object]:
+    """A calculation receipt turn from the real projector, never hand-written."""
+    from datetime import datetime
+
+    from argus.api.schemas import Message
+    from argus.domain.computation_marker import computation_from_tool_card
+    from argus.domain.public_excerpt_turns import project_calculation_turn
+
+    from tests.domain.calculations.support import run_calculation
+
+    card = run_calculation("price_multiple", _RECEIPT_ARGUMENTS)
+    message = Message(
+        id="00000000-0000-4000-8000-000000000001",
+        conversation_id="00000000-0000-4000-8000-000000000002",
+        role="assistant",
+        content="Here is that multiple.",
+        created_at=datetime.fromisoformat(_STAMP),
+        metadata={
+            "tool_result_cards": [card.model_dump(mode="json")],
+            "computation": computation_from_tool_card(card).model_dump(mode="json"),
+        },
+    )
+    turn = project_calculation_turn(
+        message=message,
+        question="Is Apple expensive at this P/E?",
+        owner_note=None,
+        language="en",
+        private_ids=(),
+    )
+    return turn.model_dump(mode="json")
+
+
+def _comparison() -> dict[str, object]:
+    """Two worked price multiples through the backend's own differences owner."""
+    from dataclasses import asdict
+    from datetime import datetime
+
+    from argus.api.computation_contract import (
+        ComparedAnswer,
+        ComputationComparison,
+        ComputationDifference,
+    )
+    from argus.domain.computation_compare import card_differences
+
+    from tests.domain.calculations.support import run_calculation
+
+    base = {key: value for key, value in _RECEIPT_ARGUMENTS.items() if key != "sources"}
+    left = run_calculation("price_multiple", {**base, "price": 150})
+    right = run_calculation("price_multiple", {**base, "price": 180})
+    stamp = datetime.fromisoformat(_STAMP)
+    comparison = ComputationComparison(
+        kind="price_multiple",
+        left=ComparedAnswer(
+            conversation_id="c-left",
+            message_id="m-left",
+            asked="Apple at 150?",
+            computed_at=stamp,
+            card=left.model_dump(mode="json"),
+        ),
+        right=ComparedAnswer(
+            conversation_id="c-right",
+            message_id="m-right",
+            asked="Apple at 180?",
+            computed_at=stamp,
+            card=right.model_dump(mode="json"),
+        ),
+        differences=[
+            ComputationDifference(
+                **{
+                    **asdict(item),
+                    "label": item.label,
+                    "unit": item.unit,
+                }
+            )
+            for item in card_differences(left, right)
+        ],
+    )
+    return comparison.model_dump(mode="json")
 
 
 def render() -> str:

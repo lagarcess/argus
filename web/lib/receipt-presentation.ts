@@ -1,5 +1,6 @@
 import type { PublicReceiptPayload, PublicReceiptVisual } from "./public-receipt-contract";
-import type { PublicReceiptDocument, PublicReceiptTurn, ResearchReceiptTurn } from "./public-receipt-turns";
+import type { CalculationReceiptFact, CalculationReceiptTurn, PublicReceiptDocument, PublicReceiptTurn, ResearchReceiptTurn } from "./public-receipt-turns";
+import { localizedToolText, toolFactSourceText, toolFactValue, type ToolFact, type ToolTranslator } from "./tool-result-card";
 import type { ArgusLanguage } from "./language-features";
 import { formatReceiptDate, formatReceiptDateRange, interpolate, receiptCopy, receiptTranslator } from "./receipt-copy";
 import { benchmarkReturn, benchmarkVerdict, receiptAssumptions, receiptPlan } from "./receipt-plan";
@@ -10,7 +11,7 @@ import { resultReadoutPlanDetails } from "./result-readout-display";
 
 export type ReceiptPresentation = {
   title: string; language: ArgusLanguage; stamp: string | null;
-  headline?: string; verdict?: string | null; benchmark?: string | null; benchmarkSymbol?: string | null;
+  headline?: string; neutralHeadline?: boolean; verdict?: string | null; benchmark?: string | null; benchmarkSymbol?: string | null;
   rows: { label: string; value: string }[];
   visual?: PublicReceiptVisual | null;
   plan?: { heading: string; rows: { text: string; exact?: string | null }[]; assumptions: string[]; footer?: string };
@@ -42,6 +43,7 @@ function legacyPresentation(payload: PublicReceiptPayload, createdAt: string | n
 function turnPresentation(turn: PublicReceiptTurn, createdAt: string | null, language: ArgusLanguage): ReceiptPresentation {
   const copy = receiptCopy(language);
   const base = { language: turn.content_language, ownerNote: turn.owner_note };
+  if (turn.kind === "calculation") return calculationPresentation(turn, language);
   if (turn.kind === "research_answer") {
     const date = formatReceiptDate(turn.retrieved_at, language) ?? "";
     const nextStepTemplate = turn.offered_next_step ? copy.research[turn.offered_next_step.kind] : null;
@@ -78,6 +80,33 @@ function turnPresentation(turn: PublicReceiptTurn, createdAt: string | null, lan
       assumptions: [view.copy.longOnlyValue, view.copy.equalWeightValue, ...view.evidence.trustGroups],
     },
     framing: copy.framing.detail,
+  };
+}
+
+/** A frozen computed answer: its figures, what Argus used with each page, its notes. */
+function calculationPresentation(turn: CalculationReceiptTurn, language: ArgusLanguage): ReceiptPresentation {
+  const copy = receiptCopy(language);
+  const t = receiptTranslator(language) as unknown as ToolTranslator;
+  const fact = (value: CalculationReceiptFact, name: string): ToolFact => ({
+    name, label: value.label, value: value.value, unit: value.unit ?? null, value_text: value.value_text ?? null,
+    source: value.source ? { kind: "page", ...value.source } : null,
+  } as ToolFact);
+  const date = formatReceiptDate(turn.computed_at, language) ?? "";
+  return {
+    language: turn.content_language, ownerNote: turn.owner_note, title: turn.question,
+    stamp: interpolate(copy.calculation.stamp, { date }),
+    headline: toolFactValue(fact(turn.answer, "answer"), t, language), neutralHeadline: true,
+    verdict: localizedToolText(turn.answer.label, t),
+    rows: turn.rows.map((row, index) => ({ label: localizedToolText(row.label, t), value: toolFactValue(fact(row, `row_${index}`), t, language) })),
+    plan: turn.inputs.length || turn.notes.length ? {
+      heading: copy.calculation.used,
+      rows: turn.inputs.map((input, index) => {
+        const shaped = fact(input, `input_${index}`);
+        return { text: `${localizedToolText(input.label, t)}: ${toolFactValue(shaped, t, language)}`, exact: toolFactSourceText(shaped, t, language) };
+      }),
+      assumptions: turn.notes.map((note) => localizedToolText(note, t)),
+    } : undefined,
+    framing: copy.calculation.framing,
   };
 }
 

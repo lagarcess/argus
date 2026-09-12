@@ -1085,7 +1085,7 @@ export default function ChatInterface() {
       stateConversationId: conversationId,
       action,
     });
-    const shouldCreateNewRouteConversation =
+    const shouldCreateNewRouteConversation = Boolean(options?.startNewConversation) ||
       shouldStartConversationForVisibleEmptyChat({
         routeState,
         visibleMessageCount: messages.length,
@@ -1989,7 +1989,8 @@ export default function ChatInterface() {
 
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
-    loadConversation,
+    loadConversation, startNewChat, requestNewChat,
+    guestGate: () => ({ accountKind: isGuest ? "guest" : "registered", hasAcceptedContent: messages.some((message) => message.role === "user") }),
     send: handleSend,
     isSourceConversationReady: (id) =>
       activeConversationIdRef.current === id &&
@@ -2300,6 +2301,7 @@ export default function ChatInterface() {
               void loadConversation(convId, messageId, openAtLeftOff);
             }}
             onRetest={omnisearch.retest}
+            onAsk={omnisearch.ask}
             turnInFlight={turnInFlight}
             activeConversationId={conversationId}
             isGuest={isGuest}
@@ -2476,6 +2478,7 @@ export default function ChatInterface() {
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
                             onToolRecompute={(card, changes) => handleToolRecompute(msg.id, card, changes)}
+                            onOpenConversation={(id) => { void loadConversation(id); }}
                             onFeedback={(type, context, rating) => {
                               void handleMessageFeedback(type, context, rating);
                             }}

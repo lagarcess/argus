@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import ComputedAnswerActions from "@/components/chat/ComputedAnswerActions";
 import ComputedRerunPanel from "@/components/chat/ComputedRerunPanel";
 import {
   AddDecisionButton,
@@ -12,6 +13,8 @@ import {
   useDecisionDraft,
 } from "@/components/chat/DecisionAffordance";
 import type { AnswerDossier } from "@/lib/answer-dossier-contract";
+import { hasCitedInputs } from "@/lib/computation-compare";
+import { refreshComputedAnswer } from "@/lib/computations-api";
 import { rerunCard } from "@/lib/computed-rerun";
 import type { DecisionNote } from "@/lib/decision-contract";
 import { rerunMessageComputation } from "@/lib/decisions-api";
@@ -24,6 +27,8 @@ type AnswerDossierViewProps = {
   onOpenConversation?: () => void;
   openConversationDisabled?: boolean;
   onDecisionSaved?: (decision: DecisionNote) => void;
+  /** Opens another conversation, such as a result continued in a new chat. */
+  onOpenConversationById?: (conversationId: string) => void;
 };
 
 /**
@@ -38,6 +43,7 @@ export function AnswerDossierView({
   onOpenConversation,
   openConversationDisabled = false,
   onDecisionSaved,
+  onOpenConversationById,
 }: AnswerDossierViewProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
@@ -46,7 +52,9 @@ export function AnswerDossierView({
   const [busy, setBusy] = useState(false);
   const [transportError, setTransportError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState<ReturnType<typeof decisionRerunTreatment> | null>(null);
-  useEffect(() => { setLatest(null); setTransportError(null); setUnavailable(null); }, [dossier.message_id]);
+  const [latestLabel, setLatestLabel] = useState<"changes" | "refreshed">("changes");
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => { setLatest(null); setTransportError(null); setUnavailable(null); setLatestLabel("changes"); }, [dossier.message_id]);
   const rerun = useCallback(async (changes: Record<string, ToolScalar>) => {
     setBusy(true);
     setTransportError(null);
@@ -58,11 +66,34 @@ export function AnswerDossierView({
       } else {
         setUnavailable(null);
         setLatest(rerunCard(response.rerun));
+        setLatestLabel("changes");
       }
     } catch {
       setTransportError(t("command_palette.answer_dossier.recompute_failed"));
     } finally {
       setBusy(false);
+    }
+  }, [dossier.conversation_id, dossier.message_id, t]);
+  // Looking the cited inputs up again is paid research the user starts; the
+  // result appears beside the stored answer, which never changes.
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    setTransportError(null);
+    setUnavailable(null);
+    try {
+      const response = await refreshComputedAnswer({ conversation_id: dossier.conversation_id, message_id: dossier.message_id });
+      const card = response.status === "refreshed" ? rerunCard(response.rerun) : null;
+      if (card) {
+        setLatest(card);
+        setLatestLabel("refreshed");
+      } else {
+        setTransportError(t("command_palette.answer_dossier.refresh_not_found"));
+      }
+    } catch (error) {
+      const status = (error as { status?: unknown } | null)?.status;
+      setTransportError(t(status === 429 ? "command_palette.answer_dossier.refresh_limit" : "command_palette.answer_dossier.refresh_failed"));
+    } finally {
+      setRefreshing(false);
     }
   }, [dossier.conversation_id, dossier.message_id, t]);
   const action = dossier.actions.find((candidate) => candidate.type === "answer_decision") ?? null;
@@ -103,7 +134,7 @@ export function AnswerDossierView({
           {stored ? (
             <ComputedRerunPanel stored={stored} latest={latest} busy={busy} unavailable={unavailable} transportError={transportError}
               onRerun={(changes) => { void rerun(changes); }} t={t} locale={locale}
-              labels={{ stored: t("command_palette.answer_dossier.stored", "Saved answer"), latest: t("command_palette.answer_dossier.latest", "With your changes") }} />
+              labels={{ stored: t("command_palette.answer_dossier.stored", "Saved answer"), latest: latestLabel === "refreshed" ? t("command_palette.answer_dossier.refreshed") : t("command_palette.answer_dossier.latest", "With your changes") }} />
           ) : (
             <p role="status" className="text-sm text-black/60 dark:text-white/60">{t("tools.card.unavailable")}</p>
           )}
@@ -116,6 +147,19 @@ export function AnswerDossierView({
           </div>
           {dossier.decision?.note ? <DecisionNoteDisplay key={`${dossier.message_id}:${dossier.decision.note}`} note={dossier.decision.note} /> : null}
           {!savedState && draft.open ? <DecisionEditorPanel draft={draft} /> : null}
+        </div>
+        <div data-answer-dossier-actions className="mt-4 flex flex-col gap-3 border-t border-black/5 pt-4 dark:border-white/5">
+          {stored && hasCitedInputs(stored) ? (
+            <div>
+              <button type="button" data-answer-dossier-refresh disabled={refreshing || busy} onClick={() => { void refresh(); }}
+                className="inline-flex min-h-11 items-center rounded-full border border-black/10 px-4 text-[13px] text-black/70 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.05]">
+                {t(refreshing ? "command_palette.answer_dossier.refreshing" : "command_palette.answer_dossier.refresh")}
+              </button>
+              <p className="mt-1 text-[11px] text-black/40 dark:text-white/40">{t("command_palette.answer_dossier.refresh_note")}</p>
+            </div>
+          ) : null}
+          <ComputedAnswerActions conversationId={dossier.conversation_id} messageId={dossier.message_id} kind={dossier.kind}
+            onOpenConversation={action?.availability === "available" ? onOpenConversationById : undefined} t={t} locale={locale} />
         </div>
       </div>
       {onOpenConversation ? (
