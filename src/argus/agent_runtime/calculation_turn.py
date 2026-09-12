@@ -78,19 +78,32 @@ async def calculation_turn_stage_result(
     if declaration is None or not is_free_calculation(declaration):
         _note(interpretation, KIND_UNKNOWN_REASON_CODE, kind=request.kind)
         return None
-    if retrievable(request):
-        routed = await _retrieved_inputs_result(
-            interpretation, request, state=state, user=user
-        )
-        if routed is not None:
-            return routed
     arguments = _arguments(declaration, request, interpretation=interpretation, user=user)
-    missing = _missing_inputs(declaration, arguments, request, interpretation)
+    retrieving = (
+        {name for name in request.retrieve if arguments.get(name) is None}
+        if retrievable(request)
+        else set()
+    )
+    # Inputs only the user can supply are asked first; a page is read once
+    # every remaining blank is one it states.
+    missing = _missing_inputs(declaration, arguments, request, interpretation, retrieving)
     if missing is None:
         return None
     if missing:
         return _clarification_result(
             interpretation, request, user=user, missing=missing, arguments=arguments
+        )
+    if retrieving:
+        routed = await _retrieved_inputs_result(
+            interpretation, request, state=state, user=user
+        )
+        if routed is not None:
+            return routed
+        published = _ordered(
+            [name for name in request.retrieve if name in retrieving], interpretation
+        )
+        return _clarification_result(
+            interpretation, request, user=user, missing=published, arguments=arguments
         )
     return await _computed_result(
         interpretation, declaration, arguments, state=state, user=user, catalog=catalog
@@ -200,15 +213,21 @@ def _missing_inputs(
     arguments: dict[str, Any],
     request: CalculationRequest,
     interpretation: StructuredInterpretation,
+    retrieving: set[str] | None = None,
 ) -> list[str] | None:
-    """Inputs the user still has to give, ``[]`` when the calculation can run,
-    ``None`` when there is nothing to solve."""
+    """Inputs the user still has to give, ``[]`` when the calculation can run
+    once any ``retrieving`` input is read from a page, ``None`` when there is
+    nothing to solve."""
+    retrieving = retrieving or set()
     try:
         declaration.validate_arguments(arguments)
     except ToolInvocationError as exc:
         failure = exc.outcome.failure
         if failure is not None and failure.code == MISSING_INPUT_CODE:
-            return _ordered(list(failure.fields), interpretation)
+            return _ordered(
+                [name for name in failure.fields if name not in retrieving],
+                interpretation,
+            )
         if failure is None or failure.code != "exactly_one_unknown":
             return []
         blanks = [name for name in failure.fields if arguments.get(name) is None]
@@ -216,7 +235,12 @@ def _missing_inputs(
             _note(interpretation, NOTHING_TO_SOLVE_REASON_CODE, kind=declaration.name)
             return None
         return _ordered(
-            [name for name in blanks if name != request.solve_for], interpretation
+            [
+                name
+                for name in blanks
+                if name != request.solve_for and name not in retrieving
+            ],
+            interpretation,
         )
     except ValidationError as exc:
         missing = [
@@ -229,9 +253,12 @@ def _missing_inputs(
         return []
     outcome = declaration.invoke_sync(arguments)
     if outcome.failure is not None and outcome.failure.code == MISSING_INPUT_CODE:
-        # An input the declaration requires at compute time, such as a price
-        # no page supplied: the user types it.
-        return _ordered(list(outcome.failure.fields), interpretation)
+        # An input the declaration requires at compute time: a page supplies it
+        # when it is being retrieved, and the user types it otherwise.
+        return _ordered(
+            [name for name in outcome.failure.fields if name not in retrieving],
+            interpretation,
+        )
     return []
 
 
@@ -299,8 +326,8 @@ def _follow_up_result(
         outcome="ready_to_respond",
         decision=_decision(interpretation, user, CALCULATION_FOLLOW_UPS_REASON_CODE),
         stage_patch={
-            "assistant_response": interpretation.assistant_response
-            or _fallback_lead(user, succeeded=True),
+            "assistant_response": (interpretation.assistant_response or "").strip()
+            or _follow_up_lead(user),
             **patch,
         },
     )
@@ -368,6 +395,13 @@ def _fallback_lead(user: UserState, *, succeeded: bool) -> str:
             "falta y ofrece una corrección."
         )
     return "The numbers as stated do not solve. The card names what is missing and offers a fix."
+
+
+def _follow_up_lead(user: UserState) -> str:
+    """A lead for follow-up questions that claims no calculation exists yet."""
+    if user.language_preference.startswith("es"):
+        return "Con un par de datos más puedo calcularlo. Elige una pregunta para seguir."
+    return "A couple more details would let me compute this. Pick a question to continue."
 
 
 def _fallback_question(field: str, user: UserState) -> str:

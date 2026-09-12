@@ -309,6 +309,30 @@ def test_a_broad_question_gets_the_models_follow_ups_as_question_steps() -> None
     assert turn.CALCULATION_FOLLOW_UPS_REASON_CODE in result.decision.reason_codes
 
 
+def test_follow_ups_without_a_lead_never_claim_a_calculation_exists() -> None:
+    for language, expected in (
+        (
+            "en",
+            "A couple more details would let me compute this. Pick a question to continue.",
+        ),
+        (
+            "es-419",
+            "Con un par de datos más puedo calcularlo. Elige una pregunta para seguir.",
+        ),
+    ):
+        result = _run(
+            _read(
+                {"kind": None, "follow_up_questions": ["When do you want to buy it?"]},
+                assistant_response=None,
+            ),
+            user=UserState(user_id="u1", language_preference=language),
+        )
+        assert result is not None
+        assert result.patch["assistant_response"] == expected
+        assert "calculation from your numbers" not in result.patch["assistant_response"]
+        assert "final_response_payload" not in result.patch
+
+
 def test_a_read_with_neither_a_kind_nor_follow_ups_leaves_the_turn_alone() -> None:
     assert _run(_read({"kind": None})) is None
     assert _run(_read(None)) is None
@@ -366,6 +390,48 @@ def test_published_inputs_route_to_research_which_computes_this_declaration(
     assert _run(named) is not None
     assert dispatched[0][0].symbols == ["NVDA"]
     assert turn.RESEARCH_QUERY_SYNTHESIZED_REASON_CODE not in named.reason_codes
+
+
+def test_an_input_only_the_user_knows_is_asked_before_any_page_is_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import research_answer
+
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    dispatched: list[Any] = []
+
+    async def dispatch(query, **kwargs):
+        dispatched.append(query)
+        return StageResult(
+            outcome="ready_to_respond", stage_patch={"assistant_response": "computed"}
+        )
+
+    monkeypatch.setattr(research_answer, "_dispatch", dispatch)
+    first = _run(
+        _read(
+            {
+                "kind": "time_value",
+                "inputs": {"direction": "save", "present_value": 0, "annual_rate_pct": 0},
+                "solve_for": "payment",
+                "retrieve": ["future_value"],
+            },
+            assistant_response="Over how many months do you want to save?",
+            requires_clarification=True,
+            missing_required_fields=["periods"],
+        )
+    )
+    assert first is not None and first.outcome == "await_user_reply"
+    assert first.patch["requested_field"] == "periods"
+    assert dispatched == [], "no page is read while the user's own input is missing"
+    reply = _run(
+        _read({"kind": "time_value", "inputs": {"periods": 10}}),
+        metadata={
+            "last_stage_outcome": "await_user_reply",
+            "clarification": first.patch["clarification"],
+        },
+    )
+    assert reply is not None and reply.patch["assistant_response"] == "computed"
+    assert len(dispatched) == 1
 
 
 def test_without_research_a_published_input_is_asked_of_the_user() -> None:
@@ -565,7 +631,7 @@ def test_the_prompt_reads_the_guidance_and_the_catalogue_of_declared_kinds() -> 
     assert "sources" not in clause
     follow_ups = CalculationRequest.model_fields["follow_up_questions"]
     assert "Never a list of what Argus can calculate" in str(follow_ups.description)
-    assert "leave kind null and fill follow_up_questions" in CALCULATION_GUIDANCE
+    assert "Leave kind null and fill follow_up_questions only when no kind" in CALCULATION_GUIDANCE
     assert "fill calculation with the kind and the stated inputs" in prompt
     assert "answer it in assistant_response with the formula" not in prompt
 

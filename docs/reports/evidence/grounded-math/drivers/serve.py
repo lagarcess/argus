@@ -116,6 +116,13 @@ def _seed() -> None:
             say(rail, "assistant", "Glad it helps. Change any input on the card to recompute it.")
         seeds[f"rail-{language}"] = {"conversation_id": rail}
 
+        unsolved = conversation("Inputs with no solution" if language == "en" else "Datos sin solución", language)
+        say(unsolved, "user", "I owe 180,000 at 14% and pay 2,000 a month. When is it paid?")
+        seeds[f"no-solution-{language}"] = {
+            "conversation_id": unsolved,
+            "message_id": answer(unsolved, run_calculation("time_value", below_interest), lead),
+        }
+
         outage = conversation("Outage card" if language == "en" else "Tarjeta con falla del proveedor", language)
         say(outage, "user", "What would a 30,000 car loan at 7% for five years cost a month?")
         declaration = catalog.get("time_value")

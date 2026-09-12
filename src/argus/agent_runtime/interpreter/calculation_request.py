@@ -63,46 +63,56 @@ class CalculationRequest(BaseModel):
         default_factory=list,
         max_length=MAX_RETRIEVED_INPUTS,
         description=(
-            "Listed inputs the user did not state that a published page about "
-            "the named asset supplies, such as the current price, per-share "
-            "earnings, published growth rates or valuation multiples. Empty "
-            "when every input is the user's own."
+            "Listed inputs the user did not state that a published page "
+            "supplies: a named product's or asset's price, a bank's or lender's "
+            "published rate, the inflation rate where the user lives, per-share "
+            "earnings, growth forecasts or multiples. Never ask the user for "
+            "these. Empty when every input is the user's own."
         ),
     )
     follow_up_questions: list[str] = Field(
         default_factory=list,
         max_length=MAX_FOLLOW_UP_QUESTIONS,
         description=(
-            "When kind is null because the question is too broad to compute, up "
-            "to three specific questions in the user's own words and language "
-            "that would make it computable, each asking for one concrete figure "
-            "or choice. Never a list of what Argus can calculate."
+            "When kind is null because no calculation fits the question, up to "
+            "three specific questions in the user's own words and language that "
+            "would make it computable, each asking for one concrete figure "
+            "or choice the user alone knows, never a figure a published page "
+            "states. Never a list of what Argus can calculate."
         ),
     )
 
 
 CALCULATION_GUIDANCE = (
-    "Independent of the act, answer one more question for every turn: does "
-    "the user want a figure computed from numbers they stated or from "
-    "published inputs about a named asset, in any language? A balance that "
-    "grows, a loan or saving payment, the rate or term that fits a plan, a "
-    "yield, a price multiple, an effective rate, a debt ratio, what a fee "
-    "costs, a ranking of stated offers, a discounted cash flow, a bond price "
-    "and what an investment or asset will be worth are all calculations. If "
-    "yes, fill calculation from the kinds below and keep a question turn "
-    "(conversation_followup or beginner_guidance with an educational_question "
-    "act); Argus computes and shows every figure, so write assistant_response "
-    "as one short lead with no numbers in it. When an input only the user can "
-    "supply is missing, keep calculation filled, set "
-    "requires_clarification=true, name the argument in missing_required_fields "
-    "and ask for that one value in assistant_response. When the question is "
-    "too broad to compute, leave kind null and fill follow_up_questions. A "
-    "reply to a pending calculation question (requested_field in the selected "
-    "thread metadata) fills calculation with the answered argument alone; "
-    "Argus keeps the rest. "
-    "Leave calculation null for requests to build or run a test, edits, "
-    "approvals, questions about a visible result or confirmation, and "
-    "questions whose answer is a figure read from a page rather than "
+    "Money questions Argus computes. Independent of the act, decide on every "
+    "turn whether the user wants a figure computed, in any language: a saving "
+    "or loan payment, what a balance grows to, the rate or time a plan needs, "
+    "what an income affords, a yield, a price multiple, an effective rate, a "
+    "debt ratio, what a fee costs, a ranking of offers, a discounted cash flow, "
+    "a bond or certificate value, or what an investment will be worth. If yes, "
+    "fill calculation and keep a question turn (conversation_followup or "
+    "beginner_guidance with an educational_question act). Never read such a "
+    "question as a test or a strategy, and never put a product, loan, bond, "
+    "certificate or card in candidate_strategy_draft or "
+    "unsupported_constraints. Choose the closest kind below even when inputs "
+    "are missing: put the numbers the user stated in inputs, and put every "
+    "input a published page states (a product's price, a lender's or bank's "
+    "rate, local inflation, an asset's price or earnings) in retrieve; never "
+    "ask the user for those. When an input only the user knows is still "
+    "missing (their income, balance, payment or horizon), set "
+    "requires_clarification=true, name that one argument in "
+    "missing_required_fields and ask for it in assistant_response. For "
+    "example, a 25,000 loan at 9 percent with no payment stated fills "
+    "time_value with direction borrow, present_value 25000, future_value 0 and "
+    "annual_rate_pct 9, and asks for the monthly payment. Leave kind null and "
+    "fill follow_up_questions only when no kind below fits the question at "
+    "all. Argus shows every computed figure, so write assistant_response as one "
+    "short lead with no numbers in it. A reply to a pending calculation "
+    "question (requested_field in the selected thread metadata) fills "
+    "calculation with the answered argument alone; Argus keeps the rest. Leave "
+    "calculation null for requests to build or run a test over past market "
+    "data, edits, approvals, questions about a visible result or confirmation, "
+    "and questions whose answer is a figure read from a page rather than "
     "computed. Kinds and their inputs:\n"
 )
 
