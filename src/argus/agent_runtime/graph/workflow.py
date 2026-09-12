@@ -103,7 +103,7 @@ class WorkflowState(TypedDict, total=False):
     discovery: dict[str, Any]
     discovery_usage: dict[str, Any]
     next_experiments: dict[str, Any]
-    suggested_questions: dict[str, Any]
+    next_steps: dict[str, Any]
     research: dict[str, Any]
     research_job_request: dict[str, Any]
     tool_effects: list[dict[str, Any]]
@@ -136,7 +136,7 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "discovery",
         "discovery_usage",
         "next_experiments",
-        "suggested_questions",
+        "next_steps",
         "research",
         "research_job_request",
         "tool_effects",
@@ -371,14 +371,16 @@ def _apply_stage_result(
     ):
         cleared_output_keys.discard("assistant_response")
         cleared_output_keys.difference_update(READOUT_METADATA_KEYS)
-    # The Try next sidecar survives the closing no-op stage the same way the
-    # response text does; only a stage that patches it may replace it.
-    if (
-        outcome is WorkflowStageOutcome.END_RUN
-        and "next_experiments" not in result.patch
-        and isinstance(state.get("next_experiments"), dict)
-    ):
-        cleared_output_keys.discard("next_experiments")
+    # The Try next rows and the list that orders them survive the closing no-op
+    # stage the same way the response text does; only a stage that patches
+    # them may replace them.
+    for key in ("next_experiments", "next_steps"):
+        if (
+            outcome is WorkflowStageOutcome.END_RUN
+            and key not in result.patch
+            and isinstance(state.get(key), dict)
+        ):
+            cleared_output_keys.discard(key)
     workflow_state: WorkflowState = {
         **state,
         **{key: None for key in cleared_output_keys},

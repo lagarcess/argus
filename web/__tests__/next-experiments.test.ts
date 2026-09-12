@@ -137,9 +137,14 @@ describe("Try next rows (issue #249)", () => {
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
     );
-    expect(source).toContain(
-      'aria-label={t("chat.next_experiments.section", "Try next")}',
+    const section = readFileSync(
+      join(root, "components/chat/NextStepsSection.tsx"),
+      "utf-8",
     );
+    // One list owns the Try next section for every message that carries steps.
+    expect(source).toContain("<NextStepsSection");
+    expect(section).toContain('t("chat.next_experiments.section", "Try next")');
+    expect(section).toContain("aria-label={sectionLabel}");
     // Infrastructure failure renders as visibly-a-failure, never under
     // result chrome.
     expect(source).toContain("message.assistantRecoveryCode ? (");

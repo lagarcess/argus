@@ -1,10 +1,10 @@
 """Stage patches for answers about the latest result.
 
-Every answer is written by `compose_result_conversation_answer`. A what-next
-answer keeps the result's Try next rows as its actions, in the order the answer
-recommends them; any other answer wears the typed heading for its focus. A turn
-no model answered gets the retryable recovery, still carrying the rows, and the
-Agent's invoice rides the research sidecar either way so the ledger records it.
+Every answer is written by `compose_result_conversation_answer`, and the one
+list of next steps under it comes from `result_next_steps`: the result's tests
+and the model's questions in the order the answer recommends. A turn no model
+answered gets the retryable recovery, and the Agent's invoice rides the
+research sidecar either way so the ledger records it.
 """
 
 from __future__ import annotations
@@ -12,13 +12,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from loguru import logger
+
 from argus.agent_runtime.next_experiments import next_experiments_sidecar
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
 )
 from argus.agent_runtime.research_grounded import returned_sources_research_sidecar
-from argus.agent_runtime.response_style import result_followup_response_intent
 from argus.agent_runtime.result_conversation import (
     ResultConversationAnswer,
     compose_result_conversation_answer,
@@ -28,8 +29,7 @@ from argus.agent_runtime.result_followups import (
     BENCHMARK_DELTA_METRIC_PATHS,
     MAX_DRAWDOWN_METRIC_PATHS,
 )
-
-SUGGESTED_QUESTIONS_VERSION = "argus_suggested_questions/v1"
+from argus.agent_runtime.result_next_steps import next_steps_patch, offered_test_steps
 
 
 async def answered_result_followup_patch(
@@ -57,14 +57,10 @@ async def answered_result_followup_patch(
         if answer.text is None
         else {"assistant_response": answer.text}
     )
-    if answer.text is not None and focus != "next_experiment":
-        patch["response_intent"] = result_followup_response_intent(focus)
-    if focus == "next_experiment" and rows is not None:
-        # The Try next section is the heading; no result chrome is added.
-        patch["next_experiments"] = ordered_next_experiments(
-            rows, answer.next_test_order
-        )
-    return {**patch, **result_answer_sidecars(answer)}
+    return {
+        **patch,
+        **result_answer_sidecars(answer, rows, offer_tests=focus == "next_experiment"),
+    }
 
 
 def result_next_experiments(
@@ -89,17 +85,17 @@ def result_next_experiments(
     )
 
 
-def ordered_next_experiments(
-    sidecar: dict[str, Any], order: Sequence[str]
+def result_answer_sidecars(
+    answer: ResultConversationAnswer,
+    rows: dict[str, Any] | None,
+    *,
+    offer_tests: bool = False,
 ) -> dict[str, Any]:
-    """Rows in the answer's recommended order; unranked rows keep theirs after."""
-    rank = {kind: index for index, kind in enumerate(order)}
-    rows = sorted(sidecar["rows"], key=lambda row: rank.get(row["kind"], len(rank)))
-    return {**sidecar, "rows": rows}
+    """The research invoice with its sources, and the list of next steps.
 
-
-def result_answer_sidecars(answer: ResultConversationAnswer) -> dict[str, Any]:
-    """The research invoice with its sources, and the questions offered to tap."""
+    A reader who asked what to try next is offered the result's tests even when
+    no model listed any.
+    """
     sidecars: dict[str, Any] = {}
     if answer.research_usage is not None:
         served = answer.source == "research_agent"
@@ -108,12 +104,12 @@ def result_answer_sidecars(answer: ResultConversationAnswer) -> dict[str, Any]:
             usage=answer.research_usage,
             degraded_code=None if served else "result_followup_research_unused",
         )
-    if answer.text is not None and answer.suggested_questions:
-        sidecars["suggested_questions"] = {
-            "version": SUGGESTED_QUESTIONS_VERSION,
-            "questions": list(answer.suggested_questions),
-        }
-    return sidecars
+    steps = answer.next_steps if answer.text is not None else ()
+    if not steps and offer_tests:
+        if answer.text is not None:
+            logger.info("Result follow-up listed no next steps; offering the tests")
+        steps = offered_test_steps(rows)
+    return {**sidecars, **next_steps_patch(rows, steps)}
 
 
 def unavailable_result_followup_patch(*, language: str | None) -> dict[str, Any]:

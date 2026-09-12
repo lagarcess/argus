@@ -1,7 +1,8 @@
-"""Answers about the latest result are written by the model; Argus keeps the
-Try next rows, the returned sources, the Agent's invoice and the offered
-questions typed, on every follow-up path, in both workspace languages. A turn
-no model answered is the retryable recovery, still carrying the rows."""
+"""Answers about the latest result are written by the model; Argus keeps one
+typed list of next steps under them (the result's runnable tests and the
+model's questions, in the answer's order), the returned sources and the Agent's
+invoice, on every follow-up path, in both workspace languages. A turn no model
+answered is the retryable recovery."""
 
 from __future__ import annotations
 
@@ -17,14 +18,16 @@ from argus.agent_runtime.next_experiments import (
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
-from argus.agent_runtime.response_style import result_followup_response_intent
 from argus.agent_runtime.result_conversation import ResultConversationAnswer
 from argus.agent_runtime.result_followup_answers import (
-    SUGGESTED_QUESTIONS_VERSION,
     answered_result_followup_patch,
-    ordered_next_experiments,
     result_next_experiments,
     unavailable_result_followup_patch,
+)
+from argus.agent_runtime.result_next_steps import (
+    NEXT_STEPS_VERSION,
+    QUESTION_STEP,
+    NextStep,
 )
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages import interpret as interpret_module
@@ -47,6 +50,10 @@ from langgraph.checkpoint.memory import MemorySaver
 
 LANGUAGES = ("en", "es-419")
 RECOVERY_CODE = "latest_result_followup_unavailable"
+QUESTIONS = {
+    "en": "How did SPY do during the same drop?",
+    "es-419": "¿Cómo le fue a SPY durante la misma caída?",
+}
 # One completed run per supported family; the rows must come from the family
 # that actually ran, never from the oldest shape.
 FAMILY_CONFIGS: dict[str, dict[str, Any]] = {
@@ -131,9 +138,14 @@ def _researched_answer(**changes: Any) -> ResultConversationAnswer:
     values: dict[str, Any] = {
         "text": fake.paragraph(),
         "source": "research_agent",
-        "suggested_questions": (fake.sentence() + "?", fake.sentence() + "?"),
+        "next_steps": (
+            NextStep(QUESTION_STEP, fake.sentence() + "?"),
+            NextStep(QUESTION_STEP, fake.sentence() + "?"),
+        ),
         "sources": (
-            ResearchSource(url=f"https://{fake.domain_name()}/story", title=fake.sentence()),
+            ResearchSource(
+                url=f"https://{fake.domain_name()}/story", title=fake.sentence()
+            ),
         ),
         "research_usage": ResearchUsage(
             model="openai/gpt-5.6-luna", cost_usd=0.012, web_search_invocations=1
@@ -169,14 +181,26 @@ def _offered_kinds(template: str, language: str) -> list[str]:
     return [row["kind"] for row in sidecar["rows"]]
 
 
+def _items(patch: dict[str, Any]) -> list[dict[str, Any]]:
+    assert patch["next_steps"]["version"] == NEXT_STEPS_VERSION
+    return patch["next_steps"]["items"]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("language", LANGUAGES)
 @pytest.mark.parametrize("template", sorted(FAMILY_CONFIGS))
-async def test_what_next_is_the_models_plan_with_the_results_rows_in_its_order(
+async def test_what_next_is_one_list_of_tests_and_questions_in_the_answers_order(
     monkeypatch: pytest.MonkeyPatch, template: str, language: str
 ) -> None:
     recommended = list(reversed(_offered_kinds(template, language)))
-    answer = _researched_answer(next_test_order=tuple(recommended))
+    question = QUESTIONS[language]
+    answer = _researched_answer(
+        next_steps=(
+            NextStep(recommended[0]),
+            NextStep(QUESTION_STEP, question),
+            *(NextStep(kind) for kind in recommended[1:]),
+        )
+    )
     composer = _install(monkeypatch, answer)
 
     patch = await answered_result_followup_patch(
@@ -188,9 +212,13 @@ async def test_what_next_is_the_models_plan_with_the_results_rows_in_its_order(
     )
 
     assert patch["assistant_response"] == answer.text
-    # The Try next section is the heading; no result chrome above the plan.
     assert "response_intent" not in patch
     assert "recovery" not in patch
+    assert _items(patch) == [
+        {"type": "test", "kind": recommended[0]},
+        {"type": "question", "text": question},
+        *({"type": "test", "kind": kind} for kind in recommended[1:]),
+    ]
     sidecar = patch["next_experiments"]
     assert sidecar["version"] == NEXT_EXPERIMENTS_VERSION
     assert sidecar["source_run_id"] == f"run-{template}"
@@ -207,10 +235,6 @@ async def test_what_next_is_the_models_plan_with_the_results_rows_in_its_order(
         template, language
     )
     assert call["language"] == language
-    assert patch["suggested_questions"] == {
-        "version": SUGGESTED_QUESTIONS_VERSION,
-        "questions": list(answer.suggested_questions),
-    }
     research = patch["research"]
     assert research["sources"][0]["url"] == answer.sources[0].url
     assert research["usage"]["cost_usd"] == answer.research_usage.cost_usd
@@ -219,7 +243,7 @@ async def test_what_next_is_the_models_plan_with_the_results_rows_in_its_order(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("focus", ["why_underperformed", "general", "what_tested"])
-async def test_a_question_about_the_result_wears_its_heading_and_offers_no_rows(
+async def test_an_answer_about_the_result_wears_no_heading_and_lists_its_steps(
     monkeypatch: pytest.MonkeyPatch, focus: str
 ) -> None:
     answer = _researched_answer()
@@ -233,13 +257,36 @@ async def test_a_question_about_the_result_wears_its_heading_and_offers_no_rows(
     )
 
     assert patch["assistant_response"] == answer.text
-    assert patch["response_intent"] == result_followup_response_intent(focus)
+    assert "response_intent" not in patch
+    assert _items(patch) == [
+        {"type": "question", "text": step.text} for step in answer.next_steps
+    ]
     assert "next_experiments" not in patch
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("language", LANGUAGES)
-async def test_an_unanswered_turn_is_the_recovery_with_rows_and_the_paid_invoice(
+async def test_a_what_next_answer_that_lists_nothing_still_offers_the_tests(
+    monkeypatch: pytest.MonkeyPatch, language: str
+) -> None:
+    _install(monkeypatch, _researched_answer(next_steps=()))
+
+    patch = await answered_result_followup_patch(
+        metadata=_result_metadata("indicator_threshold"),
+        focus="next_experiment",
+        user_message=fake.sentence(),
+        language=language,
+        source_run_id="run-indicator_threshold",
+    )
+
+    offered = _offered_kinds("indicator_threshold", language)
+    assert _items(patch) == [{"type": "test", "kind": kind} for kind in offered]
+    assert [row["kind"] for row in patch["next_experiments"]["rows"]] == offered
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", LANGUAGES)
+async def test_an_unanswered_turn_is_the_recovery_with_the_tests_and_the_paid_invoice(
     monkeypatch: pytest.MonkeyPatch, language: str
 ) -> None:
     unanswered = ResultConversationAnswer(
@@ -260,13 +307,13 @@ async def test_an_unanswered_turn_is_the_recovery_with_rows_and_the_paid_invoice
     recovery = unavailable_result_followup_patch(language=language)
     assert patch["assistant_response"] == recovery["assistant_response"]
     assert patch["recovery"] == {"code": RECOVERY_CODE, "retryable": True}
-    # Failure prose never wears result chrome (issue #249); the rows stay actions.
+    # Failure prose never wears result chrome (issue #249); the tests stay actions.
     assert "response_intent" not in patch
+    assert {item["type"] for item in _items(patch)} == {"test"}
     assert patch["next_experiments"]["rows"]
     assert patch["research"]["degraded"] == {"code": "result_followup_research_unused"}
     assert patch["research"]["sources"] == []
     assert patch["research"]["usage"]["cost_usd"] == 0.004
-    assert "suggested_questions" not in patch
 
 
 @pytest.mark.asyncio
@@ -284,19 +331,9 @@ async def test_an_answer_without_search_carries_no_research_sidecar(
     )
 
     assert "research" not in patch
-    assert patch["suggested_questions"]["questions"] == list(answer.suggested_questions)
-
-
-def test_rows_follow_the_answers_order_and_unranked_rows_keep_theirs_after() -> None:
-    sidecar = {"version": NEXT_EXPERIMENTS_VERSION, "rows": [{"kind": k} for k in "abcd"]}
-
-    assert [row["kind"] for row in ordered_next_experiments(sidecar, ["c", "a"])["rows"]] == [
-        "c",
-        "a",
-        "b",
-        "d",
+    assert [item["text"] for item in _items(patch)] == [
+        step.text for step in answer.next_steps
     ]
-    assert ordered_next_experiments(sidecar, [])["rows"] == sidecar["rows"]
 
 
 @pytest.mark.asyncio
@@ -312,12 +349,14 @@ async def test_every_follow_up_path_answers_from_the_conversation(
     ]
     message = "¿por qué quedó por debajo?"
     if path == "action":
-        result = await interpret_actions_module.artifact_followup_stage_result_if_applicable(
-            decision=_decision(user, focus="why_underperformed"),
-            snapshot=_snapshot("buy_and_hold"),
-            current_user_message=message,
-            language=user.language_preference,
-            recent_messages=history,
+        result = (
+            await interpret_actions_module.artifact_followup_stage_result_if_applicable(
+                decision=_decision(user, focus="why_underperformed"),
+                snapshot=_snapshot("buy_and_hold"),
+                current_user_message=message,
+                language=user.language_preference,
+                recent_messages=history,
+            )
         )
     elif path == "recovery":
         result = await interpret_module._latest_result_followup_recovery_if_applicable(
@@ -329,11 +368,13 @@ async def test_every_follow_up_path_answers_from_the_conversation(
             recent_messages=history,
         )
     else:
-        result = await interpret_module._latest_result_followup_when_interpreter_unavailable(
-            user=user,
-            snapshot=_snapshot("buy_and_hold"),
-            current_user_message=message,
-            recent_messages=history,
+        result = (
+            await interpret_module._latest_result_followup_when_interpreter_unavailable(
+                user=user,
+                snapshot=_snapshot("buy_and_hold"),
+                current_user_message=message,
+                recent_messages=history,
+            )
         )
 
     assert result is not None
@@ -360,14 +401,17 @@ class _StaticInterpreter:
         ("es-419", "ok, ¿qué debería probar después?"),
     ],
 )
-async def test_full_turn_carries_the_plan_rows_sources_and_questions(
+async def test_full_turn_carries_the_list_its_rows_and_the_sources(
     monkeypatch: pytest.MonkeyPatch, language: str, message: str
 ) -> None:
     """A buy-and-hold result explained, then the what-next ask. The reference
     carries only the config snapshot, as the persisted reference does when the
     follow-up turn is hydrated."""
 
-    answer = _researched_answer()
+    question = QUESTIONS[language]
+    answer = _researched_answer(
+        next_steps=(NextStep("change_date_range"), NextStep(QUESTION_STEP, question))
+    )
     composer = _install(monkeypatch, answer)
     reference = ArtifactReference(
         artifact_kind="backtest_result",
@@ -433,9 +477,14 @@ async def test_full_turn_carries_the_plan_rows_sources_and_questions(
     )
 
     assert result["assistant_response"] == answer.text
-    assert len(result["next_experiments"]["rows"]) >= 1
+    assert result["next_steps"]["items"] == [
+        {"type": "test", "kind": "change_date_range"},
+        {"type": "question", "text": question},
+    ]
+    assert [row["kind"] for row in result["next_experiments"]["rows"]] == [
+        "change_date_range"
+    ]
     assert result["next_experiments"]["source_run_id"] == "eval-run-244-next"
-    assert result["suggested_questions"]["questions"] == list(answer.suggested_questions)
     assert result["research"]["sources"][0]["url"] == answer.sources[0].url
     assert [m.content for m in composer.calls[0]["recent_messages"]] == [
         turn["content"] for turn in history

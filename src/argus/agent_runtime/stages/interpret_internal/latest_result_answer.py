@@ -16,6 +16,7 @@ from argus.agent_runtime.result_conversation import compose_result_conversation_
 from argus.agent_runtime.result_fact_enrichment import normalize_fact_key
 from argus.agent_runtime.result_followup_answers import (
     result_answer_sidecars,
+    result_next_experiments,
     unavailable_result_followup_patch,
 )
 from argus.agent_runtime.result_followups import (
@@ -152,11 +153,15 @@ async def latest_result_answer_stage_result_if_applicable(
         requested_fact_key in fact_bank
         and requested_fact_key not in _NON_ANSWERABLE_FACT_IDS
     )
+    rows = result_next_experiments(
+        metadata, language=answer_language, source_run_id=reference.artifact_id
+    )
     answer = await compose_response_func(
         metadata=metadata,
         user_message=current_user_message,
         language=answer_language,
         recent_messages=recent_messages,
+        next_test_rows=rows["rows"] if rows is not None else (),
         **(
             {"requested_fact": requested_fact_key}
             if answerable
@@ -219,7 +224,7 @@ async def latest_result_answer_stage_result_if_applicable(
         decision=updated_decision,
         stage_patch={
             **answer_patch,
-            **result_answer_sidecars(answer),
+            **result_answer_sidecars(answer, rows),
             **_run_reference_patch(metadata=metadata, artifact_id=reference.artifact_id),
         },
     )

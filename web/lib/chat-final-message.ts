@@ -5,6 +5,7 @@ import type {
   Message,
 } from "@/components/chat/types";
 import type { NextExperimentRow } from "./chat-next-experiments";
+import type { NextStep } from "./chat-next-steps";
 import type { RecoveryDisplay } from "./chat-recovery-display";
 import type { MemoryRecallItem } from "./memory-recalls";
 
@@ -28,7 +29,7 @@ type MergeFinalTextOptions = {
   memoryRecalls?: MemoryRecallItem[] | null;
   nextExperiments?: NextExperimentRow[] | null;
   nextExperimentsSourceRunId?: string | null;
-  suggestedQuestions?: string[] | null;
+  nextSteps?: NextStep[] | null;
 };
 
 export function mergeFinalTextMessage(
@@ -51,7 +52,7 @@ export function mergeFinalTextMessage(
     memoryRecalls,
     nextExperiments,
     nextExperimentsSourceRunId,
-    suggestedQuestions,
+    nextSteps,
   }: MergeFinalTextOptions,
 ): Message {
   if (message.id !== assistantId) {
@@ -78,6 +79,6 @@ export function mergeFinalTextMessage(
     nextExperiments: nextExperiments ?? message.nextExperiments,
     nextExperimentsSourceRunId:
       nextExperimentsSourceRunId ?? message.nextExperimentsSourceRunId,
-    suggestedQuestions: suggestedQuestions ?? message.suggestedQuestions,
+    nextSteps: nextSteps ?? message.nextSteps,
   };
 }

@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from argus.agent_runtime import result_conversation as conversation
 from argus.agent_runtime.result_followup_answers import result_next_experiments
+from argus.agent_runtime.result_next_steps import QUESTION_STEP, NextStep
 from argus.api.schemas import BacktestRun
 from argus.domain.backtest_message_projection import result_fact_bank
 from argus.domain.research.admission import (
@@ -31,6 +32,11 @@ from faker import Faker
 
 FIXTURES = Path(__file__).resolve().parents[1] / "evals" / "result_readout_fixtures.json"
 LANGUAGES = ("en", "es-419")
+DOLLAR_LABELS = (
+    "Modeled fees in money",
+    "Modeled slippage in money",
+    "Modeled fees and slippage in money",
+)
 fake = Faker()
 
 
@@ -51,24 +57,32 @@ def _draft(language: str, **changes: Any) -> dict[str, Any]:
         "language": language,
         "text": fake.paragraph(),
         "figures": [],
-        "suggested_questions": [],
-        "next_test_order": [],
+        "next_steps": [],
     }
     values.update(changes)
     return values
 
 
 def _usage(cost: float = 0.01) -> ResearchUsage:
-    return ResearchUsage(model=RESULT_RESEARCH_MODEL, cost_usd=cost, web_search_invocations=1)
+    return ResearchUsage(
+        model=RESULT_RESEARCH_MODEL, cost_usd=cost, web_search_invocations=1
+    )
 
 
 class _Agent:
-    def __init__(self, *, draft: dict[str, Any] | None = None, error: Exception | None = None,
-                 sources: tuple[ResearchSource, ...] = ()) -> None:
+    def __init__(
+        self,
+        *,
+        draft: dict[str, Any] | None = None,
+        error: Exception | None = None,
+        sources: tuple[ResearchSource, ...] = (),
+    ) -> None:
         self.draft, self.error, self.sources = draft, error, sources
         self.calls: list[dict[str, Any]] = []
 
-    def run_structured(self, prompt: str, spec: Any, **kwargs: Any) -> StructuredAgentResult:
+    def run_structured(
+        self, prompt: str, spec: Any, **kwargs: Any
+    ) -> StructuredAgentResult:
         self.calls.append({"prompt": prompt, "spec": spec, **kwargs})
         if self.error is not None:
             raise self.error
@@ -82,7 +96,9 @@ class _Agent:
 
 
 class _ChatModel:
-    def __init__(self, draft: dict[str, Any] | None = None, *, fail: bool = False) -> None:
+    def __init__(
+        self, draft: dict[str, Any] | None = None, *, fail: bool = False
+    ) -> None:
         self.draft, self.fail = draft, fail
         self.calls: list[dict[str, Any]] = []
 
@@ -103,7 +119,9 @@ def _history_starts(monkeypatch: pytest.MonkeyPatch) -> dict[str, date]:
     return starts
 
 
-def _compose(metadata: dict[str, Any], language: str, **kwargs: Any) -> conversation.ResultConversationAnswer:
+def _compose(
+    metadata: dict[str, Any], language: str, **kwargs: Any
+) -> conversation.ResultConversationAnswer:
     return asyncio.run(
         conversation.compose_result_conversation_answer(
             metadata=metadata,
@@ -116,7 +134,7 @@ def _compose(metadata: dict[str, Any], language: str, **kwargs: Any) -> conversa
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
-def test_a_researched_answer_keeps_returned_links_clean_questions_and_the_order(
+def test_a_researched_answer_keeps_returned_links_and_one_ordered_list_of_steps(
     language: str,
 ) -> None:
     metadata = _metadata()
@@ -129,8 +147,13 @@ def test_a_researched_answer_keeps_returned_links_clean_questions_and_the_order(
         draft=_draft(
             language,
             text=f"See [the results]({returned}) and [a rumor]({invented}).",
-            suggested_questions=[f"{question}?", f"{question}?", "Why — really?", "x" * 200],
-            next_test_order=[kinds[-1], kinds[0]],
+            next_steps=[
+                {"kind": kinds[-1], "text": ""},
+                {"kind": QUESTION_STEP, "text": f"{question}?"},
+                {"kind": QUESTION_STEP, "text": f"{question}?"},
+                {"kind": QUESTION_STEP, "text": "Why — really?"},
+                {"kind": kinds[0], "text": ""},
+            ],
         ),
     )
 
@@ -139,18 +162,24 @@ def test_a_researched_answer_keeps_returned_links_clean_questions_and_the_order(
     assert answer.source == "research_agent"
     assert f"[the results]({returned})" in answer.text
     assert invented not in answer.text and "a rumor" in answer.text
-    assert answer.suggested_questions == (f"{question}?", "Why, really?")
-    assert answer.next_test_order == (kinds[-1], kinds[0])
+    assert answer.next_steps == (
+        NextStep(kinds[-1]),
+        NextStep(QUESTION_STEP, f"{question}?"),
+        NextStep(QUESTION_STEP, "Why, really?"),
+        NextStep(kinds[0]),
+    )
     assert answer.research_usage == _usage()
     call = agent.calls[0]
     assert call["spec"].models == (RESULT_RESEARCH_MODEL,)
     assert call["spec"].timeout_seconds == conversation.RESEARCH_TIMEOUT_SECONDS
     schema = call["schema_model"].model_json_schema()
-    assert set(schema["properties"]["next_test_order"]["items"]["enum"]) == set(kinds)
+    step = schema["$defs"]["ResultConversationNextStep"]
+    assert set(step["properties"]["kind"]["enum"]) == {*kinds, QUESTION_STEP}
+    assert schema["properties"]["next_steps"]["maxItems"] == 5
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
-def test_the_request_carries_each_assets_own_history_start_and_never_a_floor_year(
+def test_the_request_carries_each_assets_own_first_date_and_never_a_floor_year(
     language: str,
 ) -> None:
     metadata = _metadata()
@@ -164,13 +193,30 @@ def test_the_request_carries_each_assets_own_history_start_and_never_a_floor_yea
 
     prompt = agent.calls[0]["prompt"]
     assert f"product_language: {language}" in prompt
-    assert "DOCN: 2021-03-24" in prompt
+    assert "DOCN: 2021-03-24\n" in prompt
     # The benchmark's start was not established, so it is not stated at all.
     assert "SPY: " not in prompt
     assert "2016" not in prompt
     assert "Reader: Buy and hold DOCN since September 2023" in prompt
     for row in _rows(metadata, language):
         assert f"{row['kind']}: " in prompt
+
+
+def test_a_run_that_starts_on_an_assets_first_date_says_so(
+    _history_starts: dict[str, date],
+) -> None:
+    metadata = _metadata("indicator_sparse_test_only")
+    start = conversation._run_start(metadata)
+    symbol = metadata["symbols"][0]
+    _history_starts[symbol] = date.fromisoformat(start)
+    agent = _Agent(draft=_draft("en"))
+
+    _compose(metadata, "en", client=agent)
+
+    assert (
+        f"{symbol}: {start} (this run already starts on that date)"
+        in agent.calls[0]["prompt"]
+    )
 
 
 def test_a_costs_question_can_quote_the_runs_modeled_cost_figures() -> None:
@@ -196,8 +242,34 @@ def test_a_costs_question_can_quote_the_runs_modeled_cost_figures() -> None:
     )
 
     assert answer.source == "research_agent"
+    prompt = agent.calls[0]["prompt"]
     for label in cost_labels:
-        assert f"{label}: " in agent.calls[0]["prompt"]
+        assert f"{label}: " in prompt
+    # A run stored before dollar costs were recorded says so instead of guessing.
+    assert "Modeled fees and slippage in money: not recorded for this run" in prompt
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_run_with_recorded_dollar_costs_offers_them_as_facts(language: str) -> None:
+    metadata = _metadata("dca_costs_test_only")
+    realism = metadata["metrics"]["aggregate"]["performance"].setdefault(
+        "execution_realism", {}
+    )
+    realism.update(
+        modeled_fee_cost=2.35, modeled_slippage_cost=4.7, modeled_cost_total=7.05
+    )
+    facts = conversation.run_headline_facts(metadata)
+    agent = _Agent(draft=_draft(language))
+
+    _compose(metadata, language, client=agent)
+
+    assert set(DOLLAR_LABELS) <= set(readout_figure_keys(facts))
+    assert facts["facts"]["Modeled fees and slippage in money"]["value"] == 7.05
+    assert facts["facts"]["Modeled fees and slippage in money"]["unit"] == "currency"
+    prompt = agent.calls[0]["prompt"]
+    assert "not recorded for this run" not in prompt
+    for label in DOLLAR_LABELS:
+        assert f"{label}: " in prompt
 
 
 def test_a_figure_that_contradicts_the_run_is_rewritten_without_search() -> None:
@@ -206,12 +278,15 @@ def test_a_figure_that_contradicts_the_run_is_rewritten_without_search() -> None
     label = readout_figure_keys(facts)[0]
     wrong = _draft("en", figures=[{"fact_key": label, "value": 9999}])
     agent = _Agent(draft=wrong)
-    chat = _ChatModel(_draft("en", suggested_questions=["What held it back?"]))
+    chat = _ChatModel(
+        _draft("en", next_steps=[{"kind": QUESTION_STEP, "text": "What held it back?"}])
+    )
 
     answer = _compose(metadata, "en", client=agent, invoke_json_schema_func=chat)
 
     assert answer.source == "chat_model"
     assert answer.text == chat.draft["text"]
+    assert answer.next_steps == (NextStep(QUESTION_STEP, "What held it back?"),)
     assert answer.research_usage == _usage()
     assert chat.calls[0]["task"] == "chat_composer"
     assert "cannot search the web" in chat.calls[0]["messages"][0]["content"]
@@ -221,7 +296,9 @@ def test_exhausted_research_capacity_answers_without_search_and_calls_no_agent()
     agent = _Agent(draft=_draft("en"))
     chat = _ChatModel(_draft("en"))
 
-    with research_attempt_admission_context(lambda: ResearchAttemptAdmission(available=False)):
+    with research_attempt_admission_context(
+        lambda: ResearchAttemptAdmission(available=False)
+    ):
         answer = _compose(_metadata(), "en", client=agent, invoke_json_schema_func=chat)
 
     assert agent.calls == []
@@ -243,7 +320,9 @@ def test_no_research_key_answers_without_search(monkeypatch: pytest.MonkeyPatch)
 def test_when_no_model_answers_the_invoice_survives_for_the_ledger() -> None:
     agent = _Agent(error=ResearchUnavailableError("timeout", "test", usage=_usage(0.002)))
 
-    answer = _compose(_metadata(), "en", client=agent, invoke_json_schema_func=_ChatModel(fail=True))
+    answer = _compose(
+        _metadata(), "en", client=agent, invoke_json_schema_func=_ChatModel(fail=True)
+    )
 
     assert answer.text is None
     assert answer.research_usage == _usage(0.002)

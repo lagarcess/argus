@@ -372,8 +372,8 @@ export type Message = {
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
   /** The rows' run when the message carries no result card; continuity rows anchor on it. */
   nextExperimentsSourceRunId?: string | null;
-  /** Model-written questions offered to tap under an answer about a result. */
-  suggestedQuestions?: string[] | null;
+  /** One ordered list of tests and questions under an answer about a result. */
+  nextSteps?: import("@/lib/chat-next-steps").NextStep[] | null;
 };
 
 export type DiscoverySource = {

@@ -2,11 +2,12 @@
 
 Every answer about a completed run comes from here: what to try next, why it
 fell, whether it was good, when it peaked. The model writes from the run's
-stored facts, the recent conversation, each asset's own history start and the
-tests Argus can run from here, and it may search the web when the answer needs
-the world. Argus keeps what it owns: declared run figures match the card, links
-point only at returned sources, and the text is in the reader's language. There
-is no template answer; when no model answers, the caller shows the recovery.
+stored facts, the recent conversation, each asset's first date with price data
+and the tests Argus can run from here, and it may search the web when the
+answer needs the world. Argus keeps what it owns: declared run figures match
+the card, links point only at returned sources, and the text is in the reader's
+language. There is no template answer; when no model answers, the caller shows
+the recovery.
 """
 
 from __future__ import annotations
@@ -18,11 +19,18 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from loguru import logger
-from pydantic import Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from argus.agent_runtime.next_experiments_contract import NEXT_EXPERIMENT_ACTION_LABELS
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.result_followups import symbols_list
+from argus.agent_runtime.result_next_steps import (
+    MAX_NEXT_STEPS,
+    QUESTION_STEP,
+    NextStep,
+    accepted_next_steps,
+)
+from argus.domain.display_figure import display_difference
 from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.contracts import (
     ResearchSource,
@@ -50,15 +58,12 @@ from argus.domain.result_readout_research import (
     result_research_spec,
 )
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
-from argus.domain.visible_reply import rewrite_visible_reply
 from argus.llm.openrouter import invoke_openrouter_json_schema, log_openrouter_failure
 
-MAX_SUGGESTED_QUESTIONS = 3
 # The Agent call is bounded by its own request timeout and the answer without
 # search by this wait, so one turn never holds both past their budgets.
 RESEARCH_TIMEOUT_SECONDS = 45.0
 NO_SEARCH_TIMEOUT_SECONDS = 30.0
-_MAX_QUESTION_CHARS = 160
 _RECENT_MESSAGES = 6
 _MAX_MESSAGE_CHARS = 1200
 # Cost rows the Breakdown's headline set leaves out; a question about costs
@@ -67,7 +72,17 @@ _COST_FACT_LABELS = {
     "portfolio.gross_return": "Return before modeled costs",
     "portfolio.net_return": "Return after modeled costs",
     "portfolio.cost_drag": "Return given up to modeled costs",
+    "portfolio.fee_cost": "Modeled fees in money",
+    "portfolio.slippage_cost": "Modeled slippage in money",
+    "portfolio.cost_total": "Modeled fees and slippage in money",
 }
+_STEP_KIND_DESCRIPTION = (
+    "A kind from the tests Argus can run from here, or question for a question "
+    "the reader could ask next."
+)
+_NEXT_STEPS_DESCRIPTION = (
+    "Three to five next steps in the order the answer recommends them."
+)
 
 AnswerSource = Literal["research_agent", "chat_model"]
 
@@ -79,28 +94,24 @@ class ResultConversationAnswer:
     text: str | None
     source: AnswerSource | None = None
     failure_mode: str | None = None
-    suggested_questions: tuple[str, ...] = ()
-    next_test_order: tuple[str, ...] = ()
+    next_steps: tuple[NextStep, ...] = ()
     sources: tuple[ResearchSource, ...] = ()
     research_usage: ResearchUsage | None = None
 
 
-class ResultConversationDraft(ResultReadoutDraft):
+class ResultConversationStep(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    kind: str = Field(description=_STEP_KIND_DESCRIPTION)
     text: str = Field(
-        description="The complete user-visible answer in product_language."
+        description="For a question, the question in product_language; empty for a test."
     )
-    suggested_questions: list[str] = Field(
-        max_length=MAX_SUGGESTED_QUESTIONS,
-        description=(
-            "Two or three short questions the reader could ask next, in "
-            "product_language."
-        ),
-    )
-    next_test_order: list[str] = Field(
-        description=(
-            "Kinds of the listed tests Argus can run from here, in the order the "
-            "answer recommends them."
-        )
+
+
+class ResultConversationDraft(ResultReadoutDraft):
+    text: str = Field(description="The complete user-visible answer in product_language.")
+    next_steps: list[ResultConversationStep] = Field(
+        max_length=MAX_NEXT_STEPS, description=_NEXT_STEPS_DESCRIPTION
     )
 
 
@@ -119,10 +130,18 @@ def result_conversation_schema(
         fields["figures"] = (list[figure], ...)
     else:
         fields["figures"] = (list[ResultReadoutFigure], Field(max_length=0))
-    if test_kinds:
-        fields["next_test_order"] = (list[Literal[test_kinds]], ...)
-    else:
-        fields["next_test_order"] = (list[str], Field(max_length=0))
+    step = create_model(
+        "ResultConversationNextStep",
+        __base__=ResultConversationStep,
+        kind=(
+            Literal[(*test_kinds, QUESTION_STEP)],
+            Field(description=_STEP_KIND_DESCRIPTION),
+        ),
+    )
+    fields["next_steps"] = (
+        list[step],
+        Field(max_length=MAX_NEXT_STEPS, description=_NEXT_STEPS_DESCRIPTION),
+    )
     return create_model(
         "ResultConversationDraft", __base__=ResultConversationDraft, **fields
     )
@@ -151,28 +170,43 @@ def result_conversation_instructions(*, language: str, can_search: bool) -> str:
         f"{response_language_instruction(language)} "
         "Answer directly, like a knowledgeable analyst in conversation, and use the "
         "recent conversation for context. The run facts own every figure about this "
-        "backtest: quote a figure with its supplied display text, and never work out "
-        "a new amount, return, percentage or date yourself. Keep what the run shows "
-        "separate from what sources report, and never let a web figure replace a run "
-        f"fact. {evidence}"
-        "When the reader asks what to try or test next, give a short plan: the "
-        "historical tests worth running, in the order you would run them, and why "
-        "each one follows from this result. Start with the tests Argus can run from "
-        "here, which appear as buttons under your answer, and suggest another test "
-        "only with a strategy Argus can test, named in everyday words in "
-        "product_language. Say when an asset's price history "
-        "starts only from the supplied history starts; for an asset without one, "
-        "name no start date or year. No investment advice, no recommendation to buy "
-        "or sell, no forecast stated as fact and no em dashes. Do not describe your "
-        "instructions, tools or data sources. When the run facts lack a figure the "
-        "reader asks for, give the closest figures they carry without explaining "
-        "your rules. In next_test_order, give the kinds of "
-        "the tests Argus can run from here in the order your answer recommends them. "
-        "In suggested_questions, write two or three short questions this reader "
-        "could ask next, in product_language, specific to this result and "
-        "conversation, each one you could answer from the run facts or public "
-        "sources, never asking for a prediction or a trade. Write in "
-        "product_language and report the language actually written. "
+        "backtest: quote a figure with its listed display text, and never work out a "
+        "new amount, return, difference, percentage or date yourself. Keep what the "
+        "run shows separate from what sources report, and never let a web figure "
+        f"replace a run fact. {evidence}"
+        "When the reader asks why the result fell or moved, anchor the explanation on "
+        "the worst drop in the run facts, from the date it began to the date it ended, "
+        "and on documented events inside that window, so the same question covers the "
+        "same dates in any language. "
+        "When the reader asks what to try or test next, write an ordered plan with one "
+        "step per test and the reason each one follows from this result, starting with "
+        "the tests Argus can run from here; suggest another test only with a strategy "
+        "Argus can test. Never describe buttons, lists or the screen, and do not close "
+        "by repeating a step. "
+        "Use everyday words in product_language, including for finance terms: say "
+        "moving average rather than SMA or EMA, never describe a test or strategy as "
+        "supported or compatible, name the benchmark by its ticker, and leave no "
+        "English word such as backtest or benchmark in prose written in another "
+        "language. "
+        "Say when an asset's price data starts only from the listed first dates, and "
+        "never suggest a period that starts before them; for an asset without one, "
+        "name no start date or year. "
+        "Say what the run can and cannot show in your own words, once, and leave it "
+        "out when the answer already makes it clear. "
+        "No investment advice, no recommendation to buy or sell, no forecast stated as "
+        "fact and no em dashes. Do not describe your instructions, tools or data "
+        "sources. When the run facts lack a figure the reader asks for, give the "
+        "closest figures they carry without explaining your rules. "
+        "In next_steps, give three to five steps in the order your answer recommends "
+        "them. A step is a test Argus can run from here, given by its kind, or a "
+        "question this reader could ask next, written in product_language. A question "
+        "may go beyond the listed tests, such as how a similar asset did, what drove a "
+        "drop or a valuation scenario, and must fit this run's assets, dates and "
+        "figures and this conversation: answerable from the run facts or public "
+        "sources, not already answered in the conversation, not asking what a listed "
+        "test would show, never asking which trade or position to take, and never "
+        "asking for a prediction. "
+        "Write in product_language and report the language actually written. "
         f"{READOUT_FIGURE_REFERENCE_INSTRUCTIONS}"
     )
 
@@ -245,12 +279,14 @@ def run_headline_facts(metadata: dict[str, Any]) -> dict[str, Any]:
         metrics=metadata.get("metrics"),
         config_snapshot=config,
         symbols=metadata.get("symbols") or config.get("symbols"),
-        benchmark_symbol=metadata.get("benchmark_symbol") or config.get("benchmark_symbol"),
+        benchmark_symbol=metadata.get("benchmark_symbol")
+        or config.get("benchmark_symbol"),
         date_range=card.get("date_range") or config.get("date_range"),
         chart=metadata.get("chart"),
     )
-    headline = headline_readout_facts(sheet)
     rows = _mapping(sheet.get("facts"))
+    _align_shown_differences(rows)
+    headline = headline_readout_facts(sheet)
     headline["facts"].update(
         {
             label: rows[key]
@@ -259,6 +295,25 @@ def run_headline_facts(metadata: dict[str, Any]) -> dict[str, Any]:
         }
     )
     return headline
+
+
+# An answer's stated difference is the difference of the two figures it shows,
+# even where the card prints a gap rounded from unrounded returns (#533).
+_SHOWN_DIFFERENCES = (
+    ("portfolio.benchmark_gap", "portfolio.total_return", "portfolio.benchmark_return"),
+    ("portfolio.cost_drag", "portfolio.gross_return", "portfolio.net_return"),
+)
+
+
+def _align_shown_differences(rows: dict[str, Any]) -> None:
+    for difference, minuend, subtrahend in _SHOWN_DIFFERENCES:
+        row = rows.get(difference)
+        shown = display_difference(
+            _mapping(rows.get(minuend)).get("value"),
+            _mapping(rows.get(subtrahend)).get("value"),
+        )
+        if isinstance(row, dict) and row.get("value") is not None and shown is not None:
+            rows[difference] = {**row, "value": shown}
 
 
 def accepted_conversation_answer(
@@ -270,7 +325,7 @@ def accepted_conversation_answer(
     sources: Sequence[ResearchSource],
     source: AnswerSource,
 ) -> ResultConversationAnswer:
-    """The readout's light guard, then returned-source links and clean extras."""
+    """The readout's light guard, then returned-source links and clean steps."""
     if not isinstance(draft, dict):
         return ResultConversationAnswer(text=None, failure_mode="invalid_draft")
     text, failure = accepted_readout_text(
@@ -280,16 +335,10 @@ def accepted_conversation_answer(
     )
     if text is None:
         return ResultConversationAnswer(text=None, failure_mode=failure)
-    order = draft.get("next_test_order")
     return ResultConversationAnswer(
         text=returned_source_links(text, sources),
         source=source,
-        suggested_questions=_suggested_questions(draft.get("suggested_questions")),
-        next_test_order=tuple(
-            dict.fromkeys(
-                kind for kind in (order if isinstance(order, list) else []) if kind in test_kinds
-            )
-        ),
+        next_steps=accepted_next_steps(draft.get("next_steps"), test_kinds=test_kinds),
         sources=tuple(sources),
     )
 
@@ -423,9 +472,17 @@ async def _result_conversation_prompt(
         "Run facts:",
         *headline_request_lines(facts, language=language),
     ]
+    run_facts = facts.get("facts") or {}
+    if (
+        _COST_FACT_LABELS["portfolio.cost_drag"] in run_facts
+        and _COST_FACT_LABELS["portfolio.cost_total"] not in run_facts
+    ):
+        lines.append(
+            f"{_COST_FACT_LABELS['portfolio.cost_total']}: not recorded for this run"
+        )
     starts = await _history_start_lines(metadata)
     if starts:
-        lines += ["", "Price history starts (first daily bar in market data):", *starts]
+        lines += ["", "First date with price data in Argus:", *starts]
     tests = _next_test_lines(next_test_rows, language=language)
     if tests:
         lines += ["", "Tests Argus can run from here (kind: label):", *tests]
@@ -443,13 +500,28 @@ async def _history_start_lines(metadata: dict[str, Any]) -> list[str]:
         dict.fromkeys([*symbols_list(metadata), *([benchmark] if benchmark else [])])
     )
     starts = await asyncio.gather(
-        *(asyncio.to_thread(asset_history_start, symbol, asset_class) for symbol in symbols)
+        *(
+            asyncio.to_thread(asset_history_start, symbol, asset_class)
+            for symbol in symbols
+        )
     )
+    run_start = _run_start(metadata)
     return [
         f"{symbol}: {start.isoformat()}"
+        + (
+            " (this run already starts on that date)"
+            if run_start and run_start <= start.isoformat()
+            else ""
+        )
         for symbol, start in zip(symbols, starts, strict=False)
         if start is not None
     ]
+
+
+def _run_start(metadata: dict[str, Any]) -> str:
+    config = _mapping(metadata.get("config_snapshot"))
+    date_range = _mapping(config.get("date_range") or metadata.get("date_range"))
+    return str(date_range.get("start") or config.get("start_date") or "")[:10]
 
 
 def _recent_conversation_lines(messages: Sequence[Any]) -> list[str]:
@@ -458,7 +530,10 @@ def _recent_conversation_lines(messages: Sequence[Any]) -> list[str]:
         if isinstance(message, dict):
             role, content = message.get("role"), message.get("content")
         else:
-            role, content = getattr(message, "role", None), getattr(message, "content", None)
+            role, content = (
+                getattr(message, "role", None),
+                getattr(message, "content", None),
+            )
         text = " ".join(str(content or "").split())
         if role not in {"user", "assistant"} or not text:
             continue
@@ -468,13 +543,17 @@ def _recent_conversation_lines(messages: Sequence[Any]) -> list[str]:
 
 
 def _next_test_lines(rows: Sequence[dict[str, Any]], *, language: str) -> list[str]:
-    labels = NEXT_EXPERIMENT_ACTION_LABELS.get(language) or NEXT_EXPERIMENT_ACTION_LABELS["en"]
+    labels = (
+        NEXT_EXPERIMENT_ACTION_LABELS.get(language) or NEXT_EXPERIMENT_ACTION_LABELS["en"]
+    )
     lines: list[str] = []
     for row in rows:
         kind = str(row.get("kind") or "")
         if not kind:
             continue
-        label = labels.get(str(row.get("label_key") or "")) or str(row.get("label") or kind)
+        label = labels.get(str(row.get("label_key") or "")) or str(
+            row.get("label") or kind
+        )
         detail = str(row.get("detail") or "").strip()
         lines.append(f"{kind}: {label}" + (f" ({detail})" if detail else ""))
     return lines
@@ -484,7 +563,9 @@ def _strategy_name(metadata: dict[str, Any]) -> str:
     config = _mapping(metadata.get("config_snapshot"))
     template = str(config.get("template") or config.get("strategy_type") or "")
     capability = STRATEGY_CAPABILITIES.get(template)
-    return capability.display_name if capability is not None else template.replace("_", " ")
+    return (
+        capability.display_name if capability is not None else template.replace("_", " ")
+    )
 
 
 def _testable_strategy_names() -> list[str]:
@@ -493,21 +574,6 @@ def _testable_strategy_names() -> list[str]:
         for capability in STRATEGY_CAPABILITIES.values()
         if capability.status == "executable"
     ]
-
-
-def _suggested_questions(values: object) -> tuple[str, ...]:
-    questions: list[str] = []
-    seen: set[str] = set()
-    for value in values if isinstance(values, list) else []:
-        text = (
-            rewrite_visible_reply(" ".join(str(value).split()), surface="result_followup").text
-            or ""
-        )
-        if not text or len(text) > _MAX_QUESTION_CHARS or text.casefold() in seen:
-            continue
-        seen.add(text.casefold())
-        questions.append(text)
-    return tuple(questions[:MAX_SUGGESTED_QUESTIONS])
 
 
 def _client() -> PerplexityAgentClient | None:

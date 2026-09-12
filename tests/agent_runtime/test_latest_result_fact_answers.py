@@ -1426,12 +1426,11 @@ async def test_recovery_followup_never_wears_result_chrome(
 
 
 @pytest.mark.asyncio
-async def test_successful_followup_still_wears_result_chrome(
+async def test_successful_followup_wears_no_result_chrome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The chrome stays owned by real fact answers: a composed response keeps
-    its typed heading intent."""
-
+    """A composed answer about the result carries no typed heading; the one
+    list of next steps under it is its only chrome."""
 
     composer = _RecordingComposer(
         response="COST and TGT beat SPY over the window; the drawdown stayed shallow."
@@ -1482,4 +1481,4 @@ async def test_successful_followup_still_wears_result_chrome(
     )
 
     assert "latest_result_followup_unavailable" not in str(result)
-    assert "result_followup_chrome" in str(result)
+    assert "result_followup_chrome" not in str(result)
