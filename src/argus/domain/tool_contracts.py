@@ -26,6 +26,12 @@ ToolScalar = StrictBool | StrictInt | StrictFloat | StrictStr | None
 ToolFailureStatus = Literal["invalid", "ambiguous", "bounded", "unavailable"]
 ToolStatus = Literal["succeeded", ToolFailureStatus]
 MAX_TOOL_CALLS = 8
+# Where an input fact came from: the user stated it, a dated page supplied it,
+# the calculation derived it, or no source gave it and it still needs a value.
+ToolFactSourceKind = Literal["user", "page", "computed", "not_found"]
+# An argument model may carry its inputs' provenance under this one field name;
+# the declaration projects it onto the card and marks an edited input as stated.
+TOOL_INPUT_SOURCES_FIELD = "sources"
 
 
 class ToolContract(BaseModel):
@@ -38,9 +44,23 @@ class ToolCall(ToolContract):
     arguments: dict[str, JsonValue] = Field(default_factory=dict)
 
 
+class LocalizedText(ToolContract):
+    locale_key: str = Field(min_length=1, max_length=160)
+    interpolation_args: dict[str, ToolScalar] = Field(default_factory=dict)
+
+
+class ToolRepair(ToolContract):
+    """A typed fix the user can tap: an argument edit the recompute route accepts."""
+
+    kind: Literal["set_inputs"] = "set_inputs"
+    label: LocalizedText
+    changes: dict[str, ToolScalar] = Field(min_length=1)
+
+
 class ToolFailure(ToolContract):
     code: str = Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_]*$")
     fields: list[str] = Field(default_factory=list)
+    repair: ToolRepair | None = None
 
 
 class ToolOutcome(ToolContract):
@@ -58,14 +78,24 @@ class ToolOutcome(ToolContract):
         return self
 
 
-class LocalizedText(ToolContract):
-    locale_key: str = Field(min_length=1, max_length=160)
-    interpolation_args: dict[str, ToolScalar] = Field(default_factory=dict)
-
-
 class ToolProgress(LocalizedText):
     call_id: str
     tool_name: str
+
+
+class ToolFactSource(ToolContract):
+    """Where a fact came from. A page names its title and date; nothing else does."""
+
+    kind: ToolFactSourceKind
+    title: str | None = Field(default=None, max_length=300)
+    url: str | None = Field(default=None, max_length=2048)
+    date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @model_validator(mode="after")
+    def only_a_page_is_cited(self) -> ToolFactSource:
+        if self.kind != "page" and (self.title or self.url or self.date):
+            raise ValueError("Only a page source carries a title, url or date")
+        return self
 
 
 class ToolFact(ToolContract):
@@ -74,6 +104,8 @@ class ToolFact(ToolContract):
     value: ToolScalar
     value_text: LocalizedText | None = None
     unit: LocalizedText | None = None
+    # Additive: older cards carry no source and remain readable.
+    source: ToolFactSource | None = None
 
 
 class ToolInputFact(ToolFact):
@@ -94,9 +126,13 @@ class ToolVisualPoint(ToolContract):
 
 
 class ToolVisual(ToolContract):
-    """Frozen visual evidence owned by the tool card, without a later fetch."""
+    """Frozen visual evidence owned by the tool card, without a later fetch.
 
-    kind: Literal["portfolio_equity"]
+    ``portfolio_equity`` is a run's equity curve; ``value_path`` is a computed
+    path over dated periods, such as a balance paid down or savings built up.
+    """
+
+    kind: Literal["portfolio_equity", "value_path"]
     currency: str | None = None
     base_value: StrictFloat | None = None
     series: list[ToolVisualPoint]

@@ -1,0 +1,147 @@
+"""Comparison over a set: items ranked by one computed key, never recommended."""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from argus.domain.calculations._shared import (
+    CalculationArguments,
+    CalculationResult,
+    Symbol,
+    free_policy,
+    input_fact,
+    text,
+)
+from argus.domain.finance import comparison
+from argus.domain.tool_contracts import (
+    LocalizedText,
+    ToolCardPresentation,
+    ToolFact,
+    ToolOutcome,
+)
+from argus.domain.tool_declaration import (
+    ToolCardBinding,
+    ToolDeclaration,
+    ToolProgressTemplate,
+)
+
+KeyKind = Literal["percent", "money", "multiple", "count"]
+
+
+class ComparisonItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    label: str = Field(min_length=1, max_length=120)
+    symbol: Symbol
+    value: float
+
+
+class RankedComparisonArguments(CalculationArguments):
+    key_label: str = Field(min_length=1, max_length=120)
+    key_kind: KeyKind = "percent"
+    prefer: Literal["higher", "lower"] = "lower"
+    items: list[ComparisonItem] = Field(min_length=2, max_length=12)
+
+
+class RankedRow(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    label: str
+    symbol: str | None
+    value: float
+    rank: int
+    gap_to_best: float
+
+
+class RankedComparisonResult(CalculationResult):
+    key_label: str
+    prefer: str
+    rows: list[RankedRow]
+
+
+def compute_ranked_comparison(
+    arguments: RankedComparisonArguments,
+) -> RankedComparisonResult:
+    ranked = comparison.rank_by_key(
+        [(item.label, item.value) for item in arguments.items], prefer=arguments.prefer
+    )
+    symbols = {item.label: item.symbol for item in arguments.items}
+    return RankedComparisonResult(
+        key_label=arguments.key_label,
+        prefer=arguments.prefer,
+        rows=[
+            RankedRow(
+                label=row.label,
+                symbol=symbols.get(row.label),
+                value=row.value,
+                rank=row.rank,
+                gap_to_best=row.gap_to_best,
+            )
+            for row in ranked
+        ],
+    )
+
+
+def _unit(kind: KeyKind, currency: str) -> LocalizedText | None:
+    if kind == "percent":
+        return text("chat.tools.units.percent")
+    if kind == "money":
+        return text("tools.calc.units.currency", code=currency)
+    if kind == "multiple":
+        return text("tools.calc.units.multiple")
+    return None
+
+
+def present_ranked_comparison(
+    arguments: RankedComparisonArguments, outcome: ToolOutcome
+) -> ToolCardPresentation:
+    inputs = [
+        input_fact("key_label", arguments.key_label),
+        input_fact("prefer", arguments.prefer),
+    ]
+    title = text("tools.calc.ranked_comparison.title", key=arguments.key_label)
+    if outcome.status != "succeeded":
+        return ToolCardPresentation(title=title, inputs=inputs)
+    result = RankedComparisonResult.model_validate(outcome.result)
+    unit = _unit(arguments.key_kind, arguments.currency)
+    facts = [
+        ToolFact(
+            name=f"rank_{index}",
+            label=text(
+                "tools.calc.ranked_comparison.row", rank=row.rank, label=row.label
+            ),
+            value=round(row.value, 2),
+            unit=unit,
+        )
+        for index, row in enumerate(result.rows)
+    ]
+    return ToolCardPresentation(
+        title=title,
+        answer=facts[0],
+        rows=facts[1:],
+        inputs=inputs,
+        notes=[text("tools.calc.notes.ranked_not_recommended")],
+    )
+
+
+def get_ranked_comparison_declaration() -> ToolDeclaration:
+    return ToolDeclaration(
+        name="ranked_comparison",
+        description=(
+            "Rank a set of products or instruments by one stated numeric key, "
+            "preferring higher or lower values, and show each item's gap to the best. "
+            "Items carry the figure a page or the user supplied; nothing is recommended."
+        ),
+        handler=compute_ranked_comparison,
+        policy=free_policy("prefer", "key_label"),
+        progress=ToolProgressTemplate(
+            locale_key="tools.calc.ranked_comparison.progress",
+            argument_fields=("key_label",),
+        ),
+        card=ToolCardBinding(
+            card_type="ranked_comparison", version=1, presenter=present_ranked_comparison
+        ),
+        domain=("Ranked by the stated key only; ties share a rank (decision 6).",),
+    )
