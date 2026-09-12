@@ -1234,6 +1234,12 @@ def _missing_fields_for_interpretation(
         required_missing_fields = list(
             dict.fromkeys(["asset_universe", *required_missing_fields])
         )
+    if "execution_cost_evidence_unresolved" in interpretation.reason_codes:
+        # A stated cost the fidelity audit could not ground is asked about, never
+        # confirmed at a default rate (#271).
+        required_missing_fields = list(
+            dict.fromkeys([*required_missing_fields, "assumption"])
+        )
     allowed_missing_fields = set(required_missing_fields)
     missing = [
         field
