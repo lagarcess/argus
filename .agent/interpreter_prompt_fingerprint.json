@@ -1,10 +1,10 @@
 {
   "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
   "last_measured": {
-    "commit": "aef7d1c2a381c685752d90a33c803f84b726f25e",
-    "scorecard": "docs/reports/evidence/conversation-after-result/live-measurement.json",
-    "passed": 67,
-    "failed": 4,
+    "commit": "36086097c2608f5b51e14d9f7387be7738a75348",
+    "scorecard": "docs/reports/evidence/conversation-after-result/final-measurement/live-measurement.json",
+    "passed": 64,
+    "failed": 7,
     "infrastructure_error": 0
   },
   "surface": {
@@ -75,8 +75,8 @@
     },
     "src/argus/agent_runtime/result_conversation.py": {
       "entries": 4,
-      "chars": 3949,
-      "sha256": "f94a154ad99137f4e80719154f0849fd7bd4f167a2d21083b2e118f74b87f3c4"
+      "chars": 4344,
+      "sha256": "c4fc0266f18c215452f59fe270a64dd19af85b062f2b35af069a6f9e3189a399"
     },
     "src/argus/agent_runtime/result_followups.py": {
       "entries": 5,
@@ -109,9 +109,9 @@
       "sha256": "902b493d4ed3ccdea45ed7ee84a30f4626295ffb4085ee7790ea3552e2a41930"
     },
     "src/argus/domain/result_readout_fact_sheet.py": {
-      "entries": 462,
-      "chars": 6924,
-      "sha256": "ca5adfc0bef4b8c035da53a48b0a874f22c3b6b28ba11c14220ec7923589b6d7"
+      "entries": 478,
+      "chars": 7124,
+      "sha256": "2406d8c7f59925bc5f1ac98f9943cc6242ecd0100b81eace183428d4ed5e6f88"
     },
     "src/argus/domain/result_readout_grounding.py": {
       "entries": 8,

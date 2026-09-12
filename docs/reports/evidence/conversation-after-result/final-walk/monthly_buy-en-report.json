@@ -1,0 +1,34 @@
+{
+  "key": "monthly_buy",
+  "language": "en",
+  "steps": [
+    {
+      "step": "01-card",
+      "sent": "Invest $1,000 in DOCN in September 2023, then buy $100 more every month, with 5 bps fees and 10 bps slippage per trade, compared with SPY.",
+      "seconds": 43.8,
+      "answer": "DOCN\nRecurring Buys\nReady to run\nCONTRIBUTION\n$100 monthly\nPERIOD\nSep 1, 2023 → Sep 11, 2026\nStarting capital\n$1,000\nStocks\nDaily data\nThrough Sep 11\nModeled costs: 5 bps fee + 10 bps slippage\nBenchmark: SPY\nEdit amounts\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel",
+      "research_rows": 0,
+      "billed_usd": 0.0363573
+    },
+    {
+      "step": "03-result",
+      "seconds": 9.7,
+      "answer": "DOCN\nRecurring Buys\n\nSep 1, 2023 → Sep 11, 2026 · Daily data\n\nSimulation Complete\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n3M\nYTD\n1Y\nAll\nRange details\n\nVisible period: Sep 1, 2023 to Sep 11, 2026.\n\nJanuary 11, 2024\n$2,050\n\nEnding value\n\n$16,273\n\n+$11,573 gain · +246.2% return on contributions\n\nCompared with SPY\nBeat by 206.6 percentage points\nWorst drop\n-44.9%\n\nStocks · Historical simulation · 5 bps fee + 10 bps slippage · Not advice\n\nView details\nExplain result\nRefine idea\nAdd decision\nQUICK TAKE\n\nBuying DOCN monthly and holding through the run produced a strong result, finishing well ahead of SPY. The tradeoff was a rough ride: the investment fell 44.9% from a prior high before recovering. A useful follow-up historical test would be to compare this monthly approach with buying DOCN once and holding.\n\nTRY NEXT\n↳\nTest a different date range·Beat the benchmark by 206.6 points\n↳\nTest the same setup on a similar asset\n↳\nTest a different contribution schedule",
+      "billed_usd": 0.007185650000000002
+    },
+    {
+      "step": "04-worst-drop",
+      "sent": "When was the worst drop?",
+      "seconds": 21.5,
+      "answer": "The worst drop in this test was a decline of 44.9% from a prior high. It began on February 18, 2025 and ended on August 1, 2025.",
+      "research_rows": 0,
+      "billed_usd": 0.02133889,
+      "try_next_under_answer": false,
+      "heading_elements": 0,
+      "starts_with_old_heading": false
+    }
+  ],
+  "page_errors": [],
+  "conversation_url": "http://127.0.0.1:3595/chat?conversation=8543e98a-0c0f-4384-baa5-c4389b256a49",
+  "try_next_check": "the locale label for Try next, compared without letter case, because the section label renders in capitals"
+}

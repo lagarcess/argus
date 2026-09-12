@@ -1,0 +1,45 @@
+{
+  "key": "buy_and_hold",
+  "language": "es-419",
+  "steps": [
+    {
+      "step": "01-card",
+      "sent": "Compra y mantén DOCN desde septiembre de 2023 y compáralo con SPY.",
+      "seconds": 24.2,
+      "answer": "DOCN\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$1,000\nPERIODO\n1 sept 2023 → 11 sept 2026\nAcciones\nDatos diarios\nHasta 11 sept\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar",
+      "research_rows": 0,
+      "billed_usd": 0.020171300000000003
+    },
+    {
+      "step": "02-result",
+      "seconds": 9.7,
+      "answer": "DOCN\nComprar y mantener\n\n1 sept 2023 → 11 sept 2026 · Datos diarios\n\nSimulación completa\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n1M\n3M\nEste año\n1A\nTodo\nDetalles del rango\n\nPeríodo visible: 1 sept 2023 al 11 sept 2026.\n\nValor final\n\n$4,594\n\n+$3,594 ganancia · +359.4% rendimiento total\n\nComparado con SPY\nSuperó por 290.0 puntos porcentuales\nPeor caída\n-44.9%\n\nAcciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría\n\nVer detalles\nExplicar resultado\nAjustar idea\nAgregar decisión\nLECTURA RÁPIDA\n\nComprar DOCN una vez y mantener la posición hasta el final convirtió $1,000 en $4,594, con una ganancia de $3,594. En esta experiencia histórica, superó a SPY: el retorno fue de 359.4% frente a 69.4%. El intercambio fue una trayectoria mucho más brusca: la cuenta llegó a caer 44.9% desde un máximo antes de recuperarse y cerrar arriba.\n\nQUÉ PROBAR DESPUÉS\n↳\nProbar otro rango de fechas·Superó la referencia por 290.0 puntos\n↳\nProbar el mismo enfoque en un activo similar\n↳\nProbar compras mensuales recurrentes",
+      "billed_usd": 0.006727050000000012
+    },
+    {
+      "step": "03-max-drawdown",
+      "sent": "¿Cuál fue la caída máxima?",
+      "seconds": 18.3,
+      "answer": "La caída máxima de esta prueba fue de 44.9%. Esa caída comenzó el 18 de febrero de 2025, cuando el portafolio valía $1,747, y tocó fondo el 1 de agosto de 2025, en $963, una pérdida de $784 antes de recuperarse hasta el cierre final. Es la peor baja desde un máximo previo que registra la prueba.\n\nQUÉ PROBAR DESPUÉS\n↳\n¿Qué eventos ocurrieron entre el 18 de febrero y el 1 de agosto de 2025 que pudieron causar esa caída del 44.9%?\n↳\nProbar compras mensuales recurrentes\n↳\nProbar un cruce de medias móviles\n↳\nProbar otro rango de fechas",
+      "research_rows": 0,
+      "billed_usd": 0.020544299999999988,
+      "try_next_under_answer": true,
+      "heading_elements": 0,
+      "starts_with_old_heading": false
+    },
+    {
+      "step": "04-why-it-fell",
+      "sent": "¿Por qué cayó tanto?",
+      "seconds": 41.9,
+      "answer": "La prueba no puede identificar una causa exacta a partir de los precios, pero sí ubica la caída máxima: fue de 44.9%, comenzó el 18 de febrero de 2025, cuando el portafolio valía $1,747, y terminó el 1 de agosto de 2025, con un mínimo de $963. La baja registrada fue de $784.\n\nDurante ese intervalo coincidieron varios factores posibles:\n\nEl 21 de febrero hubo una venta generalizada en acciones de crecimiento y tecnología. Un reporte de mercado también relacionó el movimiento con rumores sobre recortes en proyectos de centros de datos de Microsoft, algo que pudo aumentar la preocupación por el gasto en infraestructura de nube y por las valuaciones del sector. Reporte sobre la caída de DOCN del 21 de febrero\nEl 25 de febrero, DigitalOcean publicó sus resultados del cuarto trimestre y dio una perspectiva de crecimiento de ingresos de aproximadamente 13% para 2025, junto con un margen de EBITDA ajustado esperado de 37% a 40%. Aunque la empresa reportó avances operativos, el mercado pudo haber evaluado la guía futura frente a expectativas más altas. Resultados del cuarto trimestre de DigitalOcean\nEl 6 de mayo, la empresa informó que el flujo de caja libre ajustado del primer trimestre fue negativo por costos adicionales para poner en operación su nuevo centro de datos en Atlanta. Ese anuncio documenta una presión temporal sobre el efectivo, aunque la empresa mantuvo su guía anual de ingresos. Resultados del primer trimestre de DigitalOcean\n\nAsí que la explicación más prudente es una combinación de presión sobre las acciones tecnológicas y de nube, dudas sobre el ritmo futuro de crecimiento y costos de expansión. La prueba muestra cuándo y cuánto cayó DOCN, pero no permite atribuir los $784 de descenso a un evento específico.\n\n3 fuentes ›\nQUÉ PROBAR DESPUÉS\n↳\nProbar un cruce de medias móviles\n↳\nProbar compras mensuales recurrentes\n↳\nProbar otro rango de fechas\n↳\n¿Qué eventos públicos afectaron a DOCN durante la caída máxima?",
+      "research_rows": 1,
+      "billed_usd": 0.03552754999999999,
+      "try_next_under_answer": true,
+      "heading_elements": 0,
+      "starts_with_old_heading": false
+    }
+  ],
+  "page_errors": [],
+  "conversation_url": "http://127.0.0.1:3595/chat?conversation=43c6c583-c102-40a6-b9c6-f768e03354c4",
+  "try_next_check": "the locale label for Try next, compared without letter case, because the section label renders in capitals"
+}
