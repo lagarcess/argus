@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.interpreter.calculation_request import CalculationRequest
@@ -20,18 +19,6 @@ from argus.agent_runtime.state.models import StrategySummary
 from argus.api import state as api_state
 from argus.api.main import app
 from fastapi.testclient import TestClient
-
-
-@pytest.fixture(autouse=True)
-def _no_focused_read(monkeypatch) -> None:
-    from argus.agent_runtime.interpreter import calculation_focused_read
-
-    async def declined(**_kwargs):
-        return None
-
-    monkeypatch.setattr(
-        calculation_focused_read, "invoke_openrouter_json_schema", declined
-    )
 
 
 class _ScriptedInterpreter:

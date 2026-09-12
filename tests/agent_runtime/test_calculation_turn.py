@@ -41,20 +41,6 @@ from argus.api.schemas import User
 from argus.domain.calculations import get_calculation_declarations
 from argus.domain.tool_declaration import ToolCatalog
 
-
-@pytest.fixture(autouse=True)
-def _no_focused_read(monkeypatch: pytest.MonkeyPatch) -> None:
-    """These tests hand the turn a calculation read; the read has its own tests."""
-    from argus.agent_runtime.interpreter import calculation_focused_read
-
-    async def declined(**_kwargs):
-        return None
-
-    monkeypatch.setattr(
-        calculation_focused_read, "invoke_openrouter_json_schema", declined
-    )
-
-
 SAVING_PLAN = {
     "direction": "save",
     "present_value": 10_000,
@@ -690,9 +676,7 @@ def test_the_catalogue_of_declared_kinds_reaches_only_the_calculation_read() -> 
         contract=build_default_capability_contract()
     )._system_prompt()
     clause = calculation_kinds_clause()
-    assert clause not in prompt, "the primary interpretation never maps a calculation"
-    assert "set computed_figure_decides=true so Argus computes it" in prompt
-    assert "answer it in assistant_response with the formula" not in prompt
+    assert clause not in prompt, "the interpreter never maps a calculation"
     for declaration in get_calculation_declarations():
         assert f"- {declaration.name}: {declaration.description}" in clause
         for rule in declaration.rules:
@@ -710,9 +694,7 @@ def test_the_calculation_read_types_every_field_and_the_primary_read_has_none() 
         declaration.name for declaration in get_calculation_declarations()
     }
     assert "calculation" not in LLMInterpretationResponse.model_fields
-    primary = LLMInterpretationResponse.model_json_schema()
-    assert "computed_figure_decides" in primary["required"]
-    assert primary["properties"]["computed_figure_decides"]["type"] == "boolean"
+    assert "computed_figure_decides" not in LLMInterpretationResponse.model_fields
     schema = CalculationRequest.model_json_schema()
     assert set(schema["properties"]) == {
         "kind",

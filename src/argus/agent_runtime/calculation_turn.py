@@ -19,9 +19,6 @@ from loguru import logger
 from pydantic import ValidationError
 
 from argus.agent_runtime.calculation_rows import market_counterfactual_rows
-from argus.agent_runtime.interpreter.calculation_focused_read import (
-    focused_calculation_request,
-)
 from argus.agent_runtime.interpreter.calculation_request import (
     RUNTIME_ARGUMENTS,
     CalculationRequest,
@@ -70,13 +67,6 @@ async def calculation_turn_stage_result(
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
     pending = _pending_request(selected_thread_metadata)
-    if interpretation.calculation is None:
-        interpretation.calculation = await focused_calculation_request(
-            interpretation=interpretation,
-            message=state.current_user_message,
-            history=state.recent_thread_history,
-            pending=pending,
-        )
     request = _request_for_turn(interpretation, pending)
     if request is None:
         return None

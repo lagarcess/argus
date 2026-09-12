@@ -1165,7 +1165,6 @@ class OpenRouterStructuredInterpreter:
             artifact_target=_artifact_target_from_response(response),
             asset_discovery=response.asset_discovery,
             research_query=response.research_query,
-            computed_figure_decides=response.computed_figure_decides,
         )
 
 

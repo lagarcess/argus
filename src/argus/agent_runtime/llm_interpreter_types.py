@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr
 
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
@@ -297,16 +297,7 @@ class LLMAmbiguousField(BaseModel):
     reason_code: str
 
 
-def _computed_figure_mark_required(schema: dict[str, Any]) -> None:
-    """Every turn writes the computed-figure mark, false on an ordinary turn."""
-    required = schema.setdefault("required", [])
-    if "computed_figure_decides" not in required:
-        required.append("computed_figure_decides")
-
-
 class LLMInterpretationResponse(BaseModel):
-    model_config = ConfigDict(json_schema_extra=_computed_figure_mark_required)
-
     intent: Literal[
         "beginner_guidance",
         "strategy_drafting",
@@ -384,20 +375,6 @@ class LLMInterpretationResponse(BaseModel):
             "turns. Leave this null for ordinary 'what should I try next?' "
             "follow-ups, for questions about whether Argus supports finding "
             "assets, and for direct requests to test a named asset."
-        ),
-    )
-    computed_figure_decides: bool = Field(
-        default=False,
-        description=(
-            "True when a figure Argus computes, such as a payment, a balance, a "
-            "rate, a time, a yield, a multiple, a ratio, a cost or a ranking of "
-            "options, would answer or decide the user's money question, even when "
-            "no number is asked for; whether something is worth it, affordable, "
-            "cheaper or losing value, and which of several products, accounts or "
-            "currencies to choose, count. False for tests over past market data, "
-            "for whether to put money into a stock, fund or cryptocurrency, for "
-            "concept education with no figure to compute, for questions about "
-            "Argus or a visible result, and for social turns."
         ),
     )
     result_followup_focus: ResultFollowupFocus | None = None

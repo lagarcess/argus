@@ -5209,19 +5209,8 @@ provider call.
 
 ### Calculation turns
 
-The calculation read is `{kind, inputs, solve_for, retrieve,
-follow_up_questions}`, one model read that runs after interpretation. The
-primary interpretation routes the turn and never maps a calculation; it only
-marks `computed_figure_decides` when a figure Argus computes would answer or
-decide the money question. The read runs on that mark, on a reply to a
-pending calculation question, or before a refusal the primary chose (an
-`unsupported_or_out_of_scope` intent or an unsupported constraint), never on an
-ordinary turn, and records `calculation_read_money_question`,
-`calculation_read_pending_reply` or `calculation_read_before_refusal`, with
-`calculation_read_mapped` whenever its read reaches the turn. A mark on a turn
-the primary routed to an action (a runnable test, discovery, an artifact or a
-result follow-up) keeps that route and records
-`calculation_read_skipped_for_route`. `kind` is a registered calculation kind or null;
+A calculation request is `{kind, inputs, solve_for, retrieve,
+follow_up_questions}`. `kind` is a registered calculation kind or null;
 `inputs` holds the values the user stated under the declaration's argument
 names; `solve_for` names the one blank for a kind with an unknown rule;
 `retrieve` names inputs a published page supplies for a named asset; and
