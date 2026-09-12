@@ -230,3 +230,9 @@ def test_an_answer_after_a_failed_lookup_says_so_when_nothing_is_named(
     )
     assert answered is not None and answered.question_field == "periods"
     assert "The lookup for this answer found nothing" in seen[0][0]["content"]
+
+
+def test_the_no_search_answer_writes_its_calculation_before_its_prose() -> None:
+    schema = ca.CalculatedVoicedAnswer.model_json_schema()
+    assert list(schema["properties"])[0] == "calculation"
+    assert schema["required"] == list(schema["properties"])

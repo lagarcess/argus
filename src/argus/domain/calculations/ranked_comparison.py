@@ -133,7 +133,8 @@ def get_ranked_comparison_declaration() -> ToolDeclaration:
         description=(
             "Rank a set of products or instruments by one stated numeric key, "
             "preferring higher or lower values, and show each item's gap to the best. "
-            "Items carry the figure a page or the user supplied; nothing is recommended."
+            "Items carry the figure a page or the user supplied; nothing is recommended. "
+            "The ranked figures are rank_0, rank_1 and so on, from the best item."
         ),
         handler=compute_ranked_comparison,
         policy=replace(

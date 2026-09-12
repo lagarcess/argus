@@ -78,10 +78,24 @@ NO_SEARCH_ANSWER_GUIDANCE = (
 )
 
 
+def _calculation_first(schema: dict[str, Any]) -> None:
+    """Every field is written, the calculation before the prose that references it."""
+    all_properties_required(schema)
+    properties = schema.get("properties") or {}
+    if "calculation" in properties:
+        schema["properties"] = {
+            "calculation": properties["calculation"],
+            **{
+                name: value for name, value in properties.items() if name != "calculation"
+            },
+        }
+        schema["required"] = list(schema["properties"])
+
+
 class CalculatedVoicedAnswer(VoicedAnswer):
     """A voiced answer with the one calculation Argus computes for it."""
 
-    model_config = ConfigDict(json_schema_extra=all_properties_required)
+    model_config = ConfigDict(json_schema_extra=_calculation_first)
 
     calculation: AnswerCalculation | None = None
 
