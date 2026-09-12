@@ -40,3 +40,50 @@ def test_the_symbol_rides_along_as_a_stated_input() -> None:
     symbol = next(fact for fact in card.presentation.inputs if fact.name == "symbol")
     assert symbol.value == "AAPL"
     assert card.arguments["symbol"] == "AAPL"
+
+
+def test_an_invested_amount_is_carried_to_the_horizon_and_leads_the_card() -> None:
+    card = run_calculation("valuation_scenarios", {**_APPLE, "amount": 10_000})
+    base_price = row_value(card, "price_at_horizon_base")
+    # The card rounds each row once, so the check allows a cent of rounding.
+    assert row_value(card, "value_at_horizon_base") == pytest.approx(
+        10_000 * base_price / 150, abs=0.5
+    )
+    assert card.presentation.answer is not None
+    assert card.presentation.answer.name == "value_at_horizon_base"
+    assert row_value(card, "value_at_horizon_low") < row_value(
+        card, "value_at_horizon_high"
+    )
+    amount = next(fact for fact in card.presentation.inputs if fact.name == "amount")
+    assert amount.editable and amount.value == 10_000
+
+
+def test_missing_bounds_fall_back_to_the_base_and_are_named_as_assumptions() -> None:
+    card = run_calculation(
+        "valuation_scenarios",
+        {
+            "currency": "USD",
+            "symbol": "NVDA",
+            "price": 218.36,
+            "per_share": 4.5,
+            "growth_base_pct": 25,
+            "horizon_years": 10,
+            "amount": 10_000,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert row_value(card, "current_multiple") == pytest.approx(218.36 / 4.5, abs=0.01)
+    assert row_value(card, "price_at_horizon_low") == row_value(
+        card, "price_at_horizon_base"
+    )
+    assert row_value(card, "price_at_horizon_high") == row_value(
+        card, "price_at_horizon_base"
+    )
+    assert [note.locale_key for note in card.presentation.notes] == [
+        "tools.calc.notes.scenarios_not_forecasts",
+        "tools.calc.notes.single_growth_forecast",
+        "tools.calc.notes.current_multiple_held",
+        "tools.calc.notes.single_multiple",
+    ]
+    blank = next(fact for fact in card.presentation.inputs if fact.name == "growth_low_pct")
+    assert blank.value is None and not blank.unknown

@@ -244,11 +244,11 @@ async def _dispatch(
             provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
-    if scenario and query.question_kind != "cross_company":
-        # A computed scenario is never a quote and needs no background job:
-        # it runs on the balanced shape with public pages, whatever kind it
-        # was typed as. Only a named multi-company comparison keeps the
-        # thorough job it would take without the scenario.
+    if scenario:
+        # A computed scenario is never a quote and never a background job: it
+        # runs on the balanced shape with public pages, whatever kind it was
+        # typed as, because the valuation math computes the answer from the
+        # retrieved inputs on that path alone.
         shape = "balanced"
     if shape == "thorough":
         return grounded.thorough_job_result(

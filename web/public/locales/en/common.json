@@ -1953,6 +1953,9 @@
       },
       "notes": {
         "already_covered": "The other inputs already cover this, so nothing more is needed.",
+        "single_growth_forecast": "Only one growth forecast was given, so the low and high cases use it too.",
+        "current_multiple_held": "No multiple was given, so every case holds today's multiple.",
+        "single_multiple": "Only one multiple was given, so the low and high cases use it too.",
         "includes_fees": "The effective rate includes the fees.",
         "ranked_not_recommended": "Ranked by the stated figure only. Nothing here is a recommendation.",
         "scenarios_not_forecasts": "Scenarios are arithmetic on the stated inputs, not forecasts."
@@ -2010,6 +2013,9 @@
         "price_at_horizon_high": "Price at the horizon, high case",
         "annual_return_low": "Annual return, low case",
         "annual_return_base": "Annual return, base case",
+        "value_at_horizon_low": "Value of the amount at the horizon, low case",
+        "value_at_horizon_base": "Value of the amount at the horizon, base case",
+        "value_at_horizon_high": "Value of the amount at the horizon, high case",
         "annual_return_high": "Annual return, high case"
       }
     },
@@ -2028,6 +2034,7 @@
       },
       "failure": {
         "exactly_one_unknown": "Leave exactly one input blank to solve for it.",
+        "missing_input": "No source supplied the {{field}}. Type it to compute.",
         "unknown_argument": "One of these inputs is not part of this calculation.",
         "invalid_arguments": "These inputs could not produce a result.",
         "tool_execution_failed": "This result is unavailable right now.",

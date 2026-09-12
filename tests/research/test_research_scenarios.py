@@ -19,7 +19,12 @@ from argus.agent_runtime.state.models import RunState, StrategySummary, UserStat
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
-from tests.research.conftest import RecordingTransport, agent_response, set_research_query
+from tests.research.conftest import (
+    RecordingTransport,
+    agent_response,
+    set_research_query,
+    typed_answer_text,
+)
 
 USER = UserState(user_id="research-user", language_preference="en")
 
@@ -58,21 +63,50 @@ def _run(message: str, *, user=USER):
 
 
 def _scenario_rows(*, cited: bool) -> list[dict]:
+    """Inputs rowed under the names the retrieval ask spells out: the price
+    from finance data, the rest from pages when ``cited``."""
     from tests.research.conftest import retrieved_row
 
+    page = "https://www.reuters.com/markets/nvidia-outlook/" if cited else None
     return [
         retrieved_row(
             subject="NVIDIA",
             symbol="NVDA",
-            label="average twelve-month analyst price target",
-            value=327.18,
+            label="price",
+            value=218.36,
             kind="currency",
             unit="USD",
-            source_url="https://www.reuters.com/markets/nvidia-outlook/"
-            if cited
-            else None,
-        )
+            as_of="2026-09-10",
+            # Finance data: the provider host is scrubbed to null at parse time.
+            source_url="https://www.perplexity.ai/finance/NVDA",
+        ),
+        retrieved_row(
+            subject="NVIDIA",
+            symbol="NVDA",
+            label="per_share",
+            value=4.5,
+            kind="currency",
+            unit="USD",
+            as_of="2026-09-03",
+            source_url=page,
+        ),
+        retrieved_row(
+            subject="NVIDIA",
+            symbol="NVDA",
+            label="growth_base_pct",
+            value=25.0,
+            kind="percent",
+            unit="%",
+            as_of="2026-09-03",
+            source_url=page,
+        ),
     ]
+
+
+def _scenario_card(result) -> dict:
+    cards = result.stage_patch["final_response_payload"]["tool_result_cards"]
+    assert len(cards) == 1
+    return cards[0]
 
 
 def _run_scenario(monkeypatch, *, cited: bool):
@@ -91,7 +125,7 @@ def _run_scenario(monkeypatch, *, cited: bool):
         [
             agent_response(
                 text=typed_answer_text(
-                    "Bear $2,300 to $5,500; base $29,000 to $38,000; bull higher.",
+                    "NVIDIA trades at $218.36; consensus growth is 25% a year.",
                     _scenario_rows(cited=cited),
                 ),
                 sources=["https://www.reuters.com/markets/nvidia-outlook/"],
@@ -102,28 +136,71 @@ def _run_scenario(monkeypatch, *, cited: bool):
     return _run("what will $10,000 in NVDA be worth in ten years?")
 
 
-def test_a_scenario_publishes_on_a_cited_input_row(monkeypatch) -> None:
+def test_a_scenario_publishes_on_a_cited_input_row_and_argus_computes_it(
+    monkeypatch,
+) -> None:
+    """The retrieval supplies typed inputs with their pages; the valuation math
+    computes the scenario figures, and the card carries each input's source."""
     result = _run_scenario(monkeypatch, cited=True)
     assert result is not None
     sidecar = result.stage_patch["research"]
     assert "degraded" not in sidecar
-    assert "Bear" in result.stage_patch["assistant_response"]
+    assert "$218.36" in result.stage_patch["assistant_response"]
+    card = _scenario_card(result)
+    assert card["tool_name"] == "valuation_scenarios"
+    assert card["outcome"]["status"] == "succeeded"
+    assert card["arguments"]["price"] == 218.36
+    assert card["arguments"]["growth_base_pct"] == 25.0
+    assert card["arguments"]["symbol"] == "NVDA"
+    assert card["arguments"]["sources"]["growth_base_pct"] == {
+        "kind": "page",
+        "title": "NVIDIA growth_base_pct",
+        "url": "https://www.reuters.com/markets/nvidia-outlook/",
+        "date": "2026-09-03",
+    }
+    assert card["arguments"]["sources"]["price"] == {
+        "kind": "page",
+        "title": "NVIDIA price",
+        "date": "2026-09-10",
+    }
+    rows = {fact["name"]: fact for fact in card["presentation"]["rows"]}
+    assert rows["price_at_horizon_base"]["value"] > 218.36
+    assert rows["price_at_horizon_base"]["source"] == {"kind": "computed"}
+    inputs = {fact["name"]: fact for fact in card["presentation"]["inputs"]}
+    assert inputs["growth_base_pct"]["source"]["url"] == (
+        "https://www.reuters.com/markets/nvidia-outlook/"
+    )
+    assert result.stage_patch["tool_call_records"][0]["tool_name"] == "valuation_scenarios"
 
 
-def test_a_scenario_with_no_cited_input_is_withheld_not_computed(monkeypatch) -> None:
+def test_a_scenario_with_no_cited_input_is_withheld_and_its_inputs_stay_typeable(
+    monkeypatch,
+) -> None:
     """Decision 10: the arithmetic is only as grounded as its inputs. A page
     in sources proves retrieval, not that a forecast was read from it; with no
     input row citing a public page the range is withheld, on the inline path
-    and (below) the background one."""
+    and (below) the background one. The card still shows the calculation with
+    its inputs blank, so the reader can type them."""
     result = _run_scenario(monkeypatch, cited=False)
     assert result is not None
     sidecar = result.stage_patch["research"]
     assert sidecar["degraded"] == {"code": "scenario_inputs_uncited"}
     text = result.stage_patch["assistant_response"]
-    assert "Bear" not in text
     assert "won't compute a range" in text
     # The subject the user named stays testable.
     assert result.stage_patch["next_experiments"]["rows"]
+    card = _scenario_card(result)
+    assert card["outcome"]["status"] == "invalid"
+    assert card["outcome"]["failure"] == {
+        "code": "missing_input",
+        "fields": ["price"],
+        "repair": None,
+    }
+    assert card["arguments"]["price"] is None
+    assert card["arguments"].get("sources") in (None, {})
+    inputs = {fact["name"]: fact for fact in card["presentation"]["inputs"]}
+    assert inputs["price"]["value"] is None
+    assert inputs["symbol"]["value"] == "NVDA"
 
 
 def test_the_background_scenario_applies_the_same_input_gate() -> None:
@@ -151,14 +228,13 @@ def test_the_background_scenario_applies_the_same_input_gate() -> None:
     assert "won't compute a range" in composed["answer"]
 
 
-def test_a_thorough_scenario_cache_hit_keeps_the_input_gate(monkeypatch) -> None:
-    """A withheld scenario is cached so the same question is not billed
-    twice; the repeat question composes from that cache and must be withheld
-    the same way, never published with the gate off."""
-    from argus.domain.research.perplexity_agent import _packet_from_response
-
-    from tests.research.conftest import typed_answer_text
-
+def test_a_comparison_scenario_runs_balanced_and_a_withheld_cache_hit_stays_withheld(
+    monkeypatch,
+) -> None:
+    """A scenario computes from retrieved inputs on the balanced path, so a
+    named comparison asked as a scenario never takes the thorough job. A
+    withheld scenario is cached so the same question is not billed twice; the
+    repeat composes from that cache and is withheld the same way."""
     set_research_query(
         monkeypatch,
         globals(),
@@ -167,36 +243,33 @@ def test_a_thorough_scenario_cache_hit_keeps_the_input_gate(monkeypatch) -> None
         period_of_interest="ten years",
         scenario_question=True,
     )
-    transport = _wire_client(monkeypatch, [])
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "NVDA ranges written from memory.", _scenario_rows(cited=False)
+                ),
+                sources=["https://www.reuters.com/markets/nvidia-outlook/"],
+                tickers=["NVDA", "AMD"],
+            )
+        ],
+    )
 
     first = _run("Which of NVDA or AMD will be worth more in ten years?")
     assert first is not None
-    job_request = first.stage_patch["research_job_request"]
-    assert job_request["scenario_question"] is True
-
-    packet = _packet_from_response(
-        agent_response(
-            text=typed_answer_text(
-                "NVDA bear to bull ranges written from memory.",
-                _scenario_rows(cited=False),
-            ),
-            sources=["https://www.reuters.com/markets/nvidia-outlook/"],
-            tickers=["NVDA", "AMD"],
-        ),
-        latency_ms=1200,
-    )
-    composed = ra.compose_completed_research(job_request=job_request, packet=packet)
-    assert composed["research"]["degraded"] == {"code": "scenario_inputs_uncited"}
-    ra.store_research_packet_for_job(job_request, packet, composed)
+    assert "research_job_request" not in first.stage_patch
+    assert first.stage_patch["research"]["degraded"] == {"code": "scenario_inputs_uncited"}
+    assert len(transport.requests) == 1
 
     repeat = _run("Which of NVDA or AMD will be worth more in ten years?")
     assert repeat is not None
-    assert transport.requests == [], "a cache hit must not touch the provider"
-    assert "research_job_request" not in repeat.stage_patch
+    assert len(transport.requests) == 1, "a cache hit must not touch the provider"
     sidecar = repeat.stage_patch["research"]
     assert sidecar["usage"]["cache_status"] == "hit"
     assert sidecar["degraded"] == {"code": "scenario_inputs_uncited"}
     assert "written from memory" not in repeat.stage_patch["assistant_response"]
+    assert _scenario_card(repeat)["outcome"]["status"] == "invalid"
 
 
 def test_a_typed_horizon_alone_selects_the_scenario_contract(monkeypatch) -> None:
@@ -468,7 +541,9 @@ def test_a_scenario_question_sends_the_scenario_contract(monkeypatch) -> None:
     assert result is not None
     body = __import__("json").loads(transport.requests[0].content.decode())
     assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "scenarios you compute" in body["input"]
+    assert "Argus computes the scenarios itself" in body["input"]
+    assert "- price: the current share price" in body["input"]
+    assert "- growth_base_pct: " in body["input"]
     assert body["instructions"] != RETRIEVAL_INSTRUCTIONS
 
 

@@ -37,6 +37,7 @@ from argus.agent_runtime.stages.interpret_types import (
 from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
 from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.calculations import is_free_calculation
+from argus.domain.calculations._shared import MISSING_INPUT_CODE
 from argus.domain.tool_contracts import ToolCall
 from argus.domain.tool_declaration import ToolDeclaration, ToolInvocationError
 
@@ -167,6 +168,8 @@ def _missing_inputs(
         declaration.validate_arguments(arguments)
     except ToolInvocationError as exc:
         failure = exc.outcome.failure
+        if failure is not None and failure.code == MISSING_INPUT_CODE:
+            return _ordered(list(failure.fields), interpretation)
         if failure is None or failure.code != "exactly_one_unknown":
             return []
         blanks = [name for name in failure.fields if arguments.get(name) is None]

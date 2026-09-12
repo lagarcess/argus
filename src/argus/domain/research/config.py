@@ -59,23 +59,21 @@ RETRIEVAL_INSTRUCTIONS = (
 )
 
 # The same contract for a question whose answer is computed (decision 10):
-# the inputs are the retrieved figures and are rowed; the scenario values are
-# the model's arithmetic and are never rowed. Frozen by its own recording
-# under docs/reports/evidence/decision-10/probes.
+# the model retrieves the inputs a declared calculation needs, one typed row
+# each with its page, and Argus computes the scenario figures itself. Frozen
+# by its own recording under docs/reports/evidence/grounded-math/probes.
 SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
     " This question asks what something will be worth, what it must grow "
-    "into, or what it is worth today, so the answer is a set of scenarios you "
-    "compute. The retrieved figures are the inputs: the current price, "
-    "published forecasts, analyst targets, growth rates and valuation "
-    "multiples, each rowed with the page it was read from. The scenario values "
-    "are your own arithmetic from those inputs, written out step by step in "
-    "answer_markdown and never rowed; no page needs to state them. Give the "
-    "result as labeled scenario ranges (for example bear, base and bull), each "
-    "written as low to high. When no published forecast covers the full "
-    "horizon, build the scenarios from the nearest published horizon and say "
-    "what you assumed. Say that a figure could not be retrieved only when no "
-    "input at all was retrieved. Never present one number as the future, and "
-    "never say what the reader should do."
+    "into, or what it is worth today. Argus computes the scenarios from typed "
+    "inputs, so never compute scenario values, ranges or future prices "
+    "yourself. The question names each input to retrieve: the current price, "
+    "a per-share figure, published growth forecasts, valuation multiples. Row "
+    "every input you find, one row per input, with label exactly the input "
+    "name as the question writes it, value as a plain number, and the page it "
+    "was read from; the current price may come from finance data. In "
+    "answer_markdown state the inputs found with their dates and sources, and "
+    "name any input no page states. Never present one number as the future, "
+    "and never say what the reader should do."
 )
 
 
@@ -212,6 +210,7 @@ RECENCY_BY_DATA_CLASS: dict[DataClass, RecencyFilter | None] = {
     "closed_ohlcv": None,
     "filings_transcripts": None,
 }
+
 
 def iso_language(language_tag: str | None) -> str:
     """ISO 639-1 code from a BCP 47 tag: es-419 to es, en to en."""

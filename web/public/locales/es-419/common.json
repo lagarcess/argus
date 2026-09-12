@@ -1953,6 +1953,9 @@
       },
       "notes": {
         "already_covered": "Los otros datos ya cubren esto, así que no hace falta nada más.",
+        "single_growth_forecast": "Solo se dio un pronóstico de crecimiento, así que los casos bajo y alto también lo usan.",
+        "current_multiple_held": "No se dio un múltiplo, así que cada caso mantiene el múltiplo de hoy.",
+        "single_multiple": "Solo se dio un múltiplo, así que los casos bajo y alto también lo usan.",
         "includes_fees": "La tasa efectiva incluye las comisiones.",
         "ranked_not_recommended": "Ordenado solo por la cifra indicada. Nada aquí es una recomendación.",
         "scenarios_not_forecasts": "Los escenarios son aritmética sobre los datos indicados, no pronósticos."
@@ -2010,6 +2013,9 @@
         "price_at_horizon_high": "Precio en el horizonte, caso alto",
         "annual_return_low": "Retorno anual, caso bajo",
         "annual_return_base": "Retorno anual, caso base",
+        "value_at_horizon_low": "Valor del monto en el horizonte, caso bajo",
+        "value_at_horizon_base": "Valor del monto en el horizonte, caso base",
+        "value_at_horizon_high": "Valor del monto en el horizonte, caso alto",
         "annual_return_high": "Retorno anual, caso alto"
       }
     },
@@ -2028,6 +2034,7 @@
       },
       "failure": {
         "exactly_one_unknown": "Deja exactamente un dato en blanco para calcularlo.",
+        "missing_input": "Ninguna fuente aportó {{field}}. Escríbelo para calcular.",
         "unknown_argument": "Uno de estos datos no forma parte de este cálculo.",
         "invalid_arguments": "Estos datos no pudieron producir un resultado.",
         "tool_execution_failed": "Este resultado no está disponible por ahora.",

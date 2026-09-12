@@ -4687,6 +4687,7 @@
     "valuation_scenarios": {
       "card": {
         "arguments": {
+          "amount": null,
           "currency": "USD",
           "growth_base_pct": 8.0,
           "growth_high_pct": 12.0,
@@ -4710,6 +4711,7 @@
         "outcome": {
           "failure": null,
           "result": {
+            "assumptions": [],
             "current_multiple": 25.0,
             "scenarios": [
               {
@@ -4717,21 +4719,24 @@
                 "growth_pct": 3.0,
                 "label": "low",
                 "multiple": 18.0,
-                "price_at_horizon": 125.20160002440002
+                "price_at_horizon": 125.20160002440002,
+                "value_at_horizon": null
               },
               {
                 "annual_return_pct": 5.273797637325561,
                 "growth_pct": 8.0,
                 "label": "base",
                 "multiple": 22.0,
-                "price_at_horizon": 193.95130613760008
+                "price_at_horizon": 193.95130613760008,
+                "value_at_horizon": null
               },
               {
                 "annual_return_pct": 14.56755034211541,
                 "growth_pct": 12.0,
                 "label": "high",
                 "multiple": 28.0,
-                "price_at_horizon": 296.0734027776001
+                "price_at_horizon": 296.0734027776001,
+                "value_at_horizon": null
               }
             ]
           },
@@ -4945,6 +4950,27 @@
               "value": 5,
               "value_text": null,
               "visibility": "private"
+            },
+            {
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.amount"
+              },
+              "name": "amount",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
             }
           ],
           "narrative": null,
@@ -5086,6 +5112,7 @@
       },
       "computation": {
         "inputs": {
+          "amount": null,
           "currency": "USD",
           "growth_base_pct": 8.0,
           "growth_high_pct": 12.0,

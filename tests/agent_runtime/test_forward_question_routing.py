@@ -295,7 +295,8 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     figures through; every other question keeps the retrieval contract the
     recordings froze, byte for byte."""
     prompt = _prompt(scenario=True)
-    assert "scenarios you compute" in prompt
+    assert "Argus computes the scenarios itself" in prompt
+    assert "Do not compute scenario values" in prompt
     assert "never estimate a live number. No investment advice." in prompt
     assert "scenarios" not in _prompt(scenario=False)
 
@@ -312,9 +313,11 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     assert scenario_spec.instructions == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert plain_spec.instructions == RETRIEVAL_INSTRUCTIONS
     assert SCENARIO_RETRIEVAL_INSTRUCTIONS.startswith(RETRIEVAL_INSTRUCTIONS)
-    assert "labeled scenario ranges" in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "Argus computes the scenarios from typed inputs" in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "never compute scenario values" in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "label exactly the input name" in SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert "never say what the reader should do" in SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert "never rowed" in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert "arithmetic" not in SCENARIO_RETRIEVAL_INSTRUCTIONS
 
 
 def test_the_research_query_types_the_scenario_signal() -> None:

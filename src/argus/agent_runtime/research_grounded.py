@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -148,9 +149,22 @@ def _cache_key_for(
     language: str,
     country: str | None,
     scenario: bool = False,
+    computation: ScenarioComputation | None = None,
 ) -> str:
     """One key recipe for every shape, so a packet stored by the thorough job
-    finalizer serves the same question asked inline later."""
+    finalizer serves the same question asked inline later. A scenario's key
+    names the inputs its ask retrieves: a packet retrieved for one set of
+    inputs never serves a question that asks for another."""
+    contract = "retrieval"
+    if scenario:
+        contract = "scenario"
+        if computation is not None:
+            contract += (
+                ":"
+                + computation.kind
+                + ":"
+                + ",".join(name for name, _ in computation.inputs)
+            )
     return research_cache_key(
         capability_class=capability_class,
         shape=shape,
@@ -158,8 +172,34 @@ def _cache_key_for(
         period_key=(query.period_of_interest or "").strip().lower() or "current",
         question_fingerprint=" ".join(message.lower().split()),
         language=language,
-        contract="scenario" if scenario else "retrieval",
+        contract=contract,
         country=country,
+    )
+
+
+@dataclass(frozen=True)
+class ScenarioComputation:
+    """What a scenario turn computes: the declaration, the read, and the
+    inputs the retrieval ask names for it."""
+
+    kind: str
+    request: Any
+    inputs: tuple[tuple[str, str], ...]
+
+
+def _scenario_computation(
+    interpretation: StructuredInterpretation,
+) -> ScenarioComputation:
+    from argus.agent_runtime.research_inputs import retrieval_inputs, scenario_calculation
+    from argus.domain.capability_registry import get_tool_catalog
+
+    request = scenario_calculation(interpretation)
+    declaration = get_tool_catalog().get(str(request.kind))
+    assert declaration is not None  # scenario_calculation only names declared kinds
+    return ScenarioComputation(
+        kind=declaration.name,
+        request=request,
+        inputs=tuple(retrieval_inputs(request, declaration)),
     )
 
 
@@ -240,6 +280,7 @@ async def grounded_result(
                 "tools": tuple(tool for tool in spec.tools if tool != "finance_search")
             }
         )
+    computation = _scenario_computation(interpretation) if scenario else None
     prompt = _research_prompt(
         message=state.current_user_message,
         subjects=subjects,
@@ -250,6 +291,7 @@ async def grounded_result(
         sector=getattr(query, "sector_of_interest", None),
         publisher_sources_required=publisher_sources_required,
         scenario=scenario,
+        inputs=computation.inputs if computation is not None else (),
     )
     key = _cache_key_for(
         query=query,
@@ -260,6 +302,7 @@ async def grounded_result(
         language=language,
         country=user.country,
         scenario=scenario,
+        computation=computation,
     )
     cache_status = "miss"
     spend = _TurnSpend()
@@ -403,6 +446,7 @@ async def grounded_result(
             withheld_code="research_unavailable_missing_public_sources",
             scenario=scenario,
             survey=survey,
+            computation=computation,
         )
     result = _packet_stage_result(
         packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
@@ -420,6 +464,7 @@ async def grounded_result(
         decision=decision,
         scenario=scenario,
         survey=survey,
+        computation=computation,
     )
     if cache_status == "miss":
         # The response's own packet is what is stored, not the turn-total copy
@@ -455,12 +500,15 @@ def _packet_stage_result(
     withheld_code: str | None = None,
     scenario: bool = False,
     survey: bool | None = None,
+    computation: ScenarioComputation | None = None,
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
     shared cache, for any shape. ``survey`` is the caller's derived fact; a
     scenario typed as a survey kind passes False so the kind reclassifies
-    nothing here.
+    nothing here. A scenario's ``computation`` is computed from the retrieved
+    rows when the packet publishes, and from the user's own inputs alone when
+    it is withheld, so the inputs stay typeable either way.
 
     A retrieved answer publishes. A packet that did not retrieve is withheld
     for that first, since it has no page to find a publisher on.
@@ -537,6 +585,15 @@ def _packet_stage_result(
     )
     if not rows and subjects:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
+    computed = None
+    if computation is not None:
+        computed = _computed_scenario(
+            computation,
+            packet=packet,
+            subjects=subjects,
+            user=user,
+            withheld=degraded_code is not None,
+        )
     return research_stage_result(
         answer=answer,
         interpretation=interpretation,
@@ -554,7 +611,37 @@ def _packet_stage_result(
         decision=decision,
         period_start_date=period_start_date,
         question_as_of_date=question_as_of_date,
+        computed=computed,
     )
+
+
+def _computed_scenario(
+    computation: ScenarioComputation,
+    *,
+    packet: ResearchPacket,
+    subjects: list[dict[str, str]],
+    user: UserState,
+    withheld: bool,
+) -> dict[str, Any]:
+    """The scenario card: retrieved inputs with their pages when the answer
+    publishes; only what the user stated, blanks typeable, when it is withheld."""
+    from argus.agent_runtime.calculation_turn import DEFAULT_CURRENCY
+    from argus.agent_runtime.research_inputs import (
+        arguments_from_rows,
+        computed_scenario_patch,
+    )
+    from argus.domain.capability_registry import get_tool_catalog
+
+    declaration = get_tool_catalog().get(computation.kind)
+    assert declaration is not None
+    arguments = arguments_from_rows(
+        packet.model_copy(update={"rows": ()}) if withheld else packet,
+        computation.request,
+        declaration,
+        currency=user.currency or DEFAULT_CURRENCY,
+        symbol=subjects[0]["symbol"] if subjects else None,
+    )
+    return computed_scenario_patch(declaration, arguments)
 
 
 def thorough_job_result(
@@ -1152,9 +1239,11 @@ def _research_prompt(
     sector: str | None = None,
     publisher_sources_required: bool = False,
     scenario: bool = False,
+    inputs: Sequence[tuple[str, str]] = (),
 ) -> str:
     """Documented prompt guidance: business question first, then tickers and
-    the time window; state the desired outcome, let the tool pick fields."""
+    the time window; state the desired outcome, let the tool pick fields. A
+    scenario names the inputs Argus computes from, one typed row each."""
     lines = [message.strip()]
     if subjects:
         lines.append(
@@ -1179,11 +1268,15 @@ def _research_prompt(
         )
     if scenario:
         lines.append(
-            "The answer is a set of scenarios you compute from published inputs, "
-            "as the instructions describe: inputs rowed with their pages, the "
-            "arithmetic written out, labeled ranges from low to high, no single "
-            "number as the future, no advice."
+            "Argus computes the scenarios itself. Retrieve the inputs below, one "
+            "row each, with label exactly the input name as written here, the "
+            "value as a plain number, and the page it was read from with its "
+            "date. Do not compute scenario values, ranges or future prices; state "
+            "the inputs you found, their dates and their sources, and name any "
+            "input no page states. No advice."
         )
+        for name, meaning in inputs:
+            lines.append(f"- {name}: {meaning}")
     lines.append(
         "Answer the question directly for a curious non-expert, leading with "
         "the answer. Use compact tables only where they genuinely help. State "
@@ -1902,6 +1995,7 @@ def research_stage_result(
     period_start_date: date | str | None = None,
     question_as_of_date: date | str | None = None,
     decision: InterpretDecision | None = None,
+    computed: dict[str, Any] | None = None,
 ) -> StageResult:
     decision = carried_decision(
         decision,
@@ -1910,6 +2004,7 @@ def research_stage_result(
         reason_code=f"research_answer_{capability_class}",
     )
     stage_patch: dict[str, Any] = {
+        **(computed or {}),
         "assistant_response": answer,
         "research": build_research_sidecar(
             capability_class=capability_class,

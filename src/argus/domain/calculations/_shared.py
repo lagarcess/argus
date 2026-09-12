@@ -40,6 +40,8 @@ NOTE_PREFIX = "tools.calc.notes"
 REPAIR_PREFIX = "tools.calc.repairs"
 # The one argument name that identifies an asset a calculation is about.
 SYMBOL_FIELD = "symbol"
+# A required input neither the user nor a page supplied.
+MISSING_INPUT_CODE = "missing_input"
 
 
 def _tender_currency(value: str) -> str:
@@ -156,6 +158,13 @@ def no_solution(
 def known(value: float | None, field: str) -> float:
     if value is None:
         raise ToolInvocationError("invalid", code="exactly_one_unknown", fields=(field,))
+    return value
+
+
+def required(value: float | None, field: str) -> float:
+    """An input no source supplied yet; the card keeps it blank and typeable."""
+    if value is None:
+        raise ToolInvocationError("invalid", code=MISSING_INPUT_CODE, fields=(field,))
     return value
 
 
