@@ -1,0 +1,12 @@
+{
+  "user_spend_stop_usd": "4.00",
+  "full_run_guard_usd": "3.50",
+  "bounded_rerun_guard_usd": "3.85",
+  "provider_reported_usd": "1.857866291608",
+  "unpriced_failed_call_reserve_usd": "2.000000000000",
+  "conservatively_accounted_usd": "3.857866291608",
+  "unpriced_failed_provider_calls": 40,
+  "reserve_per_unpriced_failed_call_usd": "0.05",
+  "unpriced_successful_provider_calls": 0,
+  "note": "Failed provider calls may be billed without returning usage. Reported cost is not a complete cost total. The rerun guard retained $0.15 beyond the conservative ledger for an in-flight request. No more paid calls were made after the stop."
+}

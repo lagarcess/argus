@@ -1,0 +1,81 @@
+{
+  "status": "not_merge_ready",
+  "candidate_sha": "c72fa0e94963c347c6eaeaf1bd846f8f29f58ce5",
+  "integration_base": "d53575a86641e3d37c9dfbf99bfa003e3eecc5f7",
+  "current_integration_sha": "3d379d3d9020027ccfd1f2a4c617626520af8a44",
+  "reconciliation_merge_sha": "c72fa0e94963c347c6eaeaf1bd846f8f29f58ce5",
+  "semantic_overlap": "none; six-line roadmap note only",
+  "model_facing_text_changed": false,
+  "fixture_sha256": "a48b14730a14578639e41dd27a15f27e3981208298fa7e68e477da7b159bcf6b",
+  "deterministic_checks_passed": 2865,
+  "issue_replays_passed": 38,
+  "codex_delta_review": "clean",
+  "unresolved_review_threads": 0,
+  "ci": [
+    {
+      "name": "agent_runtime pytest sweep",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "ownership-gate",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "ownership-gate",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "local-smoke",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "backend-checks",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "backend-checks",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "frontend-checks",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "frontend-checks",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "guest-release-gates",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "guest-release-gates",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "ci",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "ci",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "Supabase Preview",
+      "conclusion": "SKIPPED"
+    }
+  ],
+  "full_run_counts": {
+    "passed": 63,
+    "failed": 7,
+    "infrastructure_error": 1
+  },
+  "baseline_counts": {
+    "passed": 64,
+    "failed": 7,
+    "infrastructure_error": 0
+  },
+  "reruns_completed": 3,
+  "reruns_interrupted": 1,
+  "reruns_unattempted": 4
+}

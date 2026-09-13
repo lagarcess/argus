@@ -1,0 +1,79 @@
+# Case-by-case comparison
+
+The full scorecard is preserved unchanged. Reruns are separate observations on the same candidate head.
+
+| Case | Baseline | Full run | Single rerun |
+| --- | --- | --- | --- |
+| `action_chip_run_visible_confirmation_aapl` | passed | passed | not needed |
+| `action_chip_change_asset_remove_aapl_issue_188` | passed | passed | not needed |
+| `action_chip_change_asset_bare_ticker_append_issue_190` | passed | passed | not needed |
+| `action_chip_change_asset_compound_replace_issue_188` | passed | passed | not needed |
+| `action_chip_change_asset_changed_mind_capital_issue_188` | passed | passed | not needed |
+| `action_chip_change_asset_no_active_ref_remove_aapl_issue_188` | passed | passed | not needed |
+| `action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188` | passed | passed | not needed |
+| `action_chip_change_asset_no_active_ref_multi_op_issue_188` | passed | passed | not needed |
+| `action_chip_change_asset_no_active_ref_asset_and_date_issue_188` | passed | passed | not needed |
+| `action_chip_change_asset_no_active_ref_fresh_idea_issue_188` | passed | passed | not needed |
+| `natural_language_establishes_modeled_costs_issue_271` | passed | passed | not needed |
+| `action_chip_add_asset_preserves_modeled_costs_issue_271` | passed | passed | not needed |
+| `compound_benchmark_start_date_preserves_confirmation_issue_339` | passed | passed | not needed |
+| `ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en` | passed | passed | not needed |
+| `ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es` | passed | passed | not needed |
+| `asset_discovery_category_english_issue_244` | passed | passed | not needed |
+| `asset_discovery_peer_anchor_english_issue_244` | passed | passed | not needed |
+| `asset_discovery_comparison_anchor_english_issue_244` | passed | failed | passed |
+| `asset_discovery_category_spanish_issue_244` | passed | passed | not needed |
+| `asset_discovery_recent_ipo_exact_issue_344` | passed | passed | not needed |
+| `asset_discovery_trending_crypto_exact_issue_344` | passed | passed | not needed |
+| `asset_discovery_old_pharma_escalation_exact_issue_344` | passed | passed | not needed |
+| `asset_discovery_semantic_pharma_escalation_issue_344` | passed | passed | not needed |
+| `asset_discovery_spanish_generated_pharma_escalation_issue_344` | passed | passed | not needed |
+| `asset_discovery_not_direct_backtest_issue_244` | passed | passed | not needed |
+| `asset_discovery_not_result_followup_issue_244` | passed | passed | not needed |
+| `asset_discovery_not_capability_question_issue_244` | passed | passed | not needed |
+| `metric_correctness_eth_default_crypto_benchmark` | passed | passed | not needed |
+| `capability_honesty_options_straddle_tsla` | passed | passed | not needed |
+| `capability_honesty_golden_cross_control_aapl` | failed | passed | not needed |
+| `capability_honesty_momentum_breakout_aapl` | passed | passed | not needed |
+| `capability_honesty_news_sentiment_rule_aapl` | passed | passed | not needed |
+| `capability_honesty_future_performance_nvda_golden_cross` | failed | failed | failed |
+| `capability_honesty_future_performance_btc_regression` | passed | failed | passed |
+| `dca_capital_semantics_start_by_phrase_is_contribution_issue_455` | failed | passed | not needed |
+| `dca_capital_semantics_missing_contribution_asks_amount_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_only_have_amount_is_ceiling_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_explicit_cap_refused_by_name_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_zero_seed_small_contribution_executable_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_period_exceeds_window_named_refusal_issue_455` | failed | passed | not needed |
+| `dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455` | failed | passed | not needed |
+| `dca_capital_semantics_multi_symbol_equal_weight_issue_455` | failed | passed | not needed |
+| `dca_capital_semantics_crypto_weekly_btc_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_truncated_window_measures_served_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_spanish_seed_and_contribution_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_spanish_period_exceeds_window_issue_455` | passed | passed | not needed |
+| `dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run` | failed | failed | interrupted by budget stop |
+| `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run` | passed | failed | not run: budget stop |
+| `dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10` | passed | passed | not needed |
+| `dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10` | passed | passed | not needed |
+| `graceful_recovery_weekly_options_aapl` | passed | passed | not needed |
+| `graceful_recovery_spanish_weekly_options_aapl` | passed | passed | not needed |
+| `graceful_recovery_spanish_offline_clarifier_missing_period_aapl` | passed | passed | not needed |
+| `messy_english_opening_apple_capital_missing_period_issue_336` | passed | passed | not needed |
+| `messy_english_aapl_simple_hold_2024` | passed | passed | not needed |
+| `messy_english_company_name_multi_asset_issue_142` | passed | passed | not needed |
+| `messy_english_complete_sma_crossover_benchmark_issue_270` | passed | passed | not needed |
+| `messy_english_post_result_fact_then_capital_edit_issue_160` | passed | passed | not needed |
+| `messy_spanish_btc_hold_q1_2024` | passed | passed | not needed |
+| `messy_spanish_post_result_fact_then_capital_edit_issue_160` | passed | passed | not needed |
+| `messy_spanish_future_performance_nvda_cruce_dorado` | passed | failed | not run: budget stop |
+| `ordinary_conversation_concept_compound_interest_en` | passed | infrastructure_error | not run: budget stop |
+| `ordinary_conversation_concept_inflation_es` | passed | passed | not needed |
+| `ordinary_conversation_concept_etf_es` | passed | passed | not needed |
+| `ordinary_conversation_capability_indicator_question_en` | passed | failed | not run: budget stop |
+| `ordinary_conversation_capability_indicator_question_es` | passed | passed | not needed |
+| `ordinary_conversation_macro_curiosity_en` | passed | passed | not needed |
+| `ordinary_conversation_price_question_en` | passed | passed | not needed |
+| `spanish_ui_english_user_msft_hold_h1_2024` | passed | passed | not needed |
+
+Exact failed checks and changes are in `full-comparison.json` and `partial-reruns.json`.
