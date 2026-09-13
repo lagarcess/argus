@@ -1,0 +1,43 @@
+{
+  "status": "blocked_sharing",
+  "severity": "P1",
+  "measured_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "previous_pr_head": "0b620eb68d046abe61596fa25fda71ec9b7c3922",
+  "completed_records": 21,
+  "passed_records": 17,
+  "failed_records": 4,
+  "full_walk_completed": false,
+  "unexecuted_checks": 26,
+  "sharing_eligible_answers": 0,
+  "sharing_link_created": false,
+  "phone_open_and_revoke_not_run": true,
+  "native_public_source_link_refusal": "unsafe_text",
+  "native_jobs_hydrateable": true,
+  "shadow_jobs_remained_enabled": true,
+  "research_attempts": [
+    {
+      "attempt": 1,
+      "http_status": 500,
+      "outcome": "failed"
+    },
+    {
+      "attempt": 2,
+      "http_status": null,
+      "outcome": "timeout",
+      "delay_before_retry_seconds": 132.374
+    }
+  ],
+  "tracked_usd": 0.1330577,
+  "reserve_usd": 0.1,
+  "guarded_usd": 0.2330577,
+  "cap_usd": 3,
+  "minor_findings": [
+    "Duplicate next-step presentation",
+    "Readout route receipt rejected by database tier constraint"
+  ],
+  "known_existing_spanish_confirmation_summary": "Founder confirmed this is already in production; not reached in this stopped walk and not classified as new.",
+  "fix_rounds_used": 0,
+  "production_mutations": false,
+  "step_8_started": false,
+  "founder_decision": "Choose a sharing-off promotion with remaining acceptance still owed, or hold for a sharing fix. Neither is authorized by this record."
+}

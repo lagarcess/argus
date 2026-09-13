@@ -1,0 +1,196 @@
+{
+  "candidate_sha": "1623954b1b81e094246729dff539e074f7026fa9",
+  "scope": "Literal Python env reads in src and workflows; static process.env reads in web app, components, lib, hooks and providers. Dynamic keys require separate review. Names only for canonical environment.",
+  "runtime_read_key_count": 80,
+  "missing_example_keys": {
+    "ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS": [
+      "workflows/trigger_proof.py:115"
+    ],
+    "ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS": [
+      "workflows/trigger_proof.py:107"
+    ],
+    "DATABASE_URL": [
+      "src/argus/api/state.py:23",
+      "src/argus/domain/supabase_gateway.py:164"
+    ],
+    "MEM0_TELEMETRY": [
+      "src/argus/api/personalization_memory_index.py:58",
+      "src/argus/api/personalization_memory_index.py:57"
+    ],
+    "RENDER_TASK_RUN_ID": [
+      "workflows/main.py:61",
+      "workflows/main.py:77"
+    ]
+  },
+  "canonical_env_keys_not_in_examples": [
+    "ARGUS_TURNSTILE_SECRET_KEY",
+    "JULES_API_KEY",
+    "POSTHOG_API_KEY",
+    "POSTHOG_PROJECT_ID",
+    "RESEND_API_KEY"
+  ],
+  "runtime_keys_in_canonical_file": {
+    "ALPACA_API_KEY": true,
+    "ALPACA_PAPER_TRADING": true,
+    "ALPACA_SECRET_KEY": true,
+    "APP_ENV": true,
+    "ARGUS_APP_ORIGIN": true,
+    "ARGUS_ASSET_FIXTURE_PATH": false,
+    "ARGUS_ASSET_PROVIDER_MODE": false,
+    "ARGUS_ASSET_UNIVERSE_LOADER_TIMEOUT_SECONDS": false,
+    "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": true,
+    "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": true,
+    "ARGUS_BACKTEST_REAL_WORKFLOW_TASK": true,
+    "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": true,
+    "ARGUS_BACKTEST_WORKFLOW_TASK": true,
+    "ARGUS_CHECKPOINTER_MODE": true,
+    "ARGUS_CONTEXT_PACKETS_ENABLED": true,
+    "ARGUS_CONTEXT_PACKET_BUDGET_SECONDS": true,
+    "ARGUS_CORS_ALLOW_ORIGINS": false,
+    "ARGUS_DEV_ENDPOINTS_ENABLED": true,
+    "ARGUS_DEV_MEMORY_FALLBACK": true,
+    "ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING": true,
+    "ARGUS_DISCOVERY_OPENROUTER_SEARCH_MODEL": false,
+    "ARGUS_DISCOVERY_SEARCH_PROVIDER": true,
+    "ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS": true,
+    "ARGUS_ENABLE_EXECUTION_REALISM": true,
+    "ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL": true,
+    "ARGUS_ENABLE_PERSONALIZATION_MEMORY": true,
+    "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": true,
+    "ARGUS_FRED_CONTEXT_SERIES": true,
+    "ARGUS_IN_PLACE_CARD_EDITS_ENABLED": true,
+    "ARGUS_MARKET_DATA_PROVIDER_MODE": true,
+    "ARGUS_MEMORY_EMBEDDING_MODEL": true,
+    "ARGUS_MEMORY_VECTOR_COLLECTION": true,
+    "ARGUS_MOCK_AUTH": true,
+    "ARGUS_OPS_TOKEN": true,
+    "ARGUS_PERSISTENCE_MODE": true,
+    "ARGUS_READINESS_ASSET_TIMEOUT_SECONDS": false,
+    "ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS": false,
+    "ARGUS_RENDER_WORKFLOW_PROOF_TASK": true,
+    "ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS": false,
+    "ARGUS_RESEARCH_BACKGROUND_DEADLINE_SECONDS": true,
+    "ARGUS_RESEARCH_GLOBAL_DAILY_CEILING": true,
+    "ARGUS_RESEARCH_RAIL_ENABLED": true,
+    "ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS": true,
+    "ARGUS_RUNTIME_STREAM_WORKER": false,
+    "ARGUS_RUNTIME_STREAM_WORKERS": false,
+    "ARGUS_TURN_CALL_ALLOWANCE": true,
+    "ARGUS_TURN_DEADLINE_SECONDS": false,
+    "ARGUS_VISITOR_KEY_SECRET": true,
+    "ARGUS_WORKFLOW_PROOF_PLAN": false,
+    "DATABASE_URL": false,
+    "ENABLE_MARKET_DATA_CACHE": true,
+    "FRED_API_KEY": true,
+    "MARKET_DATA_CACHE_TTL": false,
+    "MEM0_TELEMETRY": false,
+    "MOCK_USER_EMAIL": true,
+    "MOCK_USER_PASSWORD": true,
+    "NEXT_PUBLIC_ARGUS_API_URL": true,
+    "NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN": false,
+    "NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL": true,
+    "NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY": true,
+    "NEXT_PUBLIC_ENABLE_SPANISH": true,
+    "NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED": true,
+    "NEXT_PUBLIC_GUEST_ACCESS_ENABLED": true,
+    "NEXT_PUBLIC_MOCK_AUTH": true,
+    "NEXT_PUBLIC_OMNISEARCH_ENABLED": true,
+    "NEXT_PUBLIC_RESEARCH_RAIL_ENABLED": true,
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": true,
+    "NEXT_PUBLIC_SUPABASE_URL": true,
+    "NODE_ENV": false,
+    "OPENROUTER_API_KEY": true,
+    "PERPLEXITY_API_KEY": true,
+    "RENDER_API_KEY": true,
+    "RENDER_LOCAL_DEV_URL": false,
+    "RENDER_TASK_RUN_ID": false,
+    "RENDER_USE_LOCAL_DEV": true,
+    "SUPABASE_ANON_KEY": true,
+    "SUPABASE_ANON_PUBLIC_KEY": true,
+    "SUPABASE_PROJECT_URL": true,
+    "SUPABASE_SERVICE_ROLE_KEY": true,
+    "SUPABASE_URL": true
+  },
+  "hosted_contract_checks": [
+    {
+      "service": "argus-api",
+      "profile_literals_differ_from_render": [],
+      "profile_keys_missing_in_render": [],
+      "render_keys_missing_in_contract_array": []
+    },
+    {
+      "service": "argus-app",
+      "profile_literals_differ_from_render": [],
+      "profile_keys_missing_in_render": [],
+      "render_keys_missing_in_contract_array": []
+    }
+  ],
+  "status": "blocked_template_parity",
+  "reviewed_template_gaps": {
+    "ARGUS_STRUCTURED_REASONING_EFFORT": {
+      "owner": "src/argus/llm/openrouter.py:103",
+      "kind": "optional interpretation reasoning override"
+    },
+    "ARGUS_CAPABILITY_REASONING_EFFORT": {
+      "owner": "src/argus/llm/openrouter.py:104",
+      "kind": "optional capability-conflict reasoning override"
+    },
+    "ARGUS_ENV": {
+      "owner": "src/argus/api/dependencies.py:382",
+      "kind": "legacy production-environment alias also read by event envelopes"
+    },
+    "ARGUS_APP_ENV": {
+      "owner": "src/argus/api/dependencies.py:382",
+      "kind": "legacy production-environment alias also read by event envelopes"
+    },
+    "ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS": {
+      "owner": "workflows/trigger_proof.py:107",
+      "kind": "operator CLI timeout override"
+    },
+    "ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS": {
+      "owner": "workflows/trigger_proof.py:115",
+      "kind": "operator CLI poll override"
+    },
+    "ARGUS_WORKFLOW_PROOF_USER_ID": {
+      "owner": "workflows/proof.py:28",
+      "kind": "operator proof identity setting"
+    }
+  },
+  "classified_non_gaps": {
+    "DATABASE_URL": "Intentionally not assigned in the example. Its derivation is documented there and tested. Do not add a bare production URL.",
+    "MEM0_TELEMETRY": "Internally forced off by the importing code, not a selectable hosted setting.",
+    "RENDER_TASK_RUN_ID": "Provided by the workflow execution platform, not an operator secret or desired release value."
+  },
+  "dynamic_key_review": "The initial literal-read inventory is not exhaustive. Task-specific ARGUS_OPENROUTER_<TASK>_TIMEOUT_SECONDS keys are generated dynamically; a resumed full parity pass must cover this family. No runtime or template fix has been made.",
+  "canonical_only_key_disposition": "Names only. These tool/operator credentials are not evidence that a hosted variable should be added. The user explicitly requires undeclared production keys to use code defaults.",
+  "reviewed_gap_presence": {
+    "ARGUS_STRUCTURED_REASONING_EFFORT": {
+      "canonical_file": false,
+      "hosted_release_declaration": false
+    },
+    "ARGUS_CAPABILITY_REASONING_EFFORT": {
+      "canonical_file": false,
+      "hosted_release_declaration": false
+    },
+    "ARGUS_ENV": {
+      "canonical_file": false,
+      "hosted_release_declaration": false
+    },
+    "ARGUS_APP_ENV": {
+      "canonical_file": false,
+      "hosted_release_declaration": false
+    },
+    "ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS": {
+      "canonical_file": false,
+      "hosted_release_declaration": false
+    },
+    "ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS": {
+      "canonical_file": false,
+      "hosted_release_declaration": false
+    },
+    "ARGUS_WORKFLOW_PROOF_USER_ID": {
+      "canonical_file": false,
+      "hosted_release_declaration": false
+    }
+  }
+}

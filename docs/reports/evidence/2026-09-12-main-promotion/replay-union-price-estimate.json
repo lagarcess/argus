@@ -1,0 +1,21 @@
+{
+  "status": "estimated_not_started",
+  "selected_cohort": "union_of_New_York_and_UTC_August_12",
+  "window_start": "2026-08-12T00:00:00+00:00",
+  "window_end_exclusive": "2026-08-13T04:00:00+00:00",
+  "conversations": 15,
+  "people": 15,
+  "full_history_user_turns": 38,
+  "deduplicated": true,
+  "counts_reported_before_pricing": true,
+  "price_reported_before_execution": true,
+  "tracked_cost_per_turn_usd": 0.02252765612261905,
+  "tracked_estimate_usd_rounded_up": 0.86,
+  "basis": "Higher of the completed candidate and retained baseline tracked cost per user turn; original interrupted run excluded from rate but included in total eval spend.",
+  "estimate_excludes_unpriced_receipts": true,
+  "reserve_is_not_spend": true,
+  "hard_stop_usd": 4,
+  "spent_usd": 0,
+  "customer_text_pulled": false,
+  "waiting_for_founder_before_browser_walk": true
+}

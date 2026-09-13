@@ -1,0 +1,915 @@
+[
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00106935,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789290816.676207
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0164734,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789290827.9175649
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0052856,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789290831.444919
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 2.65e-05,
+    "outcome": "succeeded",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789290839.815682
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00965695,
+    "outcome": "succeeded",
+    "task": "result_summary",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789290905.662504
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789290906.987139
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789290938.864377
+  },
+  {
+    "kind": "cost",
+    "provider": "perplexity_agent",
+    "cost_usd": 0.01212,
+    "outcome": "served",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789290965.37135
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0009856,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291025.8025641
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0200534,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291044.252691
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00447465,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291052.9166532
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00193465,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291057.144452
+  },
+  {
+    "kind": "cost",
+    "provider": "perplexity_agent",
+    "cost_usd": 0.00166,
+    "outcome": "served",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789291067.622887
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789291067.884286
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0009856,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291151.231215
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.01647715,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291158.965857
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789291265.3006341
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0009856,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291446.1244118
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.01722715,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291455.609333
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789291605.9668639
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00101685,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291629.270473
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.01766965,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291641.131985
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0049556,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789291644.826493
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789291646.985019
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00108935,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318095.9826949
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0167209,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318107.3076868
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0035059,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318133.514667
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0045559,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318142.538482
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0028631,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318143.9938781
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0031131,
+    "outcome": "succeeded",
+    "task": "field_fidelity",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318145.2927492
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 3.59e-05,
+    "outcome": "succeeded",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789318147.238302
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 3.61e-05,
+    "outcome": "succeeded",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789318147.650584
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00949655,
+    "outcome": "succeeded",
+    "task": "result_summary",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789318162.321544
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789318163.66333
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789318179.504662
+  },
+  {
+    "kind": "cost",
+    "provider": "perplexity_agent",
+    "cost_usd": 0.01295,
+    "outcome": "served",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789318209.432467
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00105935,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318227.040399
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0174309,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318237.275659
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0065009,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318251.630765
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0017834,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318254.984441
+  },
+  {
+    "kind": "cost",
+    "provider": "perplexity_agent",
+    "cost_usd": 0.00147,
+    "outcome": "served",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789318261.920299
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789318262.1720588
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00090435,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318291.650442
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.01601715,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318299.0353322
+  },
+  {
+    "kind": "cost",
+    "provider": "perplexity_agent",
+    "cost_usd": 0.41737,
+    "outcome": "served",
+    "model": "openai/gpt-5.6-sol",
+    "side": "browser_walk",
+    "time": 1789318366.408997
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789318366.91872
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00034235,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318408.061101
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0179934,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318422.578399
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0036534,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318427.387208
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00270965,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318446.352475
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.003656,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "anthropic/claude-haiku-4.5",
+    "side": "browser_walk",
+    "time": 1789318450.522099
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "failed",
+    "task": "capability_conflict",
+    "model": "openai/gpt-oss-120b",
+    "side": "browser_walk",
+    "time": 1789318464.979386
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00013728918,
+    "outcome": "succeeded",
+    "task": "capability_conflict",
+    "model": "deepseek/deepseek-v4-flash",
+    "side": "browser_walk",
+    "time": 1789318467.903973
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "field_fidelity",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789318467.935152
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "clarification",
+    "model": "deepseek/deepseek-v4-flash",
+    "side": "browser_walk",
+    "time": 1789318468.35831
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "failed",
+    "task": "clarification",
+    "model": "deepseek/deepseek-v4-flash",
+    "side": "browser_walk",
+    "time": 1789318468.359842
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "clarification",
+    "model": "qwen/qwen3.5-9b",
+    "side": "browser_walk",
+    "time": 1789318468.360186
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "failed",
+    "task": "clarification",
+    "model": "qwen/qwen3.5-9b",
+    "side": "browser_walk",
+    "time": 1789318468.3603919
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789318468.782491
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0009381,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326085.544123
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0154609,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326095.7190669
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00482935,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326098.38853
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00244185,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326099.618479
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00133495,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326105.145395
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00244185,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326106.233762
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00049305,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326107.045713
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "clarification",
+    "model": "deepseek/deepseek-v4-flash",
+    "side": "browser_walk",
+    "time": 1789326107.514389
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "failed",
+    "task": "clarification",
+    "model": "deepseek/deepseek-v4-flash",
+    "side": "browser_walk",
+    "time": 1789326107.5145972
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "clarification",
+    "model": "qwen/qwen3.5-9b",
+    "side": "browser_walk",
+    "time": 1789326107.514791
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "failed",
+    "task": "clarification",
+    "model": "qwen/qwen3.5-9b",
+    "side": "browser_walk",
+    "time": 1789326107.514922
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 1.67e-05,
+    "outcome": "succeeded",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789326108.820126
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00088935,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326139.584084
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.01677715,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326149.829599
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0054934,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326157.5143838
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789326160.2435782
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0004086,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326532.735153
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.01912465,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326552.265385
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00329715,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326572.848089
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00524715,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326587.119661
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0028056,
+    "outcome": "succeeded",
+    "task": "interpretation_repair",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326588.5679731
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00295935,
+    "outcome": "succeeded",
+    "task": "field_fidelity",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326602.057417
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 2.95e-05,
+    "outcome": "succeeded",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789326603.203941
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00948515,
+    "outcome": "succeeded",
+    "task": "result_summary",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789326679.649179
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789326680.6660109
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789326711.973975
+  },
+  {
+    "kind": "cost",
+    "provider": "perplexity_agent",
+    "cost_usd": 0.01448,
+    "outcome": "served",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789326739.107357
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.00099185,
+    "outcome": "succeeded",
+    "task": "asset_mention_preflight",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326793.327056
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.01796715,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326808.2005801
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0053434,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326820.242495
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": 0.0019084,
+    "outcome": "succeeded",
+    "task": "interpretation",
+    "model": "x-ai/grok-4.3",
+    "side": "browser_walk",
+    "time": 1789326824.2089589
+  },
+  {
+    "kind": "cost",
+    "provider": "perplexity_agent",
+    "cost_usd": 0.00152,
+    "outcome": "served",
+    "model": "openai/gpt-5.6-luna",
+    "side": "browser_walk",
+    "time": 1789326831.403875
+  },
+  {
+    "kind": "cost",
+    "provider": "openrouter",
+    "cost_usd": null,
+    "outcome": "skipped",
+    "task": "name_suggestion",
+    "model": "google/gemini-2.5-flash-lite",
+    "side": "browser_walk",
+    "time": 1789326831.601658
+  }
+]

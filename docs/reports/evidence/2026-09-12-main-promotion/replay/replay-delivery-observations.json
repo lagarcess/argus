@@ -1,0 +1,15 @@
+{
+  "observations": [
+    {
+      "case_number": 12,
+      "turn_number": 3,
+      "refusal_rule_outcome": "pass",
+      "classification": "provider_side_research_delivery_failure",
+      "reason": "http_error",
+      "http_status": 429,
+      "disclosed_unavailability": true,
+      "unrelated_unavailable_capability_named": false,
+      "no_retry_performed": true
+    }
+  ]
+}

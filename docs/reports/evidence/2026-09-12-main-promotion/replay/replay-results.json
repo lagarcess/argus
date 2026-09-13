@@ -1,0 +1,307 @@
+{
+  "status": "completed",
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "environment": "C",
+  "cohort": "union of New York and UTC 2026-08-12 guest conversations; canary and internal excluded",
+  "planned_conversations": 15,
+  "planned_user_turns": 38,
+  "reported_price_before_execution_usd": 0.86,
+  "completed_user_turns": 38,
+  "passed_turns": 38,
+  "failed_turns": 0,
+  "allowance_turns": 0,
+  "assessment": "Each user message and user-visible reply read privately against the board rule: no refusal naming a capability the user did not ask about. Usage and allowance messages counted separately.",
+  "native_driver_status": {
+    "state": "completed",
+    "conversations": 15,
+    "user_turns": 38,
+    "distinct_fresh_guests": 15
+  },
+  "tracked_cost_usd": 1.7073169652599987,
+  "guard_reserve_usd": 0.18,
+  "guarded_total_usd": 1.8873169652599986,
+  "cap_usd": 4,
+  "reserve_is_not_spend": true,
+  "production_read_only": true,
+  "fresh_guest_per_conversation": true,
+  "ordered_user_messages": true,
+  "browser_walk_pending_founder_approval": true,
+  "private_inputs_frames_and_logs_deleted": true,
+  "research_provider_errors": [
+    {
+      "reason": "http_error",
+      "http_status": 429,
+      "no_http_response_status": false,
+      "shape": "balanced"
+    }
+  ],
+  "checked_at": "2026-09-13T08:25:44.250095+00:00",
+  "cases": [
+    {
+      "case_number": 1,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 1,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 1,
+      "turn_number": 3,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 3,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 4,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 5,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 6,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 7,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 8,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 2,
+      "turn_number": 9,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 3,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 4,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 4,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 5,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 5,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 5,
+      "turn_number": 3,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 6,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 7,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 8,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 9,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 9,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 10,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 10,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 10,
+      "turn_number": 3,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 10,
+      "turn_number": 4,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 11,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 12,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 12,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 12,
+      "turn_number": 3,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 12,
+      "turn_number": 4,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 13,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 14,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 14,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 15,
+      "turn_number": 1,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 15,
+      "turn_number": 2,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    },
+    {
+      "case_number": 15,
+      "turn_number": 3,
+      "outcome": "pass",
+      "refusal_code": null,
+      "named_capability": null
+    }
+  ]
+}

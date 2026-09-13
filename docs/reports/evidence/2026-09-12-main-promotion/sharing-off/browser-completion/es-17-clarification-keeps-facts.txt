@@ -1,0 +1,61 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading "Inversión en Apple con $10,000" [level=1]
+  - button "Opciones de chat":
+  - status
+  - region "Conversación":
+    - generic: Probemos Apple con $10,000.
+    - button "Copiar texto":
+    - paragraph: ¿Qué periodo quieres usar para AAPL?
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: De enero a diciembre de 2024.
+    - button "Copiar texto":
+    - paragraph: Cambiando la ventana de fechas a enero-diciembre de 2024.
+    - generic: AAPL
+    - heading "Comprar y mantener" [level=3]
+    - text: Listo para ejecutar
+    - term: Capital inicial
+    - definition: $10,000
+    - term: Periodo
+    - definition:
+      - generic: 2 ene 2024 → 31 dic 2024
+    - generic: Acciones
+    - generic: Datos diarios
+    - generic: Sin comisiones
+    - generic: Sin deslizamiento
+    - generic: "Referencia: SPY"
+    - button "Editar capital":
+      - text: Editar capital
+    - button "Editar fechas":
+      - text: Editar fechas
+    - button "Editar costos":
+      - text: Editar costos
+    - button "Ejecutar backtest":
+      - text: Ejecutar backtest
+    - button "Cambiar supuestos":
+      - text: Cambiar supuestos
+    - button "Cancelar":
+      - text: Cancelar
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+  - button "Menciona un activo o indicador":
+  - combobox "Haz una pregunta de seguimiento..."
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
+- tooltip "El mensaje está vacío":
+  - generic: El mensaje está vacío

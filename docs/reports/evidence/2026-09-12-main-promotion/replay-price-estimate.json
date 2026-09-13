@@ -1,0 +1,25 @@
+{
+  "status": "estimated_not_started",
+  "counts_reported_before_pricing": true,
+  "selected_day": "America/New_York",
+  "new_york": {
+    "conversations": 12,
+    "people": 12,
+    "full_history_user_turns": 25
+  },
+  "utc": {
+    "conversations": 14,
+    "people": 14,
+    "full_history_user_turns": 35
+  },
+  "tracked_cost_per_turn_usd": 0.02252765612261905,
+  "pricing_basis": "Higher of the completed candidate and retained baseline tracked cost per user turn; original interrupted run excluded from rate but included in total eval spend.",
+  "new_york_estimate_usd_rounded_up": 0.57,
+  "utc_estimate_usd_rounded_up": 0.79,
+  "estimate_excludes_unpriced_receipts": true,
+  "reserve_is_not_spend": true,
+  "replay_hard_stop_usd": 4,
+  "replay_spent_usd": 0,
+  "customer_text_pulled": false,
+  "execution_pending": "Release-policy resolution and browser acceptance"
+}

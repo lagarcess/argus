@@ -1,0 +1,23 @@
+{
+  "project_id": "argus-promotion-20260912",
+  "scratch": "/private/tmp/argus-promotion-20260912-supabase",
+  "scratch_home": "/private/tmp/argus-promotion-20260912-supabase/home",
+  "ports": [
+    56530,
+    56531,
+    56532,
+    56533,
+    56534,
+    56537,
+    56539,
+    8187,
+    8136,
+    3136
+  ],
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "env_files_absent": true,
+  "migration_copy_identical": true,
+  "startup": "supabase start --workdir <scratch>",
+  "stop": "supabase stop --no-backup --workdir <scratch>",
+  "reset_exit_code": 0
+}

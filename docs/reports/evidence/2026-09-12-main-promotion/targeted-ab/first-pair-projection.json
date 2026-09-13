@@ -1,0 +1,11 @@
+{
+  "basis": "First two attempts: one deployed and one candidate. Extrapolate their tracked cost and reserve growth over ten pairs.",
+  "initial_guarded_total_usd": 5.90888657926,
+  "first_pair_guarded_delta_usd": 0.0551865442,
+  "projected_combined_guarded_total_usd": 6.46075202126,
+  "combined_cap_usd": 12.5,
+  "projection_within_cap": true,
+  "checked_before_attempt_three": true,
+  "tracked_cost_after_pair_usd": 4.94407312346,
+  "reserve_after_pair_usd": 1.02
+}

@@ -1,0 +1,49 @@
+{
+  "access": "read_only",
+  "content_selected": false,
+  "identities_selected": false,
+  "windows": {
+    "utc_august_12": {
+      "start": "2026-08-12T00:00:00+00:00",
+      "end": "2026-08-13T00:00:00+00:00",
+      "groups": [
+        {
+          "guest": true,
+          "excluded": false,
+          "conversations": 14,
+          "people": 14,
+          "user_turns": 35
+        },
+        {
+          "guest": false,
+          "excluded": true,
+          "conversations": 1,
+          "people": 1,
+          "user_turns": 2
+        }
+      ]
+    },
+    "new_york_august_12": {
+      "start": "2026-08-12T04:00:00+00:00",
+      "end": "2026-08-13T04:00:00+00:00",
+      "groups": [
+        {
+          "guest": true,
+          "excluded": false,
+          "conversations": 12,
+          "people": 12,
+          "user_turns": 25
+        },
+        {
+          "guest": false,
+          "excluded": true,
+          "conversations": 1,
+          "people": 1,
+          "user_turns": 2
+        }
+      ]
+    }
+  },
+  "history_scope": "All user messages in conversations active within the selected date window",
+  "classification": "Guest at present or owning a guest workspace; exclude dedicated canary source, canary/internal/test/developer email markers, and admins. Counts precede private transcript inspection."
+}

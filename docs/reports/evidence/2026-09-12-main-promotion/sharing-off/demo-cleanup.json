@@ -1,0 +1,27 @@
+{
+  "project_id": "argus-promotion-20260912",
+  "supabase_stop_exit_code": 0,
+  "supabase_stop_command": "supabase stop --no-backup --workdir <owned scratch>",
+  "owned_processes_signaled": [
+    73996,
+    73997,
+    74009
+  ],
+  "owned_ports_closed": {
+    "8136": true,
+    "3136": true,
+    "56531": true,
+    "56532": true
+  },
+  "owned_containers_remaining": [],
+  "owned_volumes_remaining": [],
+  "unrelated_stack_preserved": true,
+  "private_replay_input_was_present": false,
+  "private_replay_directory_deleted": true,
+  "private_api_and_driver_logs_deleted": [
+    "argus-api.log",
+    "argus-app.log"
+  ],
+  "customer_text_retained_in_repo": false,
+  "checked_at_epoch": 1789325103.8225632
+}

@@ -1,0 +1,147 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Settings":
+      - generic: Settings
+  - heading "Test KO recurring buys" [level=1]
+  - button "Share conversation":
+  - button "Chat options":
+  - status: Argus is working on Test KO recurring buys.
+  - region "Conversation":
+    - generic: Test buying Coca-Cola (KO) every month from January 2020 through December 2024, starting with $5,000 and adding $200 monthly.
+    - button "Copy Plain Text":
+    - paragraph: I adjusted the test period to Jul 27, 2020 – Dec 31, 2024 because Argus has price data for KO only from Jul 27, 2020.
+    - generic: KO
+    - heading "Recurring Buys" [level=3]
+    - text: Run complete
+    - term: Contribution
+    - definition: $200 monthly
+    - term: Period
+    - definition:
+      - generic: Jul 27, 2020 → Dec 31, 2024
+    - term: Starting capital
+    - definition: $6,000
+    - generic: Stocks
+    - generic: Daily data
+    - generic: "Modeled costs: 10 bps fee + 5 bps slippage"
+    - generic: "Benchmark: SPY"
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - button "Copy Plain Text":
+    - region "Hero + Delta Evidence Card":
+      - generic: KO
+      - heading "Recurring Buys" [level=3]
+      - paragraph: Jul 27, 2020 → Dec 31, 2024 · Daily data
+      - generic: Simulation Complete
+      - table:
+        - row:
+          - cell
+          - cell:
+            - link "Charting by TradingView":
+              - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/chat
+          - cell
+        - row:
+          - cell
+          - cell
+          - cell
+      - link "TradingView Lightweight Charts":
+        - /url: https://www.tradingview.com/
+      - group "Chart range":
+        - button "3M":
+          - generic: 3M
+        - button "YTD":
+          - generic: YTD
+        - button "1Y":
+          - generic: 1Y
+        - button "All" [pressed]:
+          - generic: All
+        - button "Range details":
+          - text: Range details
+      - status: "Visible period: Jul 27, 2020 to Dec 31, 2024."
+      - paragraph: Ending value
+      - paragraph: $19,255
+      - paragraph: +$2,455 gain · +14.6% return on contributions
+      - term: Compared with SPY
+      - definition: Lagged by 38.1 percentage points
+      - term: Worst drop
+      - definition: "-20.9%"
+      - generic "Result trust context":
+        - paragraph: Stocks · Historical simulation · 10 bps fee + 5 bps slippage · Not advice
+      - generic "View details":
+        - text: View details
+      - button "Refine idea":
+        - text: Refine idea
+      - text: "Decision: Watching"
+    - region "Quick take":
+      - generic: Quick take
+      - paragraph: "Buying KO monthly and holding through the run turned $16,800 of contributions into a positive result, but it lagged SPY by a wide margin. The tradeoff was meaningful: the strategy still experienced a 20.9% peak-to-trough decline while delivering much less growth than the benchmark."
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - generic: Explain result
+    - button "Copy Plain Text":
+    - region "Result breakdown":
+      - generic: Breakdown
+      - paragraph: From July 27, 2020 through December 31, 2024, the strategy started with $6,000 and added $200 each month. It kept buying KO, making 54 purchases and no sales. In other words, staying invested meant continuing to add money through both weak and strong markets rather than trying to move in and out.
+      - paragraph:
+        - text: The early part of the period still reflected the effects of COVID-19. Coca-Cola reported that restaurant closures, fewer sporting events, and other limits on away-from-home consumption hurt sales, while stronger at-home demand did not fully make up for it, as described in the company’s
+        - link "2020 annual report":
+          - /url: https://investors.coca-colacompany.com/filings-reports/all-sec-filings/content/0000021344-21-000008/ko-20201231.htm
+        - text: . Later, inflation and rising interest rates created a much rougher market backdrop. Reuters linked the 2022 market selloff to unexpectedly high inflation and fears of more aggressive Federal Reserve rate increases in its
+        - link "report on the June 2022 bear market":
+          - /url: https://www.reuters.com/markets/europe/global-markets-wrapup-1-2022-06-13/
+        - text: .
+      - paragraph:
+        - text: For this portfolio, the largest recorded investment decline was 20.9%. It began on April 21, 2022 and ended on October 5, 2023. The regular purchases continued during that stretch, so the experience included buying through a prolonged decline and then waiting through the recovery. The portfolio later reached its highest recorded value of $21,915 on September 3, 2024. Coca-Cola was still dealing with inflation and currency pressure, but its 2024 results showed higher pricing and continued revenue growth, according to the company’s
+        - link "second-quarter 2024 results":
+          - /url: https://investors.coca-colacompany.com/news-events/press-releases/detail/1112/coca-cola-reports-second-quarter-2024-results-and-raises-full-year-guidance
+        - text: . That provides context for the later improvement, though it does not by itself explain every price movement.
+      - paragraph: "Across the full test, $16,800 was contributed and the ending portfolio value was $19,255. The total return on those contributions was 14.6%. SPY returned 52.7% over the same window, making the KO result 38.1 percentage points lower. The meaningful tradeoff was concentration: the strategy offered exposure to one established company, but it participated much less in the broad market’s gains. A useful next historical test would be to compare the same monthly contribution pattern with a broader holding such as SPY."
+    - button "3 sources ›"
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - generic: What was the gap against SPY, how many dollars did fees and slippage cost, and what were the dates of the worst drop? What should I test next?
+    - button "Copy Plain Text":
+    - paragraph: "KO returned 14.6% on contributions, versus 52.7% for SPY. The gap was 38.1 percentage points, with KO behind SPY. Modeled fees and slippage cost $25.17 in total: $16.78 in fees and $8.39 in slippage. The largest drop began on April 21, 2022 and ended on October 5, 2023."
+    - paragraph: This test shows how the monthly-buying plan performed over this period, including its modeled trading costs and largest decline. It cannot show which approach will perform better in the future.
+    - list:
+      - listitem: Compare KO buy and hold first. This separates the effect of monthly contributions from the effect of simply holding KO throughout the same dates.
+      - listitem: Test a different contribution schedule. This shows whether the result was sensitive to the timing of recurring purchases.
+      - listitem: Test a different date range. This checks whether the wide gap with SPY was concentrated in this particular market period.
+      - listitem: Ask how KO and SPY performed during KO’s worst-drop period to examine that decline in the same dates.
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - generic: What is Coca-Cola’s current valuation, and what could drive its business over the next year? Please use research and sources.
+    - button "Copy Plain Text":
+    - paragraph: I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - generic: What is Coca-Cola’s current valuation, and what could drive its business over the next year? Please use research and sources.
+    - button "Copy Plain Text":
+    - paragraph: I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - generic: For a new test, buy Microsoft (MSFT) monthly with $7,000 starting capital and $150 added each month.
+    - generic: Working...
+  - navigation "Conversation activity":
+    - 'button "Decision saved: KO · DCA Accumulation"'
+    - button "Needed attention"
+  - button "Jump to latest; Argus is working below":
+  - button "Mention an asset or indicator":
+  - combobox "Add a follow-up" [disabled]
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.

@@ -1,0 +1,140 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "baseline_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "candidate_totals": {
+    "expected_failed": 0,
+    "failed": 4,
+    "infrastructure_error": 0,
+    "passed": 67,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "baseline_totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 59,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "native_scorecards_rewritten": false,
+  "candidate_only_prose_judge_failures": [],
+  "candidate_only_failed_case_ids": [
+    "action_chip_change_asset_changed_mind_capital_issue_188",
+    "capability_honesty_future_performance_btc_regression",
+    "messy_spanish_future_performance_nvda_cruce_dorado"
+  ],
+  "case_dispositions": [
+    {
+      "case_id": "action_chip_change_asset_changed_mind_capital_issue_188",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "native_failed_checks": [
+        "capability_verdict: expected 'executable', got 'needs_clarification'",
+        "effective_date_range: expected {'start': '2024-01-02', 'end': '2024-12-31'}, got {'start': '2024-01-01', 'end': '2024-12-31'}",
+        "adjustment_reason: expected 'calendar_alignment', got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "baseline_failed_checks": [],
+      "candidate_prose_judge_pass": null,
+      "baseline_prose_judge_pass": null,
+      "native_infrastructure_errors": [],
+      "native_reason_code": "market_data_unavailable",
+      "native_research": null,
+      "disposition": {
+        "classification": "P2 availability-recovery observation; nonblocking",
+        "reason": "The native outcome preserves AAPL, MSFT, NVDA, the requested 2024 dates and edited capital 5000. It reaches ready_for_confirmation, then coverage returns market_data_unavailable and offers explicit recovery instead of a launch. This is not lost edit state. The underlying catalog, data-shape or transport exception was not retained, so no provider root cause or new product regression is asserted.",
+        "reachability": "The fixture enters through legacy change_asset. Both builds emit adjust_assumptions instead for new cards, while keeping legacy action support for stored transcripts.",
+        "fix": "None; no paid rerun or product change."
+      },
+      "same_eval_reachable_code_prior_candidate": {
+        "sha": "df7aee12955f667e31057464d62c72287fb12247",
+        "native_status": "passed",
+        "source_document": "../../candidate-eval-scorecard-df7aee12.json",
+        "scope": "The earlier candidate measured the same eval-reachable runtime and passed this case. This supports retaining the availability observation without asserting a deterministic new edit regression; it does not prove the underlying provider cause."
+      }
+    },
+    {
+      "case_id": "capability_honesty_future_performance_btc_regression",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "native_failed_checks": [
+        "research.published: expected True, got False"
+      ],
+      "baseline_failed_checks": [],
+      "candidate_prose_judge_pass": true,
+      "baseline_prose_judge_pass": true,
+      "native_infrastructure_errors": [],
+      "native_reason_code": null,
+      "native_research": {
+        "degraded_code": "research_unavailable_http_error",
+        "published": false,
+        "rows": 0,
+        "shape": "balanced",
+        "sources": 0
+      },
+      "disposition": {
+        "classification": "provider-side research delivery failure; existing known release caveat",
+        "reason": "Native research degraded_code is research_unavailable_http_error. The captured log in this case window records HTTP 500. The answer discloses the failed lookup, quotes no live figure, and passes its prose judge.",
+        "http_status": 500,
+        "provider_error_log_time": "2026-09-13 15:12:35.985 America/Chicago",
+        "follow_up": "Research retry on provider errors remains the first follow-up; founder merge disposition pending."
+      }
+    },
+    {
+      "case_id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "baseline_status": "failed",
+      "candidate_status": "failed",
+      "native_failed_checks": [
+        "capability_verdict: expected 'executable', got 'unsupported'",
+        "capital_amount: expected 13000, got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "baseline_failed_checks": [
+        "capability_verdict: expected 'executable', got 'unsupported'",
+        "capital_amount: expected 13000, got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "candidate_prose_judge_pass": null,
+      "baseline_prose_judge_pass": null,
+      "native_infrastructure_errors": [],
+      "native_reason_code": "unsupported_dca_contribution_ceiling",
+      "native_research": null,
+      "disposition": {
+        "classification": "shared deployed/candidate failure; not new",
+        "reason": "Both native builds return unsupported_dca_contribution_ceiling, null capital and the same four failed checks. Neither produces a launch."
+      }
+    },
+    {
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "native_failed_checks": [
+        "capability_verdict: expected 'answer_only', got 'unsupported'",
+        "stage_outcomes: expected ['ready_to_respond'], got ['needs_clarification', 'await_user_reply']",
+        "offered.min_next_experiment_rows: expected at least 1, got []",
+        "research: expected a research sidecar, got None"
+      ],
+      "baseline_failed_checks": [],
+      "candidate_prose_judge_pass": true,
+      "baseline_prose_judge_pass": true,
+      "native_infrastructure_errors": [],
+      "native_reason_code": "future_performance",
+      "native_research": null,
+      "disposition": {
+        "classification": "production-style future-performance limitation; no worse than deployed response",
+        "reason": "Both builds disclose the future-performance limitation and offer historical alternatives, and both prose judges pass. The candidate fails its stronger research expectations. This is not a provider delivery failure because no research sidecar was produced. The authorized ten-pair rerun measures its rate; this native failure is retained."
+      }
+    }
+  ],
+  "coverage_preflight_ast_sha256_by_build": {
+    "ee9c3491fa6219502f1e94abc5d9e661a06839d9": "cf8c3143c2e4b331e01bd83dc0406c92d48d2bd83da317c7cd5e6721d55f81b1",
+    "4fd587bf24ce39b794c2228d61f94693826d0da2": "cf8c3143c2e4b331e01bd83dc0406c92d48d2bd83da317c7cd5e6721d55f81b1"
+  },
+  "coverage_cause_limit": "The preserved error code does not distinguish catalog unavailability, unusable data or an OSError. No HTTP status is invented for this market-data failure.",
+  "new_blocking_p0_p1_identified": false,
+  "checked_at": "2026-09-13T20:42:19.795551+00:00"
+}

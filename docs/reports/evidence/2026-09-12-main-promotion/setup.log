@@ -1,0 +1,51 @@
+🔵 [Setup] Starting Argus development environment initialization...
+🔵 [Setup] Enforcing safe environment variables...
+🔵 [Setup] Provisioning worktree environment files...
+🟢 [Setup] root .env already links to the canonical worktree
+🟢 [Setup] Linked web/.env.local from the canonical worktree
+🔵 [Setup] Resolving pinned Python 3.10.20...
+🔵 [Setup] Python version: 3.10.20 (command: /Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv/bin/python3)
+🔵 [Setup] Checking Poetry 2.1.3...
+🟢 [Setup] Poetry is ready: Poetry (version 2.1.3)
+🔵 [Setup] Checking Bun 1.3.14...
+🟢 [Setup] Bun is ready: 1.3.14
+🔵 [Setup] Configuring Poetry (local virtualenvs in-project)...
+Using virtualenv: /Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv
+🔵 [Setup] Installing Python dependencies via Poetry...
+Installing dependencies from lock file
+
+No dependencies to install or update
+
+Installing the current project: argus (0.1.0)
+Installing dependencies from lock file
+
+No dependencies to install or update
+
+Installing the current project: argus (0.1.0)
+🔵 [Setup] Validating argus package imports...
+[Setup] argus package is importable
+🔵 [Setup] Installing frontend dependencies via Bun...
+[0.17ms] ".env.local"
+bun install v1.3.14 (0d9b296a)
+
+Checked 485 installs across 556 packages (no changes) [54.00ms]
+🔵 [Setup] Validating Next.js frontend setup...
+🟢 [Setup] Next.js frontend is ready
+🔵 [Setup] Validating environment files...
+🟢 [Setup] Root .env exists
+🟢 [Setup] web/.env.local exists
+🟢 [Setup] Remember:
+   - When editing /src/argus/analysis/, call warmup_jit() in test entrypoints
+   - See .agent/skills/numba-patterns/SKILL.md for details
+
+🟢 ============================================================================
+🟢 [Setup] Argus environment is ready!
+🟢 ============================================================================
+
+Next steps:
+  1. Confirm the environment-file validation above
+  2. Choose your mode and start:
+     Dev Mode:  .github/dev.sh (then: cd web && bun run dev)
+     QA Mode:   .github/qa.sh (then: cd web && bun run dev)
+
+For more details, see AGENTS.md → Quick Start

@@ -1,0 +1,60 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Settings":
+      - generic: Settings
+  - heading "Test Apple with $10,000" [level=1]
+  - button "Chat options":
+  - status
+  - region "Conversation":
+    - generic: Let's test Apple with $10,000.
+    - button "Copy Plain Text":
+    - paragraph: What date window should I use for AAPL?
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - generic: January 2024 through December 2024.
+    - button "Copy Plain Text":
+    - generic: AAPL
+    - heading "Buy and Hold" [level=3]
+    - text: Ready to run
+    - term: Starting capital
+    - definition: $10,000
+    - term: Period
+    - definition:
+      - generic: Jan 2, 2024 → Dec 31, 2024
+    - generic: Stocks
+    - generic: Daily data
+    - generic: No fees
+    - generic: No slippage
+    - generic: "Benchmark: SPY"
+    - button "Edit capital":
+      - text: Edit capital
+    - button "Edit dates":
+      - text: Edit dates
+    - button "Edit costs":
+      - text: Edit costs
+    - button "Run backtest":
+      - text: Run backtest
+    - button "Change assumptions":
+      - text: Change assumptions
+    - button "Cancel":
+      - text: Cancel
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+  - button "Mention an asset or indicator":
+  - combobox "Add a follow-up"
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.
+- tooltip "Message is empty":
+  - generic: Message is empty

@@ -1,0 +1,145 @@
+{
+  "state": "candidate_regression_stop",
+  "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+  "combined_cap_usd": 12.5,
+  "shas": {
+    "baseline": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+    "candidate": "df7aee12955f667e31057464d62c72287fb12247"
+  },
+  "order": "baseline_then_candidate_per_round",
+  "planned_attempts_per_side": 10,
+  "completed_attempts": [
+    {
+      "side": "baseline",
+      "attempt": 1,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 1291,
+      "event_end_exclusive": 1305,
+      "artifact": "attempt-01-baseline.json",
+      "artifact_sha256": "e3938dd242f3ff5c824de7c071e3ad459569f5fab143151e7ffb20d48b553f20"
+    },
+    {
+      "side": "candidate",
+      "attempt": 1,
+      "failed": true,
+      "research_timeout": false,
+      "native_status": "failed",
+      "event_start": 1305,
+      "event_end_exclusive": 1314,
+      "artifact": "attempt-01-candidate.json",
+      "artifact_sha256": "e1c4fda13f31cf6f4216270c6cae8c73832c01ed25e33696c7ca873092e92849"
+    },
+    {
+      "side": "baseline",
+      "attempt": 2,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 1314,
+      "event_end_exclusive": 1329,
+      "artifact": "attempt-02-baseline.json",
+      "artifact_sha256": "337f86b3fca11d7befe70d612347991e526b7911e99ac556f20f5c259362f6fe"
+    },
+    {
+      "side": "candidate",
+      "attempt": 2,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 1329,
+      "event_end_exclusive": 1339,
+      "artifact": "attempt-02-candidate.json",
+      "artifact_sha256": "82f0218c4ef26fb06e88c4ff06fb43ec388338e0ad05d4f31b1d9afbf73a90a0"
+    },
+    {
+      "side": "baseline",
+      "attempt": 3,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 1339,
+      "event_end_exclusive": 1353,
+      "artifact": "attempt-03-baseline.json",
+      "artifact_sha256": "f100b0264c74f4badd493419a0e12d3a864b2d2b8e2b11ef163f8e652f8ed722"
+    },
+    {
+      "side": "candidate",
+      "attempt": 3,
+      "failed": true,
+      "research_timeout": false,
+      "native_status": "failed",
+      "event_start": 1353,
+      "event_end_exclusive": 1362,
+      "artifact": "attempt-03-candidate.json",
+      "artifact_sha256": "bdc74a619f9c490766a9d1e5a190cdee2bda7e18f752c3dfeef7203493e063ae"
+    },
+    {
+      "side": "baseline",
+      "attempt": 4,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 1362,
+      "event_end_exclusive": 1378,
+      "artifact": "attempt-04-baseline.json",
+      "artifact_sha256": "4783ca6c1358bf2f6410475d519693609f54da3f9e8eabdecbec581e52de0a1a"
+    },
+    {
+      "side": "candidate",
+      "attempt": 4,
+      "failed": true,
+      "research_timeout": false,
+      "native_status": "failed",
+      "event_start": 1378,
+      "event_end_exclusive": 1392,
+      "artifact": "attempt-04-candidate.json",
+      "artifact_sha256": "a5287bd8b5e05cb0b65986ab626efe6c2b4f4e47de1326cde98fbb65bdd869ef"
+    }
+  ],
+  "failures": {
+    "baseline": 0,
+    "candidate": 3
+  },
+  "research_timeouts": {
+    "baseline": 0,
+    "candidate": 0
+  },
+  "reserve_is_not_spend": true,
+  "environment_identical_to_completed_pair": true,
+  "environment_source_sha256": "6a428549c310bd43ea51b46f2c106602284618c44bbe41b382b0289728edf45d",
+  "started_at_epoch": 1789281122.930887,
+  "tracked_cost_usd": 5.1785125893,
+  "guard_reserve_usd": 1.08,
+  "guarded_total_usd": 6.2585125893,
+  "unpriced_non_skipped_receipts": 49,
+  "initial_tracked_cost_usd": 4.88888657926,
+  "initial_guard_reserve_usd": 1.02,
+  "initial_guarded_total_usd": 5.90888657926,
+  "initial_event_count": 1291,
+  "active_side": "candidate",
+  "active_attempt": 4,
+  "active_pid": 25059,
+  "active_command": [
+    "poetry",
+    "run",
+    "pytest",
+    "-c",
+    "/private/tmp/argus-promotion-20260912-candidate-eval/pyproject.toml",
+    "/private/tmp/argus-promotion-20260912-eval-control/test_interleaved_ab.py::test_targeted_case[4]",
+    "-q"
+  ],
+  "first_pair_projection": {
+    "basis": "First two attempts: one deployed and one candidate. Extrapolate their tracked cost and reserve growth over ten pairs.",
+    "initial_guarded_total_usd": 5.90888657926,
+    "first_pair_guarded_delta_usd": 0.0551865442,
+    "projected_combined_guarded_total_usd": 6.46075202126,
+    "combined_cap_usd": 12.5,
+    "projection_within_cap": true,
+    "checked_before_attempt_three": true,
+    "tracked_cost_after_pair_usd": 4.94407312346,
+    "reserve_after_pair_usd": 1.02
+  },
+  "finished_at_epoch": 1789282121.7716138
+}

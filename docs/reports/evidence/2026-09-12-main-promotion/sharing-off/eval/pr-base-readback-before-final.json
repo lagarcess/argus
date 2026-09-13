@@ -1,0 +1,15 @@
+{
+  "source": "gh pr view 603 --repo lagarcess/argus",
+  "checked_at": "2026-09-13T20:59:34.556314+00:00",
+  "state": "OPEN",
+  "head_sha": "7cefbd49dbbe516539e909ad2b28ef64cf374694",
+  "base_sha": "17a07497abbb2ff9159b9694832a6668421e0e88",
+  "base_branch": "main",
+  "head_branch": "codex/production-promotion-20260912",
+  "mergeable": "MERGEABLE",
+  "labels": [
+    "chore",
+    "codex"
+  ],
+  "mutation_performed": false
+}

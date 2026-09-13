@@ -1,0 +1,141 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Settings":
+      - generic: Settings
+  - heading "Test KO recurring buys" [level=1]
+  - button "Share conversation":
+  - button "Chat options":
+  - status: Test KO recurring buys is ready.
+  - region "Conversation":
+    - generic: Test buying Coca-Cola (KO) every month from January 2020 through December 2024, starting with $5,000 and adding $200 monthly.
+    - button "Copy Plain Text":
+    - paragraph: I adjusted the test period to Jul 27, 2020 – Dec 31, 2024 because Argus has price data for KO only from Jul 27, 2020.
+    - generic: KO
+    - heading "Recurring Buys" [level=3]
+    - text: Run complete
+    - term: Contribution
+    - definition: $200 monthly
+    - term: Period
+    - definition:
+      - generic: Jul 27, 2020 → Dec 31, 2024
+    - term: Starting capital
+    - definition: $6,000
+    - generic: Stocks
+    - generic: Daily data
+    - generic: "Modeled costs: 10 bps fee + 5 bps slippage"
+    - generic: "Benchmark: SPY"
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - generic: Run backtest
+    - button "Copy Plain Text":
+    - region "Hero + Delta Evidence Card":
+      - generic: KO
+      - heading "Recurring Buys" [level=3]
+      - paragraph: Jul 27, 2020 → Dec 31, 2024 · Daily data
+      - generic: Simulation Complete
+      - table:
+        - row:
+          - cell
+          - cell:
+            - link "Charting by TradingView":
+              - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/chat
+          - cell
+        - row:
+          - cell
+          - cell
+          - cell
+      - link "TradingView Lightweight Charts":
+        - /url: https://www.tradingview.com/
+      - group "Chart range":
+        - button "3M":
+          - generic: 3M
+        - button "YTD":
+          - generic: YTD
+        - button "1Y":
+          - generic: 1Y
+        - button "All" [pressed]:
+          - generic: All
+        - button "Range details":
+          - text: Range details
+      - status: "Visible period: Jul 27, 2020 to Dec 31, 2024."
+      - paragraph: Ending value
+      - paragraph: $19,255
+      - paragraph: +$2,455 gain · +14.6% return on contributions
+      - term: Compared with SPY
+      - definition: Lagged by 38.1 percentage points
+      - term: Worst drop
+      - definition: "-20.9%"
+      - generic "Result trust context":
+        - paragraph: Stocks · Historical simulation · 10 bps fee + 5 bps slippage · Not advice
+      - generic "View details" [active]:
+        - text: View details
+      - term
+      - definition: $16,800
+      - term: Peak value
+      - definition: $21,915
+      - term: Lowest value
+      - definition: $6,025
+      - term: Date range
+      - definition: Jul 27, 2020 → Dec 31, 2024
+      - term: Timeframe
+      - definition: Daily data
+      - term: Side
+      - definition: Long only
+      - term: Allocation
+      - definition: Equal weight
+      - term: Benchmark
+      - definition: SPY (same modeled costs)
+      - term: Starting capital
+      - definition: $6,000
+      - term: Contribution
+      - definition: $200 monthly
+      - term: Gross return
+      - definition: +14.8%
+      - term: Net of costs
+      - definition: +14.6%
+      - term: Costs modeled
+      - definition: 10 bps fee + 5 bps slippage
+      - button "Explain result":
+        - text: Explain result
+      - button "Refine idea":
+        - text: Refine idea
+      - button "Add decision":
+        - text: Add decision
+    - region "Quick take":
+      - generic: Quick take
+      - paragraph: "Buying KO monthly and holding through the run turned $16,800 of contributions into a positive result, but it lagged SPY by a wide margin. The tradeoff was meaningful: the strategy still experienced a 20.9% peak-to-trough decline while delivering much less growth than the benchmark."
+    - region "Try next":
+      - generic: Try next
+      - button "Test a different contribution schedule":
+        - generic: ↳
+        - generic: Test a different contribution schedule·Lagged the benchmark by 38.1 points
+      - button "Compare with buy and hold":
+        - generic: ↳
+        - generic: Compare with buy and hold
+      - button "Test a different date range":
+        - generic: ↳
+        - generic: Test a different date range
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+    - group "How is Argus doing?":
+      - paragraph: Thanks for telling us.
+      - button "Tell us more"
+      - button "Don't ask again in this chat":
+  - button "Jump to new activity":
+  - button "Mention an asset or indicator":
+  - combobox "Add a follow-up"
+  - generic: Add a follow-up
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.

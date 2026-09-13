@@ -2095,6 +2095,15 @@ written before this shape existed are migrated at one named site: their
   counts when the user actually stated it, so the shared bankroll default never
   becomes a seed.
 
+Focused strategy repair after a failed interpretation must pass the same
+stated-field and modeled-cost audits before confirmation. A separate deposit
+must remain distinct from the recurring contribution. If the audit is unavailable
+or cannot establish that money role, Argus asks for the assumptions instead of
+issuing a card with silent defaults.
+An unresolved deposit is retained in the existing typed assumption ambiguity,
+not in the executable contribution. The pending response intent preserves it
+across replies until a typed money role resolves it.
+
 **The bankroll floor does not apply to a recurring plan.** `MIN_STARTING_CAPITAL`
 answers "is this a fundable one-time position", which a plan seeded at `$0` is
 not. A plan is refused by its own rule instead:

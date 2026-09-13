@@ -1,0 +1,149 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading "Compra recurrente de Coca-Cola" [level=1]
+  - button "Opciones de chat":
+  - status
+  - region "Conversación":
+    - generic: Prueba comprar Coca-Cola (KO) cada mes desde agosto de 2020 hasta diciembre de 2024, empezando con $5,000 USD y añadiendo $200 USD mensuales.
+    - button "Copiar texto":
+    - generic: KO
+    - heading "Compras recurrentes" [level=3]
+    - text: Ejecución completa
+    - term: Aporte
+    - definition: $200 cada mes
+    - term: Periodo
+    - definition:
+      - generic: 3 ago 2020 → 31 dic 2024
+    - term: Capital inicial
+    - definition: $6,000
+    - generic: Acciones
+    - generic: Datos diarios
+    - generic: "Costos modelados: comisión de 10 bps + deslizamiento de 5 bps"
+    - generic: "Referencia: SPY"
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: Ejecutar backtest
+    - button "Copiar texto":
+    - region "Hero + Delta Evidence Card":
+      - generic: KO
+      - heading "Compras recurrentes" [level=3]
+      - paragraph: 3 ago 2020 → 31 dic 2024 · Datos diarios
+      - generic: Simulación completa
+      - table:
+        - row:
+          - cell
+          - cell:
+            - link "Charting by TradingView":
+              - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/chat
+          - cell
+        - row:
+          - cell
+          - cell
+          - cell
+      - link "TradingView Lightweight Charts":
+        - /url: https://www.tradingview.com/
+      - group "Rango del gráfico":
+        - button "3M":
+          - generic: 3M
+        - button "Este año":
+          - generic: Este año
+        - button "1A":
+          - generic: 1A
+        - button "Todo" [pressed]:
+          - generic: Todo
+        - button "Detalles del rango":
+          - text: Detalles del rango
+      - status: "Período visible: 3 ago 2020 al 31 dic 2024."
+      - paragraph: Valor final
+      - paragraph: $19,361
+      - paragraph: +$2,761 ganancia · +16.6% retorno sobre aportes
+      - term: Comparado con SPY
+      - definition: Quedó por debajo por 34.7 puntos porcentuales
+      - term: Peor caída
+      - definition: "-20.9%"
+      - generic "Contexto de confianza del resultado":
+        - paragraph: Acciones · Simulación histórica · comisión de 10 bps + deslizamiento de 5 bps · No es asesoría
+      - generic "Ver detalles":
+        - text: Ver detalles
+      - button "Ajustar idea":
+        - text: Ajustar idea
+      - button "Agregar decisión":
+        - text: Agregar decisión
+    - region "Lectura rápida":
+      - generic: Lectura rápida
+      - paragraph: "Comprar KO cada mes y mantener la posición durante este periodo terminó con una ganancia de 16.6%, pero quedó por debajo de SPY, que obtuvo 51.3%. El intercambio fue claro: mantener una sola acción implicó atravesar una caída máxima de 20.9% y aceptar un resultado histórico menor que el del benchmark. Para otra prueba, ¿qué cambiaría al comparar este plan con una cartera más diversificada?"
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: Explicar resultado
+    - button "Copiar texto":
+    - region "Desglose del resultado":
+      - generic: Desglose
+      - paragraph: "Entre el 3 de agosto de 2020 y el 31 de diciembre de 2024, la estrategia puso $6,000 al inicio y añadió $200 cada mes. En la práctica, fue comprar KO de forma regular y mantener las compras: hubo 53 compras y ninguna venta. En total se aportaron $16,600, y el portafolio terminó con $19,361. El crecimiento sobre las aportaciones fue de 16.6%, equivalente a una experiencia positiva, aunque con bastante movimiento en el camino."
+      - paragraph:
+        - text: "La parte más difícil llegó entre el 21 de abril de 2022 y el 5 de octubre de 2023. En ese tramo, la mayor caída de la inversión, sin contar los nuevos depósitos, fue de 20.9%. El contexto ayuda a entender la presión: la inflación estadounidense llegó a niveles muy altos y la Reserva Federal elevó las tasas repetidamente entre 2022 y 2023, un entorno que normalmente vuelve menos atractivas las acciones y encarece el financiamiento. Puedes ver una cronología de esas alzas en"
+        - link "la cobertura de las tasas de la Reserva Federal":
+          - /url: https://www.thestreet.com/fed/fed-rate-hikes-2022-2023-timeline-discussion
+        - text: .
+      - paragraph:
+        - text: KO siguió generando ventas, pero tuvo que enfrentar mayores costos y consumidores presionados por la inflación. La empresa informó que en 2024 sus ingresos netos crecieron 3%, mientras que el efecto favorable de precios y mezcla fue de 11%, con parte de ese aumento relacionado con precios aplicados en mercados con inflación. Esa combinación sugiere que KO pudo trasladar parte de sus costos a los precios, pero también ayuda a explicar por qué el resultado de la acción no siguió con la misma fuerza que el mercado amplio. La información aparece en el
+        - link "informe anual de The Coca-Cola Company":
+          - /url: https://investors.coca-colacompany.com/filings-reports/all-sec-filings/content/0000021344-25-000011/ko-20241231.htm
+        - text: y en sus
+        - link "resultados de 2024":
+          - /url: https://investors.coca-colacompany.com/news-events/press-releases/detail/1128/coca-cola-reports-fourth-quarter-and-full-year-2024-results
+        - text: .
+      - paragraph: Después de atravesar la caída, el portafolio alcanzó su valor más alto el 3 de septiembre de 2024, con $22,040. Para el cierre del periodo ya estaba por debajo de ese máximo, pero seguía por encima del total aportado. Eso describe una tenencia con recuperación, aunque no una trayectoria pareja.
+      - paragraph:
+        - text: "La comparación con SPY fue clara: SPY obtuvo 51.3% en el mismo periodo, frente a 16.6% para las aportaciones a KO. En otras palabras, KO quedó 34.7 puntos porcentuales por debajo del benchmark. El mercado amplio tuvo una caída fuerte en 2022 y después una recuperación marcada en 2023 y 2024, un patrón visible en el"
+        - link "historial del S&P 500":
+          - /url: https://www.officialdata.org/us/stocks/s-p-500
+        - text: . Así que el intercambio de esta experiencia fue mantener una sola empresa conocida, comprarla incluso durante la caída y recuperarse después, pero aceptar una recompensa histórica mucho menor que la de SPY. ¿Quieres que Argus pruebe la misma aportación mensual con SPY o una combinación de KO y SPY?
+    - button "5 fuentes ›"
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: ¿Cuánto quedó por debajo de SPY, cuánto pagó en dólares por comisiones y deslizamiento, y entre qué fechas ocurrió la peor caída? ¿Qué probarías después?
+    - button "Copiar texto":
+    - paragraph: "KO quedó 34.7 puntos porcentuales por debajo de SPY: la estrategia obtuvo 16.6% sobre las aportaciones, frente a 51.3% de SPY. Los costos modelados fueron $16.58 en comisiones y $8.29 en deslizamiento, para un total de $24.87. La prueba muestra el efecto histórico de este plan de compras y sus costos modelados, pero no demuestra qué ocurrirá en otro periodo."
+    - paragraph: La peor caída, sin contar los nuevos depósitos, comenzó el 21 de abril de 2022 y terminó el 5 de octubre de 2023.
+    - paragraph: "Probaría después, en este orden:"
+    - list:
+      - listitem: Comparar con comprar y mantener, para separar el efecto de las compras mensuales del efecto de simplemente mantener la inversión durante el mismo periodo.
+      - listitem: Probar otro calendario de aportes, para ver si una frecuencia distinta cambia la caída máxima o la diferencia frente a SPY.
+      - listitem: Probar otro rango de fechas, para comprobar si el resultado depende especialmente del periodo que incluyó la peor caída.
+      - listitem: Revisar los eventos documentados dentro de esas fechas, para poner en contexto el descenso sin confundir contexto externo con lo que la prueba mide.
+    - region "Qué probar después":
+      - generic: Qué probar después
+      - button "Comparar con comprar y mantener":
+        - generic: ↳
+        - generic: Comparar con comprar y mantener
+      - button "Probar otro calendario de aportes":
+        - generic: ↳
+        - generic: Probar otro calendario de aportes
+      - button "Probar otro rango de fechas":
+        - generic: ↳
+        - generic: Probar otro rango de fechas
+      - button "¿Qué eventos documentados ocurrieron entre el 21 de abril de 2022 y el 5 de octubre de 2023 para ayudar a explicar la peor caída de KO?":
+        - generic: ↳
+        - generic: ¿Qué eventos documentados ocurrieron entre el 21 de abril de 2022 y el 5 de octubre de 2023 para ayudar a explicar la peor caída de KO?
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+  - button "Menciona un activo o indicador":
+  - combobox "Haz una pregunta de seguimiento..."
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

@@ -1,0 +1,40 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Cerrar país y moneda"
+    - dialog "País y moneda":
+      - heading "País y moneda" [level=2]
+      - button "Cerrar país y moneda":
+      - button "País Colombia" [pressed]:
+        - generic: País
+        - generic: Colombia
+      - button "Moneda COP":
+        - generic: Moneda
+        - generic: COP
+      - paragraph: Cuando Argus busca información, usa tu país como tu ubicación.
+      - textbox "Buscar países" [active]: Colombia
+      - button "Colombia":
+        - generic: Colombia
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading [level=1]
+  - status
+  - paragraph: ¿Qué te gustaría investigar?
+  - status: ¿Qué te gustaría investigar?
+  - button "Menciona un activo o indicador":
+  - combobox "Pregunta sobre cualquier empresa o idea"
+  - generic: Pregunta sobre cualquier empresa o idea
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
+  - button "¿Cómo gana dinero Netflix?"
+  - button "Compara Costco con Walmart y Target"
+  - button "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?"
