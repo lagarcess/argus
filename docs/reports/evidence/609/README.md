@@ -13,6 +13,11 @@ cd web && PLAYWRIGHT_PORT=3609 ARGUS_EVIDENCE_DIR="$PWD/../docs/reports/evidence
 
 Result: 4 passed (5.0s).
 
+Re-validated at `af271c47`, after the Codex review fix `c2819235` and the merge
+of integration `6eb93d84`: 4 passed (5.5s). No file under `web/` changed after
+`15b671d4`, and the spec scripts every API response, so the screenshots still
+show that head's behavior.
+
 | Case | Screenshots |
 | --- | --- |
 | English, desktop, light, transient failure (HTTP 500) | `en-desktop-light-transient-live.png` shows the amber notice with Retry; `-reloaded.png` shows the same notice after a reload; `-retried.png` shows the answer after Retry asked the same question |
