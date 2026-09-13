@@ -1,0 +1,125 @@
+{
+  "status": "authorized_targeted_live_acceptance_passed",
+  "measured_runtime_sha": "87462331901929711bfe5d689197e94f0f1693b5",
+  "non_evidence_tree_sha256": "b9d0af03451a3be1be42358b3d4e00e949a1dfff12c9863fd42e60c77f5c0f3b",
+  "original_integration_base": "d53575a86641e3d37c9dfbf99bfa003e3eecc5f7",
+  "reconciled_integration_sha": "3d379d3d9020027ccfd1f2a4c617626520af8a44",
+  "reconciliation_merge_sha": "c72fa0e94963c347c6eaeaf1bd846f8f29f58ce5",
+  "current_integration_sha": "6eb93d84c269b4e40a0ac935aac2fb933f10676f",
+  "integration_advance_disposition": "Route receipt tier constraint and its renderer/tests only. Shared receipt persistence surface, but no tier values, repair payload, interpreter, card, API, UI, environment, or pricing behavior changed. Paid interpretation evidence retained. Branch code stays identical to the measured head.",
+  "would_be_merged_tree": "43b981c6a152828c8d704b445a07387249299f8a",
+  "merged_tree_modularity": "passed",
+  "merged_tree_receipt_checks": {
+    "passed": 36,
+    "paid_calls": 0
+  },
+  "model_facing_text_changed": false,
+  "fixture_sha256": "a48b14730a14578639e41dd27a15f27e3981208298fa7e68e477da7b159bcf6b",
+  "runtime_checks_passed": 2782,
+  "focused_replays_passed": 10,
+  "original_issue_replays_passed": 38,
+  "runtime_head_ci": [
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770078549/job/103757942588",
+      "name": "agent_runtime pytest sweep",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770078530/job/103757942755",
+      "name": "ownership-gate",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770076809/job/103757937945",
+      "name": "ownership-gate",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770078523/job/103757942338",
+      "name": "local-smoke",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770078530/job/103757942607",
+      "name": "backend-checks",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770076809/job/103757937984",
+      "name": "backend-checks",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770078530/job/103757942722",
+      "name": "frontend-checks",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770076809/job/103757938083",
+      "name": "frontend-checks",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770078530/job/103757942757",
+      "name": "guest-release-gates",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770076809/job/103757938005",
+      "name": "guest-release-gates",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770078530/job/103758949307",
+      "name": "ci",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/lagarcess/argus/actions/runs/34770076809/job/103758939991",
+      "name": "ci",
+      "status": "COMPLETED"
+    },
+    {
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://supabase.com/dashboard/project/lgdhvepyrzbnscqssgqq/branches",
+      "name": "Supabase Preview",
+      "status": "COMPLETED"
+    }
+  ],
+  "runtime_head_codex_review": {
+    "outcome": "no_major_issues",
+    "url": "https://github.com/lagarcess/argus/pull/602#issuecomment-5654755603",
+    "unresolved_threads": 0
+  },
+  "documentation_commit_ci_and_review": "See PR #602 for the follow-up commit status; this document records the reviewed runtime head.",
+  "full_measurement": {
+    "sha": "c72fa0e94963c347c6eaeaf1bd846f8f29f58ce5",
+    "counts": {
+      "passed": 63,
+      "failed": 7,
+      "infrastructure_error": 1
+    }
+  },
+  "targeted_reruns": {
+    "sha": "87462331901929711bfe5d689197e94f0f1693b5",
+    "counts": {
+      "passed": 22
+    },
+    "attempted_once_each": 22,
+    "previously_passing_cases_preserved": 18
+  },
+  "excluded_pre_existing_forced_failure_path": "messy_spanish_future_performance_nvda_cruce_dorado",
+  "automation": "deleted"
+}

@@ -1,0 +1,145 @@
+{
+  "note": "Historical local artifacts and latest batch files are hashed for provenance. Their raw contents are not published. Durable sanitized comparisons and outcomes are in this directory.",
+  "files": [
+    {
+      "name": "README.md",
+      "bytes": 7215,
+      "sha256": "8e063e4db3d1d09d150ac7c9ac33494ba22a73799e17174e8a96c7448c59e1e3"
+    },
+    {
+      "name": "after.json",
+      "bytes": 13661,
+      "sha256": "113c689eb34b362bd54200ceb4a9ae15ce7442e1e42892d1613b0f205e30470d"
+    },
+    {
+      "name": "baseline-comparability.json",
+      "bytes": 552,
+      "sha256": "339844fd4e90cc4d9e2988f63064c07923c92b8aa90d55730789ae3b11f10ca7"
+    },
+    {
+      "name": "before.json",
+      "bytes": 12046,
+      "sha256": "a1165c185e66d45e10fb214d944e5b4b00b3ca6acdac7d93f7684f4310a31624"
+    },
+    {
+      "name": "case-comparison.md",
+      "bytes": 6874,
+      "sha256": "fb433de9d0964fceae065cae228f3c9099c0fd3db58cd75081f92c3b09265133"
+    },
+    {
+      "name": "ci.txt",
+      "bytes": 2664,
+      "sha256": "7a4cbe211ec0dd5f8454a8e7f9014f834d06f0f99b0174002b5d32f8e8808c7c"
+    },
+    {
+      "name": "final-pr-state.json",
+      "bytes": 4114,
+      "sha256": "9580a37e47a42cc8a4b314a3976e63b534c94b52807c5c2b185ddef4fde516a2"
+    },
+    {
+      "name": "final-review-state.json",
+      "bytes": 9613,
+      "sha256": "719222745abb31d8c9d9f6cdf2b998b095d6cc99b89b33f1bb6502b2c16c5c0f"
+    },
+    {
+      "name": "full-comparison.json",
+      "bytes": 32412,
+      "sha256": "86e395307c2ead56e50a2ed88eec967ee1146f5ed59cbff6d694f63cf4388e75"
+    },
+    {
+      "name": "full-runtime-flags.json",
+      "bytes": 350,
+      "sha256": "9987ddf5fca5a115c54c95c27ce17616e5ba7ef47c80f877592afbcfe757454e"
+    },
+    {
+      "name": "live-measurement.json",
+      "bytes": 710034,
+      "sha256": "677250a9602c8a77b6f77680f5239d47116a35ca43a114c4e0b64da6dedebf6a"
+    },
+    {
+      "name": "measure-full.py",
+      "bytes": 6351,
+      "sha256": "c741d164bbfeb0bac9e08bf5f318da0178a4d22fa2b90689b28e5b7ff91b520b"
+    },
+    {
+      "name": "measure-rerun.py",
+      "bytes": 7080,
+      "sha256": "e605deff639462c583f14b337a4dce86956c988daeaf2fe69e5dbf2358fcd369"
+    },
+    {
+      "name": "modularity.txt",
+      "bytes": 1969,
+      "sha256": "6e8c552ff8053d15ed48f6061c37e1b809ea0bc409eaead6c385fc9db522f13f"
+    },
+    {
+      "name": "partial-reruns.json",
+      "bytes": 31103,
+      "sha256": "6201b355da1173234675e9f4b3165c93b504a223d37fdcab9050a1639258ba82"
+    },
+    {
+      "name": "repro_600.py",
+      "bytes": 17856,
+      "sha256": "90599f65dd5ae11b1f1ae4a4cebc3dac31ce6eb86542b23edd3d1d262ec6e6c7"
+    },
+    {
+      "name": "reproduction-context.json",
+      "bytes": 3404,
+      "sha256": "4100e6bc3b104f39ffbd57b5324bf6ab1e2543b114e2d201e68684f28ce059cd"
+    },
+    {
+      "name": "rerun-runtime-flags.json",
+      "bytes": 350,
+      "sha256": "9987ddf5fca5a115c54c95c27ce17616e5ba7ef47c80f877592afbcfe757454e"
+    },
+    {
+      "name": "rerun-transport-responses.jsonl",
+      "bytes": 50713,
+      "sha256": "d172d107cd251a996dd18ffc49e16001175db73890cc2dc606ae7c51ceacfbe4"
+    },
+    {
+      "name": "spend-ledger.jsonl",
+      "bytes": 56931,
+      "sha256": "25b88c1c3a82d56c4d2ec295f1f8c446db6b91b95c83064324077eb0da92e7b0"
+    },
+    {
+      "name": "87462331/authorized-plan.json",
+      "bytes": 4699,
+      "sha256": "81d63a9994ec6cc3205ed1493b1772aef3245fa0e913f8c9476c8e17883163a9"
+    },
+    {
+      "name": "87462331/attempts.jsonl",
+      "bytes": 3105,
+      "sha256": "cd8e19fc74689b40dec87360675d72ba98a9c294dc2ef96a1364ac9c9e1ed90f"
+    },
+    {
+      "name": "87462331/results.jsonl",
+      "bytes": 54294,
+      "sha256": "04a0bf2eca0c6c9eca92d1cfeef5f2d9a853a75d1770a6668a0cb11629fda424"
+    },
+    {
+      "name": "87462331/spend.jsonl",
+      "bytes": 58212,
+      "sha256": "341931f8e066c2b6295f74858397a055d9a9679a83ea2f5aed09d538939dcc8b"
+    },
+    {
+      "name": "87462331/summary.json",
+      "bytes": 360,
+      "sha256": "f5c80be56b6793d0b98bfb8e83079039d2ca46211f10f9179f2164d872ea55ca"
+    },
+    {
+      "name": "87462331/provenance.json",
+      "bytes": 5036,
+      "sha256": "5a898c9c3ad9d82485af3f2af8973676dbd013f647bedf5c02ac57a2040e1579"
+    },
+    {
+      "name": "87462331/runtime-flags.json",
+      "bytes": 453,
+      "sha256": "433d084dad82220a221c48c4d57522cabca6def29d0579796b2228e47a6d359e"
+    },
+    {
+      "name": "87462331/run-authorized-reruns-87462331.py",
+      "bytes": 10108,
+      "sha256": "82332c545710ee2ba52254b848cd108ff11929637a737c38f1e3e3aab989c708"
+    }
+  ]
+}

@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+CONTRIBUTION_ROLE_PRESERVED = "contribution_role_preserved"
+
 _NON_MATERIAL_RESPONSE_FIELDS = frozenset(
     {"assistant_response", "reason_codes", "user_goal_summary"}
 )
@@ -47,6 +49,8 @@ def repair_effect_metadata(
         "before_fingerprint": _projection_fingerprint(before_projection),
         "after_fingerprint": _projection_fingerprint(after_projection),
         "no_op_reason": resolved_no_op_reason,
+        CONTRIBUTION_ROLE_PRESERVED: CONTRIBUTION_ROLE_PRESERVED
+        in getattr(after, "reason_codes", ()),
     }
 
 

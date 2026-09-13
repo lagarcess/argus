@@ -9434,6 +9434,8 @@ def test_active_artifact_rule_answer_repairs_and_preserves_prior_asset(
 
     async def invoke_stub(*, schema_model, **kwargs):
         calls.append(schema_model.__name__)
+        if schema_model.__name__ == "StatedRunFieldFidelityAudit":
+            return schema_model()
         if len(calls) == 1:
             return LLMInterpretationResponse(
                 intent="strategy_drafting",
@@ -9623,6 +9625,8 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
 
     async def invoke_stub(*, schema_model, **kwargs):
         calls.append(schema_model.__name__)
+        if schema_model.__name__ == "StatedRunFieldFidelityAudit":
+            return schema_model()
         if len(calls) == 1:
             return LLMInterpretationResponse(
                 intent="conversation_followup",

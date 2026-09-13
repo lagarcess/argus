@@ -51,6 +51,10 @@ def apply_cost_fidelity(
         cost = getattr(audit, audit_field)
         evidence_span = _bounded_cost_evidence(cost, current_message=current_message)
         if evidence_span is None:
+            if cost is not None:
+                # A focused draft has no cost slot. An audit that read a cost
+                # but cannot anchor it still owes a question, not a zero default.
+                grounded_conflicts.add(draft_field)
             continue
         rate = _supported_cost_rate(cost, field_name=draft_field)
         if rate is None:

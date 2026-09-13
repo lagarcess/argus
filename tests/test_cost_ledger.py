@@ -203,6 +203,7 @@ def test_persist_route_receipts_also_appends_cost_ledger_entries(monkeypatch) ->
         "before_fingerprint": "a" * 64,
         "after_fingerprint": "b" * 64,
         "no_op_reason": None,
+        "contribution_role_preserved": True,
     }
 
     persist_route_receipts(

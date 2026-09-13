@@ -1,0 +1,37 @@
+{
+  "accounted_stop_usd": "5.75",
+  "provider_reported_usd": "2.792059844568",
+  "unpriced_failed_call_reserve_usd": "2.05",
+  "conservatively_accounted_usd": "4.842059844568",
+  "remaining_to_stop_usd": "0.907940155432",
+  "reserve_per_unpriced_failed_call_usd": "0.05",
+  "unpriced_failed_provider_calls": 41,
+  "unpriced_successful_provider_calls": 0,
+  "batches": [
+    {
+      "scope": "original_reproductions_full_measurement_and_early_bounded_reruns",
+      "reported_usd": "1.857866291608",
+      "reserve_usd": "2.00",
+      "accounted_usd": "3.857866291608"
+    },
+    {
+      "runtime_sha": "2ff09be41602be1bb257b3fb98d68a6713e84610",
+      "scope": "8_attempted_7_passed_1_failed_then_stop",
+      "reported_usd": "0.2303896540",
+      "reserve_usd": "0.05",
+      "accounted_usd": "0.2803896540"
+    },
+    {
+      "runtime_sha": "87462331901929711bfe5d689197e94f0f1693b5",
+      "scope": "22_attempted_once_22_passed",
+      "provider_calls": 139,
+      "provider_outcomes": {
+        "succeeded": 139
+      },
+      "reported_usd": "0.70380389896",
+      "reserve_usd": "0",
+      "accounted_usd": "0.70380389896"
+    }
+  ],
+  "note": "Reported cost excludes unpriced failed calls. The reserve remains included; no extra reserve was needed for the latest batch. Three latest clarification contract_violation receipts are post-response validation records for already priced transport calls, not three additional billable attempts."
+}
