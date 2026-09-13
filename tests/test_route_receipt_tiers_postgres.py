@@ -22,6 +22,7 @@ from argus.llm.openrouter import (
     record_openrouter_route_receipt,
 )
 from argus.llm.openrouter_tasks import OpenRouterModelTier
+from argus.observability.route_receipt_tiers import TIER_CHECK_CONSTRAINT_NAME
 from faker import Faker
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
@@ -232,5 +233,5 @@ def test_tier_check_admits_exactly_the_runtime_tiers() -> None:
 
     tiers = ", ".join(f"'{tier}'::text" for tier in get_args(OpenRouterModelTier))
     assert checks == [
-        ("route_receipts_tier_check", True, f"CHECK ((tier = ANY (ARRAY[{tiers}])))")
+        (TIER_CHECK_CONSTRAINT_NAME, True, f"CHECK ((tier = ANY (ARRAY[{tiers}])))")
     ]
