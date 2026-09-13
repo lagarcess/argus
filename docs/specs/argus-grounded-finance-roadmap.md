@@ -945,6 +945,12 @@ of the no-search answer. Argus adds what a search answer cannot: the reader's
 own numbers computed on the spot, their home country, runnable next steps, and
 options shown with their math instead of advice.
 
+**After the lane: a UI polish pass, founder, 2026-09-12.** Once this lane lands,
+the grounded math surfaces get a design pass judged by the founder in the
+browser: the calculation card and its collapsed inputs, the offer to work it out
+with your own figures, the Search answer dossier, the rail's result preview,
+compare, continue, and a shared calculation.
+
 **The outcome.** Any money question gets an answer whose every figure is
 computed by our code from inputs that are cited or given by the user. The
 inputs sit under the answer, each showing where it came from, editable and
