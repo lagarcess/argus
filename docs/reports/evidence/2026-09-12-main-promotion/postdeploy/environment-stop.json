@@ -1,0 +1,32 @@
+{
+  "state": "stopped_before_migrations_and_deploys",
+  "checked_at": "2026-09-13T22:39:59.398272+00:00",
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "production_gate": {
+    "only_expected_seven_missing": true,
+    "theme_drop_destructive": true,
+    "applied_and_missing_records_identical_to_approved_premerge_gate": true,
+    "landed_ref_verified": {
+      "remote_ref": "origin/main",
+      "resolved_sha": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "status": "verified"
+    }
+  },
+  "completed_hosted_updates": "hosted-settings-after.json",
+  "unexpected_environment_file": {
+    "canonical_path": "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/web/.env.local",
+    "is_real_file": true,
+    "local_link_created_by_setup": "/private/tmp/argus-promotion-20260913-landed/web/.env.local",
+    "source_modified_at": "2026-08-04T19:57:19.166245+00:00",
+    "contents_not_printed": true,
+    "local_servers_started": false
+  },
+  "proposed_resumption": {
+    "remove_only_generated_link": "/private/tmp/argus-promotion-20260913-landed/web/.env.local",
+    "leave_canonical_file_untouched": "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/web/.env.local",
+    "run_unchanged_smoke_with_previously_approved_root_env_source": true
+  },
+  "migrations_applied": false,
+  "deploys_started": false,
+  "new_provider_spend_usd": 0
+}

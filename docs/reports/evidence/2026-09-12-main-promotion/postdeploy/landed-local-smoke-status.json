@@ -1,0 +1,17 @@
+{
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "started_at": "2026-09-13T22:45:10.907334+00:00",
+  "finished_at": "2026-09-13T22:45:44.778639+00:00",
+  "exit_code": 28,
+  "command": [
+    ".github/local-smoke.sh",
+    "--expected-sha",
+    "3d98057c1e722317f0243fb96fb647771ddae484"
+  ],
+  "root_env_source": "canonical approved .env link",
+  "web_env_local_absent": true,
+  "script_unchanged": true,
+  "timeouts_unchanged": true,
+  "api_port": 8126,
+  "web_port": 3126
+}

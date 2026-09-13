@@ -1,0 +1,16 @@
+2026-09-13T22:59:32.5292981Z canary_api_deploy_status=live
+2026-09-13T22:59:32.5293707Z canary_web_deploy_status=live
+2026-09-13T22:59:32.5295504Z canary_workflow_version_status=ready
+2026-09-13T22:59:40.8106523Z stale_job_scan_status=ready scanned=0 stale=0 reconciled=0 unresolved=0 errors=0
+2026-09-13T22:59:40.8108299Z release_profile_status=ready
+2026-09-13T22:59:40.8139313Z drift argus-api:autoDeployTrigger expected=checksPass actual=off
+2026-09-13T22:59:40.8139681Z drift argus-app:autoDeployTrigger expected=checksPass actual=off
+2026-09-13T22:59:40.8140099Z drift argus-backtests:autoDeployTrigger expected=checksPass actual=off
+2026-09-13T22:59:40.8160808Z env_fingerprint=c4ae438767addc66cc2b642c273735b9aa2bb1ec8bb4e64b3e1b8ef367a3cc4d
+2026-09-13T22:59:40.8161309Z workflow_env_fingerprint=3a20406b42ea9f6fc3640cac1478502e483eb1a6602fd1d7399db12bcf259747
+2026-09-13T22:59:40.8161771Z autodeploy_fingerprint=9423f7276c20d3a3f2a86f1081da71d5936eb00af05d46c290ba2000d2fb5e41
+2026-09-13T22:59:40.8162169Z workflow_env_status=ready
+2026-09-13T22:59:40.8162445Z autodeploy_status=drift
+2026-09-13T22:59:40.8162669Z status=drift
+2026-09-13T22:59:40.8163600Z ERROR: canary failed at warmup: warmup_probe_failed
+2026-09-13T22:59:40.8500923Z canary_capture_write_status=written

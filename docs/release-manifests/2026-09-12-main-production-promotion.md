@@ -1,12 +1,12 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: The sharing-off browser walk, fresh full candidate run and ten-pair A/B are complete at product head 4fd587bf, within every spend cap. Native failures and nonblocking findings are retained below; no new blocking P0 or P1 was identified. The founder owns the Step 7 merge decision after final-head CI, Codex review and zero unresolved threads are confirmed in the PR terminal audit. No merge or Step 8 operation was performed.
+Status: The founder merged PR #603 as `3d98057c1e722317f0243fb96fb647771ddae484`. All seven approved migrations are applied and all three services are deployed at that merge. Post-deploy acceptance stopped on an unexpected authenticated-canary failure: `Rendered profile hydration failed`. The current Step 8 record is at the end of this manifest. Earlier checkpoint records retain their original pre-merge state and evidence.
 
 ## Candidate
 
 - Candidate SHA: `4fd587bf24ce39b794c2228d61f94693826d0da2`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: The sharing-off browser walk, fresh full candidate run and ten-pair A/B are complete at product head 4fd587bf, within every spend cap. Native failures and nonblocking findings are retained below; no new blocking P0 or P1 was identified. The founder owns the Step 7 merge decision after final-head CI, Codex review and zero unresolved threads are confirmed in the PR terminal audit. No merge or Step 8 operation was performed.
+- Validation status: Pre-merge acceptance and final review completed; founder merge and the approved deployment followed. Post-deploy acceptance is stopped, as recorded in the current Step 8 section. The measured product head and scorecards below remain unchanged.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
@@ -779,3 +779,72 @@ Authoritative new-head A/B documents, after all historical references above:
 
 - Deployed A/B document: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab-baseline.json`.
 - Candidate A/B document: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab-candidate.json`.
+
+## Current Step 8: Deployed, Acceptance Stopped, 2026-09-13
+
+The founder merged [PR #603](https://github.com/lagarcess/argus/pull/603) at 22:23:31Z as `3d98057c1e722317f0243fb96fb647771ddae484`. Its parents are main `17a07497abbb2ff9159b9694832a6668421e0e88` and reviewed promotion head `f1fa4f15e6e0f4604169d5d13a8811e43e8adbf6`; its tree matches that reviewed promotion. The [terminal audit](https://github.com/lagarcess/argus/pull/603#issuecomment-5656534529) records the final pre-merge checks. Codex performed no merge or integration reconciliation.
+
+Paths below are relative to `docs/reports/evidence/2026-09-12-main-promotion/postdeploy/`. `verification-status.json` is the structured stop record. This section supersedes the earlier pending-deploy fields while retaining the pre-merge measurements unchanged.
+
+### Approved environment preparation and smoke
+
+The founder approved removal of only the setup-created link `/private/tmp/argus-promotion-20260913-landed/web/.env.local`. Before and after unlinking, the canonical file had size 1095 bytes and modification time `1785873439166244436` nanoseconds; device and inode also matched. Nothing wrote to the canonical file or through the link. The detached landed checkout retained only the approved root `.env` source. Evidence: `approved-env-link-cleanup.json`; the preceding setup stop remains in `environment-stop.json`.
+
+The unchanged landed smoke first exited 28 on its known 20-second cold readiness timeout. Under the earlier approved recovery, one direct request used the same smoke configuration and took 1.201 seconds. It returned HTTP 503 with runtime and asset checks ready; `gateway_unavailable` was the expected Supabase state in this memory-mode smoke. The single unchanged smoke rerun passed in 5.14 seconds at the merge commit. No repository timeout or environment file changed. Evidence: `landed-local-smoke.log`, its API log and status JSON, `landed-direct-readiness.json`, and `landed-local-smoke-rerun.log` with its API log and status JSON.
+
+### Hosted settings and migrations
+
+The only environment writes were four per-key Render PUTs: `ARGUS_READOUT_MODEL` and `ARGUS_READOUT_FALLBACK_MODEL`, each `openai/gpt-5.6-luna`, on `argus-api` and `argus-backtests`. All three `autoDeployTrigger` values were `off` before, immediately before, after those writes, and after deployment. All unrelated environment values matched the pre-write readback. No Blueprint sync or `workflow-runtime` command ran. Sharing stayed off. Evidence: `hosted-settings-before.json`, `hosted-settings-immediately-before-write.json`, `hosted-settings-writes.json`, `hosted-settings-after.json`, and `hosted-settings-post-deploy.json`. The approved method change is retained in `workflow-settings-method-decision.json`.
+
+Immediately before application, the read-only production gate verified `origin/main` at the merge commit and reported only the seven approved missing migrations. The founder approved all seven, including the theme drop, without backup. Each migration ran in one transaction with its ledger row. Execution and the ledger statement array used the gate's own `_split_supabase_statements`; the exact name and statement array were read back before each commit. The gate itself remained read-only.
+
+| Repository order | Migration | Committed, UTC |
+| --- | --- | --- |
+| 1 | `20260908120000_decision_notes_attach_to_computations` | 22:51:41.322 |
+| 2 | `20260908205041_add_refusal_observations` | 22:51:42.207 |
+| 3 | `20260909183646_share_answer_receipt_selections` | 22:51:43.067 |
+| 4 | `20260909225701_retire_research_rail_ledger_status` | 22:51:43.678 |
+| 5 | `20260910003000_lift_receipt_selection_cap` | 22:51:43.966 |
+| 6 | `20260911120000_add_profile_home_country` | 22:51:44.703 |
+| 7 | `20260911214608_drop_profiles_theme` | 22:51:44.994 |
+
+At 22:51:47.379992Z the gate passed: 77 applied ledger rows, 75 candidate files, zero missing migrations, zero current name/content drift, and the same approved historical ledger variance. Catalog readback confirmed `profiles.theme` absent. Connections used TLS verification with the production CA and GSS disabled. Evidence: `production-migration-gate-immediately-before-apply.json`, `production-migration-gate-after.json`, `migration-objects-before.json`, `migration-objects-after.json`, and the per-transaction hashes and ledger readbacks in `deployment-controller-status.json`. No customer rows were copied into these artifacts.
+
+### Three-service deployment proof
+
+All releases explicitly targeted the merge commit and ran serially. API and app used `render deploys create --commit <merge> --wait --confirm`; the workflow used `workflow-release <merge>`. No autodeploy setting changed.
+
+| Service | Native terminal state | Commit proof | Live or ready proof, UTC |
+| --- | --- | --- | --- |
+| `argus-api` | `live` | `3d98057c1e722317f0243fb96fb647771ddae484` | Deploy finished 22:53:32.883509 |
+| `argus-app` | `live` | `3d98057c1e722317f0243fb96fb647771ddae484` | Deploy finished 22:55:27.413133 |
+| `argus-backtests` | `ready` | Version-owned commit prefix `3d98057` | Final readback 22:57:30.613566 |
+
+Workflow version `wfv-dajijpbm8hqs738ed7i0` matches the merge under Render's version-owned prefix contract. `three-service-versions-final.json` records the joint readback, with individual command results in the three deploy logs. The controller finished verification at 22:57:31Z. The accepted theme-drop window began at 22:51:45Z; the old API remained live until 22:53:33Z. No signup attempt during that interval is claimed.
+
+### Post-deploy checks and stop
+
+| Check | Result and reason | Evidence |
+| --- | --- | --- |
+| Health, forced readiness, frontend | PASS | `postdeploy-warmup.log` |
+| Stale queued/running jobs | PASS: zero scanned, stale, unresolved, reconciled or errors | `postdeploy-warmup.log` |
+| Release configuration and workflow environment | Values match; native audit exits 1 solely for the three approved `autoDeployTrigger expected=checksPass actual=off` lines | `postdeploy-warmup.log`, `postdeploy-warmup-disposition.json` |
+| Release-coherence canary | FAIL, accepted manual-mode exception: `warmup / warmup_probe_failed`; only the same three trigger mismatches | `canary-release/release-coherence.json`, `canary-release/audit-excerpt.txt` |
+| Authenticated Spanish canary | FAIL, unexpected: `browser / rendered_golden_path_failed`, exact error `Rendered profile hydration failed` | `canary-browser/authenticated-browser.json`, `canary-browser/failure-excerpt.txt`, `canary-browser/page-at-failure.md` |
+| Canary session cleanup | PASS: `canary_session_revocation=completed` | `canary-browser/failure-excerpt.txt` |
+| New signup and profile save | NOT RUN after the unexpected canary stop | `verification-status.json` |
+| English and Spanish Usage labels | NOT RUN in production after the stop; local acceptance remains unchanged | `verification-status.json` |
+| One feedback rating and one support email | NOT RUN after the stop; no feedback email was requested | `verification-status.json` |
+| Production sharing | NOT APPLICABLE: sharing is off; no production link created | `hosted-settings-post-deploy.json`, `postdeploy-warmup.log` |
+
+Both canary surfaces ran once in [GitHub Actions run 34788336368](https://github.com/lagarcess/argus/actions/runs/34788336368), with harness, checkout and candidate all at the merge commit. The overall workflow is failed. The release-coherence stop prevented its standalone workflow proof, signup-denial and welcome-delivery phases from running; no success is claimed for skipped phases.
+
+The browser failed at the first authenticated `GET /api/v1/me` response, before any chat turn, backtest, decision or canonical result receipt check. The unchanged harness only records that the response was non-success; it did not retain a numeric HTTP status. Its page snapshot shows Spanish guest settings and the sign-in control. This does not establish the cause or whether it is a candidate regression. The known #605 exception, `canonical result_summary route receipt is missing`, was not reached and does not cover this failure. The remaining journey test did not run. Redacted native captures are retained under `canary-browser-capture/` and `canary-release-capture/`.
+
+This unexpected canary failure blocks completion of production acceptance under the founder's stop rule. No retry, product fix, further production browser action or rollback ran. The founder decision needed is whether to authorize read-only diagnosis of the profile-hydration failure before resuming acceptance. Rollback remains founder-owned; the old baseline `ee9c3491fa6219502f1e94abc5d9e661a06839d9` requires separately approved restoration of the theme column before deploying that old build.
+
+No live eval was rerun and this canary reached zero chat turns. Retained budgets are unchanged: eval $9.556433710664 tracked plus $1.64 reserve, $11.196433710664 against $12.50; browser $1.34063303874 tracked plus $0.24 reserve, $1.58063303874 against $3; historical replay $1.70731696526 tracked plus $0.18 reserve, $1.88731696526 against $4. Reserve is not spend. Infrastructure deployment charges are outside these provider-turn ledgers.
+
+The follow-up changes only `docs/`. It retains the native failed results, sanitized evidence and operator-script hashes; it changes no product, migration, release configuration or validator.
+
+Documentation verification passed all 283 checks in 14.74 seconds: both release-document test files and the complete mocked harness command from `tests/evals/README.md`. The secret-value and UUID privacy scans passed; every non-doc Git path still matches the deployed merge commit. Evidence: `docs-and-mocked-tests.log` and `docs-verification.json`. These free checks do not change the failed production acceptance result.

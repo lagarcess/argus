@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-09-13T22:35:24.188305+00:00",
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "phase": "before",
+  "autoDeployTrigger": {
+    "argus-api": "off",
+    "argus-app": "off",
+    "argus-backtests": "off"
+  },
+  "readout_values": {
+    "argus-backtests": {
+      "ARGUS_READOUT_MODEL": null,
+      "ARGUS_READOUT_FALLBACK_MODEL": null
+    },
+    "argus-api": {
+      "ARGUS_READOUT_MODEL": null,
+      "ARGUS_READOUT_FALLBACK_MODEL": null
+    }
+  }
+}

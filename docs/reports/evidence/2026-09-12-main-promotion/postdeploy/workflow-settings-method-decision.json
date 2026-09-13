@@ -1,0 +1,40 @@
+{
+  "status": "awaiting_founder_method_decision",
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "merge_tree_identical_to_reviewed_promotion_head": true,
+  "requested_command": ".github/render-env-sync.sh workflow-runtime",
+  "verified_command_effects": {
+    "workflow_patch_fields": [
+      "buildConfig",
+      "runCommand",
+      "autoDeployTrigger"
+    ],
+    "autoDeployTrigger": "checksPass",
+    "environment_keys_written": [
+      "POETRY_VERSION"
+    ],
+    "requested_readout_keys_written": false
+  },
+  "stop_rule": "Founder instruction: stop and report anything that would touch autodeploy",
+  "proposed_alternative": "Set only the two approved readout values through the existing per-key Render env endpoint. Preserve all runtime and autodeploy settings. Read back the two values and manual mode before proceeding.",
+  "proposed_workflow_requests": [
+    {
+      "method": "PUT",
+      "url": "https://api.render.com/v1/services/wfl-d8hpsmuq1p3s73duv3q0/env-vars/ARGUS_READOUT_MODEL",
+      "body": {
+        "value": "openai/gpt-5.6-luna"
+      }
+    },
+    {
+      "method": "PUT",
+      "url": "https://api.render.com/v1/services/wfl-d8hpsmuq1p3s73duv3q0/env-vars/ARGUS_READOUT_FALLBACK_MODEL",
+      "body": {
+        "value": "openai/gpt-5.6-luna"
+      }
+    }
+  ],
+  "production_mutations_performed": false,
+  "migration_gate_at_merge_commit_run": false,
+  "migrations_applied": false,
+  "deploys_started": false
+}
