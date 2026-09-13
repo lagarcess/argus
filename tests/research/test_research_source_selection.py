@@ -208,10 +208,12 @@ def test_an_answer_names_its_pages_and_only_retrieved_ones_publish() -> None:
 
 
 def _stored_packet(label: str) -> ResearchPacket:
-    turn = json.loads((GROUNDED_MATH / f"turns/{label}.json").read_text())["turns"][0]
-    research = turn["metadata"]["research"]
+    frozen = json.loads(
+        (GROUNDED_MATH / "probes/sources_before_the_cited_rule.json").read_text()
+    )
+    research = frozen["turns"][label]
     return ResearchPacket(
-        answer_markdown=str(turn.get("content") or "stored answer"),
+        answer_markdown="stored answer",
         typed_answer=True,
         sources=tuple(
             ResearchSource(

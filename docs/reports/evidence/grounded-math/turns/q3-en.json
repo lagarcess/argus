@@ -2,16 +2,16 @@
   "label": "q3",
   "language": "en",
   "country": "US",
-  "asked_at": "2026-09-13T01:41:31.035681+00:00",
+  "asked_at": "2026-09-13T04:03:49.189230+00:00",
   "turns": [
     {
       "message": "I owe 180,000 on the car at 14 percent, is paying extra worth it?",
       "action": null,
-      "message_id": "05189b23-e9d2-48c5-9ebe-03fc1cdb5431",
-      "first_answer_seconds": 17.38,
-      "final_answer_seconds": 17.38,
+      "message_id": "5e48e189-3204-408b-86af-34c5eb06eeeb",
+      "first_answer_seconds": 25.25,
+      "final_answer_seconds": 25.25,
       "research_job_id": null,
-      "elapsed_seconds": 17.38,
+      "elapsed_seconds": 25.25,
       "timeline": [
         {
           "at": 0.07,
@@ -19,16 +19,16 @@
           "stage": "interpret"
         },
         {
-          "at": 17.38,
+          "at": 25.24,
           "type": "stage_outcome",
           "outcome": "await_user_reply"
         },
         {
-          "at": 17.38,
+          "at": 25.25,
           "type": "token"
         },
         {
-          "at": 17.38,
+          "at": 25.25,
           "type": "final"
         }
       ],
@@ -58,8 +58,7 @@
           "prompt_source": "degraded_fallback",
           "requested_field": "payment",
           "requested_fields": [
-            "payment",
-            "start_date"
+            "payment"
           ],
           "missing_inputs": [
             {
@@ -68,107 +67,102 @@
                 "locale_key": "tools.calc.fields.payment",
                 "interpolation_args": {}
               }
-            },
-            {
-              "name": "start_date",
-              "label": {
-                "locale_key": "tools.calc.fields.start_date",
-                "interpolation_args": {}
-              }
             }
           ],
           "semantic_needs": [],
           "payload": {
-            "calculation": {
-              "kind": "time_value",
-              "solve_for": "periods",
-              "inputs": [
-                {
-                  "name": "currency",
-                  "value": "USD",
-                  "source": "user",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": "USD"
-                },
-                {
-                  "name": "direction",
-                  "value": "borrow",
-                  "source": "user",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": null
-                },
-                {
-                  "name": "present_value",
-                  "value": 180000.0,
-                  "source": "user",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": "USD"
-                },
-                {
-                  "name": "payment",
-                  "value": null,
-                  "source": "user",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": "USD"
-                },
-                {
-                  "name": "future_value",
-                  "value": 0.0,
-                  "source": "assumption",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": "USD"
-                },
-                {
-                  "name": "annual_rate_pct",
-                  "value": 14.0,
-                  "source": "user",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": null
-                },
-                {
-                  "name": "periods",
-                  "value": null,
-                  "source": "user",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": null
-                },
-                {
-                  "name": "periods_per_year",
-                  "value": 12.0,
-                  "source": "assumption",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": null
-                },
-                {
-                  "name": "payment_timing",
-                  "value": "end",
-                  "source": "assumption",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": null
-                },
-                {
-                  "name": "start_date",
-                  "value": null,
-                  "source": "user",
-                  "source_url": null,
-                  "as_of": null,
-                  "currency": null
-                }
-              ]
-            },
+            "calculations": [
+              {
+                "name": "extra_payoff",
+                "kind": "time_value",
+                "solve_for": "periods",
+                "inputs": [
+                  {
+                    "name": "currency",
+                    "value": "USD",
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "direction",
+                    "value": "borrow",
+                    "source": "assumption",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "present_value",
+                    "value": 180000.0,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "payment",
+                    "value": null,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "future_value",
+                    "value": 0.0,
+                    "source": "assumption",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "annual_rate_pct",
+                    "value": 14.0,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "periods",
+                    "value": null,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "periods_per_year",
+                    "value": 12.0,
+                    "source": "assumption",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "payment_timing",
+                    "value": "end",
+                    "source": "assumption",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "start_date",
+                    "value": null,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  }
+                ]
+              }
+            ],
             "requested_field": "payment",
             "requested_fields": [
-              "payment",
-              "start_date"
+              "payment"
             ],
             "evidence": [],
             "retrieved": []
@@ -176,8 +170,8 @@
           "options": []
         },
         "agent_runtime_turn": {
-          "turn_id": "ccf2ae21-66ae-4a2c-be56-e4293186c685",
-          "request_id": "80777a09-5278-4e4c-995a-f10b95f5f38f",
+          "turn_id": "4bf16724-5bfa-4483-8d71-b2ecdd501e12",
+          "request_id": "a72510d6-dc6a-4e2e-8ffe-ae3b09198f9b",
           "status": "completed",
           "terminal": true,
           "reconciled_outcome": null,
@@ -188,5 +182,5 @@
       }
     }
   ],
-  "conversation_id": "61d8789a-a654-4d4d-803e-c7587d8eb9c1"
+  "conversation_id": "3f62708d-cbf1-41ef-9cf4-d9776572644f"
 }
