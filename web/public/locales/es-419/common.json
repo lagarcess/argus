@@ -1916,6 +1916,9 @@
       }
     },
     "calc": {
+      "missing_inputs": {
+        "ask": "Para calcularlo, dime {{inputs}}."
+      },
       "units": {
         "currency": "{{code}}",
         "months": "meses",

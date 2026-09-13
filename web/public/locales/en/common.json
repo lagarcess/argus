@@ -1916,6 +1916,9 @@
       }
     },
     "calc": {
+      "missing_inputs": {
+        "ask": "To work this out, tell me {{inputs}}."
+      },
       "units": {
         "currency": "{{code}}",
         "months": "months",

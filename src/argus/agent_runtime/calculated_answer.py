@@ -25,7 +25,6 @@ from argus.agent_runtime.answer_calculation import (
     PublishedCalculation,
     latest_market_close,
     publish_calculation,
-    states_a_figure,
 )
 from argus.agent_runtime.calculation_rows import market_counterfactual_rows
 from argus.agent_runtime.knowledge_answer import VoicedAnswer
@@ -36,6 +35,7 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import RunState, UserState
+from argus.domain.calculations._shared import field_label
 from argus.domain.calculations.answer_request import (
     ANSWER_CALCULATION_INSTRUCTIONS,
     AnswerCalculation,
@@ -119,6 +119,7 @@ class CalculatedAnswer:
     template: dict[str, str] | None
     question_field: str | None
     pending: dict[str, Any] | None
+    missing_inputs: tuple[str, ...] = ()
 
 
 def calculated_answer(
@@ -205,15 +206,17 @@ def answer_from_published(
         return None
     if published.question_field is not None:
         field = published.question_field
-        asks = prose.strip() and "{{" not in prose and not states_a_figure(prose)
+        owed = published.owed or (field,)
         return CalculatedAnswer(
-            answer_text=prose.strip() if asks else question_text(field, language),
+            answer_text=missing_inputs_lead(language),
             patch={},
             template=None,
             question_field=field,
+            missing_inputs=tuple(owed),
             pending={
                 PENDING_PAYLOAD_KEY: request.model_dump(mode="json"),
                 "requested_field": field,
+                "requested_fields": list(owed),
                 "evidence": [row.model_dump(mode="json") for row in evidence],
                 "retrieved": [source.model_dump(mode="json") for source in retrieved],
             },
@@ -344,11 +347,12 @@ async def calculation_offer_stage_result(
     field = str(offer.get("requested_field") or "")
     return question_stage_result(
         CalculatedAnswer(
-            answer_text=question_text(field, user.language_preference),
+            answer_text=missing_inputs_lead(user.language_preference),
             patch={},
             template=None,
             question_field=field,
             pending=offer,
+            missing_inputs=tuple(offer.get("requested_fields") or [field]),
         ),
         decision=research_decision(interpretation, user, INPUT_MISSING_REASON_CODE),
     )
@@ -387,19 +391,26 @@ def question_stage_result(
     """One plain question for the figure only the user knows, with the pending
     calculation the reply completes."""
     field = str(answered.question_field)
+    owed = list(answered.missing_inputs or (field,))
     return StageResult(
         outcome="await_user_reply",
         decision=decision,
         stage_patch={
             "assistant_prompt": answered.answer_text,
             "requested_field": field,
-            "missing_required_fields": [field],
+            "missing_required_fields": owed,
             "clarification": {
                 "kind": "clarification",
                 "reason_code": INPUT_MISSING_REASON_CODE,
-                "prompt_source": "llm_generated",
+                # Display transport: the app writes the question from the typed
+                # missing inputs and their label keys, in the reader's language.
+                "prompt_source": "degraded_fallback",
                 "requested_field": field,
-                "requested_fields": [field],
+                "requested_fields": owed,
+                "missing_inputs": [
+                    {"name": name, "label": field_label(name).model_dump(mode="json")}
+                    for name in owed
+                ],
                 "semantic_needs": [],
                 "payload": answered.pending or {},
                 "options": [],
@@ -408,12 +419,12 @@ def question_stage_result(
     )
 
 
-def question_text(field: str, language: str) -> str:
-    """Argus's own plain question for one figure only the user knows."""
-    label = field.replace("_pct", " (%)").replace("_", " ")
+def missing_inputs_lead(language: str) -> str:
+    """The stored line of a question for figures only the user knows; the app
+    names each figure from the typed missing inputs."""
     if str(language or "").startswith("es"):
-        return f"Para calcularlo me falta un dato: {label}. ¿Qué valor uso?"
-    return f"To compute this I need one more value: {label}. What should I use?"
+        return "Para calcularlo, necesito algunos de tus propios datos."
+    return "To work this out, I need a few of your own figures."
 
 
 def _restates(message: str, lead: str) -> bool:
@@ -504,7 +515,7 @@ def _messages(
             )
         else:
             context.append(
-                f"Argus asked the user for {pending.get('requested_field')} of a "
+                f"Argus asked the user for {', '.join(pending.get('requested_fields') or [str(pending.get('requested_field'))])} of a "
                 f"{calculation.get('kind')} calculation. Keep that kind and its inputs "
                 f"so far, and fill the answered figure: {payload}\n"
             )

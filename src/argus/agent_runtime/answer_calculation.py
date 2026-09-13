@@ -109,6 +109,7 @@ class PublishedCalculation:
     template: dict[str, str] | None
     question_field: str | None
     not_looked_up: tuple[str, ...]
+    owed: tuple[str, ...] = ()
 
 
 def publish_calculation(
@@ -144,6 +145,7 @@ def publish_calculation(
             template=None,
             question_field=resolved.user_owed[0] if resolved.user_owed else None,
             not_looked_up=tuple(resolved.not_looked_up),
+            owed=tuple(resolved.user_owed),
         )
     patch = computed_answer_patch(resolved)
     card = card_in(patch)

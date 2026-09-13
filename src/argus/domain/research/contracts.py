@@ -68,7 +68,7 @@ class RetrievedRow(BaseModel):
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
     subject: str
-    """The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix."""
+    """The entity the figure describes, as the source names it: Microsoft, Santander, Netflix."""
     symbol: str | None
     """The exchange ticker of the security the figure describes, or null."""
     label: str
@@ -76,7 +76,7 @@ class RetrievedRow(BaseModel):
     value: float = Field(strict=True, allow_inf_nan=False)
     """The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000."""
     kind: RowKind
-    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares."""
+    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as price to book, count for a number of units such as shares."""
     unit: str
     """The unit of value: only the ISO 4217 code of a money amount such as USD or DOP, with a per-share or per-unit figure saying so in its label; % for a percentage, x for a multiple, the thing counted for a count."""
     as_of: str | None

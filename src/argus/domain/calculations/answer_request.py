@@ -156,8 +156,8 @@ class AnswerCalculation(BaseModel):
 ANSWER_CALCULATION_INSTRUCTIONS = (
     "Fill calculation only when the answer computes on specific figures, such as "
     "what a plan, loan or purchase costs, what an amount earns or grows to, "
-    "whether a price is high for its earnings, which option costs less or whether "
-    "savings keep up with inflation, with the one kind listed below that computes "
+    "how many years a sum takes to double, which option costs less or what "
+    "a dividend yields at today's price, with the one kind listed below that computes "
     "it. Argus computes it: never compute a figure yourself, such as a change, a "
     "percentage, a ratio or a total; state each figure as its source gives it, or "
     "let the calculation produce it. List every input the kind needs with its "

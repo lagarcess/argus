@@ -5291,13 +5291,17 @@ recomputed card. When the inputs state an amount and a whole-year horizon,
 `next_experiments` offers one `calculation_market_counterfactual` row that runs
 only when tapped, and `next_steps` lists it.
 
-A figure only the user knows answers `await_user_reply` with one plain question
-as `assistant_prompt`, `requested_field` naming the argument, no card, and
-`clarification = {kind: "clarification", reason_code:
-"calculation_input_missing", prompt_source, requested_field, requested_fields,
-semantic_needs: [], payload: {calculation, requested_field, retrieved}, options:
-[]}`, where `retrieved` keeps the pages the answer read so the reply may still
-cite them (`calculation_pending_reply`). That question belongs to the no-search
+A figure only the user knows answers `await_user_reply` with Argus's own one-line
+lead as `assistant_prompt`, `requested_field` naming the first missing argument,
+no card, and `clarification = {kind: "clarification", reason_code:
+"calculation_input_missing", prompt_source: "degraded_fallback", requested_field,
+requested_fields, missing_inputs: [{name, label}], semantic_needs: [], payload:
+{calculation, requested_field, requested_fields, evidence, retrieved}, options:
+[]}`. Each missing input carries the declaration's `LocalizedText` label key and
+the app writes the question from them (`tools.calc.missing_inputs.ask`), so the
+question names exactly the figures only the user knows. `retrieved` keeps the
+pages the answer read and `evidence` the figures it cited from finance data, so
+the reply may still cite them (`calculation_pending_reply`). That question belongs to the no-search
 answer; a research turn whose lookup failed and whose fallback asks keeps its
 `research` sidecar, so the packet it read reaches the ledger, and a background
 job in that case stores the same `clarification` and `requested_field` on its

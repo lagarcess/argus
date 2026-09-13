@@ -145,7 +145,16 @@ def test_a_figure_only_the_user_knows_is_one_question_and_the_reply_computes(
         )
     )
     assert asked is not None and asked.outcome == "await_user_reply"
-    assert asked.patch["assistant_prompt"] == "How many months are left on the loan?"
+    assert asked.patch["assistant_prompt"] == ca.missing_inputs_lead("en")
+    assert asked.patch["clarification"]["missing_inputs"] == [
+        {
+            "name": "periods",
+            "label": {
+                "locale_key": "tools.calc.fields.periods",
+                "interpolation_args": {},
+            },
+        }
+    ]
     assert asked.patch["requested_field"] == "periods"
     pending = asked.patch["clarification"]["payload"]
     assert pending["calculation"]["kind"] == "time_value"
@@ -327,3 +336,45 @@ def test_a_voiced_answer_that_only_restates_the_question_is_never_published(
         is None
     )
     assert ca.ANSWER_RESTATED_QUESTION_REASON_CODE in notes
+
+
+def test_a_question_names_only_the_missing_inputs_whatever_the_model_wrote(
+    monkeypatch,
+) -> None:
+    _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "What is the monthly payment, number of periods, and total interest for the USD loan?",
+                [
+                    {"name": "direction", "value": "borrow", "source": "user"},
+                    {"name": "present_value", "value": 180000, "source": "user"},
+                    {"name": "annual_rate_pct", "value": 14, "source": "user"},
+                    {"name": "future_value", "value": 0, "source": "user"},
+                    {"name": "periods", "value": None, "source": "user"},
+                ],
+                solve_for="payment",
+            )
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="I owe money on a boat loan at 9 percent, should I refinance?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.outcome == "await_user_reply"
+    clarification = asked.patch["clarification"]
+    assert asked.patch["assistant_prompt"] == ca.missing_inputs_lead("en")
+    assert "interest" not in asked.patch["assistant_prompt"]
+    assert "USD" not in asked.patch["assistant_prompt"]
+    assert clarification["prompt_source"] == "degraded_fallback"
+    assert [item["name"] for item in clarification["missing_inputs"]] == ["periods"]
+    assert (
+        clarification["missing_inputs"][0]["label"]["locale_key"]
+        == "tools.calc.fields.periods"
+    )
