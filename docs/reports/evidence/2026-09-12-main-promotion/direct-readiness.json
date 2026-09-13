@@ -1,0 +1,41 @@
+{
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "method": "one direct timed request using the unchanged local-smoke source-only environment",
+  "app_or_smoke_timeout_changed": false,
+  "http_status": 503,
+  "payload": {
+    "status": "degraded",
+    "checks": [
+      {
+        "name": "agent_runtime_workflow",
+        "status": "ready",
+        "duration_ms": 1171
+      },
+      {
+        "name": "supabase",
+        "status": "degraded",
+        "duration_ms": 0,
+        "reason": "gateway_unavailable"
+      },
+      {
+        "name": "asset_universe",
+        "status": "ready",
+        "duration_ms": 0,
+        "provider_mode": "synthetic_unit_fixture",
+        "alias_count": 47,
+        "required_symbols": [
+          "AAPL",
+          "MSFT",
+          "SPY"
+        ],
+        "resolved_symbols": [
+          "AAPL",
+          "MSFT",
+          "SPY"
+        ],
+        "missing_symbols": []
+      }
+    ]
+  },
+  "elapsed_seconds": 1.178
+}

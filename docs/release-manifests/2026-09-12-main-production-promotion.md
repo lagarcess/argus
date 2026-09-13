@@ -1,12 +1,12 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: stopped in Step 2 at the environment-parity check. Free-gate and readback evidence is recorded below. No live evaluation, browser acceptance, migration application, live configuration change, merge, or deployment has occurred.
+Status: Step 2 resumed after founder approval. Environment parity and the single unchanged smoke rerun passed. The migration gate is blocked only by the seven expected pending migrations. Live acceptance and terminal review remain pending. No live evaluation, browser acceptance, migration application, live configuration change, merge, or deployment has occurred.
 
 ## Candidate
 
-- Candidate SHA: `1623954b1b81e094246729dff539e074f7026fa9`
+- Candidate SHA: `df7aee12955f667e31057464d62c72287fb12247`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: stopped in Step 2; not ready for merge.
+- Validation status: free gates completed with one pending Step 3 scorecard requirement; not ready for merge.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
@@ -17,9 +17,9 @@ Status: stopped in Step 2 at the environment-parity check. Free-gate and readbac
 ## Production Migration Gate
 
 - Gate command: `scripts/ops/production_migration_gate.py`
-- Gate report durable attachment or committed path:
-- Gate checked at:
-- Gate candidate SHA:
+- Gate report durable attachment or committed path: `docs/reports/evidence/2026-09-12-main-promotion/production-migration-gate-before.json`
+- Gate checked at: `2026-09-13T02:38:15.471757Z`
+- Gate candidate SHA: `df7aee12955f667e31057464d62c72287fb12247`
 - Gated candidate parents and intended landing method:
 - Landed `origin/main` SHA:
 - Gate-to-landed-SHA identity: exact / invalidated and rerun
@@ -37,14 +37,14 @@ Status: stopped in Step 2 at the environment-parity check. Free-gate and readbac
 - Migration content drift, including missing statement history:
 - Safety classifications and live requirements for every missing migration:
 - Classification basis and human live-schema review:
-- Gate result: not run before the environment-parity stop; `status=pass` remains required before service deploy
+- Gate result: expected `status=blocked`, sole stop reason `missing_candidate_migrations`, with exactly the seven listed versions in repository order. The theme drop is destructive. No new name or content drift; the historical ledger variance matches the gate's committed reconciliation and is advisory. `status=pass` remains required before deploy.
 - Gate human-approval state: seven listed migrations approved in principle, including the destructive theme drop with no backup; application awaits the post-merge approval stop in this task.
 - Gate apply result: `not_performed_by_gate`
 - Gate ledger readback:
 - Human apply performed: no.
 - If applied, repository order and ledger before/after:
 - If applied, affected-object readback:
-- Confirm the gate never applies migrations:
+- Confirm the gate never applies migrations: `database_access=read_only`, `migration_apply=never`, `apply_result=not_performed_by_gate`.
 
 ## Deploy Proof
 
@@ -70,7 +70,7 @@ Status: stopped in Step 2 at the environment-parity check. Free-gate and readbac
 - workflow_env_status:
 - autodeploy_fingerprint:
 - autodeploy_status:
-- all three services use `checksPass`: not requested; founder requires manual mode on all three, pending readback.
+- all three services use `checksPass`: not requested; founder requires manual mode on all three, verified `off` in `production-readback-before.json`.
 - workflow_runtime_provider_mode:
 - workflow_runtime_proof:
 - env_fingerprint script output:
@@ -79,7 +79,7 @@ Status: stopped in Step 2 at the environment-parity check. Free-gate and readbac
 - Backtest service mode:
 - Workflow service proof:
   - `argus-backtests` latest deploy/status:
-  - workflow autodeploy verified: pending; required live mode is `off`.
+  - workflow autodeploy verified: `off`.
   - workflow provider mode verified: `live_provider`
   - effective runtime provider mode verified: `live_provider`
   - effective runtime proof status:
@@ -171,7 +171,7 @@ Status: stopped in Step 2 at the environment-parity check. Free-gate and readbac
 - Never merge integration into this branch again. Later integration work is excluded.
 - Founder lands the promotion with a merge commit, never squash or rebase. Codex never merges.
 - The first commit changes the two sharing flags in `render.yaml` and the release profile to `true`. Code defaults remain off. Existing contract tests derive the values; no separate false-valued pin was found.
-- Measured head: `1623954b1b81e094246729dff539e074f7026fa9`.
+- Measured head: `df7aee12955f667e31057464d62c72287fb12247`. The founder-approved template commit supersedes the first contract head before any paid measurement.
 - Later evidence commits touch only `docs/` unless an approved finding round requires a product fix.
 - Product-tree identity will compare `src/`, `web/app/`, `web/components/`, `web/lib/`, `web/public/`, `render.yaml`, and `supabase/` to the measured head, matching the prior promotion record. Also record all non-doc Git-tree changes, including `workflows/`, tests, lockfiles, and the release profile.
 
@@ -203,7 +203,7 @@ The founder explicitly approved no backup, overriding PR #595's backup step. Bet
 
 | Job | Environment | Stop | Spent | Result |
 | --- | --- | --- | --- | --- |
-| Free gates | A: development setup with the explicit canonical-root override | Free | $0 | Pending |
+| Free gates | A: development setup with the explicit canonical-root override | Free | $0 | Smoke, mocked harness, modularity and parity passed; release-doc scorecard check awaits Step 3 |
 | Candidate and production baseline eval | B: identical explicit eval env file and both provider modes live | $3.50 combined | $0 | Not started |
 | Founder browser walk | C: clean detached worktree, disposable Supabase, production build | $3.00 | $0 | Not started |
 | Historical guest replay | C: fresh guest per conversation, ordered user turns | $4.00 | $0 | Count and estimate pending |
@@ -214,7 +214,7 @@ Environment C has no `.env` or `web/.env.local`. API and web launch from empty e
 
 Local differences to cover after deployment: in-process backtests instead of `argus-backtests`, no Turnstile widget, no PostHog, no emails, and localhost origins. The API retains production key routing and shadow job rows; only if jobs stay queued may shadow mode be turned off and recorded as another local difference.
 
-## Step 2 Stop Record
+## Historical Step 2 Stop Record (Superseded by Approved Resumption)
 
 Evidence directory: `docs/reports/evidence/2026-09-12-main-promotion/`.
 
@@ -233,3 +233,19 @@ Evidence directory: `docs/reports/evidence/2026-09-12-main-promotion/`.
 The founder's explicit stop rule for an unexpected environment check applies. The migration gate, promotion PR, Step 3 pair, founder browser walk and historical replay have not started. No production user text was extracted. Spend is $0 of $3.50 for the pair, $0 of $3 for the walk, and $0 of $4 for replay. No fix round has been used.
 
 Requested decision: approve a bounded environment-template correction and resumption of Step 2, or accept the documented template gaps for this promotion. This does not authorize a migration, live setting change, deployment, merge, or production sharing link.
+
+
+## Step 2 Approved Resumption
+
+The founder approved the template correction and one unchanged smoke rerun in this task. Commit `df7aee12955f667e31057464d62c72287fb12247` adds 31 one-line setting descriptions to `.env.example`, including the original seven and the full parity findings. They are comments; parsed template values are unchanged. No real environment file was written. This commit defines the measured head before any paid measurement.
+
+- `environment-parity-after.json`: full pass across 144 runtime/operator keys, including all 15 dynamic task timeout keys. No intended hosted setting is missing from the release contract. Optional undeclared settings retain production code defaults.
+- `template-added-keys.json`: complete list of 31 additions and unchanged effective template values. The founder confirmed the original seven gaps predate this bundle.
+- `direct-readiness.json`, `direct-readiness.log`, `direct-readiness-api.log`: the one direct timed request in the unchanged smoke environment returned HTTP 503 in 1.178 seconds. The runtime and synthetic asset check were ready; memory-mode Supabase degradation is expected by this smoke.
+- `local-smoke-rerun-status.json`, `local-smoke-rerun.log`, `local-smoke-rerun-api.log`, `local-smoke-rerun-web.log`: the single approved rerun at the new measured head passed, exit 0, in 5.394 seconds. Neither timeout changed. Both timeout-owning files are byte-identical to main.
+- `free-gates-df7aee12.log`: mocked and release checks totaled 346 passed, one failed in 34.18 seconds. The sole failure is the pending durable live scorecard requirement for this manifest. It must pass after Step 3; no test was weakened.
+- `modularity-df7aee12.log`: passed. No newer integration work was included.
+- `production-migration-gate-before.json`: expected seven-migration block, read only. Historical reconciliation matches; no additional stop reason. No schema application occurred.
+- `measured-tree-identity.json`: product paths and every non-doc Git path match the new measured head. Later evidence commits touch only docs.
+
+The initial stop record above is retained as history, not an outstanding approval request. Paid spend remains zero for each of the eval pair, browser walk and replay. No production conversation content has been extracted. No fix round has been used.
