@@ -2,8 +2,6 @@
 
 **Asked:** Which credit card should I get?
 
-**Seconds to first answer:** 106.04. **Seconds to final answer:** 106.04.
+**Seconds to first answer:** 77.28. **Seconds to final answer:** 77.28.
 
-Which credit card should I get?
-
-*Published figures could not be looked up.*
+I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.

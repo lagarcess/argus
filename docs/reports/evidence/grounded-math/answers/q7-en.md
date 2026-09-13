@@ -2,42 +2,46 @@
 
 **Asked:** Should I save in pesos or in dollars?
 
-**Seconds to first answer:** 42.89. **Seconds to final answer:** 42.89.
+**Seconds to first answer:** 53.6. **Seconds to final answer:** 53.6.
 
-**Save primarily in the currency you expect to spend.** Because you live in the US, dollars generally fit a US emergency fund and near-term US bills; keep pesos for known expenses in the peso-issuing country. If you regularly spend in both currencies, splitting the savings by expected spending is usually the cleanest way to limit exchange-rate risk.
+Neither currency is universally better. The key comparison is the currency in which you expect to spend the money: dollar savings avoid exchange-rate uncertainty for U.S. expenses, while peso savings avoid it for peso-denominated expenses.
 
-### Why the spending currency matters
+### How to frame the decision
 
-A peso deposit may offer a higher stated interest rate, but that does not automatically produce a better dollar result. Changes in the peso, dollar exchange rate, and conversion spreads or fees, can offset the extra interest.
+| Expected use of the savings | Dollar portion | Peso portion | Main trade-off |
+|---|---|---|---|
+| U.S. bills or purchases | Matches the future expense | Requires conversion later | Peso depreciation could reduce the dollar value; appreciation could increase it |
+| Expenses in the peso country | Requires conversion later | Matches the future expense | Dollar movements could change how many pesos are available |
+| Expenses in both currencies | Covers dollar obligations | Covers peso obligations | A split reduces dependence on one exchange rate but does not eliminate risk |
 
-Likewise, holding only dollars creates the opposite risk if your future expenses will be in pesos: the dollars may buy fewer pesos when you need them.
+Published securities disclosures confirm that converting foreign-currency amounts into dollars exposes the holder to exchange-rate risk and that future conversion at a particular rate may not be possible. That is why the account’s interest rate should not be considered by itself: the exchange-rate movement and conversion costs can materially change the result in your spending currency.
 
-### A practical framework
+### Other points to compare
 
-| Purpose of the money | Currency match |
-|---|---|
-| US emergency fund and US bills | Dollars |
-| Planned expenses priced in pesos | The applicable peso |
-| Future spending in both countries | Split according to expected expenses |
-| Long-term money with no defined use | Compare real returns, currency risk, access, taxes, and account protection, not interest rates alone |
+- The savings rate in each currency
+- Inflation in the relevant country
+- Currency-conversion fees and the actual exchange-rate spread
+- Withdrawal restrictions and account fees
+- The bank’s deposit-protection scheme
+- When and where the money will be spent
 
-### Before comparing accounts
+For U.S. bank accounts, eligible deposit accounts at FDIC-insured institutions receive automatic federal deposit insurance subject to the applicable coverage limits and ownership rules. Protection for a peso account depends on the country, institution and account structure, so it cannot be assessed until the particular peso and bank are identified.
 
-Check the deposit rate, local inflation, exchange-rate spread, transfer fees, withdrawal restrictions, taxes, and deposit-insurance rules. Also confirm which peso you mean, Mexican, Dominican, Colombian, Argentine, Philippine, or another, because their inflation, rates, convertibility, and risks differ substantially.
+### What is still missing
 
-No live comparison is possible from the question alone because the peso country, savings period, and intended spending currency were not specified.
+“Pesos” could refer to several currencies. A meaningful comparison requires the country, the specific dollar and peso accounts, their published rates and fees, the amount involved, and the expected spending currency and date. Without those details, a live rate comparison could not be verified.
 
 ## Sources
 
+- 424B2 - SEC.gov (www.sec.gov, 2026-09-09): https://www.sec.gov/Archives/edgar/data/0000927628/000119312526387878/d28156d424b2.htm
 - 10-Q: Quarterly report [Sections 13 or 15(d)] - Investor Relations (investor.skillsoft.com, 2026-09-09): https://investor.skillsoft.com/sec-filings/all-sec-filings/content/0001437749-26-029981/skil20260731_10q.htm
-- India taps diaspora dollars to defend rupee, boost reserves, court risks - CHOSUNBIZ (biz.chosun.com, 2026-09-07): https://biz.chosun.com/en/en-international/2026/09/07/JUNKKMQ4UZAINMKHBEBAZP2SQE/
-- USC - Treatment of certain foreign currency transactions (www.govregs.com, 2026-09-07): https://www.govregs.com/uscode/26/988
-- Exchange rates when you invest outside the euro (briefinglens.com, 2026-09-09): https://briefinglens.com/en/index-funds/currency-risk-investing-outside-the-euro/
-- Central Bank Currency Composition and Financial... - F1000Research (f1000research.com, 2026-09-10): https://f1000research.com/articles/15-1525
+- FCNR(B) deposits: Who bears the currency risk? | Explained (www.thehindu.com, 2026-09-09): https://www.thehindu.com/business/Economy/fcnrb-deposits-who-bears-the-currency-risk-explained/article71446140.ece
+- Central Bank Currency Composition and Financial... (f1000research.com, 2026-09-10): https://f1000research.com/articles/15-1525/v1
+- Central Bank Liquidity Swaps: Access, Pricing, and FIMA Repo (fedlaws.org, 2026-09-08): https://fedlaws.org/central-bank-liquidity-swaps-access-pricing-and-fima-repo/
 
 ## Next steps
 
-- Question: Which country’s pesos do you mean?
-- Question: Where and in which currency will you spend the money?
-- Question: How long do you plan to keep it saved?
-- Question: Would you like a current comparison of peso and dollar savings rates?
+- Question: Which country’s peso do you mean?
+- Question: Where and in what currency will you spend the savings?
+- Question: What rates and fees do the two accounts offer?
+- Question: How soon might you need the money?

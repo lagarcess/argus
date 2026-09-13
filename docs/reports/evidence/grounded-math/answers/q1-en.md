@@ -2,51 +2,53 @@
 
 **Asked:** How much should I save each month if I earn 38,000 pesos and want an iPad?
 
-**Seconds to first answer:** 39.32. **Seconds to final answer:** 39.33.
+**Seconds to first answer:** 41.34. **Seconds to final answer:** 41.34.
 
-You would need to save **MXN 708.25 MXN per month** to buy the standard iPad priced at **MXN 8,499 MXN, checked on 2026-09-13**, assuming you start with **MXN 0 MXN**, save for **12 monthly periods**, and earn **0%%** interest.
+Based on a listed iPad price of **MXN 11,769** and an assumed **12-month** saving period, the required monthly saving is **MXN 980.75**. This uses Mexican pesos as an assumption because you did not identify which country’s pesos you earn.
 
 ### Inputs used
 
-| Input | Value and basis |
-|---|---|
-| Currency | MXN; “pesos” is assumed to mean Mexican pesos |
-| iPad | Standard iPad with A16 chip, using Apple Mexico’s listed starting cash price |
-| Starting savings | MXN 0 MXN, an assumption |
-| Saving deadline | 12 monthly periods, an assumption |
-| Savings return | 0%%, an assumption so the result does not depend on an unstated account yield |
-| Contributions | Made at the end of each month |
+| Input | Amount | Basis |
+|---|---:|---|
+| Savings already available | MXN 0 | Assumption |
+| iPad price | MXN 11,769 | Sanborns listing for the Apple iPad with A16 chip, Wi‑Fi and 128 GB; the listing does not provide a price date |
+| Saving period | 12 months | Assumption |
+| Annual return | 0% | Assumption, so no interest is included |
+| Saving frequency | 12 times per year | Monthly deposits |
+| Deposit timing | end of each month | Assumption |
+| Start date | 2026-09-13 | Assumption |
 
 ### Calculation
 
-With no starting balance or interest, the monthly amount is:
+With no starting balance or interest, the calculation divides the purchase price by the number of monthly deposits:
 
-**Monthly saving = MXN 8,499 ÷ 12 = MXN 708.25**
+**Monthly saving = MXN 11,769 ÷ 12 = MXN 980.75**
 
-Your stated monthly income does not by itself determine the required saving amount; the purchase price, current savings, deadline, and any interest earned determine it. A different iPad model or deadline would change the result.
+Your stated income is not needed to calculate this monthly amount. A different iPad model, peso currency, existing savings balance, or purchase date would change the result.
 
 ## Sources
 
 - Apple iPad 11" Retina Apple A16 128GB WiFi Rosa - Sanborns (www.sanborns.com.mx, 2026-08-28): https://www.sanborns.com.mx/producto/859446/apple-ipad-11-retina-apple-a16-128gb-wifi-rosa
+- iPad Pro de 11 pulgadas (M5) - MacBook Air (M1) - Regalos - Apple (www.apple.com, 2026-09-10): https://www.apple.com/mx/shop/accessories/all/gifts/ipad-pro-de-11-pulgadas-m5-macbook-air-m1
 - ipad con Envío Gratis a Todo México | papeleria24 (papeleria24.com.mx, 2026-08-21): https://papeleria24.com.mx/product-category/ipad/
 - iPad Mini, un Apple iPad de 7.9 pulgadas | Verizon (espanol.verizon.com, 2026-09-04): https://espanol.verizon.com/tablets/apple-new-ipad-mini/?sku=sku3390031
-- Nuevo iPhone Duo: el celular plegable de Apple que se transforma en iPad (www.xataka.com.mx, 2026-09-09): https://www.xataka.com.mx/celulares-y-smartphones/apple-iphone-plegable-duo-lanzamiento-precio-mexico-caracteristicas-especificaciones-ficha-tecnica
-- Apple 2025 iPad Air (11-inch, Wi-Fi, 128GB) - Space Gray (Renewed) — precio total con envío (agosto 2026) · dede.sh (dede.sh, 2026-08-23): https://dede.sh/ar/p/apple-2025-ipad-air-11-inch-wi-fi-zpz2yq
+- Apple ofrece descuentos para estudiantes: cómo aprovecharlos (www.generacionuniversitaria.com.mx, 2026-09-05): https://www.generacionuniversitaria.com.mx/vida-universitaria/apple-ofrece-descuentos-para-estudiantes-como-aprovecharlos/
 
 ## Next steps
 
-- Question: How would the monthly amount change for a different iPad model?
-- Question: How much would I need to save with a shorter deadline?
-- Question: What percentage of my monthly income would this saving amount represent?
+- Question: Can you calculate it for a different iPad model?
+- Question: Can you use a different number of months?
+- Question: What if I already have some money saved?
+- Question: Can you use my country’s peso currency instead?
 
 ## Calculation
 
 - time_value: succeeded
-- Result payment: 708.25
+- Result payment: 980.75
 - Input direction: save (assumption)
 - Input present_value: 0.0 (assumption)
 - Input payment: None (computed)
-- Input future_value: 8499.0 (page)
+- Input future_value: 11769.0 (page)
 - Input annual_rate_pct: 0.0 (assumption)
 - Input periods: 12 (assumption)
 - Input periods_per_year: 12 (assumption)

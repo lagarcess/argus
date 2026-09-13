@@ -2,16 +2,16 @@
   "label": "q5",
   "language": "en",
   "country": "US",
-  "asked_at": "2026-09-13T00:03:48.479473+00:00",
+  "asked_at": "2026-09-13T01:14:30.722203+00:00",
   "turns": [
     {
       "message": "Which credit card should I get?",
       "action": null,
-      "message_id": "0e311ab4-4b44-435e-b7b8-93e588b29a9a",
-      "first_answer_seconds": 106.04,
-      "final_answer_seconds": 106.04,
+      "message_id": "b73b32b2-a93d-4f4b-ba94-12c8c8d931df",
+      "first_answer_seconds": 77.28,
+      "final_answer_seconds": 77.28,
       "research_job_id": null,
-      "elapsed_seconds": 106.04,
+      "elapsed_seconds": 77.28,
       "timeline": [
         {
           "at": 0.01,
@@ -19,27 +19,27 @@
           "stage": "interpret"
         },
         {
-          "at": 9.99,
+          "at": 8.48,
           "type": "stage_start",
           "stage": "research_search",
           "detail": "balanced"
         },
         {
-          "at": 106.03,
+          "at": 77.27,
           "type": "stage_outcome",
           "outcome": "ready_to_respond"
         },
         {
-          "at": 106.04,
+          "at": 77.28,
           "type": "token"
         },
         {
-          "at": 106.04,
+          "at": 77.28,
           "type": "final"
         }
       ],
       "summary": {
-        "content": "Which credit card should I get?\n\n*Published figures could not be looked up.*",
+        "content": "I couldn't complete the data lookup just now, so I won't quote live figures. Testing an idea against historical data is still available.",
         "tool": null,
         "status": null,
         "failure": null,
@@ -72,7 +72,7 @@
           "shape": "balanced",
           "sources": [],
           "rows": [],
-          "retrieved_at": "2026-09-13T00:05:34.550766+00:00",
+          "retrieved_at": "2026-09-13T01:15:48.035074+00:00",
           "anchor_symbols": [],
           "peers": [],
           "usage": {
@@ -97,8 +97,8 @@
           }
         },
         "agent_runtime_turn": {
-          "turn_id": "0c49c96e-a796-4139-877a-fdf329593751",
-          "request_id": "7930312d-7834-4a93-8f0f-e289daaf6c72",
+          "turn_id": "d19e9499-cea9-40cc-9577-116e55ab3ab2",
+          "request_id": "bc026c3a-0aa9-44c6-85cb-af0c80c6cad5",
           "status": "completed",
           "terminal": true,
           "reconciled_outcome": null,
@@ -109,5 +109,5 @@
       }
     }
   ],
-  "conversation_id": "4056aa91-fa6a-4d04-a917-577604707750"
+  "conversation_id": "3114c05e-0e9c-416d-b7cc-bc02975d5286"
 }

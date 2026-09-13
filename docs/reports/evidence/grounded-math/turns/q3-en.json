@@ -2,16 +2,16 @@
   "label": "q3",
   "language": "en",
   "country": "US",
-  "asked_at": "2026-09-13T00:02:40.554716+00:00",
+  "asked_at": "2026-09-13T01:14:15.608926+00:00",
   "turns": [
     {
       "message": "I owe 180,000 on the car at 14 percent, is paying extra worth it?",
       "action": null,
-      "message_id": "26f18f5a-2fbd-41a3-9e95-ab830f6510d1",
-      "first_answer_seconds": 19.06,
-      "final_answer_seconds": 19.06,
+      "message_id": "cc69e1d0-f53a-4e3f-bd65-c3836ef87adb",
+      "first_answer_seconds": 14.61,
+      "final_answer_seconds": 14.61,
       "research_job_id": null,
-      "elapsed_seconds": 19.06,
+      "elapsed_seconds": 14.61,
       "timeline": [
         {
           "at": 0.01,
@@ -19,16 +19,16 @@
           "stage": "interpret"
         },
         {
-          "at": 19.06,
+          "at": 14.61,
           "type": "stage_outcome",
           "outcome": "await_user_reply"
         },
         {
-          "at": 19.06,
+          "at": 14.61,
           "type": "token"
         },
         {
-          "at": 19.06,
+          "at": 14.61,
           "type": "final"
         }
       ],
@@ -72,7 +72,7 @@
                   "source": "user",
                   "source_url": null,
                   "as_of": null,
-                  "currency": null
+                  "currency": "USD"
                 },
                 {
                   "name": "direction",
@@ -149,13 +149,14 @@
               ]
             },
             "requested_field": "periods",
+            "evidence": [],
             "retrieved": []
           },
           "options": []
         },
         "agent_runtime_turn": {
-          "turn_id": "e6fa107a-c64d-44e3-939c-ddba8ab9c065",
-          "request_id": "b7b5e870-209f-411d-88f4-95e59aee9b5c",
+          "turn_id": "52d3ad67-68d8-4987-9d89-a9301a5b18bb",
+          "request_id": "4c8c7d25-ff94-4225-a213-d04e5f2427fe",
           "status": "completed",
           "terminal": true,
           "reconciled_outcome": null,
@@ -166,5 +167,5 @@
       }
     }
   ],
-  "conversation_id": "05f0108d-0bfe-4c56-bcdb-944416ea2173"
+  "conversation_id": "85f56acd-7baf-4ee5-a662-4fbfbad54938"
 }

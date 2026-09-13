@@ -2,16 +2,16 @@
   "label": "q2",
   "language": "en",
   "country": "US",
-  "asked_at": "2026-09-13T00:01:30.237713+00:00",
+  "asked_at": "2026-09-13T01:13:25.606610+00:00",
   "turns": [
     {
       "message": "What do I need to earn to afford a Porsche?",
       "action": null,
-      "message_id": "201ac270-49da-4a77-bad3-4ec1507bf314",
-      "first_answer_seconds": 69.8,
-      "final_answer_seconds": 69.8,
+      "message_id": "97ab4a1a-0544-49fe-a7a6-07b63bb6f9bd",
+      "first_answer_seconds": 49.5,
+      "final_answer_seconds": 49.5,
       "research_job_id": null,
-      "elapsed_seconds": 69.81,
+      "elapsed_seconds": 49.5,
       "timeline": [
         {
           "at": 0.01,
@@ -19,61 +19,76 @@
           "stage": "interpret"
         },
         {
-          "at": 33.04,
+          "at": 11.55,
           "type": "stage_start",
           "stage": "research_search",
           "detail": "balanced"
         },
         {
-          "at": 69.8,
+          "at": 49.47,
           "type": "stage_outcome",
           "outcome": "ready_to_respond"
         },
         {
-          "at": 69.8,
+          "at": 49.5,
           "type": "token"
         },
         {
-          "at": 69.8,
+          "at": 49.5,
           "type": "final"
         }
       ],
       "summary": {
-        "content": "There is no honest single salary figure without knowing the Porsche model, your location, down payment, financing terms and existing debts. Current U.S. starting prices range from $65,400 for a Macan to $135,500 for a 911, as of 2026-09-12, before taxes, registration, insurance, options and ongoing ownership costs.\n\n### Current price benchmarks\n\n| Representative Porsche | Current starting MSRP |\n|---|---:|\n| Macan | $65,400 |\n| Cayenne | $89,900 |\n| 911 | $135,500 |\n\nThese are starting prices. Porsche options can raise the purchase price materially, while a used Porsche could have a lower purchase price but different maintenance and financing costs.\n\n### The income calculation that matters\n\nUse the car’s **total monthly cost**, not merely its loan payment:\n\n**Required gross annual income = annual all-in Porsche cost ÷ the share of gross income you are comfortable spending on transportation**\n\nThe all-in cost should include:\n\n- Loan or lease payment\n- Insurance quote for your age, ZIP code and driving history\n- Fuel or electricity\n- Scheduled maintenance, tires and a repair reserve\n- Registration, property tax and parking\n- Any opportunity cost or cash-flow effect of the down payment\n\n### “Can qualify” versus “can afford”\n\nA lender may approve a payment that still leaves your budget exposed. A stronger affordability test asks whether you can cover the Porsche while continuing your normal savings, paying every other debt, handling repairs without new debt and absorbing a temporary income interruption.\n\n### What is still needed for an exact answer\n\nThe exact required income is unavailable from the information provided. It requires the model and configured price, purchase location, down payment, loan or lease terms, insurance quote, expected mileage, existing monthly debt payments and the maximum share of income you want transportation to consume.",
-        "tool": null,
-        "status": null,
+        "content": "Using a current Macan lease as the example, you would need gross monthly income of **USD 11,290** if its **USD 1,129** payment were limited to **10%** of gross income. This is an illustrative affordability calculation, not an approval threshold or a complete ownership budget.\n\n### Inputs used\n\n| Input | Amount |\n|---|---:|\n| Porsche Macan Electric lease payment | USD 1,129 monthly |\n| Assumed share of gross income | 10% |\n| Gross monthly income required | **USD 11,290** |\n\nThe advertised lease was available as of 2026-09-13, runs for 39 months, and requires USD 12,224 at signing. It excludes tax, title and registration; the page also states that approved credit is required.\n\n### Formula\n\n**Gross monthly income = monthly Porsche payment ÷ assumed income ratio**\n\n### What this does not include\n\nNo page states your existing monthly debt payments, location-dependent taxes, insurance cost, maintenance cost or desired Porsche model. Those inputs can materially change the income needed, so the result covers only the advertised lease payment under the stated assumption, not the full cost of having the car.",
+        "tool": "debt_to_income",
+        "status": "succeeded",
         "failure": null,
-        "answer": null,
-        "inputs": [],
-        "currency": null,
-        "computation": false,
+        "answer": {
+          "label": "tools.calc.fields.monthly_income",
+          "value": 11290.0
+        },
+        "inputs": [
+          {
+            "name": "monthly_debt_payments",
+            "value": 1129.0,
+            "source": "page"
+          },
+          {
+            "name": "monthly_income",
+            "value": null,
+            "source": "computed"
+          },
+          {
+            "name": "ratio_pct",
+            "value": 10.0,
+            "source": "assumption"
+          }
+        ],
+        "currency": "USD",
+        "computation": true,
         "requested_field": null,
         "clarification_reason": null,
         "next_steps": [
           {
             "type": "question",
-            "text": "Which Porsche model and country or state are you considering?"
+            "text": "How would the result change for a different Porsche model?"
           },
           {
             "type": "question",
-            "text": "How much would you put down, and would you buy, finance or lease?"
+            "text": "Can you include my existing debts in the calculation?"
           },
           {
             "type": "question",
-            "text": "What are your gross income and existing monthly debt payments?"
-          },
-          {
-            "type": "question",
-            "text": "Would you like the calculation based on a new or used Porsche?"
+            "text": "What income would a financed purchase require instead of a lease?"
           }
         ],
         "next_experiments": [],
         "research": {
           "shape": "balanced",
           "degraded": null,
-          "rows": 3,
+          "rows": 2,
           "sources": 5,
-          "cost_usd": 0.23926
+          "cost_usd": 0.18548
         },
         "reason_codes": null,
         "intent": null
@@ -86,19 +101,15 @@
           "items": [
             {
               "type": "question",
-              "text": "Which Porsche model and country or state are you considering?"
+              "text": "How would the result change for a different Porsche model?"
             },
             {
               "type": "question",
-              "text": "How much would you put down, and would you buy, finance or lease?"
+              "text": "Can you include my existing debts in the calculation?"
             },
             {
               "type": "question",
-              "text": "What are your gross income and existing monthly debt payments?"
-            },
-            {
-              "type": "question",
-              "text": "Would you like the calculation based on a new or used Porsche?"
+              "text": "What income would a financed purchase require instead of a lease?"
             }
           ]
         },
@@ -108,75 +119,65 @@
           "shape": "balanced",
           "sources": [
             {
-              "title": "How Much Car Can You Actually Afford on a $75,000 Salary?",
-              "domain": "www.inkl.com",
-              "url": "https://www.inkl.com/news/how-much-car-can-you-actually-afford-on-a-75-000-salary",
-              "source_date": "2026-09-10"
+              "title": "Practical Decision Checklist",
+              "domain": "finelo.com",
+              "url": "https://finelo.com/blog/how-much-house-can-i-afford",
+              "source_date": "2026-09-03"
             },
             {
-              "title": "The Greenest Car Is the One You Already Own",
-              "domain": "cleanfleetreport.com",
-              "url": "https://cleanfleetreport.com/the-greenest-car-is-the-one-you-already-own-heres-the-math/",
-              "source_date": "2026-09-09"
+              "title": "Debt-to-Income Chart by Monthly Income | Rule Calculator",
+              "domain": "rulecalculators.com",
+              "url": "https://rulecalculators.com/chart/dti-income-chart",
+              "source_date": "2026-08-16"
             },
             {
-              "title": "The Everyday Things That Quietly Cost More Than They Used To - Crafting Your Home",
-              "domain": "craftingyourhome.com",
-              "url": "https://craftingyourhome.com/the-everyday-things-that-quietly-cost-more-than-they-used-to/",
-              "source_date": "2026-09-07"
+              "title": "Debt-to-income: drag the debts | FinanceLearn",
+              "domain": "www.financelearn.org",
+              "url": "https://www.financelearn.org/tools/dti-explorer",
+              "source_date": "2026-08-17"
             },
             {
-              "title": "How Much Car Can You Afford? The 20/4/10 Rule, Stress-Tested",
-              "domain": "getstoia.com",
-              "url": "https://getstoia.com/blog/how-much-car-can-i-afford/",
-              "source_date": "2026-09-07"
+              "title": "Loan Terms Glossary: Principal, Interest Rate, HELOC, LTV & Bankruptcy | ClearValue Lending",
+              "domain": "clearvaluelending.com",
+              "url": "https://clearvaluelending.com/glossary/guides/loan-basics-and-workout-terms",
+              "source_date": "2026-08-21"
             },
             {
-              "title": "Debt-to-Income Ratio Calculator: Check Loan Eligibility",
-              "domain": "www.calculatorcollection.org",
-              "url": "https://www.calculatorcollection.org/en/calculators/debt/debt-to-income",
-              "source_date": "2026-09-07"
+              "title": "How Much House Can I Afford? The 28/36 Rule Calculator (2026)",
+              "domain": "cobaltprosper.com",
+              "url": "https://cobaltprosper.com/homeownership/how-much-house-can-i-afford/",
+              "source_date": "2026-08-30"
             }
           ],
           "rows": [
             {
-              "subject": "Porsche Macan",
+              "subject": "2026 Porsche Macan 4 Electric",
               "symbol": null,
-              "label": "starting MSRP including destination charge",
-              "value": 65400.0,
-              "kind": "currency",
-              "unit": "USD",
-              "as_of": "2026-09-12",
-              "source_url": "https://www.edmunds.com/porsche/macan/"
+              "label": "lease term",
+              "value": 39.0,
+              "kind": "count",
+              "unit": "months",
+              "as_of": "2026-09-13",
+              "source_url": "https://warrington.porsche.com/en/specials/new"
             },
             {
-              "subject": "Porsche Cayenne",
+              "subject": "2026 Porsche Macan 4 Electric",
               "symbol": null,
-              "label": "starting MSRP including destination charge",
-              "value": 89900.0,
+              "label": "amount due at lease signing",
+              "value": 12224.0,
               "kind": "currency",
               "unit": "USD",
-              "as_of": "2026-09-12",
-              "source_url": "https://www.edmunds.com/porsche/cayenne/"
-            },
-            {
-              "subject": "Porsche 911",
-              "symbol": null,
-              "label": "base MSRP excluding destination fee",
-              "value": 135500.0,
-              "kind": "currency",
-              "unit": "USD",
-              "as_of": "2026-09-12",
-              "source_url": "https://www.edmunds.com/porsche/911/"
+              "as_of": "2026-09-13",
+              "source_url": "https://warrington.porsche.com/en/specials/new"
             }
           ],
-          "retrieved_at": "2026-09-13T00:02:40.075234+00:00",
+          "retrieved_at": "2026-09-13T01:14:15.092590+00:00",
           "anchor_symbols": [],
           "peers": [],
           "usage": {
             "invocations": 0,
-            "latency_ms": 36753,
-            "cost_usd": 0.23926,
+            "latency_ms": 37887,
+            "cost_usd": 0.18548,
             "cache_status": "miss"
           },
           "follow_up": {
@@ -189,16 +190,194 @@
               "period_of_interest": null
             },
             "questions": [
-              "Which Porsche model and country or state are you considering?",
-              "How much would you put down, and would you buy, finance or lease?",
-              "What are your gross income and existing monthly debt payments?",
-              "Would you like the calculation based on a new or used Porsche?"
+              "How would the result change for a different Porsche model?",
+              "Can you include my existing debts in the calculation?",
+              "What income would a financed purchase require instead of a lease?"
             ]
           }
         },
+        "tool_result_cards": [
+          {
+            "kind": "tool_result",
+            "schema_version": 1,
+            "tool_name": "debt_to_income",
+            "call_id": "answer-96391c7d-9b65-4438-a09b-f52155c5b142",
+            "artifact_id": "1071647b-1f3d-47ef-ad34-6072ae44ce39",
+            "input_revision": 0,
+            "card_type": "debt_to_income",
+            "card_version": 1,
+            "arguments": {
+              "currency": "USD",
+              "sources": {
+                "monthly_debt_payments": {
+                  "kind": "page",
+                  "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                  "url": "https://warrington.porsche.com/en/specials/new",
+                  "date": "2026-09-13"
+                },
+                "ratio_pct": {
+                  "kind": "assumption"
+                }
+              },
+              "monthly_debt_payments": 1129.0,
+              "monthly_income": null,
+              "ratio_pct": 10.0
+            },
+            "outcome": {
+              "status": "succeeded",
+              "result": {
+                "solved_field": "monthly_income",
+                "solved_value": 11290.0,
+                "monthly_debt_payments": 1129.0,
+                "monthly_income": 11290.0,
+                "ratio_pct": 10.0,
+                "income_after_debt": 10161.0
+              },
+              "failure": null
+            },
+            "presentation": {
+              "title": {
+                "locale_key": "tools.calc.debt_to_income.title",
+                "interpolation_args": {}
+              },
+              "answer": {
+                "name": "monthly_income",
+                "label": {
+                  "locale_key": "tools.calc.fields.monthly_income",
+                  "interpolation_args": {}
+                },
+                "value": 11290.0,
+                "value_text": null,
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "source": {
+                  "kind": "computed"
+                }
+              },
+              "narrative": null,
+              "sources": [],
+              "visual": null,
+              "rows": [
+                {
+                  "name": "income_after_debt",
+                  "label": {
+                    "locale_key": "tools.calc.fields.income_after_debt",
+                    "interpolation_args": {}
+                  },
+                  "value": 10161.0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                }
+              ],
+              "inputs": [
+                {
+                  "name": "monthly_debt_payments",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_debt_payments",
+                    "interpolation_args": {}
+                  },
+                  "value": 1129.0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                    "url": "https://warrington.porsche.com/en/specials/new",
+                    "date": "2026-09-13"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "monthly_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_income",
+                    "interpolation_args": {}
+                  },
+                  "value": null,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  },
+                  "editable": false,
+                  "unknown": true,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "ratio_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.ratio_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 10.0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                }
+              ],
+              "notes": []
+            },
+            "artifact_state": "active"
+          }
+        ],
+        "computation": {
+          "kind": "debt_to_income",
+          "inputs": {
+            "currency": "USD",
+            "sources": {
+              "monthly_debt_payments": {
+                "kind": "page",
+                "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                "url": "https://warrington.porsche.com/en/specials/new",
+                "date": "2026-09-13"
+              },
+              "ratio_pct": {
+                "kind": "assumption"
+              }
+            },
+            "monthly_debt_payments": 1129.0,
+            "monthly_income": null,
+            "ratio_pct": 10.0
+          }
+        },
         "agent_runtime_turn": {
-          "turn_id": "186ae2ed-91c2-477e-9022-55f7264878b3",
-          "request_id": "b12580e4-2bf0-49f3-a856-76c224709cc8",
+          "turn_id": "53902b6e-2a7b-4772-92c2-28071d7e79c7",
+          "request_id": "b0646d1e-6501-47cd-854b-f83f61531f85",
           "status": "completed",
           "terminal": true,
           "reconciled_outcome": null,
@@ -209,5 +388,5 @@
       }
     }
   ],
-  "conversation_id": "c8960c16-9b52-47ca-b249-0c061ed49c3b"
+  "conversation_id": "a8cc0c25-d804-4bde-952f-c1b3249e395c"
 }

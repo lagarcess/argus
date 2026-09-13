@@ -2,54 +2,46 @@
 
 **Asked:** What do I need to earn to afford a Porsche?
 
-**Seconds to first answer:** 69.8. **Seconds to final answer:** 69.8.
+**Seconds to first answer:** 49.5. **Seconds to final answer:** 49.5.
 
-There is no honest single salary figure without knowing the Porsche model, your location, down payment, financing terms and existing debts. Current U.S. starting prices range from $65,400 for a Macan to $135,500 for a 911, as of 2026-09-12, before taxes, registration, insurance, options and ongoing ownership costs.
+Using a current Macan lease as the example, you would need gross monthly income of **USD 11,290** if its **USD 1,129** payment were limited to **10%** of gross income. This is an illustrative affordability calculation, not an approval threshold or a complete ownership budget.
 
-### Current price benchmarks
+### Inputs used
 
-| Representative Porsche | Current starting MSRP |
+| Input | Amount |
 |---|---:|
-| Macan | $65,400 |
-| Cayenne | $89,900 |
-| 911 | $135,500 |
+| Porsche Macan Electric lease payment | USD 1,129 monthly |
+| Assumed share of gross income | 10% |
+| Gross monthly income required | **USD 11,290** |
 
-These are starting prices. Porsche options can raise the purchase price materially, while a used Porsche could have a lower purchase price but different maintenance and financing costs.
+The advertised lease was available as of 2026-09-13, runs for 39 months, and requires USD 12,224 at signing. It excludes tax, title and registration; the page also states that approved credit is required.
 
-### The income calculation that matters
+### Formula
 
-Use the car’s **total monthly cost**, not merely its loan payment:
+**Gross monthly income = monthly Porsche payment ÷ assumed income ratio**
 
-**Required gross annual income = annual all-in Porsche cost ÷ the share of gross income you are comfortable spending on transportation**
+### What this does not include
 
-The all-in cost should include:
-
-- Loan or lease payment
-- Insurance quote for your age, ZIP code and driving history
-- Fuel or electricity
-- Scheduled maintenance, tires and a repair reserve
-- Registration, property tax and parking
-- Any opportunity cost or cash-flow effect of the down payment
-
-### “Can qualify” versus “can afford”
-
-A lender may approve a payment that still leaves your budget exposed. A stronger affordability test asks whether you can cover the Porsche while continuing your normal savings, paying every other debt, handling repairs without new debt and absorbing a temporary income interruption.
-
-### What is still needed for an exact answer
-
-The exact required income is unavailable from the information provided. It requires the model and configured price, purchase location, down payment, loan or lease terms, insurance quote, expected mileage, existing monthly debt payments and the maximum share of income you want transportation to consume.
+No page states your existing monthly debt payments, location-dependent taxes, insurance cost, maintenance cost or desired Porsche model. Those inputs can materially change the income needed, so the result covers only the advertised lease payment under the stated assumption, not the full cost of having the car.
 
 ## Sources
 
-- How Much Car Can You Actually Afford on a $75,000 Salary? (www.inkl.com, 2026-09-10): https://www.inkl.com/news/how-much-car-can-you-actually-afford-on-a-75-000-salary
-- The Greenest Car Is the One You Already Own (cleanfleetreport.com, 2026-09-09): https://cleanfleetreport.com/the-greenest-car-is-the-one-you-already-own-heres-the-math/
-- The Everyday Things That Quietly Cost More Than They Used To - Crafting Your Home (craftingyourhome.com, 2026-09-07): https://craftingyourhome.com/the-everyday-things-that-quietly-cost-more-than-they-used-to/
-- How Much Car Can You Afford? The 20/4/10 Rule, Stress-Tested (getstoia.com, 2026-09-07): https://getstoia.com/blog/how-much-car-can-i-afford/
-- Debt-to-Income Ratio Calculator: Check Loan Eligibility (www.calculatorcollection.org, 2026-09-07): https://www.calculatorcollection.org/en/calculators/debt/debt-to-income
+- Practical Decision Checklist (finelo.com, 2026-09-03): https://finelo.com/blog/how-much-house-can-i-afford
+- Debt-to-Income Chart by Monthly Income | Rule Calculator (rulecalculators.com, 2026-08-16): https://rulecalculators.com/chart/dti-income-chart
+- Debt-to-income: drag the debts | FinanceLearn (www.financelearn.org, 2026-08-17): https://www.financelearn.org/tools/dti-explorer
+- Loan Terms Glossary: Principal, Interest Rate, HELOC, LTV & Bankruptcy | ClearValue Lending (clearvaluelending.com, 2026-08-21): https://clearvaluelending.com/glossary/guides/loan-basics-and-workout-terms
+- How Much House Can I Afford? The 28/36 Rule Calculator (2026) (cobaltprosper.com, 2026-08-30): https://cobaltprosper.com/homeownership/how-much-house-can-i-afford/
 
 ## Next steps
 
-- Question: Which Porsche model and country or state are you considering?
-- Question: How much would you put down, and would you buy, finance or lease?
-- Question: What are your gross income and existing monthly debt payments?
-- Question: Would you like the calculation based on a new or used Porsche?
+- Question: How would the result change for a different Porsche model?
+- Question: Can you include my existing debts in the calculation?
+- Question: What income would a financed purchase require instead of a lease?
+
+## Calculation
+
+- debt_to_income: succeeded
+- Result monthly_income: 11290.0
+- Input monthly_debt_payments: 1129.0 (page)
+- Input monthly_income: None (computed)
+- Input ratio_pct: 10.0 (assumption)
