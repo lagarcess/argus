@@ -1,0 +1,18 @@
+[
+  {
+    "logged_at": "2026-09-13 04:21:04.744",
+    "log_timezone": "America/Chicago",
+    "reason": "http_error",
+    "http_status": 500,
+    "no_http_response_status": false,
+    "shape": "balanced"
+  },
+  {
+    "logged_at": "2026-09-13 04:26:45.730",
+    "log_timezone": "America/Chicago",
+    "reason": "timeout",
+    "http_status": null,
+    "no_http_response_status": true,
+    "shape": "balanced"
+  }
+]

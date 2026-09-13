@@ -1,0 +1,19 @@
+{
+  "finding": "readout route receipt rejected by the tier constraint",
+  "classification": "P2, new in candidate, non-blocking observability loss under Step 6",
+  "reproduced": true,
+  "native_error": "new row for relation \"route_receipts\" violates check constraint \"route_receipts_tier_check\"",
+  "observed_at_utc": "2026-09-13T09:15:06.976Z",
+  "current_result_summary_is_readout": true,
+  "baseline_result_summary_is_readout": false,
+  "constraint_source": "supabase/migrations/20260519000001_add_context_packets_route_receipts.sql:40",
+  "constraint_allowed_tiers": [
+    "utility",
+    "chat",
+    "structured",
+    "context"
+  ],
+  "impact": "The Quick take and result reached the user, but the readout route receipt and its downstream cost-ledger persistence failed. The separate process observer retains the browser spend.",
+  "fix_round_started": false,
+  "follow_up": "Add readout to the database tier contract and verify receipt and cost-ledger persistence."
+}

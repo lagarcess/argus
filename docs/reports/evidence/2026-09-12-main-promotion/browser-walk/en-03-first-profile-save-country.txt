@@ -1,0 +1,538 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Close country and currency"
+    - dialog "Country and currency":
+      - heading "Country and currency" [level=2]
+      - button "Close country and currency":
+      - button "Country United States" [pressed]:
+        - generic: Country
+        - generic: United States
+      - button "Currency USD":
+        - generic: Currency
+        - generic: USD
+      - paragraph: When Argus looks things up, it uses your country as your location.
+      - textbox "Search countries"
+      - button "No country":
+        - generic: No country
+      - button "Afghanistan":
+        - generic: Afghanistan
+      - button "Åland Islands":
+        - generic: Åland Islands
+      - button "Albania":
+        - generic: Albania
+      - button "Algeria":
+        - generic: Algeria
+      - button "American Samoa":
+        - generic: American Samoa
+      - button "Andorra":
+        - generic: Andorra
+      - button "Angola":
+        - generic: Angola
+      - button "Anguilla":
+        - generic: Anguilla
+      - button "Antarctica":
+        - generic: Antarctica
+      - button "Antigua & Barbuda":
+        - generic: Antigua & Barbuda
+      - button "Argentina":
+        - generic: Argentina
+      - button "Armenia":
+        - generic: Armenia
+      - button "Aruba":
+        - generic: Aruba
+      - button "Australia":
+        - generic: Australia
+      - button "Austria":
+        - generic: Austria
+      - button "Azerbaijan":
+        - generic: Azerbaijan
+      - button "Bahamas":
+        - generic: Bahamas
+      - button "Bahrain":
+        - generic: Bahrain
+      - button "Bangladesh":
+        - generic: Bangladesh
+      - button "Barbados":
+        - generic: Barbados
+      - button "Belarus":
+        - generic: Belarus
+      - button "Belgium":
+        - generic: Belgium
+      - button "Belize":
+        - generic: Belize
+      - button "Benin":
+        - generic: Benin
+      - button "Bermuda":
+        - generic: Bermuda
+      - button "Bhutan":
+        - generic: Bhutan
+      - button "Bolivia":
+        - generic: Bolivia
+      - button "Bosnia & Herzegovina":
+        - generic: Bosnia & Herzegovina
+      - button "Botswana":
+        - generic: Botswana
+      - button "Bouvet Island":
+        - generic: Bouvet Island
+      - button "Brazil":
+        - generic: Brazil
+      - button "British Indian Ocean Territory":
+        - generic: British Indian Ocean Territory
+      - button "British Virgin Islands":
+        - generic: British Virgin Islands
+      - button "Brunei":
+        - generic: Brunei
+      - button "Bulgaria":
+        - generic: Bulgaria
+      - button "Burkina Faso":
+        - generic: Burkina Faso
+      - button "Burundi":
+        - generic: Burundi
+      - button "Cambodia":
+        - generic: Cambodia
+      - button "Cameroon":
+        - generic: Cameroon
+      - button "Canada":
+        - generic: Canada
+      - button "Cape Verde":
+        - generic: Cape Verde
+      - button "Caribbean Netherlands":
+        - generic: Caribbean Netherlands
+      - button "Cayman Islands":
+        - generic: Cayman Islands
+      - button "Central African Republic":
+        - generic: Central African Republic
+      - button "Chad":
+        - generic: Chad
+      - button "Chile":
+        - generic: Chile
+      - button "China":
+        - generic: China
+      - button "Christmas Island":
+        - generic: Christmas Island
+      - button "Cocos (Keeling) Islands":
+        - generic: Cocos (Keeling) Islands
+      - button "Colombia":
+        - generic: Colombia
+      - button "Comoros":
+        - generic: Comoros
+      - button "Congo - Brazzaville":
+        - generic: Congo - Brazzaville
+      - button "Congo - Kinshasa":
+        - generic: Congo - Kinshasa
+      - button "Cook Islands":
+        - generic: Cook Islands
+      - button "Costa Rica":
+        - generic: Costa Rica
+      - button "Côte d’Ivoire":
+        - generic: Côte d’Ivoire
+      - button "Croatia":
+        - generic: Croatia
+      - button "Cuba":
+        - generic: Cuba
+      - button "Curaçao":
+        - generic: Curaçao
+      - button "Cyprus":
+        - generic: Cyprus
+      - button "Czechia":
+        - generic: Czechia
+      - button "Denmark":
+        - generic: Denmark
+      - button "Djibouti":
+        - generic: Djibouti
+      - button "Dominica":
+        - generic: Dominica
+      - button "Dominican Republic":
+        - generic: Dominican Republic
+      - button "Ecuador":
+        - generic: Ecuador
+      - button "Egypt":
+        - generic: Egypt
+      - button "El Salvador":
+        - generic: El Salvador
+      - button "Equatorial Guinea":
+        - generic: Equatorial Guinea
+      - button "Eritrea":
+        - generic: Eritrea
+      - button "Estonia":
+        - generic: Estonia
+      - button "Eswatini":
+        - generic: Eswatini
+      - button "Ethiopia":
+        - generic: Ethiopia
+      - button "Falkland Islands (Islas Malvinas)":
+        - generic: Falkland Islands (Islas Malvinas)
+      - button "Faroe Islands":
+        - generic: Faroe Islands
+      - button "Fiji":
+        - generic: Fiji
+      - button "Finland":
+        - generic: Finland
+      - button "France":
+        - generic: France
+      - button "French Guiana":
+        - generic: French Guiana
+      - button "French Polynesia":
+        - generic: French Polynesia
+      - button "French Southern Territories":
+        - generic: French Southern Territories
+      - button "Gabon":
+        - generic: Gabon
+      - button "Gambia":
+        - generic: Gambia
+      - button "Georgia":
+        - generic: Georgia
+      - button "Germany":
+        - generic: Germany
+      - button "Ghana":
+        - generic: Ghana
+      - button "Gibraltar":
+        - generic: Gibraltar
+      - button "Greece":
+        - generic: Greece
+      - button "Greenland":
+        - generic: Greenland
+      - button "Grenada":
+        - generic: Grenada
+      - button "Guadeloupe":
+        - generic: Guadeloupe
+      - button "Guam":
+        - generic: Guam
+      - button "Guatemala":
+        - generic: Guatemala
+      - button "Guernsey":
+        - generic: Guernsey
+      - button "Guinea":
+        - generic: Guinea
+      - button "Guinea-Bissau":
+        - generic: Guinea-Bissau
+      - button "Guyana":
+        - generic: Guyana
+      - button "Haiti":
+        - generic: Haiti
+      - button "Heard & McDonald Islands":
+        - generic: Heard & McDonald Islands
+      - button "Honduras":
+        - generic: Honduras
+      - button "Hong Kong":
+        - generic: Hong Kong
+      - button "Hungary":
+        - generic: Hungary
+      - button "Iceland":
+        - generic: Iceland
+      - button "India":
+        - generic: India
+      - button "Indonesia":
+        - generic: Indonesia
+      - button "Iran":
+        - generic: Iran
+      - button "Iraq":
+        - generic: Iraq
+      - button "Ireland":
+        - generic: Ireland
+      - button "Isle of Man":
+        - generic: Isle of Man
+      - button "Israel":
+        - generic: Israel
+      - button "Italy":
+        - generic: Italy
+      - button "Jamaica":
+        - generic: Jamaica
+      - button "Japan":
+        - generic: Japan
+      - button "Jersey":
+        - generic: Jersey
+      - button "Jordan":
+        - generic: Jordan
+      - button "Kazakhstan":
+        - generic: Kazakhstan
+      - button "Kenya":
+        - generic: Kenya
+      - button "Kiribati":
+        - generic: Kiribati
+      - button "Kuwait":
+        - generic: Kuwait
+      - button "Kyrgyzstan":
+        - generic: Kyrgyzstan
+      - button "Laos":
+        - generic: Laos
+      - button "Latvia":
+        - generic: Latvia
+      - button "Lebanon":
+        - generic: Lebanon
+      - button "Lesotho":
+        - generic: Lesotho
+      - button "Liberia":
+        - generic: Liberia
+      - button "Libya":
+        - generic: Libya
+      - button "Liechtenstein":
+        - generic: Liechtenstein
+      - button "Lithuania":
+        - generic: Lithuania
+      - button "Luxembourg":
+        - generic: Luxembourg
+      - button "Macao":
+        - generic: Macao
+      - button "Madagascar":
+        - generic: Madagascar
+      - button "Malawi":
+        - generic: Malawi
+      - button "Malaysia":
+        - generic: Malaysia
+      - button "Maldives":
+        - generic: Maldives
+      - button "Mali":
+        - generic: Mali
+      - button "Malta":
+        - generic: Malta
+      - button "Marshall Islands":
+        - generic: Marshall Islands
+      - button "Martinique":
+        - generic: Martinique
+      - button "Mauritania":
+        - generic: Mauritania
+      - button "Mauritius":
+        - generic: Mauritius
+      - button "Mayotte":
+        - generic: Mayotte
+      - button "Mexico":
+        - generic: Mexico
+      - button "Micronesia":
+        - generic: Micronesia
+      - button "Moldova":
+        - generic: Moldova
+      - button "Monaco":
+        - generic: Monaco
+      - button "Mongolia":
+        - generic: Mongolia
+      - button "Montenegro":
+        - generic: Montenegro
+      - button "Montserrat":
+        - generic: Montserrat
+      - button "Morocco":
+        - generic: Morocco
+      - button "Mozambique":
+        - generic: Mozambique
+      - button "Myanmar (Burma)":
+        - generic: Myanmar (Burma)
+      - button "Namibia":
+        - generic: Namibia
+      - button "Nauru":
+        - generic: Nauru
+      - button "Nepal":
+        - generic: Nepal
+      - button "Netherlands":
+        - generic: Netherlands
+      - button "New Caledonia":
+        - generic: New Caledonia
+      - button "New Zealand":
+        - generic: New Zealand
+      - button "Nicaragua":
+        - generic: Nicaragua
+      - button "Niger":
+        - generic: Niger
+      - button "Nigeria":
+        - generic: Nigeria
+      - button "Niue":
+        - generic: Niue
+      - button "Norfolk Island":
+        - generic: Norfolk Island
+      - button "North Korea":
+        - generic: North Korea
+      - button "North Macedonia":
+        - generic: North Macedonia
+      - button "Northern Mariana Islands":
+        - generic: Northern Mariana Islands
+      - button "Norway":
+        - generic: Norway
+      - button "Oman":
+        - generic: Oman
+      - button "Pakistan":
+        - generic: Pakistan
+      - button "Palau":
+        - generic: Palau
+      - button "Palestine":
+        - generic: Palestine
+      - button "Panama":
+        - generic: Panama
+      - button "Papua New Guinea":
+        - generic: Papua New Guinea
+      - button "Paraguay":
+        - generic: Paraguay
+      - button "Peru":
+        - generic: Peru
+      - button "Philippines":
+        - generic: Philippines
+      - button "Pitcairn Islands":
+        - generic: Pitcairn Islands
+      - button "Poland":
+        - generic: Poland
+      - button "Portugal":
+        - generic: Portugal
+      - button "Puerto Rico":
+        - generic: Puerto Rico
+      - button "Qatar":
+        - generic: Qatar
+      - button "Réunion":
+        - generic: Réunion
+      - button "Romania":
+        - generic: Romania
+      - button "Russia":
+        - generic: Russia
+      - button "Rwanda":
+        - generic: Rwanda
+      - button "Samoa":
+        - generic: Samoa
+      - button "San Marino":
+        - generic: San Marino
+      - button "São Tomé & Príncipe":
+        - generic: São Tomé & Príncipe
+      - button "Saudi Arabia":
+        - generic: Saudi Arabia
+      - button "Senegal":
+        - generic: Senegal
+      - button "Serbia":
+        - generic: Serbia
+      - button "Seychelles":
+        - generic: Seychelles
+      - button "Sierra Leone":
+        - generic: Sierra Leone
+      - button "Singapore":
+        - generic: Singapore
+      - button "Sint Maarten":
+        - generic: Sint Maarten
+      - button "Slovakia":
+        - generic: Slovakia
+      - button "Slovenia":
+        - generic: Slovenia
+      - button "Solomon Islands":
+        - generic: Solomon Islands
+      - button "Somalia":
+        - generic: Somalia
+      - button "South Africa":
+        - generic: South Africa
+      - button "South Georgia & South Sandwich Islands":
+        - generic: South Georgia & South Sandwich Islands
+      - button "South Korea":
+        - generic: South Korea
+      - button "South Sudan":
+        - generic: South Sudan
+      - button "Spain":
+        - generic: Spain
+      - button "Sri Lanka":
+        - generic: Sri Lanka
+      - button "St. Barthélemy":
+        - generic: St. Barthélemy
+      - button "St. Helena":
+        - generic: St. Helena
+      - button "St. Kitts & Nevis":
+        - generic: St. Kitts & Nevis
+      - button "St. Lucia":
+        - generic: St. Lucia
+      - button "St. Martin":
+        - generic: St. Martin
+      - button "St. Pierre & Miquelon":
+        - generic: St. Pierre & Miquelon
+      - button "St. Vincent & Grenadines":
+        - generic: St. Vincent & Grenadines
+      - button "Sudan":
+        - generic: Sudan
+      - button "Suriname":
+        - generic: Suriname
+      - button "Svalbard & Jan Mayen":
+        - generic: Svalbard & Jan Mayen
+      - button "Sweden":
+        - generic: Sweden
+      - button "Switzerland":
+        - generic: Switzerland
+      - button "Syria":
+        - generic: Syria
+      - button "Taiwan":
+        - generic: Taiwan
+      - button "Tajikistan":
+        - generic: Tajikistan
+      - button "Tanzania":
+        - generic: Tanzania
+      - button "Thailand":
+        - generic: Thailand
+      - button "Timor-Leste":
+        - generic: Timor-Leste
+      - button "Togo":
+        - generic: Togo
+      - button "Tokelau":
+        - generic: Tokelau
+      - button "Tonga":
+        - generic: Tonga
+      - button "Trinidad & Tobago":
+        - generic: Trinidad & Tobago
+      - button "Tunisia":
+        - generic: Tunisia
+      - button "Türkiye":
+        - generic: Türkiye
+      - button "Turkmenistan":
+        - generic: Turkmenistan
+      - button "Turks & Caicos Islands":
+        - generic: Turks & Caicos Islands
+      - button "Tuvalu":
+        - generic: Tuvalu
+      - button "U.S. Outlying Islands":
+        - generic: U.S. Outlying Islands
+      - button "U.S. Virgin Islands":
+        - generic: U.S. Virgin Islands
+      - button "Uganda":
+        - generic: Uganda
+      - button "Ukraine":
+        - generic: Ukraine
+      - button "United Arab Emirates":
+        - generic: United Arab Emirates
+      - button "United Kingdom":
+        - generic: United Kingdom
+      - button "United States" [active]:
+        - generic: United States
+      - button "Uruguay":
+        - generic: Uruguay
+      - button "Uzbekistan":
+        - generic: Uzbekistan
+      - button "Vanuatu":
+        - generic: Vanuatu
+      - button "Vatican City":
+        - generic: Vatican City
+      - button "Venezuela":
+        - generic: Venezuela
+      - button "Vietnam":
+        - generic: Vietnam
+      - button "Wallis & Futuna":
+        - generic: Wallis & Futuna
+      - button "Western Sahara":
+        - generic: Western Sahara
+      - button "Yemen":
+        - generic: Yemen
+      - button "Zambia":
+        - generic: Zambia
+      - button "Zimbabwe":
+        - generic: Zimbabwe
+    - button "Settings":
+      - generic: Settings
+  - heading [level=1]
+  - status
+  - paragraph: What should we look into?
+  - status: What should we look into?
+  - button "Mention an asset or indicator":
+  - combobox "Ask about any company or idea"
+  - generic: Ask about any company or idea
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.
+  - button "How does Netflix make money?"
+  - button "Compare Costco against Walmart and Target"
+  - button "What if I had bought Coca-Cola every month for five years?"

@@ -1,0 +1,13 @@
+{
+  "finding": "Result follow-up repeats its next-step plan in prose and Try next",
+  "reproduced": true,
+  "classification": "P2, reproduced on a new candidate follow-up path; deployed occurrence not replayed; non-blocking under Step 6",
+  "baseline_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "new_result_conversation_module_absent_at_baseline": true,
+  "measured_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "evidence_step": "en-14-result-follow-up",
+  "impact": "Four next steps appear as a prose list followed by the same four structured actions. Gap, cost dollars and worst-drop dates are correct.",
+  "owner": "src/argus/agent_runtime/result_conversation.py",
+  "fix_round_started": false,
+  "follow_up": "Give the next-step plan one rendered owner; any model-facing text change needs founder approval."
+}
