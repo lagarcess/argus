@@ -4330,8 +4330,12 @@ Contract rules:
   never filtered to the past week), and the asking user's declared country
   as the reader's location on the web search tool (the profile's `country`,
   ISO 3166-1 alpha-2). A user without a country sends no location, and no
-  deployment-wide country stands in for one. A thorough job's typed request
-  carries the country, so the job sends the location of the user who asked.
+  deployment-wide country stands in for one. The research prompt names the
+  same country and the resolved currency, and asks for an answer for that
+  country unless the question names another, never asking where the reader
+  lives; a user without a country gets no such line. A thorough job's typed
+  request carries the country and currency, so the job sends the location and
+  line of the user who asked, and so does a refresh of a computed answer.
   The research cache key includes that country, so a search made for one
   country's readers never answers another's. No domain filter is sent.
 - Current external facts ("why is NVDA moving this week") are claim-shaped:
@@ -5273,7 +5277,11 @@ question takes the grounded balanced research path
 (`research_answers_concept_question`), and an out-of-scope verdict that typed no
 question, no refusal payload, no pending need and nothing to run is researched as
 a current external question (`research_answers_unsupported_verdict`), so a money
-question is never refused as out of scope. Typed fields cannot tell a money
+question is never refused as out of scope. An educational question the primary
+read left with no research query, and with no capability focus, pending need or
+anything to run, is researched as a concept question
+(`research_answers_unkinded_question`), where the reader's country and the
+no-advice boundary apply rather than the interpreter's own prose. Typed fields cannot tell a money
 question from any other request with nothing to run, so the research answer does:
 for a request that is not a money question, or that asks Argus to place a trade,
 move money or act on an account, the typed answer sets `declined`, retrieves
@@ -5322,7 +5330,11 @@ from them and `metadata.answer_text_template = {cards: {<calculation name>:
 language}` reads as its one card), the prose with its references, which the
 recompute route re-renders into `content` from the current cards. When the inputs state an amount and a whole-year horizon,
 `next_experiments` offers one `calculation_market_counterfactual` row that runs
-only when tapped, and `next_steps` lists it.
+only when tapped, and `next_steps` lists it. The test runs in dollars: an amount
+in another currency is converted at Argus's own latest close for its pair with
+the dollar, and the label states the amount as asked, the rate and its date. A
+currency with no such close offers no row, and
+`market_counterfactual_no_dollar_rate` is logged.
 
 A figure only the user knows answers `await_user_reply` with Argus's own one-line
 lead as `assistant_prompt`, `requested_field` naming the first missing argument,

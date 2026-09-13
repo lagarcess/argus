@@ -753,3 +753,107 @@ def test_an_answer_stating_a_figure_with_no_source_is_recorded_not_replaced(
     assert result is not None
     assert result.stage_patch["assistant_response"].startswith(prose)
     assert UNSOURCED_FIGURE_REASON_CODE in result.decision.reason_codes
+
+
+@pytest.mark.parametrize("intent", ["conversation_followup", "beginner_guidance"])
+def test_an_educational_question_left_with_no_kind_is_researched_for_the_readers_country(
+    monkeypatch, intent
+) -> None:
+    """A question the primary read typed no kind for is research's, not the
+    interpreter's own prose: the reader's country and currency reach the
+    prompt, so the answer never assumes another country or asks for it."""
+    from argus.agent_runtime.interpreter.research_routing import (
+        UNKINDED_QUESTION_REASON_CODE,
+    )
+
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"intent": intent}),
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Ahorrar en dólares protege de la devaluación; en pesos, la tasa es mayor.",
+                sources=["https://www.bancentral.gov.do/a/d/2532-tasas-de-interes"],
+            )
+        ],
+    )
+    reader = UserState(
+        user_id="research-do", language_preference="es", country="DO", currency="DOP"
+    )
+
+    result = _run("¿Ahorro en pesos o en dólares?", user=reader)
+
+    assert result is not None and len(transport.requests) == 1
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["max_steps"] == RESEARCH_CONFIG_SPECS["balanced"].max_steps
+    assert (
+        "The reader lives in Dominican Republic (DO) and counts money in DOP. "
+        "Answer for that country unless the question names another, and never ask "
+        "where the reader lives."
+    ) in body["input"]
+    assert UNKINDED_QUESTION_REASON_CODE in result.decision.reason_codes
+
+
+def test_a_reader_with_no_country_is_never_placed_in_one(monkeypatch) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"intent": "conversation_followup"}),
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="An emergency fund is money kept for sudden costs.",
+                sources=["https://www.consumerfinance.gov/an-essential-guide/"],
+            )
+        ],
+    )
+
+    assert _run("Should I put my emergency fund in crypto?") is not None
+
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert "The reader lives in" not in body["input"]
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        {"capability_question_focus": "supported_indicators"},
+        {"requires_clarification": True},
+    ],
+)
+def test_an_unkinded_question_another_route_owns_keeps_that_route(
+    monkeypatch, update
+) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(
+            update={"intent": "conversation_followup", **update}
+        ),
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+
+    assert _run("Can I use Bollinger Bands in a rule?") is None
+    assert not transport.requests
+
+
+def test_a_read_typed_kind_none_keeps_the_interpreters_reply(monkeypatch) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"intent": "conversation_followup"}),
+    )
+    set_research_query(monkeypatch, globals(), question_kind="none", symbols=[])
+    transport = _wire_client(monkeypatch, [agent_response()])
+
+    assert _run("Thanks, that helps.") is None
+    assert not transport.requests

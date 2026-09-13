@@ -365,6 +365,47 @@ def test_refresh_looks_up_the_cited_inputs_and_never_rewrites_the_answer(
     assert stored["metadata"]["tool_result_cards"][0]["arguments"]["price"] == 200
 
 
+def test_refresh_names_the_readers_country_and_currency_in_the_lookup(
+    client, monkeypatch
+) -> None:
+    transport = _wire_refresh(
+        monkeypatch,
+        {
+            "kind": "valuation_scenarios",
+            "inputs": [
+                {
+                    "name": "price",
+                    "value": 218.36,
+                    "source": "page",
+                    "source_url": "https://example.com/eps",
+                    "as_of": "2026-09-11",
+                }
+            ],
+        },
+    )
+    profile = client.patch("/api/v1/me", json={"country": "DO"})
+    assert profile.status_code == 200, profile.text
+    conversation = _conversation(client, "NVIDIA in ten years")
+    message_id = _answer(
+        client,
+        conversation,
+        "valuation_scenarios",
+        CITED_VALUATION,
+        "What will NVDA be worth?",
+    )
+
+    response = client.post(
+        f"/api/v1/conversations/{conversation}/messages/{message_id}/computation/refresh"
+    )
+
+    assert response.status_code == 200, response.text
+    sent = json.loads(transport.requests[0].content.decode())
+    assert (
+        "The reader lives in Dominican Republic (DO) and counts money in DOP."
+        in sent["input"]
+    )
+
+
 def test_refresh_is_refused_before_any_provider_work_when_the_allowance_is_spent(
     client, monkeypatch
 ) -> None:

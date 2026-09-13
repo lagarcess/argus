@@ -23,6 +23,7 @@ from argus.agent_runtime.interpreter.research_routing import (
     primary_research_query,
     research_turn_has_conflicting_owner,
     scenario_is_typed,
+    unkinded_question_research_query,
     unsupported_verdict_research_query,
 )
 
@@ -69,6 +70,7 @@ async def research_answer_stage_result(
         primary_research_query(interpretation)
         or concept_research_query(interpretation)
         or unsupported_verdict_research_query(interpretation)
+        or unkinded_question_research_query(interpretation)
     )
     if query is None:
         return None

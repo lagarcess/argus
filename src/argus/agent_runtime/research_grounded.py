@@ -254,6 +254,8 @@ async def grounded_result(
         sector=getattr(query, "sector_of_interest", None),
         publisher_sources_required=publisher_sources_required,
         scenario=scenario,
+        country=user.country,
+        currency=user.currency,
     )
     key = _cache_key_for(
         query=query,
@@ -1417,6 +1419,8 @@ def _research_prompt(
     publisher_sources_required: bool = False,
     scenario: bool = False,
     lookup_inputs: Sequence[str] = (),
+    country: str | None = None,
+    currency: str | None = None,
 ) -> str:
     """Documented prompt guidance: business question first, then tickers and
     the time window; state the desired outcome, let the tool pick fields. A
@@ -1425,6 +1429,16 @@ def _research_prompt(
     if subjects:
         lines.append(
             "Tickers: " + ", ".join(f"{s['name']} ({s['symbol']})" for s in subjects)
+        )
+    if country:
+        # The search location alone never tells the model where the reader is.
+        from argus.domain.home_country import country_name
+
+        counted = f" and counts money in {currency}" if currency else ""
+        lines.append(
+            f"The reader lives in {country_name(country)} ({country.upper()}){counted}. "
+            "Answer for that country unless the question names another, and never ask "
+            "where the reader lives."
         )
     if sector:
         lines.append(f"Sector or theme: {sector}")
@@ -1723,6 +1737,8 @@ def research_prompt_for_job(job_request: dict[str, Any]) -> str:
         question_kind=str(job_request.get("question_kind") or "cross_company"),
         publisher_sources_required=bool(job_request.get("requires_publisher_sources")),
         scenario=bool(job_request.get("scenario_question")),
+        country=job_request.get("country") or None,
+        currency=job_request.get("currency") or None,
     )
 
 

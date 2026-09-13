@@ -19,6 +19,11 @@ CONCEPT_QUESTION_REASON_CODE = "research_answers_concept_question"
 # Recorded when an out-of-scope verdict that typed nothing to run is answered
 # by research: a money question is never refused as out of scope.
 UNSUPPORTED_VERDICT_REASON_CODE = "research_answers_unsupported_verdict"
+# Recorded when an educational question the primary read left with no research
+# query is answered by research, where the reader's country and the no-advice
+# boundary apply, rather than by the interpreter's own prose.
+UNKINDED_QUESTION_REASON_CODE = "research_answers_unkinded_question"
+_QUESTION_INTENTS = frozenset({"conversation_followup", "beginner_guidance"})
 # Recorded on the interpretation when a strategy claim was set aside because
 # its horizon points forward: the question was answered by research, not
 # refused as a test that cannot run (decision 10).
@@ -168,6 +173,29 @@ def unsupported_verdict_research_query(
         return None
     _note_research_route(interpretation, UNSUPPORTED_VERDICT_REASON_CODE)
     return ResearchQueryExtraction(question_kind="current_external")
+
+
+def unkinded_question_research_query(
+    interpretation: Any,
+) -> ResearchQueryExtraction | None:
+    """An educational question the primary read left with no research query,
+    no capability focus, no pending need and nothing to run is answered by
+    research as a concept question; the research answer declines a request
+    that is not a money question."""
+    draft = interpretation.candidate_strategy_draft
+    if (
+        interpretation.semantic_turn_act != "educational_question"
+        or interpretation.intent not in _QUESTION_INTENTS
+        or getattr(interpretation, "research_query", None) is not None
+        or interpretation.requires_clarification
+        or getattr(interpretation, "asset_discovery", None) is not None
+        or research_turn_has_conflicting_owner(interpretation)
+        or strategy_has_execution_evidence(draft, include_defaults=False)
+        or strategy_draft_future_horizon(draft)
+    ):
+        return None
+    _note_research_route(interpretation, UNKINDED_QUESTION_REASON_CODE)
+    return ResearchQueryExtraction(question_kind="concept")
 
 
 def _note_research_route(interpretation: Any, code: str) -> None:

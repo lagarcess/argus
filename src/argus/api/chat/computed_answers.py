@@ -321,6 +321,8 @@ async def refresh_computed_answer(
         question_kind=None,
         publisher_sources_required=True,
         scenario=True,
+        country=user.country,
+        currency=user.currency,
         lookup_inputs=[
             item if single else f"{name}.{item}"
             for name, inputs in zip(names, cited, strict=True)

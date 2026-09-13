@@ -29,6 +29,8 @@ from tests.research.conftest import (
 )
 
 COUNTRIES = [("MX", {"country": "MX"}), (None, None)]
+# The prompt names the reader's country so the answer never assumes another.
+READER_LINE = "The reader lives in Mexico (MX)"
 
 
 def _answer() -> dict[str, Any]:
@@ -61,6 +63,7 @@ def test_an_inline_answer_sends_the_asking_users_country(
     assert result.stage_patch["research"]["shape"] == "balanced"
     assert len(transport.requests) == 1
     assert _user_location(transport.requests[0]) == location
+    assert (READER_LINE in request_body(transport.requests[0])["input"]) is bool(country)
 
 
 @pytest.mark.parametrize(("country", "location"), COUNTRIES)
@@ -98,6 +101,9 @@ def test_a_thorough_job_sends_the_country_of_the_user_who_asked(
     )
     assert job_row is None and packet is not None
     assert _user_location(synchronous.requests[0]) == location
+    assert (READER_LINE in request_body(synchronous.requests[0])["input"]) is bool(
+        country
+    )
 
     # The background path submits the same request, rebuilt the same way.
     background = RecordingTransport([{"id": "resp_bg1", "status": "queued"}])
@@ -106,6 +112,7 @@ def test_a_thorough_job_sends_the_country_of_the_user_who_asked(
     )
     assert request_body(background.requests[0])["background"] is True
     assert _user_location(background.requests[0]) == location
+    assert (READER_LINE in request_body(background.requests[0])["input"]) is bool(country)
 
 
 def test_a_job_queued_before_countries_existed_sends_no_location() -> None:
